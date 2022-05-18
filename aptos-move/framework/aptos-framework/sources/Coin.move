@@ -595,8 +595,12 @@ module AptosFramework::Coin {
     }
 
     #[test_only]
-    public fun mint_for_test<CoinType>(account: &signer, amount: u64) acquires CoinEvents, CoinStore {
-        register_internal<CoinType>(account);
-        deposit<CoinType>(Signer::address_of(account), Coin<CoinType> {value: amount});
+    public fun destroy_mint_cap<CoinType>(mint_cap: MintCapability<CoinType>) {
+        let MintCapability<CoinType> { } = mint_cap;
+    }
+
+    #[test_only]
+    public fun destroy_burn_cap<CoinType>(burn_cap: BurnCapability<CoinType>) {
+        let BurnCapability<CoinType> { } = burn_cap;
     }
 }

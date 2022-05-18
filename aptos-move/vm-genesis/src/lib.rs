@@ -159,7 +159,8 @@ fn exec_function(
                 "Error calling {}.{}: {}",
                 module_name,
                 function_name,
-                e.into_vm_status()
+                // The raw error contains more details for debugging.
+                e,
             )
         });
 }
@@ -198,6 +199,7 @@ fn create_and_initialize_main_accounts(
     let epoch_interval = 86400 * 1000000;
     let minimum_stake = 0;
     let maximum_stake = 1000000;
+    let minimum_delegation = 0;
 
     exec_function(
         session,
@@ -218,6 +220,7 @@ fn create_and_initialize_main_accounts(
             MoveValue::U64(epoch_interval),
             MoveValue::U64(minimum_stake),
             MoveValue::U64(maximum_stake),
+            MoveValue::U64(minimum_delegation),
         ]),
     );
 }

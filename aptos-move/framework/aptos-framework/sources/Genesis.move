@@ -3,6 +3,7 @@ module AptosFramework::Genesis {
     use Std::Event;
     use Std::Vector;
     use AptosFramework::Account;
+    use AptosFramework::Coin;
     use AptosFramework::ConsensusConfig;
     use AptosFramework::TransactionPublishingOption;
     use AptosFramework::Version;
@@ -10,7 +11,7 @@ module AptosFramework::Genesis {
     use AptosFramework::ChainId;
     use AptosFramework::Reconfiguration;
     use AptosFramework::Stake;
-    use AptosFramework::TestCoin;
+    use AptosFramework::TestCoin::{Self, TestCoin};
     use AptosFramework::Timestamp;
     use AptosFramework::TransactionFee;
     use AptosFramework::VMConfig;
@@ -29,6 +30,7 @@ module AptosFramework::Genesis {
         epoch_interval: u64,
         minimum_stake: u64,
         maximum_stake: u64,
+        minimum_delegation: u64,
     ) {
         initialize_internal(
             &core_resource_account,
@@ -44,6 +46,7 @@ module AptosFramework::Genesis {
             epoch_interval,
             minimum_stake,
             maximum_stake,
+            minimum_delegation,
         )
     }
 
@@ -61,6 +64,7 @@ module AptosFramework::Genesis {
         epoch_interval: u64,
         minimum_stake: u64,
         maximum_stake: u64,
+        minimum_delegation: u64,
     ) {
         // initialize the core resource account
         Account::initialize(
@@ -83,7 +87,7 @@ module AptosFramework::Genesis {
         // Consensus config setup
         ConsensusConfig::initialize(core_resource_account);
         Version::initialize(core_resource_account, initial_version);
-        Stake::initialize_validator_set(core_resource_account, minimum_stake, maximum_stake);
+        Stake::initialize_validator_set(core_resource_account, minimum_stake, maximum_stake, minimum_delegation);
 
         VMConfig::initialize(
             core_resource_account,
@@ -98,7 +102,10 @@ module AptosFramework::Genesis {
 
         // This is testnet-specific configuration and can be skipped for mainnet.
         // Mainnet can call Coin::initialize<MainnetCoin> directly and give mint capability to the Staking module.
-        let burn_cap = TestCoin::initialize(&core_framework_account, core_resource_account);
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework_account, core_resource_account);
+
+        // Give Stake MintCapability<TestCoin> so it can mint rewards.
+        Stake::store_test_coin_mint_cap(core_resource_account, mint_cap);
 
         // Give TransactionFee BurnCapability<TestCoin> so it can burn gas.
         TransactionFee::store_test_coin_burn_cap(&core_framework_account, burn_cap);
@@ -162,7 +169,11 @@ module AptosFramework::Genesis {
                 full_node_network_address
             );
             let amount = *Vector::borrow(&staking_distribution, i);
-            Stake::delegate_stake(&core_resource_account, *owner, amount, 100000);
+            // Transfer coins from the root account to the validator, so they have non-zero voting power and can
+            // complete consensus on the genesis block.
+            Coin::register<TestCoin>(&owner_account);
+            Coin::transfer<TestCoin>(&core_resource_account, *owner, amount);
+            Stake::delegate_stake(&owner_account, *owner, amount, 100000);
             Stake::join_validator_set(&owner_account);
 
             i = i + 1;
@@ -185,7 +196,8 @@ module AptosFramework::Genesis {
             1,
             0,
             0,
-            0
+            0,
+            0,
         )
     }
 
