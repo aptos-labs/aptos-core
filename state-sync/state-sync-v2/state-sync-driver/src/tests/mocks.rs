@@ -99,6 +99,9 @@ pub fn create_ready_storage_synchronizer() -> MockStorageSynchronizer {
     mock_storage_synchronizer
         .expect_pending_storage_data()
         .return_const(false);
+    mock_storage_synchronizer
+        .expect_reset_chunk_executor()
+        .return_const(Ok(()));
 
     mock_storage_synchronizer
 }
@@ -428,6 +431,8 @@ mock! {
             notification_id: NotificationId,
             account_states_with_proof: StateValueChunkWithProof,
         ) -> Result<(), crate::error::Error>;
+
+        fn reset_chunk_executor(&mut self) -> Result<(), crate::error::Error>;
     }
     impl Clone for StorageSynchronizer {
         fn clone(&self) -> Self;

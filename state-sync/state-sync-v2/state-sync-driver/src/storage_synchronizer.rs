@@ -89,6 +89,10 @@ pub trait StorageSynchronizerInterface {
         notification_id: NotificationId,
         account_states_with_proof: StateValueChunkWithProof,
     ) -> Result<(), Error>;
+
+    /// Resets the chunk executor. This is required to support interaction
+    /// between consensus and state sync.
+    fn reset_chunk_executor(&mut self) -> Result<(), Error>;
 }
 
 /// The implementation of the `StorageSynchronizerInterface` used by state sync
@@ -305,6 +309,15 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizerInterface
             increment_pending_data_chunks(self.pending_data_chunks.clone());
             Ok(())
         }
+    }
+
+    fn reset_chunk_executor(&mut self) -> Result<(), Error> {
+        self.chunk_executor.reset().map_err(|error| {
+            Error::UnexpectedError(format!(
+                "Failed to reset the chunk executor! Error: {:?}",
+                error
+            ))
+        })
     }
 }
 
