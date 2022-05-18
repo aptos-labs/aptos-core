@@ -285,6 +285,14 @@ workflows:
       - unit-test
       - docker-build-push:
           context: aws-dev
+          filters:
+            branches:
+              only:
+                - main
+                - auto
+                - canary
+                - devnet
+                - testnet
       - ecosystem-test:
           context: aws-dev
           requires:
