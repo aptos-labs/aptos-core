@@ -1,21 +1,26 @@
 <div class="flex flex-col lg:flex-row gap-8 sm:gap-24 xl:gap-48 justify-between flex-[2]">
   <div>
     <div class="sm:w-[36rem] mb-8 sm:mb-12 font-light sm:text-lg">
-      <p class="mb-4">
+      <h3 class="mb-4 font-display text-3xl">
       Ensuring a production-grade Aptos mainnet.
-      <br>
+      </h3>
+      <p class="mb-4">
       The Aptos community is coming together to build a secure, reliable, and decentralized network through a series of incentivized testnets.
       </p>
-      <p>
-      Additional detail of the Aptos Incentivized Testnet 1 available <a href="https://medium.com/aptoslabs/aptos-incentivized-testnet-update-abcfcd94d54c" class="underline">here</a>.
-      Please review the <a href="https://aptoslabs.com/terms-testnet/" class="underline">terms and conditions</a>.
-      </p>
+      <ul>
+        <li class="before:content-['🡒'] before:text-teal-400 before:pr-1">
+          Read more <a href="https://medium.com/aptoslabs/aptos-incentivized-testnet-update-abcfcd94d54c" class="border-b border-teal-400">Aptos Incentivized Testnet 1 details</a>.
+        </li>
+        <li class="before:content-['🡒'] before:text-teal-400 before:pr-1">
+          Please review the <a href="https://aptoslabs.com/terms-testnet/" class="border-b border-teal-400">Testnet Participation Terms of Use</a>.
+        </li>
+      </ul>
     </div>
     <% if user_signed_in? %>
-      <div class="p-4 rounded bg-[#374151]">
-        <h3 class="mb-2">We now require Discord.</h3>
+      <div class="p-4 rounded-lg bg-neutral-700">
+        <h3 class="mb-2">You are now signed in with your previous GitHub registration.</h3>
         <p class="mb-4 font-light text-sm">
-        Link your Discord.
+        Click below to link your Discord account.
         </p>
         <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-full') %>
       </div>
@@ -23,11 +28,12 @@
     <div class="mb-8 sm:mb-12">
       <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-full') %>
     </div>
-    <div>
+    <div class="p-4 rounded-lg bg-neutral-700">
+      <h3 class="mb-2">IMPORTANT: We now require all users to sign in with Discord.</h3>
       <p class="mb-4 font-light text-sm">
-      If you previously authorized with GitHub, please note that we now require authorization via Discord...
+      If you previously signed up with GitHub, click below to preserve your verification status.
       </p>
-      <%= render LoginButtonComponent.new(provider: :github, class: 'py-4') %>
+      <%= render LoginButtonComponent.new(provider: :github, size: :large, class: 'w-full') %>
     </div>
     <% end %>
   </div>

@@ -27,7 +27,9 @@ class ApplicationController < ActionController::Base
     stored_location = stored_location_for(user)
     return stored_location if stored_location.present?
 
-    if user.email.nil?
+    if !user.authorizations.where(provider: :discord).exists?
+      root_path
+    elsif user.email.nil?
       onboarding_email_path
     else
       it1_path

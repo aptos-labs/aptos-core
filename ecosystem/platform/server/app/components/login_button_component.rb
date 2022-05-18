@@ -4,8 +4,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 PROVIDER_CLASSES = {
-  github: '!bg-[#242930]',
-  discord: '!bg-[#5965f2]'
+  github: '!bg-[#24292f] !text-white',
+  discord: '!bg-[#5964f2] !text-white'
 }.freeze
 
 ICON_CLASSES = {
@@ -22,7 +22,6 @@ class LoginButtonComponent < ViewComponent::Base
     @provider = provider
     rest[:class] = [
       PROVIDER_CLASSES[@provider],
-      '!text-white',
       rest[:class]
     ]
     @rest = rest

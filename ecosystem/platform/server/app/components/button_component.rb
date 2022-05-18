@@ -9,7 +9,7 @@ SCHEME_CLASSES = {
 }.freeze
 
 SIZE_CLASSES = {
-  large: 'px-8 py-4 text-lg rounded gap-4',
+  large: 'px-8 py-4 text-lg rounded-lg gap-4',
   medium: 'px-8 py-2 text-lg rounded gap-2',
   small: 'py-1 text-sm rounded gap-1'
 }.freeze
