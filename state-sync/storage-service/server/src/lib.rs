@@ -28,6 +28,7 @@ use std::{
     cmp::min,
     collections::HashMap,
     sync::Arc,
+    thread, time,
     time::{Duration, Instant},
 };
 use storage_interface::DbReader;
@@ -816,6 +817,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     }
 
     fn get_storage_server_summary(&self) -> Result<StorageServiceResponse, Error> {
+        thread::sleep(time::Duration::from_secs(10));
         let storage_server_summary = self.cached_storage_server_summary.read().clone();
         Ok(StorageServiceResponse::StorageServerSummary(
             storage_server_summary,
