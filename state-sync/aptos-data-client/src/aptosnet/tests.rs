@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{AptosDataClient, AptosNetDataClient, DataSummaryPoller, Error};
-use crate::aptosnet::state::calculate_optimal_chunk_sizes;
+use crate::aptosnet::{poll_peer, state::calculate_optimal_chunk_sizes};
 use aptos_config::{
     config::{AptosDataClientConfig, StorageServiceConfig},
     network_id::{NetworkId, PeerNetworkId},
@@ -581,6 +581,43 @@ async fn fetch_peers_max_in_flight() {
     }
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn in_flight_error_handling() {
+    ::aptos_logger::Logger::init_for_testing();
+
+    // Create a data client with max in-flight requests of 1
+    let data_client_config = AptosDataClientConfig {
+        max_num_in_flight_priority_polls: 1,
+        max_num_in_flight_regular_polls: 1,
+        ..Default::default()
+    };
+    let (mut mock_network, _, client, _) = MockNetwork::new(Some(data_client_config));
+
+    // Verify we have no in-flight polls
+    let num_in_flight_polls = get_num_in_flight_polls(client.clone(), true);
+    assert_eq!(num_in_flight_polls, 0);
+
+    // Add a peer
+    let peer = mock_network.add_peer(true);
+
+    // Poll the peer
+    let handle = poll_peer(client.clone(), peer, None);
+
+    // Respond to the peer poll with an error
+    if let Some((_, _, _, response_sender)) = mock_network.next_request().await {
+        response_sender.send(Err(StorageServiceError::InternalError(
+            "An unexpected error occurred!".into(),
+        )));
+    }
+
+    // Wait for the poller to complete
+    handle.await.unwrap();
+
+    // Verify we have no in-flight polls
+    let num_in_flight_polls = get_num_in_flight_polls(client.clone(), true);
+    assert_eq!(num_in_flight_polls, 0);
+}
+
 // 1. 2 peers
 // 2. one advertises bad range, one advertises honest range
 // 3. sending a bunch of requests to the bad range (which will always go to the
@@ -886,4 +923,13 @@ fn fetch_peer_to_poll(
     }
 
     result
+}
+
+/// Fetches the number of in flight requests for peers depending on priority
+fn get_num_in_flight_polls(client: AptosNetDataClient, is_priority_peer: bool) -> u64 {
+    if is_priority_peer {
+        client.peer_states.read().num_in_flight_priority_polls()
+    } else {
+        client.peer_states.read().num_in_flight_regular_polls()
+    }
 }
