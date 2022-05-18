@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+.font-mono {
+  font-variant-ligatures: none;
+}
+
 dialog {
   position: absolute;
   left: 0; right: 0;
