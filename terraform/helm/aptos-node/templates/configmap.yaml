@@ -23,7 +23,6 @@ data:
 {{ .Files.Get "files/test-data/validator-identity.yaml" | indent 4 }}
   validator-full-node-identity.yaml: |-
 {{ .Files.Get "files/test-data/validator-full-node-identity.yaml" | indent 4 }}
-binaryData:
   genesis.blob: {{ .Files.Get "files/test-data/genesis.blob" | b64enc }}
 
 {{- end }}
