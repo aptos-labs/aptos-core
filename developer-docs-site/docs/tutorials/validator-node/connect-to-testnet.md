@@ -25,7 +25,7 @@ Only do this if you got confirmation email from Aptos team for your eligibility.
 - Increase `era` number in your Terraform config, this will wipe the data once applied.
 - Apply Terraform: `terraform apply`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- Recreate the secrets:
+- Recreate the secrets, make sure the secret name matches your `era` number, e.g. if you have `era = 3`, you should replace the secret name to be `${WORKSPACE}-aptos-node-genesis-e3`
     ```
     export WORKSPACE=<your workspace name>
 
