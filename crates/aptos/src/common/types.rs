@@ -6,7 +6,7 @@ use crate::{
         init::DEFAULT_REST_URL,
         utils::{
             check_if_file_exists, read_from_file, to_common_result, to_common_success_result,
-            write_to_file, write_to_file_with_opts,
+            write_to_file, write_to_file_with_opts, write_to_user_only_file,
         },
     },
     genesis::git::from_yaml,
@@ -224,7 +224,7 @@ impl CliConfig {
         let config_bytes = serde_yaml::to_string(&self).map_err(|err| {
             CliError::UnexpectedError(format!("Failed to serialize config {}", err))
         })?;
-        write_to_file(&config_file, CONFIG_FILE, config_bytes.as_bytes())?;
+        write_to_user_only_file(&config_file, CONFIG_FILE, config_bytes.as_bytes())?;
 
         // As a cleanup, delete the old if it exists
         let legacy_config_file = aptos_folder.join(LEGACY_CONFIG_FILE);

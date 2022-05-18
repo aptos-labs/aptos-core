@@ -4,7 +4,7 @@
 use crate::{
     common::{
         types::{CliError, CliTypedResult, PromptOptions},
-        utils::{check_if_file_exists, read_from_file, write_to_file},
+        utils::{check_if_file_exists, read_from_file, write_to_user_only_file},
     },
     genesis::{
         config::{HostAndPort, ValidatorConfiguration},
@@ -86,17 +86,17 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
                 .map_err(|e| CliError::IO(self.output_dir.to_str().unwrap().to_string(), e))?
         };
 
-        write_to_file(
+        write_to_user_only_file(
             keys_file.as_path(),
             PRIVATE_KEYS_FILE,
             to_yaml(&config)?.as_bytes(),
         )?;
-        write_to_file(
+        write_to_user_only_file(
             validator_file.as_path(),
             VALIDATOR_FILE,
             to_yaml(&validator_blob)?.as_bytes(),
         )?;
-        write_to_file(vfn_file.as_path(), VFN_FILE, to_yaml(&vfn_blob)?.as_bytes())?;
+        write_to_user_only_file(vfn_file.as_path(), VFN_FILE, to_yaml(&vfn_blob)?.as_bytes())?;
         Ok(vec![keys_file, validator_file, vfn_file])
     }
 }

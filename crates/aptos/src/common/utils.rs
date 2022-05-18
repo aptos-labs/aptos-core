@@ -23,6 +23,7 @@ use std::{
     env,
     fs::OpenOptions,
     io::Write,
+    os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
     str::FromStr,
     time::{Duration, Instant},
@@ -196,6 +197,14 @@ pub fn read_from_file(path: &Path) -> CliTypedResult<Vec<u8>> {
 /// Write a `&[u8]` to a file
 pub fn write_to_file(path: &Path, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
     write_to_file_with_opts(path, name, bytes, &mut OpenOptions::new())
+}
+
+/// Write a User only read / write file
+pub fn write_to_user_only_file(path: &Path, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
+    let mut opts = OpenOptions::new();
+    #[cfg(unix)]
+    opts.mode(0o600);
+    write_to_file_with_opts(path, name, bytes, &mut opts)
 }
 
 /// Write a `&[u8]` to a file with the given options
