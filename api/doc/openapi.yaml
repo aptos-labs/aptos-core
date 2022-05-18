@@ -504,6 +504,147 @@ paths:
           $ref: '#/components/responses/415'
         "500":
           $ref: '#/components/responses/500'
+  /tokens/{TokenId}:
+    get:
+      description: "Returns Token by Id"
+      operationId: getTokenById
+      parameters:
+        - name: "TokenId"
+          in: path
+          required: true
+          description: "Token Id, has format `${address}:${collection_name}:${token_name}`"
+          schema:
+            $ref: "#/components/schemas/TokenId"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Token"
+        '404':
+          $ref: '#/components/responses/404'
+        '400':
+          $ref: '#/components/responses/400'
+        '500':
+          $ref: '#/components/responses/500'
+  /token_metadata/{tokenId}:
+    get:
+      description: "Returns TokenMetaData by Id"
+      operationId: getTokenMetaDataById
+      parameters:
+        - name: "tokenId"
+          in: path
+          required: true
+          description: "TokenId, has format `${address}:${collection_name}:${token_name}`"
+          schema:
+            $ref: "#/components/schemas/TokenId"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenMetaData"
+        '404':
+          $ref: '#/components/responses/404'
+        '400':
+          $ref: '#/components/responses/400'
+        '500':
+          $ref: '#/components/responses/500'
+  /token_metadata/byIds:
+    post:
+      description: "Returns TokenMetaData by Ids"
+      operationId: getTokenMetaDataByIds
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenIds"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenMetaData"
+        '404':
+          $ref: '#/components/responses/404'
+        '400':
+          $ref: '#/components/responses/400'
+        '500':
+          $ref: '#/components/responses/500'
+  /tokens/byIds:
+    post:
+      description: "Returns Tokens by Ids"
+      operationId: getTokenByIds
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenIds"
+        required: true
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tokens"
+        '404':
+          $ref: "#/components/responses/404"
+        '400':
+          $ref: "#/components/responses/400"
+        '500':
+          $ref: "#/components/responses/500"
+  /ownerships/{ownershipId}:
+    get:
+      description: "Returns ownership by Id"
+      operationId: getOwnershipById
+      parameters:
+        - name: "ownershipId"
+          in: path
+          required: true
+          description: "Ownership Id in format: '${blockchain}:${token}:${tokenId}:${owner}'"
+          schema:
+            $ref: "#/components/schemas/OwnershipId"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ownership"
+        '404':
+          $ref: "#/components/responses/404"
+        '400':
+          $ref: "#/components/responses/400"
+        '500':
+          $ref: "#/components/responses/500"
+  /collections/{collection}:
+    get:
+      description: "Returns collection by collection id"
+      operationId: getCollectionById
+      parameters:
+        - name: "collectionId"
+          in: path
+          required: true
+          description: "Id of the collection"
+          schema:
+            $ref: "#/components/schemas/CollectionId"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Collection"
+        '404':
+          $ref: "#/components/responses/404"
+        '400':
+          $ref: "#/components/responses/400"
+        '500':
+          $ref: "#/components/responses/500"
 components:
   parameters:
     AccountAddress:
@@ -1709,3 +1850,184 @@ components:
           $ref: '#/components/schemas/MoveTypeId'
         key:
           $ref: '#/components/schemas/MoveValue'
+    TokenId:
+      title: token Id
+      type: string
+      format: string
+      description:
+        token id is the unique identifier of a token.
+        
+        It consists of 3 parts joined with "::".
+        
+        The 3 parts are creator account address, collection name and token name
+      example: "0x1::APE::LASER_APE"
+    TokenIds:
+      type: object
+      properties:
+        ids:
+          type: array
+          description: "List of token Ids "
+          items:
+            $ref: "#/components/schemas/TokenId"
+    Royalty:
+      type: object
+      properties:
+        account:
+          $ref: "#/components/schemas/Address"
+        value:
+          type: integer
+    Royalties:
+      type: object
+      properties:
+        royalties:
+          type: array
+          items:
+            $ref: "#/components/schemas/Royalty"
+    Tokens:
+      title: Tokens
+      type: object
+      properties:
+        tokens:
+          type: array
+          items:
+            $ref: "#/components/schemas/Token"
+    Token:
+      title: Token
+      type: object
+      description: Aptos Token data
+      properties:
+        id:
+          $ref: "#/components/schemas/TokenId"
+        contract:
+          $ref: '#/components/schemas/MoveModuleId'
+        creator:
+          $ref: "#/components/schemas/Address"
+        supply:
+          type: integer
+        owner:
+          $ref: "#/components/schemas/Address"
+        royalties:
+          $ref: "#/components/schemas/Royalties"
+        deleted:
+          type: boolean
+          example: False
+        max:
+          type: integer
+          description: The max number of this token
+    CollectionId:
+      title: Colelction Id
+      description: A Id of a collection
+      type: string
+      example: "0x1::my_awesome_collection"
+    Collection:
+      title: NFT collection
+      description: A collection of tokens
+      properties:
+        id:
+          $ref: "#/components/schemas/CollectionId"
+        name:
+          type: string
+        owner:
+          $ref: "#/components/schemas/Address"
+        ceator:
+          $ref: "#/components/schemas/Address"
+        maxSupply:
+          type: integer
+        count:
+          type: integer
+          example: 1
+          description: the number of tokens in this collection
+        description:
+          type: string
+        uri:
+          type: string
+    TokenMetaData:
+      title: token metadata
+      type: object
+      description: the metadata of tokens
+      properties:
+        name:
+          type: string
+          description: the name of this token
+        collection:
+          type: string
+          description: the name of the collection
+        description:
+          type: string
+          description: description of the token
+        maxium:
+          type: integer
+        uri:
+          type: string
+    OwnershipId:
+      type: string
+      description: the ownership Id is the  "TokenID::Owner"
+      example:
+    OwnershipSource:
+      type: string
+      enum:
+        - MINT
+        - TRANSFER
+    Ownership:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/OwnershipId"
+        tokenId:
+          $ref: "#/components/schemas/TokenId"
+        contract:
+          $ref: '#/components/schemas/MoveModuleId'
+        collection:
+          $ref: "#/components/schemas/CollectionId"
+        owner:
+          $ref: "#/components/schemas/Address"
+        value:
+          type: integer
+          description: the number of the tokens in this ownership
+        source:
+          $ref: "#/components/schemas/OwnershipSource"
+        createdAt:
+          type: string
+          format: "date-time"
+        creator:
+          $ref: "#/components/schemas/Address"
+    Ownerships:
+      title: Ownerships
+      type: object
+      properties:
+        ownership:
+          type: array
+          items:
+            $ref: "#/components/schemas/Ownership"
+    MintActivity:
+      type: object
+      properties:
+        "@type":
+          type: string
+          enum:
+            - MINT
+        creator:
+          $ref: "#/components/schemas/Address"
+        contract:
+          $ref: '#/components/schemas/MoveModuleId'
+        tokenId:
+          $ref: "#/components/schemas/TokenId"
+        value:
+          type: integer
+        transactionHash:
+          $ref: "#/components/schemas/HexEncodedBytes"
+    ActivityId:
+      $ref: "#/components/schemas/EventKey"
+    Activity:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/ActivityId"
+        date:
+          type: string
+          format: "date-time"
+        lastUpdatedAt:
+          type: string
+          format: "date-time"
+      oneOf:
+        - $ref: "#/components/schemas/MintActivity"
