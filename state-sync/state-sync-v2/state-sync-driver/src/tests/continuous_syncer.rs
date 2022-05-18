@@ -107,7 +107,7 @@ async fn test_critical_timeout() {
 }
 
 #[tokio::test]
-async fn test_data_stream_transactions() {
+async fn test_data_stream_transactions_with_target() {
     // Create test data
     let current_synced_epoch = 5;
     let current_synced_version = 234;

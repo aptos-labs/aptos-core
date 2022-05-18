@@ -101,11 +101,18 @@ impl<
         // Fetch the highest epoch state (in storage)
         let highest_epoch_state = utils::fetch_latest_epoch_state(self.storage.clone())?;
 
-        // Initialize a new active data stream
+        // Fetch the consensus sync request target (if there is one)
         let sync_request_target = consensus_sync_request
             .lock()
             .as_ref()
             .map(|sync_request| sync_request.get_sync_target());
+        if sync_request_target.is_some() {
+            // Reset the chunk executor to ensure we're up-to-date
+            // with where consensus stopped.
+            self.storage_synchronizer.reset_chunk_executor()?;
+        }
+
+        // Initialize a new active data stream
         let active_data_stream = match self.driver_configuration.config.continuous_syncing_mode {
             ContinuousSyncingMode::ApplyTransactionOutputs => {
                 self.streaming_client
