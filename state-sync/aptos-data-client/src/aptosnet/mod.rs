@@ -41,7 +41,7 @@ use storage_service_types::{
     StorageServiceRequest, StorageServiceResponse, TransactionOutputsWithProofRequest,
     TransactionsWithProofRequest,
 };
-use tokio::runtime::Handle;
+use tokio::{runtime::Handle, task::JoinHandle};
 
 mod logging;
 mod metrics;
@@ -673,7 +673,11 @@ fn update_in_flight_metrics(label: &str, num_in_flight_polls: u64) {
 }
 
 /// Spawns a dedicated poller for the given peer.
-fn poll_peer(data_client: AptosNetDataClient, peer: PeerNetworkId, runtime: Option<Handle>) {
+pub(crate) fn poll_peer(
+    data_client: AptosNetDataClient,
+    peer: PeerNetworkId,
+    runtime: Option<Handle>,
+) -> JoinHandle<()> {
     // Create the poller for the peer
     let poller = async move {
         // Mark the in-flight poll as started
@@ -694,6 +698,9 @@ fn poll_peer(data_client: AptosNetDataClient, peer: PeerNetworkId, runtime: Opti
             .map(Response::into_payload);
         drop(timer);
 
+        // Mark the in-flight poll as now complete
+        data_client.in_flight_request_complete(&peer);
+
         // Check the storage summary response
         let storage_summary = match result {
             Ok(storage_summary) => storage_summary,
@@ -712,9 +719,6 @@ fn poll_peer(data_client: AptosNetDataClient, peer: PeerNetworkId, runtime: Opti
         // Update the global storage summary and the summary for the peer
         data_client.update_summary(peer, storage_summary);
         data_client.update_global_summary_cache();
-
-        // Mark the in-flight poll as now complete
-        data_client.in_flight_request_complete(&peer);
 
         // Log the new global data summary and update the metrics
         sample!(
@@ -740,7 +744,7 @@ fn poll_peer(data_client: AptosNetDataClient, peer: PeerNetworkId, runtime: Opti
         runtime.spawn(poller)
     } else {
         tokio::spawn(poller)
-    };
+    }
 }
 
 /// Updates the advertised data metrics using the given global
