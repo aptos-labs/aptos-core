@@ -4,10 +4,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class OnboardingController < ApplicationController
-  before_action :authenticate_user!
-  before_action :ensure_discord!
-  before_action :ensure_confirmed!, only: %i[kyc_redirect kyc_callback]
-  before_action :set_oauth_data, except: :kyc_callback
+  before_action :authenticate_user!, except: %i[kyc_callback]
+  before_action :ensure_discord!, except: %i[kyc_callback]
+  before_action :ensure_confirmed!, only: %i[kyc_redirect]
+  before_action :set_oauth_data, except: %i[kyc_callback]
   protect_from_forgery except: :kyc_callback
 
   layout 'it1'
@@ -69,14 +69,19 @@ class OnboardingController < ApplicationController
     # inquiry-id=inq_sVMEAhz6fyAHBkmJsMa3hRdw&reference-id=ecbf9114-3539-4bb6-934e-4e84847950e0
     kyc_params = params.permit(:'inquiry-id', :'reference-id')
     reference_id = kyc_params.require(:'reference-id')
-    if current_user.external_id != reference_id
-      redirect_to onboarding_kyc_redirect_path,
-                  status: :unprocessable_entity, error: 'Persona was started with a different user' and return
+
+    # we don't have a current user if we're doing personas "complete on another device" thing
+    if current_user.present?
+      redirect_to onboarding_email_path and return unless current_user.confirmed?
+      if current_user.external_id != reference_id
+        redirect_to onboarding_kyc_redirect_path,
+                    status: :unprocessable_entity, error: 'Persona was started with a different user' and return
+      end
     end
 
     inquiry_id = kyc_params.require(:'inquiry-id')
     begin
-      KYCCompleteJob.perform_now({ user_id: current_user.id, inquiry_id: })
+      KYCCompleteJob.perform_now({ user_id: current_user&.id, inquiry_id:, external_id: reference_id })
       redirect_to it1_path, notice: 'Identity Verification completed successfully!'
     rescue KYCCompleteJobError => e
       Sentry.capture_exception(e)

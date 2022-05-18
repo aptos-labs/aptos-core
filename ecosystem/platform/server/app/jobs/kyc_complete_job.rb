@@ -6,9 +6,13 @@
 class KYCCompleteJobError < StandardError; end
 
 class KYCCompleteJob < ApplicationJob
-  # Ex args: { user_id: 32, inquiry_id=inq_syMMVRdEz7fswAa2hi }
+  # Ex args: { user_id: 32, inquiry_id=inq_syMMVRdEz7fswAa2hi, external_id: 141bc487-e025-418e-6e32-b7897060841c }
   def perform(args)
-    user = User.find(args[:user_id])
+    user = if args[:user_id].present?
+             User.find(args[:user_id])
+           else
+             User.where(external_id: args[:external_id]).first!
+           end
     sentry_scope.set_user(id: user.id)
 
     inquiry_id = args[:inquiry_id]
