@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Result};
-use aptos_config::config::DEFAULT_PORT;
+use aptos::common::types::EncodingType;
+use aptos_config::{config::DEFAULT_PORT, keys::ConfigKey};
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::chain_id::ChainId};
 use futures::future::join_all;
 use itertools::zip;
@@ -10,6 +12,7 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 use rand_core::OsRng;
 use std::{
     cmp::min,
+    path::Path,
     process,
     time::{Duration, Instant},
 };
@@ -44,6 +47,9 @@ struct Args {
     burst: bool,
     #[structopt(long, default_value = "mint.key")]
     mint_file: String,
+    /// Ed25519PrivateKey for minting coins
+    #[structopt(long, parse(try_from_str = ConfigKey::from_encoded_string))]
+    pub mint_key: Option<ConfigKey<Ed25519PrivateKey>>,
     #[structopt(long, default_value = "TESTING")]
     chain_id: ChainId,
     #[structopt(
@@ -147,8 +153,15 @@ impl BasicSwarmUtil {
             .map(|peer| parse_host_port(peer).expect("Failed to parse host_port"))
             .collect();
 
-        let cluster =
-            Cluster::from_host_port(parsed_peers, &args.mint_file, args.chain_id, args.vasp);
+        let mint_key = if let Some(ref key) = args.mint_key {
+            key.private_key()
+        } else {
+            EncodingType::BCS
+                .load_key::<Ed25519PrivateKey>("mint key pair", Path::new(&args.mint_file))
+                .unwrap()
+        };
+
+        let cluster = Cluster::from_host_port(parsed_peers, mint_key, args.chain_id, args.vasp);
         Self { cluster }
     }
 

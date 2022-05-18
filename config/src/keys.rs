@@ -12,7 +12,9 @@
 //! while ignored during serialization.
 //!
 
-use aptos_crypto::PrivateKey;
+use aptos_crypto::{
+    CryptoMaterialError, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// ConfigKey places a clonable wrapper around PrivateKeys for config purposes only. The only time
@@ -26,7 +28,7 @@ pub struct ConfigKey<T: PrivateKey + Serialize> {
     key: T,
 }
 
-impl<T: DeserializeOwned + PrivateKey + Serialize> ConfigKey<T> {
+impl<T: DeserializeOwned + PrivateKey + ValidCryptoMaterial + Serialize> ConfigKey<T> {
     pub fn new(key: T) -> Self {
         Self { key }
     }
@@ -37,6 +39,10 @@ impl<T: DeserializeOwned + PrivateKey + Serialize> ConfigKey<T> {
 
     pub fn public_key(&self) -> T::PublicKeyMaterial {
         aptos_crypto::PrivateKey::public_key(&self.key)
+    }
+
+    pub fn from_encoded_string(str: &str) -> Result<Self, CryptoMaterialError> {
+        Ok(Self::new(T::from_encoded_string(str)?))
     }
 }
 

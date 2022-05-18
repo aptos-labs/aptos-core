@@ -5,9 +5,7 @@
 
 use crate::{instance::Instance, query_sequence_numbers};
 use anyhow::{format_err, Result};
-use aptos::common::types::EncodingType;
 use aptos_crypto::{
-    ed25519,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
     Uniform,
@@ -18,7 +16,7 @@ use aptos_sdk::{
     types::{account_config::aptos_root_address, chain_id::ChainId, AccountKey, LocalAccount},
 };
 use rand::seq::SliceRandom;
-use std::{convert::TryFrom, path::Path};
+use std::convert::TryFrom;
 
 pub struct Cluster {
     instances: Vec<Instance>,
@@ -34,7 +32,7 @@ fn clone(key: &Ed25519PrivateKey) -> Ed25519PrivateKey {
 impl Cluster {
     pub fn from_host_port(
         peers: Vec<(String, u32, Option<u32>)>,
-        mint_file: &str,
+        mint_key: Ed25519PrivateKey,
         chain_id: ChainId,
         vasp: bool,
     ) -> Self {
@@ -53,11 +51,7 @@ impl Cluster {
         let mint_key_pair = if vasp {
             dummy_key_pair()
         } else {
-            KeyPair::from(
-                EncodingType::BCS
-                    .load_key::<ed25519::Ed25519PrivateKey>("mint key pair", Path::new(mint_file))
-                    .unwrap(),
-            )
+            KeyPair::from(mint_key)
         };
 
         Self {

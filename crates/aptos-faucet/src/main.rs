@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos::common::types::EncodingType;
-use aptos_crypto::ed25519;
+use aptos_config::keys::ConfigKey;
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
 use aptos_sdk::types::{
     account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
@@ -33,6 +34,9 @@ struct Args {
     /// `cargo run -p generate-keypair -- -o <output_file_path>`
     #[structopt(short = "m", long, default_value = "/opt/aptos/etc/mint.key")]
     pub mint_key_file_path: String,
+    /// Ed25519PrivateKey for minting coins
+    #[structopt(long, parse(try_from_str = ConfigKey::from_encoded_string))]
+    pub mint_key: Option<ConfigKey<Ed25519PrivateKey>>,
     /// Address of the account to send transactions from.
     /// On Testnet, for example, this is a550c18.
     /// If not present, the mint key's address is used
@@ -53,7 +57,7 @@ struct Args {
 
 #[tokio::main]
 async fn main() {
-    let args = Args::from_args();
+    let args: Args = Args::from_args();
     aptos_logger::Logger::new().init();
 
     let address: std::net::SocketAddr = format!("{}:{}", args.address, args.port)
@@ -67,9 +71,13 @@ async fn main() {
         args.maximum_amount,
     );
 
-    let key: ed25519::Ed25519PrivateKey = EncodingType::BCS
-        .load_key("Ed25519PrivateKey", Path::new(&args.mint_key_file_path))
-        .unwrap();
+    let key = if let Some(key) = args.mint_key {
+        key.private_key()
+    } else {
+        EncodingType::BCS
+            .load_key::<Ed25519PrivateKey>("mint key", Path::new(&args.mint_key_file_path))
+            .unwrap()
+    };
 
     let faucet_address: AccountAddress =
         args.mint_account_address.unwrap_or_else(aptos_root_address);

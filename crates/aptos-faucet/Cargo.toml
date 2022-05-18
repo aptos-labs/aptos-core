@@ -25,6 +25,7 @@ url = "2.2.2"
 warp = "0.3.2"
 
 aptos = { path = "../aptos" }
+aptos-config = { path = "../../config"}
 aptos-crypto = { path = "../aptos-crypto" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
