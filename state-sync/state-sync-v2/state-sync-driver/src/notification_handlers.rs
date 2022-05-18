@@ -277,7 +277,7 @@ impl ConsensusNotificationHandler {
             consensus_notifications::Error::UnexpectedErrorEncountered(format!("{:?}", error))
         });
 
-        debug!(
+        info!(
             LogSchema::new(LogEntry::NotificationHandler).message(&format!(
                 "Responding to consensus sync notification with message: {:?}",
                 message

@@ -1085,7 +1085,7 @@ impl DbReader for AptosDB {
                 .map(|(version, _)| version);
             let tree_state = self.get_tree_state(latest_version)?;
 
-            info!(tree_state = tree_state, "Got latest TreeState.");
+            debug!(tree_state = tree_state, "Got latest TreeState.");
 
             Ok(tree_state)
         })

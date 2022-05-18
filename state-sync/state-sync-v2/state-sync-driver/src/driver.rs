@@ -354,7 +354,7 @@ impl<
     /// accounts.
     async fn handle_commit_notification(&mut self, commit_notification: CommitNotification) {
         let CommitNotification::CommittedAccounts(committed_accounts) = commit_notification;
-        debug!(
+        info!(
             LogSchema::new(LogEntry::SynchronizerNotification).message(&format!(
                 "Received an account commit notification from the storage synchronizer. \
                         All synced: {:?}, last committed index: {:?}.",
