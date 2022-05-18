@@ -36,6 +36,8 @@ Rails.application.routes.draw do
   resources :overview, only: %i[index]
   resources :it1_profiles, except: %i[index destroy]
 
+  get 'leaderboard/it1'
+
   get 'it1', to: 'welcome#it1'
   root 'welcome#index'
 end

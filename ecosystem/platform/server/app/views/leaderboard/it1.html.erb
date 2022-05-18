@@ -1,0 +1,47 @@
+<div class="bg-neutral-900 text-white h-full p-6 sm:p-24 2xl:px-48">
+  <h2 class="text-6xl mb-4">AIT1 Stats</h2>
+  <div class="mb-8">
+    <%= render 'shared/bump_hero' %>
+  </div>
+  <div class="overflow-x-auto">
+    <%= render TableComponent.new do |t| %>
+      <%= t.with_column(:rank, align: 'right') do %>
+        #
+      <% end %>
+      <%= t.with_column(align: 'left') do %>
+        Peer ID
+      <% end %>
+      <%= t.with_column(:liveness, align: 'right') do %>
+        Liveness
+      <% end %>
+      <%= t.with_column(:availability, align: 'right') do %>
+        Availability
+      <% end %>
+      <%= t.with_column(:latest_version, align: 'right') do %>
+        Last Metrics Update
+      <% end %>
+
+      <%= t.with_body do %>
+        <% @metrics.each_with_index do |metric, i| %>
+          <%= render TableRowComponent.new do |tr| %>
+            <%= tr.with_column(align: 'right') do %>
+              <%= metric.rank %>
+            <% end %>
+            <%= tr.with_column(class: 'max-w-0 2xl:max-w-full w-full 2xl:w-auto truncate', title: metric.validator) do %>
+              <%= metric.validator %>
+            <% end %>
+            <%= tr.with_column(align: 'right') do %>
+              <%= metric.liveness %>
+            <% end %>
+            <%= tr.with_column(align: 'right', class: availability_color(metric.availability)) do %>
+              <%= metric.availability %>
+            <% end %>
+            <%= tr.with_column(align: 'right') do %>
+              <%= metric.latest_version %>
+            <% end %>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% end %>
+  </div>
+</div>

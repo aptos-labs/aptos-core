@@ -1,0 +1,14 @@
+<%= content_tag :th, **@rest do %>
+  <% if @id %>
+    <% if sort_arrow %>
+      <%= link_to href, class: 'cursor-pointer whitespace-nowrap' do %>
+        <%= content %>
+        <%= sort_arrow %>
+      <% end %>
+    <% else %>
+      <%= link_to content, href, class: 'cursor-pointer'  %>
+    <% end %>
+  <% else %>
+    <%= content %>
+  <% end %>
+<% end %>
