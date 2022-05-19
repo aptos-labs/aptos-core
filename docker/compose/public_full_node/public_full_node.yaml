@@ -9,7 +9,7 @@ base:
 
 state_sync:
   state_sync_driver:
-    enable_state_sync_v2: true
+    enable_state_sync_v2: false
 
 execution:
     # Path to a genesis transaction. Note, this must be paired with a waypoint. If you update your
