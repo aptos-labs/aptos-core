@@ -1713,9 +1713,9 @@ dependencies = [
 
 [[package]]
 name = "cfg-expr"
-version = "0.10.2"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e068cb2806bbc15b439846dc16c5f89f8599f2c3e4d73d4449d38f9b2f0b6c5"
+checksum = "0aacacf4d96c24b2ad6eb8ee6df040e4f27b0d0b39a5710c30091baa830485db"
 dependencies = [
  "smallvec",
  "target-lexicon",
@@ -2537,7 +2537,7 @@ dependencies = [
  "diesel_derives",
  "num-bigint 0.2.6",
  "num-integer",
- "num-traits 0.1.43",
+ "num-traits 0.2.15",
  "pq-sys",
  "r2d2",
  "serde_json",
@@ -3281,7 +3281,7 @@ dependencies = [
  "network",
  "rand 0.8.4",
  "serde 1.0.137",
- "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection)",
+ "serde-reflection 0.3.5",
  "serde_yaml",
  "structopt",
 ]
@@ -4525,7 +4525,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=f2e7585b1ed5bd2810163d6bdebafe5a388881d3)",
  "petgraph 0.5.1",
- "serde-reflection 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde-reflection 0.3.6",
 ]
 
 [[package]]
@@ -5595,9 +5595,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.10.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87f3e037eac156d1775da914196f0f37741a274155e34a0b7e427c35d2a2ecb9"
+checksum = "7b10983b38c53aebdf33f542c6275b0f58a238129d00c4ae0e6fb59738d783ca"
 
 [[package]]
 name = "oorandom"
@@ -6023,9 +6023,9 @@ checksum = "eb9f9e6e233e5c4a35559a617bf40a4ec447db2e84c20b55a6f83167b7e57872"
 
 [[package]]
 name = "pq-sys"
-version = "0.4.4"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dfb5e575ef93a1b7b2a381d47ba7c5d4e4f73bff37cee932195de769aad9a54"
+checksum = "6ac25eee5a0582f45a67e837e350d784e7003bd29a5f460796772061ca49ffda"
 dependencies = [
  "vcpkg",
 ]
@@ -6126,15 +6126,15 @@ dependencies = [
 
 [[package]]
 name = "prometheus"
-version = "0.13.0"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7f64969ffd5dd8f39bd57a68ac53c163a095ed9d0fb707146da1b27025a3504"
+checksum = "cface98dfa6d645ea4c789839f176e4b072265d085bfcc48eaa8d137f58d3c39"
 dependencies = [
  "cfg-if 1.0.0",
  "fnv",
  "lazy_static 1.4.0",
  "memchr",
- "parking_lot 0.11.2",
+ "parking_lot 0.12.0",
  "thiserror",
 ]
 
@@ -6989,7 +6989,7 @@ dependencies = [
  "include_dir 0.6.2",
  "maplit",
  "serde 1.0.137",
- "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection)",
+ "serde-reflection 0.3.5",
  "serde_bytes",
  "serde_yaml",
  "structopt",
@@ -7021,8 +7021,7 @@ dependencies = [
 [[package]]
 name = "serde-reflection"
 version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "167450ba550f903a2b35a81ba3ca387585189e2430e3df6b94b95f3bec2f26bd"
+source = "git+https://github.com/aptos-labs/serde-reflection#262fe0545367563e056eef99d6108cacbb102192"
 dependencies = [
  "once_cell",
  "serde 1.0.137",
@@ -7031,8 +7030,9 @@ dependencies = [
 
 [[package]]
 name = "serde-reflection"
-version = "0.3.5"
-source = "git+https://github.com/aptos-labs/serde-reflection#262fe0545367563e056eef99d6108cacbb102192"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f05a5f801ac62a51a49d378fdb3884480041b99aced450b28990673e8ff99895"
 dependencies = [
  "once_cell",
  "serde 1.0.137",
@@ -7134,7 +7134,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5bcc41d18f7a1d50525d080fd3e953be87c4f9f1a974f3c21798ca00d54ec15"
 dependencies = [
  "lazy_static 1.4.0",
- "parking_lot 0.10.2",
+ "parking_lot 0.11.2",
  "serial_test_derive",
 ]
 
@@ -8397,7 +8397,7 @@ dependencies = [
  "move-deps",
  "regex",
  "serde-generate",
- "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection)",
+ "serde-reflection 0.3.5",
  "serde_yaml",
  "structopt",
  "tempfile",
@@ -8496,7 +8496,7 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "static_assertions",
 ]
 

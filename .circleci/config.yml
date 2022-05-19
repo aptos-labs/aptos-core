@@ -235,6 +235,9 @@ jobs:
       - run: cd ./ecosystem/typescript/sdk && yarn install
       - run: cd ./ecosystem/typescript/sdk && yarn lint
       - run: cd ./ecosystem/typescript/sdk && yarn fmt:check
+      # Run indexer server typescript lint
+      - run: cd ./ecosystem/indexer-server/typescript && yarn install
+      - run: cd ./ecosystem/indexer-server/typescript && yarn lint
   ecosystem-test:
     executor: ubuntu-xl
     steps:

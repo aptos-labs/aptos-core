@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "lib": ["esnext"],
+    "strict": true,
+    "allowJs": false,
+    "forceConsistentCasingInFileNames": true,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": false,
+    "baseUrl": "src",
+    "esModuleInterop": true,
+    "paths": {
+      "core/*": ["./core/*"]
+    }
+  },
+  "exclude": [
+    "node_modules"
+  ],
+  "include": ["src/**/*"]
+}
