@@ -86,7 +86,7 @@ module NodeHelper
 
     # @return MetricsResult
     def fetch_metrics
-      res = HTTParty.get("http://#{@hostname}:#{@metrics_port}/metrics", open_timeout: 1, read_timeout: 2,
+      res = HTTParty.get("http://#{@hostname}:#{@metrics_port}/metrics", open_timeout: 2, read_timeout: 3,
                                                                          max_retries: 0)
       extract_metrics(res.body)
     rescue Net::ReadTimeout => e
