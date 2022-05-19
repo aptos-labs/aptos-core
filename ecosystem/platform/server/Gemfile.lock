@@ -316,8 +316,6 @@ GEM
       nokogiri (>= 1.6)
     rails-html-sanitizer (1.4.2)
       loofah (~> 2.3)
-    rails_state_machine (2.1.1)
-      activerecord
     railties (7.0.2.4)
       actionpack (= 7.0.2.4)
       activesupport (= 7.0.2.4)
@@ -389,6 +387,7 @@ GEM
       sentry-ruby-core (= 5.3.0)
     sentry-ruby-core (5.3.0)
       concurrent-ruby
+    statesman (10.0.0)
     stimulus-rails (1.0.4)
       railties (>= 6.0.0)
     strscan (3.0.1)
@@ -460,7 +459,6 @@ DEPENDENCIES
   puma (~> 5.0)
   rack-cors
   rails (~> 7.0.2, >= 7.0.2.3)
-  rails_state_machine
   recaptcha (~> 5.10)
   rspec-rails
   rubocop
@@ -468,6 +466,7 @@ DEPENDENCIES
   selenium-webdriver
   sentry-rails
   sentry-ruby
+  statesman (~> 10.0)
   stimulus-rails
   turbo-rails
   tzinfo-data

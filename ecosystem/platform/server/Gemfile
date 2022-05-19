@@ -40,7 +40,6 @@ gem 'activeadmin'
 gem 'cancancan'
 gem 'devise'
 gem 'kaminari'
-gem 'rails_state_machine'
 
 # Oauth
 gem 'omniauth'
@@ -89,6 +88,9 @@ gem 'view_component', '~> 2.54'
 gem 'lograge', '~> 0.12.0'
 gem 'sentry-rails'
 gem 'sentry-ruby'
+
+# State machines
+gem "statesman", "~> 10.0"
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem

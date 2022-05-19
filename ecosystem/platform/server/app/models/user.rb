@@ -4,8 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class User < ApplicationRecord
-  include RailsStateMachine::Model
-
   # Include devise modules. Others available are:
   # :lockable, :timeoutable, :recoverable,
   devise :database_authenticatable, :confirmable,
