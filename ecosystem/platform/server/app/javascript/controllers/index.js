@@ -9,3 +9,9 @@ application.register("dialog", DialogController)
 
 import HelloController from "./hello_controller.js"
 application.register("hello", HelloController)
+
+import RecaptchaController from "./recaptcha_controller.js"
+application.register("recaptcha", RecaptchaController)
+
+import ShakeController from "./shake_controller.js"
+application.register("shake", ShakeController)

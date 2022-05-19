@@ -6,8 +6,8 @@
 
     <%= render "layouts/flash" %>
 
-    <div class="flex flex-col lg:flex-row gap-8 sm:gap-12">
-      <div id="first-step" class="bg-neutral-800 rounded-md flex flex-col flex-1">
+    <div class="flex flex-col lg:flex-row gap-8 sm:gap-12" data-controller="shake">
+      <div data-target="shake.content" class="bg-neutral-800 rounded-md flex flex-col flex-1">
         <h3 class="font-mono uppercase mb-2 bg-neutral-700 text-teal-400 px-4 py-2 rounded-t-md text-sm">Step 1</h3>
         <div class="px-8 py-4 flex flex-col flex-1">
           <h4 class="text-teal-400 font-mono uppercase text-2xl mb-4">Node Verification</h4>
@@ -29,24 +29,15 @@
       <% if current_user&.it1_profile&.validator_verified?
            cls = ''
            title = ''
+           action = ''
          else
            cls = 'cursor-not-allowed select-none opacity-50'
-           title = 'title="You must complete Node Verification first" onclick="shakeFirst()"'.html_safe
+           title = 'You must complete Node Verification first'
+           action = 'click->shake#shake'
          end
       %>
 
-      <script type="application/javascript">
-          function shakeFirst() {
-              const element = document.getElementById("first-step");
-              if (element) {
-                  element.classList.add("shake");
-                  setTimeout(() => {
-                      element.classList.remove("shake");
-                  }, 300);
-              }
-          }
-      </script>
-      <div class="bg-neutral-800 rounded-md flex flex-col flex-1 <%=cls%>" <%=title%>>
+      <div class="bg-neutral-800 rounded-md flex flex-col flex-1 <%=cls%>" title="<%=title%>" data-action="<%=action%>">
         <h3 class="font-mono uppercase mb-2 bg-neutral-700 text-teal-400 px-4 py-2 rounded-t-md text-sm">Step 2</h3>
         <div class="px-8 py-4 flex flex-col flex-1">
           <h4 class="text-teal-400 font-mono uppercase text-2xl mb-4">Identity Verification</h4>
