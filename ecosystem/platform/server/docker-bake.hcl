@@ -24,6 +24,6 @@ target "community-platform" {
   cache-to   = ["type=registry,ref=${gh_image_cache},mode=max"]
   tags = [
     "${AWS_ECR_ACCOUNT_URL}/aptos/community-platform:${GIT_SHA1}",
-    "${GCP_DOCKER_ARTIFACT_REPO}/community-platform:${GIT_SHA1}",
+    // "${GCP_DOCKER_ARTIFACT_REPO}/community-platform:${GIT_SHA1}",
   ]
 }
