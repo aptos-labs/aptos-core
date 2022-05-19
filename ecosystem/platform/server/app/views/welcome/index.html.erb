@@ -1,6 +1,6 @@
 <div class="flex flex-col lg:flex-row gap-8 sm:gap-24 xl:gap-48 justify-between flex-[2]">
   <div>
-    <div class="sm:w-[36rem] mb-8 sm:mb-12 font-light sm:text-lg">
+    <div class="sm:w-[36rem] mb-12 font-light sm:text-lg">
       <%= render 'shared/it1_intro' %>
     </div>
     <% if user_signed_in? %>
@@ -12,7 +12,7 @@
         <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-full') %>
       </div>
     <% else %>
-    <div class="mb-8 sm:mb-12">
+    <div class="mb-12">
       <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-full') %>
     </div>
     <div class="p-4 rounded-lg bg-neutral-700">

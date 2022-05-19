@@ -4,17 +4,17 @@
 
     <% if current_user.confirmed_at.nil? %>
       <p class="bg-gray-100 border border-gray-400 text-gray-700 px-4 py-3 rounded">
-      Your email has not yet been verified. Didn't receive a verification email? <%= link_to "Re-send verification email", onboarding_email_path, class: "underline" %>
+      Your email has not yet been verified. Didn't receive a verification email? <%= link_to "Re-send verification email", onboarding_email_path, class: "underline decoration-teal-400 decoration-1 underline-offset-4 hover:decoration-2" %>
       </p>
     <% end %>
 
     <p class="bg-gray-100 border border-gray-400 text-gray-700 px-4 py-3 rounded">
       <% if current_user.it1_profile %>
         IT1 application received.
-        <%= link_to "Edit your application", edit_it1_profile_path(current_user.it1_profile), class: "underline" %>
+        <%= link_to "Edit your application", edit_it1_profile_path(current_user.it1_profile), class: "underline decoration-teal-400 decoration-1 underline-offset-4 hover:decoration-2" %>
       <% else %>
         Registration for IT1 is open!
-        <%= link_to "Apply now", it1_path, class: "underline" %>
+        <%= link_to "Apply now", it1_path, class: "underline decoration-teal-400 decoration-1 underline-offset-4 hover:decoration-2" %>
       <% end %>
     </p>
   </div>

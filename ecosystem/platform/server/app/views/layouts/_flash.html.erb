@@ -1,20 +1,20 @@
 <% flash.each do |type, msg| %>
   <% if type == "notice" %>
-    <div class="flex p-4 mb-4 bg-blue-100 rounded-lg dark:bg-blue-200" role="alert">
-      <div class="ml-3 text-sm font-medium text-blue-700 dark:text-blue-800">
+    <div class="flex p-4 mb-8 bg-teal-100 rounded-lg" role="alert">
+      <div class="ml-3 text-sm font-medium text-teal-800">
         <%= msg %>
       </div>
-      <button type="button" class="ml-auto -mx-1.5 -my-1.5 bg-blue-100 text-blue-500 rounded-lg focus:ring-2 focus:ring-blue-400 p-1.5 hover:bg-blue-200 inline-flex h-8 w-8 dark:bg-blue-200 dark:text-blue-600 dark:hover:bg-blue-300" data-dismiss-target="#alert-2" aria-label="Close" onclick="this.parentElement.remove()">
+      <button type="button" class="flex items-center justify-center ml-auto -mx-1.5 -my-1.5 bg-transparent text-teal-600 hover:text-teal-800 rounded-lg inline-flex w-8 h-8 p-1.5" data-dismiss-target="#alert-2" aria-label="Close" onclick="this.parentElement.remove()">
         <span class="sr-only">Close</span>
         <%= render IconComponent.new(:close, class: 'w-5 h-5') %>
       </button>
     </div>
   <% elsif type == "alert" %>
-    <div class="flex p-4 mb-4 bg-red-100 rounded-lg dark:bg-red-200" role="alert">
-      <div class="ml-3 text-sm font-medium text-red-700 dark:text-red-800">
+        <div class="flex p-4 mb-8 bg-red-100 rounded-lg" role="alert">
+      <div class="ml-3 text-sm font-medium text-red-800">
         <%= msg %>
       </div>
-      <button type="button" class="ml-auto -mx-1.5 -my-1.5 bg-red-100 text-red-500 rounded-lg focus:ring-2 focus:ring-red-400 p-1.5 hover:bg-red-200 inline-flex h-8 w-8 dark:bg-red-200 dark:text-red-600 dark:hover:bg-red-300" data-dismiss-target="#alert-2" aria-label="Close" onclick="this.parentElement.remove()">
+      <button type="button" class="flex items-center justify-center ml-auto -mx-1.5 -my-1.5 bg-transparent text-red-500 hover:text-red-800 rounded-lg inline-flex w-8 h-8 p-1.5" data-dismiss-target="#alert-2" aria-label="Close" onclick="this.parentElement.remove()">
         <span class="sr-only">Close</span>
         <%= render IconComponent.new(:close, class: 'w-5 h-5') %>
       </button>
