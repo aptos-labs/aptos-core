@@ -5800,6 +5800,55 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
 
 [[package]]
+name = "peer-monitoring-service-client"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "async-trait",
+ "channel",
+ "network",
+ "peer-monitoring-service-types",
+ "thiserror",
+]
+
+[[package]]
+name = "peer-monitoring-service-server"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "bcs",
+ "bounded-executor",
+ "bytes",
+ "channel",
+ "claim",
+ "futures",
+ "netcore",
+ "network",
+ "once_cell",
+ "peer-monitoring-service-types",
+ "serde 1.0.137",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "peer-monitoring-service-types"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "aptos-workspace-hack",
+ "network",
+ "serde 1.0.137",
+ "thiserror",
+]
+
+[[package]]
 name = "pem"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

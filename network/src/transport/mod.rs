@@ -28,7 +28,7 @@ use futures::{
     stream::{Stream, StreamExt, TryStreamExt},
 };
 use netcore::transport::{proxy_protocol, tcp, ConnectionOrigin, Transport};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use short_hex_str::AsShortHexStr;
 use std::{collections::BTreeMap, convert::TryFrom, fmt, io, pin::Pin, sync::Arc, time::Duration};
 
@@ -59,7 +59,7 @@ pub trait TSocket: AsyncRead + AsyncWrite + Send + fmt::Debug + Unpin + 'static 
 impl<T> TSocket for T where T: AsyncRead + AsyncWrite + Send + fmt::Debug + Unpin + 'static {}
 
 /// Unique local identifier for a connection.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct ConnectionId(u32);
 
 impl From<u32> for ConnectionId {
@@ -86,7 +86,7 @@ impl ConnectionIdGenerator {
 }
 
 /// Metadata associated with an established and fully upgraded connection.
-#[derive(Clone, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConnectionMetadata {
     pub remote_peer_id: PeerId,
     pub connection_id: ConnectionId,

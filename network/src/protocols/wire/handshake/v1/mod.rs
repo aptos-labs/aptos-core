@@ -51,6 +51,7 @@ pub enum ProtocolId {
     ConsensusRpcJson = 7,
     StorageServiceRpc = 8,
     MempoolRpc = 9,
+    PeerMonitoringServiceRpc = 10,
 }
 
 /// The encoding types for Protocols
@@ -73,6 +74,7 @@ impl ProtocolId {
             ConsensusRpcJson => "ConsensusRpcJson",
             StorageServiceRpc => "StorageServiceRpc",
             MempoolRpc => "MempoolRpc",
+            PeerMonitoringServiceRpc => "PeerMonitoringServiceRpc",
         }
     }
 
@@ -88,6 +90,7 @@ impl ProtocolId {
             ProtocolId::ConsensusRpcJson,
             ProtocolId::StorageServiceRpc,
             ProtocolId::MempoolRpc,
+            ProtocolId::PeerMonitoringServiceRpc,
         ]
     }
 
@@ -141,7 +144,7 @@ impl fmt::Display for ProtocolId {
 /// These sets are sent over-the-wire in the initial [`HandshakeMsg`] to other
 /// AptosNet peers in order to negotiate the set of common supported protocols for
 /// use on a new AptosNet connection.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ProtocolIdSet(bitvec::BitVec);
 

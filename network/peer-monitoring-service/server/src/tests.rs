@@ -3,9 +3,11 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{NetworkServiceNetworkEvents, NetworkServiceServer, NETWORK_SERVER_VERSION};
+use crate::{
+    PeerMonitoringServiceNetworkEvents, PeerMonitoringServiceServer, PEER_MONITORING_SERVER_VERSION,
+};
 use aptos_config::{
-    config::{NetworkServiceConfig, PeerRole},
+    config::{PeerMonitoringServiceConfig, PeerRole},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_logger::Level;
@@ -27,8 +29,8 @@ use network::{
     transport::{ConnectionId, ConnectionMetadata},
 };
 use peer_monitoring_service_types::{
-    ConnectedPeersResponse, PeerMonitoringServiceError, PeerMonitoringServiceMessage, PeerMonitoringServiceeRequest,
-    PeerMonitoringServiceResponse, ServerProtocolVersionResponse,
+    ConnectedPeersResponse, PeerMonitoringServiceError, PeerMonitoringServiceMessage,
+    PeerMonitoringServiceRequest, PeerMonitoringServiceResponse, ServerProtocolVersionResponse,
 };
 use std::{
     collections::{hash_map::Entry, HashMap},

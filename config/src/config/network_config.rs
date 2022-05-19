@@ -305,6 +305,22 @@ impl NetworkConfig {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct PeerMonitoringServiceConfig {
+    pub max_concurrent_requests: u64, // Max num of concurrent server tasks
+    pub max_network_channel_size: u64, // Max num of pending network messages
+}
+
+impl Default for PeerMonitoringServiceConfig {
+    fn default() -> Self {
+        Self {
+            max_concurrent_requests: 1000,
+            max_network_channel_size: 1000,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DiscoveryMethod {

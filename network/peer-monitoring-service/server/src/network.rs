@@ -17,7 +17,8 @@ use network::{
     ProtocolId,
 };
 use peer_monitoring_service_types::{
-    PeerMonitoringServiceMessage, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse, Result,
+    PeerMonitoringServiceMessage, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
+    Result,
 };
 use std::{
     pin::Pin,
@@ -37,7 +38,12 @@ pub fn network_endpoint_config(peer_monitoring_config: PeerMonitoringServiceConf
     )
 }
 
-pub type NetworkRequest = (PeerId, ProtocolId, PeerMonitoringServiceRequest, ResponseSender);
+pub type NetworkRequest = (
+    PeerId,
+    ProtocolId,
+    PeerMonitoringServiceRequest,
+    ResponseSender,
+);
 
 /// A stream of requests from the network. Each request also comes with a
 /// callback to send the response.

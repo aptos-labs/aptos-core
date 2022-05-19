@@ -19,7 +19,8 @@ use network::{
     ProtocolId,
 };
 use peer_monitoring_service_types::{
-    PeerMonitoringServiceError, PeerMonitoringServiceMessage, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
+    PeerMonitoringServiceError, PeerMonitoringServiceMessage, PeerMonitoringServiceRequest,
+    PeerMonitoringServiceResponse,
 };
 use std::{sync::Arc, time::Duration};
 use thiserror::Error;
@@ -60,18 +61,28 @@ impl PeerMonitoringServiceClient {
     ) -> Result<PeerMonitoringServiceResponse, Error> {
         let message = self
             .network_sender
-            .send_rpc(recipient, PeerMonitoringServiceMessage::Request(request), timeout)
+            .send_rpc(
+                recipient,
+                PeerMonitoringServiceMessage::Request(request),
+                timeout,
+            )
             .await?;
         match message {
             PeerMonitoringServiceMessage::Response(Ok(response)) => Ok(response),
-            PeerMonitoringServiceMessage::Response(Err(err)) => Err(Error::PeerMonitoringServiceError(err)),
-            PeerMonitoringServiceMessage::Request(_) => Err(Error::RpcError(RpcError::InvalidRpcResponse)),
+            PeerMonitoringServiceMessage::Response(Err(err)) => {
+                Err(Error::PeerMonitoringServiceError(err))
+            }
+            PeerMonitoringServiceMessage::Request(_) => {
+                Err(Error::RpcError(RpcError::InvalidRpcResponse))
+            }
         }
     }
 }
 
 #[async_trait]
-impl NetworkInterface<PeerMonitoringServiceMessage, PeerMonitoringServiceMultiSender> for PeerMonitoringServiceClient {
+impl NetworkInterface<PeerMonitoringServiceMessage, PeerMonitoringServiceMultiSender>
+    for PeerMonitoringServiceClient
+{
     type AppDataKey = ();
     type AppData = ();
 
@@ -130,7 +141,12 @@ impl ApplicationNetworkSender<PeerMonitoringServiceMessage> for PeerMonitoringSe
         timeout: Duration,
     ) -> Result<PeerMonitoringServiceMessage, RpcError> {
         self.inner
-            .send_rpc(recipient, ProtocolId::PeerMonitoringServiceRpc, message, timeout)
+            .send_rpc(
+                recipient,
+                ProtocolId::PeerMonitoringServiceRpc,
+                message,
+                timeout,
+            )
             .await
     }
 }

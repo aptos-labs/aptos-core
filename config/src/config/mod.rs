@@ -73,6 +73,8 @@ pub struct NodeConfig {
     #[serde(default)]
     pub metrics: DeprecatedConfig,
     #[serde(default)]
+    pub peer_monitoring_service: PeerMonitoringServiceConfig,
+    #[serde(default)]
     pub api: ApiConfig,
     #[serde(default)]
     pub state_sync: StateSyncConfig,
