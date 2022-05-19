@@ -85,3 +85,7 @@ target-out-docker
 
 # VSCode settings
 .vscode/
+
+# Typescript
+*.env
+node_modules
