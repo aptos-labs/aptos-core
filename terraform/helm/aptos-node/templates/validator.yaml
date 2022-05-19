@@ -172,6 +172,11 @@ spec:
       port: 6180
     - protocol: TCP
       port: 9101
+  {{- if .Values.validator.exposeRestApi }}
+  # REST API from HAproxy
+    - protocol: TCP
+      port: 8080
+  {{- end }}
   - from:
     - podSelector:
         matchLabels:
