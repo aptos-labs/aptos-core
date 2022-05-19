@@ -236,6 +236,7 @@ mod test {
         database::{new_db_pool, PgPoolConnection},
         default_processor::DefaultTransactionProcessor,
         models::transactions::TransactionModel,
+        token_processor::TokenTransactionProcessor,
     };
     use diesel::Connection;
     use serde_json::json;
@@ -265,7 +266,9 @@ mod test {
         tailer.run_migrations();
 
         let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
+        let token_transaction_processor = TokenTransactionProcessor::new(conn_pool.clone());
         tailer.add_processor(Arc::new(pg_transaction_processor));
+        tailer.add_processor(Arc::new(token_transaction_processor));
         Ok((conn_pool, tailer))
     }
 

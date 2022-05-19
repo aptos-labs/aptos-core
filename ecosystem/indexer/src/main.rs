@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use aptos_indexer::{
     database::new_db_pool, default_processor::DefaultTransactionProcessor, indexer::tailer::Tailer,
+    token_processor::TokenTransactionProcessor,
 };
 
 #[derive(Debug, Parser)]
@@ -54,6 +55,8 @@ struct IndexerArgs {
     emit_every: usize,
 }
 
+const INTERNAL_TESTING_TOKEN_PROCESSOR: bool = true;
+
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     aptos_logger::Logger::new().init();
@@ -70,8 +73,12 @@ async fn main() -> std::io::Result<()> {
         tailer.run_migrations();
     }
 
-    let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool);
+    let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
     tailer.add_processor(Arc::new(pg_transaction_processor));
+    if !INTERNAL_TESTING_TOKEN_PROCESSOR {
+        let token_transaction_processor = TokenTransactionProcessor::new(conn_pool.clone());
+        tailer.add_processor(Arc::new(token_transaction_processor));
+    }
 
     let starting_version = match args.start_from_version {
         None => tailer.set_fetcher_to_lowest_processor_version().await,

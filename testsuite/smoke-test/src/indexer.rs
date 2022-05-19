@@ -6,6 +6,7 @@ use aptos_indexer::{
     default_processor::DefaultTransactionProcessor,
     indexer::tailer::Tailer,
     models::transactions::TransactionModel,
+    token_processor::TokenTransactionProcessor,
 };
 use diesel::connection::Connection;
 use forge::{AptosContext, AptosTest, Result, Test};
@@ -21,6 +22,10 @@ impl Test for Indexer {
 
 pub fn wipe_database(conn: &PgPoolConnection) {
     for table in [
+        "tokens",
+        "token_activities",
+        "collections",
+        "ownerships",
         "write_set_changes",
         "events",
         "user_transactions",
@@ -59,7 +64,9 @@ pub fn setup_indexer(ctx: &mut AptosContext) -> anyhow::Result<(PgDbPool, Tailer
     tailer.run_migrations();
 
     let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
+    let token_processor = TokenTransactionProcessor::new(conn_pool.clone());
     tailer.add_processor(Arc::new(pg_transaction_processor));
+    tailer.add_processor(Arc::new(token_processor));
     Ok((conn_pool, tailer))
 }
 
