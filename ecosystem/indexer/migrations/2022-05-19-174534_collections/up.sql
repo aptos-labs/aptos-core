@@ -4,9 +4,9 @@ CREATE TABLE collections
 (
     creator VARCHAR NOT NULL,
     name VARCHAR NOT NULL,
-    description VARCHAR,
-    maxAmount bigint,
-    uri VARCHAR,
+    description VARCHAR NOT NULL,
+    max_amount bigint,
+    uri VARCHAR NOT NULL,
     created_at TIMESTAMP NOT NULL,
 
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),

@@ -10,9 +10,10 @@ CREATE TABLE tokens
    supply bigint NOT NULL,
    uri VARCHAR NOT NULL,
    minted_at TIMESTAMP NOT NULL,
+   last_minted_at TIMESTAMP NOT NULL,
 
    inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
 
-       -- Constraints
+    -- Constraints
    PRIMARY KEY (token_id)
 );

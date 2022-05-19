@@ -3,7 +3,7 @@ CREATE TABLE ownerships
 (
     token_id VARCHAR,
     owner VARCHAR,
-    amount NUMERIC,
+    amount BIGINT NOT NULL,
     updated_at TIMESTAMP NOT NULL,
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
 

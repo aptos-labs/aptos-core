@@ -19,9 +19,9 @@ table! {
     collections (creator, name) {
         creator -> Varchar,
         name -> Varchar,
-        description -> Nullable<Varchar>,
-        maxamount -> Nullable<Int8>,
-        uri -> Nullable<Varchar>,
+        description -> Varchar,
+        max_amount -> Nullable<Int8>,
+        uri -> Varchar,
         created_at -> Timestamp,
         inserted_at -> Timestamp,
     }
@@ -43,7 +43,7 @@ table! {
     ownerships (token_id, owner) {
         token_id -> Varchar,
         owner -> Varchar,
-        amount -> Nullable<Numeric>,
+        amount -> Int8,
         updated_at -> Timestamp,
         inserted_at -> Timestamp,
     }
@@ -84,6 +84,7 @@ table! {
         supply -> Int8,
         uri -> Varchar,
         minted_at -> Timestamp,
+        last_minted_at -> Timestamp,
         inserted_at -> Timestamp,
     }
 }

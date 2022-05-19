@@ -8,14 +8,18 @@ use crate::{
         transaction_processor::TransactionProcessor,
     },
     models::{
+        collection::Collection,
         events::EventModel,
-        token::{CreationEventType, MintEventType, Token, TokenEvent},
+        ownership::Ownership,
+        token::{CreateCollectionEventType, CreationEventType, MintEventType, Token, TokenEvent},
         transactions::{TransactionModel, UserTransaction},
     },
     schema,
-    schema::tokens::{
-        dsl::{supply, tokens},
-        token_id,
+    schema::{
+        ownerships::dsl::{
+            amount as ownership_amount, owner as ownership_owner, token_id as ownership_token_id,
+        },
+        tokens::dsl::{last_minted_at, supply, tokens},
     },
 };
 use aptos_rest_client::Transaction;
@@ -45,6 +49,85 @@ impl Debug for TokenTransactionProcessor {
     }
 }
 
+fn update_mint_token(conn: &PgPoolConnection, event_data: MintEventType, txn: &UserTransaction) {
+    let last_mint_time = txn.timestamp;
+    let query = diesel::update(tokens.find(event_data.id.to_string())).set((
+        supply.eq(supply + event_data.amount),
+        last_minted_at.eq(last_mint_time),
+    ));
+    query.execute(conn).expect("Error updating row in token");
+}
+
+fn insert_token(conn: &PgPoolConnection, event_data: CreationEventType, txn: &UserTransaction) {
+    let token = Token {
+        token_id: event_data.id.to_string(),
+        creator: event_data.id.creator,
+        collection: event_data.id.collection,
+        name: event_data.id.name,
+        description: event_data.token_data.description,
+        max_amount: event_data.token_data.maximum.value,
+        supply: 1, //TODO add initial balance to event
+        uri: event_data.token_data.uri,
+        minted_at: txn.timestamp,
+        inserted_at: chrono::Utc::now().naive_utc(),
+        last_minted_at: txn.timestamp,
+    };
+    execute_with_better_error(
+        conn,
+        diesel::insert_into(schema::tokens::table)
+            .values(&token)
+            .on_conflict_do_nothing(),
+    )
+    .expect("Error inserting row into token");
+}
+
+fn update_token_ownership(
+    conn: &PgPoolConnection,
+    token_id: String,
+    txn: &UserTransaction,
+    amount_update: i64,
+) {
+    let ownership = Ownership {
+        token_id,
+        owner: txn.sender.clone(),
+        amount: amount_update,
+        updated_at: txn.timestamp,
+        inserted_at: chrono::Utc::now().naive_utc(),
+    };
+    execute_with_better_error(
+        conn,
+        diesel::insert_into(schema::ownerships::table)
+            .values(&ownership)
+            .on_conflict((ownership_token_id, ownership_owner))
+            .do_update()
+            .set(ownership_amount.eq(ownership_amount + ownership.amount)),
+    )
+    .expect("Error update token ownership");
+}
+
+fn insert_collection(
+    conn: &PgPoolConnection,
+    event_data: CreateCollectionEventType,
+    txn: &UserTransaction,
+) {
+    let collection = Collection {
+        creator: event_data.creator,
+        name: event_data.collection_name,
+        description: event_data.description,
+        max_amount: event_data.maximum.value,
+        uri: event_data.uri,
+        created_at: txn.timestamp,
+        inserted_at: chrono::Utc::now().naive_utc(),
+    };
+    execute_with_better_error(
+        conn,
+        diesel::insert_into(schema::collections::table)
+            .values(&collection)
+            .on_conflict_do_nothing(),
+    )
+    .expect("Error inserting row into collections");
+}
+
 fn process_token(conn: &PgPoolConnection, events: &[EventModel], txn: &UserTransaction) {
     // filter events to only keep token events
     let token_events = events
@@ -56,44 +139,24 @@ fn process_token(conn: &PgPoolConnection, events: &[EventModel], txn: &UserTrans
     // if token exists, increase the supply
     for event in token_events {
         match event.unwrap() {
-            TokenEvent::CreationEvent(CreationEventType { id, token_data }) => {
-                let token = Token {
-                    token_id: id.to_string(),
-                    creator: id.creator,
-                    collection: id.collection,
-                    name: id.name,
-                    description: token_data.description,
-                    max_amount: token_data.maximum.value,
-                    supply: 1, //TODO add initial balance to event
-                    uri: token_data.uri,
-                    minted_at: txn.timestamp,
-                    inserted_at: chrono::Utc::now().naive_utc(),
-                };
-                execute_with_better_error(
-                    conn,
-                    diesel::insert_into(schema::tokens::table)
-                        .values(&token)
-                        .on_conflict_do_nothing(),
-                )
-                .expect("Error inserting row into token");
+            TokenEvent::CreationEvent(event_data) => {
+                insert_token(conn, event_data, txn);
             }
-            TokenEvent::MintEvent(MintEventType { amount, id }) => {
-                let result: Token = tokens
-                    .filter(token_id.eq(id.to_string()))
-                    .first(conn)
-                    .expect("Error in loading Tokens");
-                let new_supply = result.supply + amount;
-                let query = diesel::update(tokens.find(id.to_string())).set(supply.eq(new_supply));
-                query.execute(conn).expect("Error updating row in token");
+            TokenEvent::MintEvent(event_data) => {
+                update_mint_token(conn, event_data, txn);
+            }
+            TokenEvent::CollectionCreationEvent(event_data) => {
+                insert_collection(conn, event_data, txn);
+            }
+            TokenEvent::DepositEvent(event_data) => {
+                update_token_ownership(conn, event_data.id.to_string(), txn, event_data.amount);
+            }
+            TokenEvent::WithdrawEvent(event_data) => {
+                update_token_ownership(conn, event_data.id.to_string(), txn, -event_data.amount);
             }
             _ => (),
         }
     }
-    // TODO add a dedicated mint event when minting
-
-    // TODO for withdraw/deposite update the ownership table
-
-    // TODO add the information to token activity table
 }
 
 #[async_trait]

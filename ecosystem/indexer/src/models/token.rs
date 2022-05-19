@@ -21,6 +21,7 @@ pub struct Token {
     pub uri: String,
     pub minted_at: chrono::NaiveDateTime,
     pub inserted_at: chrono::NaiveDateTime,
+    pub last_minted_at: chrono::NaiveDateTime,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -28,12 +29,6 @@ pub struct TokenId {
     pub creator: String,
     pub collection: String,
     pub name: String,
-}
-
-impl TokenId {
-    pub fn from_serde_value(value: serde_json::Value) -> Self {
-        serde_json::from_value(value).unwrap()
-    }
 }
 
 impl fmt::Display for TokenId {
@@ -84,7 +79,6 @@ where
     use serde::de::Error;
 
     let res: Result<HashMap<String, Vec<String>>, _> = Deserialize::deserialize(deserializer);
-    // let res = serde_json::from_str::<HashMap<String, Vec<String>>>(s);
 
     res.map_or_else(
         |e| Err(D::Error::custom(e)),
@@ -126,11 +120,22 @@ pub struct MintEventType {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CreateCollectionEventType {
+    pub creator: String,
+    pub collection_name: String,
+    pub uri: String,
+    pub description: String,
+    #[serde(deserialize_with = "deserialize_option_from_string")]
+    pub maximum: MoveOption<i64>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum TokenEvent {
     WithdrawEvent(WithdrawEventType),
     DepositEvent(DepositEventType),
     CreationEvent(CreationEventType),
     MintEvent(MintEventType),
+    CollectionCreationEvent(CreateCollectionEventType),
     BurnEvent,
 }
 
@@ -149,6 +154,10 @@ impl TokenEvent {
             "0x1::Token::CreateTokenEvent" => {
                 let event = serde_json::from_value::<CreationEventType>(data).unwrap();
                 Some(TokenEvent::CreationEvent(event))
+            }
+            "0x1::Token::CreateCollectionEvent" => {
+                let event = serde_json::from_value::<CreateCollectionEventType>(data).unwrap();
+                Some(TokenEvent::CollectionCreationEvent(event))
             }
             _ => None,
         }
