@@ -115,7 +115,7 @@ module AptosFramework::Account {
     /// can publish additional resources under `new_address`.
     /// The `_witness` guarantees that owner the registered caller of this function can call it.
     /// authentication key returned is `auth_key_prefix` | `fresh_address`.
-    public fun create_account_internal(
+    public(friend) fun create_account_internal(
         new_address: address,
     ): (signer, vector<u8>) {
         // there cannot be an Account resource under new_addr already.
