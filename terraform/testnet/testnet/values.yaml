@@ -180,6 +180,7 @@ load_test:
     workers_per_ac: 64
     enableBurst: false
     waitMillis: 1000
+    txn_expiration_time_secs: 30
 
 # if enabled, faucet_test is synchronized with cluster_test traffic
 # to prevent race on mint account

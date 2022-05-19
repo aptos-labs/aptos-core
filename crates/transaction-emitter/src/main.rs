@@ -45,6 +45,8 @@ struct Args {
     wait_millis: u64,
     #[structopt(long)]
     burst: bool,
+    #[structopt(long, default_value = "30")]
+    txn_expiration_time_secs: u64,
     #[structopt(long, default_value = "mint.key")]
     mint_file: String,
     /// Ed25519PrivateKey for minting coins
@@ -94,7 +96,9 @@ async fn emit_tx(cluster: &Cluster, args: &Args) -> Result<()> {
     let mut emitter = TxnEmitter::new(
         &mut root_account,
         client,
-        TransactionFactory::new(cluster.chain_id).with_gas_unit_price(1),
+        TransactionFactory::new(cluster.chain_id)
+            .with_gas_unit_price(1)
+            .with_transaction_expiration_time(args.txn_expiration_time_secs),
         StdRng::from_seed(OsRng.gen()),
     );
     let mut emit_job_request =

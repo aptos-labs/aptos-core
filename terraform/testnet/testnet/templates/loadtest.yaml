@@ -39,6 +39,7 @@ spec:
             - --duration={{ .config.duration }}
             - --accounts-per-client={{ .config.accounts_per_client }}
             - --workers-per-ac={{ .config.workers_per_ac }}
+            - --txn-expiration-time-secs={{ .config.txn_expiration_time_secs }}
             {{- if .config.enableBurst }}
             - --burst
             - --wait-millis={{ .config.waitMillis }}
