@@ -19,7 +19,7 @@ FROM toolchain AS builder
 ARG ENABLE_FAILPOINTS
 COPY . /aptos
 
-RUN IMAGE_TARGETS="test" ./docker/build-common.sh
+RUN IMAGE_TARGET="test" ./docker/build-common.sh
 
 ### Production Image ###
 FROM debian-base AS pre-test
