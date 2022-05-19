@@ -26,7 +26,7 @@ elif [ "$OS" == "Linux" ]; then
 fi
 
 echo "Building release $VERSION of $NAME for $OS-$ARCH"
-cargo build -p $CRATE_NAME --release
+cargo build -p $CRATE_NAME --profile cli
 
 EXIT_CODE=$?
 if [ "$EXIT_CODE" != "0" ]; then

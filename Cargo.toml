@@ -143,6 +143,14 @@ default-members = [
 [profile.release]
 debug = true
 
+[profile.cli]
+inherits = "release"
+debug = false
+opt-level = "z"
+lto = true
+strip = true
+codegen-units = 1
+
 [profile.bench]
 debug = true
 
