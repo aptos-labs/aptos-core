@@ -5,6 +5,8 @@
 
 class KYCCompleteJobError < StandardError; end
 
+VALID_STATUSES = %w[approved completed].freeze
+
 class KYCCompleteJob < ApplicationJob
   # Ex args: { user_id: 32, inquiry_id=inq_syMMVRdEz7fswAa2hi, external_id: 141bc487-e025-418e-6e32-b7897060841c }
   def perform(args)
@@ -29,7 +31,7 @@ class KYCCompleteJob < ApplicationJob
     end
 
     status = inquiry['data']&.[]('attributes')&.[]('status')
-    raise KYCCompleteJobError, "Inquiry was not complete! Status: '#{status}'" unless status == 'completed'
+    raise KYCCompleteJobError, "Inquiry was not complete! Status: '#{status}'" unless VALID_STATUSES.include? status
 
     user.update(completed_persona_inquiry_id: inquiry_id, kyc_status: 'completed')
     user.maybe_send_ait1_registration_complete_email
