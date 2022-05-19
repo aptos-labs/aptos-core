@@ -29,18 +29,7 @@ class User < ApplicationRecord
 
     # returning users
     authorization = Authorization.find_by(provider: auth.provider, uid: auth.uid)
-    if authorization
-      if current_user && current_user.id != authorization.user.id &&
-         current_user.created_at < authorization.user.created_at
-        # A different User is associated with this authorization. Merge the
-        # authorization into current_user if current_user is older than the
-        # associated User.
-        authorization.user = current_user
-        authorization.save!
-      end
-
-      return authorization.user
-    end
+    return authorization.user if authorization
 
     # if user is already logged in, add new oauth to existing user
     if current_user
