@@ -5,20 +5,21 @@
 
 class DialogComponent < ViewComponent::Base
   attr_reader :id
+  renders_one :title
+  renders_one :body
 
   def initialize(**rest)
-    rest[:class] = [
-      'rounded-xl border-2 border-teal-400',
-      rest[:class]
+    @rest = rest
+    @rest[:class] = [
+      'rounded-xl bg-neutral-800 text-white border-none relative p-16',
+      @rest[:class]
     ]
 
-    @id = rest[:id] || Random.uuid
-    rest[:id] = @id
+    @id = @rest[:id] || Random.uuid
+    @rest[:id] = @id
 
-    rest[:data] ||= {}
-    rest[:data][:controller] = 'dialog'
+    @rest[:data] ||= {}
+    @rest[:data][:controller] = 'dialog'
 
-    @rest = rest
-    @tag = :dialog
   end
 end

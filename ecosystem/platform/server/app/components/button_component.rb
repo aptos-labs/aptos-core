@@ -17,6 +17,7 @@ class ButtonComponent < ViewComponent::Base
 
   def initialize(scheme: :primary,
                  size: :medium,
+                 dialog: nil,
                  **rest)
     @rest = rest
     @rest[:class] = [
@@ -24,6 +25,9 @@ class ButtonComponent < ViewComponent::Base
       SIZE_CLASSES[size],
       @rest[:class]
     ]
+    if dialog
+      @rest[:onclick] = "document.getElementById('#{dialog.id}').showModal()"
+    end
     @tag = @rest[:href] ? :a : :button
   end
 

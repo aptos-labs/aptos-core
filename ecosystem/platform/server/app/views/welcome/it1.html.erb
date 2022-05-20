@@ -6,60 +6,64 @@
 
     <%= render "layouts/flash" %>
 
-    <div class="flex flex-col lg:flex-row gap-8 sm:gap-12" data-controller="shake">
-      <div data-target="shake.content" class="bg-neutral-800 rounded-md flex flex-col flex-1">
-        <h3 class="font-mono uppercase mb-2 bg-neutral-700 text-teal-400 px-4 py-2 rounded-t-md text-sm">Step 1</h3>
-        <div class="px-8 py-4 flex flex-col flex-1">
-          <h4 class="text-teal-400 font-mono uppercase text-2xl mb-4">Node Verification</h4>
-          <div class="mb-4"><%= render 'shared/bump' %></div>
-          <p class="mb-8 font-light">
-          Register your node, and automatically verify that it is set up correctly.
-          </p>
-          <% if current_user&.it1_profile&.validator_verified? %>
-            <%= render(ButtonComponent.new(href: edit_it1_profile_path(current_user.it1_profile), class: 'w-full mt-auto')) do %>
-              Edit Registration
-            <% end %>
-          <% else %>
-            <%= render(ButtonComponent.new(href: new_it1_profile_path, class: 'w-full mt-auto')) do %>
-              Register
-            <% end %>
-          <% end %>
-        </div>
-      </div>
-      <% if current_user&.it1_profile&.validator_verified?
-           cls = ''
-           title = ''
-           action = ''
-         else
-           cls = 'cursor-not-allowed select-none opacity-50'
-           title = 'You must complete Node Verification first'
-           action = 'click->shake#shake'
-         end
-      %>
+    <div class="flex flex-col lg:flex-row gap-8" data-controller="shake">
+      <% @steps.each_with_index do |step, i| %>
+        <div data-target="shake.content" class="bg-neutral-800 rounded-md flex flex-col flex-1 <%= step.disabled ? 'cursor-not-allowed select-none opacity-50' : '' %>">
+          <h3 class="font-mono uppercase mb-2 bg-neutral-700 text-teal-400 px-4 py-2 rounded-t-md text-sm">Step <%= i + 1 %></h3>
+          <div class="px-8 py-4 flex flex-col flex-1">
+            <h4 class="text-teal-400 font-mono uppercase text-2xl mb-4">
+              <% if step.name == :connect_discord %>
+                Connect Discord
+              <% elsif step.name == :node_registration %>
+                Node Registration
+              <% elsif step.name == :identity_verification %>
+                Identity Verification
+              <% end %>
+            </h4>
 
-      <div class="bg-neutral-800 rounded-md flex flex-col flex-1 <%=cls%>" title="<%=title%>" data-action="<%=action%>">
-        <h3 class="font-mono uppercase mb-2 bg-neutral-700 text-teal-400 px-4 py-2 rounded-t-md text-sm">Step 2</h3>
-        <div class="px-8 py-4 flex flex-col flex-1">
-          <h4 class="text-teal-400 font-mono uppercase text-2xl mb-4">Identity Verification</h4>
-          <div class="mb-4"><%= render 'shared/bump' %></div>
-          <p class="mb-8 font-light">
-          Identity must be verified by noon (PST) May 23 to get into the selection process.
-          </p>
-          <% if current_user&.kyc_complete? %>
-            <div class="w-full bg-teal-400 text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mt-auto cursor-not-allowed select-none">
-              Verification Complete
-            </div>
-          <% elsif current_user&.it1_profile&.validator_verified? %>
-            <%= render(ButtonComponent.new(href: onboarding_kyc_redirect_path, class: 'w-full mt-auto')) do %>
-              Verify
+            <div class="mb-4"><%= render 'shared/bump' %></div>
+
+            <p class="mb-8 font-light">
+            <% if step.name == :connect_discord %>
+              Sign in to your Discord to continue node verification.
+            <% elsif step.name == :node_registration %>
+              Register your node, and automatically verify that it is set up correctly.
+            <% elsif step.name == :identity_verification %>
+              Identity must be verified by noon (PST) May 23 to get into the selection process.
             <% end %>
-          <% else %>
-            <div class="w-full bg-teal-400 text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mt-auto cursor-not-allowed select-none">
-              Verify
-            </div>
-          <% end %>
+            </p>
+
+            <% if step.dialog %>
+              <%= render step.dialog do |dialog| %>
+                <%= dialog.with_title do %>
+                  <% if step.name == :connect_discord %>
+                    Connect Discord
+                  <% end %>
+                <% end %>
+                <%= dialog.with_body do %>
+                  <% if step.name == :connect_discord %>
+                    <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-96') do %>
+                      Discord
+                    <% end %>
+                  <% end %>
+                <% end %>
+              <% end %>
+            <% end %>
+
+            <%= render ButtonComponent.new(href: step.disabled ? nil : step.href, dialog: step.dialog, class: 'w-full mt-auto', disabled: step.completed || step.disabled) do %>
+              <% if step.completed %>
+                Complete
+              <% elsif step.name == :connect_discord %>
+                Sign in
+              <% elsif step.name == :node_registration %>
+                Register
+              <% elsif step.name == :identity_verification %>
+                Verify
+              <% end %>
+            <% end %>
+          </div>
         </div>
-      </div>
+      <% end %>
     </div>
   </div>
 </div>

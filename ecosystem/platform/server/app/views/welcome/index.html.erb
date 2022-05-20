@@ -3,25 +3,24 @@
     <div class="sm:w-[36rem] mb-12 font-light sm:text-lg">
       <%= render 'shared/it1_intro' %>
     </div>
-    <% if user_signed_in? %>
-      <div class="p-4 rounded-lg bg-neutral-700">
-        <h3 class="mb-2">You are now signed in with your previous GitHub registration.</h3>
-        <p class="mb-4 font-light text-sm">
-        Click below to link your Discord account.
-        </p>
-        <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-full') %>
-      </div>
-    <% else %>
-    <div class="mb-12">
-      <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-full') %>
-    </div>
-    <div class="p-4 rounded-lg bg-neutral-700">
-      <h3 class="mb-2">IMPORTANT: We now require all users to sign in with Discord.</h3>
-      <p class="mb-4 font-light text-sm">
-      If you previously signed up with GitHub, click below to preserve your verification status.
-      </p>
-      <%= render LoginButtonComponent.new(provider: :github, size: :large, class: 'w-full') %>
-    </div>
+    <%= render ButtonComponent.new(size: :large, class: 'w-full mb-8', dialog: @login_dialog) do %>
+      Sign up
+    <% end %>
+    <%= render ButtonComponent.new(href: new_user_session_path, size: :large, scheme: :secondary, class: 'w-full') do %>
+      Log in
+    <% end %>
+		<%= render @login_dialog do |dialog| %>
+      <%= dialog.with_title do %>
+        Sign up with
+      <% end %>
+      <%= dialog.with_body do %>
+        <%= render LoginButtonComponent.new(provider: :github, size: :large, class: 'mb-8 w-96') do %>
+          GitHub
+        <% end %>
+        <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-96') do %>
+          Discord
+        <% end %>
+      <% end %>
     <% end %>
   </div>
 </div>
