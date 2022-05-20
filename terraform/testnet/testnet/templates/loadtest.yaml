@@ -30,7 +30,7 @@ spec:
             - --emit-tx
             - --mint-file=/opt/aptos/etc/mint.key
             - --chain-id={{ .Values.genesis.chain_id | default .Values.genesis.era }}
-            {{- if .Values.validatorLite }}
+            {{- if or .Values.validatorLite .Values.load_test.config.use_validators }}
             - --peers={{- range $i, $e := until (int .Values.genesis.numValidators) -}}val{{$i}}-aptos-validator-validator-lb:80,{{- end -}}
             {{- else }}
             - --peers={{- range $i, $e := until (int .Values.genesis.numValidators) -}}val{{$i}}-aptos-validator-fullnode-lb:80,{{- end -}}

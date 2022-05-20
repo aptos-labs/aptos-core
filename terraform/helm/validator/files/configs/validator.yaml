@@ -30,6 +30,9 @@ consensus:
   {{- if .Values.validator.config.round_initial_timeout_ms }}
   round_initial_timeout_ms: {{ .Values.validator.config.round_initial_timeout_ms }}
   {{- end }}
+  {{- if .Values.validator.config.max_block_size }}
+  max_block_size: {{ .Values.validator.config.max_block_size}}
+  {{- end }}
 
 state_sync:
   state_sync_driver:
