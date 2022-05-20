@@ -6,7 +6,7 @@ info:
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
-  version: 0.1.1
+  version: 0.1.2
   contact:
     name: Aptos
     url: https://github.com/aptos-labs/aptos-core
@@ -1093,6 +1093,11 @@ components:
         - $ref: '#/components/schemas/BlockMetadataTransaction'
       discriminator:
         propertyName: type
+        mapping:
+          pending_transaction: '#/components/schemas/PendingTransaction'
+          genesis_transaction: '#/components/schemas/GenesisTransaction'
+          user_transaction: '#/components/schemas/UserTransaction'
+          block_metadata_transaction: '#/components/schemas/BlockMetadataTransaction'
     SubmitTransactionRequest:
       title: Submit Transaction Request
       type: object
@@ -1122,6 +1127,10 @@ components:
         - $ref: '#/components/schemas/BlockMetadataTransaction'
       discriminator:
         propertyName: type
+        mapping:
+          genesis_transaction: '#/components/schemas/GenesisTransaction'
+          user_transaction: '#/components/schemas/UserTransaction'
+          block_metadata_transaction: '#/components/schemas/BlockMetadataTransaction'
     OnChainTransactionInfo:
       title: On-chain transaction information
       type: object
@@ -1238,6 +1247,11 @@ components:
         - $ref: '#/components/schemas/WriteSetPayload'
       discriminator:
         propertyName: type
+        mapping:
+          script_function_payload: '#/components/schemas/ScriptFunctionPayload'
+          script_payload: '#/components/schemas/ScriptPayload'
+          module_bundle_payload: '#/components/schemas/ModuleBundlePayload'
+          write_set_payload: '#/components/schemas/WriteSetPayload'
     ScriptFunctionPayload:
       title: Script Function Payload
       type: object
@@ -1336,6 +1350,9 @@ components:
         - $ref: '#/components/schemas/DirectWriteSet'
       discriminator:
         propertyName: type
+        mapping:
+          script_write_set: '#/components/schemas/ScriptWriteSet'
+          direct_write_set: '#/components/schemas/DirectWriteSet'
     ScriptWriteSet:
       title: Script WriteSet
       type: object
@@ -1380,6 +1397,13 @@ components:
         - $ref: '#/components/schemas/WriteTableItem'
       discriminator:
         propertyName: type
+        mapping:
+          delete_module: '#/components/schemas/DeleteModule'
+          delete_resource: '#/components/schemas/DeleteResource'
+          delete_table_item: '#/components/schemas/DeleteTableItem'
+          write_module: '#/components/schemas/WriteModule'
+          write_resource: '#/components/schemas/WriteResource'
+          write_table_item: '#/components/schemas/WriteTableItem'
     DeleteModule:
       title: Delete Module
       type: object
@@ -1616,6 +1640,10 @@ components:
         - $ref: '#/components/schemas/MultiAgentSignature'
       discriminator:
         propertyName: type
+        mapping:
+          ed25519_signature: '#/components/schemas/Ed25519Signature'
+          multi_ed25519_signature: '#/components/schemas/MultiEd25519Signature'
+          multi_agent_signature: '#/components/schemas/MultiAgentSignature'
     Ed25519Signature:
       title: Ed25519 Signature
       type: object
@@ -1695,6 +1723,9 @@ components:
         - $ref: '#/components/schemas/MultiEd25519Signature'
       discriminator:
         propertyName: type
+        mapping:
+          ed25519_signature: '#/components/schemas/Ed25519Signature'
+          multi_ed25519_signature: '#/components/schemas/MultiEd25519Signature'
     TableItemRequest:
       title: Table item request
       type: object
