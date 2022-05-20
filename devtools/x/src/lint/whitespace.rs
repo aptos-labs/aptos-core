@@ -75,15 +75,6 @@ impl<'cfg> ContentLinter for TrailingWhitespace<'cfg> {
             None => return Ok(RunStatus::Skipped(SkipReason::NonUtf8Content)),
         };
 
-        for (ln, line) in content.lines().enumerate().map(|(ln, line)| (ln + 1, line)) {
-            if line.trim_end() != line {
-                out.write(
-                    LintLevel::Error,
-                    format!("trailing whitespace at line {}", ln),
-                );
-            }
-        }
-
         if content
             .lines()
             .rev()
