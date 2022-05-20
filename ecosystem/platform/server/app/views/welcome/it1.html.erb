@@ -50,7 +50,7 @@
 
             <%= render ButtonComponent.new(href: step.disabled ? nil : step.href, dialog: step.dialog, class: 'w-full mt-auto', disabled: step.disabled) do %>
               <% if step.completed %>
-                Complete
+                <%= render IconComponent.new(:check_circle, size: :medium) %>
               <% elsif step.name == :connect_discord %>
                 Sign in
               <% elsif step.name == :node_registration %>
