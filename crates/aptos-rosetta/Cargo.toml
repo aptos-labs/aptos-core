@@ -1,0 +1,31 @@
+[package]
+name = "aptos-rosetta"
+version = "0.0.1"
+description = "Aptos Rosetta"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+edition = "2018"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+anyhow = "1.0.57"
+async-trait = "0.1.53"
+clap = "3.1.18"
+futures = "0.3.17"
+serde = { version = "1.0.137", features = ["derive"] }
+serde_json = "1.0.81"
+tokio = { version = "1.18.2", features = ["full", "time"] }
+url = "2.2.2"
+warp = "0.3.2"
+
+aptos-api = { path = "../../api" }
+aptos-config = { path = "../../config" }
+aptos-logger = { path = "../aptos-logger" }
+aptos-metrics = { path = "../aptos-metrics" }
+aptos-rest-client = { path = "../aptos-rest-client" }
+aptos-workspace-hack = { path = "../aptos-workspace-hack" }
+
+[[bin]]
+name = "aptos-rosetta"

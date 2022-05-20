@@ -41,7 +41,7 @@ pub fn bootstrap(
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct WebServer {
+pub struct WebServer {
     pub address: SocketAddr,
     pub tls_cert_path: Option<String>,
     pub tls_key_path: Option<String>,

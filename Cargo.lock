@@ -845,6 +845,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-rosetta"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-api",
+ "aptos-config",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-rest-client",
+ "aptos-workspace-hack",
+ "async-trait",
+ "clap 3.1.18",
+ "futures",
+ "serde 1.0.137",
+ "serde_json",
+ "tokio",
+ "url",
+ "warp",
+]
+
+[[package]]
 name = "aptos-sdk"
 version = "0.0.3"
 dependencies = [
