@@ -39,6 +39,7 @@ class WelcomeController < ApplicationController
     {
       name: :node_registration,
       completed:,
+      disabled: Flipper.enabled?(:it1_node_registration_disabled, current_user),
       href: completed ? edit_it1_profile_path(current_user.it1_profile) : new_it1_profile_path
     }
   end

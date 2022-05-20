@@ -4,8 +4,9 @@
 
 class It1ProfilesController < ApplicationController
   before_action :authenticate_user!
-  before_action :set_it1_profile, only: %i[show edit update destroy]
+  before_action :ensure_registration_enabled!
   before_action :ensure_confirmed!
+  before_action :set_it1_profile, only: %i[show edit update destroy]
   respond_to :html
 
   def show
@@ -123,5 +124,9 @@ class It1ProfilesController < ApplicationController
     params.fetch(:it1_profile, {}).permit(:consensus_key, :account_key, :network_key, :validator_address,
                                           :validator_port, :validator_api_port, :validator_metrics_port,
                                           :fullnode_address, :fullnode_port, :fullnode_network_key, :terms_accepted)
+  end
+
+  def ensure_registration_enabled!
+    redirect_to it1_path if Flipper.enabled?(:it1_node_registration_disabled, current_user)
   end
 end

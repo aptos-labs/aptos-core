@@ -1,4 +1,6 @@
 AllCops:
+  Exclude:
+    - db/schema.rb
   NewCops: enable
 
 Metrics/MethodLength:
