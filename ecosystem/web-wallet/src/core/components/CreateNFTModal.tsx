@@ -24,7 +24,6 @@ import { useMutation, useQueryClient } from 'react-query';
 import React from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import useWalletState from 'core/hooks/useWalletState';
-import { Inputs } from 'pages/Wallet';
 import { secondaryTextColor } from 'pages/Login';
 import { NODE_URL } from 'core/constants';
 import { AptosAccountState } from 'core/types';
@@ -32,14 +31,14 @@ import { AptosAccountState } from 'core/types';
 // eslint-disable-next-line global-require
 window.Buffer = window.Buffer || require('buffer').Buffer;
 
-const defaultRequestErrorAttributes = {
+export const defaultRequestErrorAttributes = {
   config: {},
   headers: {},
   status: 400,
   statusText: 'Move abort',
 };
 
-interface RaiseForErrorProps {
+export interface RaiseForErrorProps {
   vmStatus: string
 }
 
@@ -135,7 +134,7 @@ export default function CreateNFTModal() {
 
   const errorMessage = error?.response?.data?.message;
 
-  const onSubmit: SubmitHandler<Inputs> = async (_data, event) => {
+  const onSubmit: SubmitHandler<Record<string, any>> = async (_data, event) => {
     event?.preventDefault();
     await createTokenAndCollectionOnClick();
     await queryClient.refetchQueries(['gallery-items']);

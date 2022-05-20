@@ -26,9 +26,7 @@ import useWalletState from 'core/hooks/useWalletState';
 import { AptosWhiteLogo, AptosBlackLogo } from 'core/components/AptosLogo';
 import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import { secondaryBgColor, secondaryErrorMessageColor } from 'core/constants';
-import { getAccountResources } from './Wallet';
-
-type Inputs = Record<string, any>;
+import { getAccountResources } from 'core/queries/account';
 
 export const secondaryTextColor = {
   dark: 'gray.400',
@@ -38,13 +36,13 @@ export const secondaryTextColor = {
 function Login() {
   const { colorMode } = useColorMode();
   const { aptosAccount, updateWalletState } = useWalletState();
+  const navigate = useNavigate();
   const {
     formState: { errors }, handleSubmit, register, setError, watch,
   } = useForm();
   const key: string = watch('privateKey');
-  const navigate = useNavigate();
 
-  const onSubmit: SubmitHandler<Inputs> = async (data, event) => {
+  const onSubmit: SubmitHandler<Record<string, any>> = async (data, event) => {
     event?.preventDefault();
     try {
       const nonHexKey = (key.startsWith('0x')) ? key.substring(2) : key;

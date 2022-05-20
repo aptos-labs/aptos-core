@@ -4,8 +4,9 @@
 import { useState, useCallback } from 'react';
 import constate from 'constate';
 import { getAptosAccountState, getLocalStorageState } from 'core/utils/account';
-import { WALLET_STATE_LOCAL_STORAGE_KEY } from 'core/constants';
+import { WALLET_STATE_LOCAL_STORAGE_KEY, WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY } from 'core/constants';
 import { AptosAccountState, LocalStorageState } from 'core/types';
+import { AptosNetwork, getLocalStorageNetworkState } from 'core/utils/network';
 
 const defaultValue: LocalStorageState = {
   aptosAccountObject: undefined,
@@ -21,6 +22,9 @@ export default function useWalletState() {
   );
 
   const [aptosAccount, setAptosAccount] = useState<AptosAccountState>(() => getAptosAccountState());
+  const [aptosNetwork, setAptosNetwork] = useState<AptosNetwork | null>(
+    () => getLocalStorageNetworkState(),
+  );
 
   const updateWalletState = useCallback(({ aptosAccountState }: UpdateWalletStateProps) => {
     try {
@@ -34,6 +38,16 @@ export default function useWalletState() {
     }
   }, []);
 
+  const updateNetworkState = useCallback((network: AptosNetwork) => {
+    try {
+      setAptosNetwork(network);
+      window.localStorage.setItem(WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY, network);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+    }
+  }, []);
+
   const signOut = useCallback(() => {
     setAptosAccount(undefined);
     setLocalStorageState({ aptosAccountObject: undefined });
@@ -41,7 +55,12 @@ export default function useWalletState() {
   }, []);
 
   return {
-    aptosAccount, signOut, updateWalletState, walletState: localStorageState,
+    aptosAccount,
+    aptosNetwork,
+    signOut,
+    updateNetworkState,
+    updateWalletState,
+    walletState: localStorageState,
   };
 }
 
