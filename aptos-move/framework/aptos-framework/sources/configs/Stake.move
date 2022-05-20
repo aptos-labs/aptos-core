@@ -160,7 +160,7 @@ module AptosFramework::Stake {
     ///
     /// `validator_address` delegated to does not have to be active yet. If they're already active, the delegation is
     /// not yet effective until the next epoch.
-    public(friend) fun delegate_stake(
+    public(script) fun delegate_stake(
         delegator: &signer,
         validator_address: address,
         amount: u64,
