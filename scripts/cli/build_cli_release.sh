@@ -34,7 +34,7 @@ if [ "$EXIT_CODE" != "0" ]; then
   exit $EXIT_CODE
 fi
 
-cd target/release/
+cd target/cli/
 
 # Compress the CLI
 ZIP_NAME="$NAME-$VERSION-$OS-$ARCH.zip"
