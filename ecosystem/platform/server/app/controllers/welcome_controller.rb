@@ -35,7 +35,7 @@ class WelcomeController < ApplicationController
   end
 
   def node_registration_step
-    completed = !current_user&.it1_profile&.validator_verified?.nil?
+    completed = !!current_user.it1_profile&.validator_verified?
     {
       name: :node_registration,
       completed:,
@@ -44,7 +44,7 @@ class WelcomeController < ApplicationController
   end
 
   def identity_verification_step
-    completed = !current_user&.kyc_complete?.nil?
+    completed = current_user.kyc_complete?
     {
       name: :identity_verification,
       completed:,

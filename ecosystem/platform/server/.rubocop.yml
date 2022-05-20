@@ -27,3 +27,6 @@ Style/Copyright:
 Lint/MissingSuper:
   Exclude:
     - 'app/components/**/*'
+
+Style/DoubleNegation:
+  Enabled: false
