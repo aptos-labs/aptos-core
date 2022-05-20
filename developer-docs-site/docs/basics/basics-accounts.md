@@ -40,4 +40,4 @@ Creating a K-of-N multisig authentication key is similar to creating a single si
 
 ## Account resources
 
-Every account on Aptos can store data, which it does so in resources. The initial resource is the account data itself (authentication key and sequence number). Additional resources like currency or NFTs can be added after account creation. In order to create accounts, the Aptos testnet requires the account's public key and an amount of TestCoin to add to that account, resulting in the creation of a new account with those two resources.
+Every account on Aptos can store data, which it does so in resources. The initial resource is the account data itself (authentication key and sequence number). Additional resources like currency or NFTs can be added after account creation. In order to create accounts, the Aptos testnet requires the account's public key and an amount of Coin\<TestCoin\> to add to that account, resulting in the creation of a new account with those two resources.

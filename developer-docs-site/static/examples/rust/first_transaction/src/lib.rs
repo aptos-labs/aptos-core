@@ -271,8 +271,8 @@ impl RestClient {
     pub fn transfer(&self, account_from: &mut Account, recipient: &str, amount: u64) -> String {
         let payload = serde_json::json!({
             "type": "script_function_payload",
-            "function": "0x1::TestCoin::transfer",
-            "type_arguments": [],
+            "function": "0x1::Coin::transfer",
+            "type_arguments": ["0x1::TestCoin::TestCoin"],
             "arguments": [format!("0x{}", recipient), amount.to_string()]
         });
         let txn_request = self.generate_transaction(&account_from.address(), payload);

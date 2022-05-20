@@ -134,7 +134,7 @@ class RestClient:
 #:!:>section_5
     def account_balance(self, account_address: str) -> Optional[int]:
         """Returns the test coin balance associated with the account"""
-        return self.account_resource(account_address, "0x1::TestCoin::Balance")
+        return self.account_resource(account_address, "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>")
 
     def transfer(self, account_from: Account, recipient: str, amount: int) -> str:
         """Transfer a given coin amount from a given Account to the recipient's account address.
@@ -142,8 +142,8 @@ class RestClient:
 
         payload = {
             "type": "script_function_payload",
-            "function": "0x1::TestCoin::transfer",
-            "type_arguments": [],
+            "function": "0x1::Coin::transfer",
+            "type_arguments": ["0x1::TestCoin::TestCoin"],
             "arguments": [
                 f"0x{recipient}",
                 str(amount),
