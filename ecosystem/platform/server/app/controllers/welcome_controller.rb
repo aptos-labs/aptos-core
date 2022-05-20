@@ -17,12 +17,10 @@ class WelcomeController < ApplicationController
     @steps = [
       connect_discord_step,
       node_registration_step,
-      identity_verification_step,
+      identity_verification_step
     ].map { |h| OpenStruct.new(**h) }
     first_incomplete = @steps.index { |step| step.completed == false }
-    if first_incomplete
-      @steps[first_incomplete + 1..].each { |step| step.disabled = true }
-    end
+    @steps[first_incomplete + 1..].each { |step| step.disabled = true } if first_incomplete
   end
 
   private
@@ -36,20 +34,20 @@ class WelcomeController < ApplicationController
   end
 
   def node_registration_step
-    completed = !!current_user&.it1_profile&.validator_verified?
+    completed = !current_user&.it1_profile&.validator_verified?.nil?
     {
       name: :node_registration,
       completed:,
-      href: completed ? edit_it1_profile_path(current_user.it1_profile) : new_it1_profile_path,
+      href: completed ? edit_it1_profile_path(current_user.it1_profile) : new_it1_profile_path
     }
   end
 
   def identity_verification_step
-    completed =  !!current_user&.kyc_complete?
+    completed = !current_user&.kyc_complete?.nil?
     {
       name: :identity_verification,
       completed:,
-      href: completed ? nil : onboarding_kyc_redirect_path,
+      href: completed ? nil : onboarding_kyc_redirect_path
     }
   end
 end

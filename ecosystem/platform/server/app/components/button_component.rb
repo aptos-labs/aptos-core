@@ -25,9 +25,7 @@ class ButtonComponent < ViewComponent::Base
       SIZE_CLASSES[size],
       @rest[:class]
     ]
-    if dialog
-      @rest[:onclick] = "document.getElementById('#{dialog.id}').showModal()"
-    end
+    @rest[:onclick] = "document.getElementById('#{dialog.id}').showModal()" if dialog
     @tag = @rest[:href] ? :a : :button
   end
 

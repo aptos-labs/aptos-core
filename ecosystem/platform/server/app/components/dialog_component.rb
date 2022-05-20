@@ -5,6 +5,7 @@
 
 class DialogComponent < ViewComponent::Base
   attr_reader :id
+
   renders_one :title
   renders_one :body
 
@@ -20,6 +21,5 @@ class DialogComponent < ViewComponent::Base
 
     @rest[:data] ||= {}
     @rest[:data][:controller] = 'dialog'
-
   end
 end
