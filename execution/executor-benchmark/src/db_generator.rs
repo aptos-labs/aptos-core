@@ -69,8 +69,13 @@ pub fn run(
     let gen_thread = std::thread::Builder::new()
         .name("txn_generator".to_string())
         .spawn(move || {
-            let mut generator =
-                TransactionGenerator::new_with_sender(genesis_key, num_accounts, block_sender);
+            let seed_accounts = (num_accounts / 1000).max(1);
+            let mut generator = TransactionGenerator::new_with_sender(
+                genesis_key,
+                num_accounts,
+                seed_accounts,
+                block_sender,
+            );
             generator.run_mint(init_account_balance, block_size);
             generator
         })
