@@ -59,23 +59,22 @@ pub trait ChunkExecutorTrait: Send + Sync {
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> anyhow::Result<()>;
 
-    /// Commit a previously executed chunk. Returns a vector of reconfiguration
-    /// events in the chunk and the transactions that were committed.
-    fn commit_chunk(&self) -> Result<(Vec<ContractEvent>, Vec<Transaction>)>;
+    /// Commit a previously executed chunk. Returns a chunk commit notification.
+    fn commit_chunk(&self) -> Result<ChunkCommitNotification>;
 
     fn execute_and_commit_chunk(
         &self,
         txn_list_with_proof: TransactionListWithProof,
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<(Vec<ContractEvent>, Vec<Transaction>)>;
+    ) -> Result<ChunkCommitNotification>;
 
     fn apply_and_commit_chunk(
         &self,
         txn_output_list_with_proof: TransactionOutputListWithProof,
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<(Vec<ContractEvent>, Vec<Transaction>)>;
+    ) -> Result<ChunkCommitNotification>;
 
     /// Resets the chunk executor by synchronizing state with storage.
     fn reset(&self) -> Result<()>;
@@ -119,6 +118,13 @@ pub trait TransactionReplayer: Send {
     ) -> Result<()>;
 
     fn commit(&self) -> Result<Arc<ExecutedChunk>>;
+}
+
+/// A structure that holds relevant information about a chunk that was committed.
+pub struct ChunkCommitNotification {
+    pub committed_events: Vec<ContractEvent>,
+    pub committed_transactions: Vec<Transaction>,
+    pub reconfiguration_occurred: bool,
 }
 
 /// A structure that summarizes the result of the execution needed for consensus to agree on.

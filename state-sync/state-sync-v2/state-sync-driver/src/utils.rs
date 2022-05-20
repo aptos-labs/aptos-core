@@ -217,14 +217,14 @@ fn fetch_startup_info(storage: Arc<dyn DbReader>) -> Result<StartupInfo, Error> 
 
 /// Initializes all relevant metric gauges (e.g., after a reboot
 /// or after an account state snapshot has been restored).
-pub fn initialize_sync_version_gauges(storage: Arc<dyn DbReader>) -> Result<(), Error> {
-    let highest_synced_version = fetch_latest_synced_version(storage)?;
+pub fn initialize_sync_gauges(storage: Arc<dyn DbReader>) -> Result<(), Error> {
+    // Update the latest synced versions
+    let highest_synced_version = fetch_latest_synced_version(storage.clone())?;
     let metrics = [
         metrics::StorageSynchronizerOperations::AppliedTransactionOutputs,
         metrics::StorageSynchronizerOperations::ExecutedTransactions,
         metrics::StorageSynchronizerOperations::Synced,
     ];
-
     for metric in metrics {
         metrics::set_gauge(
             &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
@@ -232,6 +232,14 @@ pub fn initialize_sync_version_gauges(storage: Arc<dyn DbReader>) -> Result<(), 
             highest_synced_version,
         );
     }
+
+    // Update the latest synced epoch
+    let highest_synced_epoch = fetch_latest_epoch_state(storage)?.epoch;
+    metrics::set_gauge(
+        &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+        metrics::StorageSynchronizerOperations::SyncedEpoch.get_label(),
+        highest_synced_epoch,
+    );
 
     Ok(())
 }

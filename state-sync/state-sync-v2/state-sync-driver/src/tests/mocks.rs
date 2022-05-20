@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    storage_synchronizer::StorageSynchronizerInterface, tests::utils::create_transaction_info,
+    storage_synchronizer::StorageSynchronizerInterface,
+    tests::utils::{create_startup_info, create_transaction_info},
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
@@ -24,7 +25,7 @@ use aptos_types::{
         },
     },
     transaction::{
-        AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
+        AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
         TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
     },
 };
@@ -34,7 +35,7 @@ use data_streaming_service::{
     data_stream::DataStreamListener,
     streaming_client::{DataStreamingClient, Epoch, NotificationFeedback},
 };
-use executor_types::ChunkExecutorTrait;
+use executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use mockall::mock;
 use std::sync::Arc;
 use storage_interface::{
@@ -69,6 +70,9 @@ pub fn create_mock_reader_writer(
     reader
         .expect_get_latest_transaction_info_option()
         .returning(|| Ok(Some((0, create_transaction_info()))));
+    reader
+        .expect_get_startup_info()
+        .returning(|| Ok(Some(create_startup_info())));
 
     let writer = writer.unwrap_or_else(create_mock_db_writer);
     DbReaderWriter {
@@ -129,16 +133,16 @@ mock! {
             txn_list_with_proof: TransactionListWithProof,
             verified_target_li: &LedgerInfoWithSignatures,
             epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
-        ) -> Result<(Vec<ContractEvent>, Vec<Transaction>)>;
+        ) -> Result<ChunkCommitNotification>;
 
         fn apply_and_commit_chunk<'a>(
             &self,
             txn_output_list_with_proof: TransactionOutputListWithProof,
             verified_target_li: &LedgerInfoWithSignatures,
             epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
-        ) -> Result<(Vec<ContractEvent>, Vec<Transaction>)>;
+        ) -> Result<ChunkCommitNotification>;
 
-        fn commit_chunk(&self) -> Result<(Vec<ContractEvent>, Vec<Transaction>)>;
+        fn commit_chunk(&self) -> Result<ChunkCommitNotification>;
 
         fn reset(&self) -> Result<()>;
     }

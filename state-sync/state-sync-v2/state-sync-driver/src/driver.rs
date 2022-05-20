@@ -283,11 +283,13 @@ impl<
         &self,
         consensus_commit_notification: &ConsensusCommitNotification,
     ) {
+        // Update the driver metrics
         metrics::increment_counter(
             &metrics::DRIVER_COUNTERS,
             metrics::DRIVER_CONSENSUS_COMMIT_NOTIFICATION,
         );
 
+        // Update the synced versions
         let operations = [
             metrics::StorageSynchronizerOperations::ExecutedTransactions,
             metrics::StorageSynchronizerOperations::Synced,
@@ -297,6 +299,18 @@ impl<
                 &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
                 operation.get_label(),
                 consensus_commit_notification.transactions.len() as u64,
+            );
+        }
+
+        // Update the synced epoch
+        if !consensus_commit_notification
+            .reconfiguration_events
+            .is_empty()
+        {
+            metrics::increment_gauge(
+                &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+                metrics::StorageSynchronizerOperations::SyncedEpoch.get_label(),
+                1,
             );
         }
     }

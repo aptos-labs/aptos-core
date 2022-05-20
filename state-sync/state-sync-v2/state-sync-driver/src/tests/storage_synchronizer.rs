@@ -30,6 +30,7 @@ use aptos_types::{
 use claim::assert_matches;
 use data_streaming_service::data_notification::NotificationId;
 use event_notifications::{EventNotificationListener, EventSubscriptionService};
+use executor_types::ChunkCommitNotification;
 use futures::StreamExt;
 use mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
 use mockall::predicate::{always, eq};
@@ -49,10 +50,11 @@ async fn test_apply_transaction_outputs() {
         .expect_apply_chunk()
         .with(always(), always(), always())
         .returning(|_, _, _| Ok(()));
-    let expected_commit_return = Ok((
-        vec![event_to_commit.clone()],
-        vec![transaction_to_commit.clone()],
-    ));
+    let expected_commit_return = Ok(ChunkCommitNotification {
+        committed_events: vec![event_to_commit.clone()],
+        committed_transactions: vec![transaction_to_commit.clone()],
+        reconfiguration_occurred: false,
+    });
     chunk_executor
         .expect_commit_chunk()
         .return_once(move || expected_commit_return);
@@ -170,13 +172,14 @@ async fn test_execute_transactions() {
         .expect_execute_chunk()
         .with(always(), always(), always())
         .returning(|_, _, _| Ok(()));
-    let expected_execute_return = Ok((
-        vec![event_to_commit.clone()],
-        vec![transaction_to_commit.clone()],
-    ));
+    let expected_commit_return = Ok(ChunkCommitNotification {
+        committed_events: vec![event_to_commit.clone()],
+        committed_transactions: vec![transaction_to_commit.clone()],
+        reconfiguration_occurred: false,
+    });
     chunk_executor
         .expect_commit_chunk()
-        .return_once(move || expected_execute_return);
+        .return_once(move || expected_commit_return);
 
     // Set up the mock db reader
     let mut db_reader = create_mock_db_reader();

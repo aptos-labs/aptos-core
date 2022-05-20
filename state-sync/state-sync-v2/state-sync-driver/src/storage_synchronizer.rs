@@ -189,7 +189,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
         );
 
         // Initialize the metric gauges
-        utils::initialize_sync_version_gauges(storage.reader.clone())
+        utils::initialize_sync_gauges(storage.reader.clone())
             .expect("Failed to initialize the metric gauges!");
 
         let storage_synchronizer = Self {
@@ -444,29 +444,37 @@ fn spawn_committer<
                 notification_id = committer_listener.select_next_some() => {
                     // Commit the executed chunk
                     match chunk_executor.commit_chunk() {
-                        Ok((events, transactions)) => {
+                        Ok(notification) => {
                              // Log the event and update the metrics
                              debug!(
                                 LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
                                     "Committed a new transaction chunk! \
                                     Transaction total: {:?}, event total: {:?}",
-                                   transactions.len(),
-                                   events.len()
+                                   notification.committed_transactions.len(),
+                                   notification.committed_events.len()
                                 ))
                             );
                             metrics::increment_gauge(
                                 &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
                                 metrics::StorageSynchronizerOperations::Synced
                                     .get_label(),
-                                transactions.len() as u64,
+                                notification.committed_transactions.len() as u64,
                             );
+                            if notification.reconfiguration_occurred {
+                                metrics::increment_gauge(
+                                    &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+                                    metrics::StorageSynchronizerOperations::SyncedEpoch
+                                        .get_label(),
+                                    1,
+                                );
+                            }
 
                             // Handle the committed transaction notification (e.g., notify mempool).
                             // We do this here due to synchronization issues with mempool and
                             // storage. See: https://github.com/aptos-labs/aptos-core/issues/553
                             let committed_transactions = CommittedTransactions {
-                                events,
-                                transactions
+                                events: notification.committed_events,
+                                transactions: notification.committed_transactions,
                             };
                             utils::handle_committed_transactions(committed_transactions,
                                 storage.clone(),
@@ -576,7 +584,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                         Err(format!("Failed to reset the chunk executor after account states synchronization! Error: {:?}", error))
                                     } else if let Err(error) = commit_notification_sender.send(commit_notification).await {
                                        Err(format!("Failed to send the final account commit notification! Error: {:?}", error))
-                                    } else if let Err(error) = utils::initialize_sync_version_gauges(storage.reader) {
+                                    } else if let Err(error) = utils::initialize_sync_gauges(storage.reader) {
                                        Err(format!("Failed to initialize the state sync version gauges! Error: {:?}", error))
                                     } else {
                                         Ok(())

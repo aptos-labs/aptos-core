@@ -111,7 +111,7 @@ impl<C: ChunkExecutorTrait> ExecutorProxyTrait for ExecutorProxy<C> {
     ) -> Result<(), Error> {
         // track chunk execution time
         let timer = counters::EXECUTE_CHUNK_DURATION.start_timer();
-        let (events, _) = self
+        let commit_notification = self
             .chunk_executor
             .execute_and_commit_chunk(
                 txn_list_with_proof,
@@ -122,7 +122,7 @@ impl<C: ChunkExecutorTrait> ExecutorProxyTrait for ExecutorProxy<C> {
                 Error::UnexpectedError(format!("Execute and commit chunk failed: {}", error))
             })?;
         timer.stop_and_record();
-        if let Err(e) = self.publish_event_notifications(events) {
+        if let Err(e) = self.publish_event_notifications(commit_notification.committed_events) {
             error!(
                 LogSchema::event_log(LogEntry::Reconfig, LogEvent::Fail).error(&e),
                 "Failed to publish reconfig updates in execute_chunk"
