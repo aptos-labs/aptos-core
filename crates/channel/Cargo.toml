@@ -11,7 +11,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.57"
-futures = "0.3.12"
+futures = "0.3.21"
 
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-metrics = { path = "../../crates/aptos-metrics" }

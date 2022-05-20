@@ -11,7 +11,7 @@ edition = "2018"
 
 [dependencies]
 bytes = "1.1.0"
-futures = "0.3.12"
+futures = "0.3.21"
 pin-project = "1.0.10"
 serde = { version = "1.0.137", default-features = false }
 tokio = { version = "1.8.1", features = ["full"] }

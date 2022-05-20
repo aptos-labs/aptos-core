@@ -11,7 +11,7 @@ edition = "2018"
 
 [dependencies]
 async-trait = "0.1.53"
-futures = "0.3.12"
+futures = "0.3.21"
 itertools = "0.10.0"
 rand = "0.8.3"
 serde = { version = "1.0.137", default-features = false }
