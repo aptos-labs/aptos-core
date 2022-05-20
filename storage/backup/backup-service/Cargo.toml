@@ -15,7 +15,7 @@ bytes = "1.1.0"
 hyper = "0.14.18"
 once_cell = "1.10.0"
 serde = { version = "1.0.137", default-features = false }
-tokio = { version = "1.8.1", features = ["full"] }
+tokio = { version = "1.18.2", features = ["full"] }
 warp = "0.3.2"
 
 aptos-crypto = { path = "../../../crates/aptos-crypto" }

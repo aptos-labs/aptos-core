@@ -12,7 +12,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.57"
 rand = "0.8.5"
-tokio = { version = "1.8.1", features = ["full"] }
+tokio = { version = "1.18.2", features = ["full"] }
 
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-operational-tool = { path = "../../config/management/operational", features = ["testing"] }

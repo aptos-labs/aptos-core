@@ -168,7 +168,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
- "tokio-util 0.6.10",
+ "tokio-util 0.7.2",
  "toml",
  "uuid",
  "vm-genesis",
@@ -753,7 +753,7 @@ dependencies = [
  "structopt",
  "thiserror",
  "tokio",
- "tokio-util 0.6.10",
+ "tokio-util 0.7.2",
  "toml",
  "url",
 ]
@@ -799,7 +799,7 @@ dependencies = [
  "futures",
  "pin-project",
  "tokio",
- "tokio-util 0.6.10",
+ "tokio-util 0.7.2",
 ]
 
 [[package]]
@@ -1143,7 +1143,7 @@ dependencies = [
  "standback",
  "syn 1.0.95",
  "tokio",
- "tokio-util 0.6.10",
+ "tokio-util 0.7.2",
  "toml",
  "tracing",
  "tracing-core",
@@ -1352,7 +1352,7 @@ dependencies = [
  "structopt",
  "tokio",
  "tokio-stream",
- "tokio-util 0.6.10",
+ "tokio-util 0.7.2",
  "toml",
  "warp",
 ]
@@ -5241,7 +5241,7 @@ dependencies = [
  "proxy",
  "serde 1.0.137",
  "tokio",
- "tokio-util 0.6.10",
+ "tokio-util 0.7.2",
  "url",
 ]
 
@@ -5293,7 +5293,7 @@ dependencies = [
  "tokio",
  "tokio-retry",
  "tokio-stream",
- "tokio-util 0.6.10",
+ "tokio-util 0.7.2",
 ]
 
 [[package]]
@@ -8232,7 +8232,6 @@ checksum = "36943ee01a6d67977dd3f84a5a1d2efeb4ada3a1ae771cadfaa535d9d9fc6507"
 dependencies = [
  "bytes",
  "futures-core",
- "futures-io",
  "futures-sink",
  "log",
  "pin-project-lite",
@@ -8247,6 +8246,7 @@ checksum = "f988a1a1adc2fb21f9c12aa96441da33a1728193ae0b95d2be22dbd17fcb4e5c"
 dependencies = [
  "bytes",
  "futures-core",
+ "futures-io",
  "futures-sink",
  "pin-project-lite",
  "tokio",

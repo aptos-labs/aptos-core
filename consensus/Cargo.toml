@@ -27,7 +27,7 @@ serde = { version = "1.0.137", default-features = false }
 serde_json = "1.0.81"
 termion = { version = "1.5.6", default-features = false }
 thiserror = "1.0.31"
-tokio = { version = "1.8.1", features = ["full"] }
+tokio = { version = "1.18.2", features = ["full"] }
 
 aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }

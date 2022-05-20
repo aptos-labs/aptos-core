@@ -14,7 +14,7 @@ enum_dispatch = "0.3.8"
 futures = { version = "0.3.12", optional = true }
 pin-project = { version = "1.0.10", optional = true }
 thiserror = "1.0.31"
-tokio = { version = "1.8.1", features = ["macros", "rt-multi-thread", "time"], optional = true }
+tokio = { version = "1.18.2", features = ["macros", "rt-multi-thread", "time"], optional = true }
 
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-workspace-hack = { path = "../aptos-workspace-hack" }
@@ -22,7 +22,7 @@ aptos-workspace-hack = { path = "../aptos-workspace-hack" }
 [dev-dependencies]
 futures = "0.3.21"
 pin-project = "1.0.10"
-tokio = { version = "1.8.1", features = ["macros", "rt-multi-thread", "time"] }
+tokio = { version = "1.18.2", features = ["macros", "rt-multi-thread", "time"] }
 tokio-test = "0.4.1"
 
 [features]
