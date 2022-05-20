@@ -127,6 +127,7 @@ class It1ProfilesController < ApplicationController
   end
 
   def ensure_registration_enabled!
-    redirect_to it1_path if Flipper.enabled?(:it1_node_registration_disabled, current_user)
+    redirect_to it1_path if Flipper.enabled?(:it1_node_registration_disabled,
+                                             current_user) || Flipper.enabled?(:it1_registration_closed, current_user)
   end
 end

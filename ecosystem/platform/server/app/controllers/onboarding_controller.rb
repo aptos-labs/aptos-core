@@ -7,6 +7,7 @@ class OnboardingController < ApplicationController
   before_action :authenticate_user!, except: %i[kyc_callback]
   before_action :ensure_discord!, only: %i[kyc_redirect]
   before_action :ensure_confirmed!, only: %i[kyc_redirect]
+  before_action :ensure_it1_registration_open!, only: %i[kyc_callback kyc_redirect]
   before_action :set_oauth_data, except: %i[kyc_callback]
   protect_from_forgery except: :kyc_callback
 
@@ -95,5 +96,9 @@ class OnboardingController < ApplicationController
   def set_oauth_data
     @oauth_username = current_user.authorizations.pluck(:username).first
     @oauth_email = current_user.authorizations.pluck(:email).first
+  end
+
+  def ensure_it1_registration_open!
+    redirect_to root_url if Flipper.enabled?(:it1_registration_closed, current_user)
   end
 end
