@@ -8,7 +8,7 @@
 
     <div class="flex flex-col lg:flex-row gap-8" data-controller="shake">
       <% @steps.each_with_index do |step, i| %>
-        <div data-target="shake.content" class="bg-neutral-800 rounded-md flex flex-col flex-1 <%= step.disabled ? 'cursor-not-allowed select-none opacity-50' : '' %>">
+        <div data-action="<%= step.disabled ? 'click->shake#shake' : '' %>" data-target="<%= !step.disabled && !step.completed ? 'shake.content' : '' %>" class="bg-neutral-800 rounded-md flex flex-col flex-1 <%= step.disabled ? 'cursor-not-allowed select-none opacity-50' : '' %>">
           <h3 class="font-mono uppercase mb-2 bg-neutral-700 text-teal-400 px-4 py-2 rounded-t-md text-sm">Step <%= i + 1 %></h3>
           <div class="px-8 py-4 flex flex-col flex-1">
             <h4 class="text-teal-400 font-mono uppercase text-2xl mb-4">
@@ -42,15 +42,13 @@
                 <% end %>
                 <%= dialog.with_body do %>
                   <% if step.name == :connect_discord %>
-                    <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-96') do %>
-                      Discord
-                    <% end %>
+                    <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-96') %>
                   <% end %>
                 <% end %>
               <% end %>
             <% end %>
 
-            <%= render ButtonComponent.new(href: step.disabled ? nil : step.href, dialog: step.dialog, class: 'w-full mt-auto', disabled: step.completed || step.disabled) do %>
+            <%= render ButtonComponent.new(href: step.disabled ? nil : step.href, dialog: step.dialog, class: 'w-full mt-auto', disabled: step.disabled) do %>
               <% if step.completed %>
                 Complete
               <% elsif step.name == :connect_discord %>

@@ -19,17 +19,18 @@ class WelcomeController < ApplicationController
       node_registration_step,
       identity_verification_step
     ].map { |h| OpenStruct.new(**h) }
-    first_incomplete = @steps.index { |step| step.completed == false }
+    first_incomplete = @steps.index { |step| !step.completed }
     @steps[first_incomplete + 1..].each { |step| step.disabled = true } if first_incomplete
   end
 
   private
 
   def connect_discord_step
+    completed = current_user.authorizations.where(provider: :discord).exists?
     {
       name: :connect_discord,
-      completed: current_user.authorizations.where(provider: :discord).exists?,
-      dialog: DialogComponent.new
+      completed:,
+      dialog: completed ? nil : DialogComponent.new
     }
   end
 

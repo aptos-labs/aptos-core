@@ -14,12 +14,8 @@
         Sign up with
       <% end %>
       <%= dialog.with_body do %>
-        <%= render LoginButtonComponent.new(provider: :github, size: :large, class: 'mb-8 w-96') do %>
-          GitHub
-        <% end %>
-        <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-96') do %>
-          Discord
-        <% end %>
+        <%= render LoginButtonComponent.new(provider: :github, size: :large, class: 'mb-8 w-96') %>
+        <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-96') %>
       <% end %>
     <% end %>
   </div>

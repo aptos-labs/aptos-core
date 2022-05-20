@@ -5,7 +5,6 @@
 class It1ProfilesController < ApplicationController
   before_action :authenticate_user!
   before_action :set_it1_profile, only: %i[show edit update destroy]
-  before_action :ensure_discord!
   before_action :ensure_confirmed!
   respond_to :html
 

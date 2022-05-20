@@ -7,12 +7,8 @@
     <div class="flex-1 p-4 rounded-lg bg-neutral-800">
       <h3 class="font-mono uppercase text-xl mb-4">Sign in</h3>
       <div class="mb-4"><%= render 'shared/bump' %></div>
-      <%= render LoginButtonComponent.new(provider: :github, size: :large, class: 'mb-4 w-full') do %>
-        GitHub
-      <% end %>
-      <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-full') do %>
-        Discord
-      <% end %>
+      <%= render LoginButtonComponent.new(provider: :github, size: :large, class: 'mb-4 w-full') %>
+      <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-full') %>
     </div>
   </div>
 </div>
