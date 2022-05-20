@@ -22,7 +22,7 @@ dependencies = [
  "aptos-workspace-hack",
  "mirai-annotations",
  "proptest",
- "rand 0.8.4",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -157,7 +157,7 @@ dependencies = [
  "hex",
  "itertools",
  "move-deps",
- "rand 0.8.4",
+ "rand 0.8.5",
  "reqwest",
  "serde 1.0.137",
  "serde_json",
@@ -209,7 +209,7 @@ dependencies = [
  "move-deps",
  "once_cell",
  "percent-encoding",
- "rand 0.8.4",
+ "rand 0.8.5",
  "regex",
  "reqwest",
  "serde 1.0.137",
@@ -267,7 +267,7 @@ dependencies = [
  "bcs",
  "get_if_addrs",
  "mirai-annotations",
- "rand 0.8.4",
+ "rand 0.8.5",
  "serde 1.0.137",
  "serde_yaml",
  "short-hex-str",
@@ -296,7 +296,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.4",
+ "rand 0.8.5",
  "rand_core 0.6.3",
  "ripemd160",
  "serde 1.0.137",
@@ -344,7 +344,7 @@ dependencies = [
  "itertools",
  "maplit",
  "network",
- "rand 0.8.4",
+ "rand 0.8.5",
  "serde 1.0.137",
  "storage-service-client",
  "storage-service-server",
@@ -370,7 +370,7 @@ dependencies = [
  "bytes",
  "futures",
  "hex",
- "rand 0.8.4",
+ "rand 0.8.5",
  "reqwest",
  "serde 1.0.137",
  "serde_json",
@@ -419,7 +419,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.4",
+ "rand 0.8.5",
  "rusty-fork",
  "safety-rules",
  "scratchpad",
@@ -450,7 +450,7 @@ dependencies = [
  "cached-framework-packages",
  "consensus-types",
  "executor",
- "rand 0.8.4",
+ "rand 0.8.5",
  "serde 1.0.137",
  "storage-interface",
  "structopt",
@@ -531,7 +531,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.4",
+ "rand 0.8.5",
  "serde 1.0.137",
  "storage-interface",
  "thiserror",
@@ -545,7 +545,7 @@ dependencies = [
  "aptos-types",
  "aptos-workspace-hack",
  "hex",
- "rand 0.8.4",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -628,7 +628,7 @@ dependencies = [
  "network",
  "once_cell",
  "proptest",
- "rand 0.8.4",
+ "rand 0.8.5",
  "rayon",
  "serde 1.0.137",
  "serde_json",
@@ -708,7 +708,7 @@ dependencies = [
  "mempool-notifications",
  "network",
  "network-builder",
- "rand 0.8.4",
+ "rand 0.8.5",
  "state-sync-multiplexer",
  "state-sync-v1",
  "storage-client",
@@ -746,7 +746,7 @@ dependencies = [
  "move-deps",
  "netcore",
  "network",
- "rand 0.8.4",
+ "rand 0.8.5",
  "serde 1.0.137",
  "serde_json",
  "serde_yaml",
@@ -774,7 +774,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.4",
+ "rand 0.8.5",
  "rayon",
 ]
 
@@ -896,7 +896,7 @@ dependencies = [
  "bcs",
  "chrono",
  "enum_dispatch",
- "rand 0.8.4",
+ "rand 0.8.5",
  "serde 1.0.137",
  "serde_json",
  "thiserror",
@@ -939,7 +939,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-workspace-hack",
  "hex",
- "rand 0.8.4",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -1028,7 +1028,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.4",
+ "rand 0.8.5",
  "regex",
  "serde 1.0.137",
  "serde_bytes",
@@ -1132,7 +1132,7 @@ dependencies = [
  "num-integer",
  "num-traits 0.2.15",
  "parking_lot 0.12.0",
- "rand 0.8.4",
+ "rand 0.8.5",
  "regex",
  "regex-syntax",
  "reqwest",
@@ -1200,7 +1200,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.4",
+ "rand 0.8.5",
  "schemadb",
  "scratchpad",
  "serde 1.0.137",
@@ -1343,7 +1343,7 @@ dependencies = [
  "once_cell",
  "pin-project",
  "proptest",
- "rand 0.8.4",
+ "rand 0.8.5",
  "regex",
  "reqwest",
  "serde 1.0.137",
@@ -1987,7 +1987,7 @@ dependencies = [
  "num-traits 0.2.15",
  "once_cell",
  "proptest",
- "rand 0.8.4",
+ "rand 0.8.5",
  "safety-rules",
  "schemadb",
  "serde 1.0.137",
@@ -2440,7 +2440,7 @@ dependencies = [
  "futures",
  "network",
  "once_cell",
- "rand 0.8.4",
+ "rand 0.8.5",
  "serde 1.0.137",
  "short-hex-str",
  "storage-service-types",
@@ -2725,7 +2725,7 @@ source = "git+https://github.com/dalek-cryptography/ed25519-dalek?rev=44488e43b8
 dependencies = [
  "curve25519-dalek",
  "ed25519",
- "rand 0.8.4",
+ "rand 0.8.5",
  "serde 1.0.137",
  "serde_bytes",
  "sha2",
@@ -2740,7 +2740,7 @@ checksum = "97c6ac152eba578c1c53d2cefe8ad02e239e3d6f971b0f1ef3cb54cd66037fa0"
 dependencies = [
  "curve25519-dalek-fiat",
  "ed25519",
- "rand 0.8.4",
+ "rand 0.8.5",
  "serde 1.0.137",
  "serde_bytes",
  "sha2",
@@ -2875,7 +2875,7 @@ dependencies = [
  "move-deps",
  "once_cell",
  "proptest",
- "rand 0.8.4",
+ "rand 0.8.5",
  "rayon",
  "scratchpad",
  "serde 1.0.137",
@@ -2909,7 +2909,7 @@ dependencies = [
  "indicatif",
  "jemallocator",
  "num_cpus",
- "rand 0.8.4",
+ "rand 0.8.5",
  "rayon",
  "schemadb",
  "serde 1.0.137",
@@ -2937,7 +2937,7 @@ dependencies = [
  "executor",
  "executor-types",
  "move-deps",
- "rand 0.8.4",
+ "rand 0.8.5",
  "storage-interface",
  "storage-service",
  "vm-genesis",
@@ -2980,7 +2980,7 @@ checksum = "ec3245a0ca564e7f3c797d20d833a6870f57a728ac967d5225b3ffdef4465011"
 dependencies = [
  "lazy_static 1.4.0",
  "log",
- "rand 0.8.4",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -3077,7 +3077,7 @@ dependencies = [
  "hyper-tls",
  "k8s-openapi",
  "kube",
- "rand 0.8.4",
+ "rand 0.8.5",
  "rayon",
  "regex",
  "reqwest",
@@ -3274,7 +3274,7 @@ dependencies = [
  "consensus-types",
  "move-deps",
  "network",
- "rand 0.8.4",
+ "rand 0.8.5",
  "serde 1.0.137",
  "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection)",
  "serde_yaml",
@@ -4115,7 +4115,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.4",
+ "rand 0.8.5",
  "serde 1.0.137",
  "vm-genesis",
 ]
@@ -4645,7 +4645,7 @@ dependencies = [
  "hex",
  "mirai-annotations",
  "once_cell",
- "rand 0.8.4",
+ "rand 0.8.5",
  "ref-cast",
  "serde 1.0.137",
  "serde_bytes",
@@ -4662,7 +4662,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.4",
+ "rand 0.8.5",
  "ref-cast",
  "serde 1.0.137",
  "serde_bytes",
@@ -4933,7 +4933,7 @@ dependencies = [
  "num",
  "once_cell",
  "pretty",
- "rand 0.8.4",
+ "rand 0.8.5",
  "serde 1.0.137",
  "serde_json",
  "simplelog",
@@ -4961,7 +4961,7 @@ dependencies = [
  "num",
  "once_cell",
  "pretty",
- "rand 0.8.4",
+ "rand 0.8.5",
  "regex",
  "serde 1.0.137",
  "serde_json",
@@ -5170,7 +5170,7 @@ dependencies = [
  "mime",
  "mime_guess",
  "quick-error 1.2.3",
- "rand 0.8.4",
+ "rand 0.8.5",
  "safemem",
  "tempfile",
  "twoway",
@@ -5282,7 +5282,7 @@ dependencies = [
  "pin-project",
  "proptest",
  "proptest-derive",
- "rand 0.8.4",
+ "rand 0.8.5",
  "rand_core 0.6.3",
  "serde 1.0.137",
  "serde_bytes",
@@ -5316,7 +5316,7 @@ dependencies = [
  "netcore",
  "network",
  "network-discovery",
- "rand 0.8.4",
+ "rand 0.8.5",
  "serde 1.0.137",
  "tokio",
 ]
@@ -5343,7 +5343,7 @@ dependencies = [
  "netcore",
  "network",
  "once_cell",
- "rand 0.8.4",
+ "rand 0.8.5",
  "serde_yaml",
  "short-hex-str",
  "tokio",
@@ -5919,7 +5919,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d5285893bb5eb82e6aaf5d59ee909a06a16737a8970984dd7746ba9283498d6"
 dependencies = [
  "phf_shared",
- "rand 0.8.4",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -6139,7 +6139,7 @@ dependencies = [
  "lazy_static 1.4.0",
  "num-traits 0.2.15",
  "quick-error 2.0.1",
- "rand 0.8.4",
+ "rand 0.8.5",
  "rand_chacha 0.3.1",
  "rand_xorshift",
  "regex-syntax",
@@ -6286,19 +6286,18 @@ dependencies = [
  "libc",
  "rand_chacha 0.2.2",
  "rand_core 0.5.1",
- "rand_hc 0.2.0",
+ "rand_hc",
 ]
 
 [[package]]
 name = "rand"
-version = "0.8.4"
+version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e7573632e6454cf6b99d7aac4ccca54be06da05aca2ef7423d22d27d4d4bcd8"
+checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
 dependencies = [
  "libc",
  "rand_chacha 0.3.1",
  "rand_core 0.6.3",
- "rand_hc 0.3.1",
 ]
 
 [[package]]
@@ -6346,15 +6345,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca3129af7b92a17112d59ad498c6f81eaf463253766b90396d39ea7a39d6613c"
 dependencies = [
  "rand_core 0.5.1",
-]
-
-[[package]]
-name = "rand_hc"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d51e9f596de227fda2ea6c84607f5558e196eeaf43c986b724ba4fb8fdf497e7"
-dependencies = [
- "rand_core 0.6.3",
 ]
 
 [[package]]
@@ -6788,7 +6778,7 @@ dependencies = [
  "criterion",
  "once_cell",
  "proptest",
- "rand 0.8.4",
+ "rand 0.8.5",
  "rusty-fork",
  "serde 1.0.137",
  "serde_json",
@@ -6867,7 +6857,7 @@ dependencies = [
  "itertools",
  "once_cell",
  "proptest",
- "rand 0.8.4",
+ "rand 0.8.5",
  "rayon",
  "storage-interface",
  "thiserror",
@@ -6920,7 +6910,7 @@ dependencies = [
  "aptos-workspace-hack",
  "bcs",
  "hex",
- "rand 0.8.4",
+ "rand 0.8.5",
  "serde_yaml",
  "structopt",
  "thiserror",
@@ -7400,7 +7390,7 @@ dependencies = [
  "move-deps",
  "once_cell",
  "proptest",
- "rand 0.8.4",
+ "rand 0.8.5",
  "regex",
  "reqwest",
  "serde_json",
@@ -7553,7 +7543,7 @@ dependencies = [
  "network-builder",
  "once_cell",
  "proptest",
- "rand 0.8.4",
+ "rand 0.8.5",
  "serde 1.0.137",
  "short-hex-str",
  "storage-interface",
@@ -7676,7 +7666,7 @@ dependencies = [
  "bcs",
  "itertools",
  "proptest",
- "rand 0.8.4",
+ "rand 0.8.5",
  "storage-client",
  "storage-interface",
 ]
@@ -7913,7 +7903,7 @@ dependencies = [
  "percent-encoding",
  "pest",
  "pest_derive",
- "rand 0.8.4",
+ "rand 0.8.5",
  "regex",
  "serde 1.0.137",
  "serde_json",
@@ -7969,7 +7959,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-workspace-hack",
  "forge",
- "rand 0.8.4",
+ "rand 0.8.5",
  "tokio",
 ]
 
@@ -8182,7 +8172,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f57eb36ecbe0fc510036adff84824dd3c24bb781e21bfa67b69d556aa85214f"
 dependencies = [
  "pin-project",
- "rand 0.8.4",
+ "rand 0.8.5",
  "tokio",
 ]
 
@@ -8409,7 +8399,7 @@ dependencies = [
  "aptos-workspace-hack",
  "futures",
  "itertools",
- "rand 0.8.4",
+ "rand 0.8.5",
  "rand_core 0.6.3",
  "reqwest",
  "structopt",
@@ -8463,7 +8453,7 @@ dependencies = [
  "http",
  "httparse",
  "log",
- "rand 0.8.4",
+ "rand 0.8.5",
  "sha-1 0.9.8",
  "thiserror",
  "url",
@@ -8750,7 +8740,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.4",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -8770,7 +8760,7 @@ dependencies = [
  "executor-test-helpers",
  "fail 0.5.0",
  "move-deps",
- "rand 0.8.4",
+ "rand 0.8.5",
  "storage-interface",
  "vm-genesis",
 ]

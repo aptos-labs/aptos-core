@@ -38,7 +38,7 @@ move-deps = { path = "../../aptos-move/move-deps" }
 base64 = "0.13.0"
 futures = "0.3.21"
 once_cell = "1.10.0"
-rand = "0.8.3"
+rand = "0.8.5"
 regex = "1.5.5"
 serde_yaml = "0.8.24"
 

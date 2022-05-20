@@ -13,8 +13,8 @@ edition = "2018"
 anyhow = { version = "1.0.57", features = ["backtrace"] }
 futures = "0.3.21"
 itertools = "0.10.3"
-rand = "0.8.3"
-rand_core = "0.6.2"
+rand = "0.8.5"
+rand_core = "0.6.3"
 reqwest = { version = "0.11.10", features = ["blocking", "json"] }
 structopt = "0.3.21"
 termion = "1.5.6"
