@@ -7,10 +7,10 @@ The Aptos community is coming together to build a secure, reliable, and decentra
 <ul class="flex flex-col gap-4 leading-tight">
   <li class="flex gap-2">
     <div class="text-teal-400">&rarr;</div>
-    <div>Read more <a href="https://medium.com/aptoslabs/aptos-incentivized-testnet-update-abcfcd94d54c" class="underline decoration-teal-400 decoration-1 underline-offset-4 hover:decoration-2">Aptos Incentivized Testnet 1 details</a>.</div>
+    <div>Read more <%= render(LinkComponent.new(href: 'https://medium.com/aptoslabs/aptos-incentivized-testnet-update-abcfcd94d54c')) { 'Aptos Incentivized Testnet 1 details' } %>.</div>
   </li>
   <li class="flex gap-2">
     <div class="text-teal-400">&rarr;</div>
-    <div>Please review the <a href="https://aptoslabs.com/terms-testnet/" class="underline decoration-teal-400 decoration-1 underline-offset-4 hover:decoration-2">Aptos Testnet Participation Terms of Use</a>.</div>
+    <div>Please review the <%= render(LinkComponent.new(href: 'https://aptoslabs.com/terms-testnet/')) { 'Aptos Testnet Participation Terms of Use' } %>.</div>
   </li>
 </ul>
