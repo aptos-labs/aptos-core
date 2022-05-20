@@ -113,7 +113,7 @@ async fn main() {
     info!(
         "[faucet]: running on: {}. Minting from {}",
         address,
-        actual_service.faucet_account.lock().unwrap().address()
+        actual_service.faucet_account.lock().await.address()
     );
     warp::serve(aptos_faucet::routes(actual_service))
         .run(address)
@@ -493,7 +493,7 @@ mod tests {
     #[tokio::test]
     async fn test_mint_fullnode_error() {
         let (accounts, service) = setup(None);
-        let address = service.faucet_account.lock().unwrap().address();
+        let address = service.faucet_account.lock().await.address();
         accounts.write().remove(&address);
         let filter = routes(service);
 

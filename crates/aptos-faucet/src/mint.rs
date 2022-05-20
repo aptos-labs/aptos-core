@@ -114,7 +114,7 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
 
     let (mut faucet_seq, mut receiver_seq) = sequences(service, receiver_address).await?;
     let our_faucet_seq = {
-        let mut faucet_account = service.faucet_account.lock().unwrap();
+        let mut faucet_account = service.faucet_account.lock().await;
 
         // If the onchain sequence_number is greater than what we have, update our
         // sequence_numbers
@@ -143,7 +143,7 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
     // After 30 seconds, we still have not caught up, we are likely unhealthy
     if our_faucet_seq >= faucet_seq + 50 {
         error!("We are unhealthy, transactions have likely expired.");
-        let mut faucet_account = service.faucet_account.lock().unwrap();
+        let mut faucet_account = service.faucet_account.lock().await;
         if faucet_account.sequence_number() >= faucet_seq + 50 {
             info!("Resetting the sequence number counter.");
             *faucet_account.sequence_number_mut() = faucet_seq;
@@ -155,7 +155,7 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
     let mut txns = vec![];
 
     {
-        let mut faucet_account = service.faucet_account.lock().unwrap();
+        let mut faucet_account = service.faucet_account.lock().await;
 
         if receiver_seq.is_none() {
             let builder =
@@ -184,7 +184,7 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
     // If there was an issue submitting a transaction we should just reset our sequence_numbers
     // to what was on chain
     if responses.iter().any(Result::is_err) {
-        *service.faucet_account.lock().unwrap().sequence_number_mut() = faucet_seq;
+        *service.faucet_account.lock().await.sequence_number_mut() = faucet_seq;
     }
 
     while !responses.is_empty() {
@@ -204,7 +204,7 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
 }
 
 async fn sequences(service: &Service, receiver: AccountAddress) -> Result<(u64, Option<u64>)> {
-    let faucet_address = service.faucet_account.lock().unwrap().address();
+    let faucet_address = service.faucet_account.lock().await.address();
     let f_request = service.client.get_account(faucet_address);
     let r_request = service.client.get_account(receiver);
     let mut responses = futures::future::join_all([f_request, r_request]).await;
