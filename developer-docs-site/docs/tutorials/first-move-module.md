@@ -156,7 +156,7 @@ Now we return to our application to deploy and interact with the module on the A
 
 ### Step 2.2) Reading a resource
 
-The module is published at an address. This is the `contract_address` below. This is similar to the previous example, where the `TestCoin` is at `0x1`. The `contract_address` will be the same as the account that publishes it.
+The module is published at an address. This is the `contract_address` below. This is similar to the previous example, where the `Coin` is at `0x1`. The `contract_address` will be the same as the account that publishes it.
 
 <Tabs>
   <TabItem value="python" label="Python" default>

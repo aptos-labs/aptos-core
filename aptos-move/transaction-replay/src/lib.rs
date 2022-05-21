@@ -27,6 +27,7 @@ use move_deps::{
     move_binary_format::{errors::VMResult, file_format::CompiledModule},
     move_cli,
     move_cli::sandbox::utils::on_disk_state_view::OnDiskStateView,
+    move_command_line_common::env::get_bytecode_version_from_env,
     move_compiler,
     move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags},
     move_core_types::{effects::ChangeSet as MoveChanges, language_storage::TypeTag},
@@ -442,7 +443,9 @@ fn compile_move_script(file_path: &str) -> Result<Vec<u8>> {
         }
     };
     match unit {
-        AnnotatedCompiledUnit::Script(_) => Ok(unit.into_compiled_unit().serialize()),
+        AnnotatedCompiledUnit::Script(_) => Ok(unit
+            .into_compiled_unit()
+            .serialize(get_bytecode_version_from_env())),
         _ => bail!("Unexpected module"),
     }
 }

@@ -3,11 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 set -e
 
-#either release or test
-if [ -z "$IMAGE_TARGETS" ]; then
-  IMAGE_TARGETS="all"
-fi
-
 # This is a common compilation scripts across different docker file
 # It unifies RUSFLAGS, compilation flags (like --release) and set of binary crates to compile in common docker layer
 
@@ -20,9 +15,14 @@ export CARGO_PROFILE_RELEASE_LTO=thin # override lto setting to turn on thin-LTO
 # Can't use ${CARGO} because of https://github.com/rust-lang/rustup/issues/2647 and
 # https://github.com/env-logger-rs/env_logger/issues/190.
 # TODO: consider using ${CARGO} once upstream issues are fixed.
-cargo x generate-workspace-hack --mode disable
+# cargo x generate-workspace-hack --mode disable
 
-if [ "$IMAGE_TARGETS" = "release" ] || [ "$IMAGE_TARGETS" = "all" ]; then
+if [ "$IMAGE_TARGET" != "release" ] && [ "$IMAGE_TARGET" != "test" ]; then
+  echo "Error: IMAGE_TARGET must one of: release,test but received: $IMAGE_TARGET"
+  exit -1
+fi
+
+if [ "$IMAGE_TARGET" = "release" ]; then
   # Build release binaries (TODO: use x to run this?)
   cargo build --release \
           -p aptos-genesis-tool \
@@ -40,15 +40,10 @@ if [ "$IMAGE_TARGETS" = "release" ] || [ "$IMAGE_TARGETS" = "all" ]; then
   # Build our core modules!
   cargo run --package framework -- --package aptos-framework --output current
 
-  # Build and overwrite the aptos-node binary with feature failpoints if $ENABLE_FAILPOINTS is configured
-  if [ "$ENABLE_FAILPOINTS" = "1" ]; then
-    echo "Building aptos-node with failpoints feature"
-    (cd aptos-node && cargo build --release --features failpoints "$@")
-  fi
 fi
 
 
-if [ "$IMAGE_TARGETS" = "test" ] || [ "$IMAGE_TARGETS" = "all"  ]; then
+if [ "$IMAGE_TARGET" = "test" ]; then
   # These non-release binaries are built separately to avoid feature unification issues
   cargo build --release \
           -p aptos-faucet \

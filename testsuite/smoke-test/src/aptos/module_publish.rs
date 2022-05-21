@@ -33,7 +33,7 @@ impl AptosTest for ModulePublish {
 
         let mut blobs = vec![];
         compiled_package
-            .compiled_modules()
+            .root_modules_map()
             .iter_modules()
             .first()
             .unwrap()

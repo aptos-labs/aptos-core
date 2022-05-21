@@ -34,8 +34,7 @@ pub fn named_addresses() -> BTreeMap<String, NumericalAddress> {
 
 pub fn modules() -> Vec<CompiledModule> {
     APTOS_PKG
-        .transitive_compiled_units()
-        .iter()
+        .all_compiled_units()
         .filter_map(|unit| match unit {
             CompiledUnit::Module(NamedCompiledModule { module, .. }) => Some(module.clone()),
             CompiledUnit::Script(_) => None,

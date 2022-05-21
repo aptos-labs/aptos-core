@@ -40,7 +40,7 @@ module AptosFramework::BucketTable {
     public fun new<K: drop + store, V: store>(initial_buckets: u64): BucketTable<K, V> {
         assert!(initial_buckets > 0, Errors::invalid_argument(EZERO_CAPACITY));
         let buckets = Table::new();
-        Table::add(&mut buckets, &0, Vector::empty());
+        Table::add(&mut buckets, 0, Vector::empty());
         let map = BucketTable {
             buckets,
             num_buckets: 1,
@@ -57,7 +57,7 @@ module AptosFramework::BucketTable {
         assert!(map.len == 0, Errors::invalid_argument(ENOT_EMPTY));
         let i = 0;
         while (i < map.num_buckets) {
-            Vector::destroy_empty(Table::remove(&mut map.buckets, &i));
+            Vector::destroy_empty(Table::remove(&mut map.buckets, i));
             i = i + 1;
         };
         let BucketTable {buckets, num_buckets: _, level: _, len: _} = map;
@@ -70,7 +70,7 @@ module AptosFramework::BucketTable {
     public fun add<K, V>(map: &mut BucketTable<K, V>, key: K, value: V) {
         let hash = sip_hash(&key);
         let index = bucket_index(map.level, map.num_buckets, hash);
-        let bucket = Table::borrow_mut(&mut map.buckets, &index);
+        let bucket = Table::borrow_mut(&mut map.buckets, index);
         let i = 0;
         let len = Vector::length(bucket);
         while (i < len) {
@@ -97,7 +97,7 @@ module AptosFramework::BucketTable {
         if (to_split + 1 == 1 << map.level) {
             map.level = map.level + 1;
         };
-        let old_bucket = Table::borrow_mut(&mut map.buckets, &to_split);
+        let old_bucket = Table::borrow_mut(&mut map.buckets, to_split);
         // partition the bucket. after the loop, i == j and [0..i) stays in old bucket, [j..len) goes to new bucket
         let i = 0;
         let j = Vector::length(old_bucket);
@@ -117,7 +117,7 @@ module AptosFramework::BucketTable {
             Vector::push_back(&mut new_bucket, entry);
             len = len - 1;
         };
-        Table::add(&mut map.buckets, &new_bucket_index, new_bucket);
+        Table::add(&mut map.buckets, new_bucket_index, new_bucket);
     }
 
     /// Return the expected bucket index to find the hash.
@@ -138,7 +138,7 @@ module AptosFramework::BucketTable {
     /// Once Table supports borrow by K, we can remove the &mut
     public fun borrow<K: copy + drop, V>(map: &mut BucketTable<K, V>, key: K): &V {
         let index = bucket_index(map.level, map.num_buckets, sip_hash(&key));
-        let bucket = Table::borrow_mut(&mut map.buckets, &index);
+        let bucket = Table::borrow_mut(&mut map.buckets, index);
         let i = 0;
         let len = Vector::length(bucket);
         while (i < len) {
@@ -155,7 +155,7 @@ module AptosFramework::BucketTable {
     /// Aborts if there is no entry for `key`.
     public fun borrow_mut<K: copy + drop, V>(map: &mut BucketTable<K, V>, key: K): &mut V {
         let index = bucket_index(map.level, map.num_buckets, sip_hash(&key));
-        let bucket = Table::borrow_mut(&mut map.buckets, &index);
+        let bucket = Table::borrow_mut(&mut map.buckets, index);
         let i = 0;
         let len = Vector::length(bucket);
         while (i < len) {
@@ -171,7 +171,7 @@ module AptosFramework::BucketTable {
     /// Returns true iff `table` contains an entry for `key`.
     public fun contains<K, V>(map: &BucketTable<K, V>, key: &K): bool {
         let index = bucket_index(map.level, map.num_buckets, sip_hash(key));
-        let bucket = Table::borrow(&map.buckets, &index);
+        let bucket = Table::borrow(&map.buckets, index);
         let i = 0;
         let len = Vector::length(bucket);
         while (i < len) {
@@ -188,7 +188,7 @@ module AptosFramework::BucketTable {
     /// Aborts if there is no entry for `key`.
     public fun remove<K: drop, V>(map: &mut BucketTable<K,V>, key: &K): V {
         let index = bucket_index(map.level, map.num_buckets, sip_hash(key));
-        let bucket = Table::borrow_mut(&mut map.buckets, &index);
+        let bucket = Table::borrow_mut(&mut map.buckets, index);
         let i = 0;
         let len = Vector::length(bucket);
         while (i < len) {

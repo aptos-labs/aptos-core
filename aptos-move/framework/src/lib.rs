@@ -47,8 +47,7 @@ pub fn load_modules_from_paths(paths: &[PathBuf]) -> Vec<Vec<u8>> {
 }
 
 pub(crate) fn module_blobs(pkg: &CompiledPackage) -> Vec<Vec<u8>> {
-    pkg.transitive_compiled_units()
-        .iter()
+    pkg.all_compiled_units()
         .filter_map(|unit| match unit {
             CompiledUnit::Module(NamedCompiledModule { module, .. }) => {
                 let mut bytes = vec![];

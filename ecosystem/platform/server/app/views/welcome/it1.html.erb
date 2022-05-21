@@ -6,6 +6,17 @@
 
     <%= render "layouts/flash" %>
 
+    <% if @it1_registration_closed && current_user.it1_profile %>
+      <h2 class="font-mono text-3xl mb-12">
+        <% if current_user.it1_profile.selected %>
+          <div>Congratulations!</div>
+          <div>Your node was selected!</div>
+        <% else %>
+          Sorry, your node was not selected.
+        <% end %>
+      </h2>
+    <% end %>
+
     <div class="flex flex-col lg:flex-row gap-8" data-controller="shake">
       <% @steps.each_with_index do |step, i| %>
         <div data-action="<%= step.disabled ? 'click->shake#shake' : '' %>" data-target="<%= !step.disabled && !step.completed ? 'shake.content' : '' %>" class="bg-neutral-800 rounded-md flex flex-col flex-1 <%= step.disabled ? 'cursor-not-allowed select-none opacity-50' : '' %>">
@@ -50,7 +61,7 @@
 
             <%= render ButtonComponent.new(href: step.disabled ? nil : step.href, dialog: step.dialog, class: 'w-full mt-auto', disabled: step.disabled) do %>
               <% if step.completed %>
-                Complete
+                <%= render IconComponent.new(:check_circle, size: :medium) %>
               <% elsif step.name == :connect_discord %>
                 Sign in
               <% elsif step.name == :node_registration %>

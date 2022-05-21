@@ -99,13 +99,15 @@ impl ReleaseOptions {
         if !self.check_layout_compatibility {
             println!("Checking layout compatibility");
             if let Some(old_module_apis) = old_module_apis {
-                let new_modules = compiled_package
-                    .transitive_compiled_units()
-                    .into_iter()
-                    .filter_map(|unit| match unit {
-                        CompiledUnit::Module(NamedCompiledModule { module, .. }) => Some(module),
-                        CompiledUnit::Script(_) => None,
-                    });
+                let new_modules =
+                    compiled_package
+                        .all_compiled_units()
+                        .filter_map(|unit| match unit {
+                            CompiledUnit::Module(NamedCompiledModule { module, .. }) => {
+                                Some(module)
+                            }
+                            CompiledUnit::Script(_) => None,
+                        });
                 check_api_compatibility(&old_module_apis, new_modules);
             }
         }
@@ -213,16 +215,16 @@ fn extract_old_apis(package_path: impl AsRef<Path>) -> Option<BTreeMap<ModuleId,
     Some(old_module_apis)
 }
 
-fn check_api_compatibility<I>(old: &BTreeMap<ModuleId, Module>, new: I)
+fn check_api_compatibility<'a, I>(old: &BTreeMap<ModuleId, Module>, new: I)
 where
-    I: IntoIterator<Item = CompiledModule>,
+    I: Iterator<Item = &'a CompiledModule>,
 {
     let mut is_linking_layout_compatible = true;
-    for module in new.into_iter() {
+    for module in new {
         // extract new linking/layout API and check compatibility with old
         let new_module_id = module.self_id();
         if let Some(old_api) = old.get(&new_module_id) {
-            let new_api = Module::new(&module);
+            let new_api = Module::new(module);
             let compatibility = Compatibility::check(old_api, &new_api);
             if is_linking_layout_compatible && !compatibility.is_fully_compatible() {
                 println!("Found linking/layout-incompatible change:");

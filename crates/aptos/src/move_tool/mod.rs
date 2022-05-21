@@ -21,6 +21,7 @@ use clap::{Parser, Subcommand};
 use move_deps::{
     move_cli,
     move_cli::package::cli::UnitTestResult,
+    move_command_line_common::env::get_bytecode_version_from_env,
     move_core_types::{
         account_address::AccountAddress,
         identifier::Identifier,
@@ -168,7 +169,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
         let compiled_package = compile_move(build_config, self.move_options.package_dir.as_path())?;
         let mut ids = Vec::new();
         compiled_package
-            .compiled_modules()
+            .root_modules_map()
             .iter_modules()
             .iter()
             .for_each(|module| ids.push(module.self_id().to_string()));
@@ -257,9 +258,13 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         };
         let package = compile_move(build_config, self.move_options.package_dir.as_path())?;
         let compiled_units: Vec<Vec<u8>> = package
-            .compiled_units
+            .root_compiled_units
             .iter()
-            .map(|unit_with_source| unit_with_source.unit.serialize())
+            .map(|unit_with_source| {
+                unit_with_source
+                    .unit
+                    .serialize(get_bytecode_version_from_env())
+            })
             .collect();
         let compiled_payload = TransactionPayload::ModuleBundle(ModuleBundle::new(compiled_units));
 

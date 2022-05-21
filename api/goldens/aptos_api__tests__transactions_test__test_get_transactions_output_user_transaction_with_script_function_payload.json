@@ -61,7 +61,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "141",
+    "gas_used": "139",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",

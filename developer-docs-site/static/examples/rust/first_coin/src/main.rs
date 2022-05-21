@@ -13,7 +13,7 @@ fn main() -> () {
     assert_eq!(
         args.len(),
         2,
-        "Expecting an argument that points to the helloblockchain module"
+        "Expecting an argument that points to the MoonCoin module"
     );
 
     let client = FirstCoinClient::new(TESTNET_URL.to_string());

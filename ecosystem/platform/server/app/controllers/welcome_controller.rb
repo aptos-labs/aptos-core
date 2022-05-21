@@ -14,6 +14,7 @@ class WelcomeController < ApplicationController
 
   def it1
     redirect_to root_path unless user_signed_in?
+    @it1_registration_closed = Flipper.enabled?(:it1_registration_closed, current_user)
     @steps = [
       connect_discord_step,
       node_registration_step,
@@ -21,6 +22,7 @@ class WelcomeController < ApplicationController
     ].map { |h| OpenStruct.new(**h) }
     first_incomplete = @steps.index { |step| !step.completed }
     @steps[first_incomplete + 1..].each { |step| step.disabled = true } if first_incomplete
+    @steps.each { |step| step.disabled = true } if @it1_registration_closed
   end
 
   private

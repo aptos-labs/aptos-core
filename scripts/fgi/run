@@ -137,7 +137,19 @@ TAG = args.tag
 BASE_TAG = args.base_image_tag
 REPORT = args.report
 if not args.tag:
-    if args.pr:  # codebuild using a PR
+    if args.pr:
+
+        # Retain this after https://github.com/aptos-labs/aptos-core/pull/741 is found to be stable enough
+        output = subprocess.check_output(
+            [f"curl https://api.github.com/repos/aptos-labs/aptos-core/pulls/{args.pr}"],
+            shell=True,
+            stderr=subprocess.DEVNULL
+        )
+        parsed_pr = json.loads(output)
+        TAG = print(parsed_pr['head']['sha'])
+
+        # Delete all the aws codebuild stuff after https://github.com/aptos-labs/aptos-core/pull/741 is found to be stable enough
+
         ret = subprocess.call(
             ["aws", "codebuild", "list-projects"], stdout=subprocess.DEVNULL
         )
