@@ -1056,7 +1056,6 @@ components:
         - sequence_number
         - max_gas_amount
         - gas_unit_price
-        - gas_currency_code
         - expiration_timestamp_secs
         - payload
       properties:
