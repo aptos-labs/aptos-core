@@ -34,7 +34,7 @@ use tokio::time::{interval, Duration};
 use tokio_stream::wrappers::IntervalStream;
 
 // Useful constants for the driver
-const DRIVER_ERROR_LOG_FREQ_SECS: u64 = 1;
+const DRIVER_ERROR_LOG_FREQ_SECS: u64 = 3;
 
 /// The configuration of the state sync driver
 #[derive(Clone)]

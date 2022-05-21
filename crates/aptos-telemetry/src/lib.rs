@@ -136,7 +136,7 @@ pub async fn send_data(event_name: String, user_id: String, event_params: HashMa
             Ok(res) => {
                 let status_code = res.status().as_u16();
                 if status_code > 200 && status_code < 299 {
-                    info!("Sent telemetry event {}", event_name.as_str());
+                    debug!("Sent telemetry event {}", event_name.as_str());
                     debug!("Sent telemetry data {:?}", &metrics_dump);
                     APTOS_TELEMETRY_SUCCESS
                         .with_label_values(&[event_name.as_str()])
