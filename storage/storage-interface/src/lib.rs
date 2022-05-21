@@ -160,12 +160,8 @@ impl TreeState {
     }
 }
 
-pub trait StateSnapshotReceiver<V>: Send {
-    fn add_chunk(
-        &mut self,
-        chunk: Vec<(HashValue, V)>,
-        proof: SparseMerkleRangeProof,
-    ) -> Result<()>;
+pub trait StateSnapshotReceiver<K, V>: Send {
+    fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()>;
 
     fn finish(self) -> Result<()>;
 
@@ -475,7 +471,7 @@ pub trait DbReader: Send + Sync {
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof<StateValue>)> {
+    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
         unimplemented!()
     }
 
@@ -626,7 +622,7 @@ pub trait DbWriter: Send + Sync {
         &self,
         version: Version,
         expected_root_hash: HashValue,
-    ) -> Result<Box<dyn StateSnapshotReceiver<StateKeyAndValue>>> {
+    ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateKeyAndValue>>> {
         unimplemented!()
     }
 

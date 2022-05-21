@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
+use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::CryptoHash, HashValue, PrivateKey, Uniform};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_temppath::TempPath;
 use aptos_transaction_builder::aptos_stdlib;
@@ -195,7 +195,7 @@ fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
 fn get_state_backup(
     db: &Arc<AptosDB>,
 ) -> (
-    Vec<(HashValue, StateKeyAndValue)>,
+    Vec<(StateKey, StateKeyAndValue)>,
     SparseMerkleRangeProof,
     HashValue,
 ) {
@@ -206,7 +206,7 @@ fn get_state_backup(
         .collect::<Result<Vec<_>>>()
         .unwrap();
     let proof = backup_handler
-        .get_account_state_range_proof(accounts.last().unwrap().0, 1)
+        .get_account_state_range_proof(CryptoHash::hash(&accounts.last().unwrap().0), 1)
         .unwrap();
     let db_reader: Arc<dyn DbReader> = db.clone();
     let root_hash = db
@@ -222,7 +222,7 @@ fn get_state_backup(
 
 fn restore_state_to_db(
     db: &Arc<AptosDB>,
-    accounts: Vec<(HashValue, StateKeyAndValue)>,
+    accounts: Vec<(StateKey, StateKeyAndValue)>,
     proof: SparseMerkleRangeProof,
     root_hash: HashValue,
     version: Version,

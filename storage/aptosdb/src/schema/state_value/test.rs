@@ -10,10 +10,10 @@ proptest! {
     fn test_encode_decode(
         state_key in any::<StateKey>(),
         version in any::<Version>(),
-        num_nibbles in any::<u8>(),
+        v in any::<StateKeyAndValue>(),
     ) {
-        assert_encode_decode::<StateValueIndexSchema>(&(state_key, version), &num_nibbles);
+        assert_encode_decode::<StateValueSchema>(&(state_key, version), &v);
     }
 }
 
-test_no_panic_decoding!(StateValueIndexSchema);
+test_no_panic_decoding!(StateValueSchema);

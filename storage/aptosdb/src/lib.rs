@@ -235,7 +235,7 @@ impl AptosDB {
             JELLYFISH_MERKLE_NODE_CF_NAME,
             LEDGER_COUNTERS_CF_NAME,
             STALE_NODE_INDEX_CF_NAME,
-            STATE_VALUE_INDEX_CF_NAME,
+            STATE_VALUE_CF_NAME,
             TRANSACTION_CF_NAME,
             TRANSACTION_ACCUMULATOR_CF_NAME,
             TRANSACTION_BY_ACCOUNT_CF_NAME,
@@ -611,8 +611,14 @@ impl AptosDB {
                 .iter()
                 .map(|txn_to_commit| txn_to_commit.jf_node_hashes())
                 .collect::<Option<Vec<_>>>();
+            self.state_store.merklize_value_sets(
+                account_state_sets.clone(),
+                node_hashes,
+                first_version,
+                cs,
+            )?;
             self.state_store
-                .put_value_sets(account_state_sets, node_hashes, first_version, cs)?;
+                .put_value_sets(account_state_sets, first_version, cs)?;
         }
 
         // Event updates. Gather event accumulator root hashes.
@@ -1070,7 +1076,7 @@ impl DbReader for AptosDB {
         &self,
         state_store_key: &StateKey,
         version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof<StateValue>)> {
+    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
         gauged_api("get_account_state_with_proof_by_version", || {
             self.state_store
                 .get_value_with_proof_by_version(state_store_key, version)
@@ -1358,7 +1364,7 @@ impl DbWriter for AptosDB {
         &self,
         version: Version,
         expected_root_hash: HashValue,
-    ) -> Result<Box<dyn StateSnapshotReceiver<StateKeyAndValue>>> {
+    ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateKeyAndValue>>> {
         gauged_api("get_state_snapshot_receiver", || {
             self.state_store
                 .get_snapshot_receiver(version, expected_root_hash)

@@ -53,7 +53,7 @@ pub struct SparseMerkleProofFuzzer;
 
 #[derive(Debug, Arbitrary)]
 struct SparseMerkleProofFuzzerInput {
-    proof: SparseMerkleProof<StateValue>,
+    proof: SparseMerkleProof,
     expected_root_hash: HashValue,
     element_key: HashValue,
     element_blob: Option<StateValue>,

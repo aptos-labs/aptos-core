@@ -521,6 +521,7 @@ dependencies = [
  "aptos-metrics",
  "aptos-types",
  "aptos-workspace-hack",
+ "aptosdb",
  "bcs",
  "byteorder",
  "itertools",

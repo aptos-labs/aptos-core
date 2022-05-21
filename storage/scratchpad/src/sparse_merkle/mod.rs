@@ -363,7 +363,7 @@ where
     pub fn serial_update(
         &self,
         update_batch: Vec<Vec<(HashValue, &V)>>,
-        proof_reader: &impl ProofRead<V>,
+        proof_reader: &impl ProofRead,
     ) -> Result<(Vec<(HashValue, HashMap<NibblePath, HashValue>)>, Self), UpdateError> {
         self.clone()
             .freeze()
@@ -374,7 +374,7 @@ where
     pub fn batch_update(
         &self,
         updates: Vec<(HashValue, &V)>,
-        proof_reader: &impl ProofRead<V>,
+        proof_reader: &impl ProofRead,
     ) -> Result<Self, UpdateError> {
         self.clone()
             .freeze()
@@ -458,7 +458,7 @@ where
     pub fn serial_update(
         &self,
         update_batch: Vec<Vec<(HashValue, &V)>>,
-        proof_reader: &impl ProofRead<V>,
+        proof_reader: &impl ProofRead,
     ) -> Result<(Vec<(HashValue, HashMap<NibblePath, HashValue>)>, Self), UpdateError> {
         let mut cur = self.clone();
         let mut result = Vec::with_capacity(update_batch.len());
@@ -562,7 +562,7 @@ where
     pub fn batch_update(
         &self,
         updates: Vec<(HashValue, &V)>,
-        proof_reader: &impl ProofRead<V>,
+        proof_reader: &impl ProofRead,
     ) -> Result<Self, UpdateError> {
         // Flatten, dedup and sort the updates with a btree map since the updates between different
         // versions may overlap on the same address in which case the latter always overwrites.
@@ -627,9 +627,9 @@ where
 }
 
 /// A type that implements `ProofRead` can provide proof for keys in persistent storage.
-pub trait ProofRead<V>: Sync {
+pub trait ProofRead: Sync {
     /// Gets verified proof for this key in persistent storage.
-    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProof<V>>;
+    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProof>;
 }
 
 /// All errors `update` can possibly return.

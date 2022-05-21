@@ -10,9 +10,7 @@ use crate::proof::{
     TransactionAccumulatorSummary,
 };
 use aptos_crypto::{
-    hash::{
-        CryptoHash, CryptoHasher, ACCUMULATOR_PLACEHOLDER_HASH, SPARSE_MERKLE_PLACEHOLDER_HASH,
-    },
+    hash::{CryptoHasher, ACCUMULATOR_PLACEHOLDER_HASH, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
 use proptest::{collection::vec, prelude::*};
@@ -72,10 +70,7 @@ where
     }
 }
 
-impl<V> Arbitrary for SparseMerkleProof<V>
-where
-    V: std::fmt::Debug + CryptoHash,
-{
+impl Arbitrary for SparseMerkleProof {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
 

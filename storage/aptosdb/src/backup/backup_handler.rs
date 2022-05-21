@@ -18,7 +18,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{SparseMerkleRangeProof, TransactionAccumulatorRangeProof, TransactionInfoWithProof},
-    state_store::state_value::StateKeyAndValue,
+    state_store::{state_key::StateKey, state_value::StateKeyAndValue},
     transaction::{Transaction, TransactionInfo, Version},
 };
 use itertools::zip_eq;
@@ -103,18 +103,22 @@ impl BackupHandler {
     pub fn get_account_iter(
         &self,
         version: Version,
-    ) -> Result<Box<dyn Iterator<Item = Result<(HashValue, StateKeyAndValue)>> + Send + Sync>> {
-        let iterator = JellyfishMerkleIterator::new(
-            Arc::clone(&self.state_store),
-            version,
-            HashValue::zero(),
-        )?
-        .enumerate()
-        .map(move |(idx, res)| {
-            BACKUP_STATE_SNAPSHOT_VERSION.set(version as i64);
-            BACKUP_STATE_SNAPSHOT_LEAF_IDX.set(idx as i64);
-            res
-        });
+    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateKeyAndValue)>> + Send + Sync>> {
+        let store = Arc::clone(&self.state_store);
+        let iterator =
+            JellyfishMerkleIterator::new(Arc::clone(&store), version, HashValue::zero())?
+                .enumerate()
+                .map(move |(idx, res)| {
+                    BACKUP_STATE_SNAPSHOT_VERSION.set(version as i64);
+                    BACKUP_STATE_SNAPSHOT_LEAF_IDX.set(idx as i64);
+                    match res {
+                        Ok((_hashed_key, key_and_version)) => Ok((
+                            key_and_version.0.clone(),
+                            store.get_value_at_version(&key_and_version)?,
+                        )),
+                        Err(err) => Err(err),
+                    }
+                });
         Ok(Box::new(iterator))
     }
 

@@ -8,7 +8,7 @@ use proptest::{
     prelude::*,
 };
 
-use aptos_jellyfish_merkle::restore::JellyfishMerkleRestore;
+use aptos_jellyfish_merkle::restore::StateSnapshotRestore;
 use aptos_temppath::TempPath;
 use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, state_store::state_key::StateKeyTag,
@@ -31,8 +31,11 @@ fn put_value_set(
         .collect();
 
     let root = state_store
-        .put_value_sets(vec![&value_set], None, version, &mut cs)
+        .merklize_value_sets(vec![&value_set], None, version, &mut cs)
         .unwrap()[0];
+    state_store
+        .put_value_sets(vec![&value_set], version, &mut cs)
+        .unwrap();
     state_store.db.write_schemas(cs.batch).unwrap();
     state_store.set_latest_version(version);
     root
@@ -496,9 +499,9 @@ proptest! {
                 .unwrap();
             let mut expected_values: Vec<_> = kvs[..=i]
                 .iter()
-                .map(|(key, value)| (key.hash(), StateKeyAndValue::new(key.clone(), value.clone())))
+                .map(|(key, value)| (key.clone(), StateKeyAndValue::new(key.clone(), value.clone())))
                 .collect();
-            expected_values.sort_unstable_by_key(|item| item.0);
+            expected_values.sort_unstable_by_key(|item| item.0.hash());
             prop_assert_eq!(actual_values, expected_values);
         }
     }
@@ -524,21 +527,20 @@ proptest! {
         let store2 = &db2.state_store;
 
         let mut restore =
-            JellyfishMerkleRestore::new(Arc::clone(store2), version, expected_root_hash).unwrap();
+            StateSnapshotRestore::new(Arc::clone(store2), version, expected_root_hash).unwrap();
 
         let mut ordered_input: Vec<_> = input
             .into_iter()
-            .map(|(addr, value)| (addr.hash(), value))
             .collect();
-        ordered_input.sort_unstable_by_key(|(key, _value)| *key);
+        ordered_input.sort_unstable_by_key(|(key, _value)| key.hash());
 
         let batch1: Vec<_> = ordered_input
             .clone()
             .into_iter()
             .take(batch1_size)
-            .map(|(key, value)| (key, StateKeyAndValue::new(StateKey::Raw(vec![]), value)))
+            .map(|(key, value)| {let kv = StateKeyAndValue::new(key.clone(), value); (key, kv)})
             .collect();
-        let rightmost_of_batch1 = batch1.last().map(|(key, _value)| *key).unwrap();
+        let rightmost_of_batch1 = batch1.last().map(|(key, _value)| key.hash()).unwrap();
         let proof_of_batch1 = store1
             .get_value_range_proof(rightmost_of_batch1, version)
             .unwrap();
@@ -548,9 +550,9 @@ proptest! {
         let batch2: Vec<_> = ordered_input
             .into_iter()
             .skip(batch1_size)
-            .map(|(key, value)| (key, StateKeyAndValue::new(StateKey::Raw(vec![]), value)))
+            .map(|(key, value)| {let kv = StateKeyAndValue::new(key.clone(), value); (key, kv)})
             .collect();
-        let rightmost_of_batch2 = batch2.last().map(|(key, _value)| *key).unwrap();
+        let rightmost_of_batch2 = batch2.last().map(|(key, _value)| key.hash()).unwrap();
         let proof_of_batch2 = store1
             .get_value_range_proof(rightmost_of_batch2, version)
             .unwrap();
@@ -625,20 +627,19 @@ proptest! {
         let store2 = &db2.state_store;
 
         let mut restore =
-            JellyfishMerkleRestore::new(Arc::clone(store2), version, expected_root_hash).unwrap();
+            StateSnapshotRestore::new(Arc::clone(store2), version, expected_root_hash).unwrap();
 
         let mut ordered_input: Vec<_> = input
             .into_iter()
-            .map(|(addr, value)| (addr.hash(), value))
             .collect();
-        ordered_input.sort_unstable_by_key(|(key, _value)| *key);
+        ordered_input.sort_unstable_by_key(|(key, _value)| key.hash());
 
         let batch1: Vec<_> = ordered_input
             .into_iter()
             .take(batch1_size)
             .map(|(key, value)| (key, StateKeyAndValue::new(StateKey::Raw(vec![]), value)))
             .collect();
-        let rightmost_of_batch1 = batch1.last().map(|(key, _value)| *key).unwrap();
+        let rightmost_of_batch1 = batch1.last().map(|(key, _value)| key.hash()).unwrap();
         let proof_of_batch1 = store1
             .get_value_range_proof(rightmost_of_batch1, version)
             .unwrap();
@@ -680,7 +681,10 @@ fn update_store(
         let value_state_set: HashMap<_, _> = std::iter::once((key, value)).collect();
         let version = first_version + i as Version;
         store
-            .put_value_sets(vec![&value_state_set], None, version, &mut cs)
+            .merklize_value_sets(vec![&value_state_set], None, version, &mut cs)
+            .unwrap();
+        store
+            .put_value_sets(vec![&value_state_set], version, &mut cs)
             .unwrap();
         store.db.write_schemas(cs.batch).unwrap();
         store.set_latest_version(version);

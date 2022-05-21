@@ -54,7 +54,7 @@ impl StorageService {
     fn get_account_state_with_proof_by_version(
         &self,
         req: &storage_interface::GetStateValueWithProofByVersionRequest,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof<StateValue>), Error> {
+    ) -> Result<(Option<StateValue>, SparseMerkleProof), Error> {
         Ok(self
             .db
             .get_state_value_with_proof_by_version(&req.state_key, req.version)?)

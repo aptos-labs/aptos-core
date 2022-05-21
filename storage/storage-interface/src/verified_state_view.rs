@@ -82,7 +82,7 @@ pub struct VerifiedStateView {
     /// the corresponding key has been deleted. This is a temporary hack until we support deletion
     /// in JMT node.
     state_cache: RwLock<HashMap<StateKey, StateValue>>,
-    state_proof_cache: RwLock<HashMap<HashValue, SparseMerkleProof<StateValue>>>,
+    state_proof_cache: RwLock<HashMap<HashValue, SparseMerkleProof>>,
 }
 
 impl VerifiedStateView {
@@ -178,7 +178,7 @@ impl VerifiedStateView {
 pub struct StateCache {
     pub frozen_base: FrozenSparseMerkleTree<StateValue>,
     pub state_cache: HashMap<StateKey, StateValue>,
-    pub proofs: HashMap<HashValue, SparseMerkleProof<StateValue>>,
+    pub proofs: HashMap<HashValue, SparseMerkleProof>,
 }
 
 impl StateView for VerifiedStateView {

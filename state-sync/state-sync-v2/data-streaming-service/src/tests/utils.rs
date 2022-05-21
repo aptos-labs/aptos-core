@@ -163,7 +163,7 @@ impl AptosDataClient for MockAptosDataClient {
         let mut account_blobs = vec![];
         for _ in start_index..=end_index {
             account_blobs.push((
-                HashValue::random(),
+                StateKey::Raw(HashValue::random().to_vec()),
                 StateKeyAndValue::new(StateKey::Raw(vec![]), vec![].into()),
             ));
         }

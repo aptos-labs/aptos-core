@@ -1545,7 +1545,7 @@ mock! {
             &self,
             state_key: &StateKey,
             version: Version,
-        ) -> Result<(Option<StateValue>, SparseMerkleProof<StateValue>)>;
+        ) -> Result<(Option<StateValue>, SparseMerkleProof)>;
 
         fn get_latest_tree_state(&self) -> Result<TreeState>;
 

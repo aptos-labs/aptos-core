@@ -3,7 +3,9 @@
 
 ///! This module provides reusable helpers in tests.
 use super::*;
-use crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema;
+use crate::{
+    jellyfish_merkle_node::JellyfishMerkleNodeSchema, schema::state_value::StateValueSchema,
+};
 use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher};
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 use aptos_temppath::TempPath;
@@ -608,11 +610,15 @@ pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &Transacti
 }
 
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
+    let state_value = StateKeyAndValue::new(key.clone(), value);
     db.db
         .put::<JellyfishMerkleNodeSchema>(
             &NodeKey::new_empty_path(version),
-            &Node::new_leaf(key.hash(), StateKeyAndValue::new(key, value)),
+            &Node::new_leaf(key.hash(), state_value.hash(), (key.clone(), version)),
         )
+        .unwrap();
+    db.db
+        .put::<StateValueSchema>(&(key, version), &state_value)
         .unwrap();
     db.state_store.set_latest_version(version);
 }

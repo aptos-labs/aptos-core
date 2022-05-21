@@ -41,7 +41,7 @@ impl DbReader for MockDbReaderWriter {
         &self,
         state_key: &StateKey,
         _: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof<StateValue>)> {
+    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
         // dummy proof which is not used
         Ok((
             self.get_latest_state_value(state_key.clone()).unwrap(),

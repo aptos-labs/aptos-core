@@ -38,6 +38,7 @@ rand = "0.8.5"
 
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
 aptos-types = { path = "../../types", features = ["fuzzing"] }
+aptosdb = { path = "../aptosdb", features = ["fuzzing"] }
 
 [features]
 default = []

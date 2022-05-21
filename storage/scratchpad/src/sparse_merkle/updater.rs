@@ -96,8 +96,8 @@ impl<V: Clone + CryptoHash> InMemSubTreeInfo<V> {
 }
 
 #[derive(Clone)]
-enum PersistedSubTreeInfo<'a, V> {
-    ProofPathInternal { proof: &'a SparseMerkleProof<V> },
+enum PersistedSubTreeInfo<'a> {
+    ProofPathInternal { proof: &'a SparseMerkleProof },
     ProofSibling { hash: HashValue },
     Leaf { leaf: SparseMerkleLeafNode },
 }
@@ -105,7 +105,7 @@ enum PersistedSubTreeInfo<'a, V> {
 #[derive(Clone)]
 enum SubTreeInfo<'a, V> {
     InMem(InMemSubTreeInfo<V>),
-    Persisted(PersistedSubTreeInfo<'a, V>),
+    Persisted(PersistedSubTreeInfo<'a>),
 }
 
 impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
@@ -125,7 +125,7 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
         }
     }
 
-    fn new_on_proof_path(proof: &'a SparseMerkleProof<V>, depth: usize) -> Self {
+    fn new_on_proof_path(proof: &'a SparseMerkleProof, depth: usize) -> Self {
         match proof.siblings().len().cmp(&depth) {
             Ordering::Greater => Self::Persisted(PersistedSubTreeInfo::ProofPathInternal { proof }),
             Ordering::Equal => match proof.leaf() {
@@ -139,7 +139,7 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
     fn from_persisted(
         a_descendant_key: HashValue,
         depth: usize,
-        proof_reader: &'a impl ProofRead<V>,
+        proof_reader: &'a impl ProofRead,
     ) -> Result<Self> {
         let proof = proof_reader
             .get_proof(a_descendant_key)
@@ -206,7 +206,7 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
         self,
         a_descendent_key: HashValue,
         depth: usize,
-        proof_reader: &'a impl ProofRead<V>,
+        proof_reader: &'a impl ProofRead,
         generation: u64,
     ) -> Result<(Self, Self)> {
         let myself = if self.is_unknown() {
@@ -278,7 +278,7 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
     pub(crate) fn update(
         root: InMemSubTree<V>,
         updates: &'a [(HashValue, &'a V)],
-        proof_reader: &'a impl ProofRead<V>,
+        proof_reader: &'a impl ProofRead,
         generation: u64,
     ) -> Result<InMemSubTree<V>> {
         let updater = Self {
@@ -290,7 +290,7 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
         Ok(updater.run(proof_reader)?.into_subtree())
     }
 
-    fn run(self, proof_reader: &impl ProofRead<V>) -> Result<InMemSubTreeInfo<V>> {
+    fn run(self, proof_reader: &impl ProofRead) -> Result<InMemSubTreeInfo<V>> {
         // Limit total tasks that are potentially sent to other threads.
         const MAX_PARALLELIZABLE_DEPTH: usize = 8;
         // No point to introduce Rayon overhead if work is small.
@@ -342,7 +342,7 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
         }
     }
 
-    fn into_children(self, proof_reader: &'a impl ProofRead<V>) -> Result<(Self, Self)> {
+    fn into_children(self, proof_reader: &'a impl ProofRead) -> Result<(Self, Self)> {
         let pivot = partition(self.updates, self.depth);
         let (left_updates, right_updates) = self.updates.split_at(pivot);
         let generation = self.generation;

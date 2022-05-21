@@ -36,7 +36,7 @@ use storage_interface::DbReader;
 pub use executed_chunk::ExecutedChunk;
 use storage_interface::{in_memory_state::InMemoryState, verified_state_view::VerifiedStateView};
 
-type SparseMerkleProof = aptos_types::proof::SparseMerkleProof<StateValue>;
+type SparseMerkleProof = aptos_types::proof::SparseMerkleProof;
 
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
@@ -390,7 +390,7 @@ impl ProofReader {
     }
 }
 
-impl ProofRead<StateValue> for ProofReader {
+impl ProofRead for ProofReader {
     fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProof> {
         self.proofs.get(&key)
     }

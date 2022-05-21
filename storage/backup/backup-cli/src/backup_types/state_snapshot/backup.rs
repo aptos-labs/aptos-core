@@ -11,11 +11,13 @@ use crate::{
     },
 };
 use anyhow::{anyhow, Result};
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
-    ledger_info::LedgerInfoWithSignatures, proof::TransactionInfoWithProof,
-    state_store::state_value::StateKeyAndValue, transaction::Version,
+    ledger_info::LedgerInfoWithSignatures,
+    proof::TransactionInfoWithProof,
+    state_store::{state_key::StateKey, state_value::StateKeyAndValue},
+    transaction::Version,
 };
 use bytes::Bytes;
 use once_cell::sync::Lazy;
@@ -155,8 +157,8 @@ impl StateSnapshotBackupController {
     }
 
     fn parse_key(record: &Bytes) -> Result<HashValue> {
-        let (key, _): (HashValue, StateKeyAndValue) = bcs::from_bytes(record)?;
-        Ok(key)
+        let (key, _): (StateKey, StateKeyAndValue) = bcs::from_bytes(record)?;
+        Ok(key.hash())
     }
 
     async fn write_chunk(

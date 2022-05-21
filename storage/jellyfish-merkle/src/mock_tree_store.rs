@@ -10,12 +10,12 @@ use aptos_infallible::RwLock;
 use aptos_types::transaction::Version;
 use std::collections::{hash_map::Entry, BTreeSet, HashMap};
 
-pub struct MockTreeStore<V> {
-    data: RwLock<(HashMap<NodeKey, Node<V>>, BTreeSet<StaleNodeIndex>)>,
+pub struct MockTreeStore<K> {
+    data: RwLock<(HashMap<NodeKey, Node<K>>, BTreeSet<StaleNodeIndex>)>,
     allow_overwrite: bool,
 }
 
-impl<V> Default for MockTreeStore<V> {
+impl<K> Default for MockTreeStore<K> {
     fn default() -> Self {
         Self {
             data: RwLock::new((HashMap::new(), BTreeSet::new())),
@@ -24,17 +24,17 @@ impl<V> Default for MockTreeStore<V> {
     }
 }
 
-impl<V> TreeReader<V> for MockTreeStore<V>
+impl<K> TreeReader<K> for MockTreeStore<K>
 where
-    V: crate::TestValue,
+    K: crate::TestKey,
 {
-    fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node<V>>> {
+    fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node<K>>> {
         Ok(self.data.read().0.get(node_key).cloned())
     }
 
-    fn get_rightmost_leaf(&self) -> Result<Option<(NodeKey, LeafNode<V>)>> {
+    fn get_rightmost_leaf(&self) -> Result<Option<(NodeKey, LeafNode<K>)>> {
         let locked = self.data.read();
-        let mut node_key_and_node: Option<(NodeKey, LeafNode<V>)> = None;
+        let mut node_key_and_node: Option<(NodeKey, LeafNode<K>)> = None;
 
         for (key, value) in locked.0.iter() {
             if let Node::Leaf(leaf_node) = value {
@@ -50,11 +50,11 @@ where
     }
 }
 
-impl<V> TreeWriter<V> for MockTreeStore<V>
+impl<K> TreeWriter<K> for MockTreeStore<K>
 where
-    V: crate::TestValue,
+    K: crate::TestKey,
 {
-    fn write_node_batch(&self, node_batch: &NodeBatch<V>) -> Result<()> {
+    fn write_node_batch(&self, node_batch: &NodeBatch<K>) -> Result<()> {
         let mut locked = self.data.write();
         for (node_key, node) in node_batch.clone() {
             let replaced = locked.0.insert(node_key, node);
@@ -68,9 +68,9 @@ where
     fn finish_version(&self, _version: Version) {}
 }
 
-impl<V> MockTreeStore<V>
+impl<K> MockTreeStore<K>
 where
-    V: crate::TestValue,
+    K: crate::TestKey,
 {
     pub fn new(allow_overwrite: bool) -> Self {
         Self {
@@ -79,7 +79,7 @@ where
         }
     }
 
-    pub fn put_node(&self, node_key: NodeKey, node: Node<V>) -> Result<()> {
+    pub fn put_node(&self, node_key: NodeKey, node: Node<K>) -> Result<()> {
         match self.data.write().0.entry(node_key) {
             Entry::Occupied(o) => bail!("Key {:?} exists.", o.key()),
             Entry::Vacant(v) => {
@@ -95,7 +95,7 @@ where
         Ok(())
     }
 
-    pub fn write_tree_update_batch(&self, batch: TreeUpdateBatch<V>) -> Result<()> {
+    pub fn write_tree_update_batch(&self, batch: TreeUpdateBatch<K>) -> Result<()> {
         batch
             .node_batch
             .into_iter()

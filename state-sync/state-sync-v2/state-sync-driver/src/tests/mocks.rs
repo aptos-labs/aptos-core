@@ -269,7 +269,7 @@ mock! {
             &self,
             state_key: &StateKey,
             version: Version,
-        ) -> Result<(Option<StateValue>, SparseMerkleProof<StateValue>)>;
+        ) -> Result<(Option<StateValue>, SparseMerkleProof)>;
 
         fn get_latest_tree_state(&self) -> Result<TreeState>;
 
@@ -311,7 +311,7 @@ mock! {
             &self,
             version: Version,
             expected_root_hash: HashValue,
-        ) -> Result<Box<dyn StateSnapshotReceiver<StateKeyAndValue>>>;
+        ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateKeyAndValue>>>;
 
         fn finalize_state_snapshot(
             &self,
@@ -335,8 +335,8 @@ mock! {
 // This automatically creates a MockSnapshotReceiver.
 mock! {
     pub SnapshotReceiver {}
-    impl StateSnapshotReceiver<StateKeyAndValue> for SnapshotReceiver {
-        fn add_chunk(&mut self, chunk: Vec<(HashValue, StateKeyAndValue)>, proof: SparseMerkleRangeProof) -> Result<()>;
+    impl StateSnapshotReceiver<StateKey, StateKeyAndValue> for SnapshotReceiver {
+        fn add_chunk(&mut self, chunk: Vec<(StateKey, StateKeyAndValue)>, proof: SparseMerkleRangeProof) -> Result<()>;
 
         fn finish(self) -> Result<()>;
 

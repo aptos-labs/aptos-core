@@ -14,9 +14,13 @@ use anyhow::{anyhow, Result};
 use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
-use aptos_jellyfish_merkle::{restore::JellyfishMerkleRestore, NodeBatch, TreeWriter};
+use aptos_jellyfish_merkle::{
+    restore::StateSnapshotRestore, KVBatch, KVWriter, NodeBatch, TreeWriter,
+};
 use aptos_types::{
-    state_store::state_value::StateKeyAndValue, transaction::Version, waypoint::Waypoint,
+    state_store::{state_key::StateKey, state_value::StateKeyAndValue},
+    transaction::Version,
+    waypoint::Waypoint,
 };
 use aptosdb::{backup::restore_handler::RestoreHandler, AptosDB, GetRestoreHandler};
 use std::{
@@ -101,14 +105,20 @@ pub enum RestoreRunMode {
     Verify,
 }
 
-struct MockTreeWriter;
+struct MockStore;
 
-impl TreeWriter<StateKeyAndValue> for MockTreeWriter {
-    fn write_node_batch(&self, _node_batch: &NodeBatch<StateKeyAndValue>) -> Result<()> {
+impl TreeWriter<StateKey> for MockStore {
+    fn write_node_batch(&self, _node_batch: &NodeBatch<StateKey>) -> Result<()> {
         Ok(())
     }
 
     fn finish_version(&self, _version: Version) {}
+}
+
+impl KVWriter<StateKey, StateKeyAndValue> for MockStore {
+    fn write_kv_batch(&self, _kv_batch: &KVBatch<StateKey, StateKeyAndValue>) -> Result<()> {
+        Ok(())
+    }
 }
 
 impl RestoreRunMode {
@@ -130,13 +140,13 @@ impl RestoreRunMode {
         &self,
         version: Version,
         expected_root_hash: HashValue,
-    ) -> Result<JellyfishMerkleRestore<StateKeyAndValue>> {
+    ) -> Result<StateSnapshotRestore<StateKey, StateKeyAndValue>> {
         match self {
             Self::Restore { restore_handler } => {
                 restore_handler.get_state_restore_receiver(version, expected_root_hash)
             }
-            Self::Verify => JellyfishMerkleRestore::new_overwrite(
-                Arc::new(MockTreeWriter),
+            Self::Verify => StateSnapshotRestore::new_overwrite(
+                Arc::new(MockStore),
                 version,
                 expected_root_hash,
             ),
