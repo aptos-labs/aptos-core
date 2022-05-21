@@ -134,31 +134,30 @@ impl AptosNetDataClient {
         *self.global_summary_cache.write() = aggregate;
     }
 
-    /// Choose a connected peer that can service the given request. Returns an
-    /// error if no such peer can be found.
+    /// Choose a connected peer that can service the given request.
+    /// Returns an error if no such peer can be found.
     fn choose_peer_for_request(
         &self,
         request: &StorageServiceRequest,
     ) -> Result<PeerNetworkId, Error> {
-        // Try to send the request to a priority peer that can service it
-        let internal_peer_states = self.peer_states.read();
-        let priority_connected_peers = self.get_priority_connected_peers()?;
-        let mut serviceable_peers = priority_connected_peers
-            .into_iter()
-            .filter(|peer| internal_peer_states.can_service_request(peer, request))
-            .collect::<Vec<_>>();
+        // Identify the peers that can service the request
+        let serviceable_peers =
+            if request.is_get_storage_server_summary() || request.is_data_subscription_request() {
+                // Storage summary and data subscription requests should be sent to prioritized peers.
+                // If none can handle the request, fall back to the regular peers.
+                let (priority_peers, regular_peers) = self.get_priority_and_regular_peers()?;
+                let priority_serviceable = self.identify_serviceable(priority_peers, request);
+                if !priority_serviceable.is_empty() {
+                    priority_serviceable
+                } else {
+                    self.identify_serviceable(regular_peers, request)
+                }
+            } else {
+                let all_connected_peers = self.get_all_connected_peers()?;
+                self.identify_serviceable(all_connected_peers, request)
+            };
 
-        // If there are no priority serviceable peers, try to send the request
-        // to a regular peer that can service it.
-        if serviceable_peers.is_empty() {
-            let regular_connected_peers = self.get_regular_connected_peers()?;
-            serviceable_peers = regular_connected_peers
-                .into_iter()
-                .filter(|peer| internal_peer_states.can_service_request(peer, request))
-                .collect::<Vec<_>>();
-        }
-
-        // Choose a random peer from those that can service the request
+        // Randomly select a peer to handle the request
         serviceable_peers
             .choose(&mut rand::thread_rng())
             .copied()
@@ -167,6 +166,19 @@ impl AptosNetDataClient {
                     format!("No connected peers are advertising that they can serve this data! Request: {:?}",request),
                 )
             })
+    }
+
+    /// Identifies the peers in the given set of prospective peers
+    /// that can service the specified request.
+    fn identify_serviceable(
+        &self,
+        prospective_peers: Vec<PeerNetworkId>,
+        request: &StorageServiceRequest,
+    ) -> Vec<PeerNetworkId> {
+        prospective_peers
+            .into_iter()
+            .filter(|peer| self.peer_states.read().can_service_request(peer, request))
+            .collect::<Vec<_>>()
     }
 
     /// Fetches the next prioritized peer to poll
@@ -181,7 +193,7 @@ impl AptosNetDataClient {
         }
 
         // Select a priority peer to poll
-        let priority_connected_peers = self.get_priority_connected_peers()?;
+        let (priority_connected_peers, _) = self.get_priority_and_regular_peers()?;
         self.select_peer_to_poll(priority_connected_peers)
     }
 
@@ -197,7 +209,7 @@ impl AptosNetDataClient {
         }
 
         // Select a regular peer to poll
-        let regular_connected_peers = self.get_regular_connected_peers()?;
+        let (_, regular_connected_peers) = self.get_priority_and_regular_peers()?;
         self.select_peer_to_poll(regular_connected_peers)
     }
 
@@ -250,18 +262,25 @@ impl AptosNetDataClient {
         Ok(connected_peers)
     }
 
-    /// Returns all priority connected peers
-    fn get_priority_connected_peers(&self) -> Result<Vec<PeerNetworkId>, Error> {
-        let mut peers = self.get_all_connected_peers()?;
-        peers.retain(|peer| self.peer_states.read().is_priority_peer(peer));
-        Ok(peers)
-    }
+    /// Returns all priority and regular peers
+    fn get_priority_and_regular_peers(
+        &self,
+    ) -> Result<(Vec<PeerNetworkId>, Vec<PeerNetworkId>), Error> {
+        // Get all connected peers
+        let all_connected_peers = self.get_all_connected_peers()?;
 
-    /// Returns all regular connected peers
-    fn get_regular_connected_peers(&self) -> Result<Vec<PeerNetworkId>, Error> {
-        let mut peers = self.get_all_connected_peers()?;
-        peers.retain(|peer| !self.peer_states.read().is_priority_peer(peer));
-        Ok(peers)
+        // Filter the peers based on priority
+        let mut priority_peers = vec![];
+        let mut regular_peers = vec![];
+        for peer in all_connected_peers {
+            if self.peer_states.read().is_priority_peer(&peer) {
+                priority_peers.push(peer);
+            } else {
+                regular_peers.push(peer);
+            }
+        }
+
+        Ok((priority_peers, regular_peers))
     }
 
     /// Sends a request (to an undecided peer) and decodes the response
