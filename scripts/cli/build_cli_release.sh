@@ -8,6 +8,9 @@
 ###########################################
 
 # Note: This must be run from the root of the aptos-core repository
+
+set -e
+
 NAME='aptos-cli'
 CRATE_NAME='aptos'
 CARGO_PATH="crates/$CRATE_NAME/Cargo.toml"
@@ -27,12 +30,6 @@ fi
 
 echo "Building release $VERSION of $NAME for $OS-$ARCH"
 cargo build -p $CRATE_NAME --profile cli
-
-EXIT_CODE=$?
-if [ "$EXIT_CODE" != "0" ]; then
-  echo "Build failed with exit code $EXIT_CODE"
-  exit $EXIT_CODE
-fi
 
 cd target/cli/
 
