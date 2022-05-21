@@ -27,7 +27,7 @@ source $HOME/.cargo/env
       - `pkg-config`:
          - Download and unzip the source code at https://pkgconfig.freedesktop.org/releases/
          - `./configure --prefix=/usr/local/pkg_config/0_29_2 --with-internal-glib`
-         - `sudo make && sudo make install` 
+         - `sudo make && sudo make install`
       - `openssl` and `libssl`:
          - Check https://wiki.openssl.org/index.php/Compilation_and_Installation for full instructions.
       - `libclang`:
