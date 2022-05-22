@@ -49,7 +49,7 @@ pub type ColumnFamilyName = &'static str;
 /// [`LedgerInfo`](../types/ledger_info/struct.LedgerInfo.html).
 pub const DEFAULT_CF_NAME: ColumnFamilyName = "default";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum WriteOp {
     Value { key: Vec<u8>, value: Vec<u8> },
     Deletion { key: Vec<u8> },
@@ -68,6 +68,21 @@ impl SchemaBatch {
     /// Creates an empty batch.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn split(&self, num_splits: usize) -> Vec<SchemaBatch> {
+        let mut splits: Vec<SchemaBatch> = (0..num_splits).map(|_| SchemaBatch::new()).collect();
+        let index = 0;
+        for (cf_name, rows) in &self.rows {
+            for write_op in rows {
+                splits[index]
+                    .rows
+                    .entry(cf_name)
+                    .or_insert_with(Vec::new)
+                    .push(write_op.clone());
+            }
+        }
+        splits
     }
 
     /// Adds an insert/update operation to the batch.
@@ -516,6 +531,7 @@ impl DB {
 /// selectively turning this off for some non-critical writes to improve performance.
 fn default_write_options() -> rocksdb::WriteOptions {
     let mut opts = rocksdb::WriteOptions::default();
+    //opts.disable_wal(true);
     opts.set_sync(true);
     opts
 }

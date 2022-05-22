@@ -79,6 +79,7 @@ use aptos_types::{
 };
 use itertools::zip_eq;
 use once_cell::sync::Lazy;
+use rayon::prelude::*;
 use schemadb::{ColumnFamilyName, Options, SchemaBatch, DB, DEFAULT_CF_NAME};
 use std::{
     collections::HashMap,
@@ -657,6 +658,13 @@ impl AptosDB {
     /// state of some transaction by leveraging rocksdb atomicity support. Also committed are the
     /// LedgerCounters.
     fn commit(&self, sealed_cs: SealedChangeSet) -> Result<()> {
+        // sealed_cs
+        //     .batch
+        //     .split(100)
+        //     .into_par_iter()
+        //     .for_each(|batch| {
+        //         self.db.write_schemas(batch).unwrap();
+        //     });
         self.db.write_schemas(sealed_cs.batch)?;
 
         Ok(())

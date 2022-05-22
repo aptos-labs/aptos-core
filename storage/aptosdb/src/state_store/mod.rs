@@ -6,6 +6,10 @@
 #[cfg(test)]
 mod state_store_test;
 
+use aptos_logger::prelude::*;
+
+use std::time::Duration;
+
 use crate::{
     change_set::ChangeSet,
     ledger_counters::LedgerCounter,
@@ -33,6 +37,7 @@ use aptos_types::{
     transaction::{Version, PRE_GENESIS_VERSION},
 };
 use itertools::process_results;
+use lru::LruCache;
 use schemadb::{SchemaBatch, DB};
 use std::{cmp::Ordering, collections::HashMap, sync::Arc};
 use storage_interface::StateSnapshotReceiver;
@@ -47,6 +52,9 @@ pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 pub(crate) struct StateStore {
     db: Arc<DB>,
     latest_version: Mutex<Option<Version>>,
+    lru_node_cache: Arc<Mutex<LruCache<NodeKey, Option<Node>>>>,
+    lru_cache_hit: Mutex<u32>,
+    lru_cache_miss: Mutex<u32>,
 }
 
 impl StateStore {
@@ -57,6 +65,9 @@ impl StateStore {
         Self {
             db,
             latest_version: Mutex::new(latest_version),
+            lru_node_cache: Arc::new(Mutex::new(LruCache::new(1_000_000))),
+            lru_cache_hit: Mutex::new(0),
+            lru_cache_miss: Mutex::new(0),
         }
     }
 
@@ -313,7 +324,7 @@ impl StateStore {
                 counter_bumps.bump(LedgerCounter::StaleStateNodes, stats.stale_nodes);
                 counter_bumps.bump(LedgerCounter::StaleStateLeaves, stats.stale_leaves);
             });
-        add_node_batch_and_index(&mut cs.batch, &tree_update_batch.node_batch)?;
+        self.add_node_batch_and_index(&mut cs.batch, &tree_update_batch.node_batch)?;
 
         tree_update_batch
             .stale_node_index_batch
@@ -321,7 +332,34 @@ impl StateStore {
             .map(|row| cs.batch.put::<StaleNodeIndexSchema>(row, &()))
             .collect::<Result<Vec<()>>>()?;
 
+        tree_update_batch.node_batch.into_iter().for_each(|(x, y)| {
+            self.lru_node_cache.lock().put(x, Some(y));
+        });
+
         Ok(new_root_hash_vec)
+    }
+
+    fn add_node_batch_and_index(
+        &self,
+        batch: &mut SchemaBatch,
+        node_batch: &NodeBatch,
+    ) -> Result<()> {
+        node_batch
+            .iter()
+            .map(|(node_key, node)| {
+                batch.put::<JellyfishMerkleNodeSchema>(node_key, node)?;
+                // Add the value index for leaf nodes.
+                match node {
+                    Node::Leaf(leaf) => batch.put::<StateValueIndexSchema>(
+                        &(leaf.value().key.clone(), node_key.version()),
+                        &(node_key.nibble_path().num_nibbles() as u8),
+                    ),
+
+                    _ => Ok(()),
+                }
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(())
     }
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
@@ -409,7 +447,26 @@ impl StateStore {
 
 impl TreeReader<StateKeyAndValue> for StateStore {
     fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node>> {
-        self.db.get::<JellyfishMerkleNodeSchema>(node_key)
+        // Check if the response is already in the cache
+
+        // sample!(
+        //     SampleRate::Duration(Duration::from_secs(10)),
+        //     info!("lru hits is {:?}, miss is {:?}", *self.lru_cache_hit.lock(), *self.lru_cache_miss.lock());
+        // );
+
+        if let Some(node_option) = self.lru_node_cache.lock().get(node_key) {
+            *self.lru_cache_hit.lock() += 1;
+            if let Some(node) = node_option {
+                return Ok(Some(node.clone()));
+            }
+            return Ok(None);
+        }
+        //*self.lru_cache_miss.lock() += 1;
+        let node_option = self.db.get::<JellyfishMerkleNodeSchema>(node_key)?;
+        self.lru_node_cache
+            .lock()
+            .put(node_key.clone(), node_option.clone());
+        Ok(node_option)
     }
 
     fn get_rightmost_leaf(&self) -> Result<Option<(NodeKey, LeafNode)>> {
@@ -477,30 +534,11 @@ impl TreeReader<StateKeyAndValue> for StateStore {
 impl TreeWriter<StateKeyAndValue> for StateStore {
     fn write_node_batch(&self, node_batch: &NodeBatch) -> Result<()> {
         let mut batch = SchemaBatch::new();
-        add_node_batch_and_index(&mut batch, node_batch)?;
+        self.add_node_batch_and_index(&mut batch, node_batch)?;
         self.db.write_schemas(batch)
     }
 
     fn finish_version(&self, version: Version) {
         self.set_latest_version(version)
     }
-}
-
-fn add_node_batch_and_index(batch: &mut SchemaBatch, node_batch: &NodeBatch) -> Result<()> {
-    node_batch
-        .iter()
-        .map(|(node_key, node)| {
-            batch.put::<JellyfishMerkleNodeSchema>(node_key, node)?;
-            // Add the value index for leaf nodes.
-            match node {
-                Node::Leaf(leaf) => batch.put::<StateValueIndexSchema>(
-                    &(leaf.value().key.clone(), node_key.version()),
-                    &(node_key.nibble_path().num_nibbles() as u8),
-                ),
-
-                _ => Ok(()),
-            }
-        })
-        .collect::<Result<Vec<_>>>()?;
-    Ok(())
 }
