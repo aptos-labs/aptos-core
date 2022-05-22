@@ -81,14 +81,14 @@ AptosNet uses [`NetworkAddress`](network-address.md) to encapsulate the precise 
     * `"/dns4/<name>/tcp/<port>"`
     * `"/dns6/<name>/tcp/<port>"`
 2. Secure Transport Upgrade:
-    * `"/ln-noise-ik/<x25519-public-key>"`
+    * `"/noise-ik/<x25519-public-key>"`
 3. AptosNet Handshake Upgrade:
-    * `"/ln-handshake/<version>"`
+    * `"/handshake/<version>"`
 
 For example, a full AptosNet `NetworkAddress` in human-readable format:
 
 ```
-"/ip4/10.0.0.61/tcp/6080/ln-noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/ln-handshake/0"
+"/ip4/10.0.0.61/tcp/6080/noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/handshake/0"
 ```
 
 AptosNet `NetworkAddress`es are advertised via the [onchain discovery protocol](onchain-discovery.md) or stored in local configurations.
@@ -111,7 +111,7 @@ An expanded view of the connection handshakes looks like:
 
 ```
 server: TCP::bind [address]
-client: discover server_address = "/ip4/[address]/ln-noise-ik/[public_key]/ln-handshake/[version]"
+client: discover server_address = "/ip4/[address]/noise-ik/[public_key]/handshake/[version]"
 
 ...
 

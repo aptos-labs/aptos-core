@@ -4,10 +4,10 @@ The handshake protocol is used between two connecting peers during the initial c
 
 ## NetworkAddress Protocol
 
-The handshake protocol version itself is "pre-negotiated" in peers' advertised or configured [`NetworkAddress`](network-address.md)es. Canonical AptosNet addresses will include the following `Protocol` after the `"/ln-noise-ik/<public-key>"` `Protocol`:
+The handshake protocol version itself is "pre-negotiated" in peers' advertised or configured [`NetworkAddress`](network-address.md)es. Canonical AptosNet addresses will include the following `Protocol` after the `"/noise-ik/<public-key>"` `Protocol`:
 
 ```
-human-readable format: "/ln-handshake/<version>"
+human-readable format: "/handshake/<version>"
 ```
 
 where supported `<version>` is currently only `0`.

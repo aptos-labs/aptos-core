@@ -488,7 +488,7 @@ where
                 io::ErrorKind::InvalidInput,
                 format!(
                     "Unexpected dialing network address: '{}', expected: \
-                     '/../ln-noise-ik/<pubkey>/ln-handshake/<version>'",
+                     '/../noise-ik/<pubkey>/handshake/<version>'",
                     addr
                 ),
             )),
@@ -504,7 +504,7 @@ where
     ///
     /// We parse the dial address like:
     ///
-    /// `/<base_transport>` + `/ln-noise-ik/<pubkey>/ln-handshake/<version>`
+    /// `/<base_transport>` + `/noise-ik/<pubkey>/handshake/<version>`
     ///
     /// If the base transport is `MemoryTransport`, then `/<base_transport>` is:
     ///

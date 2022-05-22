@@ -179,12 +179,12 @@ Share your FullNode static network identity in the following format in the Disco
   <Peer_ID>:
     addresses:
     # with DNS
-    - "/dns4/<DNS_Name>/tcp/<Port_Number>/ln-noise-ik/<Public_Key>/ln-handshake/0"
+    - "/dns4/<DNS_Name>/tcp/<Port_Number>/noise-ik/<Public_Key>/handshake/0"
     role: Upstream
   <Peer_ID>:
     addresses:
     # with IP
-    - "/ip4/<IP_Address>/tcp/<Port_Number>/ln-noise-ik/<Public_Key>/ln-handshake/0"
+    - "/ip4/<IP_Address>/tcp/<Port_Number>/noise-ik/<Public_Key>/handshake/0"
     role: Upstream
   ```
 
@@ -193,11 +193,11 @@ Share your FullNode static network identity in the following format in the Disco
   ```
   B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813:
     addresses:
-    - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813/ln-handshake/0"
+    - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/noise-ik/B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813/handshake/0"
     role: "Upstream"
   B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813:
     addresses:
-    - "/ip4/100.20.221.187/tcp/6182/ln-noise-ik/B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813/ln-handshake/0"
+    - "/ip4/100.20.221.187/tcp/6182/noise-ik/B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813/handshake/0"
     role: "Upstream"
   ```
 
