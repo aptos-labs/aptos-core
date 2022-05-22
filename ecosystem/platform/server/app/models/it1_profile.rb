@@ -37,10 +37,6 @@ class It1Profile < ApplicationRecord
     self.class.address_from_key account_key
   end
 
-  def network_address
-    self.class.address_from_key network_key
-  end
-
   def validator_port
     self[:validator_port] || 6180
   end

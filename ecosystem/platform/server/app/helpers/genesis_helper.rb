@@ -47,6 +47,9 @@ module GenesisHelper
           host: it1_profile.fullnode_address,
           port: it1_profile.fullnode_port
         }
+      else
+        # Fallback
+        data[:full_node_network_key] = it1_profile.network_key
       end
       data
     end
@@ -60,7 +63,7 @@ module GenesisHelper
       @it1_profiles = it1_profiles
       @yamls = {}
       @it1_profiles.each do |it1_profile|
-        @yamls[it1_profile.network_address] = self.class.convert_profile_to_yaml it1_profile
+        @yamls[it1_profile.account_address] = self.class.convert_profile_to_yaml it1_profile
       end
     end
 
