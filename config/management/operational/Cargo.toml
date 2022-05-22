@@ -38,7 +38,6 @@ aptos-temppath = { path = "../../../crates/aptos-temppath" }
 aptos-transaction-builder = { path = "../../../sdk/transaction-builder" }
 aptos-types = { path = "../../../types" }
 aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
-fallible = { path = "../../../crates/fallible" }
 move-deps = { path = "../../../aptos-move/move-deps", features = ["address32"] }
 netcore = { path = "../../../network/netcore" }
 network = { path = "../../../network" }

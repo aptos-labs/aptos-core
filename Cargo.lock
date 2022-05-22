@@ -136,7 +136,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-github-client",
  "aptos-logger",
- "aptos-management",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-secure-storage",
@@ -711,7 +710,6 @@ dependencies = [
  "rand 0.8.5",
  "state-sync-multiplexer",
  "state-sync-v1",
- "storage-client",
  "storage-interface",
  "storage-service",
  "storage-service-client",
@@ -739,7 +737,6 @@ dependencies = [
  "aptos-workspace-hack",
  "base64",
  "bcs",
- "fallible",
  "futures",
  "hex",
  "itertools",
@@ -762,7 +759,6 @@ dependencies = [
 name = "aptos-parallel-executor"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "aptos-infallible",
  "aptos-workspace-hack",
  "arc-swap",
@@ -999,7 +995,6 @@ dependencies = [
  "aptos-workspace-hack",
  "aptosdb",
  "bcs",
- "cached-framework-packages",
  "difference",
  "framework",
  "hex",
@@ -5185,7 +5180,6 @@ name = "mvhashmap"
 version = "0.1.0"
 dependencies = [
  "aptos-workspace-hack",
- "arc-swap",
  "crossbeam",
  "dashmap",
  "proptest",
@@ -5296,7 +5290,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-retry",
- "tokio-stream",
  "tokio-util 0.7.2",
 ]
 
@@ -6823,7 +6816,6 @@ name = "schemadb"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-config",
  "aptos-logger",
  "aptos-metrics",
  "aptos-temppath",
@@ -6855,7 +6847,6 @@ dependencies = [
  "aptos-metrics",
  "aptos-types",
  "aptos-workspace-hack",
- "arc-swap",
  "bitvec",
  "criterion",
  "itertools",
@@ -8733,7 +8724,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-proptest-helpers",
  "aptos-state-view",
- "aptos-transaction-builder",
  "aptos-types",
  "aptos-vm",
  "aptos-workspace-hack",

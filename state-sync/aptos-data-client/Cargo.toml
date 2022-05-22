@@ -29,7 +29,6 @@ aptos-types = { path = "../../types" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 network = { path = "../../network" }
 storage-service-client = { path = "../storage-service/client" }
-storage-service-server = { path = "../storage-service/server" }
 storage-service-types = { path = "../storage-service/types" }
 
 [dev-dependencies]
@@ -41,3 +40,4 @@ tokio = { version = "1.18.2", features = ["rt", "macros"], default-features = fa
 aptos-time-service = { path = "../../crates/aptos-time-service", features = ["async", "testing"] }
 channel = { path = "../../crates/channel" }
 network = { path = "../../network", features = ["fuzzing"] }
+storage-service-server = { path = "../storage-service/server" }

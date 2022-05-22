@@ -35,7 +35,6 @@ aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto", features = [] }
 aptos-github-client = { path = "../../secure/storage/github" }
 aptos-logger = { path = "../aptos-logger" }
-aptos-management = { path = "../../config/management" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
 aptos-secure-storage = { path = "../../secure/storage" }

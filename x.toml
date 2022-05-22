@@ -188,6 +188,7 @@ members = [
     "memsocket",
     "move-examples",
     "smoke-test",
+    "storage-client",
     "transaction-emitter",
     "x",
     "x-core",

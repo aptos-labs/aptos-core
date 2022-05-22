@@ -28,7 +28,6 @@ aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
 consensus-notifications = { path = "../../inter-component/consensus-notifications" }
 data-streaming-service = { path = "../data-streaming-service" }
 event-notifications = { path = "../../inter-component/event-notifications" }
-executor = { path = "../../../execution/executor" }
 executor-types = { path = "../../../execution/executor-types" }
 mempool-notifications = { path = "../../inter-component/mempool-notifications" }
 storage-interface = { path = "../../../storage/storage-interface" }
@@ -46,6 +45,7 @@ aptos-time-service = { path = "../../../crates/aptos-time-service", features = [
 aptos-vm = { path = "../../../aptos-move/aptos-vm" }
 aptosdb = { path = "../../../storage/aptosdb" }
 channel = { path = "../../../crates/channel" }
+executor = { path = "../../../execution/executor" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers" }
 move-deps = { path = "../../../aptos-move/move-deps", features = ["address32"] }
 network = { path = "../../../network", features = ["fuzzing"] }

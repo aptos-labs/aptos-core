@@ -28,7 +28,6 @@ aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-mempool = { path = "../../mempool" }
 aptos-metrics = { path = "../../crates/aptos-metrics" }
 aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers", optional = true }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
