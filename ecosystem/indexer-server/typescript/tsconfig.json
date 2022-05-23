@@ -13,12 +13,10 @@
     "noEmit": false,
     "baseUrl": "src",
     "esModuleInterop": true,
-    "paths": {
-      "core/*": ["./core/*"]
-    }
   },
+  "include": ["src/**/*"],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "src/openapi-schema.ts"
   ],
-  "include": ["src/**/*"]
 }
