@@ -1,5 +1,5 @@
 <%= content_tag :th, **@rest do %>
-  <%= content_tag :div, class: 'flex gap-2 items-center' do %>
+  <%= content_tag :div, class: (@rest[:align] == 'left' ? 'justify-start' : 'justify-end') + ' flex gap-2 items-center' do %>
     <% if @id %>
       <% if sort_arrow %>
         <%= link_to href, class: 'cursor-pointer whitespace-nowrap flex gap-1 items-center items-end relative' do %>
