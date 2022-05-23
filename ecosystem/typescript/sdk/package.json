@@ -47,6 +47,7 @@
     "typescript": "^4.6.3"
   },
   "dependencies": {
+    "@noble/ed25519": "^1.6.0",
     "axios": "^0.26.1",
     "buffer": "^6.0.3",
     "js-sha3": "^0.8.0",

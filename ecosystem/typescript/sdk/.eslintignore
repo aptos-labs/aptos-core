@@ -2,3 +2,4 @@ node_modules
 packages/**/node_modules/
 dist/**
 **/*.test.ts
+src/transaction_builder/**
