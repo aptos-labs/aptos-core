@@ -23,6 +23,14 @@ resource "helm_release" "indexer" {
           "eks.amazonaws.com/role-arn" = aws_iam_role.indexer.arn
         }
       }
+      prometheus-postgres-exporter = {
+        config = {
+          datasourceSecret = {
+            name = kubernetes_secret.indexer_credentials.metadata[0].name
+            key  = "pg_db_uri"
+          }
+        }
+      }
     }),
     jsonencode(var.indexer_helm_values),
   ]
