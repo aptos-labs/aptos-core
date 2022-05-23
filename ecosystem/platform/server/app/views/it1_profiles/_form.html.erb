@@ -20,7 +20,7 @@
       <div>
         <div class="mb-16">
           <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Public Keys</h3>
-          <div class="mb-8"><%= render 'shared/bump' %></div>
+          <div class="mb-8"><%= render DividerComponent.new %></div>
 
           <div class="mb-6">
           <%= f.label :consensus_key, class: "font-mono uppercase block mb-2" %>
@@ -38,7 +38,7 @@
 
         <div class="mb-16">
           <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Validator Node</h3>
-          <div class="mb-8"><%= render 'shared/bump' %></div>
+          <div class="mb-8"><%= render DividerComponent.new %></div>
 
           <div class="mb-6">
           <%= f.label :validator_address, "Address (IP or hostname)", class: "font-mono uppercase block mb-2" %>
@@ -70,7 +70,7 @@
           <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">
             Full Node <span class="text-teal-400 opacity-50 font-mono lowercase text-sm mb-2">[optional]</span>
           </h3>
-          <div class="mb-8"><%= render 'shared/bump' %></div>
+          <div class="mb-8"><%= render DividerComponent.new %></div>
 
           <div class="mb-6">
           <%= f.label :fullnode_address, "Address (IP or hostname)", class: "font-mono uppercase block mb-2" %>

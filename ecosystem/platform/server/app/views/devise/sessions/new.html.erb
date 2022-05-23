@@ -6,7 +6,7 @@
 
     <div class="flex-1 p-4 rounded-lg bg-neutral-800">
       <h3 class="font-mono uppercase text-xl mb-4">Sign in</h3>
-      <div class="mb-4"><%= render 'shared/bump' %></div>
+      <div class="mb-4"><%= render DividerComponent.new %></div>
       <%= render LoginButtonComponent.new(provider: :github, size: :large, class: 'mb-4 w-full') %>
       <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-full') %>
     </div>

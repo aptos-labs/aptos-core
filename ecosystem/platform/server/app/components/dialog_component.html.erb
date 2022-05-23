@@ -3,6 +3,6 @@
     <button type="submit"><%= render IconComponent.new(:close, size: :small) %></button>
   </form>
   <h3 class="font-mono uppercase text-xl mb-4"><%= title %></h3>
-  <div class="mb-16"><%= render 'shared/bump' %></div>
+  <div class="mb-16"><%= render DividerComponent.new %></div>
   <%= body %>
 <% end %>
