@@ -29,3 +29,6 @@ terraform/
 
 clippy.toml
 .gitattributes
+
+# Ignore generated credentials from google-github-actions/auth as per https://github.com/google-github-actions/auth#prerequisites
+gha-creds-*.json

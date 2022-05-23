@@ -4,10 +4,17 @@
 
 variable "BUILD_DATE" {}
 
+variable "GITHUB_SHA" {}
+// this is the full GIT_SHA1 - let's use that as primary identifier going forward
+variable "GIT_SHA1" {
+  default = "${GITHUB_SHA}"
+}
 // this is the short GIT_SHA1 (8 chars). Tagging our docker images with that one is kinda deprecated and we might remove this in future.
-variable "GIT_REV" {}
-// this is the full GIT_SHA1 - let's use that as primary identify going forward
-variable "GIT_SHA1" {}
+variable "GIT_REV" {
+  default = substr("${GIT_SHA1}", 0, 8)
+}
+
+variable "GCP_DOCKER_ARTIFACT_REPO" {}
 
 variable "AWS_ECR_ACCOUNT_NUM" {}
 
@@ -127,19 +134,19 @@ target "forge" {
 
 function "generate_cache_from" {
   params = [target]
-  result = "type=registry,ref=${gh_image_cache}/${target}"
+  result = "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache"
 }
 
 function "generate_cache_to" {
   params = [target]
-  result = ["type=registry,ref=${gh_image_cache}/${target},mode=max"]
+  result = ["type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache,mode=max"]
 }
 
 function "generate_tags" {
   params = [target]
   result = [
-    // "${ecr_base}/${target}:dev_${GIT_REV}",
-    // "${ecr_base}/${target}:${GIT_REV}",
+
+    "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${GIT_SHA1}",
     "${ecr_base}/${target}:${GIT_SHA1}", // only tag with full GIT_SHA1 unless it turns out we really need any of the other variations
   ]
 }

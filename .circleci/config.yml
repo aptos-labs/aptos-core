@@ -96,26 +96,6 @@ jobs:
               done
               exit $ret
             fi
-  build-push-docker-rust-code:
-    executor: ubuntu-2xl
-    parameters:
-      image_target:
-        description: what value to pass to `IMAGE_TARGET=<value>` when running the docker/build-common.sh script which runs the Rust build.
-        type: string
-        default: NOT_PROVIDED
-    steps:
-      - checkout
-      - aws-ecr-setup
-      - run: echo $GITHUB_CONTAINER_REGISTRY_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
-      - run:
-          name: Build and Push
-          shell: /bin/bash
-          environment:
-            IMAGE_TARGET: << parameters.image_target >>
-          command: |
-            set -e
-            docker buildx create --use
-            docker/docker-bake-rust-all.sh
   build-push-community-platform:
     executor: ubuntu-medium
     steps:
@@ -124,7 +104,6 @@ jobs:
       - aws-ecr-setup
       - gcp-gcr/gcr-auth:
           registry-url: us-west1-docker.pkg.dev
-      - run: echo $GITHUB_CONTAINER_REGISTRY_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
       - run:
           name: Build or skip
           shell: /bin/bash
@@ -133,6 +112,7 @@ jobs:
             cd ecosystem/platform/server
             docker buildx create --use
             GIT_SHA1=${CIRCLE_SHA1} docker buildx bake --progress=plain --push -f ./docker-bake.hcl
+
   ecr-dockerhub-mirror:
     executor: ubuntu-medium
     parameters:
@@ -292,8 +272,8 @@ workflows:
     jobs:
       - build-push-community-platform:
           context:
-          - aws-dev
-          - gcp-global
+            - aws-dev
+            - gcp-global
 
   build-test-deploy:
     when:
@@ -315,34 +295,13 @@ workflows:
                 - canary
                 - devnet
                 - testnet
-      - build-push-docker-rust-code: &BuildPushRustRelease
-          name: build-push-rust-release-target
-          context: aws-dev
-          image_target: release
-      - build-push-docker-rust-code: &BuildPushRustTest
-          name: build-push-rust-test-target
-          context: aws-dev
-          image_target: test
-          filters:
-            branches:
-              only:
-                - main
-                - auto
-                - canary
-                - devnet
-                - testnet
-                - docker-caching ## remove this once https://github.com/aptos-labs/aptos-core/pull/741 is merged
       - ecosystem-test:
           context: aws-dev
           requires:
-            # - build-push-rust-release-target
-            # - build-push-rust-test-target
             - docker-build-push
       - forge-k8s-test:
           context: aws-dev
           requires:
-            # - build-push-rust-release-target
-            # - build-push-rust-test-target
             - docker-build-push
   ### on devnet branch update ###
   # Ensure the latest is built on the "devnet" branch, and mirror from ECR to Dockerhub
@@ -350,8 +309,6 @@ workflows:
     when:
       equal: [devnet, << pipeline.git.branch >>]
     jobs:
-      - build-push-docker-rust-code: *BuildPushRustRelease
-      - build-push-docker-rust-code: *BuildPushRustTest
       - docker-build-push:
           context: aws-dev
           addl_tag: devnet
@@ -361,8 +318,6 @@ workflows:
             - docker-aptoslabsbots
           addl_tag: devnet
           requires:
-            # - build-push-rust-release-target
-            # - build-push-rust-test-target
             - docker-build-push
   ### on testnet branch update ###
   # Ensure the latest is built on the "testnet" branch, and mirror from ECR to Dockerhub
@@ -370,8 +325,6 @@ workflows:
     when:
       equal: [testnet, << pipeline.git.branch >>]
     jobs:
-      - build-push-docker-rust-code: *BuildPushRustRelease
-      - build-push-docker-rust-code: *BuildPushRustTest
       - docker-build-push:
           context: aws-dev
           addl_tag: testnet
@@ -381,8 +334,6 @@ workflows:
             - docker-aptoslabsbots
           addl_tag: testnet
           requires:
-            # - build-push-rust-release-target
-            # - build-push-rust-test-target
             - docker-build-push
   ### on continuous_push scheduled pipeline ###
   # Build the latest on "main" branch
@@ -392,8 +343,6 @@ workflows:
         - equal: [scheduled_pipeline, << pipeline.trigger_source >>]
         - equal: ["continuous_push", << pipeline.schedule.name >>]
     jobs:
-      - build-push-docker-rust-code: *BuildPushRustRelease
-      - build-push-docker-rust-code: *BuildPushRustTest
       - docker-build-push:
           context: aws-dev
           addl_tag: main
@@ -405,8 +354,6 @@ workflows:
         - equal: [scheduled_pipeline, << pipeline.trigger_source >>]
         - equal: ["nightly", << pipeline.schedule.name >>]
     jobs:
-      - build-push-docker-rust-code: *BuildPushRustRelease
-      - build-push-docker-rust-code: *BuildPushRustTest
       - docker-build-push:
           context: aws-dev
           addl_tag: main
@@ -417,8 +364,6 @@ workflows:
           addl_tag: main
           requires:
             - docker-build-push
-            # - build-push-rust-release-target
-            # - build-push-rust-test-target
 commands:
   dev-setup:
     steps:

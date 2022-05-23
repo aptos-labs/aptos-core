@@ -4,11 +4,10 @@
 
 
 variable "GIT_SHA1" {}
-variable "AWS_ECR_ACCOUNT_URL" {}
+variable "AWS_ECR_ACCOUNT_NUM" {}
 variable "GCP_DOCKER_ARTIFACT_REPO" {}
-
-variable "gh_image_cache" {
-  default = "ghcr.io/aptos-labs/aptos-core/community-platform"
+variable "ecr_base" {
+  default = "${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.us-west-2.amazonaws.com/aptos"
 }
 
 group "default" {
@@ -20,10 +19,10 @@ group "default" {
 target "community-platform" {
   dockerfile = "Dockerfile"
   context    = "."
-  cache-from = ["type=registry,ref=${gh_image_cache}"]
-  cache-to   = ["type=registry,ref=${gh_image_cache},mode=max"]
+  cache-from = ["type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/community-platform:cache"]
+  cache-to   = ["type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/community-platform:cache,mode=max"]
   tags = [
-    "${AWS_ECR_ACCOUNT_URL}/aptos/community-platform:${GIT_SHA1}",
+    "${ecr_base}/community-platform:${GIT_SHA1}",
     "${GCP_DOCKER_ARTIFACT_REPO}/community-platform:${GIT_SHA1}",
   ]
 }
