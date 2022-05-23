@@ -23,6 +23,7 @@ validator:
     size: 350Gi
   rust_log: info
   rust_log_remote: debug,hyper=off
+  remoteLogAddress:
   nodeSelector: {}
   tolerations: []
   affinity: {}
