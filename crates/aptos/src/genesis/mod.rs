@@ -13,20 +13,20 @@ use crate::{
         utils::{check_if_file_exists, write_to_file},
     },
     genesis::{
-        config::{Layout, ValidatorConfiguration},
-        git::{GitOptions, LAYOUT_NAME},
+        config::{Layout, StringValidatorConfiguration, ValidatorConfiguration},
+        git::{Client, GitOptions, LAYOUT_NAME},
     },
     CliCommand, CliResult,
 };
 use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
-use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_crypto::{ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
 use aptos_temppath::TempPath;
-use aptos_types::{chain_id::ChainId, transaction::Transaction};
+use aptos_types::{account_address::AccountAddress, chain_id::ChainId, transaction::Transaction};
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use async_trait::async_trait;
 use clap::Parser;
-use std::{convert::TryInto, path::PathBuf};
+use std::{convert::TryInto, path::PathBuf, str::FromStr};
 use storage_interface::DbReaderWriter;
 use vm_genesis::Validator;
 
@@ -127,8 +127,31 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
     let layout: Layout = client.get(LAYOUT_NAME)?;
 
     let mut validators = Vec::new();
+    let mut errors = Vec::new();
     for user in &layout.users {
-        validators.push(client.get::<ValidatorConfiguration>(user)?.try_into()?);
+        match get_config(&client, user) {
+            Ok(validator) => {
+                validators.push(validator);
+            }
+            Err(failure) => {
+                if let CliError::UnexpectedError(failure) = failure {
+                    errors.push(format!("{}: {}", user, failure));
+                } else {
+                    errors.push(format!("{}: {:?}", user, failure));
+                }
+            }
+        }
+    }
+
+    // Collect errors, and print out failed inputs
+    if !errors.is_empty() {
+        eprintln!(
+            "Failed to parse genesis inputs:\n{}",
+            serde_yaml::to_string(&errors).unwrap()
+        );
+        return Err(CliError::UnexpectedError(
+            "Failed to parse genesis inputs".to_string(),
+        ));
     }
 
     let modules = client.get_modules("framework")?;
@@ -139,6 +162,46 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
         validators,
         modules,
     })
+}
+
+/// Do proper parsing so more information is known about failures
+fn get_config(client: &Client, user: &str) -> CliTypedResult<Validator> {
+    let config = client.get::<StringValidatorConfiguration>(user)?;
+
+    // Convert each individually
+    let account_address = AccountAddress::from_str(&config.account_address)
+        .map_err(|_| CliError::UnexpectedError("account_address invalid".to_string()))?;
+    let account_key = Ed25519PublicKey::from_encoded_string(&config.account_key)
+        .map_err(|_| CliError::UnexpectedError("account_key invalid".to_string()))?;
+    let consensus_key = Ed25519PublicKey::from_encoded_string(&config.consensus_key)
+        .map_err(|_| CliError::UnexpectedError("consensus_key invalid".to_string()))?;
+    let validator_network_key =
+        x25519::PublicKey::from_encoded_string(&config.validator_network_key)
+            .map_err(|_| CliError::UnexpectedError("validator_network_key invalid".to_string()))?;
+    let validator_host = config.validator_host.clone();
+    let full_node_network_key =
+        if let Some(ref full_node_network_key) = config.full_node_network_key {
+            Some(
+                x25519::PublicKey::from_encoded_string(full_node_network_key).map_err(|_| {
+                    CliError::UnexpectedError("full_node_network_key invalid".to_string())
+                })?,
+            )
+        } else {
+            None
+        };
+    let full_node_host = config.full_node_host;
+
+    let config = ValidatorConfiguration {
+        account_address,
+        consensus_key,
+        account_key,
+        validator_network_key,
+        validator_host,
+        full_node_network_key,
+        full_node_host,
+        stake_amount: 0,
+    };
+    config.try_into()
 }
 
 /// Holder object for all pieces needed to generate a genesis transaction

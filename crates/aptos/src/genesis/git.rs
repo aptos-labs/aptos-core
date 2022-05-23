@@ -14,7 +14,7 @@ use aptos_github_client::Client as GithubClient;
 use async_trait::async_trait;
 use clap::Parser;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{io::Read, path::PathBuf, str::FromStr};
+use std::{fmt::Debug, io::Read, path::PathBuf, str::FromStr};
 
 pub const LAYOUT_NAME: &str = "layout";
 
@@ -137,7 +137,7 @@ impl Client {
     }
 
     /// Retrieves an object as a YAML encoded file from the appropriate storage
-    pub fn get<T: DeserializeOwned>(&self, name: &str) -> CliTypedResult<T> {
+    pub fn get<T: DeserializeOwned + Debug>(&self, name: &str) -> CliTypedResult<T> {
         match self {
             Client::Local(local_repository_path) => {
                 let path = local_repository_path.join(format!("{}.yaml", name));

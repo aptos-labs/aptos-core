@@ -73,6 +73,27 @@ pub struct ValidatorConfiguration {
     pub stake_amount: u64,
 }
 
+/// For better parsing error messages
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StringValidatorConfiguration {
+    /// Account address
+    pub account_address: String,
+    /// Key used for signing in consensus
+    pub consensus_key: String,
+    /// Key used for signing transactions with the account
+    pub account_key: String,
+    /// Public key used for validator network identity (same as account address)
+    pub validator_network_key: String,
+    /// Host for validator which can be an IP or a DNS name
+    pub validator_host: HostAndPort,
+    /// Public key used for full node network identity (same as account address)
+    pub full_node_network_key: Option<String>,
+    /// Host for full node which can be an IP or a DNS name and is optional
+    pub full_node_host: Option<HostAndPort>,
+    /// Stake amount for consensus
+    pub stake_amount: u64,
+}
+
 impl TryFrom<ValidatorConfiguration> for Validator {
     type Error = CliError;
 
