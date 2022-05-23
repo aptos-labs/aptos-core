@@ -4,6 +4,8 @@
 pub mod config;
 pub mod git;
 pub mod keys;
+#[cfg(test)]
+mod tests;
 
 use crate::{
     common::{

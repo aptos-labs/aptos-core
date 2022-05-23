@@ -23,10 +23,10 @@ pub const LAYOUT_NAME: &str = "layout";
 #[derive(Parser)]
 pub struct SetupGit {
     #[clap(flatten)]
-    git_options: GitOptions,
+    pub(crate) git_options: GitOptions,
     /// Path to `Layout` which defines where all the files are
     #[clap(long, parse(from_os_str))]
-    layout_file: PathBuf,
+    pub(crate) layout_file: PathBuf,
 }
 
 #[async_trait]
@@ -49,7 +49,7 @@ impl CliCommand<()> for SetupGit {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct GithubRepo {
     owner: String,
     repository: String,
@@ -71,20 +71,20 @@ impl FromStr for GithubRepo {
     }
 }
 
-#[derive(Clone, Parser)]
+#[derive(Clone, Default, Parser)]
 pub struct GitOptions {
     /// Github repository e.g. 'aptos-labs/aptos-core'
     #[clap(long)]
-    github_repository: Option<GithubRepo>,
+    pub(crate) github_repository: Option<GithubRepo>,
     /// Github repository branch e.g. main
     #[clap(long, default_value = "main")]
-    github_branch: String,
+    pub(crate) github_branch: String,
     /// Path to Github API token.  Token must have repo:* permissions
     #[clap(long, parse(from_os_str))]
-    github_token_file: Option<PathBuf>,
+    pub(crate) github_token_file: Option<PathBuf>,
     /// Path to local git repository
     #[clap(long, parse(from_os_str))]
-    local_repository_dir: Option<PathBuf>,
+    pub(crate) local_repository_dir: Option<PathBuf>,
 }
 
 impl GitOptions {

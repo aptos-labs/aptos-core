@@ -30,10 +30,10 @@ const VFN_FILE: &str = "validator-full-node-identity.yaml";
 #[derive(Parser)]
 pub struct GenerateKeys {
     #[clap(flatten)]
-    prompt_options: PromptOptions,
+    pub(crate) prompt_options: PromptOptions,
     /// Output path for the three keys
     #[clap(long, parse(from_os_str), default_value = ".")]
-    output_dir: PathBuf,
+    pub(crate) output_dir: PathBuf,
 }
 
 #[async_trait]
@@ -116,21 +116,21 @@ pub struct PrivateIdentity {
 pub struct SetValidatorConfiguration {
     /// Username
     #[clap(long)]
-    username: String,
+    pub(crate) username: String,
     #[clap(flatten)]
-    git_options: GitOptions,
+    pub(crate) git_options: GitOptions,
     /// Path to folder with account.key, consensus.key, and network.key
     #[clap(long, parse(from_os_str), default_value = ".")]
-    keys_dir: PathBuf,
+    pub(crate) keys_dir: PathBuf,
     /// Host and port pair for the validator e.g. 127.0.0.1:6180
     #[clap(long)]
-    validator_host: HostAndPort,
+    pub(crate) validator_host: HostAndPort,
     /// Host and port pair for the fullnode e.g. 127.0.0.1:6180
     #[clap(long)]
-    full_node_host: Option<HostAndPort>,
+    pub(crate) full_node_host: Option<HostAndPort>,
     /// Stake amount for stake distribution
     #[clap(long, default_value = "1")]
-    stake_amount: u64,
+    pub(crate) stake_amount: u64,
 }
 
 #[async_trait]

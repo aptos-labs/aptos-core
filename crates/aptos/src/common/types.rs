@@ -356,6 +356,15 @@ pub struct PromptOptions {
     pub assume_no: bool,
 }
 
+impl PromptOptions {
+    pub fn yes() -> Self {
+        Self {
+            assume_yes: true,
+            assume_no: false,
+        }
+    }
+}
+
 /// An insertable option for use with encodings.
 #[derive(Debug, Parser)]
 pub struct EncodingOptions {
