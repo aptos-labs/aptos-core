@@ -1,6 +1,8 @@
+# Copyright (c) Aptos
+# SPDX-License-Identifier: Apache-2.0
 # frozen_string_literal: true
 
-require "rails_helper"
+require 'rails_helper'
 
 RSpec.describe DividerComponent, type: :component do
   pending "add some examples to (or delete) #{__FILE__}"

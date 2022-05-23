@@ -31,9 +31,9 @@ class PersonaURL
   end
 end
 
-FirstInquiryResult = Struct.new(:exists?, :inquiry_id, :status)
-
 module PersonaHelper
+  FirstInquiryResult = Struct.new(:exists?, :inquiry_id, :status)
+
   class PersonaClient
     include HTTParty
     base_uri 'https://withpersona.com/api/v1/'
