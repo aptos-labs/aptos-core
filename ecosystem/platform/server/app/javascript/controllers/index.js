@@ -13,5 +13,8 @@ application.register("hello", HelloController)
 import RecaptchaController from "./recaptcha_controller.js"
 application.register("recaptcha", RecaptchaController)
 
+import RefreshController from "./refresh_controller.js"
+application.register("refresh", RefreshController)
+
 import ShakeController from "./shake_controller.js"
 application.register("shake", ShakeController)
