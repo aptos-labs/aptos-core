@@ -64,8 +64,10 @@ pub struct ValidatorConfiguration {
     /// Host for validator which can be an IP or a DNS name
     pub validator_host: HostAndPort,
     /// Public key used for full node network identity (same as account address)
-    pub full_node_network_key: x25519::PublicKey,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub full_node_network_key: Option<x25519::PublicKey>,
     /// Host for full node which can be an IP or a DNS name and is optional
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub full_node_host: Option<HostAndPort>,
     /// Stake amount for consensus
     pub stake_amount: u64,
@@ -81,9 +83,15 @@ impl TryFrom<ValidatorConfiguration> for Validator {
             .as_network_address(config.validator_network_key)
             .unwrap()];
         let full_node_addresses = if let Some(full_node_host) = config.full_node_host {
-            vec![full_node_host
-                .as_network_address(config.full_node_network_key)
-                .unwrap()]
+            if let Some(full_node_network_key) = config.full_node_network_key {
+                vec![full_node_host
+                    .as_network_address(full_node_network_key)
+                    .unwrap()]
+            } else {
+                return Err(CliError::CommandArgumentError(
+                    "Full node host specified, but not full node network key".to_string(),
+                ));
+            }
         } else {
             vec![]
         };

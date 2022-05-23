@@ -148,7 +148,12 @@ impl CliCommand<()> for SetValidatorConfiguration {
         let account_key = key_files.account_key.public_key();
         let consensus_key = key_files.consensus_key.public_key();
         let validator_network_key = key_files.validator_network_key.public_key();
-        let full_node_network_key = key_files.full_node_network_key.public_key();
+
+        let full_node_network_key = if self.full_node_host.is_some() {
+            Some(key_files.full_node_network_key.public_key())
+        } else {
+            None
+        };
 
         let credentials = ValidatorConfiguration {
             account_address,
