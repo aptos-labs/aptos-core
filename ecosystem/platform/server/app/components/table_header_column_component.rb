@@ -8,7 +8,7 @@ class TableHeaderColumnComponent < ViewComponent::Base
   def initialize(id = nil, **rest)
     @id = id
     rest[:class] = [
-      'py-4 pr-8 pl-2 first:rounded-l-lg last:rounded-r-lg uppercase text-lg font-normal',
+      'py-4 pr-8 pl-2 first:rounded-l-lg last:rounded-r-lg uppercase text-base font-bold whitespace-nowrap',
       rest[:class]
     ]
     @rest = rest

@@ -5,11 +5,18 @@
 module LeaderboardHelper
   def availability_color(availability)
     if availability >= 97
-      'text-green-400'
+      'bg-teal-400'
     elsif availability >= 95
-      'text-orange-400'
+      'bg-yellow-500'
     else
-      'text-red-400'
+      'bg-red-500'
+    end
+  end
+  def liveness_icon(liveness)
+    if liveness >= 50
+      render IconComponent.new(:check_circle, class: 'text-teal-400 w-5 h-5')
+    else
+      render IconComponent.new(:x_circle, class: 'text-red-500 w-5 h-5')
     end
   end
 end

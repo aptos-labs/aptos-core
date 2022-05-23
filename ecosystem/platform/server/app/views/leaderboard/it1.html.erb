@@ -1,64 +1,73 @@
-<div class="bg-neutral-900 text-white h-full p-6 sm:p-24 2xl:px-48">
-  <h2 class="text-6xl mb-4 font-display font-light">AIT1 Validator Status</h2>
-  <div class="mb-8">
-    <%= render 'shared/bump_hero' %>
-  </div>
-  <div class="flex gap-8 mb-8">
-    <div class="flex-1 p-4 rounded-lg bg-neutral-800">
-      <h3 class="font-mono uppercase text-xl mb-4">No. of nodes</h3>
-      <div class="mb-4"><%= render 'shared/bump' %></div>
-      <p class="font-mono uppercase text-5xl font-light">100</p>
+<div class="bg-neutral-900 text-white h-full">
+  <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 md:px-8 py-12 sm:py-24">
+    <h2 class="text-6xl mb-4 font-display font-light">AIT1 Validator Status</h2>
+    <div class="mb-16">
+      <%= render 'shared/bump_hero' %>
     </div>
-    <div class="flex-1 p-4 rounded-lg bg-neutral-800">
-      <h3 class="font-mono uppercase text-xl mb-4">No. of countries</h3>
-      <div class="mb-4"><%= render 'shared/bump' %></div>
-      <p class="font-mono uppercase text-5xl font-light">43</p>
+    <div class="flex flex-col md:flex-row gap-8 mb-8">
+      <div class="flex-1 p-8 rounded-lg bg-neutral-800">
+        <h3 class="font-mono uppercase text-xl mb-4 font-bold">Nodes</h3>
+        <div class="mb-4"><%= render 'shared/bump' %></div>
+        <p class="font-mono uppercase text-5xl font-light">100</p>
+      </div>
+      <div class="flex-1 p-8 rounded-lg bg-neutral-800">
+        <h3 class="font-mono uppercase text-xl mb-4 font-bold">Countries</h3>
+        <div class="mb-4"><%= render 'shared/bump' %></div>
+        <p class="font-mono uppercase text-5xl font-light">43</p>
+      </div>
+      <div class="flex-1 p-8 rounded-lg bg-neutral-800">
+        <h3 class="font-mono uppercase text-xl mb-4 font-bold">Cities</h3>
+        <div class="mb-4"><%= render 'shared/bump' %></div>
+        <p class="font-mono uppercase text-5xl font-light">58</p>
+      </div>
     </div>
-    <div class="flex-1 p-4 rounded-lg bg-neutral-800">
-      <h3 class="font-mono uppercase text-xl mb-4">No. of cities</h3>
-      <div class="mb-4"><%= render 'shared/bump' %></div>
-      <p class="font-mono uppercase text-5xl font-light">58</p>
-    </div>
-  </div>
-  <div class="overflow-x-auto">
-    <%= render TableComponent.new(class: 'w-full') do |t| %>
-      <%= t.with_column(:rank, align: 'right') do %>
-        #
-      <% end %>
-      <%= t.with_column(align: 'left') do %>
-        Peer ID
-      <% end %>
-      <%= t.with_column(:liveness, align: 'right') do %>
-        Liveness
-      <% end %>
-      <%= t.with_column(:participation, align: 'right') do %>
-        Participation
-      <% end %>
-      <%= t.with_column(:latest_reported_timestamp, align: 'right') do %>
-        Last Metrics Update
-      <% end %>
+    <div class="overflow-x-auto">
+      <%= render TableComponent.new(class: 'w-full table-auto') do |t| %>
+        <%= t.with_column(:rank, align: 'right') do %>
+          #
+        <% end %>
+        <%= t.with_column(align: 'left') do %>
+          Peer ID
+        <% end %>
+        <%= t.with_column(:liveness, align: 'left') do %>
+          Liveness
+        <% end %>
+        <%= t.with_column(:participation, align: 'left') do %>
+          Participation
+        <% end %>
+        <%= t.with_column(:latest_reported_timestamp, align: 'right') do %>
+          Last Metrics Update
+        <% end %>
 
-      <%= t.with_body do %>
-        <% @metrics.each_with_index do |metric, i| %>
-          <%= render TableRowComponent.new do |tr| %>
-            <%= tr.with_column(align: 'right') do %>
-              <%= metric.rank %>
-            <% end %>
-            <%= tr.with_column(class: 'max-w-0 2xl:max-w-full w-full 2xl:w-auto truncate', title: metric.validator) do %>
-              <%= metric.validator %>
-            <% end %>
-            <%= tr.with_column(align: 'right') do %>
-              <%= number_to_percentage(metric.liveness) %>
-            <% end %>
-            <%= tr.with_column(align: 'right', class: availability_color(metric.participation)) do %>
-              <%= number_to_percentage(metric.participation) %>
-            <% end %>
-            <%= tr.with_column(align: 'right') do %>
-              <%= Time.at(metric.latest_reported_timestamp).to_fs(:db) %>
+        <%= t.with_body do %>
+          <% @metrics.each_with_index do |metric, i| %>
+            <%= render TableRowComponent.new do |tr| %>
+              <%= tr.with_column(align: 'right') do %>
+                <%= metric.rank %>
+              <% end %>
+              <%= tr.with_column(class: 'max-w-0 2xl:max-w-full w-full 2xl:w-auto truncate', title: metric.validator) do %>
+                <%= metric.validator %>
+              <% end %>
+              <%= tr.with_column(align: 'left') do %>
+                <div class="flex items-center gap-2">
+                  <%= liveness_icon(metric.liveness) %>
+                  <%= number_to_percentage(metric.liveness, precision: 2) %>
+                </div>
+              <% end %>
+              <%= tr.with_column(align: 'left') do %>
+                <div class="flex items-center gap-2">
+                  <div class="<%= availability_color(metric.participation) %> block w-5 h-5 rounded-full"></div>
+                  <%= number_to_percentage(metric.participation, precision: 2) %>
+                </div>
+
+              <% end %>
+              <%= tr.with_column(align: 'right') do %>
+                <%= Time.at(metric.latest_reported_timestamp).to_fs(:db) %>
+              <% end %>
             <% end %>
           <% end %>
         <% end %>
       <% end %>
-    <% end %>
+    </div>
   </div>
 </div>

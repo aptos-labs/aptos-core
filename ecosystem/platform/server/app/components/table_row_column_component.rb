@@ -5,7 +5,7 @@
 class TableRowColumnComponent < ViewComponent::Base
   def initialize(**rest)
     rest[:class] = [
-      'py-4 pr-8 pl-2 font-light border-b-2 border-dotted border-neutral-700',
+      'py-4 pr-8 pl-2 text-neutral-100 border-b-2 border-dotted border-neutral-700',
       rest[:class]
     ]
     @rest = rest
