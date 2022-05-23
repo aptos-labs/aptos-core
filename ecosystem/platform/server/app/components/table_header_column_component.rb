@@ -5,13 +5,22 @@
 class TableHeaderColumnComponent < ViewComponent::Base
   include ApplicationHelper
 
-  def initialize(id = nil, **rest)
-    @id = id
-    rest[:class] = [
-      'py-4 pr-8 pl-2 first:rounded-l-lg last:rounded-r-lg uppercase text-base font-bold whitespace-nowrap',
-      rest[:class]
-    ]
+  renders_one :tooltip, IconTooltipComponent
+
+  def initialize(id = nil, title = nil, **rest)
+    if id.is_a? String
+      @id = nil
+      @title = id
+    else
+      @id = id
+      @title = title
+    end
+
     @rest = rest
+    @rest[:class] = [
+      'py-4 pr-8 pl-2 first:rounded-l-lg last:rounded-r-lg uppercase text-base font-bold whitespace-nowrap',
+      @rest[:class]
+    ]
   end
 
   private

@@ -12,6 +12,7 @@ module LeaderboardHelper
       'bg-red-500'
     end
   end
+
   def liveness_icon(liveness)
     if liveness >= 50
       render IconComponent.new(:check_circle, class: 'text-teal-400 w-5 h-5')

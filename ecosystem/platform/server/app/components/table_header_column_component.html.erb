@@ -1,85 +1,22 @@
 <%= content_tag :th, **@rest do %>
-  <div class="flex gap-2 items-center <%= @rest[:align] == 'left' ? 'justify-start' : 'justify-end' %>">
-  <% if @id %>
-    <% if sort_arrow %>
-      <%= link_to href, class: 'cursor-pointer whitespace-nowrap flex gap-1 items-center items-end relative' do %>
-        <div class="text-teal-400 font-light absolute -left-4">
-          <%= sort_arrow %>
-        </div>
-        <%= content %>
+  <%= content_tag :div, class: 'flex gap-2 items-center' do %>
+    <% if @id %>
+      <% if sort_arrow %>
+        <%= link_to href, class: 'cursor-pointer whitespace-nowrap flex gap-1 items-center items-end relative' do %>
+          <div class="text-teal-400 font-light absolute -left-4">
+            <%= sort_arrow %>
+          </div>
+          <%= @title %>
+        <% end %>
+      <% else %>
+        <%= link_to @title, href, class: 'cursor-pointer'  %>
       <% end %>
     <% else %>
-      <%= link_to content, href, class: 'cursor-pointer'  %>
+      <%= @title %>
     <% end %>
-  <% else %>
-    <%= content %>
+
+    <% if tooltip %>
+      <%= tooltip %>
+    <% end %>
   <% end %>
-  <% if @id.to_s == 'liveness' %>
-    <button class="relative group text-left normal-case font-sans text-xs cursor-pointer">
-    <%= render IconComponent.new(:info, class: 'text-neutral-700 w-4 h-4 group-focus:text-neutral-600 group-hover:text-neutral-600') %>
-      <div class="absolute right-0 top-4 z-10 scale-0 opacity-0 group-focus:scale-100 group-hover:scale-100 group-focus:opacity-100 group-hover:opacity-100 origin-top-right transition-opacity duration-150 cursor-default">
-        <div class="pointer-events-auto mt-4 bg-neutral-700 rounded-md flex flex-col flex-1 max-w-xs">
-          <h3 class="bg-neutral-600 p-4 rounded-t-md">Cumulative range: 0% - 100%</h3>
-          <div class="p-4 flex flex-col flex-1">
-              <div class="flex flex-col gap-4">
-                <div class="flex items-start gap-2">
-                  <%= render IconComponent.new(:check_circle, class: 'text-teal-400 w-4 h-4') %>
-                  <div>
-                    Live
-                    <ul>
-                      <li>-Push metrics to Aptos telemetry</li>
-                      <li>-Connected to Aptos node</li>
-                    </ul>
-                  </div>
-                </div>
-                <div class="flex items-start gap-2">
-                  <%= render IconComponent.new(:x_circle, class: 'text-red-500 w-4 h-4') %>
-                  <div>
-                    Not Live
-                  </div>
-                </div>
-              </div>
-              <div class="flex justify-end">
-                <a title="Node Liveness Criteria" href="https://aptos.dev/reference/node-liveness-criteria/" class="text-neutral-500 hover:text-neutral-400 inline text-right mt-2 cursor-pointer" target="_blank">More Details</a>
-              </div>
-          </div>
-        </div>
-      </div>
-    </button>
-    <% elsif @id.to_s == 'participation' %>
-    <button class="relative group text-left normal-case font-sans text-xs cursor-pointer">
-    <%= render IconComponent.new(:info, class: 'text-neutral-700 w-4 h-4 group-focus:text-neutral-600 group-hover:text-neutral-600') %>
-      <div class="absolute right-0 top-4 z-10 scale-0 opacity-0 group-focus:scale-100 group-hover:scale-100 group-focus:opacity-100 group-hover:opacity-100 origin-top-right transition-opacity duration-150 cursor-default">
-        <div class="sticky mt-4 bg-neutral-700 rounded-md flex flex-col flex-1 max-w-xs">
-          <h3 class="bg-neutral-600 p-4 rounded-t-md">At least 1 proposal every hour. <br>Cumulative range: 0%-100%</h3>
-          <div class="p-4 flex flex-col flex-1">
-              <div class="flex flex-col gap-4">
-                <div class="flex items-start gap-2">
-                  <div class="bg-teal-400 block w-4 h-4 rounded-full"></div>
-                  <div>
-                    Above 97%
-                  </div>
-                </div>
-                <div class="flex items-start gap-2">
-                  <div class="bg-yellow-500 block w-4 h-4 rounded-full"></div>
-                  <div>
-                    Between 95% &  97%
-                  </div>
-                </div>
-                <div class="flex items-start gap-2">
-                  <div class="bg-red-500 block w-4 h-4 rounded-full"></div>
-                  <div>
-                    Below 95%
-                  </div>
-                </div>
-              </div>
-              <div class="flex justify-end">
-                <a title="Telemetry" href="https://aptos.dev/reference/telemetry" class="text-neutral-500 hover:text-neutral-400 inline text-right mt-2 cursor-pointer" target="_blank">More Details</a>
-              </div>
-          </div>
-        </div>
-      </div>
-    </button>
-    <% end %>
-  </div>
 <% end %>
