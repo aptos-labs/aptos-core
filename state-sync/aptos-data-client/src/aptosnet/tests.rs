@@ -928,10 +928,12 @@ async fn bad_peer_is_eventually_added_back() {
         }
     });
 
-    // Advance time so the poller sends a data summary request.
-    tokio::task::yield_now().await;
+    // Advance time so the poller sends data summary requests.
     let summary_poll_interval = Duration::from_millis(1_000);
-    mock_time.advance_async(summary_poll_interval).await;
+    for _ in 0..2 {
+        tokio::task::yield_now().await;
+        mock_time.advance_async(summary_poll_interval).await;
+    }
 
     // Initially this request range is serviceable by this peer.
     let global_summary = client.get_global_data_summary();

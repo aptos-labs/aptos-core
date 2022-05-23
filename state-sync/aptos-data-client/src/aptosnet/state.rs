@@ -261,19 +261,25 @@ impl PeerStates {
 
     /// Calculates a global data summary using all known storage summaries
     pub fn calculate_aggregate_summary(&self) -> GlobalDataSummary {
+        // Only include likely-not-malicious peers in the data summary aggregation
+        let summaries: Vec<StorageServerSummary> = self
+            .peer_to_state
+            .values()
+            .filter_map(PeerState::storage_summary_if_not_ignored)
+            .cloned()
+            .collect();
+
+        // If we have no peers, return an empty global summary
+        if summaries.is_empty() {
+            return GlobalDataSummary::empty();
+        }
+
+        // Calculate the global data summary using the advertised peer data
         let mut advertised_data = AdvertisedData::empty();
         let mut max_epoch_chunk_sizes = vec![];
         let mut max_transaction_chunk_sizes = vec![];
         let mut max_transaction_output_chunk_sizes = vec![];
         let mut max_account_states_chunk_sizes = vec![];
-
-        // Only include likely-not-malicious peers in the data summary aggregation
-        let summaries = self
-            .peer_to_state
-            .values()
-            .filter_map(PeerState::storage_summary_if_not_ignored);
-
-        // Collect each peer's protocol and data advertisements
         for summary in summaries {
             // Collect aggregate data advertisements
             if let Some(account_states) = summary.data_summary.account_states {

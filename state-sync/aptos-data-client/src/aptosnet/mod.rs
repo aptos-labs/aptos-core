@@ -608,6 +608,9 @@ impl DataSummaryPoller {
             // Wait for next round before polling
             ticker.next().await;
 
+            // Update the global storage summary
+            self.data_client.update_global_summary_cache();
+
             // Fetch the prioritized and regular peers to poll (if any)
             let prioritized_peer = self.try_fetch_peer(true);
             let regular_peer = self.fetch_regular_peer(prioritized_peer.is_none());
@@ -735,9 +738,8 @@ pub(crate) fn poll_peer(
             }
         };
 
-        // Update the global storage summary and the summary for the peer
+        // Update the summary for the peer
         data_client.update_summary(peer, storage_summary);
-        data_client.update_global_summary_cache();
 
         // Log the new global data summary and update the metrics
         sample!(
