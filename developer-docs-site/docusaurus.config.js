@@ -26,6 +26,7 @@ const config = {
         docs: {
           routeBasePath: "/",
           sidebarPath: require.resolve("./sidebars.js"),
+          sidebarCollapsible: false,
           editUrl: "https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/",
           remarkPlugins: [codeInjector],
         },
