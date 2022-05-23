@@ -76,6 +76,13 @@ module AptosFramework::Token {
     struct CreateTokenEvent has drop, store {
         id: TokenId,
         token_data: TokenData,
+        initial_balance: u64,
+    }
+
+    /// mint token event. This event triggered when creator adds more supply to existing token
+    struct MintTokenEvent has drop, store {
+        id: TokenId,
+        amount: u64,
     }
 
     //
@@ -90,6 +97,7 @@ module AptosFramework::Token {
         mint_capabilities: Table<TokenId, MintCapability>,
         create_collection_events: EventHandle<CreateCollectionEvent>,
         create_token_events: EventHandle<CreateTokenEvent>,
+        mint_token_events: EventHandle<MintTokenEvent>,
     }
 
     /// Represent the collection metadata
@@ -262,6 +270,7 @@ module AptosFramework::Token {
     /// Deposit the token balance into the recipients account and emit an event.
     public fun direct_deposit(account_addr: address, token: Token) acquires TokenStore {
         let token_store = borrow_global_mut<TokenStore>(account_addr);
+
         Event::emit_event<DepositEvent>(
             &mut token_store.deposit_events,
             DepositEvent { id: token.id, amount: token.value },
@@ -357,7 +366,6 @@ module AptosFramework::Token {
             &mut token_store.withdraw_events,
             WithdrawEvent { id, amount },
         );
-
         withdraw_without_event_internal(account_addr, id, amount)
     }
 
@@ -438,6 +446,7 @@ module AptosFramework::Token {
                     mint_capabilities: Table::new(),
                     create_collection_events:  Event::new_event_handle<CreateCollectionEvent>(creator),
                     create_token_events: Event::new_event_handle<CreateTokenEvent>(creator),
+                    mint_token_events: Event::new_event_handle<MintTokenEvent>(creator),
                 },
             )
         };
@@ -542,6 +551,7 @@ module AptosFramework::Token {
             CreateTokenEvent {
                 id: token_id,
                 token_data,
+                initial_balance,
             }
         );
 
