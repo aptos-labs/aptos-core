@@ -7,15 +7,17 @@
     "start": "node dist/server",
     "clean": "rm -rf dist",
     "build": "npm -s run clean && npm -s run generate && tsc",
-    "generate": "npm -s run generate:prisma && npm -s run generate:nexus",
+    "generate": "npm -s run generate:prisma && npx openapi-typescript ../doc/openapi.yaml --output src/openapi-schema.ts",
     "generate:prisma": "prisma generate",
-    "generate:nexus": "ts-node --transpile-only src/schema",
+    "generate:openapi": "npx openapi-typescript ../doc/openapi.yaml --output src/openapi-schema.ts",
     "test": "jest",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix"
   },
   "dependencies": {
     "@prisma/client": "3.14.0",
+    "eslint-plugin-jsx-a11y": "^6.5.1",
+    "eslint-plugin-react-hooks": "^4.3.0",
     "express": "4.18.1"
   },
   "devDependencies": {
@@ -38,9 +40,9 @@
     "eslint-plugin-typescript-sort-keys": "^2.1.0",
     "jest": "^27.5.1",
     "prisma": "3.14.0",
+    "ts-jest": "^27.1.4",
     "ts-node": "10.7.0",
     "ts-node-dev": "1.1.8",
-    "ts-jest": "^27.1.4",
     "typescript": "4.6.4"
   },
   "prisma": {
