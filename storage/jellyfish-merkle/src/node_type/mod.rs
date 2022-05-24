@@ -31,6 +31,7 @@ use num_traits::cast::FromPrimitive;
 use proptest::{collection::hash_map, prelude::*};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
+
 use serde::{Deserialize, Serialize};
 use std::{
     collections::hash_map::HashMap,

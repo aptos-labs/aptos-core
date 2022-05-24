@@ -6,8 +6,8 @@ use crate::{
     node_type::{LeafNode, Node, NodeKey},
     restore::StateSnapshotRestore,
     test_helper::{init_mock_db, ValueBlob},
-    JellyfishMerkleTree, KVBatch, NodeBatch, StateValueWriter, TestKey, TestValue, TreeReader,
-    TreeWriter,
+    JellyfishMerkleTree, NodeBatch, StateValueBatch, StateValueWriter, TestKey, TestValue,
+    TreeReader, TreeWriter,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -45,7 +45,7 @@ where
     K: TestKey,
     V: TestValue,
 {
-    fn write_kv_batch(&self, kv_batch: &KVBatch<K, V>) -> Result<()> {
+    fn write_kv_batch(&self, kv_batch: &StateValueBatch<K, V>) -> Result<()> {
         for (k, v) in kv_batch {
             self.kv_store.write().insert(k.clone(), v.clone());
         }
@@ -90,7 +90,7 @@ where
 
     let (tree_store, version) = init_mock_db(
         &kvs.iter()
-            .map(|(k, v)| (k.hash(), (v.hash(), k.clone())))
+            .map(|(k, v)| (CryptoHash::hash(k), (CryptoHash::hash(v), k.clone())))
             .collect(),
     );
 
@@ -201,10 +201,13 @@ fn assert_success<V>(
 {
     let tree = JellyfishMerkleTree::new(db);
     for (key, value) in btree.values() {
-        let (value_hash, value_index) =
-            tree.get_with_proof(key.hash(), version).unwrap().0.unwrap();
+        let (value_hash, value_index) = tree
+            .get_with_proof(CryptoHash::hash(key), version)
+            .unwrap()
+            .0
+            .unwrap();
         let value_in_db = db.get_value_at_version(&value_index).unwrap();
-        assert_eq!(value.hash(), value_hash);
+        assert_eq!(CryptoHash::hash(value), value_hash);
         assert_eq!(&value_in_db, value);
     }
 

@@ -15,7 +15,7 @@ use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{
-    restore::StateSnapshotRestore, KVBatch, NodeBatch, StateValueWriter, TreeWriter,
+    restore::StateSnapshotRestore, NodeBatch, StateValueBatch, StateValueWriter, TreeWriter,
 };
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -116,7 +116,7 @@ impl TreeWriter<StateKey> for MockStore {
 }
 
 impl StateValueWriter<StateKey, StateValue> for MockStore {
-    fn write_kv_batch(&self, _kv_batch: &KVBatch<StateKey, StateValue>) -> Result<()> {
+    fn write_kv_batch(&self, _kv_batch: &StateValueBatch<StateKey, StateValue>) -> Result<()> {
         Ok(())
     }
 }

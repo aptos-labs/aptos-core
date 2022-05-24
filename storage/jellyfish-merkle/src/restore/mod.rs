@@ -28,7 +28,7 @@ use aptos_types::{
     transaction::Version,
 };
 use mirai_annotations::*;
-use std::sync::Arc;
+use std::{cmp::Eq, hash::Hash, sync::Arc};
 use storage_interface::StateSnapshotReceiver;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -47,7 +47,7 @@ enum ChildInfo<K> {
 
 impl<K> ChildInfo<K>
 where
-    K: crate::Key,
+    K: crate::Key + CryptoHash,
 {
     /// Converts `self` to a child, assuming the hash is known if it's an internal node.
     fn into_child(self, version: Version) -> Child {
@@ -76,7 +76,7 @@ struct InternalInfo<K> {
 
 impl<K> InternalInfo<K>
 where
-    K: crate::Key,
+    K: crate::Key + CryptoHash,
 {
     /// Creates an empty internal node with no children.
     fn new_empty(node_key: NodeKey) -> Self {
@@ -163,7 +163,7 @@ struct JellyfishMerkleRestore<K> {
 
 impl<K> JellyfishMerkleRestore<K>
 where
-    K: crate::Key,
+    K: crate::Key + CryptoHash,
 {
     pub fn new<D: 'static + TreeReader<K> + TreeWriter<K>>(
         store: Arc<D>,
@@ -690,7 +690,7 @@ struct StateValueRestore<K, V> {
     db: Arc<dyn StateValueWriter<K, V>>,
 }
 
-impl<K: crate::Key, V: crate::Value> StateValueRestore<K, V> {
+impl<K: crate::Key + Hash + Eq, V: crate::Value> StateValueRestore<K, V> {
     pub fn new<D: 'static + StateValueWriter<K, V>>(db: Arc<D>, version: Version) -> Self {
         Self { version, db }
     }
@@ -709,7 +709,7 @@ pub struct StateSnapshotRestore<K, V> {
     kv_restore: StateValueRestore<K, V>,
 }
 
-impl<K: crate::Key, V: crate::Value> StateSnapshotRestore<K, V> {
+impl<K: crate::Key + CryptoHash + Hash + Eq, V: crate::Value> StateSnapshotRestore<K, V> {
     pub fn new<D: 'static + TreeReader<K> + TreeWriter<K> + StateValueWriter<K, V>>(
         store: Arc<D>,
         version: Version,
@@ -741,7 +741,9 @@ impl<K: crate::Key, V: crate::Value> StateSnapshotRestore<K, V> {
     }
 }
 
-impl<K: crate::Key, V: crate::Value> StateSnapshotReceiver<K, V> for StateSnapshotRestore<K, V> {
+impl<K: crate::Key + CryptoHash + Hash + Eq, V: crate::Value> StateSnapshotReceiver<K, V>
+    for StateSnapshotRestore<K, V>
+{
     fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()> {
         self.tree_restore
             .add_chunk_impl(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)?;

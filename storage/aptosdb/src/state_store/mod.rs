@@ -33,17 +33,13 @@ use aptos_types::{
     transaction::{Version, PRE_GENESIS_VERSION},
 };
 use schemadb::{SchemaBatch, DB};
-use std::{
-    cmp::Ordering,
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::{cmp::Ordering, collections::HashMap, sync::Arc};
 use storage_interface::StateSnapshotReceiver;
 
 type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
 type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
 type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKey>;
-type KVBatch = aptos_jellyfish_merkle::KVBatch<StateKey, StateValue>;
+type StateValueBatch = aptos_jellyfish_merkle::StateValueBatch<StateKey, StateValue>;
 
 pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 
@@ -241,7 +237,7 @@ impl StateStore {
                 kvs.iter()
                     .map(move |(k, v)| ((k.clone(), first_version + i as Version), v.clone()))
             })
-            .collect::<BTreeMap<_, _>>();
+            .collect::<HashMap<_, _>>();
         add_kv_batch(&mut cs.batch, &kv_batch)
     }
 
@@ -468,7 +464,7 @@ impl TreeWriter<StateKey> for StateStore {
 }
 
 impl StateValueWriter<StateKey, StateValue> for StateStore {
-    fn write_kv_batch(&self, node_batch: &KVBatch) -> Result<()> {
+    fn write_kv_batch(&self, node_batch: &StateValueBatch) -> Result<()> {
         let mut batch = SchemaBatch::new();
         add_kv_batch(&mut batch, node_batch)?;
         self.db.write_schemas(batch)
@@ -485,7 +481,7 @@ fn add_node_batch(batch: &mut SchemaBatch, node_batch: &NodeBatch) -> Result<()>
     Ok(())
 }
 
-fn add_kv_batch(batch: &mut SchemaBatch, kv_batch: &KVBatch) -> Result<()> {
+fn add_kv_batch(batch: &mut SchemaBatch, kv_batch: &StateValueBatch) -> Result<()> {
     kv_batch
         .iter()
         .map(|(k, v)| batch.put::<StateValueSchema>(k, v))

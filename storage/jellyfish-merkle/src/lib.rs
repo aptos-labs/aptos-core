@@ -95,7 +95,8 @@ use proptest::arbitrary::Arbitrary;
 use proptest_derive::Arbitrary;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
+    hash::Hash,
     marker::PhantomData,
 };
 use thiserror::Error;
@@ -135,14 +136,11 @@ pub trait TreeWriter<K>: Send + Sync {
 
 pub trait StateValueWriter<K, V>: Send + Sync {
     /// Writes a kv batch into storage.
-    fn write_kv_batch(&self, kv_batch: &KVBatch<K, V>) -> Result<()>;
+    fn write_kv_batch(&self, kv_batch: &StateValueBatch<K, V>) -> Result<()>;
 }
 
 /// `Key` defines the types of data key that can be stored in a Jellyfish Merkle tree.
-pub trait Key:
-    Clone + CryptoHash + Eq + PartialOrd + Ord + Serialize + DeserializeOwned + Send + Sync
-{
-}
+pub trait Key: Clone + Serialize + DeserializeOwned + Send + Sync {}
 
 /// `Value` defines the types of data that can be stored in a Jellyfish Merkle tree.
 pub trait Value: Clone + CryptoHash + Serialize + DeserializeOwned + Send + Sync {}
@@ -150,7 +148,10 @@ pub trait Value: Clone + CryptoHash + Serialize + DeserializeOwned + Send + Sync
 /// `TestKey` defines the types of data that can be stored in a Jellyfish Merkle tree and used in
 /// tests.
 #[cfg(any(test, feature = "fuzzing"))]
-pub trait TestKey: Key + Arbitrary + std::fmt::Debug + Eq + PartialEq + 'static {}
+pub trait TestKey:
+    Key + Arbitrary + std::fmt::Debug + Eq + Hash + Ord + PartialOrd + PartialEq + 'static
+{
+}
 
 /// `TestValue` defines the types of data that can be stored in a Jellyfish Merkle tree and used in
 /// tests.
@@ -165,13 +166,13 @@ impl Value for StateValue {}
 impl TestKey for StateKey {}
 
 /// Node batch that will be written into db atomically with other batches.
-pub type NodeBatch<K> = BTreeMap<NodeKey, Node<K>>;
+pub type NodeBatch<K> = HashMap<NodeKey, Node<K>>;
 /// Key-Value batch that will be written into db atomically with other batches.
-pub type KVBatch<K, V> = BTreeMap<(K, Version), V>;
+pub type StateValueBatch<K, V> = HashMap<(K, Version), V>;
 
 /// [`StaleNodeIndex`](struct.StaleNodeIndex.html) batch that will be written into db atomically
 /// with other batches.
-pub type StaleNodeIndexBatch = BTreeSet<StaleNodeIndex>;
+pub type StaleNodeIndexBatch = HashSet<StaleNodeIndex>;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct NodeStats {
