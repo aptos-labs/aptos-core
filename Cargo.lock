@@ -85,6 +85,7 @@ dependencies = [
  "bcs",
  "cached-framework-packages",
  "clap 3.1.18",
+ "crossbeam-channel",
  "datatest-stable",
  "move-deps",
 ]
@@ -7638,8 +7639,10 @@ dependencies = [
  "aptos-types",
  "aptos-workspace-hack",
  "bcs",
+ "crossbeam-channel",
  "move-deps",
  "parking_lot 0.12.0",
+ "rayon",
  "scratchpad",
  "serde 1.0.137",
  "thiserror",

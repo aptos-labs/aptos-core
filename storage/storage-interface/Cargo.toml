@@ -13,8 +13,11 @@ edition = "2018"
 anyhow = "1.0.57"
 bcs = "0.1.3"
 parking_lot = "0.12.0"
+rayon = "1.5.2"
+crossbeam-channel = { version = "0.5.4", features = ["crossbeam-utils", "std"] }
 serde = { version = "1.0.137", default-features = false }
 thiserror = "1.0.31"
+
 
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-secure-net = { path = "../../secure/net" }

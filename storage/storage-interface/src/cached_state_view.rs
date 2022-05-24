@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::async_proof_reader::AsyncProofReader;
 use crate::{proof_fetcher::ProofFetcher, DbReader};
 use anyhow::{format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
