@@ -1,17 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::proof_fetcher::ProofFetcher;
+use crate::{proof_fetcher::ProofFetcher, DbReader};
 use anyhow::{format_err, Result};
-use aptos_crypto::{
-    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
-    HashValue,
-};
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     proof::SparseMerkleProof,
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{Version, PRE_GENESIS_VERSION},
+    transaction::Version,
     write_set::WriteSet,
 };
 use parking_lot::RwLock;
@@ -27,13 +24,10 @@ pub struct CachedStateView {
     /// For logging and debugging purpose, identifies what this view is for.
     id: StateViewId,
 
-    /// The most recent version in persistent storage.
-    latest_persistent_version: Option<Version>,
+    /// A readable state checkpoint in the persistent storage.
+    persisted_checkpoint: Option<(Version, HashValue)>,
 
-    /// The most recent state root hash in persistent storage.
-    latest_persistent_state_root: HashValue,
-
-    /// The in-memory version of sparse Merkle tree of which the states haven't been committed.
+    /// The in-memory state on top of the persisted checkpoint.
     speculative_state: FrozenSparseMerkleTree<StateValue>,
 
     /// The cache of verified account states from `reader` and `speculative_state_view`,
@@ -82,33 +76,29 @@ pub struct CachedStateView {
 }
 
 impl CachedStateView {
-    /// Constructs a [`CachedStateView`] with persistent state view represented by
-    /// `latest_persistent_state_root` plus a storage reader, and the in-memory speculative state
-    /// on top of it represented by `speculative_state`.
+    /// Constructs a [`CachedStateView`] with persistent state view in the DB and the in-memory
+    /// speculative state represented by `speculative_state`. The persistent state view is the
+    /// latest one preceding `next_version`
     pub fn new(
         id: StateViewId,
-        latest_persistent_version: Option<Version>,
-        latest_persistent_state_root: HashValue,
+        reader: Arc<dyn DbReader>,
+        next_version: Version,
         speculative_state: SparseMerkleTree<StateValue>,
         proof_fetcher: Arc<dyn ProofFetcher>,
-    ) -> Self {
-        // Hack: When there's no transaction in the db but state tree root hash is not the
-        // placeholder hash, it implies that there's pre-genesis state present.
-        let latest_persistent_version = latest_persistent_version.or_else(|| {
-            if latest_persistent_state_root != *SPARSE_MERKLE_PLACEHOLDER_HASH {
-                Some(PRE_GENESIS_VERSION)
-            } else {
-                None
-            }
-        });
-        Self {
+    ) -> Result<Self> {
+        // n.b. Freeze the state before getting the state checkpoint, otherwise it's possible that
+        // after we got the checkpoint, in-mem trees newer than it gets dropped before being frozen,
+        // due to a commit happening from another thread.
+        let speculative_state = speculative_state.freeze();
+        let persisted_checkpoint = reader.get_state_checkpoint_before(next_version)?;
+
+        Ok(Self {
             id,
-            latest_persistent_version,
-            latest_persistent_state_root,
-            speculative_state: speculative_state.freeze(),
+            persisted_checkpoint,
+            speculative_state,
             state_cache: RwLock::new(HashMap::new()),
             proof_fetcher,
-        }
+        })
     }
 
     pub fn prime_cache_by_write_set(&self, write_sets: &[WriteSet]) -> Result<()> {
@@ -133,34 +123,33 @@ impl CachedStateView {
         // Do most of the work outside the write lock.
         let key_hash = state_key.hash();
         let state_value_option = match self.speculative_state.get(key_hash) {
-            StateStoreStatus::ExistsInScratchPad(blob) => Some(blob),
+            StateStoreStatus::ExistsInScratchPad(value) => Some(value),
             StateStoreStatus::DoesNotExist => None,
             // No matter it is in db or unknown, we have to query from db since even the
             // former case, we don't have the blob data but only its hash.
             StateStoreStatus::ExistsInDB | StateStoreStatus::Unknown => {
-                let (state_value, proof) = match self.latest_persistent_version {
-                    Some(version) => self
-                        .proof_fetcher
-                        .fetch_state_value_and_proof(state_key, version)?,
-                    None => (None, Some(SparseMerkleProof::new(None, vec![]))),
-                };
-                if let Some(proof) = proof {
-                    proof
-                        .verify(
-                            self.latest_persistent_state_root,
-                            key_hash,
-                            state_value.as_ref(),
-                        )
-                        .map_err(|err| {
-                            format_err!(
-                                "Proof is invalid for key {:?} with state root hash {:?}: {}",
-                                state_key,
-                                self.latest_persistent_state_root,
-                                err
-                            )
-                        })?;
+                match self.persisted_checkpoint {
+                    Some((version, root_hash)) => {
+                        let (value, proof) = self
+                            .proof_fetcher
+                            .fetch_state_value_and_proof(state_key, version)?;
+                        // TODO: proof verification can be opted out, for performance
+                        if let Some(proof) = proof {
+                            proof
+                                .verify(root_hash, key_hash, value.as_ref())
+                                .map_err(|err| {
+                                    format_err!(
+                                    "Proof is invalid for key {:?} with state root hash {:?}: {}",
+                                    state_key,
+                                    root_hash,
+                                    err
+                                )
+                                })?;
+                        }
+                        value
+                    }
+                    None => None,
                 }
-                state_value
             }
         };
 
@@ -195,6 +184,6 @@ impl StateView for CachedStateView {
     }
 
     fn is_genesis(&self) -> bool {
-        self.latest_persistent_version.is_none()
+        self.persisted_checkpoint.is_none()
     }
 }

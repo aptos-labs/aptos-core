@@ -60,11 +60,11 @@ impl IntoLedgerView for TreeState {
             );
             let checkpoint_state_view = CachedStateView::new(
                 StateViewId::Miscellaneous,
-                self.state_checkpoint_version,
-                self.state_checkpoint_hash,
+                db.clone(),
+                self.num_transactions,
                 checkpoint_state.checkpoint.clone(),
                 Arc::new(SyncProofFetcher::new(db.clone())),
-            );
+            )?;
             let write_sets = db.get_write_sets(checkpoint_next_version, self.num_transactions)?;
             checkpoint_state_view.prime_cache_by_write_set(&write_sets)?;
             let state_cache = checkpoint_state_view.into_state_cache();

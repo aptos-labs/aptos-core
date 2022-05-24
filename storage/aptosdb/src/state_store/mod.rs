@@ -46,53 +46,75 @@ pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 #[derive(Debug)]
 pub(crate) struct StateStore {
     db: Arc<DB>,
-    latest_version: Mutex<Option<Version>>,
+    latest_checkpoint: Mutex<Option<(Version, HashValue)>>,
 }
 
 impl StateStore {
     pub fn new(db: Arc<DB>) -> Self {
-        let latest_version = Self::find_latest_persisted_version_from_db(&db, Version::MAX)
-            .expect("Failed to query latest node on initialization.");
-
-        Self {
+        let myself = Self {
             db,
-            latest_version: Mutex::new(latest_version),
+            latest_checkpoint: Mutex::new(None),
+        };
+
+        let latest_version = myself
+            .find_latest_persisted_version_from_db(Version::MAX)
+            .expect("Failed to query latest node on initialization.");
+        if let Some(version) = latest_version {
+            let root_hash = myself
+                .get_root_hash(version)
+                .expect("Failed to query latest checkpoint root hash on initialization.");
+            myself.set_latest_checkpoint(version, root_hash)
         }
+
+        myself
     }
 
-    pub fn latest_version(&self) -> Option<Version> {
-        *self.latest_version.lock()
+    pub fn latest_checkpoint(&self) -> Option<(Version, HashValue)> {
+        *self.latest_checkpoint.lock()
     }
 
-    pub fn set_latest_state_checkpoint_version(&self, version: Version) {
-        *self.latest_version.lock() = Some(version)
+    pub fn set_latest_checkpoint(&self, version: Version, root_hash: HashValue) {
+        *self.latest_checkpoint.lock() = Some((version, root_hash))
+    }
+
+    pub fn get_checkpoint_before(
+        &self,
+        next_version: Version,
+    ) -> Result<Option<(Version, HashValue)>> {
+        ensure!(
+            next_version != PRE_GENESIS_VERSION,
+            "Nothing before pre-genesis"
+        );
+
+        if let Some((version, root_hash)) = self.latest_checkpoint() {
+            if next_version > version {
+                Ok(Some((version, root_hash)))
+            } else {
+                self.find_latest_persisted_version_from_db(next_version)?
+                    .map(|ver| Ok((ver, self.get_root_hash(ver)?)))
+                    .transpose()
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn find_latest_persisted_version_less_than(
         &self,
         next_version: Version,
     ) -> Result<Option<Version>> {
-        ensure!(
-            next_version != PRE_GENESIS_VERSION,
-            "Nothing before pre-genesis"
-        );
-
-        let latest_version_opt = self.latest_version();
-        if let Some(latest_version) = &latest_version_opt {
-            if *latest_version < next_version {
-                return Ok(latest_version_opt);
-            }
-        }
-        Self::find_latest_persisted_version_from_db(&self.db, next_version)
+        Ok(self.get_checkpoint_before(next_version)?.map(|(v, _h)| v))
     }
 
     fn find_latest_persisted_version_from_db(
-        db: &Arc<DB>,
+        &self,
         next_version: Version,
     ) -> Result<Option<Version>> {
         if next_version > 0 {
             let max_possible_version = next_version - 1;
-            let mut iter = db.rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+            let mut iter = self
+                .db
+                .rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
             iter.seek_for_prev(&NodeKey::new_empty_path(max_possible_version))?;
             if let Some((key, _node)) = iter.next().transpose()? {
                 // TODO: If we break up a single update batch to multiple commits, we would need to
@@ -101,7 +123,8 @@ impl StateStore {
             }
         }
         // try PRE_GENESIS
-        Ok(db
+        Ok(self
+            .db
             .get::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(PRE_GENESIS_VERSION))?
             .map(|_pre_genesis_root| PRE_GENESIS_VERSION))
     }
@@ -477,8 +500,8 @@ impl TreeWriter<StateKey> for StateStore {
         self.db.write_schemas(batch)
     }
 
-    fn finish_version(&self, version: Version) {
-        self.set_latest_state_checkpoint_version(version)
+    fn finish_version(&self, version: Version, root_hash: HashValue) {
+        self.set_latest_checkpoint(version, root_hash)
     }
 }
 

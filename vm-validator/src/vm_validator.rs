@@ -42,13 +42,14 @@ fn latest_state_view(db_reader: &Arc<dyn DbReader>) -> CachedStateView {
         .into_ledger_view(db_reader)
         .expect("Should not fail.");
 
-    ledger_view.state_view(
-        &ledger_view,
-        StateViewId::TransactionValidation {
-            base_version: ledger_view.version().expect("Must be bootstrapped."),
-        },
-        db_reader.clone(),
-    )
+    ledger_view
+        .state_view(
+            StateViewId::TransactionValidation {
+                base_version: ledger_view.version().expect("Must be bootstrapped."),
+            },
+            db_reader.clone(),
+        )
+        .expect("failed to get latest state view.")
 }
 
 pub struct VMValidator {

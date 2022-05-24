@@ -37,7 +37,7 @@ fn put_value_set(
         .put_value_sets(vec![&value_set], version, &mut cs)
         .unwrap();
     state_store.db.write_schemas(cs.batch).unwrap();
-    state_store.set_latest_state_checkpoint_version(version);
+    state_store.set_latest_checkpoint(version, root);
     root
 }
 
@@ -677,13 +677,13 @@ fn update_store(
         let mut cs = ChangeSet::new();
         let value_state_set: HashMap<_, _> = std::iter::once((key, value)).collect();
         let version = first_version + i as Version;
-        store
+        let root_hashes = store
             .merklize_value_sets(vec![&value_state_set], None, version, &mut cs)
             .unwrap();
         store
             .put_value_sets(vec![&value_state_set], version, &mut cs)
             .unwrap();
         store.db.write_schemas(cs.batch).unwrap();
-        store.set_latest_state_checkpoint_version(version);
+        store.set_latest_checkpoint(version, root_hashes[0]);
     }
 }

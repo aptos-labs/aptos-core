@@ -58,13 +58,8 @@ impl<V> ChunkExecutor<V> {
         }
     }
 
-    fn state_view(
-        &self,
-        latest_view: &ExecutedTrees,
-        persisted_view: &ExecutedTrees,
-    ) -> CachedStateView {
+    fn state_view(&self, latest_view: &ExecutedTrees) -> Result<CachedStateView> {
         latest_view.verified_state_view(
-            persisted_view,
             StateViewId::ChunkExecution {
                 first_version: latest_view.txn_accumulator().num_leaves(),
             },
@@ -121,7 +116,7 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
 
         let num_txns = txn_list_with_proof.transactions.len();
         let first_version_in_request = txn_list_with_proof.first_transaction_version;
-        let (persisted_view, latest_view) = self.commit_queue.lock().persisted_and_latest_view();
+        let (_persisted_view, latest_view) = self.commit_queue.lock().persisted_and_latest_view();
 
         // Verify input transaction list.
         txn_list_with_proof.verify(verified_target_li.ledger_info(), first_version_in_request)?;
@@ -142,7 +137,7 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         }
 
         // Execute transactions.
-        let state_view = self.state_view(&latest_view, &persisted_view);
+        let state_view = self.state_view(&latest_view)?;
         let chunk_output = {
             let _timer = APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS.start_timer();
             ChunkOutput::by_transaction_execution::<V>(transactions, state_view)?
@@ -179,7 +174,7 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
 
         let num_txns = txn_output_list_with_proof.transactions_and_outputs.len();
         let first_version_in_request = txn_output_list_with_proof.first_transaction_output_version;
-        let (persisted_view, latest_view) = self.commit_queue.lock().persisted_and_latest_view();
+        let (_persisted_view, latest_view) = self.commit_queue.lock().persisted_and_latest_view();
 
         // Verify input transaction list.
         txn_output_list_with_proof
@@ -195,7 +190,7 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         txns_and_outputs.drain(..txns_to_skip as usize);
 
         // Apply transaction outputs.
-        let state_view = self.state_view(&latest_view, &persisted_view);
+        let state_view = self.state_view(&latest_view)?;
         let chunk_output = ChunkOutput::by_transaction_output(txns_and_outputs, state_view)?;
         let executed_chunk = Self::apply_chunk_output_for_state_sync(
             verified_target_li,
@@ -273,14 +268,14 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
         transactions: Vec<Transaction>,
         mut transaction_infos: Vec<TransactionInfo>,
     ) -> Result<()> {
-        let (persisted_view, mut latest_view) =
+        let (_persisted_view, mut latest_view) =
             self.commit_queue.lock().persisted_and_latest_view();
 
         let mut executed_chunk = ExecutedChunk::default();
         let mut to_run = Some(transactions);
         while !to_run.as_ref().unwrap().is_empty() {
             // Execute transactions.
-            let state_view = self.state_view(&latest_view, &persisted_view);
+            let state_view = self.state_view(&latest_view)?;
             let txns = to_run.take().unwrap();
             let (executed, to_discard, to_retry) =
                 ChunkOutput::by_transaction_execution::<V>(txns, state_view)?

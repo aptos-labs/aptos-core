@@ -112,7 +112,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     let genesis_version = tree_state.num_transactions;
     let base_view = tree_state.into_ledger_view(&db.reader)?;
     let base_state_view =
-        base_view.verified_state_view(&base_view, StateViewId::Miscellaneous, db.reader.clone());
+        base_view.verified_state_view(StateViewId::Miscellaneous, db.reader.clone())?;
 
     let epoch = if genesis_version == 0 {
         GENESIS_EPOCH
@@ -132,11 +132,9 @@ pub fn calculate_genesis<V: VMExecutor>(
         // TODO(aldenhu): fix existing tests before using real timestamp and check on-chain epoch.
         GENESIS_TIMESTAMP_USECS
     } else {
-        let state_view = output.result_view.verified_state_view(
-            &base_view,
-            StateViewId::Miscellaneous,
-            db.reader.clone(),
-        );
+        let state_view = output
+            .result_view
+            .verified_state_view(StateViewId::Miscellaneous, db.reader.clone())?;
         let next_epoch = epoch
             .checked_add(1)
             .ok_or_else(|| format_err!("integer overflow occurred"))?;

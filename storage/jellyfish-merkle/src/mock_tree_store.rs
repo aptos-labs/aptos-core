@@ -6,6 +6,7 @@ use crate::{
     NodeBatch, StaleNodeIndex, TreeReader, TreeUpdateBatch, TreeWriter,
 };
 use anyhow::{bail, ensure, Result};
+use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_types::transaction::Version;
 use std::collections::{hash_map::Entry, BTreeSet, HashMap};
@@ -65,7 +66,7 @@ where
         Ok(())
     }
 
-    fn finish_version(&self, _version: Version) {}
+    fn finish_version(&self, _version: Version, _root_hash: HashValue) {}
 }
 
 impl<K> MockTreeStore<K>

@@ -359,31 +359,29 @@ impl ExecutedTrees {
 
     pub fn verified_state_view(
         &self,
-        persisted_view: &Self,
         id: StateViewId,
         reader: Arc<dyn DbReader>,
-    ) -> CachedStateView {
+    ) -> Result<CachedStateView> {
         CachedStateView::new(
             id,
-            persisted_view.state.checkpoint_version,
-            persisted_view.state.checkpoint_root_hash(),
+            reader.clone(),
+            self.transaction_accumulator.num_leaves(),
             self.state.current.clone(),
-            Arc::new(SyncProofFetcher::new(reader.clone())),
+            Arc::new(SyncProofFetcher::new(reader)),
         )
     }
 
     pub fn state_view(
         &self,
-        persisted_view: &Self,
         id: StateViewId,
         reader: Arc<dyn DbReader>,
-    ) -> CachedStateView {
+    ) -> Result<CachedStateView> {
         CachedStateView::new(
             id,
-            persisted_view.state.checkpoint_version,
-            persisted_view.state.checkpoint_root_hash(),
+            reader.clone(),
+            self.transaction_accumulator.num_leaves(),
             self.state.current.clone(),
-            Arc::new(NoProofFetcher::new(reader.clone())),
+            Arc::new(NoProofFetcher::new(reader)),
         )
     }
 }

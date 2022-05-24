@@ -112,7 +112,7 @@ impl TreeWriter<StateKey> for MockStore {
         Ok(())
     }
 
-    fn finish_version(&self, _version: Version) {}
+    fn finish_version(&self, _version: Version, _root_hash: HashValue) {}
 }
 
 impl StateValueWriter<StateKey, StateValue> for MockStore {

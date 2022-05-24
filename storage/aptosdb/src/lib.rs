@@ -591,11 +591,11 @@ impl AptosDB {
         txns_to_commit: &[TransactionToCommit],
         first_version: u64,
         cs: &mut ChangeSet,
-    ) -> Result<(HashValue, Option<Version>)> {
+    ) -> Result<(HashValue, Option<(Version, HashValue)>)> {
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
 
         // Account state updates. Gather account state root hashes
-        let updated_state_version = {
+        let new_state_checkpoint = {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["save_transactions_state"])
                 .start_timer();
@@ -605,16 +605,15 @@ impl AptosDB {
                 .map(|txn_to_commit| txn_to_commit.state_updates())
                 .collect::<Vec<_>>();
             // find the last version with state tree updates -- that's the latest state checkpoint
-            let latest_state_checkpoint_version = state_updates_vec
+            let latest_state_checkpoint_index = state_updates_vec
                 .iter()
-                .rposition(|updates| !updates.is_empty())
-                .map(|idx| first_version + idx as LeafCount);
+                .rposition(|updates| !updates.is_empty());
 
             let node_hashes = txns_to_commit
                 .iter()
                 .map(|txn_to_commit| txn_to_commit.jf_node_hashes())
                 .collect::<Option<Vec<_>>>();
-            self.state_store.merklize_value_sets(
+            let root_hashes = self.state_store.merklize_value_sets(
                 state_updates_vec.clone(),
                 node_hashes,
                 first_version,
@@ -623,7 +622,11 @@ impl AptosDB {
             self.state_store
                 .put_value_sets(state_updates_vec, first_version, cs)?;
 
-            latest_state_checkpoint_version
+            latest_state_checkpoint_index.map(|idx| {
+                let version = first_version + idx as LeafCount;
+                let root_hash = root_hashes[idx];
+                (version, root_hash)
+            })
         };
 
         // Event updates. Gather event accumulator root hashes.
@@ -661,7 +664,7 @@ impl AptosDB {
                 .put_transaction_infos(first_version, &txn_infos, cs)?
         };
 
-        Ok((new_root_hash, updated_state_version))
+        Ok((new_root_hash, new_state_checkpoint))
     }
 
     /// Write the whole schema batch including all data necessary to mutate the ledger
@@ -1183,9 +1186,18 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
+    fn get_latest_state_checkpoint(&self) -> Result<Option<(Version, HashValue)>> {
         gauged_api("get_latest_state_checkpoint_version", || {
-            Ok(self.state_store.latest_version())
+            Ok(self.state_store.latest_checkpoint())
+        })
+    }
+
+    fn get_state_checkpoint_before(
+        &self,
+        next_version: Version,
+    ) -> Result<Option<(Version, HashValue)>> {
+        gauged_api("get_state_checkpoint_before", || {
+            self.state_store.get_checkpoint_before(next_version)
         })
     }
 
@@ -1288,7 +1300,7 @@ impl DbWriter for AptosDB {
             // Gather db mutations to `batch`.
             let mut cs = ChangeSet::new();
 
-            let (new_root_hash, latest_state_checkpoint) =
+            let (new_root_hash, new_state_checkpoint) =
                 self.save_transactions_impl(txns_to_commit, first_version, &mut cs)?;
 
             // If expected ledger info is provided, verify result root hash and save the ledger info.
@@ -1313,9 +1325,8 @@ impl DbWriter for AptosDB {
                 self.commit(sealed_cs)?;
             }
 
-            if let Some(latest_state_version) = latest_state_checkpoint {
-                self.state_store
-                    .set_latest_state_checkpoint_version(latest_state_version);
+            if let Some((version, root_hash)) = new_state_checkpoint {
+                self.state_store.set_latest_checkpoint(version, root_hash);
             }
 
             // Only increment counter if commit succeeds and there are at least one transaction written

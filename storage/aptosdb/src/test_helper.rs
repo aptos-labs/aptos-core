@@ -617,16 +617,15 @@ pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &Transacti
 }
 
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
+    let leaf_node = Node::new_leaf(key.hash(), value.hash(), (key.clone(), version));
     db.db
-        .put::<JellyfishMerkleNodeSchema>(
-            &NodeKey::new_empty_path(version),
-            &Node::new_leaf(key.hash(), value.hash(), (key.clone(), version)),
-        )
+        .put::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version), &leaf_node)
         .unwrap();
     db.db
         .put::<StateValueSchema>(&(key, version), &value)
         .unwrap();
-    db.state_store.set_latest_state_checkpoint_version(version);
+    db.state_store
+        .set_latest_checkpoint(version, leaf_node.hash());
 }
 
 pub fn test_sync_transactions_impl(
