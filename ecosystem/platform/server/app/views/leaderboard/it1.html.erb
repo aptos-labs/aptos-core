@@ -2,22 +2,22 @@
   <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 md:px-8 py-12 sm:py-24">
     <h2 class="text-6xl mb-4 font-display font-light">AIT1 Validator Status</h2>
     <div class="mb-16">
-      <%= render 'shared/bump_hero' %>
+      <%= render DividerComponent.new(scheme: :primary) %>
     </div>
     <div class="flex flex-col md:flex-row gap-8 mb-8">
       <div class="flex-1 p-8 rounded-lg bg-neutral-800">
         <h3 class="font-mono uppercase text-xl mb-4 font-bold">Nodes</h3>
-        <div class="mb-4"><%= render 'shared/bump' %></div>
+        <div class="mb-4"><%= render DividerComponent.new %></div>
         <p class="font-mono uppercase text-5xl font-light">100</p>
       </div>
       <div class="flex-1 p-8 rounded-lg bg-neutral-800">
         <h3 class="font-mono uppercase text-xl mb-4 font-bold">Countries</h3>
-        <div class="mb-4"><%= render 'shared/bump' %></div>
+        <div class="mb-4"><%= render DividerComponent.new %></div>
         <p class="font-mono uppercase text-5xl font-light">43</p>
       </div>
       <div class="flex-1 p-8 rounded-lg bg-neutral-800">
         <h3 class="font-mono uppercase text-xl mb-4 font-bold">Cities</h3>
-        <div class="mb-4"><%= render 'shared/bump' %></div>
+        <div class="mb-4"><%= render DividerComponent.new %></div>
         <p class="font-mono uppercase text-5xl font-light">58</p>
       </div>
     </div>

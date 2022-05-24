@@ -9,37 +9,37 @@ require 'maxmind/geoip2'
 require 'httparty'
 require 'logging/logs'
 
-# @param [String] hostname
-def normalize_hostname!(hostname)
-  hostname.strip!
-  hostname.downcase!
-  hostname.delete_prefix! 'http://'
-  hostname.delete_prefix! 'https://'
-  hostname.delete_suffix! '/'
-end
-
-# @param [String] metrics
-# @return MetricsResult
-def extract_metrics(metrics)
-  return MetricsResult.new(false, nil, 'Metrics result is empty') unless metrics.present?
-
-  metrics.split("\n").each_entry do |metric|
-    next if metric.start_with? '#'
-
-    name, value = metric.split
-    # aptos_consensus_last_committed_version 8299
-    return MetricsResult.new(true, value.to_i, nil) if name == 'aptos_consensus_last_committed_version'
+module NodeHelper
+  # @param [String] hostname
+  def normalize_hostname!(hostname)
+    hostname.strip!
+    hostname.downcase!
+    hostname.delete_prefix! 'http://'
+    hostname.delete_prefix! 'https://'
+    hostname.delete_suffix! '/'
   end
 
-  MetricsResult.new(false, nil, 'could not find `aptos_consensus_last_committed_version` metric')
-end
+  # @param [String] metrics
+  # @return MetricsResult
+  def extract_metrics(metrics)
+    return MetricsResult.new(false, nil, 'Metrics result is empty') unless metrics.present?
 
-VerifyResult = Struct.new(:valid, :message)
-MetricsResult = Struct.new(:ok, :version, :message)
-LocationResult = Struct.new(:ok, :message, :record)
-IPResult = Struct.new(:ok, :ip, :message)
+    metrics.split("\n").each_entry do |metric|
+      next if metric.start_with? '#'
 
-module NodeHelper
+      name, value = metric.split
+      # aptos_consensus_last_committed_version 8299
+      return MetricsResult.new(true, value.to_i, nil) if name == 'aptos_consensus_last_committed_version'
+    end
+
+    MetricsResult.new(false, nil, 'could not find `aptos_consensus_last_committed_version` metric')
+  end
+
+  VerifyResult = Struct.new(:valid, :message)
+  MetricsResult = Struct.new(:ok, :version, :message)
+  LocationResult = Struct.new(:ok, :message, :record)
+  IPResult = Struct.new(:ok, :ip, :message)
+
   class NodeVerifier
     include Logging::Logs
 
