@@ -59,15 +59,64 @@ paths:
           description: Returns OpenAPI specification YAML document.
         "400":
           description: Bad Request
-  /tokens/{TokenId}:
+  /tokens/all:
+    get:
+      description: "Returns all tokens"
+      operationId: getAllTokens
+      parameters:
+        - name: "offset"
+          in: query
+          required: false
+          description:
+            offset of the tokens to be returned from the first token.
+          schema:
+            type: integer
+        - name: "size"
+          in: query
+          required: false
+          description: "The number of items to return"
+          schema:
+            type: integer
+        - name: "showDeleted"
+          in: query
+          required: false
+          description: "Include deleted items"
+          schema:
+            type: boolean
+        - name: "lastUpdatedFrom"
+          in: query
+          required: false
+          description: "Filter condition to return only items that have been updated after this date (timestamp)"
+          schema:
+            type: integer
+            format: int64
+        - name: "lastUpdatedTo"
+          in: query
+          required: false
+          description: "Filter condition to return only items that have been updated before this date (timestamp)"
+          schema:
+            type: integer
+            format: "int64"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tokens"
+        '400':
+          $ref: "#/components/responses/400"
+        '500':
+          $ref: "#/components/responses/500"
+  /tokens/{tokenId}:
     get:
       description: "Returns Token by Id"
       operationId: getTokenById
       parameters:
-        - name: "TokenId"
+        - name: "tokenId"
           in: path
           required: true
-          description: "Token Id, has format `${address}:${collection_name}:${token_name}`"
+          description: "Token Id has format `${creator_address}::${collection_name}::${token_name}`"
           schema:
             $ref: "#/components/schemas/TokenId"
       responses:
@@ -83,15 +132,15 @@ paths:
           $ref: '#/components/responses/400'
         '500':
           $ref: '#/components/responses/500'
-  /token_metadata/{tokenId}:
+  /tokens/{tokenId}/meta:
     get:
-      description: "Returns TokenMetaData by Id"
+      description: "Returns token metadata by Id"
       operationId: getTokenMetaDataById
       parameters:
         - name: "tokenId"
           in: path
           required: true
-          description: "TokenId, has format `${address}:${collection_name}:${token_name}`"
+          description: "Token Id has format `${creator_address}::${collection_name}::${token_name}`"
           schema:
             $ref: "#/components/schemas/TokenId"
       responses:
@@ -100,16 +149,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TokenMetaData"
+                $ref: "#/components/schemas/Token"
         '404':
           $ref: '#/components/responses/404'
         '400':
           $ref: '#/components/responses/400'
         '500':
           $ref: '#/components/responses/500'
-  /token_metadata/byIds:
+  /tokens/{tokenId}/royalties:
+    get:
+      description: Returns token royalty by tokenId
+      operationId: getTokenRoyaltiesById
+      parameters:
+        - name: "tokenId"
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/TokenId"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Royalties"
+        '400':
+          $ref: "#/components/responses/400"
+        '500':
+          $ref: "#/components/responses/500"
+  /metadata/byIds:
     post:
-      description: "Returns TokenMetaData by Ids"
+      description: "Returns Token MetaData by Ids"
       operationId: getTokenMetaDataByIds
       requestBody:
         content:
@@ -160,9 +230,66 @@ paths:
         - name: "ownershipId"
           in: path
           required: true
-          description: "Ownership Id in format: '${blockchain}:${token}:${tokenId}:${owner}'"
+          description: Ownership Id has the format of "${tokenID}::${ownerAddress}"
           schema:
             $ref: "#/components/schemas/OwnershipId"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ownership"
+        '404':
+          $ref: "#/components/responses/404"
+        '400':
+          $ref: "#/components/responses/400"
+        '500':
+          $ref: "#/components/responses/500"
+  /ownerships/byToken:
+    get:
+      description: "Returns ownerships by token"
+      operationId: getOwnershipsByToken
+      parameters:
+        - name: "tokenId"
+          in: query
+          required: true
+          description: "TokenId, has format `${creator_address}::${collection_name}::${token_name}`"
+          schema:
+            $ref: "#/components/schemas/TokenId"
+        - name: "offset"
+          in: query
+          required: false
+          description: "offset from the first ownership to be returned"
+          schema:
+            type: integer
+        - name: "size"
+          in: query
+          required: false
+          description: "The number of tokens to return"
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ownerships"
+        '400':
+          $ref: "#/components/responses/400"
+        '500':
+          $ref: "#/components/responses/500"
+  /ownership/byIds:
+    post:
+      description: "Returns Ownership by Ids"
+      operationId: getOwnershipByIds
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Ownerships"
+        required: true
       responses:
         "200":
           description: "OK"
@@ -1472,7 +1599,7 @@ components:
       description:
         token id is the unique identifier of a token.
         It consists of 3 parts joined with "::".
-        The 3 parts are creator account address, collection name and token name
+        The 3 parts are ${creator_address}::${collection_name}::${token_name}
       example: "0x1::APE::LASER_APE"
     TokenIds:
       type: object
@@ -1556,7 +1683,7 @@ components:
           type: string
     OwnershipId:
       type: string
-      description: the ownership Id is the  "TokenID::Owner"
+      description: Ownership Id has the format of "${tokenID}::${ownerAddress}"
       example:
     OwnershipSource:
       type: string
