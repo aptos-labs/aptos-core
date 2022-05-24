@@ -4,17 +4,14 @@
 
 import { application } from "./application"
 
-import DialogController from "./dialog_controller.js"
+import DialogController from "./dialog_controller.ts"
 application.register("dialog", DialogController)
 
-import HelloController from "./hello_controller.js"
-application.register("hello", HelloController)
-
-import RecaptchaController from "./recaptcha_controller.js"
+import RecaptchaController from "./recaptcha_controller.ts"
 application.register("recaptcha", RecaptchaController)
 
-import RefreshController from "./refresh_controller.js"
+import RefreshController from "./refresh_controller.ts"
 application.register("refresh", RefreshController)
 
-import ShakeController from "./shake_controller.js"
+import ShakeController from "./shake_controller.ts"
 application.register("shake", ShakeController)

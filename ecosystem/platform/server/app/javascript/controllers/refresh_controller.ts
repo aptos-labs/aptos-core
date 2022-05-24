@@ -1,11 +1,16 @@
-import { Controller } from "@hotwired/stimulus"
+import { Controller } from "./controller";
+import type { FrameElement } from "@hotwired/turbo/dist/types/elements";
 
 // Connects to data-controller="refresh"
-export default class extends Controller {
+export default class extends Controller<FrameElement> {
   static values = {
     src: String,
     interval: {type: Number, default: 5},
   };
+
+  timeoutId: number | undefined;
+  declare readonly srcValue: string;
+  declare readonly intervalValue: number;
 
   resetTimeout = () => {
     this.timeoutId = setTimeout(() => {

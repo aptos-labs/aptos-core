@@ -1,3 +1,3 @@
 web: bin/rails server -p 3001
-js: yarn build --watch
+js: yarn dev
 css: yarn build:css --watch

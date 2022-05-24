@@ -1,4 +1,4 @@
-export function shake(element) {
+export function shake(element: Element) {
   const keyframes = [
     { transform: 'translate(1px, 1px) rotate(0deg)' },
     { transform: 'translate(-1px, -2px) rotate(-1deg)' },

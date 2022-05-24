@@ -5,6 +5,8 @@ import { shake } from '../utils';
 export default class extends Controller {
   static targets = ["content"];
 
+  declare readonly contentTargets: Element[];
+
   shake() {
     this.contentTargets.forEach(shake);
   }
