@@ -20,7 +20,7 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{
     iterator::JellyfishMerkleIterator, node_type::NodeKey, restore::StateSnapshotRestore,
-    JellyfishMerkleTree, KVWriter, TreeReader, TreeWriter,
+    JellyfishMerkleTree, StateValueWriter, TreeReader, TreeWriter,
 };
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
@@ -28,7 +28,7 @@ use aptos_types::{
     state_store::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
-        state_value::{StateKeyAndValue, StateValue, StateValueChunkWithProof},
+        state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{Version, PRE_GENESIS_VERSION},
 };
@@ -43,7 +43,7 @@ use storage_interface::StateSnapshotReceiver;
 type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
 type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
 type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKey>;
-type KVBatch = aptos_jellyfish_merkle::KVBatch<StateKey, StateKeyAndValue>;
+type KVBatch = aptos_jellyfish_merkle::KVBatch<StateKey, StateValue>;
 
 pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 
@@ -120,7 +120,7 @@ impl StateStore {
             JellyfishMerkleTree::new(self).get_with_proof(state_key.hash(), version)?;
         Ok((
             match leaf_data {
-                Some(x) => Some(self.get_value_at_version(&x.1).map(|kv| kv.value)?),
+                Some(x) => Some(self.get_value_at_version(&x.1)?),
                 None => None,
             },
             proof,
@@ -138,9 +138,7 @@ impl StateStore {
         let mut iter = self.db.iter::<StateValueSchema>(Default::default())?;
         let mut result = HashMap::new();
         iter.seek(&(key_prefix))?;
-        while let Some(((state_key, first_version), state_key_and_value)) =
-            iter.next().transpose()?
-        {
+        while let Some(((state_key, first_version), state_value)) = iter.next().transpose()? {
             // Cursor is currently at the first available version of the state key.
             // Check if the key_prefix is a valid prefix of the state_key we got from DB.
 
@@ -151,7 +149,7 @@ impl StateStore {
             match first_version.cmp(&desired_version) {
                 Ordering::Less => {
                     iter.seek_for_prev(&(state_key.clone(), desired_version))?;
-                    let ((state_key, _), state_key_and_value) =
+                    let ((state_key, _), state_value) =
                         iter.next().transpose()?.ok_or_else(|| {
                             anyhow!(
                                 "Failure seeking to desired version {:?} for state key {:?}",
@@ -159,11 +157,11 @@ impl StateStore {
                                 state_key
                             )
                         })?;
-                    result.insert(state_key.clone(), state_key_and_value.value.clone());
+                    result.insert(state_key.clone(), state_value);
                 }
 
                 Ordering::Equal => {
-                    result.insert(state_key.clone(), state_key_and_value.value.clone());
+                    result.insert(state_key.clone(), state_value);
                 }
                 Ordering::Greater => {}
             }
@@ -185,7 +183,7 @@ impl StateStore {
     pub fn get_value_at_version(
         &self,
         key_and_version: &(StateKey, Version),
-    ) -> Result<StateKeyAndValue> {
+    ) -> Result<StateValue> {
         self.db
             .get::<StateValueSchema>(key_and_version)?
             .ok_or_else(|| {
@@ -211,9 +209,9 @@ impl StateStore {
         Ok(iter
             .next()
             .transpose()?
-            .and_then(|((db_state_key, _), state_key_and_value)| {
+            .and_then(|((db_state_key, _), state_value)| {
                 if *state_key == db_state_key {
-                    Some(state_key_and_value.value)
+                    Some(state_value)
                 } else {
                     None
                 }
@@ -240,12 +238,8 @@ impl StateStore {
             .iter()
             .enumerate()
             .flat_map(|(i, kvs)| {
-                kvs.iter().map(move |(k, v)| {
-                    (
-                        (k.clone(), first_version + i as Version),
-                        StateKeyAndValue::new(k.clone(), v.clone()),
-                    )
-                })
+                kvs.iter()
+                    .map(move |(k, v)| ((k.clone(), first_version + i as Version), v.clone()))
             })
             .collect::<BTreeMap<_, _>>();
         add_kv_batch(&mut cs.batch, &kv_batch)
@@ -265,15 +259,7 @@ impl StateStore {
             .map(|value_set| {
                 value_set
                     .iter()
-                    .map(|(key, value)| {
-                        (
-                            key.hash(),
-                            (
-                                StateKeyAndValue::new(key.clone(), value.clone()).hash(),
-                                key.clone(),
-                            ),
-                        )
-                    })
+                    .map(|(key, value)| (key.hash(), (value.hash(), key.clone())))
                     .collect::<Vec<_>>()
             })
             .collect();
@@ -364,7 +350,7 @@ impl StateStore {
         let result_iter =
             JellyfishMerkleIterator::new_by_index(Arc::clone(self), version, first_index)?
                 .take(chunk_size);
-        let state_key_values: Vec<(StateKey, StateKeyAndValue)> = result_iter
+        let state_key_values: Vec<(StateKey, StateValue)> = result_iter
             .into_iter()
             .map(|res| res.and_then(|(_, k)| Ok((k.0.clone(), self.get_value_at_version(&k)?))))
             .collect::<Result<Vec<_>>>()?;
@@ -393,7 +379,7 @@ impl StateStore {
         self: &Arc<Self>,
         version: Version,
         expected_root_hash: HashValue,
-    ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateKeyAndValue>>> {
+    ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
         Ok(Box::new(StateSnapshotRestore::new_overwrite(
             Arc::clone(self),
             version,
@@ -481,7 +467,7 @@ impl TreeWriter<StateKey> for StateStore {
     }
 }
 
-impl KVWriter<StateKey, StateKeyAndValue> for StateStore {
+impl StateValueWriter<StateKey, StateValue> for StateStore {
     fn write_kv_batch(&self, node_batch: &KVBatch) -> Result<()> {
         let mut batch = SchemaBatch::new();
         add_kv_batch(&mut batch, node_batch)?;

@@ -15,10 +15,10 @@ use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{
-    restore::StateSnapshotRestore, KVBatch, KVWriter, NodeBatch, TreeWriter,
+    restore::StateSnapshotRestore, KVBatch, NodeBatch, StateValueWriter, TreeWriter,
 };
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateKeyAndValue},
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
     waypoint::Waypoint,
 };
@@ -115,8 +115,8 @@ impl TreeWriter<StateKey> for MockStore {
     fn finish_version(&self, _version: Version) {}
 }
 
-impl KVWriter<StateKey, StateKeyAndValue> for MockStore {
-    fn write_kv_batch(&self, _kv_batch: &KVBatch<StateKey, StateKeyAndValue>) -> Result<()> {
+impl StateValueWriter<StateKey, StateValue> for MockStore {
+    fn write_kv_batch(&self, _kv_batch: &KVBatch<StateKey, StateValue>) -> Result<()> {
         Ok(())
     }
 }
@@ -140,7 +140,7 @@ impl RestoreRunMode {
         &self,
         version: Version,
         expected_root_hash: HashValue,
-    ) -> Result<StateSnapshotRestore<StateKey, StateKeyAndValue>> {
+    ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
         match self {
             Self::Restore { restore_handler } => {
                 restore_handler.get_state_restore_receiver(version, expected_root_hash)

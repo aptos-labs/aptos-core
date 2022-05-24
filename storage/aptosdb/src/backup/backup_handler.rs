@@ -18,7 +18,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{SparseMerkleRangeProof, TransactionAccumulatorRangeProof, TransactionInfoWithProof},
-    state_store::{state_key::StateKey, state_value::StateKeyAndValue},
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version},
 };
 use itertools::zip_eq;
@@ -103,7 +103,7 @@ impl BackupHandler {
     pub fn get_account_iter(
         &self,
         version: Version,
-    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateKeyAndValue)>> + Send + Sync>> {
+    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync>> {
         let store = Arc::clone(&self.state_store);
         let iterator =
             JellyfishMerkleIterator::new(Arc::clone(&store), version, HashValue::zero())?

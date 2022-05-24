@@ -7,19 +7,17 @@
 //! An Index Key in this data set has 2 pieces of information:
 //!     1. The state key
 //!     2. The version associated with the key
-//! The value associated with the key is the the serialized State Key and Value.
+//! The value associated with the key is the the serialized State Value.
 //!
 //! //! ```text
-//! |<-------- key -------->|<----- value ----->|
-//! |  state key  | version |  statekeyandvalue  |
+//! |<-------- key -------->|<-- value --->|
+//! |  state key  | version |  state value  |
 //! ```
 
 use crate::schema::{ensure_slice_len_gt, STATE_VALUE_CF_NAME};
 use anyhow::Result;
 use aptos_types::{
-    state_store::{
-        state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateKeyAndValue,
-    },
+    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
     transaction::Version,
 };
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -31,7 +29,7 @@ use std::{io::Write, mem::size_of};
 
 type Key = (StateKey, Version);
 
-define_schema!(StateValueSchema, Key, StateKeyAndValue, STATE_VALUE_CF_NAME);
+define_schema!(StateValueSchema, Key, StateValue, STATE_VALUE_CF_NAME);
 
 impl KeyCodec<StateValueSchema> for Key {
     fn encode_key(&self) -> Result<Vec<u8>> {
@@ -52,7 +50,7 @@ impl KeyCodec<StateValueSchema> for Key {
     }
 }
 
-impl ValueCodec<StateValueSchema> for StateKeyAndValue {
+impl ValueCodec<StateValueSchema> for StateValue {
     fn encode_value(&self) -> Result<Vec<u8>> {
         bcs::to_bytes(self).map_err(Into::into)
     }

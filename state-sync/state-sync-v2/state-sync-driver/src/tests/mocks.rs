@@ -20,9 +20,7 @@ use aptos_types::{
     state_proof::StateProof,
     state_store::{
         state_key::StateKey,
-        state_value::{
-            StateKeyAndValue, StateValue, StateValueChunkWithProof, StateValueWithProof,
-        },
+        state_value::{StateValue, StateValueChunkWithProof, StateValueWithProof},
     },
     transaction::{
         AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
@@ -311,7 +309,7 @@ mock! {
             &self,
             version: Version,
             expected_root_hash: HashValue,
-        ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateKeyAndValue>>>;
+        ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>>;
 
         fn finalize_state_snapshot(
             &self,
@@ -335,8 +333,8 @@ mock! {
 // This automatically creates a MockSnapshotReceiver.
 mock! {
     pub SnapshotReceiver {}
-    impl StateSnapshotReceiver<StateKey, StateKeyAndValue> for SnapshotReceiver {
-        fn add_chunk(&mut self, chunk: Vec<(StateKey, StateKeyAndValue)>, proof: SparseMerkleRangeProof) -> Result<()>;
+    impl StateSnapshotReceiver<StateKey, StateValue> for SnapshotReceiver {
+        fn add_chunk(&mut self, chunk: Vec<(StateKey, StateValue)>, proof: SparseMerkleRangeProof) -> Result<()>;
 
         fn finish(self) -> Result<()>;
 

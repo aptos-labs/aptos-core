@@ -85,10 +85,7 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleRangeProof},
-    state_store::{
-        state_key::StateKey,
-        state_value::{StateKeyAndValue, StateValue},
-    },
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
 use node_type::{Child, Children, InternalNode, LeafNode, Node, NodeKey, NodeType};
@@ -136,7 +133,7 @@ pub trait TreeWriter<K>: Send + Sync {
     fn finish_version(&self, version: Version);
 }
 
-pub trait KVWriter<K, V>: Send + Sync {
+pub trait StateValueWriter<K, V>: Send + Sync {
     /// Writes a kv batch into storage.
     fn write_kv_batch(&self, kv_batch: &KVBatch<K, V>) -> Result<()>;
 }
@@ -163,8 +160,6 @@ pub trait TestValue: Value + Arbitrary + std::fmt::Debug + Eq + PartialEq + 'sta
 impl Key for StateKey {}
 
 impl Value for StateValue {}
-
-impl Value for StateKeyAndValue {}
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl TestKey for StateKey {}

@@ -6,7 +6,8 @@ use crate::{
     node_type::{LeafNode, Node, NodeKey},
     restore::StateSnapshotRestore,
     test_helper::{init_mock_db, ValueBlob},
-    JellyfishMerkleTree, KVBatch, KVWriter, NodeBatch, TestKey, TestValue, TreeReader, TreeWriter,
+    JellyfishMerkleTree, KVBatch, NodeBatch, StateValueWriter, TestKey, TestValue, TreeReader,
+    TreeWriter,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -39,7 +40,7 @@ where
     }
 }
 
-impl<K, V> KVWriter<K, V> for MockSnapshotStore<K, V>
+impl<K, V> StateValueWriter<K, V> for MockSnapshotStore<K, V>
 where
     K: TestKey,
     V: TestValue,

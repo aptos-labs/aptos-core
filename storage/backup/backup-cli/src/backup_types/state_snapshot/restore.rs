@@ -25,7 +25,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::TransactionInfoWithProof,
-    state_store::{state_key::StateKey, state_value::StateKeyAndValue},
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
 use std::sync::Arc;
@@ -148,7 +148,7 @@ impl StateSnapshotRestoreController {
     async fn read_state_value(
         &self,
         file_handle: FileHandle,
-    ) -> Result<Vec<(StateKey, StateKeyAndValue)>> {
+    ) -> Result<Vec<(StateKey, StateValue)>> {
         let mut file = self.storage.open_for_read(&file_handle).await?;
 
         let mut chunk = vec![];

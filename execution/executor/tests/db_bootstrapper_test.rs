@@ -20,7 +20,7 @@ use aptos_types::{
         access_path_for_config, config_address, ConfigurationResource, OnChainConfig, ValidatorSet,
     },
     proof::SparseMerkleRangeProof,
-    state_store::{state_key::StateKey, state_value::StateKeyAndValue},
+    state_store::{state_key::StateKey, state_value::StateValue},
     test_helpers::transaction_test_helpers::block,
     transaction::{
         authenticator::AuthenticationKey, ChangeSet, Transaction, Version, WriteSetPayload,
@@ -196,7 +196,7 @@ fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
 fn get_state_backup(
     db: &Arc<AptosDB>,
 ) -> (
-    Vec<(StateKey, StateKeyAndValue)>,
+    Vec<(StateKey, StateValue)>,
     SparseMerkleRangeProof,
     HashValue,
 ) {
@@ -224,7 +224,7 @@ fn get_state_backup(
 
 fn restore_state_to_db(
     db: &Arc<AptosDB>,
-    accounts: Vec<(StateKey, StateKeyAndValue)>,
+    accounts: Vec<(StateKey, StateValue)>,
     proof: SparseMerkleRangeProof,
     root_hash: HashValue,
     version: Version,

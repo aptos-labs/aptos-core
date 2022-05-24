@@ -12,7 +12,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::definition::LeafCount,
-    state_store::{state_key::StateKey, state_value::StateKeyAndValue},
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version, PRE_GENESIS_VERSION},
 };
 use schemadb::DB;
@@ -53,7 +53,7 @@ impl RestoreHandler {
         &self,
         version: Version,
         expected_root_hash: HashValue,
-    ) -> Result<StateSnapshotRestore<StateKey, StateKeyAndValue>> {
+    ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
         StateSnapshotRestore::new_overwrite(
             Arc::clone(&self.state_store),
             version,

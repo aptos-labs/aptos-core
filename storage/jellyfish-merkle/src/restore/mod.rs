@@ -12,7 +12,7 @@ use crate::{
         get_child_and_sibling_half_start, Child, Children, InternalNode, LeafNode, Node, NodeKey,
         NodeType,
     },
-    KVWriter, NibbleExt, NodeBatch, TreeReader, TreeWriter, ROOT_NIBBLE_HEIGHT,
+    NibbleExt, NodeBatch, StateValueWriter, TreeReader, TreeWriter, ROOT_NIBBLE_HEIGHT,
 };
 use anyhow::{bail, ensure, Result};
 use aptos_crypto::{
@@ -685,13 +685,13 @@ where
     }
 }
 
-struct KVRestore<K, V> {
+struct StateValueRestore<K, V> {
     version: Version,
-    db: Arc<dyn KVWriter<K, V>>,
+    db: Arc<dyn StateValueWriter<K, V>>,
 }
 
-impl<K: crate::Key, V: crate::Value> KVRestore<K, V> {
-    pub fn new<D: 'static + KVWriter<K, V>>(db: Arc<D>, version: Version) -> Self {
+impl<K: crate::Key, V: crate::Value> StateValueRestore<K, V> {
+    pub fn new<D: 'static + StateValueWriter<K, V>>(db: Arc<D>, version: Version) -> Self {
         Self { version, db }
     }
 
@@ -706,11 +706,11 @@ impl<K: crate::Key, V: crate::Value> KVRestore<K, V> {
 
 pub struct StateSnapshotRestore<K, V> {
     tree_restore: JellyfishMerkleRestore<K>,
-    kv_restore: KVRestore<K, V>,
+    kv_restore: StateValueRestore<K, V>,
 }
 
 impl<K: crate::Key, V: crate::Value> StateSnapshotRestore<K, V> {
-    pub fn new<D: 'static + TreeReader<K> + TreeWriter<K> + KVWriter<K, V>>(
+    pub fn new<D: 'static + TreeReader<K> + TreeWriter<K> + StateValueWriter<K, V>>(
         store: Arc<D>,
         version: Version,
         expected_root_hash: HashValue,
@@ -721,11 +721,11 @@ impl<K: crate::Key, V: crate::Value> StateSnapshotRestore<K, V> {
                 version,
                 expected_root_hash,
             )?,
-            kv_restore: KVRestore::new(store, version),
+            kv_restore: StateValueRestore::new(store, version),
         })
     }
 
-    pub fn new_overwrite<D: 'static + TreeWriter<K> + KVWriter<K, V>>(
+    pub fn new_overwrite<D: 'static + TreeWriter<K> + StateValueWriter<K, V>>(
         store: Arc<D>,
         version: Version,
         expected_root_hash: HashValue,
@@ -736,7 +736,7 @@ impl<K: crate::Key, V: crate::Value> StateSnapshotRestore<K, V> {
                 version,
                 expected_root_hash,
             )?,
-            kv_restore: KVRestore::new(store, version),
+            kv_restore: StateValueRestore::new(store, version),
         })
     }
 }

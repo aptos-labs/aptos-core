@@ -10,7 +10,7 @@ proptest! {
     fn test_encode_decode(
         state_key in any::<StateKey>(),
         version in any::<Version>(),
-        v in any::<StateKeyAndValue>(),
+        v in any::<StateValue>(),
     ) {
         assert_encode_decode::<StateValueSchema>(&(state_key, version), &v);
     }

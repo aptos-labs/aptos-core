@@ -17,7 +17,7 @@ use aptos_types::{
     proof::SparseMerkleRangeProof,
     state_store::{
         state_key::StateKey,
-        state_value::{StateKeyAndValue, StateValueChunkWithProof},
+        state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
         RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
@@ -164,7 +164,7 @@ impl AptosDataClient for MockAptosDataClient {
         for _ in start_index..=end_index {
             account_blobs.push((
                 StateKey::Raw(HashValue::random().to_vec()),
-                StateKeyAndValue::new(StateKey::Raw(vec![]), vec![].into()),
+                StateValue::from(vec![]),
             ));
         }
 
