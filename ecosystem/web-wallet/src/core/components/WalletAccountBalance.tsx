@@ -10,12 +10,15 @@ import numeral from 'numeral';
 
 function WalletAccountBalance() {
   const { colorMode } = useColorMode();
-  const { aptosAccount } = useWalletState();
+  const { aptosAccount, aptosNetwork } = useWalletState();
   const {
     data: accountResources,
   } = useQuery(
     'getAccountResources',
-    () => getAccountResources({ address: aptosAccount?.address() }),
+    () => getAccountResources({
+      address: aptosAccount?.address(),
+      nodeUrl: aptosNetwork,
+    }),
     { refetchInterval: 2000 },
   );
 

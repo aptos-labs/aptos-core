@@ -9,13 +9,15 @@ import {
 } from 'react-query';
 import { Routes, Route, MemoryRouter } from 'react-router-dom';
 import { ChakraProvider, extendTheme, type ThemeConfig } from '@chakra-ui/react';
-import Account from 'pages/Account';
+import Settings from 'pages/Settings';
 import Wallet from 'pages/Wallet';
 import Login from 'pages/Login';
 import { WalletStateProvider } from 'core/hooks/useWalletState';
 import Help from 'pages/Help';
 import CreateWallet from 'pages/CreateWallet';
 import Gallery from 'pages/Gallery';
+import Credentials from 'pages/Credentials';
+import Network from 'pages/Network';
 
 const theme: ThemeConfig = extendTheme({
   initialColorMode: 'dark',
@@ -46,7 +48,9 @@ root.render(
               <Route path="/gallery" element={<Gallery />} />
               <Route path="/help" element={<Help />} />
               <Route path="/create-wallet" element={<CreateWallet />} />
-              <Route path="/account" element={<Account />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/settings/network" element={<Network />} />
+              <Route path="/settings/credentials" element={<Credentials />} />
             </Routes>
           </MemoryRouter>
         </WalletStateProvider>

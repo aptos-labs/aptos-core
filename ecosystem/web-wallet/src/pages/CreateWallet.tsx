@@ -20,7 +20,7 @@ import ChakraLink from 'core/components/ChakraLink';
 import CreateWalletHeader from 'core/components/CreateWalletHeader';
 import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import { createNewAccount } from 'core/utils/account';
-import { NODE_URL, FAUCET_URL, secondaryBgColor } from 'core/constants';
+import { secondaryBgColor } from 'core/constants';
 
 export interface CredentialHeaderAndBodyProps {
   body?: string;
@@ -38,7 +38,7 @@ export function CredentialHeaderAndBody({
         {header}
       </Tag>
       <Tooltip label={hasCopied ? 'Copied!' : 'Copy'} closeDelay={300}>
-        <Text fontSize="xs" cursor="pointer" wordBreak="break-word" onClick={onCopy}>
+        <Text fontSize="sm" cursor="pointer" wordBreak="break-word" onClick={onCopy}>
           {body}
         </Text>
       </Tooltip>
@@ -48,7 +48,9 @@ export function CredentialHeaderAndBody({
 
 function NewAccountState() {
   const [isAccountBeingCreated, setIsAccountBeingCreated] = useState<boolean>(false);
-  const { aptosAccount, updateWalletState } = useWalletState();
+  const {
+    aptosAccount, aptosNetwork, faucetNetwork, updateWalletState,
+  } = useWalletState();
   const privateKeyObject = aptosAccount?.toPrivateKeyObject();
   const privateKeyHex = privateKeyObject?.privateKeyHex;
   const publicKeyHex = privateKeyObject?.publicKeyHex;
@@ -56,7 +58,7 @@ function NewAccountState() {
 
   const createAccountOnClick = async () => {
     setIsAccountBeingCreated(true);
-    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+    const faucetClient = new FaucetClient(aptosNetwork, faucetNetwork);
     const account = createNewAccount();
     await faucetClient.fundAccount(account.address(), 0);
     updateWalletState({ aptosAccountState: account });

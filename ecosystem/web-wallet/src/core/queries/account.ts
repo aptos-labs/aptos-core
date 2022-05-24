@@ -6,6 +6,7 @@ import {
 } from 'aptos';
 import { NODE_URL } from 'core/constants';
 import { AptosAccountState } from 'core/types';
+import { AptosNetwork } from 'core/utils/network';
 
 export interface GetAccountResourcesProps {
   address?: MaybeHexString;
@@ -60,7 +61,7 @@ export const getTestCoinTokenBalanceFromAccountResources = ({
   return tokenBalance;
 };
 
-export const accountExists = async ({
+export const getAccountExists = async ({
   nodeUrl = NODE_URL,
   address,
 }: GetAccountResourcesProps) => {
@@ -79,6 +80,7 @@ export const accountExists = async ({
 interface GetToAddressAccountExistsProps {
   queryKey: (string | {
     aptosAccount: AptosAccountState;
+    nodeUrl: AptosNetwork;
     toAddress?: MaybeHexString | null;
   })[]
 }
@@ -88,9 +90,9 @@ export const getToAddressAccountExists = async (
 ) => {
   const [, paramsObject] = queryKey;
   if (typeof paramsObject === 'string') return false;
-  const { aptosAccount, toAddress } = paramsObject;
+  const { aptosAccount, nodeUrl, toAddress } = paramsObject;
   if (toAddress && aptosAccount) {
-    const doesAccountExist = await accountExists({ address: toAddress });
+    const doesAccountExist = await getAccountExists({ address: toAddress, nodeUrl });
     return doesAccountExist;
   }
   return false;

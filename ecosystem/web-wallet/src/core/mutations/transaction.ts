@@ -75,12 +75,14 @@ GetTestCoinTokenBalanceFromAccountResourcesProps & {
 export const submitTestCoinTransferTransaction = async ({
   amount,
   fromAccount,
+  nodeUrl,
   onClose,
   toAddress,
 }: SubmitTestCoinTransferTransactionProps) => {
   const txnHash = await sendTestCoinTransaction({
     amount,
     fromAccount,
+    nodeUrl,
     toAddress,
   });
   onClose();
