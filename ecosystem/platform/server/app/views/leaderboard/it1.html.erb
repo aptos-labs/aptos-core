@@ -21,105 +21,106 @@
         <p class="font-mono uppercase text-5xl font-light">58</p>
       </div>
     </div>
-    <div class="overflow-x-auto">
-      <%= render TableComponent.new(class: 'w-full table-auto') do |t| %>
-        <%= t.with_column(:rank, '#', align: 'right') %>
-        <%= t.with_column('Peer ID', align: 'left') %>
-        <%= t.with_column(:liveness, 'Liveness', align: 'left') do |column| %>
-          <%= column.with_tooltip(:info) do |tooltip| %>
-            <%= tooltip.with_header do %>
-              Cumulative range: 0% - 100%
-            <% end %>
-            <%= tooltip.with_body do %>
-              <div class="flex flex-col gap-4">
-                <div class="flex items-start gap-2">
-                  <%= render IconComponent.new(:check_circle, size: :small, class: 'text-teal-400') %>
-                  <div>
-                    Live
-                    <ul>
-                      <li>-Push metrics to Aptos telemetry</li>
-                      <li>-Connected to Aptos node</li>
-                    </ul>
+    <%= turbo_frame_tag 'metrics', data: {controller: 'refresh', refresh_interval_value: 1.minute, refresh_src_value: request.path, turbo_action: 'advance'} do %>
+      <%= content_tag :div, class: 'overflow-x-auto' do %>
+        <%= render TableComponent.new(class: 'w-full table-auto') do |t| %>
+          <%= t.with_column(:rank, '#', align: 'right') %>
+          <%= t.with_column('Peer ID', align: 'left') %>
+          <%= t.with_column(:liveness, 'Liveness', align: 'left') do |column| %>
+            <%= column.with_tooltip(:info) do |tooltip| %>
+              <%= tooltip.with_header do %>
+                Cumulative range: 0% - 100%
+              <% end %>
+              <%= tooltip.with_body do %>
+                <div class="flex flex-col gap-4">
+                  <div class="flex items-start gap-2">
+                    <%= render IconComponent.new(:check_circle, size: :small, class: 'text-teal-400') %>
+                    <div>
+                      Live
+                      <ul>
+                        <li>-Push metrics to Aptos telemetry</li>
+                        <li>-Connected to Aptos node</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <%= render IconComponent.new(:x_circle, size: :small, class: 'text-red-500') %>
+                    <div>
+                      Not Live
+                    </div>
                   </div>
                 </div>
-                <div class="flex items-start gap-2">
-                  <%= render IconComponent.new(:x_circle, size: :small, class: 'text-red-500') %>
-                  <div>
-                    Not Live
-                  </div>
+                <div class="flex justify-end">
+                  <a title="Node Liveness Criteria" href="https://aptos.dev/reference/node-liveness-criteria/" class="text-neutral-500 hover:text-neutral-400 inline text-right mt-2 cursor-pointer" target="_blank">More Details</a>
                 </div>
-              </div>
-              <div class="flex justify-end">
-                <a title="Node Liveness Criteria" href="https://aptos.dev/reference/node-liveness-criteria/" class="text-neutral-500 hover:text-neutral-400 inline text-right mt-2 cursor-pointer" target="_blank">More Details</a>
-              </div>
-            <% end %>
-          <% end %>
-        <% end %>
-        <%= t.with_column(:participation, 'Participation', align: 'left') do |column| %>
-          <%= column.with_tooltip(:info) do |tooltip| %>
-            <%= tooltip.with_header do %>
-              At least 1 proposal every hour.
-              <br>
-              Cumulative range: 0%-100%
-            <% end %>
-            <%= tooltip.with_body do %>
-              <div class="flex flex-col gap-4">
-                <div class="flex items-start gap-2">
-                  <div class="bg-teal-400 block w-4 h-4 rounded-full"></div>
-                  <div>
-                    Above 97%
-                  </div>
-                </div>
-                <div class="flex items-start gap-2">
-                  <div class="bg-yellow-500 block w-4 h-4 rounded-full"></div>
-                  <div>
-                    Between 95% &amp;  97%
-                  </div>
-                </div>
-                <div class="flex items-start gap-2">
-                  <div class="bg-red-500 block w-4 h-4 rounded-full"></div>
-                  <div>
-                    Below 95%
-                  </div>
-                </div>
-              </div>
-              <div class="flex justify-end">
-                <a title="Telemetry" href="https://aptos.dev/reference/telemetry" class="text-neutral-500 hover:text-neutral-400 inline text-right mt-2 cursor-pointer" target="_blank">More Details</a>
-              </div>
+              <% end %>
             <% end %>
           <% end %>
-        <% end %>
-        <%= t.with_column(:latest_reported_timestamp, 'Last Metrics Update', align: 'right') %>
-
-        <%= t.with_body do %>
-          <% @metrics.each_with_index do |metric, i| %>
-            <%= render TableRowComponent.new do |tr| %>
-              <%= tr.with_column(align: 'right') do %>
-                <%= metric.rank %>
+          <%= t.with_column(:participation, 'Participation', align: 'left') do |column| %>
+            <%= column.with_tooltip(:info) do |tooltip| %>
+              <%= tooltip.with_header do %>
+                At least 1 proposal every hour.
+                <br>
+                Cumulative range: 0%-100%
               <% end %>
-              <%= tr.with_column(class: 'max-w-0 2xl:max-w-full w-full 2xl:w-auto truncate', title: metric.validator) do %>
-                <%= metric.validator %>
-              <% end %>
-              <%= tr.with_column(align: 'left') do %>
-                <div class="flex items-center gap-2">
-                  <%= liveness_icon(metric.liveness) %>
-                  <%= number_to_percentage(metric.liveness, precision: 2) %>
+              <%= tooltip.with_body do %>
+                <div class="flex flex-col gap-4">
+                  <div class="flex items-start gap-2">
+                    <div class="bg-teal-400 block w-4 h-4 rounded-full"></div>
+                    <div>
+                      Above 97%
+                    </div>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <div class="bg-yellow-500 block w-4 h-4 rounded-full"></div>
+                    <div>
+                      Between 95% &amp;  97%
+                    </div>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <div class="bg-red-500 block w-4 h-4 rounded-full"></div>
+                    <div>
+                      Below 95%
+                    </div>
+                  </div>
+                </div>
+                <div class="flex justify-end">
+                  <a title="Telemetry" href="https://aptos.dev/reference/telemetry" class="text-neutral-500 hover:text-neutral-400 inline text-right mt-2 cursor-pointer" target="_blank">More Details</a>
                 </div>
               <% end %>
-              <%= tr.with_column(align: 'left') do %>
-                <div class="flex items-center gap-2">
-                  <div class="<%= availability_color(metric.participation) %> block w-5 h-5 rounded-full"></div>
-                  <%= number_to_percentage(metric.participation, precision: 2) %>
-                </div>
+            <% end %>
+          <% end %>
+          <%= t.with_column(:latest_reported_timestamp, 'Last Metrics Update', align: 'right') %>
 
-              <% end %>
-              <%= tr.with_column(align: 'right') do %>
-                <%= Time.at(metric.latest_reported_timestamp).to_fs(:db) %>
+          <%= t.with_body do %>
+            <% @metrics.each_with_index do |metric, i| %>
+              <%= render TableRowComponent.new do |tr| %>
+                <%= tr.with_column(align: 'right') do %>
+                  <%= metric.rank %>
+                <% end %>
+                <%= tr.with_column(class: 'max-w-0 2xl:max-w-full w-full 2xl:w-auto truncate', title: metric.validator) do %>
+                  <%= metric.validator %>
+                <% end %>
+                <%= tr.with_column(align: 'left') do %>
+                  <div class="flex items-center gap-2">
+                    <%= liveness_icon(metric.liveness) %>
+                    <%= number_to_percentage(metric.liveness, precision: 2) %>
+                  </div>
+                <% end %>
+                <%= tr.with_column(align: 'left') do %>
+                  <div class="flex items-center gap-2">
+                    <div class="<%= availability_color(metric.participation) %> block w-5 h-5 rounded-full"></div>
+                    <%= number_to_percentage(metric.participation, precision: 2) %>
+                  </div>
+                <% end %>
+                <%= tr.with_column(align: 'right') do %>
+                  <%= Time.at(metric.latest_reported_timestamp).to_fs(:db) %>
+                <% end %>
               <% end %>
             <% end %>
           <% end %>
         <% end %>
       <% end %>
-    </div>
+    <% end %>
   </div>
 </div>
