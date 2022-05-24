@@ -9,7 +9,7 @@ class LeaderboardController < ApplicationController
 
   def it1
     expires_in 1.minute, public: true
-    default_sort = [[:participation, -1], [:liveness, -1]]
+    default_sort = [[:participation, -1], [:liveness, -1], [:latest_reported_timestamp, -1]]
     @metrics = Rails.cache.fetch(:it1_leaderboard, expires_in: 1.minute) do
       response = HTTParty.get(ENV.fetch('LEADERBOARD_IT1_URL'))
       metrics = JSON.parse(response.body).map do |metric|
