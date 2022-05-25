@@ -17,7 +17,7 @@ consensus:
         waypoint:
           from_file: /opt/aptos/genesis/waypoint.txt
         identity_blob_path: /opt/aptos/genesis/validator-identity.yaml
-  mempool_poll_count: 0
+  mempool_poll_count: 1
   round_initial_timeout_ms: 5000
 
 execution:

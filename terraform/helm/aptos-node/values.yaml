@@ -31,7 +31,7 @@ validator:
     provide_genesis: true
     sync_only: false
     concurrency_level: 1
-    mempool_poll_count: 0
+    mempool_poll_count: 1
     round_initial_timeout_ms: 5000
     ledger_prune_window: 10000000
     state_store_prune_window: 1000000
