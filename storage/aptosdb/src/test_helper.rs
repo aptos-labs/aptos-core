@@ -580,12 +580,16 @@ pub fn verify_committed_transactions(
 
         // Fetch and verify account states.
         for (state_key, state_value) in txn_to_commit.state_updates() {
-            let state_value_with_proof = db
-                .get_state_value_with_proof(state_key.clone(), cur_ver, ledger_version)
+            let (state_value_in_db, proof) = db
+                .get_state_value_with_proof_by_version(state_key, cur_ver)
                 .unwrap();
-            assert_eq!(state_value_with_proof.value, Some(state_value.clone()));
-            state_value_with_proof
-                .verify(ledger_info, cur_ver, state_key.clone())
+            assert_eq!(state_value_in_db, Some(state_value.clone()));
+            proof
+                .verify(
+                    txn_info.state_checkpoint_hash().unwrap(),
+                    state_key.hash(),
+                    state_value_in_db.as_ref(),
+                )
                 .unwrap();
         }
 

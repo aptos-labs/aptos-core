@@ -22,7 +22,7 @@ use aptos_types::{
     state_store::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
-        state_value::{StateValue, StateValueChunkWithProof, StateValueWithProof},
+        state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
         AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
@@ -454,14 +454,16 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// Returns the account state corresponding to the given version and account address with proof
-    /// based on `ledger_version`
-    fn get_state_value_with_proof(
+    /// Gets an account state by account address.
+    /// See [AptosDB::get_state_value_by_version].
+    ///
+    /// [AptosDB::get_state_value_by_version]:
+    /// ../aptosdb/struct.AptosDB.html#method.get_state_value_by_version
+    fn get_state_value_by_version(
         &self,
-        state_key: StateKey,
+        state_key: &StateKey,
         version: Version,
-        ledger_version: Version,
-    ) -> Result<StateValueWithProof> {
+    ) -> Result<Option<StateValue>> {
         unimplemented!()
     }
 
@@ -478,21 +480,6 @@ pub trait DbReader: Send + Sync {
         state_key: &StateKey,
         version: Version,
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        unimplemented!()
-    }
-
-    /// Gets a state value by state key, out of the ledger state indicated by the version
-    /// See [AptosDB::get_account_state_with_proof_by_version].
-    ///
-    /// [AptosDB::get_account_state_with_proof_by_version]:
-    /// ../aptosdb/struct.AptosDB.html#method.get_account_state_with_proof_by_version
-    ///
-    /// This is used by aptos core (executor) internally.
-    fn get_state_value_by_version(
-        &self,
-        state_store_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<StateValue>> {
         unimplemented!()
     }
 
@@ -726,13 +713,13 @@ impl DbReaderWriter {
 /// Network types for storage service
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum StorageRequest {
-    GetStateValueWithProofByVersionRequest(Box<GetStateValueWithProofByVersionRequest>),
+    GetStateValueByVersionRequest(Box<GetStateValueByVersionRequest>),
     GetStartupInfoRequest,
     SaveTransactionsRequest(Box<SaveTransactionsRequest>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
-pub struct GetStateValueWithProofByVersionRequest {
+pub struct GetStateValueByVersionRequest {
     /// The access key for the resource
     pub state_key: StateKey,
 
@@ -740,7 +727,7 @@ pub struct GetStateValueWithProofByVersionRequest {
     pub version: Version,
 }
 
-impl GetStateValueWithProofByVersionRequest {
+impl GetStateValueByVersionRequest {
     /// Constructor.
     pub fn new(state_key: StateKey, version: Version) -> Self {
         Self { state_key, version }

@@ -16,8 +16,8 @@ impl DbStateView {
     fn get(&self, key: &StateKey) -> Result<Option<Vec<u8>>> {
         if let Some(version) = self.version {
             self.db
-                .get_state_value_with_proof_by_version(key, version)
-                .map(|(value_opt, _proof)| {
+                .get_state_value_by_version(key, version)
+                .map(|value_opt| {
                     // Hack: `v.maybe_bytes == None` represents deleted value, deemed non-existent
                     value_opt.and_then(|value| value.maybe_bytes)
                 })

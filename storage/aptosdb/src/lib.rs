@@ -60,13 +60,13 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         definition::LeafCount, AccumulatorConsistencyProof, EventProof, SparseMerkleProof,
-        StateStoreValueProof, TransactionInfoListWithProof,
+        TransactionInfoListWithProof,
     },
     state_proof::StateProof,
     state_store::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
-        state_value::{StateValue, StateValueChunkWithProof, StateValueWithProof},
+        state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
@@ -1016,40 +1016,14 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_state_value_with_proof(
+    fn get_state_value_by_version(
         &self,
-        state_store_key: StateKey,
+        state_store_key: &StateKey,
         version: Version,
-        ledger_version: Version,
-    ) -> Result<StateValueWithProof> {
-        gauged_api("get_state_value_with_proof", || {
-            ensure!(
-                version <= ledger_version,
-                "The queried version {} should be equal to or older than ledger version {}.",
-                version,
-                ledger_version
-            );
-            {
-                let latest_version = self.get_latest_version()?;
-                ensure!(
-                    ledger_version <= latest_version,
-                    "ledger_version specified {} is greater than committed version {}.",
-                    ledger_version,
-                    latest_version
-                );
-            }
-
-            let txn_info_with_proof = self
-                .ledger_store
-                .get_transaction_info_with_proof(version, ledger_version)?;
-            let (state_store_value, sparse_merkle_proof) = self
-                .state_store
-                .get_value_with_proof_by_version(&state_store_key, version)?;
-            Ok(StateValueWithProof::new(
-                version,
-                state_store_value,
-                StateStoreValueProof::new(txn_info_with_proof, sparse_merkle_proof),
-            ))
+    ) -> Result<Option<StateValue>> {
+        gauged_api("get_state_value_by_version", || {
+            self.state_store
+                .get_value_by_version(state_store_key, version)
         })
     }
 
@@ -1085,17 +1059,6 @@ impl DbReader for AptosDB {
         gauged_api("get_account_state_with_proof_by_version", || {
             self.state_store
                 .get_value_with_proof_by_version(state_store_key, version)
-        })
-    }
-
-    fn get_state_value_by_version(
-        &self,
-        state_store_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<StateValue>> {
-        gauged_api("get_state_value_at_version", || {
-            self.state_store
-                .get_value_by_version(state_store_key, version)
         })
     }
 

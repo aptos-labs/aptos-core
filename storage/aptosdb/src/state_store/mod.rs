@@ -106,7 +106,7 @@ impl StateStore {
             .map(|_pre_genesis_root| PRE_GENESIS_VERSION))
     }
 
-    /// Get the state value with proof given the state key and root hash of state Merkle tree
+    /// Get the state value with proof given the state key and version
     pub fn get_value_with_proof_by_version(
         &self,
         state_key: &StateKey,
@@ -176,24 +176,19 @@ impl StateStore {
         Ok(result)
     }
 
-    pub fn get_value_at_version(
-        &self,
-        key_and_version: &(StateKey, Version),
-    ) -> Result<StateValue> {
+    /// Read the value for a specific version and require its existence. Call `get_value_by_value`
+    /// for most use cases.
+    fn get_value_at_version(&self, key_and_version: &(StateKey, Version)) -> Result<StateValue> {
         self.db
-            .get::<StateValueSchema>(key_and_version)?
-            .ok_or_else(|| {
-                format_err!(
-                    "Canot find value of key {:?} at version {}",
-                    key_and_version.0,
-                    key_and_version.1
-                )
+            .get::<StateValueSchema>(key_and_version)
+            .and_then(|v| {
+                v.ok_or_else(|| format_err!("State Value is missing for {:?}", *key_and_version))
             })
     }
 
-    /// Get the state value given the state key and root hash of state Merkle tree by using the
-    /// state value index. Only used for testing for now but should replace the
-    /// `get_value_with_proof_by_version` call for VM execution to fetch the value without proof.
+    /// Get the lastest state value of the given key up to the given version. Only used for testing for now
+    /// but should replace the `get_value_with_proof_by_version` call for VM execution if just fetch the
+    /// value without proof.
     pub fn get_value_by_version(
         &self,
         state_key: &StateKey,
@@ -201,16 +196,22 @@ impl StateStore {
     ) -> Result<Option<StateValue>> {
         let mut iter = self.db.iter::<StateValueSchema>(Default::default())?;
         iter.seek_for_prev(&(state_key.clone(), version))?;
-        Ok(iter
-            .next()
+        iter.next()
             .transpose()?
             .and_then(|((db_state_key, _), state_value)| {
                 if *state_key == db_state_key {
-                    Some(state_value)
+                    Some(Ok(state_value))
                 } else {
                     None
                 }
-            }))
+            })
+            // A hack to deal with PRE_GENESIS_VERSION
+            .or_else(|| {
+                self.db
+                    .get::<StateValueSchema>(&(state_key.clone(), PRE_GENESIS_VERSION))
+                    .transpose()
+            })
+            .transpose()
     }
 
     /// Gets the proof that proves a range of accounts.
@@ -334,6 +335,25 @@ impl StateStore {
 
     pub fn get_value_count(&self, version: Version) -> Result<usize> {
         JellyfishMerkleTree::new(self).get_leaf_count(version)
+    }
+
+    pub fn get_state_key_and_value_iter(
+        self: &Arc<Self>,
+        version: Version,
+        start_hashed_key: HashValue,
+    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync> {
+        let store = Arc::clone(self);
+        Ok(
+            JellyfishMerkleIterator::new(Arc::clone(self), version, start_hashed_key)?.map(
+                move |res| match res {
+                    Ok((_hashed_key, key_and_version)) => Ok((
+                        key_and_version.0.clone(),
+                        store.get_value_at_version(&key_and_version)?,
+                    )),
+                    Err(err) => Err(err),
+                },
+            ),
+        )
     }
 
     pub fn get_value_chunk_with_proof(

@@ -9,7 +9,6 @@ use super::{
 };
 use crate::{
     ledger_info::LedgerInfo,
-    state_store::state_value::StateValue,
     transaction::{TransactionInfo, Version},
 };
 use anyhow::{bail, ensure, format_err, Context, Result};
@@ -706,66 +705,6 @@ impl TransactionInfoWithProof {
             &self.transaction_info,
             &self.ledger_info_to_transaction_info_proof,
         )?;
-        Ok(())
-    }
-}
-
-/// The complete proof used to authenticate the state of a resource in state store.
-/// This structure consists of the `AccumulatorProof` from `LedgerInfo` to `TransactionInfo`,
-/// the `TransactionInfo` object and the `SparseMerkleProof` from state root to the resource.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct StateStoreValueProof {
-    transaction_info_with_proof: TransactionInfoWithProof,
-
-    /// The sparse merkle proof from state root to the account state.
-    transaction_info_to_value_proof: SparseMerkleProof,
-}
-
-impl StateStoreValueProof {
-    /// Constructs a new `AccountStateProof` using given `ledger_info_to_transaction_info_proof`,
-    /// `transaction_info` and `transaction_info_to_account_proof`.
-    pub fn new(
-        transaction_info_with_proof: TransactionInfoWithProof,
-        transaction_info_to_value_proof: SparseMerkleProof,
-    ) -> Self {
-        StateStoreValueProof {
-            transaction_info_with_proof,
-            transaction_info_to_value_proof,
-        }
-    }
-
-    /// Returns the `transaction_info_with_proof` object in this proof.
-    pub fn transaction_info_with_proof(&self) -> &TransactionInfoWithProof {
-        &self.transaction_info_with_proof
-    }
-
-    /// Returns the `transaction_info_to_account_proof` object in this proof.
-    pub fn transaction_info_to_account_proof(&self) -> &SparseMerkleProof {
-        &self.transaction_info_to_value_proof
-    }
-
-    /// Verifies that the state of an account at version `state_version` is correct using the
-    /// provided proof. If `state_value` is present, we expect the account to exist,
-    /// otherwise we expect the account to not exist.
-    pub fn verify(
-        &self,
-        ledger_info: &LedgerInfo,
-        state_version: Version,
-        value_hash: HashValue,
-        state_value: Option<&StateValue>,
-    ) -> Result<()> {
-        self.transaction_info_to_value_proof.verify(
-            self.transaction_info_with_proof
-                .transaction_info
-                .ensure_state_checkpoint_hash()?,
-            value_hash,
-            state_value,
-        )?;
-
-        self.transaction_info_with_proof
-            .verify(ledger_info, state_version)?;
-
         Ok(())
     }
 }

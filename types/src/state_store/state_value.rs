@@ -1,13 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    ledger_info::LedgerInfo,
-    proof::{SparseMerkleRangeProof, StateStoreValueProof},
-    state_store::state_key::StateKey,
-    transaction::Version,
-};
-use anyhow::ensure;
+use crate::{proof::SparseMerkleRangeProof, state_store::state_key::StateKey};
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -91,53 +85,6 @@ impl StateValueChunkWithProof {
         right_siblings
             .iter()
             .all(|sibling| *sibling == *SPARSE_MERKLE_PLACEHOLDER_HASH)
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
-pub struct StateValueWithProof {
-    /// The transaction version at which this account state is seen.
-    pub version: Version,
-    /// Value represents the value in state store. If this field is not set, it
-    /// means the key does not exist.
-    pub value: Option<StateValue>,
-    /// The proof the client can use to authenticate the value.
-    pub proof: StateStoreValueProof,
-}
-
-impl StateValueWithProof {
-    /// Constructor.
-    pub fn new(version: Version, value: Option<StateValue>, proof: StateStoreValueProof) -> Self {
-        Self {
-            version,
-            value,
-            proof,
-        }
-    }
-
-    /// Verifies the state store value with the proof, both carried by `self`.
-    ///
-    /// Two things are ensured if no error is raised:
-    ///   1. This value exists in the ledger represented by `ledger_info`.
-    ///   2. It belongs to state_key and is seen at the time the transaction at version
-    /// `state_version` is just committed. To make sure this is the latest state, pass in
-    /// `ledger_info.version()` as `state_version`.
-    pub fn verify(
-        &self,
-        ledger_info: &LedgerInfo,
-        version: Version,
-        state_key: StateKey,
-    ) -> anyhow::Result<()> {
-        ensure!(
-            self.version == version,
-            "State version ({}) is not expected ({}).",
-            self.version,
-            version,
-        );
-
-        self.proof
-            .verify(ledger_info, version, state_key.hash(), self.value.as_ref())
     }
 }
 

@@ -10,7 +10,7 @@ use crate::{
     event::EventKey,
     ledger_info::LedgerInfo,
     proof::{
-        definition::{EventProof, StateStoreValueProof, MAX_ACCUMULATOR_PROOF_DEPTH},
+        definition::{EventProof, MAX_ACCUMULATOR_PROOF_DEPTH},
         AccumulatorExtensionProof, AccumulatorRangeProof, EventAccumulatorInternalNode,
         EventAccumulatorProof, SparseMerkleInternalNode, SparseMerkleLeafNode,
         TestAccumulatorInternalNode, TestAccumulatorProof, TransactionAccumulatorInternalNode,
@@ -422,46 +422,6 @@ fn test_verify_state_store_resource_and_event() {
 
     let ledger_info_to_transaction_info_proof =
         TransactionAccumulatorProof::new(vec![*ACCUMULATOR_PLACEHOLDER_HASH, internal_a_hash]);
-    let transaction_info_to_account_proof = SparseMerkleProof::new(
-        Some(leaf2),
-        vec![leaf3_hash, leaf1_hash, *SPARSE_MERKLE_PLACEHOLDER_HASH],
-    );
-    let account_state_proof = StateStoreValueProof::new(
-        TransactionInfoWithProof::new(
-            ledger_info_to_transaction_info_proof.clone(),
-            txn_info2.clone(),
-        ),
-        transaction_info_to_account_proof,
-    );
-
-    // Prove that account at `key2` has value `value2`.
-    assert!(account_state_proof
-        .verify(
-            &ledger_info,
-            /* state_version = */ 2,
-            key2,
-            Some(&blob2),
-        )
-        .is_ok());
-    // Use the same proof to prove that `non_existing_key` doesn't exist.
-    assert!(account_state_proof
-        .verify(
-            &ledger_info,
-            /* state_version = */ 2,
-            non_existing_key,
-            None,
-        )
-        .is_ok());
-
-    let bad_blob2 = b"3".to_vec().into();
-    assert!(account_state_proof
-        .verify(
-            &ledger_info,
-            /* state_version = */ 2,
-            key2,
-            Some(&bad_blob2),
-        )
-        .is_err());
 
     let transaction_info_to_event_proof = EventAccumulatorProof::new(vec![event1_hash]);
     let event_proof = EventProof::new(

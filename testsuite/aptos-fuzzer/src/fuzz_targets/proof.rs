@@ -7,8 +7,8 @@ use aptos_proptest_helpers::ValueGenerator;
 use aptos_types::{
     ledger_info::LedgerInfo,
     proof::{
-        EventProof, SparseMerkleProof, StateStoreValueProof, TestAccumulatorProof,
-        TestAccumulatorRangeProof, TransactionInfoListWithProof, TransactionInfoWithProof,
+        EventProof, SparseMerkleProof, TestAccumulatorProof, TestAccumulatorRangeProof,
+        TransactionInfoListWithProof, TransactionInfoWithProof,
     },
     state_store::state_value::StateValue,
     transaction::Version,
@@ -136,38 +136,6 @@ impl FuzzTargetImpl for TransactionInfoWithProofFuzzer {
         let _res = input
             .proof
             .verify(&input.ledger_info, input.transaction_version);
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct AccountStateProofFuzzer;
-
-#[derive(Debug, Arbitrary)]
-struct AccountStateProofFuzzerInput {
-    proof: StateStoreValueProof,
-    ledger_info: LedgerInfo,
-    state_version: Version,
-    state_key_hash: HashValue,
-    state_value: Option<StateValue>,
-}
-
-impl FuzzTargetImpl for AccountStateProofFuzzer {
-    fn description(&self) -> &'static str {
-        "Proof: AccountStateProof"
-    }
-
-    fn generate(&self, _idx: usize, _gen: &mut ValueGenerator) -> Option<Vec<u8>> {
-        Some(corpus_from_strategy(any::<AccountStateProofFuzzerInput>()))
-    }
-
-    fn fuzz(&self, data: &[u8]) {
-        let input = fuzz_data_to_value(data, any::<AccountStateProofFuzzerInput>());
-        let _res = input.proof.verify(
-            &input.ledger_info,
-            input.state_version,
-            input.state_key_hash,
-            input.state_value.as_ref(),
-        );
     }
 }
 

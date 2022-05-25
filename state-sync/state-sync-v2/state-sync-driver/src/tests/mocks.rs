@@ -20,7 +20,7 @@ use aptos_types::{
     state_proof::StateProof,
     state_store::{
         state_key::StateKey,
-        state_value::{StateValue, StateValueChunkWithProof, StateValueWithProof},
+        state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
         AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
@@ -255,13 +255,6 @@ mock! {
         ) -> Result<StateProof>;
 
         fn get_state_proof(&self, known_version: u64) -> Result<StateProof>;
-
-        fn get_state_value_with_proof(
-            &self,
-            state_key: StateKey,
-            version: Version,
-            ledger_version: Version,
-        ) -> Result<StateValueWithProof>;
 
         fn get_state_value_with_proof_by_version(
             &self,
