@@ -1,12 +1,12 @@
 <div class="flex flex-col lg:flex-row gap-8 sm:gap-24 xl:gap-48 justify-between flex-[2]">
   <div>
-    <div class="sm:w-[36rem] mb-12 font-light sm:text-lg">
+    <div class="max-w-prose mb-12 font-light sm:text-lg">
       <%= render 'shared/it1_intro' %>
     </div>
-    <%= render ButtonComponent.new(size: :large, class: 'w-full mb-8', dialog: @login_dialog) do %>
+    <%= render ButtonComponent.new(size: :large, class: 'w-full mb-6 max-w-prose', dialog: @login_dialog) do %>
       Sign up
     <% end %>
-    <%= render ButtonComponent.new(href: new_user_session_path, size: :large, scheme: :secondary, class: 'w-full') do %>
+    <%= render ButtonComponent.new(href: new_user_session_path, size: :large, scheme: :secondary, class: 'w-full max-w-prose') do %>
       Log in
     <% end %>
 		<%= render @login_dialog do |dialog| %>

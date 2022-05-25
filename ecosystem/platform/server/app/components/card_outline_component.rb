@@ -3,11 +3,12 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
-class HeaderComponent < ViewComponent::Base
+class CardOutlineComponent < ViewComponent::Base
+
   def initialize(**rest)
     @rest = rest
     @rest[:class] = [
-      'bg-black text-white flex px-4 sm:px-6 items-center justify-between sticky top-0 h-16 z-10',
+      'self-start relative z-0 mix-blend-lighten pl-2 pb-2',
       @rest[:class]
     ]
   end

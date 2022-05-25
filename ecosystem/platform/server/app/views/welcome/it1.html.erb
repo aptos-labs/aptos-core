@@ -1,6 +1,6 @@
-<div class="flex flex-col lg:flex-row gap-8 sm:gap-24 xl:gap-48 justify-between flex-[2]">
+<div class="flex flex-col lg:flex-row flex-[2]">
   <div>
-    <div class="sm:w-[36rem] mb-12 font-light sm:text-lg">
+    <div class="mb-12 max-w-prose font-light sm:text-lg">
       <%= render 'shared/it1_intro' %>
     </div>
 
@@ -17,9 +17,9 @@
       </h2>
     <% end %>
 
-    <div class="flex flex-col lg:flex-row gap-8" data-controller="shake">
+    <div class="flex flex-wrap flex-col xl:flex-row gap-8" data-controller="shake">
       <% @steps.each_with_index do |step, i| %>
-        <div data-action="<%= step.disabled ? 'click->shake#shake' : '' %>" data-target="<%= !step.disabled && !step.completed ? 'shake.content' : '' %>" class="bg-neutral-800 rounded-md flex flex-col flex-1 <%= step.disabled ? 'cursor-not-allowed select-none opacity-50' : '' %>">
+        <div data-action="<%= step.disabled ? 'click->shake#shake' : '' %>" data-target="<%= !step.disabled && !step.completed ? 'shake.content' : '' %>" class="bg-neutral-800 rounded-md flex flex-col flex-1 <%= step.disabled ? 'cursor-not-allowed select-none opacity-25' : '' %>">
           <h3 class="font-mono uppercase mb-2 bg-neutral-700 text-teal-400 px-4 py-2 rounded-t-md text-sm">Step <%= i + 1 %></h3>
           <div class="px-8 py-4 flex flex-col flex-1">
             <h4 class="text-teal-400 font-mono uppercase text-2xl mb-4">
@@ -59,7 +59,7 @@
               <% end %>
             <% end %>
 
-            <%= render ButtonComponent.new(href: step.disabled ? nil : step.href, dialog: step.dialog, class: 'w-full mt-auto', disabled: step.disabled) do %>
+            <%= render ButtonComponent.new(href: step.disabled ? nil : step.href, dialog: step.dialog, class: step.completed ? 'bg-neutral-700/50 text-teal-600 w-full mt-auto' : 'w-full mt-auto', disabled: step.disabled) do %>
               <% if step.completed %>
                 <%= render IconComponent.new(:check_circle, size: :medium) %>
               <% elsif step.name == :connect_discord %>
