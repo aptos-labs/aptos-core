@@ -77,26 +77,6 @@ paths:
           description: "The number of items to return"
           schema:
             type: integer
-        - name: "showDeleted"
-          in: query
-          required: false
-          description: "Include deleted items"
-          schema:
-            type: boolean
-        - name: "lastUpdatedFrom"
-          in: query
-          required: false
-          description: "Filter condition to return only items that have been updated after this date (timestamp)"
-          schema:
-            type: integer
-            format: int64
-        - name: "lastUpdatedTo"
-          in: query
-          required: false
-          description: "Filter condition to return only items that have been updated before this date (timestamp)"
-          schema:
-            type: integer
-            format: "int64"
       responses:
         "200":
           description: "OK"
@@ -142,7 +122,7 @@ paths:
           required: true
           description: "Token Id has format `${creator_address}::${collection_name}::${token_name}`"
           schema:
-            $ref: "#/components/schemas/TokenId"
+            $ref: "#/components/schemas/TokenMetaData"
       responses:
         "200":
           description: "OK"
@@ -222,6 +202,36 @@ paths:
           $ref: "#/components/responses/400"
         '500':
           $ref: "#/components/responses/500"
+  /ownerships/all:
+    get:
+      description: "Returns all ownerships"
+      operationId: getAllOwnerships
+      parameters:
+        - name: "offset"
+          in: query
+          required: false
+          description:
+            offset of the ownership to be returned from the first ownership.
+          schema:
+            type: integer
+        - name: "size"
+          in: query
+          required: false
+          description: "The number of items to return"
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ownerships"
+        '400':
+          $ref: "#/components/responses/400"
+        '500':
+          $ref: "#/components/responses/500"
   /ownerships/{ownershipId}:
     get:
       description: "Returns ownership by Id"
@@ -280,10 +290,10 @@ paths:
           $ref: "#/components/responses/400"
         '500':
           $ref: "#/components/responses/500"
-  /ownership/byIds:
+  /ownerships/byIds:
     post:
-      description: "Returns Ownership by Ids"
-      operationId: getOwnershipByIds
+      description: "Returns Ownerships by Ids"
+      operationId: getOwnershipsByIds
       requestBody:
         content:
           application/json:
@@ -323,6 +333,36 @@ paths:
                 $ref: "#/components/schemas/Collection"
         '404':
           $ref: "#/components/responses/404"
+        '400':
+          $ref: "#/components/responses/400"
+        '500':
+          $ref: "#/components/responses/500"
+  /collections/all:
+    get:
+      description: "Returns all collections"
+      operationId: getAllCollections
+      parameters:
+        - name: "offset"
+          in: query
+          required: false
+          description:
+            offset of the collections to be returned from the first collection.
+          schema:
+            type: integer
+        - name: "size"
+          in: query
+          required: false
+          description: "The number of items to return"
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Collections"
         '400':
           $ref: "#/components/responses/400"
         '500':
@@ -1644,8 +1684,6 @@ components:
           $ref: "#/components/schemas/Address"
         supply:
           type: integer
-        owner:
-          $ref: "#/components/schemas/Address"
         royalties:
           $ref: "#/components/schemas/Royalties"
         deleted:
@@ -1654,9 +1692,23 @@ components:
         max:
           type: integer
           description: The max number of this token
+        uri:
+          type: string
+          description: The link to the json metadata of the token
+        mintedAt:
+          type: string
+          format: date-time
+          description: "Date and time of the token first minting"
+      required:
+        - id
+        - contract
+        - creator
+        - supply
+        - uri
+        - mintedAt
     CollectionId:
       title: Colelction Id
-      description: A Id of a collection
+      description: A Id of a collection with the format of ${creator_address}::${collection_name}
       type: string
       example: "0x1::my_awesome_collection"
     Collection:
@@ -1667,9 +1719,7 @@ components:
           $ref: "#/components/schemas/CollectionId"
         name:
           type: string
-        owner:
-          $ref: "#/components/schemas/Address"
-        ceator:
+        creator:
           $ref: "#/components/schemas/Address"
         maxSupply:
           type: integer
@@ -1681,6 +1731,21 @@ components:
           type: string
         uri:
           type: string
+      required:
+        - id
+        - name
+        - creator
+        - description
+        - uri
+        - count
+    Collections:
+      title: Collections
+      type: object
+      properties:
+        tokens:
+          type: array
+          items:
+            $ref: "#/components/schemas/Collection"
     OwnershipId:
       type: string
       description: Ownership Id has the format of "${tokenID}::${ownerAddress}"
@@ -1713,6 +1778,14 @@ components:
           format: "date-time"
         creator:
           $ref: "#/components/schemas/Address"
+      required:
+        - id
+        - tokenId
+        - collection
+        - owner
+        - value
+        - createdAt
+        - creator
     Ownerships:
       title: Ownerships
       type: object
@@ -1791,10 +1864,6 @@ components:
         collection:
           type: string
           description: the name of the collection
-        maxium:
-          type: integer
-        uri:
-          type: string
         name:
           type: string
           description: "Name of the NFT item"
@@ -1813,6 +1882,10 @@ components:
             $ref: "#/components/schemas/MetaContent"
         raw:
           type: string
+      required:
+        - name
+        - attributes
+        - content
     TokenMetaAttribute:
       required:
         - key
@@ -1831,27 +1904,10 @@ components:
       properties:
         url:
           type: string
-        representation:
-          type: string
-          enum:
-            - PREVIEW
-            - BIG
-            - ORIGINAL
-        mimeType:
-          type: string
-          example: "image/png"
-        size:
-          type: integer
-          format: int64
       required:
         - url
-        - representation
       oneOf:
         - $ref: "#/components/schemas/ImageContent"
-        - $ref: "#/components/schemas/VideoContent"
-        - $ref: "#/components/schemas/AudioContent"
-        - $ref: "#/components/schemas/Model3dContent"
-        - $ref: "#/components/schemas/HtmlContent"
     ImageContent:
       type: object
       properties:
@@ -1863,35 +1919,3 @@ components:
           type: integer
         height:
           type: integer
-    VideoContent:
-      type: object
-      properties:
-        "@type":
-          type: string
-          enum:
-            - VIDEO
-        width:
-          type: integer
-        height:
-          type: integer
-    AudioContent:
-      type: object
-      properties:
-        "@type":
-          type: string
-          enum:
-            - AUDIO
-    Model3dContent:
-      type: object
-      properties:
-        "@type":
-          type: string
-          enum:
-            - MODEL_3D
-    HtmlContent:
-      type: object
-      properties:
-        "@type":
-          type: string
-          enum:
-            - HTML
