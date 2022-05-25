@@ -312,6 +312,7 @@ commands:
           command: |
             echo 'export APTOS_NODE_URL="http://localhost:8080"' >> $BASH_ENV
             echo 'export APTOS_FAUCET_URL="http://localhost:8000"' >> $BASH_ENV
+            echo 'export CHAIN_ID="4"' >> $BASH_ENV
       - run:
           name: Start local testnet docker-compose and verify up
           shell: /bin/bash

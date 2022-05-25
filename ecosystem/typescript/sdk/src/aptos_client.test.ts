@@ -1,8 +1,22 @@
+import { AxiosResponse } from "axios";
 import { AptosClient, raiseForStatus } from "./aptos_client";
 import { AnyObject } from "./util";
-import { AxiosResponse } from "axios";
 
-import { NODE_URL } from "./util.test";
+import { FAUCET_URL, NODE_URL, CHAIN_ID } from "./util.test";
+import { FaucetClient } from "./faucet_client";
+import { AptosAccount } from "./aptos_account";
+import {
+  ChainId,
+  Identifier,
+  ModuleId,
+  RawTransaction,
+  ScriptFunction,
+  StructTag,
+  TransactionPayloadVariantScriptFunction,
+  TypeTagVariantstruct,
+} from "./transaction_builder/aptosTypes";
+import { hexToAccountAddress } from "./transaction_builder";
+import { BcsSerializer } from "./transaction_builder/bcs";
 
 test("gets genesis account", async () => {
   const client = new AptosClient(NODE_URL);
@@ -21,13 +35,13 @@ test("gets genesis resources", async () => {
   const client = new AptosClient(NODE_URL);
   const resources = await client.getAccountResources("0x1");
   const accountResource = resources.find((r) => r.type === "0x1::Account::Account");
-  expect((accountResource.data as AnyObject)["self_address"]).toBe("0x1");
+  expect((accountResource.data as AnyObject).self_address).toBe("0x1");
 });
 
 test("gets the Account resource", async () => {
   const client = new AptosClient(NODE_URL);
   const accountResource = await client.getAccountResource("0x1", "0x1::Account::Account");
-  expect((accountResource.data as AnyObject)["self_address"]).toBe("0x1");
+  expect((accountResource.data as AnyObject).self_address).toBe("0x1");
 });
 
 test("gets ledger info", async () => {
@@ -80,3 +94,78 @@ test("test raiseForStatus", async () => {
 
   expect(() => raiseForStatus(200, fakeResponse)).toThrow('Status Text - "some string"');
 });
+
+function bcsSerializeUint64(i: BigInt): Uint8Array {
+  const bcsSerializer = new BcsSerializer();
+  bcsSerializer.serializeU64(i);
+  return bcsSerializer.getBytes();
+}
+
+test(
+  "submits bcs transaction",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL, null);
+
+    const account1 = new AptosAccount();
+    await faucetClient.fundAccount(account1.address(), 5000);
+    let resources = await client.getAccountResources(account1.address());
+    let accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
+    expect((accountResource.data as any).coin.value).toBe("5000");
+
+    const account2 = new AptosAccount();
+    await faucetClient.fundAccount(account2.address(), 0);
+    resources = await client.getAccountResources(account2.address());
+    accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
+    expect((accountResource.data as any).coin.value).toBe("0");
+
+    const moduleName = new ModuleId(
+      hexToAccountAddress("0000000000000000000000000000000000000000000000000000000000000001"),
+      new Identifier("Coin"),
+    );
+
+    const bcsSerializer = new BcsSerializer();
+    const accountAddress2 = hexToAccountAddress(account2.address().noPrefix());
+    accountAddress2.serialize(bcsSerializer);
+
+    const token = new TypeTagVariantstruct(
+      new StructTag(
+        hexToAccountAddress("0000000000000000000000000000000000000000000000000000000000000001"),
+        new Identifier("TestCoin"),
+        new Identifier("TestCoin"),
+        [],
+      ),
+    );
+
+    const scriptFunctionPayload = new TransactionPayloadVariantScriptFunction(
+      new ScriptFunction(
+        moduleName,
+        new Identifier("transfer"),
+        [token],
+        [bcsSerializer.getBytes(), bcsSerializeUint64(BigInt(717))],
+      ),
+    );
+
+    const { sequence_number } = await client.getAccount(account1.address());
+
+    const rawTxn = new RawTransaction(
+      hexToAccountAddress(account1.address().noPrefix()),
+      BigInt(sequence_number),
+      scriptFunctionPayload,
+      BigInt(1000),
+      BigInt(1),
+      BigInt(Math.floor(Date.now() / 1000) + 10),
+      new ChainId(parseInt(CHAIN_ID)),
+    );
+
+    const bcsTxn = await AptosClient.generateBCSTransaction(account1, rawTxn);
+    const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
+
+    await client.waitForTransaction(transactionRes.hash);
+
+    resources = await client.getAccountResources(account2.address());
+    accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
+    expect((accountResource.data as any).coin.value).toBe("717");
+  },
+  30 * 1000,
+);

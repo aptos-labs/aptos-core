@@ -9,6 +9,8 @@ import { AptosAccount } from "./aptos_account";
 import { Types } from "./types";
 import { Tables } from "./api/Tables";
 import { AptosError } from "./api/data-contracts";
+import * as TxnBuilderTypes from "./transaction_builder/aptosTypes";
+import { SigningMessage, TransactionBuilderEd25519 } from "./transaction_builder";
 
 export class RequestError extends Error {
   response?: AxiosResponse<any, Types.AptosError>;
@@ -135,6 +137,21 @@ export class AptosClient {
     return response.data;
   }
 
+  /** Generates a signed transaction that can be submitted to the chain for execution. */
+  static async generateBCSTransaction(
+    accountFrom: AptosAccount,
+    rawTxn: TxnBuilderTypes.RawTransaction,
+  ): Promise<Uint8Array> {
+    const txnBuilder = new TransactionBuilderEd25519(async (signingMessage: SigningMessage) => {
+      // @ts-ignore
+      const sigHexStr = accountFrom.signBuffer(signingMessage);
+      return sigHexStr.toUint8Array();
+    }, accountFrom.pubKey().toUint8Array());
+
+    const signedTxn = await txnBuilder.sign(rawTxn);
+    return signedTxn;
+  }
+
   /** Generates a transaction request that can be submitted to produce a raw transaction that
    * can be signed, which upon being signed can be submitted to the blockchain. */
   async generateTransaction(
@@ -208,10 +225,28 @@ export class AptosClient {
     return response.data;
   }
 
-  /** Submits a signed transaction to the blockchain. */
+  /** Submits a signed transaction to the transaction endpoint that takes JSON payload. */
   async submitTransaction(signedTxnRequest: Types.SubmitTransactionRequest): Promise<Types.PendingTransaction> {
     const response = await this.transactions.submitTransaction(signedTxnRequest);
     raiseForStatus(202, response, signedTxnRequest);
+    return response.data;
+  }
+
+  /** Submits a signed transaction to the the endpoint that takes BCS payload. */
+  async submitSignedBCSTransaction(signedTxn: Uint8Array): Promise<Types.PendingTransaction> {
+    // Need to construct a customized post request for transactions in BCS payload
+    const httpClient = this.transactions.http;
+
+    const response = await httpClient.request<Types.PendingTransaction, AptosError>({
+      path: "/transactions",
+      method: "POST",
+      body: signedTxn,
+      // @ts-ignore
+      type: "application/x.aptos.signed_transaction+bcs",
+      format: "json",
+    });
+
+    raiseForStatus(202, response, signedTxn);
     return response.data;
   }
 
