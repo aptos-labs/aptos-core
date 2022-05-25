@@ -123,7 +123,7 @@ impl NaiveSmt {
         }
     }
 
-    pub fn get_proof<V: CryptoHash>(&mut self, key: &HashValue) -> SparseMerkleProof<V> {
+    pub fn get_proof(&mut self, key: &HashValue) -> SparseMerkleProof {
         let root = NaiveSubTree {
             leaves: &self.leaves,
             depth: 0,

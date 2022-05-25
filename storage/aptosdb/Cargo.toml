@@ -44,7 +44,7 @@ storage-interface = { path = "../storage-interface" }
 [dev-dependencies]
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
-rand = "0.8.3"
+rand = "0.8.5"
 
 aptos-jellyfish-merkle = { path = "../jellyfish-merkle", features = ["fuzzing"] }
 aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers" }

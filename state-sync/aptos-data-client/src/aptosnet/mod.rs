@@ -36,11 +36,12 @@ use rand::seq::SliceRandom;
 use std::{convert::TryFrom, fmt, sync::Arc, time::Duration};
 use storage_service_client::StorageServiceClient;
 use storage_service_types::{
-    AccountStatesChunkWithProofRequest, Epoch, EpochEndingLedgerInfoRequest, StorageServerSummary,
+    AccountStatesChunkWithProofRequest, Epoch, EpochEndingLedgerInfoRequest,
+    NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest, StorageServerSummary,
     StorageServiceRequest, StorageServiceResponse, TransactionOutputsWithProofRequest,
     TransactionsWithProofRequest,
 };
-use tokio::runtime::Handle;
+use tokio::{runtime::Handle, task::JoinHandle};
 
 mod logging;
 mod metrics;
@@ -100,8 +101,11 @@ impl AptosNetDataClient {
     ) -> (Self, DataSummaryPoller) {
         let client = Self {
             data_client_config,
-            network_client,
-            peer_states: Arc::new(RwLock::new(PeerStates::new(storage_service_config))),
+            network_client: network_client.clone(),
+            peer_states: Arc::new(RwLock::new(PeerStates::new(
+                storage_service_config,
+                network_client.get_peer_metadata_storage(),
+            ))),
             global_summary_cache: Arc::new(RwLock::new(GlobalDataSummary::empty())),
             response_id_generator: Arc::new(U64IdGenerator::new()),
         };
@@ -130,22 +134,30 @@ impl AptosNetDataClient {
         *self.global_summary_cache.write() = aggregate;
     }
 
-    /// Choose a connected peer that can service the given request. Returns an
-    /// error if no such peer can be found.
+    /// Choose a connected peer that can service the given request.
+    /// Returns an error if no such peer can be found.
     fn choose_peer_for_request(
         &self,
         request: &StorageServiceRequest,
     ) -> Result<PeerNetworkId, Error> {
-        let all_connected_peers = self.get_all_connected_peers()?;
+        // Identify the peers that can service the request
+        let serviceable_peers =
+            if request.is_get_storage_server_summary() || request.is_data_subscription_request() {
+                // Storage summary and data subscription requests should be sent to prioritized peers.
+                // If none can handle the request, fall back to the regular peers.
+                let (priority_peers, regular_peers) = self.get_priority_and_regular_peers()?;
+                let priority_serviceable = self.identify_serviceable(priority_peers, request);
+                if !priority_serviceable.is_empty() {
+                    priority_serviceable
+                } else {
+                    self.identify_serviceable(regular_peers, request)
+                }
+            } else {
+                let all_connected_peers = self.get_all_connected_peers()?;
+                self.identify_serviceable(all_connected_peers, request)
+            };
 
-        // Identify the peers that can service this request
-        let internal_peer_states = self.peer_states.read();
-        let serviceable_peers = all_connected_peers
-            .into_iter()
-            .filter(|peer| internal_peer_states.can_service_request(peer, request))
-            .collect::<Vec<_>>();
-
-        // Choose a random peer from those that can service the request
+        // Randomly select a peer to handle the request
         serviceable_peers
             .choose(&mut rand::thread_rng())
             .copied()
@@ -154,6 +166,19 @@ impl AptosNetDataClient {
                     format!("No connected peers are advertising that they can serve this data! Request: {:?}",request),
                 )
             })
+    }
+
+    /// Identifies the peers in the given set of prospective peers
+    /// that can service the specified request.
+    fn identify_serviceable(
+        &self,
+        prospective_peers: Vec<PeerNetworkId>,
+        request: &StorageServiceRequest,
+    ) -> Vec<PeerNetworkId> {
+        prospective_peers
+            .into_iter()
+            .filter(|peer| self.peer_states.read().can_service_request(peer, request))
+            .collect::<Vec<_>>()
     }
 
     /// Fetches the next prioritized peer to poll
@@ -167,11 +192,9 @@ impl AptosNetDataClient {
             return Ok(None);
         }
 
-        // Get all connected peers and identify the priority peers
-        let mut peers = self.get_all_connected_peers()?;
-        peers.retain(|peer| self.peer_states.read().is_priority_peer(peer));
-
-        self.select_peer_to_poll(peers)
+        // Select a priority peer to poll
+        let (priority_connected_peers, _) = self.get_priority_and_regular_peers()?;
+        self.select_peer_to_poll(priority_connected_peers)
     }
 
     /// Fetches the next regular peer to poll
@@ -185,11 +208,9 @@ impl AptosNetDataClient {
             return Ok(None);
         }
 
-        // Get all connected peers and identify the regular peers
-        let mut peers = self.get_all_connected_peers()?;
-        peers.retain(|peer| !self.peer_states.read().is_priority_peer(peer));
-
-        self.select_peer_to_poll(peers)
+        // Select a regular peer to poll
+        let (_, regular_connected_peers) = self.get_priority_and_regular_peers()?;
+        self.select_peer_to_poll(regular_connected_peers)
     }
 
     /// Randomly selects a peer to poll that does not have an in-flight request
@@ -239,6 +260,27 @@ impl AptosNetDataClient {
             ));
         }
         Ok(connected_peers)
+    }
+
+    /// Returns all priority and regular peers
+    fn get_priority_and_regular_peers(
+        &self,
+    ) -> Result<(Vec<PeerNetworkId>, Vec<PeerNetworkId>), Error> {
+        // Get all connected peers
+        let all_connected_peers = self.get_all_connected_peers()?;
+
+        // Filter the peers based on priority
+        let mut priority_peers = vec![];
+        let mut regular_peers = vec![];
+        for peer in all_connected_peers {
+            if self.peer_states.read().is_priority_peer(&peer) {
+                priority_peers.push(peer);
+            } else {
+                regular_peers.push(peer);
+            }
+        }
+
+        Ok((priority_peers, regular_peers))
     }
 
     /// Sends a request (to an undecided peer) and decodes the response
@@ -434,6 +476,35 @@ impl AptosDataClient for AptosNetDataClient {
         Ok(response.map(|epoch_change| epoch_change.ledger_info_with_sigs))
     }
 
+    async fn get_new_transaction_outputs_with_proof(
+        &self,
+        known_version: Version,
+        known_epoch: Epoch,
+    ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>> {
+        let request = StorageServiceRequest::GetNewTransactionOutputsWithProof(
+            NewTransactionOutputsWithProofRequest {
+                known_version,
+                known_epoch,
+            },
+        );
+        self.send_request_and_decode(request).await
+    }
+
+    async fn get_new_transactions_with_proof(
+        &self,
+        known_version: Version,
+        known_epoch: Epoch,
+        include_events: bool,
+    ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>> {
+        let request =
+            StorageServiceRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
+                known_version,
+                known_epoch,
+                include_events,
+            });
+        self.send_request_and_decode(request).await
+    }
+
     async fn get_number_of_account_states(&self, version: Version) -> Result<Response<u64>> {
         let request = StorageServiceRequest::GetNumberOfAccountsAtVersion(version);
         self.send_request_and_decode(request).await
@@ -537,6 +608,9 @@ impl DataSummaryPoller {
             // Wait for next round before polling
             ticker.next().await;
 
+            // Update the global storage summary
+            self.data_client.update_global_summary_cache();
+
             // Fetch the prioritized and regular peers to poll (if any)
             let prioritized_peer = self.try_fetch_peer(true);
             let regular_peer = self.fetch_regular_peer(prioritized_peer.is_none());
@@ -621,7 +695,11 @@ fn update_in_flight_metrics(label: &str, num_in_flight_polls: u64) {
 }
 
 /// Spawns a dedicated poller for the given peer.
-fn poll_peer(data_client: AptosNetDataClient, peer: PeerNetworkId, runtime: Option<Handle>) {
+pub(crate) fn poll_peer(
+    data_client: AptosNetDataClient,
+    peer: PeerNetworkId,
+    runtime: Option<Handle>,
+) -> JoinHandle<()> {
     // Create the poller for the peer
     let poller = async move {
         // Mark the in-flight poll as started
@@ -642,6 +720,9 @@ fn poll_peer(data_client: AptosNetDataClient, peer: PeerNetworkId, runtime: Opti
             .map(Response::into_payload);
         drop(timer);
 
+        // Mark the in-flight poll as now complete
+        data_client.in_flight_request_complete(&peer);
+
         // Check the storage summary response
         let storage_summary = match result {
             Ok(storage_summary) => storage_summary,
@@ -657,12 +738,8 @@ fn poll_peer(data_client: AptosNetDataClient, peer: PeerNetworkId, runtime: Opti
             }
         };
 
-        // Update the global storage summary and the summary for the peer
+        // Update the summary for the peer
         data_client.update_summary(peer, storage_summary);
-        data_client.update_global_summary_cache();
-
-        // Mark the in-flight poll as now complete
-        data_client.in_flight_request_complete(&peer);
 
         // Log the new global data summary and update the metrics
         sample!(
@@ -688,7 +765,7 @@ fn poll_peer(data_client: AptosNetDataClient, peer: PeerNetworkId, runtime: Opti
         runtime.spawn(poller)
     } else {
         tokio::spawn(poller)
-    };
+    }
 }
 
 /// Updates the advertised data metrics using the given global

@@ -26,6 +26,7 @@ const config = {
         docs: {
           routeBasePath: "/",
           sidebarPath: require.resolve("./sidebars.js"),
+          sidebarCollapsible: false,
           editUrl: "https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/",
           remarkPlugins: [codeInjector],
         },
@@ -128,7 +129,7 @@ const config = {
       },
       algolia: {
         appId: 'HM7UY0NMLG',
-        apiKey: 'ab185b9077070c3e02dce2e381a3f81b',
+        apiKey: '63c5819714b74e64977337e61a1e3ae6',
         indexName: 'aptos',
         contextualSearch: true,
         debug: false,

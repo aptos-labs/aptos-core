@@ -18,6 +18,7 @@ use aptos_types::{
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::{rngs::StdRng, SeedableRng};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
@@ -26,7 +27,7 @@ use std::{
     sync::{mpsc, Arc},
     time::Instant,
 };
-use storage_interface::{state_view::LatestDbStateView, DbReader};
+use storage_interface::{state_view::LatestDbStateCheckpointView, DbReader};
 
 const META_FILENAME: &str = "metadata.toml";
 const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
@@ -71,6 +72,11 @@ pub struct TransactionGenerator {
     /// so generated transactions are guaranteed to be successfully executed.
     accounts_cache: Vec<AccountData>,
 
+    /// The current state of seed accounts. The purpose of the seed accounts to parallelize the
+    /// account creation and minting process so that they are not blocked on sequence number of
+    /// a single root account.
+    seed_accounts_cache: Vec<AccountData>,
+
     /// Total number of accounts in the DB
     num_accounts: usize,
 
@@ -89,27 +95,39 @@ pub struct TransactionGenerator {
 }
 
 impl TransactionGenerator {
-    pub fn new(genesis_key: Ed25519PrivateKey, num_accounts: usize) -> Self {
-        Self::new_impl(genesis_key, num_accounts, None)
+    pub fn new(
+        genesis_key: Ed25519PrivateKey,
+        num_accounts: usize,
+        num_seed_accounts: usize,
+    ) -> Self {
+        Self::new_impl(genesis_key, num_accounts, num_seed_accounts, None)
     }
 
     pub fn new_with_sender(
         genesis_key: Ed25519PrivateKey,
         num_accounts: usize,
+        num_seed_accounts: usize,
         block_sender: mpsc::SyncSender<Vec<Transaction>>,
     ) -> Self {
-        Self::new_impl(genesis_key, num_accounts, Some(block_sender))
+        Self::new_impl(
+            genesis_key,
+            num_accounts,
+            num_seed_accounts,
+            Some(block_sender),
+        )
     }
 
     fn new_impl(
         genesis_key: Ed25519PrivateKey,
         num_accounts: usize,
+        num_seed_accounts: usize,
         block_sender: Option<mpsc::SyncSender<Vec<Transaction>>>,
     ) -> Self {
         let seed = [1u8; 32];
         let rng = StdRng::from_seed(seed);
         Self {
-            accounts_cache: Self::gen_account_cache(num_accounts),
+            seed_accounts_cache: Self::gen_account_cache(num_seed_accounts, true),
+            accounts_cache: Self::gen_account_cache(num_accounts, false),
             num_accounts,
             genesis_key,
             version: 0,
@@ -118,13 +136,21 @@ impl TransactionGenerator {
         }
     }
 
-    fn gen_account_cache(num_accounts: usize) -> Vec<AccountData> {
+    fn gen_account_cache(num_accounts: usize, seed_account: bool) -> Vec<AccountData> {
         let start = Instant::now();
-        let seed = [1u8; 32];
+        let seed = if seed_account { [1u8; 32] } else { [2u8; 32] };
         let mut rng = StdRng::from_seed(seed);
 
         let mut accounts = Vec::with_capacity(num_accounts);
-        println!("[{}] Generating {} accounts.", now_fmt!(), num_accounts);
+        if seed_account {
+            println!(
+                "[{}] Generating {} seed accounts.",
+                now_fmt!(),
+                num_accounts
+            );
+        } else {
+            println!("[{}] Generating {} accounts.", now_fmt!(), num_accounts);
+        }
         let bar = get_progress_bar(num_accounts);
         for _i in 0..num_accounts {
             let private_key = Ed25519PrivateKey::generate(&mut rng);
@@ -142,38 +168,47 @@ impl TransactionGenerator {
         bar.finish();
         println!("[{}] done.", now_fmt!());
 
-        info!(
-            num_accounts_generated = num_accounts,
-            time_ms = %start.elapsed().as_millis(),
-            "Account cache generation finished.",
-        );
+        if seed_account {
+            info!(
+                num_accounts_generated = num_accounts,
+                time_ms = %start.elapsed().as_millis(),
+                "Seed Account cache generation finished.",
+            );
+        } else {
+            info!(
+                num_accounts_generated = num_accounts,
+                time_ms = %start.elapsed().as_millis(),
+                "Account cache generation finished.",
+            );
+        }
         accounts
     }
 
-    pub fn new_with_metafile<P: AsRef<Path>>(
+    pub fn new_with_existing_db<P: AsRef<Path>>(
         genesis_key: Ed25519PrivateKey,
         block_sender: mpsc::SyncSender<Vec<Transaction>>,
         db_dir: P,
+        version: Version,
     ) -> Self {
         let path = db_dir.as_ref().join(META_FILENAME);
         let mut file = File::open(&path).unwrap();
         let mut contents = vec![];
         file.read_to_end(&mut contents).unwrap();
         let test_case: TestCase = toml::from_slice(&contents).expect("Must exist.");
-        let num_accounts = match test_case {
-            TestCase::P2p(P2pTestCase { num_accounts }) => num_accounts,
-        };
+        let TestCase::P2p(P2pTestCase { num_accounts }) = test_case;
 
         let seed = [1u8; 32];
         let rng = StdRng::from_seed(seed);
+        let num_seed_accounts = (num_accounts / 1000).max(1);
         Self {
-            accounts_cache: Self::gen_account_cache(std::cmp::min(
-                num_accounts,
-                MAX_ACCOUNTS_INVOLVED_IN_P2P,
-            )),
+            seed_accounts_cache: Self::gen_account_cache(num_seed_accounts, true),
+            accounts_cache: Self::gen_account_cache(
+                std::cmp::min(num_accounts, MAX_ACCOUNTS_INVOLVED_IN_P2P),
+                false,
+            ),
             num_accounts,
             genesis_key,
-            version: 2 * num_accounts as Version,
+            version,
             rng,
             block_sender: Some(block_sender),
         }
@@ -196,8 +231,11 @@ impl TransactionGenerator {
 
     pub fn run_mint(&mut self, init_account_balance: u64, block_size: usize) {
         assert!(self.block_sender.is_some());
-        self.gen_account_creations(block_size);
-        self.gen_mint_transactions(init_account_balance, block_size);
+        self.create_seed_accounts(block_size);
+        // Ensure that seed accounts have enough balance to transfer money to at least 1000 account with
+        // balance init_account_balance.
+        self.mint_seed_accounts(init_account_balance * 10_000, block_size);
+        self.create_and_fund_accounts(init_account_balance, block_size);
     }
 
     pub fn run_transfer(&mut self, block_size: usize, num_transfer_blocks: usize) {
@@ -212,18 +250,18 @@ impl TransactionGenerator {
             .with_max_gas_amount(1000)
     }
 
-    pub fn gen_account_creations(&mut self, block_size: usize) -> Vec<Vec<Transaction>> {
+    pub fn create_seed_accounts(&mut self, block_size: usize) -> Vec<Vec<Transaction>> {
         let root_address = aptos_root_address();
         let mut txn_block = vec![];
 
         println!(
-            "[{}] Generating {} account creation txns.",
+            "[{}] Generating {} seed account creation txns.",
             now_fmt!(),
-            self.accounts_cache.len(),
+            self.seed_accounts_cache.len(),
         );
-        let bar = get_progress_bar(self.accounts_cache.len());
-        for (i, block) in self.accounts_cache.chunks(block_size).enumerate() {
-            let mut transactions = Vec::with_capacity(block_size);
+        let bar = get_progress_bar(self.seed_accounts_cache.len());
+        for (i, block) in self.seed_accounts_cache.chunks(block_size).enumerate() {
+            let mut transactions = Vec::with_capacity(block_size + 1);
             for (j, account) in block.iter().enumerate() {
                 let txn = create_transaction(
                     &self.genesis_key,
@@ -236,6 +274,54 @@ impl TransactionGenerator {
                 );
                 transactions.push(txn);
             }
+            transactions.push(Transaction::StateCheckpoint);
+            self.version += transactions.len() as Version;
+            if let Some(sender) = &self.block_sender {
+                sender.send(transactions).unwrap();
+            } else {
+                txn_block.push(transactions);
+            }
+            bar.inc(block_size as u64);
+        }
+        bar.finish();
+        println!("[{}] done.", now_fmt!());
+        txn_block
+    }
+
+    /// Generates transactions that creates a set of accounts and fund them from the seed accounts.
+    pub fn create_and_fund_accounts(
+        &mut self,
+        init_account_balance: u64,
+        block_size: usize,
+    ) -> Vec<Vec<Transaction>> {
+        let mut txn_block = vec![];
+
+        println!(
+            "[{}] Generating {} account creation txns.",
+            now_fmt!(),
+            self.accounts_cache.len(),
+        );
+        let bar = get_progress_bar(self.accounts_cache.len());
+        for (_, block) in self.accounts_cache.chunks(block_size).enumerate() {
+            let mut transactions = Vec::with_capacity(block_size + 1);
+            for (_, account) in block.iter().enumerate() {
+                let seed_index =
+                    rand::seq::index::sample(&mut self.rng, self.seed_accounts_cache.len(), 1)
+                        .index(0);
+                let seed_account = &self.seed_accounts_cache[seed_index];
+                let txn = create_transaction(
+                    &seed_account.private_key,
+                    seed_account.public_key.clone(),
+                    Self::transaction_factory()
+                        .create_and_fund_user_account(&account.public_key, init_account_balance)
+                        .sender(seed_account.address)
+                        .sequence_number(seed_account.sequence_number)
+                        .build(),
+                );
+                self.seed_accounts_cache[seed_index].sequence_number += 1;
+                transactions.push(txn);
+            }
+            transactions.push(Transaction::StateCheckpoint);
             self.version += transactions.len() as Version;
             if let Some(sender) = &self.block_sender {
                 sender.send(transactions).unwrap();
@@ -250,31 +336,36 @@ impl TransactionGenerator {
     }
 
     /// Generates transactions that allocate `init_account_balance` to every account.
-    pub fn gen_mint_transactions(
+    pub fn mint_seed_accounts(
         &mut self,
-        init_account_balance: u64,
+        seed_account_balance: u64,
         block_size: usize,
     ) -> Vec<Vec<Transaction>> {
         let root_address = aptos_root_address();
         let mut txn_block = vec![];
 
-        let total_accounts = self.accounts_cache.len();
-        println!("[{}] Generating {} mint txns.", now_fmt!(), total_accounts,);
+        let total_accounts = self.seed_accounts_cache.len();
+        println!(
+            "[{}] Generating {} mint txns for seed accounts.",
+            now_fmt!(),
+            total_accounts,
+        );
         let bar = get_progress_bar(total_accounts);
-        for (i, block) in self.accounts_cache.chunks(block_size).enumerate() {
-            let mut transactions = Vec::with_capacity(block_size);
+        for (i, block) in self.seed_accounts_cache.chunks(block_size).enumerate() {
+            let mut transactions = Vec::with_capacity(block_size + 1);
             for (j, account) in block.iter().enumerate() {
                 let txn = create_transaction(
                     &self.genesis_key,
                     self.genesis_key.public_key(),
                     Self::transaction_factory()
-                        .mint(account.address, init_account_balance)
+                        .mint(account.address, seed_account_balance)
                         .sender(root_address)
                         .sequence_number((total_accounts + i * block_size + j) as u64)
                         .build(),
                 );
                 transactions.push(txn);
             }
+            transactions.push(Transaction::StateCheckpoint);
             self.version += transactions.len() as Version;
 
             if let Some(sender) = &self.block_sender {
@@ -298,7 +389,7 @@ impl TransactionGenerator {
         let mut txn_block = vec![];
 
         for _i in 0..num_blocks {
-            let mut transactions = Vec::with_capacity(block_size);
+            let mut transactions = Vec::with_capacity(block_size + 1);
             for _j in 0..block_size {
                 let indices = rand::seq::index::sample(&mut self.rng, self.accounts_cache.len(), 2);
                 let sender_idx = indices.index(0);
@@ -318,6 +409,7 @@ impl TransactionGenerator {
                 transactions.push(txn);
                 self.accounts_cache[sender_idx].sequence_number += 1;
             }
+            transactions.push(Transaction::StateCheckpoint);
             self.version += transactions.len() as Version;
 
             if let Some(sender) = &self.block_sender {
@@ -337,9 +429,9 @@ impl TransactionGenerator {
             self.accounts_cache.len(),
         );
         let bar = get_progress_bar(self.accounts_cache.len());
-        for account in &self.accounts_cache {
+        self.accounts_cache.par_iter().for_each(|account| {
             let address = account.address;
-            let db_state_view = db.latest_state_view().unwrap();
+            let db_state_view = db.latest_state_checkpoint_view().unwrap();
             let address_account_view = db_state_view.as_account_with_state_view(&address);
             assert_eq!(
                 address_account_view
@@ -350,7 +442,7 @@ impl TransactionGenerator {
                 account.sequence_number
             );
             bar.inc(1);
-        }
+        });
         bar.finish();
         println!("[{}] done.", now_fmt!());
     }

@@ -6,7 +6,7 @@ use crate::{
     chain_id::ChainId,
     transaction::{
         authenticator::AccountAuthenticator, Module, RawTransaction, RawTransactionWithData,
-        Script, SignatureCheckedTransaction, SignedTransaction, TransactionPayload,
+        Script, SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionPayload,
     },
     write_set::WriteSet,
 };
@@ -250,4 +250,9 @@ pub fn get_write_set_txn(
     RawTransaction::new_write_set(sender, sequence_number, write_set, ChainId::test())
         .sign(private_key, public_key)
         .unwrap()
+}
+
+pub fn block(mut user_txns: Vec<Transaction>) -> Vec<Transaction> {
+    user_txns.push(Transaction::StateCheckpoint);
+    user_txns
 }

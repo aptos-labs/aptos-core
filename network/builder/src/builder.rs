@@ -321,9 +321,9 @@ impl NetworkBuilder {
         self.peer_manager_builder.listen_address()
     }
 
-    /// Add a [`ConnectivityManager`] to the network.
+    /// Add a [`network::connectivity_manager::ConnectivityManager`] to the network.
     ///
-    /// [`ConnectivityManager`] is responsible for ensuring that we are connected
+    /// [`network::connectivity_manager::ConnectivityManager`] is responsible for ensuring that we are connected
     /// to a node iff. it is an eligible node and maintaining persistent
     /// connections with all eligible nodes. A list of eligible nodes is received
     /// at initialization, and updates are received on changes to system membership.

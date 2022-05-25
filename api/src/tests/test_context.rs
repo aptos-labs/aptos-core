@@ -41,7 +41,7 @@ use crate::tests::golden_output::GoldenOutputs;
 use executor::block_executor::BlockExecutor;
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, collections::BTreeMap, sync::Arc};
+use std::{boxed::Box, collections::BTreeMap, iter::once, sync::Arc};
 use storage_interface::state_view::DbStateView;
 use vm_validator::vm_validator::VMValidator;
 use warp::http::header::CONTENT_TYPE;
@@ -224,15 +224,22 @@ impl TestContext {
                     .cloned()
                     .map(Transaction::UserTransaction),
             )
+            .chain(once(Transaction::StateCheckpoint))
             .collect();
 
+        // Check that txn execution was successful.
         let parent_id = self.executor.committed_block_id();
         let result = self
             .executor
             .execute_block((metadata.id(), txns.clone()), parent_id)
             .unwrap();
-
-        assert_eq!(result.compute_status().len(), txns.len(), "{:?}", result);
+        let mut compute_status = result.compute_status().clone();
+        assert_eq!(compute_status.len(), txns.len(), "{:?}", result);
+        if matches!(compute_status.last(), Some(TransactionStatus::Retry)) {
+            // a state checkpoint txn can be Retry if prefixed by a write set txn
+            compute_status.pop();
+        }
+        // But the rest of the txns must be Kept.
         for st in result.compute_status() {
             match st {
                 TransactionStatus::Discard(st) => panic!("transaction is discarded: {:?}", st),
@@ -240,6 +247,7 @@ impl TestContext {
                 TransactionStatus::Keep(_) => (),
             }
         }
+
         self.executor
             .commit_blocks(
                 vec![metadata.id()],

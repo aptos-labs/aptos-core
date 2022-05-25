@@ -108,7 +108,7 @@ spec:
         - name: STRUCT_LOG_TCP_ADDR
           value: '{{ include "aptos-validator.fullname" . }}-logging:5044'
         - name: RUST_BACKTRACE
-          value: "1"
+          value: "0"
         volumeMounts:
         - name: aptos-config
           mountPath: /opt/aptos/etc

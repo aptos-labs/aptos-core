@@ -37,7 +37,7 @@ module Std::Event {
     public fun new_event_handle<T: drop + store>(account: &signer): EventHandle<T> {
         // must be 40 for compatibility with legacy Event ID's--see comment on GUIDWrapper
         let len_bytes = 40u8;
-         EventHandle<T> {
+        EventHandle<T> {
             counter: 0,
             guid: GUIDWrapper { len_bytes, guid: GUID::create(account) }
         }
@@ -68,6 +68,12 @@ module Std::Event {
     public fun create_guid_wrapper_for_test<T: drop + store>(s: &signer): GUIDWrapper {
         let EventHandle<T> { counter: _, guid } = new_event_handle<T>(s);
         guid
+    }
+
+    #[test_only]
+    public fun get_event_handle_counter<T: drop + store>(handle : &EventHandle<T>): u64 {
+        let counter = handle.counter;
+        counter
     }
 
     // ****************** SPECIFICATIONS *******************

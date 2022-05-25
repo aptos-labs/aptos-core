@@ -59,22 +59,21 @@ use aptos_types::{
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
-        AccumulatorConsistencyProof, EventProof, SparseMerkleProof, StateStoreValueProof,
-        TransactionInfoListWithProof,
+        definition::LeafCount, AccumulatorConsistencyProof, EventProof, SparseMerkleProof,
+        StateStoreValueProof, TransactionInfoListWithProof,
     },
     state_proof::StateProof,
     state_store::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
-        state_value::{
-            StateKeyAndValue, StateValue, StateValueChunkWithProof, StateValueWithProof,
-        },
+        state_value::{StateValue, StateValueChunkWithProof, StateValueWithProof},
     },
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
         TransactionOutput, TransactionOutputListWithProof, TransactionToCommit,
-        TransactionWithProof, Version, PRE_GENESIS_VERSION,
+        TransactionWithProof, Version,
     },
+    write_set::WriteSet,
 };
 use itertools::zip_eq;
 use once_cell::sync::Lazy;
@@ -234,7 +233,7 @@ impl AptosDB {
             JELLYFISH_MERKLE_NODE_CF_NAME,
             LEDGER_COUNTERS_CF_NAME,
             STALE_NODE_INDEX_CF_NAME,
-            STATE_VALUE_INDEX_CF_NAME,
+            STATE_VALUE_CF_NAME,
             TRANSACTION_CF_NAME,
             TRANSACTION_ACCUMULATOR_CF_NAME,
             TRANSACTION_BY_ACCOUNT_CF_NAME,
@@ -443,6 +442,29 @@ impl AptosDB {
         })
     }
 
+    fn get_tree_state(&self, version: Option<Version>) -> Result<TreeState> {
+        let num_transactions = version.map_or(0, |v| v + 1);
+
+        let frozen_subtrees = self
+            .ledger_store
+            .get_frozen_subtree_hashes(num_transactions)?;
+
+        let checkpoint_version = self
+            .state_store
+            .find_latest_persisted_version_less_than(num_transactions)?;
+        let checkpoint_root_hash = checkpoint_version
+            .map_or(Ok(*SPARSE_MERKLE_PLACEHOLDER_HASH), |ver| {
+                self.state_store.get_root_hash(ver)
+            })?;
+
+        Ok(TreeState::new(
+            num_transactions,
+            frozen_subtrees,
+            checkpoint_root_hash,
+            checkpoint_version,
+        ))
+    }
+
     // ================================== Backup APIs ===================================
 
     /// Gets an instance of `BackupHandler` for data backup purpose.
@@ -569,27 +591,40 @@ impl AptosDB {
         txns_to_commit: &[TransactionToCommit],
         first_version: u64,
         cs: &mut ChangeSet,
-    ) -> Result<HashValue> {
+    ) -> Result<(HashValue, Option<Version>)> {
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
 
         // Account state updates. Gather account state root hashes
-        {
+        let updated_state_version = {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["save_transactions_state"])
                 .start_timer();
 
-            let account_state_sets = txns_to_commit
+            let state_updates_vec = txns_to_commit
                 .iter()
                 .map(|txn_to_commit| txn_to_commit.state_updates())
                 .collect::<Vec<_>>();
+            // find the last version with state tree updates -- that's the latest state checkpoint
+            let latest_state_checkpoint_version = state_updates_vec
+                .iter()
+                .rposition(|updates| !updates.is_empty())
+                .map(|idx| first_version + idx as LeafCount);
 
             let node_hashes = txns_to_commit
                 .iter()
                 .map(|txn_to_commit| txn_to_commit.jf_node_hashes())
                 .collect::<Option<Vec<_>>>();
+            self.state_store.merklize_value_sets(
+                state_updates_vec.clone(),
+                node_hashes,
+                first_version,
+                cs,
+            )?;
             self.state_store
-                .put_value_sets(account_state_sets, node_hashes, first_version, cs)?;
-        }
+                .put_value_sets(state_updates_vec, first_version, cs)?;
+
+            latest_state_checkpoint_version
+        };
 
         // Event updates. Gather event accumulator root hashes.
         {
@@ -626,7 +661,7 @@ impl AptosDB {
                 .put_transaction_infos(first_version, &txn_infos, cs)?
         };
 
-        Ok(new_root_hash)
+        Ok((new_root_hash, updated_state_version))
     }
 
     /// Write the whole schema batch including all data necessary to mutate the ledger
@@ -888,6 +923,21 @@ impl DbReader for AptosDB {
         })
     }
 
+    /// Get write sets for range [begin_version, end_version).
+    ///
+    /// Used by the executor to build in memory state after a state checkpoint.
+    /// Any missing write set in the entire range results in error.
+    fn get_write_sets(
+        &self,
+        begin_version: Version,
+        end_version: Version,
+    ) -> Result<Vec<WriteSet>> {
+        gauged_api("get_write_sets", || {
+            self.transaction_store
+                .get_write_sets(begin_version, end_version)
+        })
+    }
+
     fn get_events(
         &self,
         event_key: &EventKey,
@@ -1004,14 +1054,34 @@ impl DbReader for AptosDB {
     }
 
     fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
-        gauged_api("get_startup_info", || self.ledger_store.get_startup_info())
+        gauged_api("get_startup_info", || {
+            self.ledger_store
+                .get_startup_info()?
+                .map(
+                    |(latest_ledger_info, latest_epoch_state_if_not_in_li, synced_version_opt)| {
+                        let committed_tree_state =
+                            self.get_tree_state(Some(latest_ledger_info.ledger_info().version()))?;
+                        let synced_tree_state = synced_version_opt
+                            .map(|v| self.get_tree_state(Some(v)))
+                            .transpose()?;
+
+                        Ok(StartupInfo::new(
+                            latest_ledger_info,
+                            latest_epoch_state_if_not_in_li,
+                            committed_tree_state,
+                            synced_tree_state,
+                        ))
+                    },
+                )
+                .transpose()
+        })
     }
 
     fn get_state_value_with_proof_by_version(
         &self,
         state_store_key: &StateKey,
         version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof<StateValue>)> {
+    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
         gauged_api("get_account_state_with_proof_by_version", || {
             self.state_store
                 .get_value_with_proof_by_version(state_store_key, version)
@@ -1020,25 +1090,13 @@ impl DbReader for AptosDB {
 
     fn get_latest_tree_state(&self) -> Result<TreeState> {
         gauged_api("get_latest_tree_state", || {
-            let tree_state = match self.ledger_store.get_latest_transaction_info_option()? {
-                Some((version, txn_info)) => {
-                    self.ledger_store.get_tree_state(version + 1, txn_info)?
-                }
-                None => TreeState::new(
-                    0,
-                    vec![],
-                    self.state_store
-                        .get_root_hash_option(PRE_GENESIS_VERSION)?
-                        .unwrap_or(*SPARSE_MERKLE_PLACEHOLDER_HASH),
-                ),
-            };
+            let latest_version = self
+                .ledger_store
+                .get_latest_transaction_info_option()?
+                .map(|(version, _)| version);
+            let tree_state = self.get_tree_state(latest_version)?;
 
-            info!(
-                num_transactions = tree_state.num_transactions,
-                state_root_hash = %tree_state.state_root_hash,
-                description = tree_state.describe(),
-                "Got latest TreeState."
-            );
+            debug!(tree_state = tree_state, "Got latest TreeState.");
 
             Ok(tree_state)
         })
@@ -1151,6 +1209,12 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
+        gauged_api("get_latest_state_checkpoint_version", || {
+            Ok(self.state_store.latest_version())
+        })
+    }
+
     fn get_accumulator_root_hash(&self, version: Version) -> Result<HashValue> {
         gauged_api("get_accumulator_root_hash", || {
             self.ledger_store.get_root_hash(version)
@@ -1250,7 +1314,7 @@ impl DbWriter for AptosDB {
             // Gather db mutations to `batch`.
             let mut cs = ChangeSet::new();
 
-            let new_root_hash =
+            let (new_root_hash, latest_state_checkpoint) =
                 self.save_transactions_impl(txns_to_commit, first_version, &mut cs)?;
 
             // If expected ledger info is provided, verify result root hash and save the ledger info.
@@ -1275,11 +1339,15 @@ impl DbWriter for AptosDB {
                 self.commit(sealed_cs)?;
             }
 
+            if let Some(latest_state_version) = latest_state_checkpoint {
+                self.state_store
+                    .set_latest_state_checkpoint_version(latest_state_version);
+            }
+
             // Only increment counter if commit succeeds and there are at least one transaction written
             // to the storage. That's also when we'd inform the pruner thread to work.
             if num_txns > 0 {
                 let last_version = first_version + num_txns - 1;
-                self.state_store.set_latest_version(last_version);
                 COMMITTED_TXNS.inc_by(num_txns);
                 LATEST_TXN_VERSION.set(last_version as i64);
                 counters
@@ -1311,7 +1379,7 @@ impl DbWriter for AptosDB {
         &self,
         version: Version,
         expected_root_hash: HashValue,
-    ) -> Result<Box<dyn StateSnapshotReceiver<StateKeyAndValue>>> {
+    ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
         gauged_api("get_state_snapshot_receiver", || {
             self.state_store
                 .get_snapshot_receiver(version, expected_root_hash)

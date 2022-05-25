@@ -29,7 +29,7 @@ module TestAccount::TableTestData {
         Vector::push_back(&mut vec_str, str);
         Vector::push_back(&mut vec_str, str);
         let table_u8 = Table::new();
-        Table::add(&mut table_u8, &2, 3);
+        Table::add(&mut table_u8, 2, 3);
 
         let test_tables = TestTables {
             u8_table: Table::new(),
@@ -47,16 +47,16 @@ module TestAccount::TableTestData {
 
         let t = &mut test_tables;
 
-        Table::add(&mut t.u8_table, &1, 1);
-        Table::add(&mut t.u64_table, &1, 1);
-        Table::add(&mut t.u128_table, &1, 1);
-        Table::add(&mut t.bool_table, &true, true);
-        Table::add(&mut t.string_table, &str, copy str);
-        Table::add(&mut t.address_table, &@0x1, @0x1);
-        Table::add(&mut t.vector_u8_table, &vec_u8, copy vec_u8);
-        Table::add(&mut t.vector_string_table, &vec_str, copy vec_str);
-        Table::add(&mut t.id_table, &id, copy id);
-        Table::add(&mut t.table_table, &1, table_u8);
+        Table::add(&mut t.u8_table, 1, 1);
+        Table::add(&mut t.u64_table, 1, 1);
+        Table::add(&mut t.u128_table, 1, 1);
+        Table::add(&mut t.bool_table, true, true);
+        Table::add(&mut t.string_table, str, copy str);
+        Table::add(&mut t.address_table, @0x1, @0x1);
+        Table::add(&mut t.vector_u8_table, vec_u8, copy vec_u8);
+        Table::add(&mut t.vector_string_table, vec_str, copy vec_str);
+        Table::add(&mut t.id_table, id, copy id);
+        Table::add(&mut t.table_table, 1, table_u8);
 
         move_to(&account, test_tables);
     }

@@ -12,15 +12,15 @@ use crate::{
     schema::{
         jellyfish_merkle_node::JellyfishMerkleNodeSchema, stale_node_index::StaleNodeIndexSchema,
     },
-    state_value_index::StateValueIndexSchema,
+    state_value::StateValueSchema,
     AptosDbError,
 };
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{
-    iterator::JellyfishMerkleIterator, node_type::NodeKey, restore::JellyfishMerkleRestore,
-    JellyfishMerkleTree, TreeReader, TreeWriter,
+    iterator::JellyfishMerkleIterator, node_type::NodeKey, restore::StateSnapshotRestore,
+    JellyfishMerkleTree, StateValueWriter, TreeReader, TreeWriter,
 };
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
@@ -28,18 +28,18 @@ use aptos_types::{
     state_store::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
-        state_value::{StateKeyAndValue, StateValue, StateValueChunkWithProof},
+        state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{Version, PRE_GENESIS_VERSION},
 };
-use itertools::process_results;
 use schemadb::{SchemaBatch, DB};
 use std::{cmp::Ordering, collections::HashMap, sync::Arc};
 use storage_interface::StateSnapshotReceiver;
 
-type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKeyAndValue>;
-type Node = aptos_jellyfish_merkle::node_type::Node<StateKeyAndValue>;
-type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKeyAndValue>;
+type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
+type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
+type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKey>;
+type StateValueBatch = aptos_jellyfish_merkle::StateValueBatch<StateKey, StateValue>;
 
 pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 
@@ -64,7 +64,7 @@ impl StateStore {
         *self.latest_version.lock()
     }
 
-    pub fn set_latest_version(&self, version: Version) {
+    pub fn set_latest_state_checkpoint_version(&self, version: Version) {
         *self.latest_version.lock() = Some(version)
     }
 
@@ -111,24 +111,30 @@ impl StateStore {
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof<StateValue>)> {
-        let (state_key_value_option, proof) =
+    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
+        let (leaf_data, proof) =
             JellyfishMerkleTree::new(self).get_with_proof(state_key.hash(), version)?;
         Ok((
-            state_key_value_option.map(|x| x.value),
-            SparseMerkleProof::from(proof),
+            match leaf_data {
+                Some(x) => Some(self.get_value_at_version(&x.1)?),
+                None => None,
+            },
+            proof,
         ))
     }
 
-    fn get_node_keys_by_key_prefix(
+    /// Returns the key, value pairs for a particular state key prefix at at desired version. This
+    /// API can be used to get all resources of an account by passing the account address as the
+    /// key prefix.
+    pub fn get_values_by_key_prefix(
         &self,
         key_prefix: &StateKeyPrefix,
         desired_version: Version,
-    ) -> Result<HashMap<StateKey, NodeKey>> {
-        let mut iter = self.db.iter::<StateValueIndexSchema>(Default::default())?;
+    ) -> Result<HashMap<StateKey, StateValue>> {
+        let mut iter = self.db.iter::<StateValueSchema>(Default::default())?;
         let mut result = HashMap::new();
         iter.seek(&(key_prefix))?;
-        while let Some(((state_key, first_version), num_nibbles)) = iter.next().transpose()? {
+        while let Some(((state_key, first_version), state_value)) = iter.next().transpose()? {
             // Cursor is currently at the first available version of the state key.
             // Check if the key_prefix is a valid prefix of the state_key we got from DB.
 
@@ -139,7 +145,7 @@ impl StateStore {
             match first_version.cmp(&desired_version) {
                 Ordering::Less => {
                     iter.seek_for_prev(&(state_key.clone(), desired_version))?;
-                    let ((state_key, db_version), num_nibbles) =
+                    let ((state_key, _), state_value) =
                         iter.next().transpose()?.ok_or_else(|| {
                             anyhow!(
                                 "Failure seeking to desired version {:?} for state key {:?}",
@@ -147,23 +153,11 @@ impl StateStore {
                                 state_key
                             )
                         })?;
-                    result.insert(
-                        state_key.clone(),
-                        NodeKey::new(
-                            db_version,
-                            NibblePath::new_from_state_key(&state_key, num_nibbles as usize),
-                        ),
-                    );
+                    result.insert(state_key.clone(), state_value);
                 }
 
                 Ordering::Equal => {
-                    result.insert(
-                        state_key.clone(),
-                        NodeKey::new(
-                            first_version,
-                            NibblePath::new_from_state_key(&state_key, num_nibbles as usize),
-                        ),
-                    );
+                    result.insert(state_key.clone(), state_value);
                 }
                 Ordering::Greater => {}
             }
@@ -182,22 +176,19 @@ impl StateStore {
         Ok(result)
     }
 
-    /// Returns the key, value pairs for a particular state key prefix at at desired version. This
-    /// API can be used to get all resources of an account by passing the account address as the
-    /// key prefix.
-    pub fn get_values_by_key_prefix(
+    pub fn get_value_at_version(
         &self,
-        key_prefix: &StateKeyPrefix,
-        version: Version,
-    ) -> Result<HashMap<StateKey, StateValue>> {
-        let mut result = HashMap::new();
-        for (state_key, node_key) in self.get_node_keys_by_key_prefix(key_prefix, version)? {
-            let state_value = self
-                .get_value_by_node_key(&node_key)?
-                .ok_or_else(|| anyhow!("Failure reading value for node_key {:?}", node_key))?;
-            result.insert(state_key, state_value);
-        }
-        Ok(result)
+        key_and_version: &(StateKey, Version),
+    ) -> Result<StateValue> {
+        self.db
+            .get::<StateValueSchema>(key_and_version)?
+            .ok_or_else(|| {
+                format_err!(
+                    "Canot find value of key {:?} at version {}",
+                    key_and_version.0,
+                    key_and_version.1
+                )
+            })
     }
 
     /// Get the state value given the state key and root hash of state Merkle tree by using the
@@ -209,44 +200,14 @@ impl StateStore {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<StateValue>> {
-        match self.get_jmt_leaf_node_key(state_key, version)? {
-            Some(node_key) => self.get_value_by_node_key(&node_key),
-            None => Ok(None),
-        }
-    }
-
-    fn get_value_by_node_key(&self, node_key: &NodeKey) -> Result<Option<StateValue>> {
-        if let Some(Node::Leaf(leaf)) = self.db.get::<JellyfishMerkleNodeSchema>(node_key)? {
-            Ok(Some(leaf.value().value.clone()))
-        } else {
-            Err(anyhow::anyhow!(
-                "Can't find value in JMT for node key {:?}",
-                node_key
-            ))
-        }
-    }
-
-    /// Returns the value index in the form of number of nibbles for given pair of state key and version
-    /// which can be used to index into the JMT leaf.
-    #[cfg(test)]
-    fn get_jmt_leaf_node_key(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<NodeKey>> {
-        let mut iter = self.db.iter::<StateValueIndexSchema>(Default::default())?;
+        let mut iter = self.db.iter::<StateValueSchema>(Default::default())?;
         iter.seek_for_prev(&(state_key.clone(), version))?;
         Ok(iter
             .next()
             .transpose()?
-            .and_then(|((db_state_key, db_version), num_nibbles)| {
+            .and_then(|((db_state_key, _), state_value)| {
                 if *state_key == db_state_key {
-                    Some(NodeKey::new(
-                        // It is possible that the db_version is not equal to the version passed,
-                        // but it should be strictly less than or equal to the version.
-                        db_version,
-                        NibblePath::new_from_state_key(state_key, num_nibbles as usize),
-                    ))
+                    Some(state_value)
                 } else {
                     None
                 }
@@ -262,29 +223,42 @@ impl StateStore {
         JellyfishMerkleTree::new(self).get_range_proof(rightmost_key, version)
     }
 
-    /// Put the results generated by `value_state_sets` to `batch` and return the result root
-    /// hashes for each write set.
+    /// Put the `value_state_sets` into its own CF.
     pub fn put_value_sets(
+        &self,
+        value_state_sets: Vec<&HashMap<StateKey, StateValue>>,
+        first_version: Version,
+        cs: &mut ChangeSet,
+    ) -> Result<()> {
+        let kv_batch = value_state_sets
+            .iter()
+            .enumerate()
+            .flat_map(|(i, kvs)| {
+                kvs.iter()
+                    .map(move |(k, v)| ((k.clone(), first_version + i as Version), v.clone()))
+            })
+            .collect::<HashMap<_, _>>();
+        add_kv_batch(&mut cs.batch, &kv_batch)
+    }
+
+    /// Merklize the results generated by `value_state_sets` to `batch` and return the result root
+    /// hashes for each write set.
+    pub fn merklize_value_sets(
         &self,
         value_state_sets: Vec<&HashMap<StateKey, StateValue>>,
         node_hashes: Option<Vec<&HashMap<NibblePath, HashValue>>>,
         first_version: Version,
         cs: &mut ChangeSet,
     ) -> Result<Vec<HashValue>> {
-        let value_sets = value_state_sets
-            .into_iter()
+        let value_sets: Vec<Vec<_>> = value_state_sets
+            .iter()
             .map(|value_set| {
                 value_set
                     .iter()
-                    .map(|(key, value)| {
-                        (
-                            key.hash(),
-                            StateKeyAndValue::new(key.clone(), value.clone()),
-                        )
-                    })
+                    .map(|(key, value)| (key.hash(), (value.hash(), key.clone())))
                     .collect::<Vec<_>>()
             })
-            .collect::<Vec<_>>();
+            .collect();
 
         let value_sets_ref = value_sets
             .iter()
@@ -313,7 +287,8 @@ impl StateStore {
                 counter_bumps.bump(LedgerCounter::StaleStateNodes, stats.stale_nodes);
                 counter_bumps.bump(LedgerCounter::StaleStateLeaves, stats.stale_leaves);
             });
-        add_node_batch_and_index(&mut cs.batch, &tree_update_batch.node_batch)?;
+
+        add_node_batch(&mut cs.batch, &tree_update_batch.node_batch)?;
 
         tree_update_batch
             .stale_node_index_batch
@@ -371,15 +346,17 @@ impl StateStore {
         let result_iter =
             JellyfishMerkleIterator::new_by_index(Arc::clone(self), version, first_index)?
                 .take(chunk_size);
-        let state_key_values: Vec<(HashValue, StateKeyAndValue)> =
-            process_results(result_iter, |iter| iter.collect())?;
+        let state_key_values: Vec<(StateKey, StateValue)> = result_iter
+            .into_iter()
+            .map(|res| res.and_then(|(_, k)| Ok((k.0.clone(), self.get_value_at_version(&k)?))))
+            .collect::<Result<Vec<_>>>()?;
         ensure!(
             !state_key_values.is_empty(),
             AptosDbError::NotFound(format!("State chunk starting at {}", first_index)),
         );
         let last_index = (state_key_values.len() - 1 + first_index) as u64;
-        let first_key = state_key_values.first().expect("checked to exist").0;
-        let last_key = state_key_values.last().expect("checked to exist").0;
+        let first_key = state_key_values.first().expect("checked to exist").0.hash();
+        let last_key = state_key_values.last().expect("checked to exist").0.hash();
         let proof = self.get_value_range_proof(last_key, version)?;
         let root_hash = self.get_root_hash(version)?;
 
@@ -398,8 +375,8 @@ impl StateStore {
         self: &Arc<Self>,
         version: Version,
         expected_root_hash: HashValue,
-    ) -> Result<Box<dyn StateSnapshotReceiver<StateKeyAndValue>>> {
-        Ok(Box::new(JellyfishMerkleRestore::new_overwrite(
+    ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
+        Ok(Box::new(StateSnapshotRestore::new_overwrite(
             Arc::clone(self),
             version,
             expected_root_hash,
@@ -407,7 +384,7 @@ impl StateStore {
     }
 }
 
-impl TreeReader<StateKeyAndValue> for StateStore {
+impl TreeReader<StateKey> for StateStore {
     fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node>> {
         self.db.get::<JellyfishMerkleNodeSchema>(node_key)
     }
@@ -474,33 +451,42 @@ impl TreeReader<StateKeyAndValue> for StateStore {
     }
 }
 
-impl TreeWriter<StateKeyAndValue> for StateStore {
+impl TreeWriter<StateKey> for StateStore {
     fn write_node_batch(&self, node_batch: &NodeBatch) -> Result<()> {
         let mut batch = SchemaBatch::new();
-        add_node_batch_and_index(&mut batch, node_batch)?;
+        add_node_batch(&mut batch, node_batch)?;
         self.db.write_schemas(batch)
     }
 
     fn finish_version(&self, version: Version) {
-        self.set_latest_version(version)
+        self.set_latest_state_checkpoint_version(version)
     }
 }
 
-fn add_node_batch_and_index(batch: &mut SchemaBatch, node_batch: &NodeBatch) -> Result<()> {
+impl StateValueWriter<StateKey, StateValue> for StateStore {
+    fn write_kv_batch(&self, node_batch: &StateValueBatch) -> Result<()> {
+        let mut batch = SchemaBatch::new();
+        add_kv_batch(&mut batch, node_batch)?;
+        self.db.write_schemas(batch)
+    }
+}
+
+fn add_node_batch(batch: &mut SchemaBatch, node_batch: &NodeBatch) -> Result<()> {
     node_batch
         .iter()
-        .map(|(node_key, node)| {
-            batch.put::<JellyfishMerkleNodeSchema>(node_key, node)?;
-            // Add the value index for leaf nodes.
-            match node {
-                Node::Leaf(leaf) => batch.put::<StateValueIndexSchema>(
-                    &(leaf.value().key.clone(), node_key.version()),
-                    &(node_key.nibble_path().num_nibbles() as u8),
-                ),
-
-                _ => Ok(()),
-            }
-        })
+        .map(|(node_key, node)| batch.put::<JellyfishMerkleNodeSchema>(node_key, node))
         .collect::<Result<Vec<_>>>()?;
+
+    // Add kv_batch
+    Ok(())
+}
+
+fn add_kv_batch(batch: &mut SchemaBatch, kv_batch: &StateValueBatch) -> Result<()> {
+    kv_batch
+        .iter()
+        .map(|(k, v)| batch.put::<StateValueSchema>(k, v))
+        .collect::<Result<Vec<_>>>()?;
+
+    // Add kv_batch
     Ok(())
 }

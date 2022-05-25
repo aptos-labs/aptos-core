@@ -3,7 +3,11 @@
 
 ///! This module provides reusable helpers in tests.
 use super::*;
+use crate::{
+    jellyfish_merkle_node::JellyfishMerkleNodeSchema, schema::state_value::StateValueSchema,
+};
 use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher};
+use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -59,7 +63,7 @@ prop_compose! {
 
                 let txn_info = TransactionInfo::new(
                     txn.transaction().hash(),
-                    state_checkpoint_hash.unwrap(),
+                    txn.write_set().hash(),
                     event_root_hash,
                     state_checkpoint_hash,
                     placeholder_txn_info.gas_used(),
@@ -511,6 +515,9 @@ pub fn verify_committed_transactions(
             txn_info.transaction_hash(),
             txn_to_commit.transaction().hash()
         );
+        if matches!(txn_to_commit.transaction(), Transaction::StateCheckpoint) {
+            continue;
+        }
 
         // Fetch and verify transaction itself.
         let txn = txn_to_commit.transaction().as_signed_user_txn().unwrap();
@@ -603,6 +610,19 @@ pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &Transacti
         .put_transaction_infos(version, &[txn_info.clone()], &mut cs)
         .unwrap();
     db.db.write_schemas(cs.batch).unwrap();
+}
+
+pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
+    db.db
+        .put::<JellyfishMerkleNodeSchema>(
+            &NodeKey::new_empty_path(version),
+            &Node::new_leaf(key.hash(), value.hash(), (key.clone(), version)),
+        )
+        .unwrap();
+    db.db
+        .put::<StateValueSchema>(&(key, version), &value)
+        .unwrap();
+    db.state_store.set_latest_state_checkpoint_version(version);
 }
 
 pub fn test_sync_transactions_impl(

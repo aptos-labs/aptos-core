@@ -177,6 +177,7 @@ impl Transaction {
                     .optional()?;
             }
             "genesis_transaction" => {}
+            "state_checkpoint_transaction" => {}
             _ => unreachable!("Unknown transaction type: {}", &self.type_),
         };
         Ok((
@@ -237,7 +238,19 @@ impl Transaction {
                     &tx.info.changes,
                 ),
             ),
-            _ => unreachable!(),
+            APITransaction::StateCheckpointTransaction(tx) => (
+                Self::from_transaction_info(
+                    &tx.info,
+                    serde_json::Value::Null,
+                    transaction.type_str().to_string(),
+                ),
+                None,
+                None,
+                None,
+            ),
+            APITransaction::PendingTransaction(..) => {
+                unreachable!()
+            }
         }
     }
 

@@ -5,7 +5,9 @@
 //!
 //! There will be only one row in this column family for each type of data.
 //! The key will be a serialized enum type designating the data type and should not have any meaning
-//! and be used. ```text
+//! and be used.
+//!
+//! ```text
 //! |<-------key------->|<-----value----->|
 //! | single entry key  | raw value bytes |
 //! ```

@@ -8,6 +8,9 @@
 ###########################################
 
 # Note: This must be run from the root of the aptos-core repository
+
+set -e
+
 NAME='aptos-cli'
 CRATE_NAME='aptos'
 CARGO_PATH="crates/$CRATE_NAME/Cargo.toml"
@@ -26,15 +29,9 @@ elif [ "$OS" == "Linux" ]; then
 fi
 
 echo "Building release $VERSION of $NAME for $OS-$ARCH"
-cargo build -p $CRATE_NAME --release
+cargo build -p $CRATE_NAME --profile cli
 
-EXIT_CODE=$?
-if [ "$EXIT_CODE" != "0" ]; then
-  echo "Build failed with exit code $EXIT_CODE"
-  exit $EXIT_CODE
-fi
-
-cd target/release/
+cd target/cli/
 
 # Compress the CLI
 ZIP_NAME="$NAME-$VERSION-$OS-$ARCH.zip"

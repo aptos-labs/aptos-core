@@ -1,21 +1,20 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Community Platform</title>
+    <title>Aptos Community Platform</title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
     <%= favicon_link_tag asset_path('favicon.ico') %>
 
-    <link rel="stylesheet" href="https://use.typekit.net/<%= ENV.fetch('TYPEKIT_CSS_ID') %>.css" />
-    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+    <%= javascript_include_tag "application", "data-turbo-track": "reload", defer: true %>
     <%= render 'layouts/google_analytics' %>
-    <%= javascript_importmap_tags %>
+    <%= render 'layouts/typekit' %>
   </head>
 
-  <body class="flex flex-col h-screen justify-between" data-turbo="false">
+  <body class="flex flex-col h-screen justify-between bg-neutral-900 antialiased">
     <div class="flex flex-col flex-1">
       <%= render "layouts/header" unless @hide_header %>
 

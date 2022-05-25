@@ -3,10 +3,10 @@
 
 use crate::{
     common::{
-        init::DEFAULT_REST_URL,
+        init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
         utils::{
             check_if_file_exists, read_from_file, to_common_result, to_common_success_result,
-            write_to_file,
+            write_to_file, write_to_file_with_opts, write_to_user_only_file,
         },
     },
     genesis::git::from_yaml,
@@ -22,9 +22,12 @@ use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
 use move_deps::move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
+    fs::OpenOptions,
     path::{Path, PathBuf},
     str::FromStr,
     time::Instant,
@@ -221,7 +224,7 @@ impl CliConfig {
         let config_bytes = serde_yaml::to_string(&self).map_err(|err| {
             CliError::UnexpectedError(format!("Failed to serialize config {}", err))
         })?;
-        write_to_file(&config_file, CONFIG_FILE, config_bytes.as_bytes())?;
+        write_to_user_only_file(&config_file, CONFIG_FILE, config_bytes.as_bytes())?;
 
         // As a cleanup, delete the old if it exists
         let legacy_config_file = aptos_folder.join(LEGACY_CONFIG_FILE);
@@ -351,6 +354,15 @@ pub struct PromptOptions {
     /// Assume no for all yes/no prompts
     #[clap(long, group = "prompt_options")]
     pub assume_no: bool,
+}
+
+impl PromptOptions {
+    pub fn yes() -> Self {
+        Self {
+            assume_yes: true,
+            assume_no: false,
+        }
+    }
 }
 
 /// An insertable option for use with encodings.
@@ -493,6 +505,14 @@ impl SaveFile {
     pub fn save_to_file(&self, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
         write_to_file(self.output_file.as_path(), name, bytes)
     }
+
+    /// Save to the `output_file` with restricted permissions (mode 0600)
+    pub fn save_to_file_confidential(&self, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
+        let mut opts = OpenOptions::new();
+        #[cfg(unix)]
+        opts.mode(0o600);
+        write_to_file_with_opts(self.output_file.as_path(), name, bytes, &mut opts)
+    }
 }
 
 /// Options specific to using the Rest endpoint
@@ -500,7 +520,7 @@ impl SaveFile {
 pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
-    /// Defaults to https://fullnode.devnet.aptoslabs.com
+    /// Defaults to <https://fullnode.devnet.aptoslabs.com>
     #[clap(long, parse(try_from_str))]
     pub url: Option<reqwest::Url>,
 }
@@ -729,4 +749,28 @@ pub struct ChangeSummary {
     resource: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     value: Option<String>,
+}
+
+#[derive(Debug, Parser)]
+pub struct FaucetOptions {
+    /// URL for the faucet
+    #[clap(long)]
+    faucet_url: Option<reqwest::Url>,
+}
+
+impl FaucetOptions {
+    pub fn faucet_url(&self, profile: &str) -> CliTypedResult<reqwest::Url> {
+        if let Some(ref faucet_url) = self.faucet_url {
+            Ok(faucet_url.clone())
+        } else if let Some(Some(url)) =
+            CliConfig::load_profile(profile)?.map(|profile| profile.faucet_url)
+        {
+            reqwest::Url::parse(&url)
+                .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))
+        } else {
+            reqwest::Url::parse(DEFAULT_FAUCET_URL).map_err(|err| {
+                CliError::UnexpectedError(format!("Failed to parse default faucet URL {}", err))
+            })
+        }
+    }
 }

@@ -20,14 +20,15 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
 use aptos_types::{
-    contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     transaction::{
         Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
     },
 };
 use aptos_vm::VMExecutor;
-use executor_types::{ChunkExecutorTrait, ExecutedChunk, ExecutedTrees, TransactionReplayer};
+use executor_types::{
+    ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, ExecutedTrees, TransactionReplayer,
+};
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
 use storage_interface::{verified_state_view::VerifiedStateView, DbReaderWriter};
@@ -218,13 +219,14 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         Ok(())
     }
 
-    fn commit_chunk(&self) -> Result<(Vec<ContractEvent>, Vec<Transaction>)> {
+    fn commit_chunk(&self) -> Result<ChunkCommitNotification> {
         let _timer = APTOS_EXECUTOR_COMMIT_CHUNK_SECONDS.start_timer();
         let executed_chunk = self.commit_chunk_impl()?;
-        Ok((
-            executed_chunk.events_to_commit(),
-            executed_chunk.transactions(),
-        ))
+        Ok(ChunkCommitNotification {
+            committed_events: executed_chunk.events_to_commit(),
+            committed_transactions: executed_chunk.transactions(),
+            reconfiguration_occurred: executed_chunk.has_reconfiguration(),
+        })
     }
 
     fn execute_and_commit_chunk(
@@ -232,7 +234,7 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         txn_list_with_proof: TransactionListWithProof,
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<(Vec<ContractEvent>, Vec<Transaction>)> {
+    ) -> Result<ChunkCommitNotification> {
         // Re-sync with DB, make sure the queue is empty.
         self.reset()?;
 
@@ -245,7 +247,7 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         txn_output_list_with_proof: TransactionOutputListWithProof,
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<(Vec<ContractEvent>, Vec<Transaction>)> {
+    ) -> Result<ChunkCommitNotification> {
         // Re-sync with DB, make sure the queue is empty.
         self.reset()?;
 

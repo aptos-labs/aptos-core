@@ -12,13 +12,13 @@ edition = "2018"
 [dependencies]
 anyhow = { version = "1.0.57", features = ["backtrace"] }
 async-trait = "0.1.53"
-futures = "0.3.12"
+futures = "0.3.21"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-proxy = "0.9.1"
 hyper-tls = "0.5.0"
 k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_15"] }
 kube = "0.51.0"
-rand = "0.8.3"
+rand = "0.8.5"
 rayon = "1.5.2"
 regex = "1.5.5"
 reqwest = { version = "0.11.10", features = ["blocking", "json"] }
@@ -31,7 +31,7 @@ serde_json = "1.0.81"
 structopt = "0.3.21"
 tempfile = "3.3.0"
 termcolor = "1.1.2"
-tokio = { version = "1.8.1", features = ["full"] }
+tokio = { version = "1.18.2", features = ["full"] }
 url = "2.2.2"
 
 aptos-config = { path = "../../config" }

@@ -1,10 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{account_config::constants::CORE_ACCOUNT_MODULE_IDENTIFIER, event::EventHandle};
+use crate::account_config::constants::CORE_ACCOUNT_MODULE_IDENTIFIER;
 use move_deps::move_core_types::{
     account_address::AccountAddress,
-    ident_str,
     identifier::IdentStr,
     move_resource::{MoveResource, MoveStructType},
 };
@@ -57,33 +56,3 @@ impl MoveStructType for AccountResource {
 }
 
 impl MoveResource for AccountResource {}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TransferEventsResource {
-    sent_events: EventHandle,
-    received_events: EventHandle,
-}
-
-impl TransferEventsResource {
-    pub fn new(sent_events: EventHandle, received_events: EventHandle) -> Self {
-        Self {
-            sent_events,
-            received_events,
-        }
-    }
-
-    pub fn received_events(&self) -> &EventHandle {
-        &self.received_events
-    }
-
-    pub fn sent_events(&self) -> &EventHandle {
-        &self.sent_events
-    }
-}
-
-impl MoveStructType for TransferEventsResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("TestCoin");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("TransferEvents");
-}
-
-impl MoveResource for TransferEventsResource {}

@@ -81,8 +81,12 @@ spec:
         - name: RUST_LOG_REMOTE
           value: {{ .rust_log_remote }}
       {{- end }}
+        {{- if $.Values.validator.remoteLogAddress }}
+        - name: STRUCT_LOG_TCP_ADDR
+          value: {{ $.Values.validator.remoteLogAddress }}
+        {{- end }}
         - name: RUST_BACKTRACE
-          value: "1"
+          value: "0"
         volumeMounts:
         - name: aptos-config
           mountPath: /opt/aptos/etc

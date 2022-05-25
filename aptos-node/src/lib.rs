@@ -60,7 +60,7 @@ use std::{
     thread,
     time::Instant,
 };
-use storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter};
+use storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use storage_service::start_storage_service_with_db;
 use storage_service_client::{StorageServiceClient, StorageServiceMultiSender};
 use storage_service_server::{
@@ -219,12 +219,9 @@ pub fn load_test_environment<R>(
 
 // Fetch chain ID from on-chain resource
 fn fetch_chain_id(db: &DbReaderWriter) -> ChainId {
-    let synced_version = (&*db.reader)
-        .fetch_synced_version()
-        .expect("[aptos-node] failed fetching synced version.");
     let db_state_view = db
         .reader
-        .state_view_at_version(Some(synced_version))
+        .latest_state_checkpoint_view()
         .expect("[aptos-node] failed to create db state view");
     db_state_view
         .as_account_with_state_view(&aptos_root_address())

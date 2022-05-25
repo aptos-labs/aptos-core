@@ -271,7 +271,9 @@ fn test_update() {
     let y_hash = hash_internal(x_hash, *SPARSE_MERKLE_PLACEHOLDER_HASH);
     let old_root_hash = hash_internal(y_hash, leaf3_hash);
     let proof = SparseMerkleProof::new(None, vec![x_hash, leaf3_hash]);
-    assert!(proof.verify(old_root_hash, key4, None).is_ok());
+    assert!(proof
+        .verify::<StateValue>(old_root_hash, key4, None)
+        .is_ok());
 
     // Create the old tree and update the tree with new value and proof.
     let proof_reader = ProofReader::new(vec![(key4, proof)]);
@@ -403,7 +405,7 @@ static VALUE: Lazy<StateValue> =
     Lazy::new(|| StateValue::from(String::from("test_val").into_bytes()));
 static LEAF: Lazy<SparseMerkleLeafNode> =
     Lazy::new(|| SparseMerkleLeafNode::new(*KEY, VALUE.hash()));
-static PROOF_READER: Lazy<ProofReader<StateValue>> = Lazy::new(|| {
+static PROOF_READER: Lazy<ProofReader> = Lazy::new(|| {
     let proof = SparseMerkleProof::new(Some(*LEAF), vec![]);
     ProofReader::new(vec![(*KEY, proof)])
 });

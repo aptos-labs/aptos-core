@@ -407,8 +407,8 @@ pub fn assert_accounts_match(
         let resource = executor
             .read_account_resource(account.account())
             .expect("account resource must exist");
-        let resource_balance = executor
-            .read_balance_resource(account.account())
+        let coin_store_resource = executor
+            .read_coin_store_resource(account.account())
             .expect("account balance resource must exist");
         let auth_key = account.account().auth_key();
         prop_assert_eq!(
@@ -419,7 +419,7 @@ pub fn assert_accounts_match(
         );
         prop_assert_eq!(
             account.balance(),
-            resource_balance.coin(),
+            coin_store_resource.coin(),
             "account {} should have correct balance",
             idx
         );

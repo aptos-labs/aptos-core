@@ -74,12 +74,12 @@ impl CryptoHash for StateValue {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub struct StateValueChunkWithProof {
-    pub first_index: u64,     // The first account index in chunk
-    pub last_index: u64,      // The last account index in chunk
-    pub first_key: HashValue, // The first account key in chunk
-    pub last_key: HashValue,  // The last account key in chunk
-    pub raw_values: Vec<(HashValue, StateKeyAndValue)>, // The account blobs in the chunk
-    pub proof: SparseMerkleRangeProof, // The proof to ensure the chunk is in the account states
+    pub first_index: u64,     // The first hashed state index in chunk
+    pub last_index: u64,      // The last hashed state index in chunk
+    pub first_key: HashValue, // The first hashed state key in chunk
+    pub last_key: HashValue,  // The last hashed state key in chunk
+    pub raw_values: Vec<(StateKey, StateValue)>, // The hashed state key and and raw state value.
+    pub proof: SparseMerkleRangeProof, // The proof to ensure the chunk is in the hashed states
     pub root_hash: HashValue, // The root hash of the sparse merkle tree for this chunk
 }
 
@@ -138,29 +138,6 @@ impl StateValueWithProof {
 
         self.proof
             .verify(ledger_info, version, state_key.hash(), self.value.as_ref())
-    }
-}
-
-#[derive(
-    Clone, Debug, CryptoHasher, Eq, PartialEq, Serialize, Deserialize, Ord, PartialOrd, Hash,
-)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
-pub struct StateKeyAndValue {
-    pub key: StateKey,
-    pub value: StateValue,
-}
-
-impl StateKeyAndValue {
-    pub fn new(key: StateKey, value: StateValue) -> Self {
-        Self { key, value }
-    }
-}
-
-impl CryptoHash for StateKeyAndValue {
-    type Hasher = StateKeyAndValueHasher;
-
-    fn hash(&self) -> HashValue {
-        self.value.hash
     }
 }
 

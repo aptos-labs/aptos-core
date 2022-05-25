@@ -12,6 +12,7 @@ module AptosFramework::Genesis {
     use AptosFramework::Stake;
     use AptosFramework::TestCoin;
     use AptosFramework::Timestamp;
+    use AptosFramework::TransactionFee;
     use AptosFramework::VMConfig;
 
     fun initialize(
@@ -78,7 +79,6 @@ module AptosFramework::Genesis {
         Account::rotate_authentication_key_internal(core_resource_account, copy core_resource_account_auth_key);
         // initialize the core framework account
         let core_framework_account = Account::create_core_framework_account();
-        Account::rotate_authentication_key_internal(&core_framework_account, core_resource_account_auth_key);
 
         // Consensus config setup
         ConsensusConfig::initialize(core_resource_account);
@@ -96,8 +96,12 @@ module AptosFramework::Genesis {
 
         TransactionPublishingOption::initialize(core_resource_account, initial_script_allow_list, is_open_module);
 
-        TestCoin::initialize(core_resource_account, 1000000);
-        TestCoin::mint_internal(core_resource_account, Signer::address_of(core_resource_account), 18446744073709551615);
+        // This is testnet-specific configuration and can be skipped for mainnet.
+        // Mainnet can call Coin::initialize<MainnetCoin> directly and give mint capability to the Staking module.
+        let burn_cap = TestCoin::initialize(&core_framework_account, core_resource_account);
+
+        // Give TransactionFee BurnCapability<TestCoin> so it can burn gas.
+        TransactionFee::store_test_coin_burn_cap(&core_framework_account, burn_cap);
 
         // Pad the event counter for the Root account to match DPN. This
         // _MUST_ match the new epoch event counter otherwise all manner of

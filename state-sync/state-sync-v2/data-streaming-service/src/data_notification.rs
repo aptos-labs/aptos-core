@@ -38,6 +38,8 @@ pub enum DataPayload {
 pub enum DataClientRequest {
     AccountsWithProof(AccountsWithProofRequest),
     EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest),
+    NewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest),
+    NewTransactionsWithProof(NewTransactionsWithProofRequest),
     NumberOfAccounts(NumberOfAccountsRequest),
     TransactionsWithProof(TransactionsWithProofRequest),
     TransactionOutputsWithProof(TransactionOutputsWithProofRequest),
@@ -49,6 +51,8 @@ impl DataClientRequest {
         match self {
             Self::AccountsWithProof(_) => "accounts_with_proof",
             Self::EpochEndingLedgerInfos(_) => "epoch_ending_ledger_infos",
+            Self::NewTransactionOutputsWithProof(_) => "new_transaction_outputs_with_proof",
+            Self::NewTransactionsWithProof(_) => "new_transactions_with_proof",
             Self::NumberOfAccounts(_) => "number_of_accounts",
             Self::TransactionsWithProof(_) => "transactions_with_proof",
             Self::TransactionOutputsWithProof(_) => "transaction_outputs_with_proof",
@@ -69,6 +73,21 @@ pub struct AccountsWithProofRequest {
 pub struct EpochEndingLedgerInfosRequest {
     pub start_epoch: Epoch,
     pub end_epoch: Epoch,
+}
+
+/// A client request for fetching new transactions with proofs.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NewTransactionsWithProofRequest {
+    pub known_version: Version,
+    pub known_epoch: Epoch,
+    pub include_events: bool,
+}
+
+/// A client request for fetching new transaction outputs with proofs.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NewTransactionOutputsWithProofRequest {
+    pub known_version: Version,
+    pub known_epoch: Epoch,
 }
 
 /// A client request for fetching the number of accounts at a version.

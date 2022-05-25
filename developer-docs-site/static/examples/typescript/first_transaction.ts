@@ -169,7 +169,7 @@ export class RestClient {
   //:!:>section_5
   /** Returns the test coin balance associated with the account */
   async accountBalance(accountAddress: string): Promise<number | null> {
-    const resource = await this.accountResource(accountAddress, "0x1::TestCoin::Balance");
+    const resource = await this.accountResource(accountAddress, "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
     if (resource == null) {
         return null
     }
@@ -181,8 +181,8 @@ export class RestClient {
   async transfer(accountFrom: Account, recipient: string, amount: number): Promise<string> {
     const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: "0x1::TestCoin::transfer",
-      type_arguments: [],
+      function: "0x1::Coin::transfer",
+      type_arguments: ["0x1::TestCoin::TestCoin"],
       arguments: [
         `0x${recipient}`,
         amount.toString(),

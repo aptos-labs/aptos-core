@@ -17,14 +17,16 @@ Install pre-requisites if needed:
 1. Create a working directory for your configuration.
 
     * Choose a workspace name e.g. `testnet`. Note: This defines Terraform workspace name, which in turn is used to form resource names.
-    ```
-    export WORKSPACE=testnet
-    ```
 
-    * Create a directory for the workspace
-    ```
-    mkdir -p ~/$WORKSPACE
-    ```
+      ```
+      export WORKSPACE=testnet
+      ```
+
+    * Create a directory for the workspace.
+      
+      ```
+      mkdir -p ~/$WORKSPACE
+      ```
 
 2. Create a blob storage container for storing the Terraform state on Azure, you can do this on Azure UI or by the command: 
 
@@ -41,6 +43,7 @@ Install pre-requisites if needed:
   ```
 
 4. Modify `main.tf` file to configure Terraform, and create fullnode from Terraform module. Example content for `main.tf`:
+
   ```
   terraform {
     required_version = "~> 1.1.0"
@@ -51,8 +54,6 @@ Install pre-requisites if needed:
       key                  = "state/validator"
     }
   }
-
-
   module "aptos-node" {
     # download Terraform module from aptos-labs/aptos-core repo
     source        = "github.com/aptos-labs/aptos-core.git//terraform/aptos-node/azure?ref=main"
@@ -64,9 +65,9 @@ Install pre-requisites if needed:
   }
   ```
 
-    For the full customization options, see the variables file [here](https://github.com/aptos-labs/aptos-core/blob/main/terraform/aptos-node/azure/variables.tf), and the [helm values](https://github.com/aptos-labs/aptos-core/blob/main/terraform/helm/aptos-node/values.yaml).
+    For the full customization options, see the variables file [here](https://github.com/aptos-labs/aptos-core/blob/main/terraform/aptos-node/azure/variables.tf), and the [Helm values](https://github.com/aptos-labs/aptos-core/blob/main/terraform/helm/aptos-node/values.yaml).
 
-5. Initialize Terraform in the same directory of your `main.tf` file
+5. Initialize Terraform in the same directory of your `main.tf` file.
   ```
   terraform init
   ```
@@ -110,7 +111,12 @@ This will download all the terraform dependencies for you, in the `.terraform` f
 11. Configure validator information. This is all the info you need to register on our community website later.
 
     ```
-    aptos genesis set-validator-configuration --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE --username <select a username for your node> --validator-host $VALIDATOR_ADDRESS:6180 --full-node-host $FULLNODE_ADDRESS:6182
+    aptos genesis set-validator-configuration \
+        --keys-dir ~/$WORKSPACE 
+        --local-repository-dir ~/$WORKSPACE \
+        --username <pick a username for your node> \
+        --validator-host $VALIDATOR_ADDRESS:6180 \
+        --full-node-host $FULLNODE_ADDRESS:6182
 
     ```
 
@@ -147,7 +153,7 @@ This will download all the terraform dependencies for you, in the `.terraform` f
     chain_id: 23
     ```
 
-13. Download AptosFramework Move bytecodes into a folder named `framework`.
+13. Download AptosFramework Move bytecode into a folder named `framework`.
 
     Download the Aptos Framework from the release page: https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v0.1.0
 
@@ -157,7 +163,7 @@ This will download all the terraform dependencies for you, in the `.terraform` f
     unzip framework.zip
     ```
 
-    You should now have a folder called `framework`, which contains move bytecodes with format `.mv`.
+    You should now have a folder called `framework`, which contains Move bytecode with the format `.mv`.
 
 14. Compile genesis blob and waypoint
 
@@ -187,8 +193,12 @@ This will download all the terraform dependencies for you, in the `.terraform` f
         --from-file=validator-identity.yaml=validator-identity.yaml \
         --from-file=validator-full-node-identity.yaml=validator-full-node-identity.yaml
     ```
+  
+    :::note
+    
+    The `-e1` suffix refers to the era number. If you changed the era number, make sure it matches when creating the secret.
 
-    If you changed the era number, make sure it matches when creating the secret.
+    :::
 
 17. Check all pods running.
 
@@ -201,4 +211,4 @@ This will download all the terraform dependencies for you, in the `.terraform` f
     node1-aptos-node-validator-0                1/1     Running   0          4h30m
     ```
 
-Now you have completed setting up your node in test mode. You can continue to our [community](https://community.aptoslabs.com/) website for registration.
+Now you have successfully completed setting up your node in test mode. You can now proceed to the [Aptos community](https://community.aptoslabs.com/) website for registration.

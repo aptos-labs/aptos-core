@@ -26,12 +26,9 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{chain_id::ChainId, LocalAccount},
 };
+use futures::lock::Mutex;
 use reqwest::StatusCode;
-use std::{
-    convert::Infallible,
-    fmt,
-    sync::{Arc, Mutex},
-};
+use std::{convert::Infallible, fmt, sync::Arc};
 use url::Url;
 use warp::{http, Filter, Rejection, Reply};
 
@@ -108,7 +105,7 @@ fn health_route(
 }
 
 async fn handle_health(service: Arc<Service>) -> Result<Box<dyn warp::Reply>, Infallible> {
-    let faucet_address = service.faucet_account.lock().unwrap().address();
+    let faucet_address = service.faucet_account.lock().await.address();
     let faucet_account = service.client.get_account(faucet_address).await;
 
     match faucet_account {
@@ -183,7 +180,7 @@ pub async fn delegate_mint_account(
 
     // Delegate minting to the account
     {
-        let mut faucet_account = service.faucet_account.lock().unwrap();
+        let mut faucet_account = service.faucet_account.lock().await;
         service
             .client
             .submit_and_wait(&faucet_account.sign_with_transaction_builder(

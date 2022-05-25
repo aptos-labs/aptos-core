@@ -21,8 +21,9 @@ use shadow_rs::shadow;
 use std::{
     collections::{BTreeMap, HashMap},
     env,
-    fs::File,
+    fs::OpenOptions,
     io::Write,
+    os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
     str::FromStr,
     time::{Duration, Instant},
@@ -195,7 +196,30 @@ pub fn read_from_file(path: &Path) -> CliTypedResult<Vec<u8>> {
 
 /// Write a `&[u8]` to a file
 pub fn write_to_file(path: &Path, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
-    let mut file = File::create(path).map_err(|e| CliError::IO(name.to_string(), e))?;
+    write_to_file_with_opts(path, name, bytes, &mut OpenOptions::new())
+}
+
+/// Write a User only read / write file
+pub fn write_to_user_only_file(path: &Path, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
+    let mut opts = OpenOptions::new();
+    #[cfg(unix)]
+    opts.mode(0o600);
+    write_to_file_with_opts(path, name, bytes, &mut opts)
+}
+
+/// Write a `&[u8]` to a file with the given options
+pub fn write_to_file_with_opts(
+    path: &Path,
+    name: &str,
+    bytes: &[u8],
+    opts: &mut OpenOptions,
+) -> CliTypedResult<()> {
+    let mut file = opts
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)
+        .map_err(|e| CliError::IO(name.to_string(), e))?;
     file.write_all(bytes)
         .map_err(|e| CliError::IO(name.to_string(), e))
 }
@@ -306,4 +330,28 @@ pub fn read_line(input_name: &'static str) -> CliTypedResult<String> {
         .map_err(|err| CliError::IO(input_name.to_string(), err))?;
 
     Ok(input_buf)
+}
+
+/// Fund account (and possibly create it) from a faucet
+pub async fn fund_account(
+    faucet_url: Url,
+    num_coins: u64,
+    address: AccountAddress,
+) -> CliTypedResult<()> {
+    let response = reqwest::Client::new()
+        .post(format!(
+            "{}mint?amount={}&auth_key={}",
+            faucet_url, num_coins, address
+        ))
+        .send()
+        .await
+        .map_err(|err| CliError::ApiError(err.to_string()))?;
+    if response.status() == 200 {
+        Ok(())
+    } else {
+        Err(CliError::ApiError(format!(
+            "Faucet issue: {}",
+            response.status()
+        )))
+    }
 }

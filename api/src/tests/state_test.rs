@@ -219,7 +219,7 @@ async fn build_test_module(account: AccountAddress) -> Vec<u8> {
 
     let mut out = Vec::new();
     package
-        .compiled_modules()
+        .root_modules_map()
         .iter_modules()
         .first()
         .unwrap()

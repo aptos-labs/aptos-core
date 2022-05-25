@@ -6,22 +6,17 @@ use aptos_crypto::HashValue;
 use aptos_types::proof::SparseMerkleProof;
 use std::collections::HashMap;
 
-pub struct ProofReader<V>(HashMap<HashValue, SparseMerkleProof<V>>);
+#[derive(Default)]
+pub struct ProofReader(HashMap<HashValue, SparseMerkleProof>);
 
-impl<V: Sync> ProofReader<V> {
-    pub fn new(key_with_proof: Vec<(HashValue, SparseMerkleProof<V>)>) -> Self {
+impl ProofReader {
+    pub fn new(key_with_proof: Vec<(HashValue, SparseMerkleProof)>) -> Self {
         ProofReader(key_with_proof.into_iter().collect())
     }
 }
 
-impl<V: Sync> Default for ProofReader<V> {
-    fn default() -> Self {
-        Self(HashMap::new())
-    }
-}
-
-impl<V: Sync> ProofRead<V> for ProofReader<V> {
-    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProof<V>> {
+impl ProofRead for ProofReader {
+    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProof> {
         self.0.get(&key)
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "aptos"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos tool for management of nodes and interacting with the blockchain"
 repository = "https://github.com/aptos-labs/aptos-core"
@@ -18,7 +18,7 @@ bcs = "0.1.3"
 clap = "3.1.8"
 hex = "0.4.3"
 itertools = "0.10.3"
-rand = "0.8.3"
+rand = "0.8.5"
 reqwest = { version = "0.11.10", features = ["blocking", "json"] }
 serde = "1.0.137"
 serde_json = "1.0.81"
@@ -26,8 +26,8 @@ serde_yaml = "0.8.24"
 shadow-rs = "0.11.0"
 tempfile = "3.3.0"
 thiserror = "1.0.31"
-tokio = { version = "1.8.1", features = ["full"] }
-tokio-util = { version = "0.6.4", features = ["compat"] }
+tokio = { version = "1.18.2", features = ["full"] }
+tokio-util = { version = "0.7.2", features = ["compat"] }
 toml = "0.5.9"
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 
@@ -35,7 +35,6 @@ aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto", features = [] }
 aptos-github-client = { path = "../../secure/storage/github" }
 aptos-logger = { path = "../aptos-logger" }
-aptos-management = { path = "../../config/management" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
 aptos-secure-storage = { path = "../../secure/storage" }
@@ -49,7 +48,7 @@ aptosdb = { path = "../../storage/aptosdb" }
 cached-framework-packages =  { path = "../../aptos-move/framework/cached-packages" }
 executor = { path = "../../execution/executor" }
 framework = { path = '../../aptos-move/framework' }
-move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "testing"] }
+move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "testing", "table-extension"] }
 short-hex-str = { path = "../short-hex-str" }
 storage-interface = { path = "../../storage/storage-interface" }
 vm-genesis = { path = "../../aptos-move/vm-genesis" }

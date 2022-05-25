@@ -22,6 +22,7 @@ use tokio_stream::wrappers::IntervalStream;
 // Useful constants for the Data Streaming Service
 const GLOBAL_DATA_REFRESH_LOG_FREQ_SECS: u64 = 3;
 const NO_DATA_TO_FETCH_LOG_FREQ_SECS: u64 = 3;
+const STREAM_REQUEST_ERROR_LOG_FREQ_SECS: u64 = 3;
 
 /// The data streaming service that responds to data stream requests.
 pub struct DataStreamingService<T> {
@@ -103,9 +104,12 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
         // Process the stream request
         let response = self.process_new_stream_request(&request_message);
         if let Err(error) = &response {
-            error!(LogSchema::new(LogEntry::HandleStreamRequest)
-                .event(LogEvent::Error)
-                .error(error));
+            sample!(
+                SampleRate::Duration(Duration::from_secs(STREAM_REQUEST_ERROR_LOG_FREQ_SECS)),
+                error!(LogSchema::new(LogEntry::HandleStreamRequest)
+                    .event(LogEvent::Error)
+                    .error(error));
+            );
         }
 
         // Send the response to the client

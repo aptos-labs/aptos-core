@@ -3,50 +3,146 @@
 
 use crate::{
     mock_tree_store::MockTreeStore,
-    restore::JellyfishMerkleRestore,
+    node_type::{LeafNode, Node, NodeKey},
+    restore::StateSnapshotRestore,
     test_helper::{init_mock_db, ValueBlob},
-    JellyfishMerkleTree, TreeReader,
+    JellyfishMerkleTree, NodeBatch, StateValueBatch, StateValueWriter, TestKey, TestValue,
+    TreeReader, TreeWriter,
 };
-use aptos_crypto::HashValue;
+use anyhow::Result;
+use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_infallible::RwLock;
 use aptos_types::transaction::Version;
 use proptest::{collection::btree_map, prelude::*};
 use std::{collections::BTreeMap, sync::Arc};
 use storage_interface::StateSnapshotReceiver;
+
+#[derive(Default)]
+struct MockSnapshotStore<K: TestKey, V: TestValue> {
+    tree_store: MockTreeStore<K>,
+    kv_store: RwLock<BTreeMap<(K, Version), V>>,
+}
+
+impl<K, V> MockSnapshotStore<K, V>
+where
+    K: TestKey,
+    V: TestValue,
+{
+    fn new(overwrite: bool) -> Self {
+        Self {
+            tree_store: MockTreeStore::new(overwrite),
+            kv_store: RwLock::new(BTreeMap::default()),
+        }
+    }
+
+    fn get_value_at_version(&self, k: &(K, Version)) -> Option<V> {
+        self.kv_store.read().get(k).cloned()
+    }
+}
+
+impl<K, V> StateValueWriter<K, V> for MockSnapshotStore<K, V>
+where
+    K: TestKey,
+    V: TestValue,
+{
+    fn write_kv_batch(&self, kv_batch: &StateValueBatch<K, V>) -> Result<()> {
+        for (k, v) in kv_batch {
+            self.kv_store.write().insert(k.clone(), v.clone());
+        }
+        Ok(())
+    }
+}
+
+impl<K, V> TreeReader<K> for MockSnapshotStore<K, V>
+where
+    K: TestKey,
+    V: TestValue,
+{
+    fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node<K>>> {
+        self.tree_store.get_node_option(node_key)
+    }
+
+    fn get_rightmost_leaf(&self) -> Result<Option<(NodeKey, LeafNode<K>)>> {
+        self.tree_store.get_rightmost_leaf()
+    }
+}
+
+impl<K, V> TreeWriter<K> for MockSnapshotStore<K, V>
+where
+    K: TestKey,
+    V: TestValue,
+{
+    fn write_node_batch(&self, node_batch: &NodeBatch<K>) -> Result<()> {
+        self.tree_store.write_node_batch(node_batch)
+    }
+
+    fn finish_version(&self, _version: Version) {}
+}
+
+fn init_mock_store<V>(kvs: &BTreeMap<V, V>) -> (MockSnapshotStore<V, V>, Version)
+where
+    V: TestKey + TestValue,
+{
+    let mut kv_store = BTreeMap::new();
+    kvs.iter().enumerate().for_each(|(i, (k, v))| {
+        kv_store.insert((k.clone(), i as Version), v.clone());
+    });
+
+    let (tree_store, version) = init_mock_db(
+        &kvs.iter()
+            .map(|(k, v)| (CryptoHash::hash(k), (CryptoHash::hash(v), k.clone())))
+            .collect(),
+    );
+
+    (
+        MockSnapshotStore {
+            tree_store,
+            kv_store: RwLock::new(kv_store),
+        },
+        version,
+    )
+}
+
+prop_compose! {
+    fn arb_btree_map(min_quantity: usize)(tree in btree_map(any::<ValueBlob>(), any::<ValueBlob>(), min_quantity..1000)) -> BTreeMap<HashValue, (ValueBlob, ValueBlob)> {
+        tree.into_iter().map(|(k, v)| (CryptoHash::hash(&k), (k, v))).collect()
+    }
+}
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
     #[test]
     fn test_restore_without_interruption(
-        btree in btree_map(any::<HashValue>(), any::<ValueBlob>(), 1..1000),
+        btree in arb_btree_map(1),
         target_version in 0u64..2000,
     ) {
-        let restore_db = Arc::new(MockTreeStore::default());
+        let restore_db = Arc::new(MockSnapshotStore::default());
         // For this test, restore everything without interruption.
         restore_without_interruption(&btree, target_version, &restore_db, true);
     }
 
     #[test]
     fn test_restore_with_interruption(
-        (all, batch1_size) in btree_map(any::<HashValue>(), any::<ValueBlob>(), 2..1000)
+        (all, batch1_size) in arb_btree_map(2)
             .prop_flat_map(|btree| {
                 let len = btree.len();
                 (Just(btree), 1..len)
             })
     ) {
-        let (db, version) = init_mock_db(&all.clone().into_iter().collect());
+        let (db, version) = init_mock_store(&all.clone().into_iter().map(|(_, kv)| kv).collect());
         let tree = JellyfishMerkleTree::new(&db);
         let expected_root_hash = tree.get_root_hash(version).unwrap();
         let batch1: Vec<_> = all.clone().into_iter().take(batch1_size).collect();
 
-        let restore_db = Arc::new(MockTreeStore::default());
+        let restore_db = Arc::new(MockSnapshotStore::default());
         {
             let mut restore =
-                JellyfishMerkleRestore::new(Arc::clone(&restore_db), version, expected_root_hash ).unwrap();
+                StateSnapshotRestore::new(Arc::clone(&restore_db), version, expected_root_hash ).unwrap();
             let proof = tree
                 .get_range_proof(batch1.last().map(|(key, _value)| *key).unwrap(), version)
                 .unwrap();
-            restore.add_chunk(batch1, proof).unwrap();
+            restore.add_chunk(batch1.into_iter().map(|(_, kv)| kv).collect(), proof).unwrap();
             // Do not call `finish`.
         }
 
@@ -61,18 +157,21 @@ proptest! {
             let remaining_accounts: Vec<_> = all
                 .clone()
                 .into_iter()
-                .filter(|(k, _v)| *k > rightmost_key)
+                .filter(|(k, _)| *k > rightmost_key)
                 .collect();
 
             let mut restore =
-                JellyfishMerkleRestore::new(Arc::clone(&restore_db), version, expected_root_hash).unwrap();
+                StateSnapshotRestore::new(Arc::clone(&restore_db), version, expected_root_hash).unwrap();
             let proof = tree
                 .get_range_proof(
-                    remaining_accounts.last().map(|(key, _value)| *key).unwrap(),
+                    remaining_accounts.last().map(|(h, _)| *h).unwrap(),
                     version,
                 )
                 .unwrap();
-            restore.add_chunk(remaining_accounts, proof).unwrap();
+            restore.add_chunk(remaining_accounts.into_iter().
+                map(|(_, kv)| kv)
+                              .collect()
+                              , proof).unwrap();
             restore.finish().unwrap();
         }
 
@@ -81,11 +180,11 @@ proptest! {
 
     #[test]
     fn test_overwrite(
-        btree1 in btree_map(any::<HashValue>(), any::<ValueBlob>(), 1..1000),
-        btree2 in btree_map(any::<HashValue>(), any::<ValueBlob>(), 1..1000),
+        btree1 in arb_btree_map(1),
+        btree2 in arb_btree_map(1),
         target_version in 0u64..2000,
     ) {
-        let restore_db = Arc::new(MockTreeStore::new(true /* allow_overwrite */));
+        let restore_db = Arc::new(MockSnapshotStore::new(true /* allow_overwrite */));
         restore_without_interruption(&btree1, target_version, &restore_db, true);
         // overwrite, an entirely different tree
         restore_without_interruption(&btree2, target_version, &restore_db, false);
@@ -93,16 +192,23 @@ proptest! {
 }
 
 fn assert_success<V>(
-    db: &MockTreeStore<V>,
+    db: &MockSnapshotStore<V, V>,
     expected_root_hash: HashValue,
-    btree: &BTreeMap<HashValue, V>,
+    btree: &BTreeMap<HashValue, (V, V)>,
     version: Version,
 ) where
-    V: crate::TestValue,
+    V: crate::TestKey + crate::TestValue,
 {
     let tree = JellyfishMerkleTree::new(db);
-    for (key, value) in btree {
-        assert_eq!(tree.get(*key, version).unwrap(), Some(value.clone()));
+    for (key, value) in btree.values() {
+        let (value_hash, value_index) = tree
+            .get_with_proof(CryptoHash::hash(key), version)
+            .unwrap()
+            .0
+            .unwrap();
+        let value_in_db = db.get_value_at_version(&value_index).unwrap();
+        assert_eq!(CryptoHash::hash(value), value_hash);
+        assert_eq!(&value_in_db, value);
     }
 
     let actual_root_hash = tree.get_root_hash(version).unwrap();
@@ -110,32 +216,37 @@ fn assert_success<V>(
 }
 
 fn restore_without_interruption<V>(
-    btree: &BTreeMap<HashValue, V>,
+    btree: &BTreeMap<HashValue, (V, V)>,
     target_version: Version,
-    target_db: &Arc<MockTreeStore<V>>,
+    target_db: &Arc<MockSnapshotStore<V, V>>,
     try_resume: bool,
 ) where
-    V: crate::TestValue,
+    V: crate::TestKey + crate::TestValue,
 {
-    let (db, source_version) = init_mock_db(&btree.iter().map(|(k, v)| (*k, v.clone())).collect());
+    let (db, source_version) = init_mock_store(
+        &btree
+            .iter()
+            .map(|(_, (k, v))| (k.clone(), v.clone()))
+            .collect(),
+    );
     let tree = JellyfishMerkleTree::new(&db);
     let expected_root_hash = tree.get_root_hash(source_version).unwrap();
 
     let mut restore = if try_resume {
-        JellyfishMerkleRestore::new(Arc::clone(target_db), target_version, expected_root_hash)
+        StateSnapshotRestore::new(Arc::clone(target_db), target_version, expected_root_hash)
             .unwrap()
     } else {
-        JellyfishMerkleRestore::new_overwrite(
+        StateSnapshotRestore::new_overwrite(
             Arc::clone(target_db),
             target_version,
             expected_root_hash,
         )
         .unwrap()
     };
-    for (key, value) in btree {
-        let proof = tree.get_range_proof(*key, source_version).unwrap();
+    for (hashed_key, (k, v)) in btree {
+        let proof = tree.get_range_proof(*hashed_key, source_version).unwrap();
         restore
-            .add_chunk(vec![(*key, value.clone())], proof)
+            .add_chunk(vec![(k.clone(), v.clone())], proof)
             .unwrap();
     }
     Box::new(restore).finish().unwrap();

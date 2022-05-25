@@ -20,12 +20,24 @@ You will need the `cargo` package manager to install the `aptos` CLI tool.  Foll
 source $HOME/.cargo/env
 ```
 ### Install the `aptos` CLI
-1. Install the `aptos` CLI tool by running the below command.  You can run this command from any directory.  The `aptos`
+1. Install dependencies before compiling:
+   1. For Debian or Ubuntu: `sudo apt install build-essential pkg-config openssl libssl-dev libclang-dev`.
+   2. For RHEL or Centos: `sudo yum install pkgconfig openssl openssl-devel clang`.
+   3. For others: please manually install `pkg-config` `openssl`, `libssl` and `libclang`:
+      - `pkg-config`:
+         - Download and unzip the source code at https://pkgconfig.freedesktop.org/releases/
+         - `./configure --prefix=/usr/local/pkg_config/0_29_2 --with-internal-glib`
+         - `sudo make && sudo make install`
+      - `openssl` and `libssl`:
+         - Check https://wiki.openssl.org/index.php/Compilation_and_Installation for full instructions.
+      - `libclang`:
+         - Check https://clang.llvm.org/get_started.html for full instructions.
+2. Install the `aptos` CLI tool by running the below command.  You can run this command from any directory.  The `aptos`
    CLI tool will be installed into your `CARGO_HOME`, usually `~/.cargo`:
 ```bash
 cargo install --git https://github.com/aptos-labs/aptos-core.git aptos --tag aptos-cli-latest
 ```
-2. Confirm that the `aptos` CLI tool is installed successfully by running the below command.  The terminal will display
+3. Confirm that the `aptos` CLI tool is installed successfully by running the below command.  The terminal will display
    the path to the `aptos` CLI's location.
 ```bash
 which aptos
@@ -174,6 +186,52 @@ Aptos is now set up for account 18B61497FD290B02BB0751F44381CADA1657C2B3AA6194A0
 }
 
 ```
+### View an account's balance and transfer events
+
+You can view the balance and transfer events (deposits and withdrawals) with:
+```bash
+$ aptos account list --query balance --account 18B61497FD290B02BB0751F44381CADA1657C2B3AA6194A00D9BC9A85FAD3B04
+
+```
+
+The above command will generate the following information on your terminal:
+
+```bash
+{
+  "Result": [
+    {
+      "coin": {
+        "value": "9999729"
+      },
+      "deposit_events": {
+        "counter": "1",
+        "guid": {
+          "guid": {
+            "id": {
+              "addr": "0x661a4ca2b5f7475e61d2209cd3818488b3725ddb5e483633317291f86d3a26d6",
+              "creation_num": "1"
+            }
+          },
+          "len_bytes": 40
+        }
+      },
+      "withdraw_events": {
+        "counter": "3",
+        "guid": {
+          "guid": {
+            "id": {
+              "addr": "0x661a4ca2b5f7475e61d2209cd3818488b3725ddb5e483633317291f86d3a26d6",
+              "creation_num": "2"
+            }
+          },
+          "len_bytes": 40
+        }
+      }
+    }
+  ]
+}
+```
+
 ### Listing resources in an account
 
 You can list the resources in an account from the command line. For example, see below for how to list the resources in the account you just created above:

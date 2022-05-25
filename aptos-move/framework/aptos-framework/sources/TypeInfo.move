@@ -21,9 +21,9 @@ module AptosFramework::TypeInfo {
 
     #[test]
     fun test() {
-        let type_info = type_of<AptosFramework::Account::Account>();
+        let type_info = type_of<TypeInfo>();
         assert!(account_address(&type_info) == @AptosFramework, 0);
-        assert!(module_name(&type_info) == b"Account", 1);
-        assert!(struct_name(&type_info) == b"Account", 2);
+        assert!(module_name(&type_info) == b"TypeInfo", 1);
+        assert!(struct_name(&type_info) == b"TypeInfo", 2);
     }
 }

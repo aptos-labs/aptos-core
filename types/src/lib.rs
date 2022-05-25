@@ -30,6 +30,7 @@ pub mod test_helpers;
 pub mod timestamp;
 pub mod transaction;
 pub mod trusted_state;
+pub mod utility_coin;
 pub mod validator_config;
 pub mod validator_info;
 pub mod validator_signer;
@@ -39,6 +40,7 @@ pub mod waypoint;
 pub mod write_set;
 
 pub use account_address::AccountAddress as PeerId;
+pub use utility_coin::*;
 
 pub mod account_view;
 pub mod state_store;

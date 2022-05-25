@@ -38,6 +38,10 @@ class ApplicationController < ActionController::Base
     head :forbidden
   end
 
+  def ensure_discord!
+    redirect_to root_path unless current_user && current_user.authorizations.where(provider: :discord).exists?
+  end
+
   def ensure_confirmed!
     redirect_to onboarding_email_path unless current_user&.confirmed?
   end

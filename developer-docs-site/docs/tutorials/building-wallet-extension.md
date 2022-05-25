@@ -49,8 +49,8 @@ const accountAddress = await (window as any).aptos.account()
 // Create a transaction dictionary
 const transaction = {
     type: 'script_function_payload',
-    function: '0x1::TestCoin::transfer',
-    type_arguments: [],
+    function: '0x1::Coin::transfer',
+    type_arguments: ['0x1::TestCoin::TestCoin'],
     arguments: [receiverAddress, amount]
 }
 

@@ -1,0 +1,12 @@
+<%= content_tag :table, **@rest do %>
+  <thead>
+    <tr class="rounded bg-neutral-800">
+      <% columns.each do |column| %>
+        <%= column %>
+      <% end %>
+    </tr>
+  </thead>
+  <tbody class="before:h-4 before:block font-light">
+    <%= body %>
+  </tbody>
+<% end %>

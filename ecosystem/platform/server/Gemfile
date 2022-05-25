@@ -11,18 +11,21 @@ ruby '3.1.2'
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem 'rails', '~> 7.0.2', '>= 7.0.2.3'
 
-# The original asset pipeline for Rails [https://github.com/rails/sprockets-rails]
-gem 'sprockets-rails'
+# The modern asset pipeline for Rails [https://github.com/rails/propshaft]
+gem 'propshaft'
+
+# Bundle and transpile JavaScript [https://github.com/rails/jsbundling-rails]
+gem 'jsbundling-rails'
+
+# Bundle and process CSS [https://github.com/rails/cssbundling-rails]
+gem 'cssbundling-rails'
 
 # Use pg as the database for Active Record
 gem 'dotenv-rails'
-gem 'pg'
+gem 'pg', '~> 1.1'
 
 # Use the Puma web server [https://github.com/puma/puma]
 gem 'puma', '~> 5.0'
-
-# Use JavaScript with ESM import maps [https://github.com/rails/importmap-rails]
-gem 'importmap-rails'
 
 # Hotwire's SPA-like page accelerator [https://turbo.hotwired.dev]
 gem 'turbo-rails'
@@ -37,7 +40,6 @@ gem 'activeadmin'
 gem 'cancancan'
 gem 'devise'
 gem 'kaminari'
-gem 'rails_state_machine'
 
 # Oauth
 gem 'omniauth'
@@ -65,9 +67,6 @@ gem 'bootsnap', require: false
 
 gem 'httparty'
 
-# Use Sass to process CSS
-gem 'sassc-rails'
-
 # IP -> GEO via MaxMind
 gem 'maxmind-geoip2'
 
@@ -83,13 +82,20 @@ gem 'recaptcha', '~> 5.10'
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
 # gem "image_processing", "~> 1.2"
 
-gem 'tailwindcss-rails', '~> 2.0'
+# UI components
 gem 'view_component', '~> 2.54'
 
 # Monitoring
 gem 'lograge', '~> 0.12.0'
 gem 'sentry-rails'
 gem 'sentry-ruby'
+
+# State machines
+gem 'statesman', '~> 10.0'
+
+# Feature flags
+gem 'flipper', '~> 0.24.1'
+gem 'flipper-active_record', '~> 0.24.1'
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem

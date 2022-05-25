@@ -15,23 +15,23 @@ This guide (in concert with the [Move module tutorial][your-first-move-module]) 
 be up to date. The most recent framework can be found in the source code, [here][aptos_framework].
 
 The core functions provided to users within the Aptos Framework include:
-* Sending and receiving `TestCoin`
+* Sending and receiving the network coin `Coin<TestCoin>`
 * Creating a new account
 * Publishing a new Move module
 
 Note: this document assumes readers are already familiar with submitting transactions, as described in the [Your first transaction tutorial][your-first-transaction].
 
-## Sending and Receiving `TestCoin`
+## Sending and Receiving the network coin `Coin<TestCoin>`
 
-`TestCoin` is required for paying gas fees when submitting and executing transactions. `TestCoin` can be obtained by querying the Devnet Faucet. See the [Your first transaction tutorial][your-first-transaction] for an example.
+`Coin<TestCoin>` is required for paying gas fees when submitting and executing transactions. `Coin<TestCoin>` can be obtained by calling the Devnet Faucet. See the [Your first transaction tutorial][your-first-transaction] for an example.
 
 The payload for instructing the blockchain to perform a transfer is:
 
 ```
 {
   "type": "script_function_payload",
-  "function": "0x1::TestCoin::transfer",
-  "type_arguments": [],
+  "function": "0x1::Coin::transfer",
+  "type_arguments": ["0x1::TestCoin::TestCoin"],
   "arguments": [
     "0x737b36c96926043794ed3a0b3eaaceaf",
     "1000",
@@ -39,8 +39,8 @@ The payload for instructing the blockchain to perform a transfer is:
 }
 ```
 
-This instructs the VM to execute the `script` `0x1::TestCoin::transfer`. The first argument is the recipient address, `0x737b36c96926043794ed3a0b3eaaceaf`, and the second is the amount to transfer, `1000`. The sender address is the account
-address that sent the transaction calling this `script`.
+This instructs the VM to execute the `script` `0x1::Coin::transfer` with a type argument of 0x1::TestCoin::TestCoin. Type is required here as Coin is our standard module that can be used to create many types of Coins. See the [Your first coin tutorial][your-first-coin] for an example of creating a custom Coin. The first argument is the recipient address, `0x737b36c96926043794ed3a0b3eaaceaf`, and the second is the amount to transfer, `1000`. The sender address is the account
+address that sent the transaction querying this `script`.
 
 ## Creating a new account
 
@@ -76,6 +76,7 @@ This instructs the VM to publish the module bytecode under the sender's account.
 It is important to note that the Move bytecode must specify the same address as the sender's account, otherwise the transaction will be rejected. For example, assuming account address `0xe110`, the Move module would need to be updated as such `module 0xe110::Message`, `module 0xbar::Message` would be rejected. Alternatively an aliased address could be used, such as `module HelloBlockchain::Message` but the `HelloBlockchain` alias would need to updated to `0xe110` in the `Move.toml` file. We are working with the Move team and planning on incorporating a compiler into our REST interface to mitigate this issue.
 
 [accounts]: /basics/basics-accounts
+[your-first-coin]: /tutorials/your-first-coin
 [your-first-move-module]: /tutorials/your-first-move-module
 [your-first-transaction]: /tutorials/your-first-transaction
 [move_url]: https://diem.github.io/move/

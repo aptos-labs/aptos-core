@@ -34,7 +34,7 @@ use aptos_crypto::{
 };
 use move_deps::move_core_types::language_storage::TypeTag;
 
-type SparseMerkleProof = crate::proof::SparseMerkleProof<StateValue>;
+type SparseMerkleProof = crate::proof::SparseMerkleProof;
 
 #[test]
 fn test_verify_empty_accumulator() {
@@ -151,9 +151,11 @@ fn test_verify_empty_sparse_merkle() {
     let proof = SparseMerkleProof::new(None, vec![]);
 
     // Trying to show that this key doesn't exist.
-    assert!(proof.verify(root_hash, key, None).is_ok());
+    assert!(proof.verify::<StateValue>(root_hash, key, None).is_ok());
     // Trying to show that this key exists.
-    assert!(proof.verify(root_hash, key, Some(&blob)).is_err());
+    assert!(proof
+        .verify::<StateValue>(root_hash, key, Some(&blob))
+        .is_err());
 }
 
 #[test]
@@ -167,21 +169,25 @@ fn test_verify_single_element_sparse_merkle() {
     let proof = SparseMerkleProof::new(Some(root_node), vec![]);
 
     // Trying to show this exact key exists with its value.
-    assert!(proof.verify(root_hash, key, Some(&blob)).is_ok());
+    assert!(proof
+        .verify::<StateValue>(root_hash, key, Some(&blob))
+        .is_ok());
     // Trying to show this exact key exists with another value.
     assert!(proof
-        .verify(root_hash, key, Some(&non_existing_blob))
+        .verify::<StateValue>(root_hash, key, Some(&non_existing_blob))
         .is_err());
     // Trying to show this key doesn't exist.
-    assert!(proof.verify(root_hash, key, None).is_err());
+    assert!(proof.verify::<StateValue>(root_hash, key, None).is_err());
 
     let non_existing_key = b"HELLO".test_only_hash();
 
     // The proof can be used to show non_existing_key doesn't exist.
-    assert!(proof.verify(root_hash, non_existing_key, None).is_ok());
+    assert!(proof
+        .verify::<StateValue>(root_hash, non_existing_key, None)
+        .is_ok());
     // The proof can't be used to non_existing_key exists.
     assert!(proof
-        .verify(root_hash, non_existing_key, Some(&blob))
+        .verify::<StateValue>(root_hash, non_existing_key, Some(&blob))
         .is_err());
 }
 
@@ -231,17 +237,21 @@ fn test_verify_three_element_sparse_merkle() {
         // Trying to show that this key has another value.
         assert!(proof.verify(root_hash, key1, Some(&blob2)).is_err());
         // Trying to show that this key doesn't exist.
-        assert!(proof.verify(root_hash, key1, None).is_err());
+        assert!(proof.verify::<StateValue>(root_hash, key1, None).is_err());
         // This proof can't be used to show anything about key2.
-        assert!(proof.verify(root_hash, key2, None).is_err());
+        assert!(proof.verify::<StateValue>(root_hash, key2, None).is_err());
         assert!(proof.verify(root_hash, key2, Some(&blob1)).is_err());
         assert!(proof.verify(root_hash, key2, Some(&blob2)).is_err());
 
         // This proof can be used to show that non_existing_key1 indeed doesn't exist.
-        assert!(proof.verify(root_hash, non_existing_key1, None).is_ok());
+        assert!(proof
+            .verify::<StateValue>(root_hash, non_existing_key1, None)
+            .is_ok());
         // This proof can't be used to show that non_existing_key2 doesn't exist because it lives
         // in a different subtree.
-        assert!(proof.verify(root_hash, non_existing_key2, None).is_err());
+        assert!(proof
+            .verify::<StateValue>(root_hash, non_existing_key2, None)
+            .is_err());
     }
 
     {
@@ -249,9 +259,13 @@ fn test_verify_three_element_sparse_merkle() {
         let proof = SparseMerkleProof::new(None, vec![internal_a_hash]);
 
         // This proof can't be used to show that a key starting with 0 doesn't exist.
-        assert!(proof.verify(root_hash, non_existing_key1, None).is_err());
+        assert!(proof
+            .verify::<StateValue>(root_hash, non_existing_key1, None)
+            .is_err());
         // This proof can be used to show that a key starting with 1 doesn't exist.
-        assert!(proof.verify(root_hash, non_existing_key2, None).is_ok());
+        assert!(proof
+            .verify::<StateValue>(root_hash, non_existing_key2, None)
+            .is_ok());
     }
 }
 

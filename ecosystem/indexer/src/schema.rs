@@ -16,6 +16,18 @@ table! {
 }
 
 table! {
+    collections (creator, name) {
+        creator -> Varchar,
+        name -> Varchar,
+        description -> Nullable<Varchar>,
+        maxamount -> Nullable<Int8>,
+        uri -> Nullable<Varchar>,
+        created_at -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
     events (key, sequence_number) {
         transaction_hash -> Varchar,
         key -> Varchar,
@@ -28,12 +40,51 @@ table! {
 }
 
 table! {
+    ownerships (token_id, owner) {
+        token_id -> Varchar,
+        owner -> Varchar,
+        amount -> Nullable<Numeric>,
+        updated_at -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
     processor_statuses (name, version) {
         name -> Varchar,
         version -> Int8,
         success -> Bool,
         details -> Nullable<Text>,
         last_updated -> Timestamp,
+    }
+}
+
+table! {
+    token_activities (event_key, sequence_number) {
+        event_key -> Varchar,
+        sequence_number -> Int8,
+        account -> Varchar,
+        token_id -> Nullable<Varchar>,
+        event_type -> Nullable<Varchar>,
+        amount -> Nullable<Numeric>,
+        created_at -> Timestamp,
+        inserted_at -> Timestamp,
+        transaction_hash -> Varchar,
+    }
+}
+
+table! {
+    tokens (token_id) {
+        token_id -> Varchar,
+        creator -> Varchar,
+        collection -> Varchar,
+        name -> Varchar,
+        description -> Varchar,
+        max_amount -> Nullable<Int8>,
+        supply -> Int8,
+        uri -> Varchar,
+        minted_at -> Timestamp,
+        inserted_at -> Timestamp,
     }
 }
 
@@ -84,8 +135,12 @@ table! {
 
 allow_tables_to_appear_in_same_query!(
     block_metadata_transactions,
+    collections,
     events,
+    ownerships,
     processor_statuses,
+    token_activities,
+    tokens,
     transactions,
     user_transactions,
     write_set_changes,

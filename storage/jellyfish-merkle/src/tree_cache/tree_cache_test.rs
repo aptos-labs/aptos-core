@@ -2,15 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use crate::{mock_tree_store::MockTreeStore, node_type::Node, test_helper::ValueBlob, NodeKey};
+use crate::{mock_tree_store::MockTreeStore, node_type::LeafNode, test_helper::ValueBlob, NodeKey};
 use aptos_crypto::HashValue;
 use aptos_types::nibble::nibble_path::NibblePath;
 
 fn random_leaf_with_key(next_version: Version) -> (Node<ValueBlob>, NodeKey) {
     let address = HashValue::random();
-    let node = Node::new_leaf(address, ValueBlob::from(HashValue::random().to_vec()));
+    let node = LeafNode::new(
+        address,
+        HashValue::random(),
+        (
+            ValueBlob::from(HashValue::random().to_vec()),
+            0, /* version */
+        ),
+    );
     let node_key = NodeKey::new(next_version, NibblePath::new_even(address.to_vec()));
-    (node, node_key)
+    (node.into(), node_key)
 }
 
 #[test]
@@ -55,7 +62,7 @@ fn test_pre_genesis() {
 #[test]
 fn test_freeze_with_delete() {
     let next_version = 0;
-    let db = MockTreeStore::default();
+    let db = MockTreeStore::<ValueBlob>::default();
     let mut cache = TreeCache::new_test(&db, next_version).unwrap();
 
     assert_eq!(*cache.get_root_node_key(), NodeKey::new_empty_path(0));
@@ -70,9 +77,9 @@ fn test_freeze_with_delete() {
     assert_eq!(cache.get_node(&node1_key).unwrap(), node1);
     assert_eq!(cache.get_node(&node2_key).unwrap(), node2);
 
-    cache.delete_node(&node1_key, true /* is_leaf */);
+    cache.delete_node(&node1_key, true);
     cache.freeze();
-    let (_, update_batch) = cache.into();
-    assert_eq!(update_batch.node_batch.len(), 3);
-    assert_eq!(update_batch.stale_node_index_batch.len(), 1);
+    let (_, tree_update_batch) = cache.into();
+    assert_eq!(tree_update_batch.node_batch.len(), 3);
+    assert_eq!(tree_update_batch.stale_node_index_batch.len(), 1);
 }

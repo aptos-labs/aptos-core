@@ -1,17 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { useColorMode, VStack } from '@chakra-ui/react'
-import React from 'react'
-import HelpHeader from '../components/HelpHeader'
-import withSimulatedExtensionContainer from '../components/WithSimulatedExtensionContainer'
-import { secondaryBgColor } from '../constants'
+import { useColorMode, VStack } from '@chakra-ui/react';
+import React from 'react';
+import HelpHeader from 'core/components/HelpHeader';
+import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
+import { secondaryBgColor } from '../core/constants';
 
 /**
  * TODO fill out Help page
  */
-const Help = () => {
-  const { colorMode } = useColorMode()
+function Help() {
+  const { colorMode } = useColorMode();
   return (
     <VStack
       bgColor={secondaryBgColor[colorMode]}
@@ -21,7 +21,7 @@ const Help = () => {
     >
       <HelpHeader />
     </VStack>
-  )
+  );
 }
 
-export default withSimulatedExtensionContainer(Help)
+export default withSimulatedExtensionContainer(Help);

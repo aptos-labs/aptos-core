@@ -13,6 +13,7 @@ use std::str::FromStr;
 
 #[derive(ArgEnum, Clone, Copy, Debug)]
 enum ListQuery {
+    Balance,
     Modules,
     Resources,
 }
@@ -22,6 +23,7 @@ impl FromStr for ListQuery {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
+            "balance" => Ok(ListQuery::Balance),
             "modules" => Ok(ListQuery::Modules),
             "resources" => Ok(ListQuery::Resources),
             _ => Err("Invalid query. Valid values are modules, resources"),
@@ -72,6 +74,15 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
         let client = Client::new(self.rest_options.url(&self.profile_options.profile)?);
         let map_err_func = |err: anyhow::Error| CliError::ApiError(err.to_string());
         let response = match self.query {
+            ListQuery::Balance => vec![
+                client
+                    .get_account_resource(account, "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>")
+                    .await
+                    .map_err(map_err_func)?
+                    .into_inner()
+                    .unwrap()
+                    .data,
+            ],
             ListQuery::Modules => client
                 .get_account_modules(account)
                 .await

@@ -1,5 +1,4 @@
-# This compose file defines an Aptos node deployment.
-# It includes a validator node and a fullnode.
+# This compose file defines an Aptos Validator deployment.
 # Read the README.md files for instruction on how to install aptos-node
 
 version: "3.8"
@@ -8,7 +7,6 @@ services:
     image: "${VALIDATOR_IMAGE_REPO:-aptoslab/validator}:${IMAGE_TAG:-testnet}"
     networks:
       shared:
-        ipv4_address:  172.16.1.10
     volumes:
       - type: volume
         source: aptos-validator
@@ -33,38 +31,8 @@ services:
       - "9101:9101"
     expose:
       - 6180
+      - 6181
       - 9101
-
-  fullnode:
-    image: "${VALIDATOR_IMAGE_REPO:-aptoslab/validator}:${IMAGE_TAG:-testnet}"
-    networks:
-      shared:
-        ipv4_address:  172.16.1.11
-    volumes:
-      - type: volume
-        source: aptos-fullnode
-        target: /opt/aptos/data
-      - type: bind
-        source: ./fullnode.yaml
-        target: /opt/aptos/etc/fullnode.yaml
-      - type: bind
-        source: ./genesis.blob
-        target: /opt/aptos/genesis/genesis.blob
-      - type: bind
-        source: ./waypoint.txt
-        target: /opt/aptos/genesis/waypoint.txt
-      - type: bind
-        source: ./validator-full-node-identity.yaml
-        target: /opt/aptos/genesis/validator-full-node-identity.yaml
-    command: ["/opt/aptos/bin/aptos-node", "-f", "/opt/aptos/etc/fullnode.yaml"]
-    ports:
-      - "6182:6182"
-      - "80:8080"
-      - "9103:9101"
-    expose:
-      - 6182
-      - 80
-      - 9103
 
 networks:
   shared:
@@ -76,5 +44,3 @@ networks:
 volumes:
   aptos-validator:
     name: aptos-validator
-  aptos-fullnode:
-    name: aptos-fullnode

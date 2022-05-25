@@ -10,7 +10,7 @@ use aptos_keygen::KeyGen;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{self, AccountResource, BalanceResource, TransferEventsResource},
+    account_config::{self, AccountResource, CoinStoreResource},
     chain_id::ChainId,
     event::EventHandle,
     state_store::state_key::StateKey,
@@ -130,15 +130,11 @@ impl Account {
         self.make_access_path(AccountResource::struct_tag())
     }
 
-    /// Returns the AccessPath that describes the Account balance resource instance.
+    /// Returns the AccessPath that describes the Account's CoinStore resource instance.
     ///
-    /// Use this to retrieve or publish the Account balance blob.
-    pub fn make_balance_access_path(&self) -> AccessPath {
-        self.make_access_path(BalanceResource::struct_tag())
-    }
-
-    pub fn make_transfer_events_access_path(&self) -> AccessPath {
-        self.make_access_path(TransferEventsResource::struct_tag())
+    /// Use this to retrieve or publish the Account CoinStore blob.
+    pub fn make_coin_store_access_path(&self) -> AccessPath {
+        self.make_access_path(CoinStoreResource::struct_tag())
     }
 
     // TODO: plug in the account type
@@ -310,19 +306,25 @@ impl TransactionBuilder {
 }
 
 //---------------------------------------------------------------------------
-// Balance resource represenation
+// CoinStore resource represenation
 //---------------------------------------------------------------------------
 
-/// Struct that represents an account balance resource for tests.
+/// Struct that represents an account CoinStore resource for tests.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Balance {
+pub struct CoinStore {
     coin: u64,
+    deposit_events: EventHandle,
+    withdraw_events: EventHandle,
 }
 
-impl Balance {
-    /// Create a new balance with amount `balance`
-    pub fn new(coin: u64) -> Self {
-        Self { coin }
+impl CoinStore {
+    /// Create a new CoinStore
+    pub fn new(coin: u64, deposit_events: EventHandle, withdraw_events: EventHandle) -> Self {
+        Self {
+            coin,
+            deposit_events,
+            withdraw_events,
+        }
     }
 
     /// Retrieve the balance inside of this
@@ -330,14 +332,34 @@ impl Balance {
         self.coin
     }
 
-    /// Returns the Move Value for the account balance
+    /// Returns the Move Value for the account's CoinStore
     pub fn to_value(&self) -> Value {
-        Value::struct_(Struct::pack(vec![Value::u64(self.coin)]))
+        Value::struct_(Struct::pack(vec![
+            Value::u64(self.coin),
+            Value::struct_(Struct::pack(vec![
+                Value::u64(self.withdraw_events.count()),
+                Value::vector_u8(self.withdraw_events.key().to_vec()),
+            ])),
+            Value::struct_(Struct::pack(vec![
+                Value::u64(self.deposit_events.count()),
+                Value::vector_u8(self.deposit_events.key().to_vec()),
+            ])),
+        ]))
     }
 
-    /// Returns the value layout for the account balance
+    /// Returns the value layout for the account's CoinStore
     pub fn layout() -> MoveStructLayout {
-        MoveStructLayout::new(vec![MoveTypeLayout::U64])
+        MoveStructLayout::new(vec![
+            MoveTypeLayout::U64,
+            MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+                MoveTypeLayout::U64,
+                MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
+            ])),
+            MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+                MoveTypeLayout::U64,
+                MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
+            ])),
+        ])
     }
 }
 
@@ -434,10 +456,8 @@ pub struct AccountData {
     withdrawal_capability: Option<WithdrawCapability>,
     key_rotation_capability: Option<KeyRotationCapability>,
     sequence_number: u64,
-    sent_events: EventHandle,
-    received_events: EventHandle,
 
-    balance: Balance,
+    coin_store: CoinStore,
     account_role: AccountRole,
 }
 
@@ -514,23 +534,18 @@ impl AccountData {
             withdrawal_capability: Some(WithdrawCapability::new(addr)),
             key_rotation_capability: Some(KeyRotationCapability::new(addr)),
             account,
-            balance: Balance::new(balance),
+            coin_store: CoinStore::new(
+                balance,
+                new_event_handle(received_events_count, addr),
+                new_event_handle(sent_events_count, addr),
+            ),
             sequence_number,
-            sent_events: new_event_handle(sent_events_count, addr),
-            received_events: new_event_handle(received_events_count, addr),
         }
     }
 
     /// Changes the keys for this account to the provided ones.
     pub fn rotate_key(&mut self, privkey: Ed25519PrivateKey, pubkey: Ed25519PublicKey) {
         self.account.rotate_key(privkey, pubkey)
-    }
-
-    pub fn event_handle_layout() -> MoveStructLayout {
-        MoveStructLayout::new(vec![
-            MoveTypeLayout::U64,
-            MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
-        ])
     }
 
     /// Returns the (Move value) layout of the Account::Account struct
@@ -547,7 +562,7 @@ impl AccountData {
     }
 
     /// Creates and returns the top-level resources to be published under the account
-    pub fn to_value(&self) -> (Value, Value, Value) {
+    pub fn to_value(&self) -> (Value, Value) {
         // TODO: publish some concept of Account
         let account = Value::struct_(Struct::pack(vec![
             // TODO: this needs to compute the auth key instead
@@ -555,16 +570,7 @@ impl AccountData {
             Value::u64(self.sequence_number),
             Value::address(*self.address()),
         ]));
-        let sent_events = Value::struct_(Struct::pack(vec![
-            Value::u64(self.sent_events_count()),
-            Value::vector_u8(self.sent_events.key().to_vec()),
-        ]));
-        let received_events = Value::struct_(Struct::pack(vec![
-            Value::u64(self.sent_events_count()),
-            Value::vector_u8(self.sent_events.key().to_vec()),
-        ]));
-        let transfer_events = Value::struct_(Struct::pack(vec![sent_events, received_events]));
-        (account, self.balance.to_value(), transfer_events)
+        (account, self.coin_store.to_value())
     }
 
     /// Returns the AccessPath that describes the Account resource instance.
@@ -574,15 +580,11 @@ impl AccountData {
         self.account.make_account_access_path()
     }
 
-    /// Returns the AccessPath that describes the Account balance resource instance.
+    /// Returns the AccessPath that describes the Account's CoinStore resource instance.
     ///
-    /// Use this to retrieve or publish the Account blob.
-    pub fn make_balance_access_path(&self) -> AccessPath {
-        self.account.make_balance_access_path()
-    }
-
-    pub fn make_transfer_events_access_path(&self) -> AccessPath {
-        self.account.make_transfer_events_access_path()
+    /// Use this to retrieve or publish the Account's CoinStore blob.
+    pub fn make_coin_store_access_path(&self) -> AccessPath {
+        self.account.make_coin_store_access_path()
     }
 
     pub fn transfer_event_layout() -> MoveStructLayout {
@@ -596,7 +598,7 @@ impl AccountData {
     /// Creates a writeset that contains the account data and can be patched to the storage
     /// directly.
     pub fn to_writeset(&self) -> WriteSet {
-        let (account_blob, balance_blob, transfer_events) = self.to_value();
+        let (account_blob, coinstore_blob) = self.to_value();
         let mut write_set = Vec::new();
         let account = account_blob
             .value_as::<Struct>()
@@ -608,24 +610,14 @@ impl AccountData {
             WriteOp::Value(account),
         ));
 
-        let balance = balance_blob
+        let balance = coinstore_blob
             .value_as::<Struct>()
             .unwrap()
-            .simple_serialize(&Balance::layout())
+            .simple_serialize(&CoinStore::layout())
             .unwrap();
         write_set.push((
-            StateKey::AccessPath(self.make_balance_access_path()),
+            StateKey::AccessPath(self.make_coin_store_access_path()),
             WriteOp::Value(balance),
-        ));
-
-        let transfer = transfer_events
-            .value_as::<Struct>()
-            .unwrap()
-            .simple_serialize(&Self::transfer_event_layout())
-            .unwrap();
-        write_set.push((
-            StateKey::AccessPath(self.make_transfer_events_access_path()),
-            WriteOp::Value(transfer),
         ));
 
         WriteSetMut::new(write_set).freeze().unwrap()
@@ -651,7 +643,7 @@ impl AccountData {
 
     /// Returns the initial balance.
     pub fn balance(&self) -> u64 {
-        self.balance.coin()
+        self.coin_store.coin()
     }
 
     /// Returns the initial sequence number.
@@ -661,22 +653,22 @@ impl AccountData {
 
     /// Returns the unique key for this sent events stream.
     pub fn sent_events_key(&self) -> &[u8] {
-        self.sent_events.key().as_bytes()
+        self.coin_store.withdraw_events.key().as_bytes()
     }
 
     /// Returns the initial sent events count.
     pub fn sent_events_count(&self) -> u64 {
-        self.sent_events.count()
+        self.coin_store.withdraw_events.count()
     }
 
     /// Returns the unique key for this received events stream.
     pub fn received_events_key(&self) -> &[u8] {
-        self.received_events.key().as_bytes()
+        self.coin_store.deposit_events.key().as_bytes()
     }
 
     /// Returns the initial received events count.
     pub fn received_events_count(&self) -> u64 {
-        self.received_events.count()
+        self.coin_store.deposit_events.count()
     }
 }
 

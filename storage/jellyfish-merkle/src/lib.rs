@@ -85,7 +85,7 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleRangeProof},
-    state_store::state_value::{StateKeyAndValue, StateValue},
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
 use node_type::{Child, Children, InternalNode, LeafNode, Node, NodeKey, NodeType};
@@ -95,7 +95,8 @@ use proptest::arbitrary::Arbitrary;
 use proptest_derive::Arbitrary;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
+    hash::Hash,
     marker::PhantomData,
 };
 use thiserror::Error;
@@ -110,49 +111,68 @@ pub struct MissingRootError {
 /// `TreeReader` defines the interface between
 /// [`JellyfishMerkleTree`](struct.JellyfishMerkleTree.html)
 /// and underlying storage holding nodes.
-pub trait TreeReader<V> {
+pub trait TreeReader<K> {
     /// Gets node given a node key. Returns error if the node does not exist.
-    fn get_node(&self, node_key: &NodeKey) -> Result<Node<V>> {
+    fn get_node(&self, node_key: &NodeKey) -> Result<Node<K>> {
         self.get_node_option(node_key)?
             .ok_or_else(|| format_err!("Missing node at {:?}.", node_key))
     }
 
     /// Gets node given a node key. Returns `None` if the node does not exist.
-    fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node<V>>>;
+    fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node<K>>>;
 
     /// Gets the rightmost leaf. Note that this assumes we are in the process of restoring the tree
     /// and all nodes are at the same version.
-    fn get_rightmost_leaf(&self) -> Result<Option<(NodeKey, LeafNode<V>)>>;
+    fn get_rightmost_leaf(&self) -> Result<Option<(NodeKey, LeafNode<K>)>>;
 }
 
-pub trait TreeWriter<V>: Send + Sync {
+pub trait TreeWriter<K>: Send + Sync {
     /// Writes a node batch into storage.
-    fn write_node_batch(&self, node_batch: &NodeBatch<V>) -> Result<()>;
+    fn write_node_batch(&self, node_batch: &NodeBatch<K>) -> Result<()>;
 
     /// Inform underlying store that a latest version is complete and readable.
     fn finish_version(&self, version: Version);
 }
 
+pub trait StateValueWriter<K, V>: Send + Sync {
+    /// Writes a kv batch into storage.
+    fn write_kv_batch(&self, kv_batch: &StateValueBatch<K, V>) -> Result<()>;
+}
+
+/// `Key` defines the types of data key that can be stored in a Jellyfish Merkle tree.
+pub trait Key: Clone + Serialize + DeserializeOwned + Send + Sync {}
+
 /// `Value` defines the types of data that can be stored in a Jellyfish Merkle tree.
 pub trait Value: Clone + CryptoHash + Serialize + DeserializeOwned + Send + Sync {}
+
+/// `TestKey` defines the types of data that can be stored in a Jellyfish Merkle tree and used in
+/// tests.
+#[cfg(any(test, feature = "fuzzing"))]
+pub trait TestKey:
+    Key + Arbitrary + std::fmt::Debug + Eq + Hash + Ord + PartialOrd + PartialEq + 'static
+{
+}
 
 /// `TestValue` defines the types of data that can be stored in a Jellyfish Merkle tree and used in
 /// tests.
 #[cfg(any(test, feature = "fuzzing"))]
 pub trait TestValue: Value + Arbitrary + std::fmt::Debug + Eq + PartialEq + 'static {}
 
+impl Key for StateKey {}
+
 impl Value for StateValue {}
 
-impl Value for StateKeyAndValue {}
-
 #[cfg(any(test, feature = "fuzzing"))]
-impl TestValue for StateValue {}
+impl TestKey for StateKey {}
 
 /// Node batch that will be written into db atomically with other batches.
-pub type NodeBatch<V> = BTreeMap<NodeKey, Node<V>>;
+pub type NodeBatch<K> = HashMap<NodeKey, Node<K>>;
+/// Key-Value batch that will be written into db atomically with other batches.
+pub type StateValueBatch<K, V> = HashMap<(K, Version), V>;
+
 /// [`StaleNodeIndex`](struct.StaleNodeIndex.html) batch that will be written into db atomically
 /// with other batches.
-pub type StaleNodeIndexBatch = BTreeSet<StaleNodeIndex>;
+pub type StaleNodeIndexBatch = HashSet<StaleNodeIndex>;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct NodeStats {
@@ -178,22 +198,22 @@ pub struct StaleNodeIndex {
 /// the incremental updates of a tree and pruning indices after applying a write set,
 /// which is a vector of `hashed_account_address` and `new_value` pairs.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct TreeUpdateBatch<V> {
-    pub node_batch: NodeBatch<V>,
+pub struct TreeUpdateBatch<K> {
+    pub node_batch: NodeBatch<K>,
     pub stale_node_index_batch: StaleNodeIndexBatch,
     pub node_stats: Vec<NodeStats>,
 }
 
 /// An iterator that iterates the index range (inclusive) of each different nibble at given
 /// `nibble_idx` of all the keys in a sorted key-value pairs.
-struct NibbleRangeIterator<'a, V> {
-    sorted_kvs: &'a [(HashValue, V)],
+struct NibbleRangeIterator<'a, K> {
+    sorted_kvs: &'a [(HashValue, K)],
     nibble_idx: usize,
     pos: usize,
 }
 
-impl<'a, V> NibbleRangeIterator<'a, V> {
-    fn new(sorted_kvs: &'a [(HashValue, V)], nibble_idx: usize) -> Self {
+impl<'a, K> NibbleRangeIterator<'a, K> {
+    fn new(sorted_kvs: &'a [(HashValue, K)], nibble_idx: usize) -> Self {
         assert!(nibble_idx < ROOT_NIBBLE_HEIGHT);
         NibbleRangeIterator {
             sorted_kvs,
@@ -203,7 +223,7 @@ impl<'a, V> NibbleRangeIterator<'a, V> {
     }
 }
 
-impl<'a, V> std::iter::Iterator for NibbleRangeIterator<'a, V> {
+impl<'a, K> std::iter::Iterator for NibbleRangeIterator<'a, K> {
     type Item = (usize, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -229,15 +249,15 @@ impl<'a, V> std::iter::Iterator for NibbleRangeIterator<'a, V> {
 }
 
 /// The Jellyfish Merkle tree data structure. See [`crate`] for description.
-pub struct JellyfishMerkleTree<'a, R, V> {
+pub struct JellyfishMerkleTree<'a, R, K> {
     reader: &'a R,
-    phantom_value: PhantomData<V>,
+    phantom_value: PhantomData<K>,
 }
 
-impl<'a, R, V> JellyfishMerkleTree<'a, R, V>
+impl<'a, R, K> JellyfishMerkleTree<'a, R, K>
 where
-    R: 'a + TreeReader<V>,
-    V: Value,
+    R: 'a + TreeReader<K>,
+    K: Key,
 {
     /// Creates a `JellyfishMerkleTree` backed by the given [`TreeReader`](trait.TreeReader.html).
     pub fn new(reader: &'a R) -> Self {
@@ -250,7 +270,7 @@ where
     /// Get the node hash from the cache if exists, otherwise compute it.
     fn get_hash(
         node_key: &NodeKey,
-        node: &Node<V>,
+        node: &Node<K>,
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
     ) -> HashValue {
         if let Some(cache) = hash_cache {
@@ -307,11 +327,11 @@ where
     /// the batch is not reachable from public interfaces before being committed.
     pub fn batch_put_value_sets(
         &self,
-        value_sets: Vec<Vec<(HashValue, &V)>>,
+        value_sets: Vec<Vec<(HashValue, &(HashValue, K))>>,
         node_hashes: Option<Vec<&HashMap<NibblePath, HashValue>>>,
         persisted_version: Option<Version>,
         first_version: Version,
-    ) -> Result<(Vec<HashValue>, TreeUpdateBatch<V>)> {
+    ) -> Result<(Vec<HashValue>, TreeUpdateBatch<K>)> {
         let mut tree_cache = TreeCache::new(self.reader, first_version, persisted_version)?;
         let hash_sets: Vec<_> = match node_hashes {
             Some(hashes) => hashes.into_iter().map(Some).collect(),
@@ -321,10 +341,11 @@ where
         for (idx, (value_set, hash_set)) in
             itertools::zip_eq(value_sets.into_iter(), hash_sets.into_iter()).enumerate()
         {
-            assert!(
-                !value_set.is_empty(),
-                "Transactions that output empty write set should not be included.",
-            );
+            if value_set.is_empty() {
+                tree_cache.freeze();
+                continue;
+            }
+
             let version = first_version + idx as u64;
             let deduped_and_sorted_kvs = value_set
                 .into_iter()
@@ -352,10 +373,10 @@ where
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn batch_put_value_sets_test(
         &self,
-        value_sets: Vec<Vec<(HashValue, &V)>>,
+        value_sets: Vec<Vec<(HashValue, &(HashValue, K))>>,
         node_hashes: Option<Vec<&HashMap<NibblePath, HashValue>>>,
         first_version: Version,
-    ) -> Result<(Vec<HashValue>, TreeUpdateBatch<V>)> {
+    ) -> Result<(Vec<HashValue>, TreeUpdateBatch<K>)> {
         self.batch_put_value_sets(
             value_sets,
             node_hashes,
@@ -368,13 +389,11 @@ where
         &self,
         mut node_key: NodeKey,
         version: Version,
-        kvs: &[(HashValue, &V)],
+        kvs: &[(HashValue, &(HashValue, K))],
         depth: usize,
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
-        tree_cache: &mut TreeCache<R, V>,
-    ) -> Result<(NodeKey, Node<V>)> {
-        assert!(!kvs.is_empty());
-
+        tree_cache: &mut TreeCache<R, K>,
+    ) -> Result<(NodeKey, Node<K>)> {
         let node = tree_cache.get_node(&node_key)?;
         Ok(match node {
             Node::Internal(internal_node) => {
@@ -473,17 +492,22 @@ where
         &self,
         node_key: NodeKey,
         version: Version,
-        existing_leaf_node: LeafNode<V>,
-        kvs: &[(HashValue, &V)],
+        existing_leaf_node: LeafNode<K>,
+        kvs: &[(HashValue, &(HashValue, K))],
         depth: usize,
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
-        tree_cache: &mut TreeCache<R, V>,
-    ) -> Result<(NodeKey, Node<V>)> {
+        tree_cache: &mut TreeCache<R, K>,
+    ) -> Result<(NodeKey, Node<K>)> {
         let existing_leaf_key = existing_leaf_node.account_key();
 
         if kvs.len() == 1 && kvs[0].0 == existing_leaf_key {
-            let new_leaf_node = Node::new_leaf(existing_leaf_key, kvs[0].1.clone());
+            let new_leaf_node = Node::new_leaf(
+                existing_leaf_key,
+                kvs[0].1 .0,
+                (kvs[0].1 .1.clone(), version),
+            );
             tree_cache.put_node(node_key.clone(), new_leaf_node.clone())?;
+            // TODO(lightmark): Add the purge logic the value here.
             Ok((node_key, new_leaf_node))
         } else {
             let existing_leaf_bucket = existing_leaf_key.get_nibble(depth);
@@ -544,13 +568,14 @@ where
         &self,
         node_key: NodeKey,
         version: Version,
-        kvs: &[(HashValue, &V)],
+        kvs: &[(HashValue, &(HashValue, K))],
         depth: usize,
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
-        tree_cache: &mut TreeCache<R, V>,
-    ) -> Result<(NodeKey, Node<V>)> {
+        tree_cache: &mut TreeCache<R, K>,
+    ) -> Result<(NodeKey, Node<K>)> {
         if kvs.len() == 1 {
-            let new_leaf_node = Node::new_leaf(kvs[0].0, kvs[0].1.clone());
+            let new_leaf_node =
+                Node::new_leaf(kvs[0].0, kvs[0].1 .0, (kvs[0].1 .1.clone(), version));
             tree_cache.put_node(node_key.clone(), new_leaf_node.clone())?;
             Ok((node_key, new_leaf_node))
         } else {
@@ -588,9 +613,9 @@ where
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn put_value_set_test(
         &self,
-        value_set: Vec<(HashValue, &V)>,
+        value_set: Vec<(HashValue, &(HashValue, K))>,
         version: Version,
-    ) -> Result<(HashValue, TreeUpdateBatch<V>)> {
+    ) -> Result<(HashValue, TreeUpdateBatch<K>)> {
         let (root_hashes, tree_update_batch) =
             self.batch_put_value_sets_test(vec![value_set], None, version)?;
         assert_eq!(
@@ -606,7 +631,7 @@ where
         &self,
         key: HashValue,
         version: Version,
-    ) -> Result<(Option<V>, SparseMerkleProof<V>)> {
+    ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProof)> {
         // Empty tree just returns proof with no sibling hash.
         let mut next_node_key = NodeKey::new_empty_path(version);
         let mut siblings = vec![];
@@ -647,7 +672,7 @@ where
                 Node::Leaf(leaf_node) => {
                     return Ok((
                         if leaf_node.account_key() == key {
-                            Some(leaf_node.value().clone())
+                            Some((leaf_node.value_hash(), leaf_node.value_index().clone()))
                         } else {
                             None
                         },
@@ -700,16 +725,16 @@ where
     }
 
     #[cfg(test)]
-    pub fn get(&self, key: HashValue, version: Version) -> Result<Option<V>> {
-        Ok(self.get_with_proof(key, version)?.0)
+    pub fn get(&self, key: HashValue, version: Version) -> Result<Option<HashValue>> {
+        Ok(self.get_with_proof(key, version)?.0.map(|x| x.0))
     }
 
-    fn get_root_node(&self, version: Version) -> Result<Node<V>> {
+    fn get_root_node(&self, version: Version) -> Result<Node<K>> {
         self.get_root_node_option(version)?
             .ok_or_else(|| format_err!("Root node not found for version {}.", version))
     }
 
-    fn get_root_node_option(&self, version: Version) -> Result<Option<Node<V>>> {
+    fn get_root_node_option(&self, version: Version) -> Result<Option<Node<K>>> {
         let root_node_key = NodeKey::new_empty_path(version);
         self.reader.get_node_option(&root_node_key)
     }

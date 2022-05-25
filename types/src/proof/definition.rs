@@ -9,7 +9,7 @@ use super::{
 };
 use crate::{
     ledger_info::LedgerInfo,
-    state_store::state_value::{StateKeyAndValue, StateValue},
+    state_store::state_value::StateValue,
     transaction::{TransactionInfo, Version},
 };
 use anyhow::{bail, ensure, format_err, Context, Result};
@@ -132,7 +132,7 @@ pub type TestAccumulatorProof = AccumulatorProof<TestOnlyHasher>;
 /// A proof that can be used to authenticate an element in a Sparse Merkle Tree given trusted root
 /// hash. For example, `TransactionInfoToAccountProof` can be constructed on top of this structure.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct SparseMerkleProof<V> {
+pub struct SparseMerkleProof {
     /// This proof can be used to authenticate whether a given leaf exists in the tree or not.
     ///     - If this is `Some(leaf_node)`
     ///         - If `leaf_node.key` equals requested key, this is an inclusion proof and
@@ -147,21 +147,12 @@ pub struct SparseMerkleProof<V> {
     /// All siblings in this proof, including the default ones. Siblings are ordered from the bottom
     /// level to the root level.
     siblings: Vec<HashValue>,
-
-    phantom: PhantomData<V>,
 }
 
-impl<V> SparseMerkleProof<V>
-where
-    V: CryptoHash,
-{
+impl SparseMerkleProof {
     /// Constructs a new `SparseMerkleProof` using leaf and a list of siblings.
     pub fn new(leaf: Option<SparseMerkleLeafNode>, siblings: Vec<HashValue>) -> Self {
-        SparseMerkleProof {
-            leaf,
-            siblings,
-            phantom: PhantomData,
-        }
+        SparseMerkleProof { leaf, siblings }
     }
 
     /// Returns the leaf node in this proof.
@@ -174,15 +165,28 @@ where
         &self.siblings
     }
 
-    /// If `element_value` is present, verifies an element whose key is `element_key` and value is
-    /// `element_value` exists in the Sparse Merkle Tree using the provided proof. Otherwise
-    /// verifies the proof is a valid non-inclusion proof that shows this key doesn't exist in the
-    /// tree.
-    pub fn verify(
+    pub fn verify<V: CryptoHash>(
         &self,
         expected_root_hash: HashValue,
         element_key: HashValue,
         element_value: Option<&V>,
+    ) -> Result<()> {
+        self.verify_by_hash(
+            expected_root_hash,
+            element_key,
+            element_value.map(|v| v.hash()),
+        )
+    }
+
+    /// If `element_hash` is present, verifies an element whose key is `element_key` and value is
+    /// authenticated by `element_hash` exists in the Sparse Merkle Tree using the provided proof.
+    /// Otherwise verifies the proof is a valid non-inclusion proof that shows this key doesn't
+    /// exist in the tree.
+    pub fn verify_by_hash(
+        &self,
+        expected_root_hash: HashValue,
+        element_key: HashValue,
+        element_hash: Option<HashValue>,
     ) -> Result<()> {
         ensure!(
             self.siblings.len() <= HashValue::LENGTH_IN_BITS,
@@ -191,8 +195,8 @@ where
             self.siblings.len(),
         );
 
-        match (element_value, self.leaf) {
-            (Some(value), Some(leaf)) => {
+        match (element_hash, self.leaf) {
+            (Some(hash), Some(leaf)) => {
                 // This is an inclusion proof, so the key and value hash provided in the proof
                 // should match element_key and element_value_hash. `siblings` should prove the
                 // route from the leaf node to the root.
@@ -202,7 +206,6 @@ where
                     leaf.key,
                     element_key
                 );
-                let hash = value.hash();
                 ensure!(
                     hash == leaf.value_hash,
                     "Value hashes do not match. Value hash in proof: {:x}. \
@@ -211,7 +214,7 @@ where
                     hash,
                 );
             }
-            (Some(_value), None) => bail!("Expected inclusion proof. Found non-inclusion proof."),
+            (Some(_hash), None) => bail!("Expected inclusion proof. Found non-inclusion proof."),
             (None, Some(leaf)) => {
                 // This is a non-inclusion proof. The proof intends to show that if a leaf node
                 // representing `element_key` is inserted, it will break a currently existing leaf
@@ -262,12 +265,6 @@ where
         );
 
         Ok(())
-    }
-}
-
-impl From<SparseMerkleProof<StateKeyAndValue>> for SparseMerkleProof<StateValue> {
-    fn from(proof: SparseMerkleProof<StateKeyAndValue>) -> Self {
-        SparseMerkleProof::new(proof.leaf(), proof.siblings().to_vec())
     }
 }
 
@@ -368,7 +365,7 @@ impl TransactionAccumulatorSummary {
 /// the client can verify that it can indeed obtain the new root hash by appending these new
 /// leaves, it can be convinced that the two accumulators are consistent.
 ///
-/// See [`crate::proof::accumulator::Accumulator::append_subtrees`] for more details.
+/// See [`crate::proof::accumulator::InMemoryAccumulator::append_subtrees`] for more details.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AccumulatorConsistencyProof {
     /// The subtrees representing the newly appended leaves.
@@ -722,7 +719,7 @@ pub struct StateStoreValueProof {
     transaction_info_with_proof: TransactionInfoWithProof,
 
     /// The sparse merkle proof from state root to the account state.
-    transaction_info_to_value_proof: SparseMerkleProof<StateValue>,
+    transaction_info_to_value_proof: SparseMerkleProof,
 }
 
 impl StateStoreValueProof {
@@ -730,7 +727,7 @@ impl StateStoreValueProof {
     /// `transaction_info` and `transaction_info_to_account_proof`.
     pub fn new(
         transaction_info_with_proof: TransactionInfoWithProof,
-        transaction_info_to_value_proof: SparseMerkleProof<StateValue>,
+        transaction_info_to_value_proof: SparseMerkleProof,
     ) -> Self {
         StateStoreValueProof {
             transaction_info_with_proof,
@@ -744,7 +741,7 @@ impl StateStoreValueProof {
     }
 
     /// Returns the `transaction_info_to_account_proof` object in this proof.
-    pub fn transaction_info_to_account_proof(&self) -> &SparseMerkleProof<StateValue> {
+    pub fn transaction_info_to_account_proof(&self) -> &SparseMerkleProof {
         &self.transaction_info_to_value_proof
     }
 

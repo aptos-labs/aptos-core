@@ -106,7 +106,7 @@ spec:
           value: {{ .rust_log_remote }}
       {{- end }}
         - name: RUST_BACKTRACE
-          value: "1"
+          value: "0"
         volumeMounts:
         - name: aptos-config
           mountPath: /opt/aptos/etc

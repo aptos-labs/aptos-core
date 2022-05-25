@@ -6,10 +6,11 @@ use aptos_types::state_store::state_value::StateValue;
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
 use itertools::zip_eq;
 use rand::{distributions::Standard, prelude::StdRng, seq::IteratorRandom, Rng, SeedableRng};
-use scratchpad::{test_utils::naive_smt::NaiveSmt, SparseMerkleTree};
+use scratchpad::{
+    test_utils::{naive_smt::NaiveSmt, proof_reader::ProofReader},
+    SparseMerkleTree,
+};
 use std::collections::HashSet;
-
-type ProofReader = scratchpad::test_utils::proof_reader::ProofReader<StateValue>;
 
 struct Block {
     smt: SparseMerkleTree<StateValue>,

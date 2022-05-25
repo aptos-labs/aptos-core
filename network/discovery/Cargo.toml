@@ -12,10 +12,10 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.57"
 bcs = "0.1.3"
-futures = "0.3.12"
+futures = "0.3.21"
 once_cell = "1.10.0"
 serde_yaml = "0.8.24"
-tokio = { version = "1.8.1", features = ["full"] }
+tokio = { version = "1.18.2", features = ["full"] }
 
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
@@ -32,7 +32,7 @@ network = { path = "../../network" }
 short-hex-str = { path = "../../crates/short-hex-str" }
 
 [dev-dependencies]
-rand = "0.8.3"
+rand = "0.8.5"
 
 aptos-config = { path = "../../config", features = ["testing"] }
 aptos-temppath = { path = "../../crates/aptos-temppath" }

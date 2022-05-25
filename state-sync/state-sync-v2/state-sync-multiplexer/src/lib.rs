@@ -77,7 +77,7 @@ impl StateSyncMultiplexer {
         streaming_service_client: StreamingServiceClient,
     ) -> Self {
         // Notify subscribers of the initial on-chain config values
-        match (&*storage.reader).fetch_synced_version() {
+        match (&*storage.reader).fetch_latest_state_checkpoint_version() {
             Ok(synced_version) => {
                 if let Err(error) =
                     event_subscription_service.notify_initial_configs(synced_version)

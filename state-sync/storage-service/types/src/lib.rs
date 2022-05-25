@@ -55,6 +55,8 @@ pub enum StorageServiceMessage {
 pub enum StorageServiceRequest {
     GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest), // Fetches a list of account states with a proof
     GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest), // Fetches a list of epoch ending ledger infos
+    GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest), // Subscribes to new transaction outputs
+    GetNewTransactionsWithProof(NewTransactionsWithProofRequest), // Subscribes to new transactions with a proof
     GetNumberOfAccountsAtVersion(Version), // Fetches the number of accounts at the specified version
     GetServerProtocolVersion,              // Fetches the protocol version run by the server
     GetStorageServerSummary,               // Fetches a summary of the storage server state
@@ -68,6 +70,8 @@ impl StorageServiceRequest {
         match self {
             Self::GetAccountStatesChunkWithProof(_) => "get_account_states_chunk_with_proof",
             Self::GetEpochEndingLedgerInfos(_) => "get_epoch_ending_ledger_infos",
+            Self::GetNewTransactionOutputsWithProof(_) => "get_new_transaction_outputs_with_proof",
+            Self::GetNewTransactionsWithProof(_) => "get_new_transactions_with_proof",
             Self::GetNumberOfAccountsAtVersion(_) => "get_number_of_accounts_at_version",
             Self::GetServerProtocolVersion => "get_server_protocol_version",
             Self::GetStorageServerSummary => "get_storage_server_summary",
@@ -79,15 +83,21 @@ impl StorageServiceRequest {
     pub fn is_get_storage_server_summary(&self) -> bool {
         matches!(self, &Self::GetStorageServerSummary)
     }
+
+    pub fn is_data_subscription_request(&self) -> bool {
+        matches!(self, &Self::GetNewTransactionOutputsWithProof(_))
+            || matches!(self, &Self::GetNewTransactionsWithProof(_))
+    }
 }
 
 /// A storage service response.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-// TODO(philiphayes): do something about this without making it ugly :(
 #[allow(clippy::large_enum_variant)]
 pub enum StorageServiceResponse {
     AccountStatesChunkWithProof(StateValueChunkWithProof),
     EpochEndingLedgerInfos(EpochChangeProof),
+    NewTransactionOutputsWithProof((TransactionOutputListWithProof, LedgerInfoWithSignatures)),
+    NewTransactionsWithProof((TransactionListWithProof, LedgerInfoWithSignatures)),
     NumberOfAccountsAtVersion(u64),
     ServerProtocolVersion(ServerProtocolVersion),
     StorageServerSummary(StorageServerSummary),
@@ -102,6 +112,8 @@ impl StorageServiceResponse {
         match self {
             Self::AccountStatesChunkWithProof(_) => "account_states_chunk_with_proof",
             Self::EpochEndingLedgerInfos(_) => "epoch_ending_ledger_infos",
+            Self::NewTransactionOutputsWithProof(_) => "new_transaction_outputs_with_proof",
+            Self::NewTransactionsWithProof(_) => "new_transactions_with_proof",
             Self::NumberOfAccountsAtVersion(_) => "number_of_accounts_at_version",
             Self::ServerProtocolVersion(_) => "server_protocol_version",
             Self::StorageServerSummary(_) => "storage_server_summary",
@@ -156,6 +168,34 @@ impl TryFrom<StorageServiceResponse> for EpochChangeProof {
             StorageServiceResponse::EpochEndingLedgerInfos(inner) => Ok(inner),
             _ => Err(UnexpectedResponseError(format!(
                 "expected epoch_ending_ledger_infos, found {}",
+                response.get_label()
+            ))),
+        }
+    }
+}
+
+impl TryFrom<StorageServiceResponse>
+    for (TransactionOutputListWithProof, LedgerInfoWithSignatures)
+{
+    type Error = UnexpectedResponseError;
+    fn try_from(response: StorageServiceResponse) -> Result<Self, Self::Error> {
+        match response {
+            StorageServiceResponse::NewTransactionOutputsWithProof(inner) => Ok(inner),
+            _ => Err(UnexpectedResponseError(format!(
+                "expected new_transaction_outputs_with_proof, found {}",
+                response.get_label()
+            ))),
+        }
+    }
+}
+
+impl TryFrom<StorageServiceResponse> for (TransactionListWithProof, LedgerInfoWithSignatures) {
+    type Error = UnexpectedResponseError;
+    fn try_from(response: StorageServiceResponse) -> Result<Self, Self::Error> {
+        match response {
+            StorageServiceResponse::NewTransactionsWithProof(inner) => Ok(inner),
+            _ => Err(UnexpectedResponseError(format!(
+                "expected new_transactions_with_proof, found {}",
                 response.get_label()
             ))),
         }
@@ -236,6 +276,23 @@ pub struct AccountStatesChunkWithProofRequest {
     pub end_account_index: u64,   // The account index to stop fetching account states (inclusive)
 }
 
+/// A storage service request for fetching a new transaction output list
+/// beyond the already known version and epoch.
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct NewTransactionOutputsWithProofRequest {
+    pub known_version: u64, // The highest known output version
+    pub known_epoch: u64,   // The highest known epoch
+}
+
+/// A storage service request for fetching a new transaction list
+/// beyond the already known version and epoch.
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct NewTransactionsWithProofRequest {
+    pub known_version: u64,   // The highest known transaction version
+    pub known_epoch: u64,     // The highest known epoch
+    pub include_events: bool, // Whether or not to include events in the response
+}
+
 /// A storage service request for fetching a transaction output list with a
 /// corresponding proof.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -295,12 +352,15 @@ pub struct ProtocolMetadata {
 }
 
 impl ProtocolMetadata {
+    /// Returns true iff the request can be serviced
     pub fn can_service(&self, request: &StorageServiceRequest) -> bool {
         use StorageServiceRequest::*;
         match request {
-            GetServerProtocolVersion
-            | GetStorageServerSummary
-            | GetNumberOfAccountsAtVersion(_) => true,
+            GetNewTransactionsWithProof(_)
+            | GetNewTransactionOutputsWithProof(_)
+            | GetNumberOfAccountsAtVersion(_)
+            | GetServerProtocolVersion
+            | GetStorageServerSummary => true,
             GetAccountStatesChunkWithProof(request) => {
                 CompleteDataRange::new(request.start_account_index, request.end_account_index)
                     .map_or(false, |range| {
@@ -376,12 +436,14 @@ pub struct DataSummary {
 }
 
 impl DataSummary {
+    /// Returns true iff the request can be serviced
     pub fn can_service(&self, request: &StorageServiceRequest) -> bool {
         use StorageServiceRequest::*;
         match request {
-            // storage services can always serve these metadata requests
-            GetServerProtocolVersion => true,
-            GetStorageServerSummary => true,
+            GetNewTransactionsWithProof(_)
+            | GetNewTransactionOutputsWithProof(_)
+            | GetServerProtocolVersion
+            | GetStorageServerSummary => true,
             GetAccountStatesChunkWithProof(request) => {
                 let proof_version = request.version;
 

@@ -1,21 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    proof::{
-        definition::{
-            EventProof, StateStoreValueProof, TransactionInfoListWithProof,
-            TransactionInfoWithProof,
-        },
-        AccumulatorConsistencyProof, SparseMerkleRangeProof, TestAccumulatorProof,
-        TestAccumulatorRangeProof,
+use crate::proof::{
+    definition::{
+        EventProof, StateStoreValueProof, TransactionInfoListWithProof, TransactionInfoWithProof,
     },
-    state_store::state_value::StateValue,
+    AccumulatorConsistencyProof, SparseMerkleRangeProof, TestAccumulatorProof,
+    TestAccumulatorRangeProof,
 };
 use bcs::test_helpers::assert_canonical_encode_decode;
 use proptest::prelude::*;
 
-type SparseMerkleProof = crate::proof::SparseMerkleProof<StateValue>;
+type SparseMerkleProof = crate::proof::SparseMerkleProof;
 
 proptest! {
 

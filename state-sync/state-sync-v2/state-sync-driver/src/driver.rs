@@ -34,7 +34,7 @@ use tokio::time::{interval, Duration};
 use tokio_stream::wrappers::IntervalStream;
 
 // Useful constants for the driver
-const DRIVER_ERROR_LOG_FREQ_SECS: u64 = 1;
+const DRIVER_ERROR_LOG_FREQ_SECS: u64 = 3;
 
 /// The configuration of the state sync driver
 #[derive(Clone)]
@@ -283,11 +283,13 @@ impl<
         &self,
         consensus_commit_notification: &ConsensusCommitNotification,
     ) {
+        // Update the driver metrics
         metrics::increment_counter(
             &metrics::DRIVER_COUNTERS,
             metrics::DRIVER_CONSENSUS_COMMIT_NOTIFICATION,
         );
 
+        // Update the synced versions
         let operations = [
             metrics::StorageSynchronizerOperations::ExecutedTransactions,
             metrics::StorageSynchronizerOperations::Synced,
@@ -297,6 +299,18 @@ impl<
                 &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
                 operation.get_label(),
                 consensus_commit_notification.transactions.len() as u64,
+            );
+        }
+
+        // Update the synced epoch
+        if !consensus_commit_notification
+            .reconfiguration_events
+            .is_empty()
+        {
+            metrics::increment_gauge(
+                &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+                metrics::StorageSynchronizerOperations::SyncedEpoch.get_label(),
+                1,
             );
         }
     }
@@ -354,7 +368,7 @@ impl<
     /// accounts.
     async fn handle_commit_notification(&mut self, commit_notification: CommitNotification) {
         let CommitNotification::CommittedAccounts(committed_accounts) = commit_notification;
-        debug!(
+        info!(
             LogSchema::new(LogEntry::SynchronizerNotification).message(&format!(
                 "Received an account commit notification from the storage synchronizer. \
                         All synced: {:?}, last committed index: {:?}.",

@@ -63,7 +63,7 @@ pub(crate) struct Pruner {
 }
 
 pub enum PrunerIndex {
-    #[cfg(test)]
+    #[allow(dead_code)]
     StateStorePrunerIndex,
     LedgerPrunerIndex,
 }

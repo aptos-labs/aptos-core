@@ -145,15 +145,15 @@ fn test_continuously_stream_transactions() {
         new_streaming_service_client_listener_pair();
 
     // Note the request we expect to receive on the streaming service side
-    let request_start_version = 101;
-    let request_start_epoch = 2;
-    let request_include_events = false;
+    let known_version = 101;
+    let known_epoch = 2;
+    let include_events = false;
     let target = None;
     let expected_request =
         StreamRequest::ContinuouslyStreamTransactions(ContinuouslyStreamTransactionsRequest {
-            start_version: request_start_version,
-            start_epoch: request_start_epoch,
-            include_events: request_include_events,
+            known_version,
+            known_epoch,
+            include_events,
             target: target.clone(),
         });
 
@@ -162,9 +162,9 @@ fn test_continuously_stream_transactions() {
 
     // Send a continuous transaction stream request and verify we get a data stream listener
     let response = block_on(streaming_service_client.continuously_stream_transactions(
-        request_start_version,
-        request_start_epoch,
-        request_include_events,
+        known_version,
+        known_epoch,
+        include_events,
         target,
     ));
     assert_ok!(response);
@@ -182,8 +182,8 @@ fn test_continuously_stream_transaction_outputs() {
     let target = Some(create_ledger_info(1000, 10, true));
     let expected_request = StreamRequest::ContinuouslyStreamTransactionOutputs(
         ContinuouslyStreamTransactionOutputsRequest {
-            start_version: request_start_version,
-            start_epoch: request_start_epoch,
+            known_version: request_start_version,
+            known_epoch: request_start_epoch,
             target: target.clone(),
         },
     );

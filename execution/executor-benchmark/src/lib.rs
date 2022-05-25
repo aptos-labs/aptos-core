@@ -66,9 +66,9 @@ pub fn run_benchmark(
 
     let (mut config, genesis_key) = aptos_genesis_tool::test_config();
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
-    AptosVM::set_concurrency_level_once(config.execution.concurrency_level as usize);
 
     let (db, executor) = init_db_and_executor(&config);
+    let start_version = db.get_latest_version().unwrap();
     let parent_block_id = executor.committed_block_id();
     let executor_1 = Arc::new(executor);
     let executor_2 = executor_1.clone();
@@ -76,8 +76,12 @@ pub fn run_benchmark(
     let (block_sender, block_receiver) = mpsc::sync_channel(50 /* bound */);
     let (commit_sender, commit_receiver) = mpsc::sync_channel(3 /* bound */);
 
-    let mut generator =
-        TransactionGenerator::new_with_metafile(genesis_key, block_sender, source_dir);
+    let mut generator = TransactionGenerator::new_with_existing_db(
+        genesis_key,
+        block_sender,
+        source_dir,
+        start_version,
+    );
     let start_version = generator.version();
 
     // Spawn two threads to run transaction generator and executor separately.
@@ -134,8 +138,6 @@ mod tests {
     fn test_benchmark() {
         let storage_dir = TempPath::new();
         let checkpoint_dir = TempPath::new();
-        storage_dir.create_as_dir().unwrap();
-        checkpoint_dir.create_as_dir().unwrap();
 
         crate::db_generator::run(
             25,    /* num_accounts */

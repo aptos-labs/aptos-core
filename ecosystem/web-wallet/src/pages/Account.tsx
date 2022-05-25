@@ -19,23 +19,23 @@ import {
   ModalContent,
   ModalHeader,
   ModalCloseButton,
-  ModalBody
-} from '@chakra-ui/react'
-import React from 'react'
-import withSimulatedExtensionContainer from '../components/WithSimulatedExtensionContainer'
-import { CredentialHeaderAndBody, CredentialHeaderAndBodyProps } from './CreateWallet'
-import useWalletState from '../hooks/useWalletState'
-import { useNavigate } from 'react-router-dom'
-import { secondaryTextColor } from './Login'
-import { ExternalLinkIcon } from '@chakra-ui/icons'
-import WalletLayout from '../Layouts/WalletLayout'
+  ModalBody,
+} from '@chakra-ui/react';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ExternalLinkIcon } from '@chakra-ui/icons';
+import useWalletState from 'core/hooks/useWalletState';
+import WalletLayout from 'core/layouts/WalletLayout';
+import withSimulatedExtensionContainer from '../core/components/WithSimulatedExtensionContainer';
+import { CredentialHeaderAndBody, CredentialHeaderAndBodyProps } from './CreateWallet';
+import { secondaryTextColor } from './Login';
 
-export const CredentialRow = ({
+export function CredentialRow({
+  body,
   header,
-  body
-}: CredentialHeaderAndBodyProps) => {
-  const { hasCopied, onCopy } = useClipboard(body || '')
-  const { colorMode } = useColorMode()
+}: CredentialHeaderAndBodyProps) {
+  const { hasCopied, onCopy } = useClipboard(body || '');
+  const { colorMode } = useColorMode();
   return (
     <SimpleGrid columns={2} width="100%">
       <Flex alignItems="flex-start">
@@ -51,24 +51,24 @@ export const CredentialRow = ({
         </Tooltip>
       </Flex>
     </SimpleGrid>
-  )
+  );
 }
 
-const Account = () => {
-  const { isOpen, onOpen, onClose } = useDisclosure()
-  const { signOut, aptosAccount } = useWalletState()
-  const navigate = useNavigate()
+function Account() {
+  const { isOpen, onClose, onOpen } = useDisclosure();
+  const { aptosAccount, signOut } = useWalletState();
+  const navigate = useNavigate();
 
-  const privateKeyObject = aptosAccount?.toPrivateKeyObject()
-  const privateKeyHex = privateKeyObject?.privateKeyHex
-  const publicKeyHex = privateKeyObject?.publicKeyHex
-  const address = privateKeyObject?.address
-  const explorerAddress = `https://explorer.devnet.aptos.dev/account/${address}`
+  const privateKeyObject = aptosAccount?.toPrivateKeyObject();
+  const privateKeyHex = privateKeyObject?.privateKeyHex;
+  const publicKeyHex = privateKeyObject?.publicKeyHex;
+  const address = privateKeyObject?.address;
+  const explorerAddress = `https://explorer.devnet.aptos.dev/account/${address}`;
 
   const signOutOnClick = () => {
-    signOut()
-    navigate('/')
-  }
+    signOut();
+    navigate('/');
+  };
 
   return (
     <WalletLayout>
@@ -105,20 +105,20 @@ const Account = () => {
                   </ModalHeader>
                   <ModalCloseButton />
                   <ModalBody>
-                  <VStack mt={2} spacing={4} pb={8}>
-                    <CredentialHeaderAndBody
-                      header="Private key"
-                      body={privateKeyHex}
-                    />
-                    <CredentialHeaderAndBody
-                      header="Public key"
-                      body={publicKeyHex}
-                    />
-                    <CredentialHeaderAndBody
-                      header="Address"
-                      body={address}
-                    />
-                  </VStack>
+                    <VStack mt={2} spacing={4} pb={8}>
+                      <CredentialHeaderAndBody
+                        header="Private key"
+                        body={privateKeyHex}
+                      />
+                      <CredentialHeaderAndBody
+                        header="Public key"
+                        body={publicKeyHex}
+                      />
+                      <CredentialHeaderAndBody
+                        header="Address"
+                        body={address}
+                      />
+                    </VStack>
                   </ModalBody>
                 </ModalContent>
               </Modal>
@@ -146,7 +146,7 @@ const Account = () => {
         </Box>
       </VStack>
     </WalletLayout>
-  )
+  );
 }
 
-export default withSimulatedExtensionContainer(Account)
+export default withSimulatedExtensionContainer(Account);

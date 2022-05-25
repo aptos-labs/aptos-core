@@ -22,14 +22,13 @@ use aptos_types::{
     state_store::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
-        state_value::{
-            StateKeyAndValue, StateValue, StateValueChunkWithProof, StateValueWithProof,
-        },
+        state_value::{StateValue, StateValueChunkWithProof, StateValueWithProof},
     },
     transaction::{
         AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
         TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
     },
+    write_set::WriteSet,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
@@ -77,7 +76,8 @@ impl StartupInfo {
         let committed_tree_state = TreeState {
             num_transactions: 0,
             ledger_frozen_subtree_hashes: Vec::new(),
-            state_root_hash: *SPARSE_MERKLE_PLACEHOLDER_HASH,
+            state_checkpoint_hash: *SPARSE_MERKLE_PLACEHOLDER_HASH,
+            state_checkpoint_version: None,
         };
         let synced_tree_state = None;
 
@@ -109,26 +109,48 @@ impl StartupInfo {
 pub struct TreeState {
     pub num_transactions: LeafCount,
     pub ledger_frozen_subtree_hashes: Vec<HashValue>,
-    pub state_root_hash: HashValue,
+    /// Root hash of the state checkpoint (global sparse merkle tree).
+    pub state_checkpoint_hash: HashValue,
+    pub state_checkpoint_version: Option<Version>,
 }
 
 impl TreeState {
     pub fn new(
         num_transactions: LeafCount,
         ledger_frozen_subtree_hashes: Vec<HashValue>,
-        account_state_root_hash: HashValue,
+        state_checkpoint_hash: HashValue,
+        state_checkpoint_version: Option<Version>,
     ) -> Self {
         Self {
             num_transactions,
             ledger_frozen_subtree_hashes,
-            state_root_hash: account_state_root_hash,
+            state_checkpoint_hash,
+            state_checkpoint_version,
         }
+    }
+
+    pub fn new_at_state_checkpoint(
+        num_transactions: LeafCount,
+        ledger_frozen_subtree_hashes: Vec<HashValue>,
+        state_root_hash: HashValue,
+    ) -> Self {
+        Self {
+            num_transactions,
+            ledger_frozen_subtree_hashes,
+            state_checkpoint_hash: state_root_hash,
+            // Doesn't consider the possibility of PRE_GENESIS exists
+            state_checkpoint_version: num_transactions.checked_sub(1),
+        }
+    }
+
+    pub fn new_empty() -> Self {
+        Self::new_at_state_checkpoint(0, Vec::new(), *SPARSE_MERKLE_PLACEHOLDER_HASH)
     }
 
     pub fn describe(&self) -> &'static str {
         if self.num_transactions != 0 {
             "DB has been bootstrapped."
-        } else if self.state_root_hash != *SPARSE_MERKLE_PLACEHOLDER_HASH {
+        } else if self.state_checkpoint_hash != *SPARSE_MERKLE_PLACEHOLDER_HASH {
             "DB has no transaction, but a non-empty pre-genesis state."
         } else {
             "DB is empty, has no transaction or state."
@@ -136,12 +158,8 @@ impl TreeState {
     }
 }
 
-pub trait StateSnapshotReceiver<V>: Send {
-    fn add_chunk(
-        &mut self,
-        chunk: Vec<(HashValue, V)>,
-        proof: SparseMerkleRangeProof,
-    ) -> Result<()>;
+pub trait StateSnapshotReceiver<K, V>: Send {
+    fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()>;
 
     fn finish(self) -> Result<()>;
 
@@ -189,9 +207,9 @@ pub enum Order {
 /// expected of an Aptos DB
 #[allow(unused_variables)]
 pub trait DbReader: Send + Sync {
-    /// See [`AptosDB::get_epoch_ending_ledger_infos`].
+    /// See [AptosDB::get_epoch_ending_ledger_infos].
     ///
-    /// [`AptosDB::get_epoch_ending_ledger_infos`]:
+    /// [AptosDB::get_epoch_ending_ledger_infos]:
     /// ../aptosdb/struct.AptosDB.html#method.get_epoch_ending_ledger_infos
     fn get_epoch_ending_ledger_infos(
         &self,
@@ -201,9 +219,9 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// See [`AptosDB::get_transactions`].
+    /// See [AptosDB::get_transactions].
     ///
-    /// [`AptosDB::get_transactions`]: ../aptosdb/struct.AptosDB.html#method.get_transactions
+    /// [AptosDB::get_transactions]: ../aptosdb/struct.AptosDB.html#method.get_transactions
     fn get_transactions(
         &self,
         start_version: Version,
@@ -214,9 +232,9 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// See [`AptosDB::get_transaction_by_hash`].
+    /// See [AptosDB::get_transaction_by_hash].
     ///
-    /// [`AptosDB::get_transaction_by_hash`]: ../aptosdb/struct.AptosDB.html#method.get_transaction_by_hash
+    /// [AptosDB::get_transaction_by_hash]: ../aptosdb/struct.AptosDB.html#method.get_transaction_by_hash
     fn get_transaction_by_hash(
         &self,
         hash: HashValue,
@@ -226,9 +244,9 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// See [`AptosDB::get_transaction_by_version`].
+    /// See [AptosDB::get_transaction_by_version].
     ///
-    /// [`AptosDB::get_transaction_by_version`]: ../aptosdb/struct.AptosDB.html#method.get_transaction_by_version
+    /// [AptosDB::get_transaction_by_version]: ../aptosdb/struct.AptosDB.html#method.get_transaction_by_version
     fn get_transaction_by_version(
         &self,
         version: Version,
@@ -238,29 +256,40 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// See [`AptosDB::get_txn_set_version`].
+    /// See [AptosDB::get_first_txn_version].
     ///
-    /// [`AptosDB::get_first_txn_version`]: ../aptosdb/struct.AptosDB.html#method.get_first_txn_version
+    /// [AptosDB::get_first_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_txn_version
     fn get_first_txn_version(&self) -> Result<Option<Version>> {
         unimplemented!()
     }
 
-    /// See [`AptosDB::get_first_write_set_version`].
+    /// See [AptosDB::get_first_write_set_version].
     ///
-    /// [`AptosDB::get_first_write_set_version`]: ../aptosdb/struct.AptosDB.html#method.get_first_write_set_version
+    /// [AptosDB::get_first_write_set_version]: ../aptosdb/struct.AptosDB.html#method.get_first_write_set_version
     fn get_first_write_set_version(&self) -> Result<Option<Version>> {
         unimplemented!()
     }
 
-    /// See [`AptosDB::get_transaction_outputs`].
+    /// See [AptosDB::get_transaction_outputs].
     ///
-    /// [`AptosDB::get_transaction_outputs`]: ../aptosdb/struct.AptosDB.html#method.get_transaction_outputs
+    /// [AptosDB::get_transaction_outputs]: ../aptosdb/struct.AptosDB.html#method.get_transaction_outputs
     fn get_transaction_outputs(
         &self,
         start_version: Version,
         limit: u64,
         ledger_version: Version,
     ) -> Result<TransactionOutputListWithProof> {
+        unimplemented!()
+    }
+
+    /// See [`AptosDB::get_write_sets`].
+    ///
+    /// [`AptosDB::get_write_sets`]: ../aptosdb/struct.AptosDB.html#method.get_write_sets
+    fn get_write_sets(
+        &self,
+        start_version: Version,
+        end_version: Version,
+    ) -> Result<Vec<WriteSet>> {
         unimplemented!()
     }
 
@@ -287,16 +316,16 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// See [`AptosDB::get_block_timestamp`].
+    /// See [AptosDB::get_block_timestamp].
     ///
-    /// [`AptosDB::get_block_timestamp`]:
+    /// [AptosDB::get_block_timestamp]:
     /// ../aptosdb/struct.AptosDB.html#method.get_block_timestamp
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
         unimplemented!()
     }
 
-    /// Returns the [`NewBlockEvent`] for the block containing the requested
-    /// `version` and proof that the block actually contains the `version`.
+    /// Returns the [`aptos_types::account_config::events::new_block::NewBlockEvent`] for the block
+    /// containing the requested `version` and proof that the block actually contains the `version`.
     fn get_event_by_version_with_proof(
         &self,
         event_key: &EventKey,
@@ -307,7 +336,7 @@ pub trait DbReader: Send + Sync {
     }
 
     /// Gets the version of the last transaction committed before timestamp,
-    /// a commited block at or after the required timestamp must exist (otherwise it's possible
+    /// a committed block at or after the required timestamp must exist (otherwise it's possible
     /// the next block committed as a timestamp smaller than the one in the request).
     fn get_last_version_before_timestamp(
         &self,
@@ -317,9 +346,9 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// See [`AptosDB::get_latest_account_state`].
+    /// See [AptosDB::get_latest_account_state].
     ///
-    /// [`AptosDB::get_latest_account_state`]:
+    /// [AptosDB::get_latest_account_state]:
     /// ../aptosdb/struct.AptosDB.html#method.get_latest_account_state
     fn get_latest_state_value(&self, state_key: StateKey) -> Result<Option<StateValue>> {
         unimplemented!()
@@ -359,6 +388,11 @@ pub trait DbReader: Send + Sync {
         Ok(self.get_latest_ledger_info()?.ledger_info().version())
     }
 
+    /// Returns the latest state checkpoint version if any.
+    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
+        unimplemented!()
+    }
+
     /// Returns the latest version and committed block timestamp
     fn get_latest_commit_metadata(&self) -> Result<(Version, u64)> {
         let ledger_info_with_sig = self.get_latest_ledger_info()?;
@@ -367,9 +401,9 @@ pub trait DbReader: Send + Sync {
     }
 
     /// Gets information needed from storage during the main node startup.
-    /// See [`AptosDB::get_startup_info`].
+    /// See [AptosDB::get_startup_info].
     ///
-    /// [`AptosDB::get_startup_info`]:
+    /// [AptosDB::get_startup_info]:
     /// ../aptosdb/struct.AptosDB.html#method.get_startup_info
     fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
         unimplemented!()
@@ -428,19 +462,19 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    // Gets an account state by account address, out of the ledger state indicated by the state
-    // Merkle tree root with a sparse merkle proof proving state tree root.
-    // See [`AptosDB::get_account_state_with_proof_by_version`].
-    //
-    // [`AptosDB::get_account_state_with_proof_by_version`]:
-    // ../aptosdb/struct.AptosDB.html#method.get_account_state_with_proof_by_version
-    //
-    // This is used by aptos core (executor) internally.
+    /// Gets an account state by account address, out of the ledger state indicated by the state
+    /// Merkle tree root with a sparse merkle proof proving state tree root.
+    /// See [AptosDB::get_account_state_with_proof_by_version].
+    ///
+    /// [AptosDB::get_account_state_with_proof_by_version]:
+    /// ../aptosdb/struct.AptosDB.html#method.get_account_state_with_proof_by_version
+    ///
+    /// This is used by aptos core (executor) internally.
     fn get_state_value_with_proof_by_version(
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof<StateValue>)> {
+    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
         unimplemented!()
     }
 
@@ -534,7 +568,7 @@ pub trait DbReader: Send + Sync {
 
 impl MoveStorage for &dyn DbReader {
     fn fetch_resource(&self, access_path: AccessPath) -> Result<Vec<u8>> {
-        self.fetch_resource_by_version(access_path, self.fetch_synced_version()?)
+        self.fetch_resource_by_version(access_path, self.fetch_latest_state_checkpoint_version()?)
     }
 
     fn fetch_resource_by_version(
@@ -578,6 +612,11 @@ impl MoveStorage for &dyn DbReader {
             .ok_or_else(|| format_err!("[MoveStorage] Latest transaction info not found."))?;
         Ok(synced_version)
     }
+
+    fn fetch_latest_state_checkpoint_version(&self) -> Result<Version> {
+        self.get_latest_state_checkpoint_version()?
+            .ok_or_else(|| format_err!("[MoveStorage] Latest state checkpoint not found."))
+    }
 }
 
 /// Trait that is implemented by a DB that supports certain public (to client) write APIs
@@ -591,7 +630,7 @@ pub trait DbWriter: Send + Sync {
         &self,
         version: Version,
         expected_root_hash: HashValue,
-    ) -> Result<Box<dyn StateSnapshotReceiver<StateKeyAndValue>>> {
+    ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
         unimplemented!()
     }
 

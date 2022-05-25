@@ -23,4 +23,7 @@ pub trait MoveStorage {
 
     /// Get the version on the latest transaction info.
     fn fetch_synced_version(&self) -> Result<Version>;
+
+    /// Get the version of the latest state checkpoint
+    fn fetch_latest_state_checkpoint_version(&self) -> Result<Version>;
 }

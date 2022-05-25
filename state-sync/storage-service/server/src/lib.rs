@@ -6,7 +6,7 @@
 use crate::{
     logging::{LogEntry, LogSchema},
     metrics::{increment_counter, start_timer, LRU_CACHE_HIT, LRU_CACHE_PROBE},
-    network::StorageServiceNetworkEvents,
+    network::{ResponseSender, StorageServiceNetworkEvents},
 };
 use ::network::ProtocolId;
 use aptos_config::config::StorageServiceConfig;
@@ -14,7 +14,9 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
+    account_address::AccountAddress,
     epoch_change::EpochChangeProof,
+    ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
@@ -22,7 +24,12 @@ use bounded_executor::BoundedExecutor;
 use futures::stream::StreamExt;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
-use std::{sync::Arc, time::Duration};
+use std::{
+    cmp::min,
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use storage_interface::DbReader;
 use storage_service_types::{
     AccountStatesChunkWithProofRequest, CompleteDataRange, DataSummary,
@@ -41,7 +48,7 @@ pub mod network;
 mod tests;
 
 /// Storage server constants.
-pub const STORAGE_SERVER_VERSION: u64 = 1;
+const STORAGE_SERVER_VERSION: u64 = 1;
 const SUMMARY_LOG_FREQUENCY_SECS: u64 = 5;
 
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
@@ -65,6 +72,134 @@ impl Error {
     }
 }
 
+/// A subscription for data received by a client
+pub struct DataSubscriptionRequest {
+    protocol: ProtocolId,
+    request: StorageServiceRequest,
+    response_sender: ResponseSender,
+    subscription_start_time: Instant,
+    time_service: TimeService,
+}
+
+impl DataSubscriptionRequest {
+    fn new(
+        protocol: ProtocolId,
+        request: StorageServiceRequest,
+        response_sender: ResponseSender,
+        time_service: TimeService,
+    ) -> Self {
+        Self {
+            protocol,
+            request,
+            response_sender,
+            subscription_start_time: time_service.now(),
+            time_service,
+        }
+    }
+
+    /// Creates a new storage service request to satisfy the transaction
+    /// subscription using the new data at the specified `target_ledger_info`.
+    fn get_storage_request_for_missing_data(
+        &self,
+        config: StorageServiceConfig,
+        target_ledger_info: &LedgerInfoWithSignatures,
+    ) -> Result<StorageServiceRequest, Error> {
+        // Calculate the number of versions to fetch
+        let known_version = self.highest_known_version();
+        let target_version = target_ledger_info.ledger_info().version();
+        let mut num_versions_to_fetch =
+            target_version.checked_sub(known_version).ok_or_else(|| {
+                Error::UnexpectedErrorEncountered(
+                    "Number of versions to fetch has overflown!".into(),
+                )
+            })?;
+
+        // Bound the number of versions to fetch by the maximum chunk size
+        num_versions_to_fetch = min(
+            num_versions_to_fetch,
+            self.max_chunk_size_for_request(config),
+        );
+
+        // Calculate the start and end versions
+        let start_version = known_version.checked_add(1).ok_or_else(|| {
+            Error::UnexpectedErrorEncountered("Start version has overflown!".into())
+        })?;
+        let end_version = known_version
+            .checked_add(num_versions_to_fetch)
+            .ok_or_else(|| {
+                Error::UnexpectedErrorEncountered("End version has overflown!".into())
+            })?;
+
+        // Create the storage request
+        let storage_request = match &self.request {
+            StorageServiceRequest::GetNewTransactionOutputsWithProof(_) => {
+                StorageServiceRequest::GetTransactionOutputsWithProof(
+                    TransactionOutputsWithProofRequest {
+                        proof_version: target_version,
+                        start_version,
+                        end_version,
+                    },
+                )
+            }
+            StorageServiceRequest::GetNewTransactionsWithProof(request) => {
+                StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+                    proof_version: target_version,
+                    start_version,
+                    end_version,
+                    include_events: request.include_events,
+                })
+            }
+            request => unreachable!("Unexpected subscription request: {:?}", request),
+        };
+        Ok(storage_request)
+    }
+
+    /// Returns the highest version known by the peer
+    fn highest_known_version(&self) -> u64 {
+        match &self.request {
+            StorageServiceRequest::GetNewTransactionOutputsWithProof(request) => {
+                request.known_version
+            }
+            StorageServiceRequest::GetNewTransactionsWithProof(request) => request.known_version,
+            request => unreachable!("Unexpected subscription request: {:?}", request),
+        }
+    }
+
+    /// Returns the highest epoch known by the peer
+    fn highest_known_epoch(&self) -> u64 {
+        match &self.request {
+            StorageServiceRequest::GetNewTransactionOutputsWithProof(request) => {
+                request.known_epoch
+            }
+            StorageServiceRequest::GetNewTransactionsWithProof(request) => request.known_epoch,
+            request => unreachable!("Unexpected subscription request: {:?}", request),
+        }
+    }
+
+    /// Returns the maximum chunk size for the request depending
+    /// on the request type.
+    fn max_chunk_size_for_request(&self, config: StorageServiceConfig) -> u64 {
+        match &self.request {
+            StorageServiceRequest::GetNewTransactionOutputsWithProof(_) => {
+                config.max_transaction_output_chunk_size
+            }
+            StorageServiceRequest::GetNewTransactionsWithProof(_) => {
+                config.max_transaction_chunk_size
+            }
+            request => unreachable!("Unexpected subscription request: {:?}", request),
+        }
+    }
+
+    /// Returns true iff the subscription has expired
+    fn is_expired(&self, timeout_ms: u64) -> bool {
+        let current_time = self.time_service.now();
+        let elapsed_time = current_time
+            .duration_since(self.subscription_start_time)
+            .as_millis();
+        elapsed_time > timeout_ms as u128
+    }
+}
+
 /// The server-side actor for the storage service. Handles inbound storage
 /// service requests from clients.
 pub struct StorageServiceServer<T> {
@@ -74,13 +209,16 @@ pub struct StorageServiceServer<T> {
     storage: T,
     time_service: TimeService,
 
-    // We maintain a cached storage server summary to avoid hitting the DB for
-    // every request. This is refreshed periodically.
+    // A cached storage server summary to avoid hitting the DB for every
+    // request. This is refreshed periodically.
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
 
-    // We maintain a LRU cache for commonly requested data items. This is
-    // separate from the cached storage summary because these responses
-    // should never change (the storage summary changes over time).
+    // A set of active subscriptions for peers waiting for new data
+    data_subscriptions: Arc<Mutex<HashMap<AccountAddress, DataSubscriptionRequest>>>,
+
+    // An LRU cache for commonly requested data items. This is separate
+    // from the cached storage summary because these responses should
+    // never change while the storage summary changes over time.
     lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
 }
 
@@ -95,6 +233,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         let bounded_executor =
             BoundedExecutor::new(config.max_concurrent_requests as usize, executor);
         let cached_storage_server_summary = Arc::new(RwLock::new(StorageServerSummary::default()));
+        let data_subscriptions = Arc::new(Mutex::new(HashMap::new()));
         let lru_storage_cache = Arc::new(Mutex::new(LruCache::new(
             config.max_lru_cache_size as usize,
         )));
@@ -106,16 +245,17 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             network_requests,
             time_service,
             cached_storage_server_summary,
+            data_subscriptions,
             lru_storage_cache,
         }
     }
 
     /// Spawns a non-terminating task that refreshes the cached storage server summary
     async fn spawn_storage_summary_refresher(&mut self) {
+        let cached_storage_server_summary = self.cached_storage_server_summary.clone();
         let config = self.config;
         let storage = self.storage.clone();
         let time_service = self.time_service.clone();
-        let cached_storage_server_summary = self.cached_storage_server_summary.clone();
 
         // Spawn the task
         self.bounded_executor
@@ -129,16 +269,82 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                 loop {
                     ticker.next().await;
 
+                    // Refresh the cache
                     if let Err(error) = refresh_cached_storage_summary(
-                        config,
-                        storage.clone(),
                         cached_storage_server_summary.clone(),
+                        storage.clone(),
+                        config,
                     ) {
                         let error = format!(
                             "Failed to refresh the cached storage summary! Error: {:?}",
                             error
                         );
-                        error!(LogSchema::new(LogEntry::StorageServiceError).message(&error));
+                        error!(LogSchema::new(LogEntry::StorageSummaryRefresh).message(&error));
+                    }
+                }
+            })
+            .await;
+    }
+
+    /// Spawns a non-terminating task that handles subscriptions
+    async fn spawn_subscription_handler(&mut self) {
+        let cached_storage_server_summary = self.cached_storage_server_summary.clone();
+        let config = self.config;
+        let data_subscriptions = self.data_subscriptions.clone();
+        let lru_storage_cache = self.lru_storage_cache.clone();
+        let storage = self.storage.clone();
+        let time_service = self.time_service.clone();
+
+        // Spawn the task
+        self.bounded_executor
+            .spawn(async move {
+                // Create a ticker for the refresh interval
+                let duration = Duration::from_millis(config.storage_summary_refresh_interval_ms);
+                let ticker = time_service.interval(duration);
+                futures::pin_mut!(ticker);
+
+                // Periodically check the data subscriptions
+                loop {
+                    ticker.next().await;
+
+                    // Remove all expired subscriptions
+                    remove_expired_data_subscriptions(config, data_subscriptions.clone());
+
+                    // Identify the peers with ready subscriptions
+                    let peers_with_ready_subscriptions = match get_peers_with_ready_subscriptions(
+                        cached_storage_server_summary.clone(),
+                        data_subscriptions.clone(),
+                        lru_storage_cache.clone(),
+                        storage.clone(),
+                        time_service.clone(),
+                    ) {
+                        Ok(peers_with_ready_subscriptions) => peers_with_ready_subscriptions,
+                        Err(error) => {
+                            error!(LogSchema::new(LogEntry::SubscriptionRefresh)
+                                .error(&Error::UnexpectedErrorEncountered(error.to_string())));
+                            continue;
+                        }
+                    };
+
+                    // Remove and handle the ready subscriptions
+                    for (peer, target_ledger_info) in peers_with_ready_subscriptions {
+                        if let Some(data_subscription) =
+                            data_subscriptions.clone().lock().remove(&peer)
+                        {
+                            if let Err(error) = notify_peer_of_new_data(
+                                cached_storage_server_summary.clone(),
+                                config,
+                                data_subscriptions.clone(),
+                                lru_storage_cache.clone(),
+                                storage.clone(),
+                                time_service.clone(),
+                                data_subscription,
+                                target_ledger_info,
+                            ) {
+                                error!(LogSchema::new(LogEntry::SubscriptionRefresh)
+                                    .error(&Error::UnexpectedErrorEncountered(error.to_string())));
+                            }
+                        }
                     }
                 }
             })
@@ -147,8 +353,11 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 
     /// Starts the storage service server thread
     pub async fn start(mut self) {
-        // Spawn the refresher for the cache
+        // Spawn the refresher for the storage summary cache
         self.spawn_storage_summary_refresher().await;
+
+        // Spawn the subscription handler
+        self.spawn_subscription_handler().await;
 
         // Handle the storage requests
         while let Some(request) = self.network_requests.next().await {
@@ -166,25 +375,181 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             // avoid starving other async tasks on the same runtime.
             let storage = self.storage.clone();
             let cached_storage_server_summary = self.cached_storage_server_summary.clone();
+            let data_subscriptions = self.data_subscriptions.clone();
             let lru_storage_cache = self.lru_storage_cache.clone();
+            let time_service = self.time_service.clone();
             self.bounded_executor
                 .spawn_blocking(move || {
-                    let response =
-                        Handler::new(storage, cached_storage_server_summary, lru_storage_cache)
-                            .call(protocol, request);
-                    log_storage_response(&response);
-                    response_sender.send(response);
+                    Handler::new(
+                        cached_storage_server_summary,
+                        data_subscriptions,
+                        lru_storage_cache,
+                        storage,
+                        time_service,
+                    )
+                    .process_request_and_respond(
+                        peer,
+                        protocol,
+                        request,
+                        response_sender,
+                    );
                 })
                 .await;
         }
     }
 }
 
+/// Identifies the data subscriptions that can be handled now.
+/// Returns the list of peers that made those subscriptions
+/// alongside the ledger info at the target version for the peer.
+fn get_peers_with_ready_subscriptions<T: StorageReaderInterface>(
+    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    data_subscriptions: Arc<Mutex<HashMap<AccountAddress, DataSubscriptionRequest>>>,
+    lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    storage: T,
+    time_service: TimeService,
+) -> Result<Vec<(AccountAddress, LedgerInfoWithSignatures)>, Error> {
+    // Fetch the latest storage summary and highest synced version
+    let latest_storage_summary = cached_storage_server_summary.read().clone();
+    let highest_synced_ledger_info = match latest_storage_summary.data_summary.synced_ledger_info {
+        Some(ledger_info) => ledger_info,
+        None => return Ok(vec![]),
+    };
+    let highest_synced_version = highest_synced_ledger_info.ledger_info().version();
+    let highest_synced_epoch = highest_synced_ledger_info.ledger_info().epoch();
+
+    // Identify the peers with ready subscriptions
+    let mut ready_subscriptions = vec![];
+    for (peer, data_subscription) in data_subscriptions.lock().iter() {
+        if data_subscription.highest_known_version() < highest_synced_version {
+            let highest_known_epoch = data_subscription.highest_known_epoch();
+            let target_ledger_info = if highest_known_epoch < highest_synced_epoch {
+                // The peer needs to sync to their epoch ending ledger info
+                get_epoch_ending_ledger_info(
+                    cached_storage_server_summary.clone(),
+                    data_subscriptions.clone(),
+                    highest_known_epoch,
+                    lru_storage_cache.clone(),
+                    data_subscription.protocol,
+                    storage.clone(),
+                    time_service.clone(),
+                )?
+            } else {
+                highest_synced_ledger_info.clone()
+            };
+            ready_subscriptions.push((*peer, target_ledger_info));
+        }
+    }
+    Ok(ready_subscriptions)
+}
+
+/// Gets the epoch ending ledger info at the given epoch
+fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
+    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    data_subscriptions: Arc<Mutex<HashMap<AccountAddress, DataSubscriptionRequest>>>,
+    epoch: u64,
+    lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    protocol: ProtocolId,
+    storage: T,
+    time_service: TimeService,
+) -> Result<LedgerInfoWithSignatures, Error> {
+    // Create a new storage request for the epoch ending ledger info
+    let storage_request =
+        StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
+            start_epoch: epoch,
+            expected_end_epoch: epoch,
+        });
+
+    // Process the request
+    let handler = Handler::new(
+        cached_storage_server_summary,
+        data_subscriptions,
+        lru_storage_cache,
+        storage,
+        time_service,
+    );
+    let storage_data = handler.process_request(protocol, storage_request);
+
+    // Verify the response
+    match storage_data {
+        Ok(StorageServiceResponse::EpochEndingLedgerInfos(epoch_change_proof)) => {
+            if let Some(ledger_info) = epoch_change_proof.ledger_info_with_sigs.get(0) {
+                Ok(ledger_info.clone())
+            } else {
+                Err(Error::UnexpectedErrorEncountered(
+                    "Empty change proof found!".into(),
+                ))
+            }
+        }
+        Ok(storage_service_response) => Err(Error::UnexpectedErrorEncountered(format!(
+            "Expected epoch ending ledger infos but found: {:?}",
+            storage_service_response
+        ))),
+        Err(error) => Err(Error::StorageErrorEncountered(format!(
+            "Failed to get epoch ending ledger info! Error: {:?}",
+            error
+        ))),
+    }
+}
+
+/// Notifies a subscriber of new data according to the target ledger info
+fn notify_peer_of_new_data<T: StorageReaderInterface>(
+    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    config: StorageServiceConfig,
+    data_subscriptions: Arc<Mutex<HashMap<AccountAddress, DataSubscriptionRequest>>>,
+    lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    storage: T,
+    time_service: TimeService,
+    subscription: DataSubscriptionRequest,
+    target_ledger_info: LedgerInfoWithSignatures,
+) -> Result<(), Error> {
+    match subscription.get_storage_request_for_missing_data(config, &target_ledger_info) {
+        Ok(storage_request) => {
+            // Handle the storage service request to fetch the missing data
+            let handler = Handler::new(
+                cached_storage_server_summary,
+                data_subscriptions,
+                lru_storage_cache,
+                storage,
+                time_service,
+            );
+            let storage_data = handler.process_request(subscription.protocol, storage_request);
+
+            // Transform the missing data into a subscription response
+            let transformed_response = match storage_data {
+                Ok(StorageServiceResponse::TransactionsWithProof(transactions_with_proof)) => {
+                    StorageServiceResponse::NewTransactionsWithProof((
+                        transactions_with_proof,
+                        target_ledger_info.clone(),
+                    ))
+                }
+                Ok(StorageServiceResponse::TransactionOutputsWithProof(outputs_with_proof)) => {
+                    StorageServiceResponse::NewTransactionOutputsWithProof((
+                        outputs_with_proof,
+                        target_ledger_info.clone(),
+                    ))
+                }
+                response => {
+                    return Err(Error::UnexpectedErrorEncountered(format!(
+                        "Failed to fetch missing data for peer! {:?}",
+                        response
+                    )))
+                }
+            };
+
+            // Send the response to the peer
+            handler.send_response(Ok(transformed_response), subscription.response_sender);
+            Ok(())
+        }
+        Err(error) => Err(error),
+    }
+}
+
 /// Refreshes the cached storage server summary
 fn refresh_cached_storage_summary<T: StorageReaderInterface>(
-    storage_config: StorageServiceConfig,
-    storage: T,
     cached_storage_summary: Arc<RwLock<StorageServerSummary>>,
+    storage: T,
+    storage_config: StorageServiceConfig,
 ) -> Result<()> {
     // Fetch the data summary from storage
     let data_summary = storage
@@ -209,34 +574,54 @@ fn refresh_cached_storage_summary<T: StorageReaderInterface>(
     Ok(())
 }
 
+/// Removes all expired data subscriptions
+fn remove_expired_data_subscriptions(
+    config: StorageServiceConfig,
+    data_subscriptions: Arc<Mutex<HashMap<AccountAddress, DataSubscriptionRequest>>>,
+) {
+    data_subscriptions.lock().retain(|_, data_subscription| {
+        !data_subscription.is_expired(config.max_subscription_period_ms)
+    });
+}
+
 /// The `Handler` is the "pure" inbound request handler. It contains all the
 /// necessary context and state needed to construct a response to an inbound
 /// request. We usually clone/create a new handler for every request.
 #[derive(Clone)]
 pub struct Handler<T> {
-    storage: T,
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    data_subscriptions: Arc<Mutex<HashMap<AccountAddress, DataSubscriptionRequest>>>,
     lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    storage: T,
+    time_service: TimeService,
 }
 
 impl<T: StorageReaderInterface> Handler<T> {
     pub fn new(
-        storage: T,
         cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+        data_subscriptions: Arc<Mutex<HashMap<AccountAddress, DataSubscriptionRequest>>>,
         lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+        storage: T,
+        time_service: TimeService,
     ) -> Self {
         Self {
             storage,
             cached_storage_server_summary,
+            data_subscriptions,
             lru_storage_cache,
+            time_service,
         }
     }
 
-    pub fn call(
+    /// Handles the given storage service request and responds to the
+    /// request directly.
+    pub fn process_request_and_respond(
         &self,
+        peer: AccountAddress,
         protocol: ProtocolId,
         request: StorageServiceRequest,
-    ) -> Result<StorageServiceResponse> {
+        response_sender: ResponseSender,
+    ) {
         // Update the request count
         increment_counter(
             &metrics::STORAGE_REQUESTS_RECEIVED,
@@ -244,6 +629,23 @@ impl<T: StorageReaderInterface> Handler<T> {
             request.get_label().into(),
         );
 
+        // Handle any data subscriptions
+        if request.is_data_subscription_request() {
+            self.handle_subscription_request(peer, protocol, request, response_sender);
+            return;
+        }
+
+        // Process the request and return the response to the client
+        let response = self.process_request(protocol, request);
+        self.send_response(response, response_sender);
+    }
+
+    /// Processes the given request and returns the response
+    fn process_request(
+        &self,
+        protocol: ProtocolId,
+        request: StorageServiceRequest,
+    ) -> Result<StorageServiceResponse> {
         // Time the request processing (the timer will stop when it's dropped)
         let _timer = start_timer(
             &metrics::STORAGE_REQUEST_PROCESSING_LATENCY,
@@ -289,6 +691,40 @@ impl<T: StorageReaderInterface> Handler<T> {
         }
     }
 
+    /// Sends a response via the provided sender
+    fn send_response(
+        &self,
+        response: Result<StorageServiceResponse>,
+        response_sender: ResponseSender,
+    ) {
+        log_storage_response(&response);
+        response_sender.send(response);
+    }
+
+    /// Handles the given data subscription request
+    pub fn handle_subscription_request(
+        &self,
+        peer: AccountAddress,
+        protocol: ProtocolId,
+        request: StorageServiceRequest,
+        response_sender: ResponseSender,
+    ) {
+        // Create the subscription request
+        let subscription_request = DataSubscriptionRequest::new(
+            protocol,
+            request,
+            response_sender,
+            self.time_service.clone(),
+        );
+
+        // Store the subscription for when there is new data
+        self.data_subscriptions
+            .lock()
+            .insert(peer, subscription_request);
+    }
+
+    /// Processes a storage service request for which the response
+    /// might already be cached.
     fn process_cachable_request(
         &self,
         protocol: ProtocolId,

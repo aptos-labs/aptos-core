@@ -1,53 +1,22 @@
 <div class="flex flex-col lg:flex-row gap-8 sm:gap-24 xl:gap-48 justify-between flex-[2]">
   <div>
-    <div class="sm:w-[36rem] mb-8 sm:mb-12 font-light sm:text-lg">
-      <p class="mb-4">
-      Ensuring a production-grade Aptos mainnet.
-      <br>
-      The Aptos community is coming together to build a secure, reliable, and decentralized network through a series of incentivized testnets.
-      </p>
-      <p>
-      Additional detail of the Aptos Incentivized Testnet 1 available <a href="https://medium.com/aptoslabs/aptos-incentivized-testnet-update-abcfcd94d54c" class="underline">here</a>.
-      Please review the <a href="https://aptoslabs.com/terms-testnet/" class="underline">terms and conditions</a>.
-      </p>
+    <div class="sm:w-[36rem] mb-12 font-light sm:text-lg">
+      <%= render 'shared/it1_intro' %>
     </div>
-    <dialog id="login-dialog" class="rounded-xl border-2 border-teal-400">
-      <form type="dialog" class="text-right">
-        <button type="submit">x</button>
-      </form>
-      <h3 class="text-center uppercase font-mono text-2xl mt-16">Sign up with</h3>
-      <div class="flex p-16">
-        <div class="p-16 py-8 border-r border-black">
-          <%= form_with url: omniauth_authorize_path(User, :github), data: {turbo: false} do |form| %>
-            <button type="submit">
-              <svg width="100" height="100" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M15.938 15.939a8.375 8.375 0 0 1-3.443 2.083v-1.498c0-.788-.27-1.368-.81-1.739a8.9 8.9 0 0 0 .932-.136c.283-.059.582-.143.898-.254.316-.111.6-.243.85-.396.25-.153.492-.351.723-.596.23-.243.424-.52.58-.83.157-.308.28-.68.372-1.113.09-.433.137-.91.137-1.43 0-1.01-.33-1.87-.987-2.579.3-.78.267-1.63-.098-2.548l-.244-.03c-.17-.02-.473.052-.913.215-.44.163-.932.43-1.48.8a8.984 8.984 0 0 0-2.412-.322 8.8 8.8 0 0 0-2.401.323 8.475 8.475 0 0 0-.982-.581 5.141 5.141 0 0 0-.742-.313 2.579 2.579 0 0 0-.826-.112.62.62 0 0 0-.097.02c-.365.924-.398 1.773-.098 2.548-.658.71-.986 1.57-.986 2.579 0 .52.045.997.137 1.43.09.433.214.805.37 1.113.157.31.35.587.582.83.23.245.472.443.722.596.25.153.534.285.85.396.316.11.615.195.898.254.283.058.594.104.933.136-.534.365-.8.945-.8 1.739v1.527a8.364 8.364 0 0 1-3.541-2.113A8.356 8.356 0 0 1 1.6 10 8.351 8.351 0 0 1 4.06 4.062 8.363 8.363 0 0 1 10 1.602a8.358 8.358 0 0 1 5.938 2.46A8.381 8.381 0 0 1 18.398 10a8.358 8.358 0 0 1-2.46 5.939ZM10 0C4.478 0 0 4.478 0 10c0 5.523 4.478 10 10 10 5.523 0 10-4.477 10-10 0-5.522-4.477-10-10-10Z" fill="#000"/></svg>
-            </button>
-          <% end %>
-        </div>
-        <div class="p-16 py-8">
-          <%= form_with url: omniauth_authorize_path(User, :discord), data: {turbo: false} do |form| %>
-            <button type="submit">
-              <svg width="100" height="100" viewBox="0 0 71 55" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#a)"><path d="M60.105 4.898A58.55 58.55 0 0 0 45.653.415a.22.22 0 0 0-.233.11 40.784 40.784 0 0 0-1.8 3.697c-5.456-.817-10.886-.817-16.23 0-.485-1.164-1.201-2.587-1.828-3.697a.228.228 0 0 0-.233-.11 58.386 58.386 0 0 0-14.451 4.483.207.207 0 0 0-.095.082C1.578 18.73-.944 32.144.293 45.39a.244.244 0 0 0 .093.167c6.073 4.46 11.955 7.167 17.729 8.962a.23.23 0 0 0 .249-.082 42.08 42.08 0 0 0 3.627-5.9.225.225 0 0 0-.123-.312 38.772 38.772 0 0 1-5.539-2.64.228.228 0 0 1-.022-.378c.372-.279.744-.569 1.1-.862a.22.22 0 0 1 .23-.03c11.619 5.304 24.198 5.304 35.68 0a.219.219 0 0 1 .233.027c.356.293.728.586 1.103.865a.228.228 0 0 1-.02.378 36.384 36.384 0 0 1-5.54 2.637.227.227 0 0 0-.121.315 47.249 47.249 0 0 0 3.624 5.897.225.225 0 0 0 .249.084c5.801-1.794 11.684-4.502 17.757-8.961a.228.228 0 0 0 .092-.164c1.48-15.315-2.48-28.618-10.497-40.412a.18.18 0 0 0-.093-.084Zm-36.38 32.427c-3.497 0-6.38-3.211-6.38-7.156 0-3.944 2.827-7.156 6.38-7.156 3.583 0 6.438 3.24 6.382 7.156 0 3.945-2.827 7.156-6.381 7.156Zm23.593 0c-3.498 0-6.38-3.211-6.38-7.156 0-3.944 2.826-7.156 6.38-7.156 3.582 0 6.437 3.24 6.38 7.156 0 3.945-2.798 7.156-6.38 7.156Z" fill="#000"/></g><defs><clipPath id="a"><path fill="#000" d="M0 0h71v55H0z"/></clipPath></defs></svg>
-            </button>
-          <% end %>
-        </div>
-      </div>
-    </dialog>
-    <script type="application/javascript">
-        function showLoginModal(title) {
-            document.getElementById("login-dialog").children[1].innerHTML = title;
-            document.getElementById("login-dialog").showModal();
-        }
-    </script>
-    <p class=" mb-4">
-      <%= render(ButtonComponent.new(size: :large, onclick: 'showLoginModal("Sign up with")', class: 'w-full mt-auto')) do %>
-        Sign up for Testnet
+    <%= render ButtonComponent.new(size: :large, class: 'w-full mb-8', dialog: @login_dialog) do %>
+      Sign up
+    <% end %>
+    <%= render ButtonComponent.new(href: new_user_session_path, size: :large, scheme: :secondary, class: 'w-full') do %>
+      Log in
+    <% end %>
+		<%= render @login_dialog do |dialog| %>
+      <%= dialog.with_title do %>
+        Sign up with
       <% end %>
-    </p>
-    <p>
-      <%= render(ButtonComponent.new(size: :large, onclick: 'showLoginModal("Sign in with")', class: 'w-full mt-auto')) do %>
-        Log in
+      <%= dialog.with_body do %>
+        <%= render LoginButtonComponent.new(provider: :github, size: :large, class: 'mb-8 w-96') %>
+        <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-96') %>
       <% end %>
-    </p>
+    <% end %>
   </div>
 </div>

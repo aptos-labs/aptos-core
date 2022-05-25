@@ -11,14 +11,14 @@ use crate::{
     state_store::StateStore,
     transaction_store::TransactionStore,
 };
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{ensure, Result};
 use aptos_crypto::hash::HashValue;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{SparseMerkleRangeProof, TransactionAccumulatorRangeProof, TransactionInfoWithProof},
-    state_store::state_value::StateKeyAndValue,
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version},
 };
 use itertools::zip_eq;
@@ -103,18 +103,22 @@ impl BackupHandler {
     pub fn get_account_iter(
         &self,
         version: Version,
-    ) -> Result<Box<dyn Iterator<Item = Result<(HashValue, StateKeyAndValue)>> + Send + Sync>> {
-        let iterator = JellyfishMerkleIterator::new(
-            Arc::clone(&self.state_store),
-            version,
-            HashValue::zero(),
-        )?
-        .enumerate()
-        .map(move |(idx, res)| {
-            BACKUP_STATE_SNAPSHOT_VERSION.set(version as i64);
-            BACKUP_STATE_SNAPSHOT_LEAF_IDX.set(idx as i64);
-            res
-        });
+    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync>> {
+        let store = Arc::clone(&self.state_store);
+        let iterator =
+            JellyfishMerkleIterator::new(Arc::clone(&store), version, HashValue::zero())?
+                .enumerate()
+                .map(move |(idx, res)| {
+                    BACKUP_STATE_SNAPSHOT_VERSION.set(version as i64);
+                    BACKUP_STATE_SNAPSHOT_LEAF_IDX.set(idx as i64);
+                    match res {
+                        Ok((_hashed_key, key_and_version)) => Ok((
+                            key_and_version.0.clone(),
+                            store.get_value_at_version(&key_and_version)?,
+                        )),
+                        Err(err) => Err(err),
+                    }
+                });
         Ok(Box::new(iterator))
     }
 
@@ -132,23 +136,24 @@ impl BackupHandler {
     pub fn get_db_state(&self) -> Result<Option<DbState>> {
         self.ledger_store
             .get_startup_info()?
-            .map(|s| {
-                Ok(DbState {
-                    epoch: s.get_epoch_state().epoch,
-                    committed_version: s
-                        .committed_tree_state
-                        .num_transactions
-                        .checked_sub(1)
-                        .ok_or_else(|| anyhow!("Bootstrapped DB has no transactions."))?,
-                    synced_version: s
-                        .synced_tree_state
-                        .as_ref()
-                        .unwrap_or(&s.committed_tree_state)
-                        .num_transactions
-                        .checked_sub(1)
-                        .ok_or_else(|| anyhow!("Bootstrapped DB has no transactions."))?,
-                })
-            })
+            .map(
+                |(latest_li, epoch_state_if_not_in_li, synced_version_opt)| {
+                    Ok(DbState {
+                        epoch: latest_li
+                            .ledger_info()
+                            .next_epoch_state()
+                            .unwrap_or_else(|| {
+                                epoch_state_if_not_in_li
+                                    .as_ref()
+                                    .expect("EpochState must exist")
+                            })
+                            .epoch,
+                        committed_version: latest_li.ledger_info().version(),
+                        synced_version: synced_version_opt
+                            .unwrap_or_else(|| latest_li.ledger_info().version()),
+                    })
+                },
+            )
             .transpose()
     }
 

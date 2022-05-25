@@ -2,21 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    get_first_seq_num_and_limit, schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    test_helper, test_helper::arb_blocks_to_commit, AptosDB, ROCKSDB_PROPERTIES,
+    get_first_seq_num_and_limit, test_helper,
+    test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_info},
+    AptosDB, ROCKSDB_PROPERTIES,
 };
-use aptos_crypto::{
-    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
-    HashValue,
-};
-use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_temppath::TempPath;
 use aptos_types::{
     proof::SparseMerkleLeafNode,
-    state_store::{
-        state_key::StateKey,
-        state_value::{StateKeyAndValue, StateValue},
-    },
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{ExecutionStatus, TransactionInfo, PRE_GENESIS_VERSION},
 };
 use proptest::prelude::*;
@@ -87,42 +81,41 @@ fn test_get_latest_tree_state() {
 
     // entirely emtpy db
     let empty = db.get_latest_tree_state().unwrap();
-    assert_eq!(
-        empty,
-        TreeState::new(0, vec![], *SPARSE_MERKLE_PLACEHOLDER_HASH,)
-    );
+    assert_eq!(empty, TreeState::new_empty(),);
 
     // unbootstrapped db with pre-genesis state
     let key = StateKey::Raw(String::from("test_key").into_bytes());
     let value = StateValue::from(String::from("test_val").into_bytes());
 
-    db.db
-        .put::<JellyfishMerkleNodeSchema>(
-            &NodeKey::new_empty_path(PRE_GENESIS_VERSION),
-            &Node::new_leaf(
-                key.hash(),
-                StateKeyAndValue::new(key.clone(), value.clone()),
-            ),
-        )
-        .unwrap();
+    put_as_state_root(&db, PRE_GENESIS_VERSION, key.clone(), value.clone());
     let hash = SparseMerkleLeafNode::new(key.hash(), value.hash()).hash();
     let pre_genesis = db.get_latest_tree_state().unwrap();
-    assert_eq!(pre_genesis, TreeState::new(0, vec![], hash));
+    assert_eq!(
+        pre_genesis,
+        TreeState::new(0, vec![], hash, Some(PRE_GENESIS_VERSION))
+    );
 
     // bootstrapped db (any transaction info is in)
+    put_as_state_root(&db, 0, key, value);
     let txn_info = TransactionInfo::new(
         HashValue::random(),
         HashValue::random(),
         HashValue::random(),
-        Some(HashValue::random()),
+        Some(hash),
         0,
         ExecutionStatus::MiscellaneousError(None),
     );
-    test_helper::put_transaction_info(&db, 0, &txn_info);
+    put_transaction_info(&db, 0, &txn_info);
+
     let bootstrapped = db.get_latest_tree_state().unwrap();
     assert_eq!(
         bootstrapped,
-        TreeState::new(1, vec![txn_info.hash()], txn_info.state_change_hash(),)
+        TreeState::new(
+            1,
+            vec![txn_info.hash()],
+            txn_info.state_checkpoint_hash().unwrap(),
+            Some(0),
+        ),
     );
 }
 

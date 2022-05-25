@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{AptosDataClient, AptosNetDataClient, DataSummaryPoller, Error};
-use crate::aptosnet::state::calculate_optimal_chunk_sizes;
+use crate::aptosnet::{poll_peer, state::calculate_optimal_chunk_sizes};
 use aptos_config::{
     config::{AptosDataClientConfig, StorageServiceConfig},
     network_id::{NetworkId, PeerNetworkId},
@@ -33,9 +33,10 @@ use std::{
 use storage_service_client::{StorageServiceClient, StorageServiceNetworkSender};
 use storage_service_server::network::{NetworkRequest, ResponseSender};
 use storage_service_types::{
-    CompleteDataRange, DataSummary, ProtocolMetadata, StorageServerSummary, StorageServiceError,
+    CompleteDataRange, DataSummary, NewTransactionOutputsWithProofRequest,
+    NewTransactionsWithProofRequest, ProtocolMetadata, StorageServerSummary, StorageServiceError,
     StorageServiceMessage, StorageServiceRequest, StorageServiceResponse,
-    TransactionsWithProofRequest,
+    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
 
 fn mock_ledger_info(version: Version) -> LedgerInfoWithSignatures {
@@ -60,7 +61,7 @@ fn mock_storage_summary(version: Version) -> StorageServerSummary {
             synced_ledger_info: Some(mock_ledger_info(version)),
             epoch_ending_ledger_infos: None,
             transactions: Some(CompleteDataRange::new(0, version).unwrap()),
-            transaction_outputs: None,
+            transaction_outputs: Some(CompleteDataRange::new(0, version).unwrap()),
             account_states: None,
         },
     }
@@ -581,6 +582,180 @@ async fn fetch_peers_max_in_flight() {
     }
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn in_flight_error_handling() {
+    ::aptos_logger::Logger::init_for_testing();
+
+    // Create a data client with max in-flight requests of 1
+    let data_client_config = AptosDataClientConfig {
+        max_num_in_flight_priority_polls: 1,
+        max_num_in_flight_regular_polls: 1,
+        ..Default::default()
+    };
+    let (mut mock_network, _, client, _) = MockNetwork::new(Some(data_client_config));
+
+    // Verify we have no in-flight polls
+    let num_in_flight_polls = get_num_in_flight_polls(client.clone(), true);
+    assert_eq!(num_in_flight_polls, 0);
+
+    // Add a peer
+    let peer = mock_network.add_peer(true);
+
+    // Poll the peer
+    let handle = poll_peer(client.clone(), peer, None);
+
+    // Respond to the peer poll with an error
+    if let Some((_, _, _, response_sender)) = mock_network.next_request().await {
+        response_sender.send(Err(StorageServiceError::InternalError(
+            "An unexpected error occurred!".into(),
+        )));
+    }
+
+    // Wait for the poller to complete
+    handle.await.unwrap();
+
+    // Verify we have no in-flight polls
+    let num_in_flight_polls = get_num_in_flight_polls(client.clone(), true);
+    assert_eq!(num_in_flight_polls, 0);
+}
+
+#[tokio::test]
+async fn prioritized_peer_request_selection() {
+    ::aptos_logger::Logger::init_for_testing();
+    let (mut mock_network, _, client, _) = MockNetwork::new(None);
+
+    // Ensure the properties hold for storage summary and data subscription requests
+    let storage_summary_request = StorageServiceRequest::GetStorageServerSummary;
+    let new_transactions_request =
+        StorageServiceRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
+            known_version: 1023,
+            known_epoch: 23,
+            include_events: false,
+        });
+    let new_outputs_request = StorageServiceRequest::GetNewTransactionOutputsWithProof(
+        NewTransactionOutputsWithProofRequest {
+            known_version: 4504,
+            known_epoch: 3,
+        },
+    );
+    for storage_request in [
+        storage_summary_request,
+        new_transactions_request,
+        new_outputs_request,
+    ] {
+        // Ensure no peers can service the request (we have no connections)
+        assert_matches!(
+            client.choose_peer_for_request(&storage_request),
+            Err(Error::DataIsUnavailable(_))
+        );
+
+        // Add a regular peer and verify the peer is selected as the recipient
+        let regular_peer_1 = mock_network.add_peer(false);
+        assert_eq!(
+            client.choose_peer_for_request(&storage_request),
+            Ok(regular_peer_1)
+        );
+
+        // Add a priority peer and verify the peer is selected as the recipient
+        let priority_peer_1 = mock_network.add_peer(true);
+        assert_eq!(
+            client.choose_peer_for_request(&storage_request),
+            Ok(priority_peer_1)
+        );
+
+        // Disconnect the priority peer and verify the regular peer is now chosen
+        mock_network.disconnect_peer(priority_peer_1);
+        assert_eq!(
+            client.choose_peer_for_request(&storage_request),
+            Ok(regular_peer_1)
+        );
+
+        // Connect a new priority peer and verify it is now selected
+        let priority_peer_2 = mock_network.add_peer(true);
+        assert_eq!(
+            client.choose_peer_for_request(&storage_request),
+            Ok(priority_peer_2)
+        );
+
+        // Disconnect the priority peer and verify the regular peer is again chosen
+        mock_network.disconnect_peer(priority_peer_2);
+        assert_eq!(
+            client.choose_peer_for_request(&storage_request),
+            Ok(regular_peer_1)
+        );
+
+        // Disconnect the regular peer so that we no longer have any connections
+        mock_network.disconnect_peer(regular_peer_1);
+    }
+}
+
+#[tokio::test]
+async fn all_peer_request_selection() {
+    ::aptos_logger::Logger::init_for_testing();
+    let (mut mock_network, _, client, _) = MockNetwork::new(None);
+
+    // Ensure no peers can service the given request (we have no connections)
+    let server_version_request = StorageServiceRequest::GetServerProtocolVersion;
+    assert_matches!(
+        client.choose_peer_for_request(&server_version_request),
+        Err(Error::DataIsUnavailable(_))
+    );
+
+    // Add a regular peer and verify the peer is selected as the recipient
+    let regular_peer_1 = mock_network.add_peer(false);
+    assert_eq!(
+        client.choose_peer_for_request(&server_version_request),
+        Ok(regular_peer_1)
+    );
+
+    // Add two prioritized peers
+    let priority_peer_1 = mock_network.add_peer(true);
+    let priority_peer_2 = mock_network.add_peer(true);
+
+    // Request data that is not being advertised and verify we get an error
+    let output_data_request =
+        StorageServiceRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
+            proof_version: 100,
+            start_version: 0,
+            end_version: 100,
+        });
+    assert_matches!(
+        client.choose_peer_for_request(&output_data_request),
+        Err(Error::DataIsUnavailable(_))
+    );
+
+    // Advertise the data for the regular peer and verify it is now selected
+    client.update_summary(regular_peer_1, mock_storage_summary(100));
+    assert_eq!(
+        client.choose_peer_for_request(&output_data_request),
+        Ok(regular_peer_1)
+    );
+
+    // Advertise the data for the priority peer and verify either is selected
+    client.update_summary(priority_peer_2, mock_storage_summary(100));
+    let peer_for_request = client
+        .choose_peer_for_request(&output_data_request)
+        .unwrap();
+    assert!(peer_for_request == priority_peer_2 || peer_for_request == regular_peer_1);
+
+    // Reconnect priority peer 1 and remove the advertised data for priority peer 2
+    mock_network.reconnect_peer(priority_peer_1);
+    client.update_summary(priority_peer_2, mock_storage_summary(0));
+
+    // Request the data again and verify the regular peer is chosen
+    assert_eq!(
+        client.choose_peer_for_request(&output_data_request),
+        Ok(regular_peer_1)
+    );
+
+    // Advertise the data for priority peer 1 and verify either is selected
+    client.update_summary(priority_peer_1, mock_storage_summary(100));
+    let peer_for_request = client
+        .choose_peer_for_request(&output_data_request)
+        .unwrap();
+    assert!(peer_for_request == priority_peer_1 || peer_for_request == regular_peer_1);
+}
+
 // 1. 2 peers
 // 2. one advertises bad range, one advertises honest range
 // 3. sending a bunch of requests to the bad range (which will always go to the
@@ -753,10 +928,12 @@ async fn bad_peer_is_eventually_added_back() {
         }
     });
 
-    // Advance time so the poller sends a data summary request.
-    tokio::task::yield_now().await;
+    // Advance time so the poller sends data summary requests.
     let summary_poll_interval = Duration::from_millis(1_000);
-    mock_time.advance_async(summary_poll_interval).await;
+    for _ in 0..2 {
+        tokio::task::yield_now().await;
+        mock_time.advance_async(summary_poll_interval).await;
+    }
 
     // Initially this request range is serviceable by this peer.
     let global_summary = client.get_global_data_summary();
@@ -812,6 +989,7 @@ async fn optimal_chunk_size_calculations() {
         max_epoch_chunk_size,
         max_lru_cache_size: 0,
         max_network_channel_size: 0,
+        max_subscription_period_ms: 0,
         max_transaction_chunk_size,
         max_transaction_output_chunk_size,
         storage_summary_refresh_interval_ms: 0,
@@ -885,4 +1063,13 @@ fn fetch_peer_to_poll(
     }
 
     result
+}
+
+/// Fetches the number of in flight requests for peers depending on priority
+fn get_num_in_flight_polls(client: AptosNetDataClient, is_priority_peer: bool) -> u64 {
+    if is_priority_peer {
+        client.peer_states.read().num_in_flight_priority_polls()
+    } else {
+        client.peer_states.read().num_in_flight_regular_polls()
+    }
 }

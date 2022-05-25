@@ -12,9 +12,7 @@ from first_transaction import Account, FaucetClient, RestClient, TESTNET_URL, FA
 
 class TokenClient(RestClient):
     def submit_transaction_helper(self, account: Account, payload: Dict[str, Any]):
-        txn_request = self.generate_transaction(account.address(), payload)
-        signed_txn = self.sign_transaction(account, txn_request)
-        res = self.submit_transaction(signed_txn)
+        res = self.execute_transaction_with_payload(account, payload)
         self.wait_for_transaction(res["hash"])
 
 #:!:>section_1

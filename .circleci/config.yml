@@ -33,12 +33,11 @@ jobs:
       - run: sudo apt-get install shellcheck --assume-yes --no-install-recommends
       - run: shellcheck scripts/dev_setup.sh
       - run: shellcheck scripts/dockerhub_prune.sh
-      - run: shellcheck docker/build_push.sh
-      - run: shellcheck docker/docker_republish.sh
       - run: shellcheck scripts/weekly-dep-report.sh
       - run: cargo x lint
       - run: cargo xclippy --workspace --all-targets
       - run: cargo xfmt --check
+      - run: cargo install cargo-sort
       # Temporary workaround for unsorted hakari generated Cargo files (https://github.com/DevinR528/cargo-sort/issues/38).
       - run: cargo sort --grouped crates/aptos-workspace-hack
       - run: cargo sort --grouped --check --workspace
@@ -49,7 +48,7 @@ jobs:
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
       - run: echo "export RUST_BACKTRACE=full" >> $BASH_ENV
       - run: echo "export INDEXER_DATABASE_URL=postgresql://postgres@localhost/postgres" >> $BASH_ENV
-      # --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries
+      # --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
       - run: cargo nextest --nextest-profile ci --partition hash:1/1 --package smoke-test --test-threads 6 --retries 3
   unit-test:
     executor: ubuntu-2xl
@@ -105,7 +104,6 @@ jobs:
       - aws-ecr-setup
       - gcp-gcr/gcr-auth:
           registry-url: us-west1-docker.pkg.dev
-      - run: echo $GITHUB_CONTAINER_REGISTRY_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
       - run:
           name: Build or skip
           shell: /bin/bash
@@ -114,6 +112,7 @@ jobs:
             cd ecosystem/platform/server
             docker buildx create --use
             GIT_SHA1=${CIRCLE_SHA1} docker buildx bake --progress=plain --push -f ./docker-bake.hcl
+
   ecr-dockerhub-mirror:
     executor: ubuntu-medium
     parameters:
@@ -209,7 +208,7 @@ jobs:
             FORGE_COMMENT=$(awk '{printf "%s\\n", $0}' forge_comment.txt)
 
             # TODO(rustielin): report cluster name
-            echo "forge_job_status $FGI_EXIT_CODE" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
+            echo "forge_job_status {FGI_EXIT_CODE=\"$FGI_EXIT_CODE\"} $CIRCLE_BUILD_NUM" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
 
             # post github comment on the PR
             curl -s -H "Authorization: token ${FORGE_GH_TOKEN}" \
@@ -235,6 +234,9 @@ jobs:
       - run: cd ./ecosystem/typescript/sdk && yarn install
       - run: cd ./ecosystem/typescript/sdk && yarn lint
       - run: cd ./ecosystem/typescript/sdk && yarn fmt:check
+      # Run typescript indexer server linting
+      - run: cd ./ecosystem/indexer-server/typescript && yarn install
+      - run: cd ./ecosystem/indexer-server/typescript && yarn lint
   ecosystem-test:
     executor: ubuntu-xl
     steps:
@@ -270,8 +272,8 @@ workflows:
     jobs:
       - build-push-community-platform:
           context:
-          - aws-dev
-          - gcp-global
+            - aws-dev
+            - gcp-global
 
   build-test-deploy:
     when:
@@ -285,6 +287,14 @@ workflows:
       - unit-test
       - docker-build-push:
           context: aws-dev
+          filters:
+            branches:
+              only:
+                - main
+                - auto
+                - canary
+                - devnet
+                - testnet
       - ecosystem-test:
           context: aws-dev
           requires:
@@ -362,7 +372,6 @@ commands:
       - run: sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config --no-install-recommends --assume-yes
       - run: curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
       - run: cat $HOME/.cargo/env >> $BASH_ENV
-      - run: cargo install cargo-sort
   deploy-setup:
     steps:
       - kubernetes/install-kubectl:

@@ -20,10 +20,10 @@ use crate::{
     },
 };
 use aptos_temppath::TempPath;
-use aptos_types::transaction::Version;
+use aptos_types::transaction::{Transaction, Version};
 use aptosdb::AptosDB;
 use executor_test_helpers::integration_test_impl::test_execution_with_storage_impl;
-use proptest::prelude::*;
+use proptest::{prelude::*, sample::Index};
 use std::{convert::TryInto, sync::Arc};
 use storage_interface::DbReader;
 use tokio::time::Duration;
@@ -40,11 +40,25 @@ fn test_data_strategy() -> impl Strategy<Value = TestData> {
     let db = test_execution_with_storage_impl();
     let latest_ver = db.get_latest_version().unwrap();
 
-    (0..=latest_ver)
-        .prop_flat_map(move |txn_start_ver| (Just(txn_start_ver), txn_start_ver..=latest_ver))
-        .prop_flat_map(move |(txn_start_ver, state_snapshot_ver)| {
+    let state_checkpoint_versions = db
+        .get_transactions(0, 100, latest_ver, false)
+        .unwrap()
+        .transactions
+        .into_iter()
+        .enumerate()
+        .filter_map(|(idx, txn)| match txn {
+            Transaction::GenesisTransaction(..) | Transaction::StateCheckpoint => {
+                Some(idx as Version)
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    any::<Index>()
+        .prop_flat_map(move |state_snapshot_index| {
+            let state_snapshot_ver = *state_snapshot_index.get(&state_checkpoint_versions);
             (
-                Just(txn_start_ver),
+                0..=state_snapshot_ver,
                 prop_oneof![Just(Some(state_snapshot_ver)), Just(None)],
                 state_snapshot_ver..=latest_ver,
             )

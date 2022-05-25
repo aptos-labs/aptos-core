@@ -1,26 +1,30 @@
 <%= render 'layouts/application' do %>
-  <div class="bg-neutral-900 text-white h-full p-6 sm:p-24 2xl:px-48">
-    <h2 class="text-6xl mb-4 font-display font-light">Incentivized Testnet</h2>
-    <div class="mb-10">
-      <%= render 'shared/bump_hero' %>
-    </div>
-
-    <div class="flex flex-col lg:flex-row gap-8 sm:gap-24 2xl:gap-48 justify-between">
-      <%= yield %>
-      <div class="w-full lg:w-96 flex-1">
-        <%= render 'shared/outline_card' do %>
-          <h3 class="font-mono uppercase text-xl mb-4 mt-4">Schedule</h3>
-          <div class="mb-8"><%= render 'shared/bump' %></div>
-          <p class="mb-4 font-light"><em>All dates and times shown are for Pacific Time.</em></p>
-          <h4 class="font-mono uppercase text-teal-400 text-lg">May 13</h4>
-          <p class="mb-4 font-light">Registration starts. Node and identity verification begins.</p>
-          <h4 class="font-mono uppercase text-teal-400 text-lg">May 20</h4>
-          <p class="mb-4 font-light">Node registration locked. Only 48 hours left to complete identity verification.</p>
-          <h4 class="font-mono uppercase text-teal-400 text-lg">May 23</h4>
-          <p class="mb-4 font-light">Selection process concludes. Email notifications are sent.</p>
-          <h4 class="font-mono uppercase text-teal-400 text-lg">May 24</h4>
-          <p class="mb-4 font-light">Aptos Incentivized Testnet 1 goes live at noon. Validator score tracking begins.</p>
-        <% end %>
+  <div class="bg-neutral-900 text-white h-full">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-12 sm:py-24">
+      <h2 class="text-6xl mb-4 font-display font-light">Incentivized Testnet</h2>
+      <div class="mb-16">
+        <%= render DividerComponent.new(scheme: :primary) %>
+      </div>
+      <div class="flex flex-col lg:flex-row gap-8 sm:gap-24 2xl:gap-48 justify-between">
+        <%= yield %>
+        <div class="w-full lg:w-96 flex-1">
+          <%= render 'shared/outline_card' do %>
+            <h3 class="flex items-center gap-2 font-mono uppercase text-xl mb-4 mt-4">
+              <%= render IconComponent.new(:calendar, class: 'w-[21px] h-[21px]') %>
+              Schedule
+            </h3>
+            <div class="mb-8"><%= render DividerComponent.new %></div>
+            <p class="mb-4 font-light text-sm"><em>All dates and times shown are for Pacific Time.</em></p>
+            <h4 class="font-mono uppercase text-teal-400 text-lg">May 13</h4>
+            <p class="mb-4 font-light">Registration starts. Node and identity verification begins.</p>
+            <h4 class="font-mono uppercase text-teal-400 text-lg">May 20</h4>
+            <p class="mb-4 font-light">Node registration locked. Only 48 hours left to complete identity verification.</p>
+            <h4 class="font-mono uppercase text-teal-400 text-lg">May 23</h4>
+            <p class="mb-4 font-light">Selection process concludes. Email notifications are sent.</p>
+            <h4 class="font-mono uppercase text-teal-400 text-lg">May 24</h4>
+            <p class="mb-4 font-light">Aptos Incentivized Testnet 1 goes live at noon. Validator score tracking begins.</p>
+          <% end %>
+        </div>
       </div>
     </div>
   </div>

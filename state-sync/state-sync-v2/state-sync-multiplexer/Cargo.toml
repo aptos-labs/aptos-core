@@ -10,8 +10,8 @@ publish = false
 edition = "2018"
 
 [dependencies]
-futures = "0.3.12"
-tokio = { version = "1.8.1", features = ["full"] }
+futures = "0.3.21"
+tokio = { version = "1.18.2", features = ["full"] }
 
 aptos-config = { path = "../../../config" }
 aptos-data-client = { path = "../../aptos-data-client" }

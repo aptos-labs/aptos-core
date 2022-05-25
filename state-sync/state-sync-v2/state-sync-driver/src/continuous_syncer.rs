@@ -19,7 +19,7 @@ use aptos_types::{
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, NotificationFeedback},
+    streaming_client::{DataStreamingClient, Epoch, NotificationFeedback},
 };
 use std::{sync::Arc, time::Duration};
 use storage_interface::DbReader;
@@ -101,21 +101,23 @@ impl<
         // Fetch the highest epoch state (in storage)
         let highest_epoch_state = utils::fetch_latest_epoch_state(self.storage.clone())?;
 
-        // Start fetching data at highest_synced_version + 1
-        let next_version = highest_synced_version
-            .checked_add(1)
-            .ok_or_else(|| Error::IntegerOverflow("The next version has overflown!".into()))?;
-
-        // Initialize a new active data stream
+        // Fetch the consensus sync request target (if there is one)
         let sync_request_target = consensus_sync_request
             .lock()
             .as_ref()
             .map(|sync_request| sync_request.get_sync_target());
+        if sync_request_target.is_some() {
+            // Reset the chunk executor to ensure we're up-to-date
+            // with where consensus stopped.
+            self.storage_synchronizer.reset_chunk_executor()?;
+        }
+
+        // Initialize a new active data stream
         let active_data_stream = match self.driver_configuration.config.continuous_syncing_mode {
             ContinuousSyncingMode::ApplyTransactionOutputs => {
                 self.streaming_client
                     .continuously_stream_transaction_outputs(
-                        next_version,
+                        highest_synced_version,
                         highest_synced_epoch,
                         sync_request_target,
                     )
@@ -124,7 +126,7 @@ impl<
             ContinuousSyncingMode::ExecuteTransactions => {
                 self.streaming_client
                     .continuously_stream_transactions(
-                        next_version,
+                        highest_synced_version,
                         highest_synced_epoch,
                         false,
                         sync_request_target,
@@ -212,7 +214,7 @@ impl<
     }
 
     /// Returns the highest synced version and epoch in storage
-    fn get_highest_synced_version_and_epoch(&self) -> Result<(Version, Version), Error> {
+    fn get_highest_synced_version_and_epoch(&self) -> Result<(Version, Epoch), Error> {
         let highest_synced_version = utils::fetch_latest_synced_version(self.storage.clone())?;
         let highest_synced_epoch = utils::fetch_latest_epoch_state(self.storage.clone())?.epoch;
 

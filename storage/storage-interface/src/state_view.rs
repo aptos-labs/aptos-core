@@ -37,15 +37,15 @@ impl StateView for DbStateView {
     }
 }
 
-pub trait LatestDbStateView {
-    fn latest_state_view(&self) -> Result<DbStateView>;
+pub trait LatestDbStateCheckpointView {
+    fn latest_state_checkpoint_view(&self) -> Result<DbStateView>;
 }
 
-impl LatestDbStateView for Arc<dyn DbReader> {
-    fn latest_state_view(&self) -> Result<DbStateView> {
+impl LatestDbStateCheckpointView for Arc<dyn DbReader> {
+    fn latest_state_checkpoint_view(&self) -> Result<DbStateView> {
         Ok(DbStateView {
             db: self.clone(),
-            version: self.get_latest_version_option()?,
+            version: self.get_latest_state_checkpoint_version()?,
         })
     }
 }

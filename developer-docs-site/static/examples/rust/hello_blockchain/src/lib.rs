@@ -22,12 +22,7 @@ impl HelloBlockchainClient {
             "type": "module_bundle_payload",
             "modules": [{"bytecode": format!("0x{}", module_hex)}],
         });
-        let txn_request = self
-            .rest_client
-            .generate_transaction(&account_from.address(), payload);
-        let signed_txn = self.rest_client.sign_transaction(account_from, txn_request);
-        let res = self.rest_client.submit_transaction(&signed_txn);
-        res.get("hash").unwrap().as_str().unwrap().to_string()
+        self.rest_client.execution_transaction_with_payload(account_from, payload)
     }
     //<:!:section_1
     //:!:>section_2
@@ -55,18 +50,7 @@ impl HelloBlockchainClient {
             "type_arguments": [],
             "arguments": [message_hex]
         });
-
-        let txn_request = self
-            .rest_client
-            .generate_transaction(&account_from.address(), payload);
-        let signed_txn = self.rest_client.sign_transaction(account_from, txn_request);
-        self.rest_client
-            .submit_transaction(&signed_txn)
-            .get("hash")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .to_string()
+        self.rest_client.execution_transaction_with_payload(account_from, payload)
     }
     //<:!:section_3
 }

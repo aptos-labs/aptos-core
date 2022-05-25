@@ -230,7 +230,7 @@ impl SaveKey {
         // Write private and public keys to files
         let public_key_file = self.public_key_file()?;
         self.file_options
-            .save_to_file(key_name, &encoded_private_key)?;
+            .save_to_file_confidential(key_name, &encoded_private_key)?;
         write_to_file(&public_key_file, key_name, &encoded_public_key)?;
 
         let mut map = HashMap::new();

@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account::create::CreateAccount,
     common::{
         types::{
             account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
             EncodingOptions, PrivateKeyInputOptions, ProfileConfig, ProfileOptions, PromptOptions,
         },
-        utils::{prompt_yes_with_override, read_line},
+        utils::{fund_account, prompt_yes_with_override, read_line},
     },
     op::key::GenerateKey,
 };
@@ -157,8 +156,7 @@ impl CliCommand<()> for InitTool {
                 "Account {} doesn't exist, creating it and funding it with {} coins",
                 address, NUM_DEFAULT_COINS
             );
-            CreateAccount::create_account_with_faucet(faucet_url, NUM_DEFAULT_COINS, address)
-                .await?;
+            fund_account(faucet_url, NUM_DEFAULT_COINS, address).await?;
         }
 
         // Ensure the loaded config has profiles setup for a possible empty file

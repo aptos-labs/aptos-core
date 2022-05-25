@@ -165,7 +165,7 @@ pub(crate) mod test_utils {
 
         // Create the event subscription service and notify initial configs
         let storage: Arc<dyn DbReader> = db.clone();
-        let synced_version = (&*storage).fetch_synced_version().unwrap();
+        let synced_version = (&*storage).fetch_latest_state_checkpoint_version().unwrap();
         let mut event_subscription_service = EventSubscriptionService::new(
             ON_CHAIN_CONFIG_REGISTRY,
             Arc::new(RwLock::new(db_rw.clone())),

@@ -11,7 +11,7 @@ edition = "2018"
 
 [dependencies]
 bcs = "0.1.3"
-rand_core = "0.6.2"
+rand_core = "0.6.3"
 serde = { version = "1.0.137", features = ["derive"] }
 
 aptos-crypto = { path = "../crates/aptos-crypto" }

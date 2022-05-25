@@ -13,6 +13,7 @@ use crate::{
 use aptos_crypto::HashValue;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
+    test_helpers::transaction_test_helpers::block,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof},
 };
 use aptosdb::AptosDB;
@@ -250,15 +251,15 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
         let executor = BlockExecutor::<MockVM>::new(db);
         let parent_block_id = executor.committed_block_id();
         let block_id = tests::gen_block_id(1);
-        let version = 5;
+
         let mut rng = rand::thread_rng();
-        let txns = (0..version)
+        let txns = (0..5)
             .map(|_| encode_mint_transaction(tests::gen_address(rng.gen::<u64>()), 100))
             .collect::<Vec<_>>();
         let output = executor
-            .execute_block((block_id, txns), parent_block_id)
+            .execute_block((block_id, block(txns)), parent_block_id)
             .unwrap();
-        let ledger_info = tests::gen_ledger_info(version, output.root_hash(), block_id, 1);
+        let ledger_info = tests::gen_ledger_info(6, output.root_hash(), block_id, 1);
         executor.commit_blocks(vec![block_id], ledger_info).unwrap();
     }
 

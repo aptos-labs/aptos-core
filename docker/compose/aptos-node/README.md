@@ -7,11 +7,10 @@
     mkdir ~/$WORKSPACE
     cd ~/$WORKSPACE
     ```
-3. Download the validator.yaml, fullnode.yaml and docker-compose.yaml configuration files into this directory.
+3. Download the validator.yaml and docker-compose.yaml configuration files into this directory.
     ```
     wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/docker-compose.yaml
     wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/validator.yaml
-    wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/fullnode.yaml
     ```
 4. Generate key pairs (node owner key, consensus key and networking key) in your working directory.
 
@@ -98,9 +97,8 @@
 
     This should create two files in your working directory, `genesis.blob` and `waypoint.txt`
 
-9. To re-cap, in your working directory, you should have a list of files:
+9. To recap, in your working directory, you should have a list of files:
     - `validator.yaml` validator config file
-    - `fullnode.yaml` fullnode config file
     - `docker-compose.yaml` docker compose file to run validator and fullnode
     - `private-keys.yaml` Private keys for owner account, consensus, networking
     - `validator-identity.yaml` Private keys for setting validator identity
@@ -112,3 +110,15 @@
     - `genesis.blob` genesis binary contains all the info about framework, validatorSet and more.
 
 10. Run docker-compose: `docker-compose up`.
+
+11. [Optional] Now let's setup Fullnode on a different machine. Download the `fullnode.yaml` and `docker-compose-fullnode.yaml` configuration files into the working directory of Fullnode machine.
+    ```
+    wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/docker-compose-fullnode.yaml
+    wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/fullnode.yaml
+    ```
+
+12. Edit `fullnode.yaml` file to update the IP address for Validator node.
+
+13. [Optional] Copy the `validator-full-node-identity.yaml`, `genesis.blob` and `waypoint.txt` files generated above into the same working directory on Fullnode machine.
+
+14. [Optional] Run docker-compose: `docker-compose up -f docker-compose-fullnode.yaml`.

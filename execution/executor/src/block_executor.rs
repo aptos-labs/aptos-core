@@ -112,6 +112,7 @@ where
             let (output, _, _) = chunk_output.apply_to_ledger(parent_view)?;
             output
         };
+        output.ensure_ends_with_state_checkpoint()?;
 
         let block = self
             .block_tree

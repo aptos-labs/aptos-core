@@ -4,7 +4,7 @@
 use crate::{
     common::{
         types::{CliError, CliTypedResult, PromptOptions},
-        utils::{check_if_file_exists, read_from_file, write_to_file},
+        utils::{check_if_file_exists, read_from_file, write_to_user_only_file},
     },
     genesis::{
         config::{HostAndPort, ValidatorConfiguration},
@@ -30,10 +30,10 @@ const VFN_FILE: &str = "validator-full-node-identity.yaml";
 #[derive(Parser)]
 pub struct GenerateKeys {
     #[clap(flatten)]
-    prompt_options: PromptOptions,
+    pub(crate) prompt_options: PromptOptions,
     /// Output path for the three keys
     #[clap(long, parse(from_os_str), default_value = ".")]
-    output_dir: PathBuf,
+    pub(crate) output_dir: PathBuf,
 }
 
 #[async_trait]
@@ -86,17 +86,17 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
                 .map_err(|e| CliError::IO(self.output_dir.to_str().unwrap().to_string(), e))?
         };
 
-        write_to_file(
+        write_to_user_only_file(
             keys_file.as_path(),
             PRIVATE_KEYS_FILE,
             to_yaml(&config)?.as_bytes(),
         )?;
-        write_to_file(
+        write_to_user_only_file(
             validator_file.as_path(),
             VALIDATOR_FILE,
             to_yaml(&validator_blob)?.as_bytes(),
         )?;
-        write_to_file(vfn_file.as_path(), VFN_FILE, to_yaml(&vfn_blob)?.as_bytes())?;
+        write_to_user_only_file(vfn_file.as_path(), VFN_FILE, to_yaml(&vfn_blob)?.as_bytes())?;
         Ok(vec![keys_file, validator_file, vfn_file])
     }
 }
@@ -116,21 +116,21 @@ pub struct PrivateIdentity {
 pub struct SetValidatorConfiguration {
     /// Username
     #[clap(long)]
-    username: String,
+    pub(crate) username: String,
     #[clap(flatten)]
-    git_options: GitOptions,
+    pub(crate) git_options: GitOptions,
     /// Path to folder with account.key, consensus.key, and network.key
     #[clap(long, parse(from_os_str), default_value = ".")]
-    keys_dir: PathBuf,
+    pub(crate) keys_dir: PathBuf,
     /// Host and port pair for the validator e.g. 127.0.0.1:6180
     #[clap(long)]
-    validator_host: HostAndPort,
+    pub(crate) validator_host: HostAndPort,
     /// Host and port pair for the fullnode e.g. 127.0.0.1:6180
     #[clap(long)]
-    full_node_host: Option<HostAndPort>,
+    pub(crate) full_node_host: Option<HostAndPort>,
     /// Stake amount for stake distribution
     #[clap(long, default_value = "1")]
-    stake_amount: u64,
+    pub(crate) stake_amount: u64,
 }
 
 #[async_trait]
@@ -148,7 +148,12 @@ impl CliCommand<()> for SetValidatorConfiguration {
         let account_key = key_files.account_key.public_key();
         let consensus_key = key_files.consensus_key.public_key();
         let validator_network_key = key_files.validator_network_key.public_key();
-        let full_node_network_key = key_files.full_node_network_key.public_key();
+
+        let full_node_network_key = if self.full_node_host.is_some() {
+            Some(key_files.full_node_network_key.public_key())
+        } else {
+            None
+        };
 
         let credentials = ValidatorConfiguration {
             account_address,

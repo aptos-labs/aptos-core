@@ -9,7 +9,7 @@ sidebar_position: 13
 1. Clone the Aptos repo.
 
       ```
-      git clone https://github.com/<YOUR-GITHUB-USERID>/aptos-core
+      git clone https://github.com/aptos-labs/aptos-core.git
 
       ```
 
@@ -51,6 +51,12 @@ With your development environment ready, now you can start to setup your Validat
 
 8. Configure validator information, you need to setup a static IP / DNS address which can be used by the node, and make sure the network / firewalls are properly configured to accept external connections. This is all the info you need to register on our community website later.
 
+    :::tip
+
+    The `--full-node-host` flag is optional.
+
+    :::
+
     ```
     cargo run --release -p aptos -- genesis set-validator-configuration \
         --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE \
@@ -75,7 +81,7 @@ With your development environment ready, now you can start to setup your Validat
         --full-node-host fn.bot.aptosdev.com:6182
     ```
 
-    This will create a YAML file in your working directory with your username, e.g. `aptosbot.yml`, it should looks like:
+    This will create a YAML file in your working directory with your username, e.g., `aptosbot.yaml`. It looks like the below:
 
     ```
     ---
@@ -108,27 +114,27 @@ With your development environment ready, now you can start to setup your Validat
     chain_id: 23
     ```
 
-    You can use the same root key as the example, or generate new one yourself by running `cargo run -p aptos -- key generate --output-file <file name>`
+    You can use the same root key as the example, or generate new one yourself by running `cargo run -p aptos -- key generate --output-file <file name>`.
 
-10. Build AptosFramework Move bytecodes, copy into the framework folder
+10. Build AptosFramework Move bytecode and copy into the framework folder.
 
     ```
     cargo run --release --package framework -- --package aptos-framework --output current
 
-    mkdir ~/WORKSPACE/framework
+    mkdir ~/$WORKSPACE/framework
 
     mv aptos-framework/releases/artifacts/current/build/**/bytecode_modules/*.mv ~/$WORKSPACE/framework/
     ```
 
-    You should now have a folder called `framework`, which contains move bytecodes with format `.mv`.
+    You will now have a folder called `framework`, which contains Move bytecode with the format `.mv`.
 
-11. Compile genesis blob and waypoint
+11. Compile genesis blob and waypoint.
 
     ```
     cargo run --release -p aptos -- genesis generate-genesis --local-repository-dir ~/$WORKSPACE --output-dir ~/$WORKSPACE
     ```
 
-    This should create two files in your working directory, `genesis.blob` and `waypoint.txt`
+    This will create two files, `genesis.blob` and `waypoint.txt`, in your working directory.
 
 12. Copy the `validator.yaml`, `fullnode.yaml` files into this directory.
     ```

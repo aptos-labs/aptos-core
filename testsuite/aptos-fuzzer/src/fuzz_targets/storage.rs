@@ -14,7 +14,7 @@ use aptos_jellyfish_merkle::test_helper::{
     test_get_with_proof_with_distinct_last_nibble,
 };
 use aptos_proptest_helpers::ValueGenerator;
-use aptos_types::state_store::state_value::StateValue;
+use aptos_types::state_store::state_key::StateKey;
 use aptosdb::{
     schema::fuzzing::fuzz_decode,
     test_helper::{arb_blocks_to_commit, test_save_blocks_impl},
@@ -77,14 +77,14 @@ impl FuzzTargetImpl for JellyfishGetWithProof {
 
     fn generate(&self, _idx: usize, _gen: &mut ValueGenerator) -> Option<Vec<u8>> {
         Some(corpus_from_strategy(
-            arb_existent_kvs_and_nonexistent_keys::<StateValue>(1000, 100),
+            arb_existent_kvs_and_nonexistent_keys::<StateKey>(1000, 100),
         ))
     }
 
     fn fuzz(&self, data: &[u8]) {
         let input = fuzz_data_to_value(
             data,
-            arb_existent_kvs_and_nonexistent_keys::<StateValue>(1000, 100),
+            arb_existent_kvs_and_nonexistent_keys::<StateKey>(1000, 100),
         );
         test_get_with_proof(input);
     }
@@ -100,12 +100,12 @@ impl FuzzTargetImpl for JellyfishGetWithProofWithDistinctLastNibble {
 
     fn generate(&self, _idx: usize, _gen: &mut ValueGenerator) -> Option<Vec<u8>> {
         Some(corpus_from_strategy(
-            arb_kv_pair_with_distinct_last_nibble::<StateValue>(),
+            arb_kv_pair_with_distinct_last_nibble::<StateKey>(),
         ))
     }
 
     fn fuzz(&self, data: &[u8]) {
-        let input = fuzz_data_to_value(data, arb_kv_pair_with_distinct_last_nibble::<StateValue>());
+        let input = fuzz_data_to_value(data, arb_kv_pair_with_distinct_last_nibble::<StateKey>());
         test_get_with_proof_with_distinct_last_nibble(input);
     }
 }
@@ -119,11 +119,11 @@ impl FuzzTargetImpl for JellyfishGetRangeProof {
     }
 
     fn generate(&self, _idx: usize, _gen: &mut ValueGenerator) -> Option<Vec<u8>> {
-        Some(corpus_from_strategy(arb_tree_with_index::<StateValue>(100)))
+        Some(corpus_from_strategy(arb_tree_with_index::<StateKey>(100)))
     }
 
     fn fuzz(&self, data: &[u8]) {
-        let input = fuzz_data_to_value(data, arb_tree_with_index::<StateValue>(100));
+        let input = fuzz_data_to_value(data, arb_tree_with_index::<StateKey>(100));
         test_get_range_proof(input);
     }
 }

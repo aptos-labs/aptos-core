@@ -36,7 +36,7 @@ use storage_interface::DbReader;
 pub use executed_chunk::ExecutedChunk;
 use storage_interface::{in_memory_state::InMemoryState, verified_state_view::VerifiedStateView};
 
-type SparseMerkleProof = aptos_types::proof::SparseMerkleProof<StateValue>;
+type SparseMerkleProof = aptos_types::proof::SparseMerkleProof;
 
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
@@ -59,23 +59,22 @@ pub trait ChunkExecutorTrait: Send + Sync {
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> anyhow::Result<()>;
 
-    /// Commit a previously executed chunk. Returns a vector of reconfiguration
-    /// events in the chunk and the transactions that were committed.
-    fn commit_chunk(&self) -> Result<(Vec<ContractEvent>, Vec<Transaction>)>;
+    /// Commit a previously executed chunk. Returns a chunk commit notification.
+    fn commit_chunk(&self) -> Result<ChunkCommitNotification>;
 
     fn execute_and_commit_chunk(
         &self,
         txn_list_with_proof: TransactionListWithProof,
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<(Vec<ContractEvent>, Vec<Transaction>)>;
+    ) -> Result<ChunkCommitNotification>;
 
     fn apply_and_commit_chunk(
         &self,
         txn_output_list_with_proof: TransactionOutputListWithProof,
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<(Vec<ContractEvent>, Vec<Transaction>)>;
+    ) -> Result<ChunkCommitNotification>;
 
     /// Resets the chunk executor by synchronizing state with storage.
     fn reset(&self) -> Result<()>;
@@ -121,6 +120,13 @@ pub trait TransactionReplayer: Send {
     fn commit(&self) -> Result<Arc<ExecutedChunk>>;
 }
 
+/// A structure that holds relevant information about a chunk that was committed.
+pub struct ChunkCommitNotification {
+    pub committed_events: Vec<ContractEvent>,
+    pub committed_transactions: Vec<Transaction>,
+    pub reconfiguration_occurred: bool,
+}
+
 /// A structure that summarizes the result of the execution needed for consensus to agree on.
 /// The execution is responsible for generating the ID of the new state, which is returned in the
 /// result.
@@ -134,7 +140,7 @@ pub struct StateComputeResult {
     /// transaction accumulator root hash is identified as `state_id` in Consensus.
     root_hash: HashValue,
     /// Represents the roots of all the full subtrees from left to right in this accumulator
-    /// after the execution. For details, please see [`InMemoryAccumulator`](accumulator::InMemoryAccumulator).
+    /// after the execution. For details, please see [`InMemoryAccumulator`](aptos_types::proof::accumulator::InMemoryAccumulator).
     frozen_subtree_roots: Vec<HashValue>,
 
     /// The frozen subtrees roots of the parent block,
@@ -325,7 +331,10 @@ impl ExecutedTrees {
         frozen_subtrees_in_accumulator: Vec<HashValue>,
         num_leaves_in_accumulator: u64,
     ) -> Self {
-        let state = InMemoryState::new_at_checkpoint(state_root_hash, num_leaves_in_accumulator);
+        let state = InMemoryState::new_at_checkpoint(
+            state_root_hash,
+            num_leaves_in_accumulator.checked_sub(1),
+        );
         let transaction_accumulator = Arc::new(
             InMemoryAccumulator::new(frozen_subtrees_in_accumulator, num_leaves_in_accumulator)
                 .expect("The startup info read from storage should be valid."),
@@ -354,7 +363,7 @@ impl ExecutedTrees {
         VerifiedStateView::new(
             id,
             reader.clone(),
-            persisted_view.state.checkpoint_version(),
+            persisted_view.state.checkpoint_version,
             persisted_view.state.checkpoint_root_hash(),
             self.state.current.clone(),
         )
@@ -381,7 +390,7 @@ impl ProofReader {
     }
 }
 
-impl ProofRead<StateValue> for ProofReader {
+impl ProofRead for ProofReader {
     fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProof> {
         self.proofs.get(&key)
     }

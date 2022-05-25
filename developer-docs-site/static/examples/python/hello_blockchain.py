@@ -43,9 +43,7 @@ class HelloBlockchainClient(RestClient):
                 message.encode("utf-8").hex(),
             ]
         }
-        txn_request = self.generate_transaction(account_from.address(), payload)
-        signed_txn = self.sign_transaction(account_from, txn_request)
-        res = self.submit_transaction(signed_txn)
+        res = self.execute_transaction_with_payload(account_from, payload)
         return str(res["hash"])
 #<:!:section_3
 

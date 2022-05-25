@@ -176,8 +176,8 @@ impl<'t> AptosPublicInfo<'t> {
     }
 
     pub async fn get_balance(&self, address: AccountAddress) -> Option<u64> {
-        let module = Identifier::new("TestCoin".to_string()).unwrap();
-        let name = Identifier::new("Balance".to_string()).unwrap();
+        let module = Identifier::new("Coin".to_string()).unwrap();
+        let name = Identifier::new("CoinStore".to_string()).unwrap();
         self.rest_client
             .get_account_resources(address)
             .await

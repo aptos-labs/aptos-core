@@ -3,10 +3,11 @@ module AptosFramework::Stake {
     use Std::Option::{Self, Option};
     use Std::Signer;
     use Std::Vector;
+    use AptosFramework::Coin::{Self, Coin};
     use AptosFramework::IterableTable::{Self, IterableTable};
     use AptosFramework::SystemAddresses;
     use AptosFramework::Timestamp;
-    use AptosFramework::TestCoin::{Self, Coin};
+    use AptosFramework::TestCoin::TestCoin;
 
     friend AptosFramework::Reconfiguration;
     friend AptosFramework::Genesis;
@@ -38,8 +39,8 @@ module AptosFramework::Stake {
 
     /// Basic unit of stake delegation, it's stored in StakePool.
     struct Delegation has store {
-        coins: Coin,
-        rewards: Coin,
+        coins: Coin<TestCoin>,
+        rewards: Coin<TestCoin>,
         locked_until_secs: u64,
     }
 
@@ -99,7 +100,7 @@ module AptosFramework::Stake {
 
     /// Any user can delegate a stake.
     public(friend) fun delegate_stake(account: &signer, to: address, amount: u64, locked_until_secs: u64) acquires StakePool, ValidatorSet {
-        let coins = TestCoin::withdraw(account, amount);
+        let coins = Coin::withdraw<TestCoin>(account, amount);
         let current_time = Timestamp::now_seconds();
         assert!(current_time + MINIMUM_LOCK_PERIOD < locked_until_secs, Errors::invalid_argument(ELOCK_TIME_TOO_SHORT));
         let addr = Signer::address_of(account);
@@ -107,17 +108,17 @@ module AptosFramework::Stake {
         assert!(!find_delegation_from_pool(stake_pool, addr), Errors::invalid_argument(EDELEGATION_ALREADY_EXIST));
         let delegation = Delegation {
             coins,
-            rewards: TestCoin::zero(),
+            rewards: Coin::zero<TestCoin>(),
             locked_until_secs,
         };
         // add to pending_active if it's a current validator otherwise add to active directly
-        stake_pool.next_epoch_voting_power = stake_pool.next_epoch_voting_power + TestCoin::value(&delegation.coins);
+        stake_pool.next_epoch_voting_power = stake_pool.next_epoch_voting_power + Coin::value<TestCoin>(&delegation.coins);
         let maximum_stake = borrow_global<ValidatorSet>(@CoreResources).maximum_stake;
         assert!(stake_pool.next_epoch_voting_power <= maximum_stake, Errors::invalid_argument(EDELEGATION_EXCEED_MAX));
         if (!is_current_validator(to)) {
-            IterableTable::add(&mut stake_pool.active, &addr, delegation);
+            IterableTable::add(&mut stake_pool.active, addr, delegation);
         } else {
-            IterableTable::add(&mut stake_pool.pending_active, &addr, delegation);
+            IterableTable::add(&mut stake_pool.pending_active, addr, delegation);
         }
     }
 
@@ -129,25 +130,25 @@ module AptosFramework::Stake {
         let stake_pool = borrow_global_mut<StakePool>(from);
         let delegation = withdraw_internal(&mut stake_pool.active, addr);
         let is_current_validator = is_current_validator(from);
-        stake_pool.next_epoch_voting_power = stake_pool.next_epoch_voting_power - TestCoin::value(&delegation.coins);
+        stake_pool.next_epoch_voting_power = stake_pool.next_epoch_voting_power - Coin::value<TestCoin>(&delegation.coins);
         if (!is_current_validator) {
             // move to inactive directly if it's not from an active validator
-            IterableTable::add(&mut stake_pool.inactive, &addr, delegation);
+            IterableTable::add(&mut stake_pool.inactive, addr, delegation);
         } else if (delegation.locked_until_secs < current_time) {
             // move to pending_inactive if it can be unlocked
-            IterableTable::add(&mut stake_pool.pending_inactive, &addr,  delegation);
+            IterableTable::add(&mut stake_pool.pending_inactive, addr,  delegation);
         } else {
             abort Errors::invalid_argument(EWITHDRAW_NOT_ALLOWED)
         };
     }
 
     /// Withdraw from inactive delegation.
-    public(script) fun withdraw(account: &signer, from: address): Coin acquires StakePool {
+    public(script) fun withdraw(account: &signer, from: address): Coin<TestCoin> acquires StakePool {
         let addr = Signer::address_of(account);
         let stake_pool = borrow_global_mut<StakePool>(from);
         let delegation = withdraw_internal(&mut stake_pool.inactive, addr);
         let Delegation {coins, rewards, locked_until_secs: _} = delegation;
-        TestCoin::merge(&mut coins, rewards);
+        Coin::merge<TestCoin>(&mut coins, rewards);
         coins
     }
 
@@ -291,9 +292,9 @@ module AptosFramework::Stake {
     fun distribute_reward(v: &mut IterableTable<address, Delegation>) {
         let key = IterableTable::head_key(v);
         while (Option::is_some(&key)) {
-            let (delegation, _, next) = IterableTable::borrow_iter_mut(v, Option::borrow(&key));
-            let reward = TestCoin::zero(); // mint some coins based on delegation, timestamp, maybe also total stakes
-            TestCoin::merge(&mut delegation.rewards, reward);
+            let (delegation, _, next) = IterableTable::borrow_iter_mut(v, *Option::borrow(&key));
+            let reward = Coin::zero<TestCoin>(); // mint some coins based on delegation, timestamp, maybe also total stakes
+            Coin::merge<TestCoin>(&mut delegation.rewards, reward);
             key = next;
         };
     }
@@ -312,7 +313,7 @@ module AptosFramework::Stake {
     }
 
     fun find_delegation(v: &IterableTable<address, Delegation>, addr: address): bool {
-        IterableTable::contains(v, &addr)
+        IterableTable::contains(v, addr)
     }
 
     fun find_validator(v: &vector<ValidatorInfo>, addr: address): Option<u64> {
@@ -329,7 +330,7 @@ module AptosFramework::Stake {
 
     fun withdraw_internal(v: &mut IterableTable<address, Delegation>, addr: address): Delegation {
         assert!(find_delegation(v, addr), Errors::invalid_argument(EDELEGATION_NOT_FOUND));
-        IterableTable::remove(v, &addr)
+        IterableTable::remove(v, addr)
     }
 
     fun generate_validator_info(addr: address): ValidatorInfo acquires StakePool, ValidatorConfig {
@@ -351,18 +352,18 @@ module AptosFramework::Stake {
     ) acquires StakePool, ValidatorConfig, ValidatorSet {
         initialize_validator_set(&core_resources, 100, 10000);
         Timestamp::set_time_has_started_for_testing(&core_resources);
-        TestCoin::mint_for_test(&account_1, 10000);
-        TestCoin::mint_for_test(&account_2, 10000);
-        TestCoin::mint_for_test(&account_3, 10000);
+        Coin::mint_for_test<TestCoin>(&account_1, 10000);
+        Coin::mint_for_test<TestCoin>(&account_2, 10000);
+        Coin::mint_for_test<TestCoin>(&account_3, 10000);
         register_validator_candidate(&account_1, Vector::empty(), Vector::empty(), Vector::empty());
         let addr1 = Signer::address_of(&account_1);
         let addr2 = Signer::address_of(&account_2);
         let addr3 = Signer::address_of(&account_3);
         // delegation when the address is not a validator
         delegate_stake(&account_1, addr1, 100, 100000);
-        assert!(TestCoin::value(&IterableTable::borrow(&borrow_global<StakePool>(addr1).active, &addr1).coins) == 100, 0);
+        assert!(Coin::value<TestCoin>(&IterableTable::borrow(&borrow_global<StakePool>(addr1).active, addr1).coins) == 100, 0);
         delegate_stake(&account_2, addr1, 101, 100000);
-        assert!(TestCoin::value(&IterableTable::borrow(&borrow_global<StakePool>(addr1).active, &addr2).coins) == 101, 0);
+        assert!(Coin::value<TestCoin>(&IterableTable::borrow(&borrow_global<StakePool>(addr1).active, addr2).coins) == 101, 0);
         // join the validator set with enough stake
         join_validator_set(&account_1);
         on_new_epoch();
@@ -370,26 +371,26 @@ module AptosFramework::Stake {
         assert!(is_current_validator(addr1), 0);
         delegate_stake(&account_3, addr1, 102, 100000);
         assert!(borrow_global<StakePool>(addr1).voting_power == 201, 0);
-        assert!(TestCoin::value(&IterableTable::borrow(&borrow_global<StakePool>(addr1).active, &addr1).coins) == 100, 0);
-        assert!(TestCoin::value(&IterableTable::borrow(&borrow_global<StakePool>(addr1).active, &addr2).coins) == 101, 0);
-        assert!(TestCoin::value(&IterableTable::borrow(&borrow_global<StakePool>(addr1).pending_active, &addr3).coins) == 102, 0);
+        assert!(Coin::value<TestCoin>(&IterableTable::borrow(&borrow_global<StakePool>(addr1).active, addr1).coins) == 100, 0);
+        assert!(Coin::value<TestCoin>(&IterableTable::borrow(&borrow_global<StakePool>(addr1).active, addr2).coins) == 101, 0);
+        assert!(Coin::value<TestCoin>(&IterableTable::borrow(&borrow_global<StakePool>(addr1).pending_active, addr3).coins) == 102, 0);
         // unlock active stakes
         Timestamp::update_global_time_for_test(100001000000);
         unlock(&account_1, addr1);
-        assert!(TestCoin::value(&IterableTable::borrow(&borrow_global<StakePool>(addr1).pending_inactive, &addr1).coins) == 100, 0);
+        assert!(Coin::value<TestCoin>(&IterableTable::borrow(&borrow_global<StakePool>(addr1).pending_inactive, addr1).coins) == 100, 0);
         // total stake doesn't change until next epoch
         assert!(borrow_global<StakePool>(addr1).voting_power == 201, 0);
         // pending delegations are processed on new epoch
         on_new_epoch();
         assert!(IterableTable::length(&borrow_global<StakePool>(addr1).pending_active) == 0, 0);
         assert!(IterableTable::length(&borrow_global<StakePool>(addr1).pending_inactive) == 0, 0);
-        assert!(TestCoin::value(&IterableTable::borrow(&borrow_global<StakePool>(addr1).inactive, &addr1).coins) == 100, 0);
-        assert!(TestCoin::value(&IterableTable::borrow(&borrow_global<StakePool>(addr1).active, &addr3).coins) == 102, 0);
+        assert!(Coin::value<TestCoin>(&IterableTable::borrow(&borrow_global<StakePool>(addr1).inactive, addr1).coins) == 100, 0);
+        assert!(Coin::value<TestCoin>(&IterableTable::borrow(&borrow_global<StakePool>(addr1).active, addr3).coins) == 102, 0);
         assert!(borrow_global<StakePool>(addr1).voting_power == 203, 0);
         // withdraw
         let coins = withdraw(&account_1, addr1);
-        assert!(TestCoin::value(&coins) == 100, 0);
-        TestCoin::deposit(addr1, coins);
+        assert!(Coin::value<TestCoin>(&coins) == 100, 0);
+        Coin::deposit<TestCoin>(addr1, coins);
     }
 
     #[test(core_resources = @CoreResources, account_1 = @0x123, account_2 = @0x234, account_3 = @0x345)]
@@ -401,7 +402,7 @@ module AptosFramework::Stake {
     ) acquires StakePool, ValidatorConfig, ValidatorSet {
         initialize_validator_set(&core_resources, 100, 10000);
         Timestamp::set_time_has_started_for_testing(&core_resources);
-        TestCoin::mint_for_test(&account_1, 10000);
+        Coin::mint_for_test<TestCoin>(&account_1, 10000);
         let addr1 = Signer::address_of(&account_1);
         let addr2 = Signer::address_of(&account_2);
         let addr3 = Signer::address_of(&account_3);

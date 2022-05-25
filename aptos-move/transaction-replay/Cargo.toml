@@ -23,7 +23,6 @@ aptos-validator-interface = { path = "../aptos-validator-interface" }
 aptos-vm = { path = "../aptos-vm" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 aptosdb = { path = "../../storage/aptosdb" }
-cached-framework-packages =  { path = "../framework/cached-packages" }
 framework =  { path = "../framework" }
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "table-extension"] }
 

@@ -10,6 +10,7 @@ use crate::{
         transaction::TransactionSchema, transaction_by_account::TransactionByAccountSchema,
         transaction_by_hash::TransactionByHashSchema, write_set::WriteSetSchema,
     },
+    transaction_accumulator::TransactionAccumulatorSchema,
     transaction_info::TransactionInfoSchema,
 };
 use anyhow::{ensure, format_err, Result};
@@ -295,6 +296,23 @@ impl TransactionStore {
     ) -> anyhow::Result<()> {
         for version in begin..end {
             db_batch.delete::<WriteSetSchema>(&version)?;
+        }
+        Ok(())
+    }
+
+    /// Prune the transaction schema store between a range of version in [begin, end).
+    pub fn prune_transaction_accumulator(
+        &self,
+        begin: Version,
+        end: Version,
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
+        let begin_position = self.get_min_proof_node(begin);
+        let end_position = self.get_min_proof_node(end);
+        for position in begin_position.to_postorder_index()..end_position.to_postorder_index() {
+            db_batch.delete::<TransactionAccumulatorSchema>(&Position::from_postorder_index(
+                position,
+            )?)?;
         }
         Ok(())
     }

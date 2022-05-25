@@ -12,10 +12,14 @@ use aptos_types::{
     proof::SparseMerkleProof,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Version, PRE_GENESIS_VERSION},
+    write_set::WriteSet,
 };
 use parking_lot::RwLock;
 use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 /// `VerifiedStateView` is like a snapshot of the global state comprised of state view at two
 /// levels, persistent storage and memory.
@@ -78,7 +82,7 @@ pub struct VerifiedStateView {
     /// the corresponding key has been deleted. This is a temporary hack until we support deletion
     /// in JMT node.
     state_cache: RwLock<HashMap<StateKey, StateValue>>,
-    state_proof_cache: RwLock<HashMap<HashValue, SparseMerkleProof<StateValue>>>,
+    state_proof_cache: RwLock<HashMap<HashValue, SparseMerkleProof>>,
 }
 
 impl VerifiedStateView {
@@ -110,6 +114,16 @@ impl VerifiedStateView {
             state_cache: RwLock::new(HashMap::new()),
             state_proof_cache: RwLock::new(HashMap::new()),
         }
+    }
+
+    pub fn prime_cache_by_write_set(&self, write_sets: &[WriteSet]) -> Result<()> {
+        write_sets
+            .iter()
+            .flat_map(|write_set| write_set.iter())
+            .map(|(key, _)| key)
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .try_for_each(|key| self.get_state_value(key).map(|_| ()))
     }
 
     pub fn into_state_cache(self) -> StateCache {
@@ -164,7 +178,7 @@ impl VerifiedStateView {
 pub struct StateCache {
     pub frozen_base: FrozenSparseMerkleTree<StateValue>,
     pub state_cache: HashMap<StateKey, StateValue>,
-    pub proofs: HashMap<HashValue, SparseMerkleProof<StateValue>>,
+    pub proofs: HashMap<HashValue, SparseMerkleProof>,
 }
 
 impl StateView for VerifiedStateView {

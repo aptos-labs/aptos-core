@@ -1,6 +1,34 @@
+# list of files to ignore from docker's perspective
+# The more we can exclude the higher likelihood we can reuse cached layers
+
+.assets/
+.circleci/
+.config/
+.github/
+.idea/
+.lintrules/
+developer-docs-site/
+docker/
+!docker/validator/install-tools.sh
+!docker/build-common.sh
+!docker/tools/boto.cfg
+documentation/
+ecosystem/
+!ecosystem/indexer/
+scripts/
+target/
+terraform/
+
 *~
 *.swp
 **/.terraform/
-target/
+**/*.md
+**/*.MD
 **/*Dockerfile
-docker/update_or_build.sh
+.git/
+
+clippy.toml
+.gitattributes
+
+# Ignore generated credentials from google-github-actions/auth as per https://github.com/google-github-actions/auth#prerequisites
+gha-creds-*.json

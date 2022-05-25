@@ -6,7 +6,8 @@
 Rails.application.routes.draw do
   devise_for :users, {
     controllers: {
-      omniauth_callbacks: 'users/omniauth_callbacks'
+      omniauth_callbacks: 'users/omniauth_callbacks',
+      sessions: 'users/sessions'
     }
   }
   ActiveAdmin.routes(self)
@@ -27,13 +28,16 @@ Rails.application.routes.draw do
   get 'onboarding/kyc_redirect', to: 'onboarding#kyc_redirect'
   get 'onboarding/kyc_callback', to: 'onboarding#kyc_callback'
 
-  get 'onboarding/email', to: 'onboarding#email'
+  get 'onboarding/email'
+  get 'onboarding/email_success'
   post 'onboarding/email', to: 'onboarding#email_update'
 
   get 'health', to: 'health#health'
 
   resources :overview, only: %i[index]
   resources :it1_profiles, except: %i[index destroy]
+
+  get 'leaderboard/it1'
 
   get 'it1', to: 'welcome#it1'
   root 'welcome#index'

@@ -19,6 +19,7 @@ use aptos_types::{
         authenticator::{AuthenticationKey, TransactionAuthenticator},
         ChangeSet, Script, ScriptFunction, SignedTransaction,
     },
+    utility_coin::TEST_COIN_TYPE,
     write_set::{WriteOp, WriteSetMut},
 };
 
@@ -120,7 +121,7 @@ async fn test_get_transactions_output_user_transaction_with_script_function_payl
     context.commit_block(&vec![txn.clone()]).await;
 
     let txns = context.get("/transactions?start=1").await;
-    assert_eq!(2, txns.as_array().unwrap().len());
+    assert_eq!(3, txns.as_array().unwrap().len());
     context.check_golden_output(txns);
 }
 
@@ -198,9 +199,9 @@ async fn test_get_transactions_output_user_transaction_with_write_set_payload() 
                         context.root_account().address(),
                         bcs::to_bytes(&Path::Resource(StructTag {
                             address: code_address,
-                            module: Identifier::new("TestCoin").unwrap(),
-                            name: Identifier::new("Balance").unwrap(),
-                            type_params: vec![],
+                            module: Identifier::new("Coin").unwrap(),
+                            name: Identifier::new("CoinStore").unwrap(),
+                            type_params: vec![TEST_COIN_TYPE.clone()],
                         }))
                         .unwrap(),
                     )),
@@ -416,7 +417,7 @@ async fn test_get_transaction_by_hash() {
     let txn = context.create_user_account(&account);
     context.commit_block(&vec![txn.clone()]).await;
 
-    let txns = context.get("/transactions?start=2").await;
+    let txns = context.get("/transactions?start=2&limit=1").await;
     assert_eq!(1, txns.as_array().unwrap().len());
 
     let resp = context
@@ -468,7 +469,7 @@ async fn test_get_transaction_by_version() {
     let txn = context.create_user_account(&account);
     context.commit_block(&vec![txn.clone()]).await;
 
-    let txns = context.get("/transactions?start=2").await;
+    let txns = context.get("/transactions?start=2&limit=1").await;
     assert_eq!(1, txns.as_array().unwrap().len());
 
     let resp = context.get("/transactions/2").await;
@@ -566,9 +567,9 @@ async fn test_signing_message_with_write_set_payload() {
                             context.root_account().address(),
                             bcs::to_bytes(&Path::Resource(StructTag {
                                 address: code_address,
-                                module: Identifier::new("TestCoin").unwrap(),
-                                name: Identifier::new("Balance").unwrap(),
-                                type_params: vec![],
+                                module: Identifier::new("Coin").unwrap(),
+                                name: Identifier::new("CoinStore").unwrap(),
+                                type_params: vec![TEST_COIN_TYPE.clone()],
                             }))
                             .unwrap(),
                         )),
@@ -594,7 +595,7 @@ async fn test_signing_message_with_write_set_payload() {
                 {
                     "type": "delete_resource",
                     "address": "0xb1e55ed",
-                    "resource": "0x1::TestCoin::Balance"
+                    "resource": "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>"
                 }
             ],
             "events": []
@@ -674,7 +675,7 @@ async fn test_signing_message_with_payload(
     context.commit_mempool_txns(10).await;
 
     let ledger = context.get("/").await;
-    assert_eq!(ledger["ledger_version"].as_str().unwrap(), "2"); // one metadata + one txn
+    assert_eq!(ledger["ledger_version"].as_str().unwrap(), "3"); // metadata + user txn + state checkpoint
 }
 
 #[tokio::test]
@@ -836,9 +837,9 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_address() {
         context,
         account,
         "0x1222",
-        "TestCoin",
+        "Coin",
         "transfer",
-        vec![],
+        vec![TEST_COIN_TYPE.clone()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&1u64).unwrap(),
@@ -855,9 +856,9 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_module_name() {
         context,
         account,
         "0x1",
-        "TestCoinInvalid",
+        "CoinInvalid",
         "transfer",
-        vec![],
+        vec![TEST_COIN_TYPE.clone()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&1u64).unwrap(),
@@ -874,9 +875,9 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_name() {
         context,
         account,
         "0x1",
-        "TestCoin",
+        "Coin",
         "transfer_invalid",
-        vec![],
+        vec![TEST_COIN_TYPE.clone()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&1u64).unwrap(),
@@ -893,9 +894,9 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_arguments() {
         context,
         account,
         "0x1",
-        "TestCoin",
+        "Coin",
         "transfer",
-        vec![],
+        vec![TEST_COIN_TYPE.clone()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&1u8).unwrap(), // invalid type
@@ -912,9 +913,9 @@ async fn test_get_txn_execute_failed_by_missing_script_function_arguments() {
         context,
         account,
         "0x1",
-        "TestCoin",
+        "Coin",
         "transfer",
-        vec![],
+        vec![TEST_COIN_TYPE.clone()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             // missing arguments
@@ -935,9 +936,9 @@ async fn test_get_txn_execute_failed_by_script_function_validation() {
         context,
         account,
         "0x1",
-        "TestCoin",
+        "Coin",
         "transfer",
-        vec![],
+        vec![TEST_COIN_TYPE.clone()],
         vec![
             bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
             bcs::to_bytes(&123u64).unwrap(), // exceed limit, account balance is 0.

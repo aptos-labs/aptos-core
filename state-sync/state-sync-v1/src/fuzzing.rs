@@ -10,13 +10,12 @@ use crate::{
     shared_components::test_utils,
 };
 use aptos_config::network_id::NetworkId;
-use aptos_infallible::Mutex;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, transaction::TransactionListWithProof, PeerId,
 };
 use aptos_vm::AptosVM;
 use executor::chunk_executor::ChunkExecutor;
-use futures::executor::block_on;
+use futures::{executor::block_on, lock::Mutex};
 use mempool_notifications::MempoolNotifier;
 use once_cell::sync::Lazy;
 use proptest::{
@@ -43,6 +42,7 @@ pub fn test_state_sync_msg_fuzzer_impl(message: StateSyncMessage) {
     block_on(async move {
         let _ = STATE_SYNC_COORDINATOR
             .lock()
+            .await
             .process_chunk_message(
                 NetworkId::Validator,
                 PeerId::new([0u8; PeerId::LENGTH]),

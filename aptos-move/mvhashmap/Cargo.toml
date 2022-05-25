@@ -10,13 +10,12 @@ publish = false
 edition = "2018"
 
 [dependencies]
-arc-swap = "1.5.0"
 crossbeam = "0.8.1"
 dashmap = "5.2.0"
-rayon = "1.5.2"
 
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
+rayon = "1.5.2"

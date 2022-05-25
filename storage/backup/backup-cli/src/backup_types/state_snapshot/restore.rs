@@ -21,11 +21,12 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    ledger_info::LedgerInfoWithSignatures, proof::TransactionInfoWithProof,
-    state_store::state_value::StateKeyAndValue, transaction::Version,
+    ledger_info::LedgerInfoWithSignatures,
+    proof::TransactionInfoWithProof,
+    state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::Version,
 };
 use std::sync::Arc;
 use storage_interface::StateSnapshotReceiver;
@@ -136,8 +137,8 @@ impl StateSnapshotRestoreController {
         for chunk in manifest.chunks {
             let blobs = self.read_state_value(chunk.blobs).await?;
             let proof = self.storage.load_bcs_file(&chunk.proof).await?;
-
             receiver.add_chunk(blobs, proof)?;
+
             leaf_idx.set(chunk.last_idx as i64);
         }
 
@@ -147,7 +148,7 @@ impl StateSnapshotRestoreController {
     async fn read_state_value(
         &self,
         file_handle: FileHandle,
-    ) -> Result<Vec<(HashValue, StateKeyAndValue)>> {
+    ) -> Result<Vec<(StateKey, StateValue)>> {
         let mut file = self.storage.open_for_read(&file_handle).await?;
 
         let mut chunk = vec![];

@@ -4,8 +4,9 @@
 
 class It1ProfilesController < ApplicationController
   before_action :authenticate_user!
-  before_action :set_it1_profile, only: %i[show edit update destroy]
+  before_action :ensure_registration_enabled!
   before_action :ensure_confirmed!
+  before_action :set_it1_profile, only: %i[show edit update destroy]
   respond_to :html
 
   def show
@@ -27,7 +28,7 @@ class It1ProfilesController < ApplicationController
     params[:user] = current_user
     @it1_profile = It1Profile.new(params)
 
-    respond_with(@it1_profile) and return unless verify_recaptcha(model: @it1_profile)
+    return unless check_recaptcha
 
     v = NodeHelper::NodeVerifier.new(@it1_profile.validator_address, @it1_profile.validator_metrics_port,
                                      @it1_profile.validator_api_port)
@@ -36,7 +37,7 @@ class It1ProfilesController < ApplicationController
       @it1_profile.validator_ip = v.ip.ip
     else
       @it1_profile.errors.add :validator_address, v.ip.message
-      respond_with(@it1_profile) and return
+      respond_with(@it1_profile, status: :unprocessable_entity) and return
     end
 
     if @it1_profile.save
@@ -47,7 +48,7 @@ class It1ProfilesController < ApplicationController
         redirect_to it1_path, notice: 'AIT1 application completed successfully: your node is verified!' and return
       end
     end
-    respond_with(@it1_profile)
+    respond_with(@it1_profile, status: :unprocessable_entity)
   end
 
   # PATCH/PUT /it1_profiles/1 or /it1_profiles/1.json
@@ -56,13 +57,13 @@ class It1ProfilesController < ApplicationController
                                      it1_profile_params[:validator_metrics_port],
                                      it1_profile_params[:validator_api_port])
 
-    respond_with(@it1_profile) and return unless verify_recaptcha(model: @it1_profile)
+    return unless check_recaptcha
 
     if v.ip.ok
       @it1_profile.validator_ip = v.ip.ip
     else
       @it1_profile.errors.add :validator_address, v.ip.message
-      respond_with(@it1_profile) and return
+      respond_with(@it1_profile, status: :unprocessable_entity) and return
     end
 
     ip_changed = @it1_profile.validator_ip_changed?
@@ -78,7 +79,7 @@ class It1ProfilesController < ApplicationController
         redirect_to it1_path, notice: 'AIT1 node verification completed successfully!' and return
       end
     end
-    respond_with(@it1_profile)
+    respond_with(@it1_profile, status: :unprocessable_entity)
   end
 
   private
@@ -100,6 +101,18 @@ class It1ProfilesController < ApplicationController
     results
   end
 
+  def check_recaptcha
+    recaptcha_v3_success = verify_recaptcha(action: 'it1/update', minimum_score: 0.5,
+                                            secret_key: ENV.fetch('RECAPTCHA_V3_SECRET_KEY', nil), model: @it1_profile)
+    recaptcha_v2_success = verify_recaptcha(model: @it1_profile) unless recaptcha_v3_success
+    unless recaptcha_v3_success || recaptcha_v2_success
+      @show_recaptcha_v2 = true
+      respond_with(@it1_profile, status: :unprocessable_entity)
+      return false
+    end
+    true
+  end
+
   # Use callbacks to share common setup or constraints between actions.
   def set_it1_profile
     @it1_profile = It1Profile.find(params[:id])
@@ -111,5 +124,10 @@ class It1ProfilesController < ApplicationController
     params.fetch(:it1_profile, {}).permit(:consensus_key, :account_key, :network_key, :validator_address,
                                           :validator_port, :validator_api_port, :validator_metrics_port,
                                           :fullnode_address, :fullnode_port, :fullnode_network_key, :terms_accepted)
+  end
+
+  def ensure_registration_enabled!
+    redirect_to it1_path if Flipper.enabled?(:it1_node_registration_disabled,
+                                             current_user) || Flipper.enabled?(:it1_registration_closed, current_user)
   end
 end

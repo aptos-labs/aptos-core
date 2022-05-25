@@ -37,7 +37,11 @@ fn get_abi_paths(dir: &Path) -> std::io::Result<Vec<String>> {
                 // not read Genesis abi (script builder doesn't work with the script function there)
                 if !path
                     .to_str()
-                    .map(|s| s.contains("/Genesis/") || s.contains("/Coin/"))
+                    .map(|s| {
+                        s.contains("/Genesis/")
+                            || s.contains("/Coin/")
+                            || s.contains("/ManagedCoin/")
+                    })
                     .unwrap()
                 {
                     abi_paths.push(path.to_str().unwrap().to_string());

@@ -22,10 +22,13 @@ fn put_value_set(
         .collect();
 
     let root = state_store
-        .put_value_sets(vec![&value_set], None, version, &mut cs)
+        .merklize_value_sets(vec![&value_set], None, version, &mut cs)
         .unwrap()[0];
+    state_store
+        .put_value_sets(vec![&value_set], version, &mut cs)
+        .unwrap();
     db.write_schemas(cs.batch).unwrap();
-    state_store.set_latest_version(version);
+    state_store.set_latest_state_checkpoint_version(version);
 
     root
 }

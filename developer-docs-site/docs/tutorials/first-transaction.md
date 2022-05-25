@@ -215,26 +215,31 @@ Finally, we can execute the application and verify the output.
 
 <Tabs>
 <TabItem value="python" label="Python" default>
+For Python3:
 
-```python
-:!: static/examples/python/first_transaction.py section_7
-```
+* Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python)
+* Open your favorite terminal and navigate to where you downloaded the above example project
+* Install the required libraries: `pip3 install -r requirements.txt`.
+* Execute the example: `python3 first_transaction.py`
 
-  </TabItem>
-  <TabItem value="rust" label="Rust" default>
+</TabItem>
+<TabItem value="rust" label="Rust">
+For Rust:
 
-```rust
-:!: static/examples/rust/first_transaction/src/main.rs section_7
-```
+* Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust)
+* Open your favorite terminal and navigate to where you downloaded the above example project
+* Execute the example: `cargo run --bin first-transaction`
 
-  </TabItem>
-  <TabItem value="typescript" label="Typescript" default>
+</TabItem>
+<TabItem value="typescript" label="Typescript">
+For Typescript:
 
-```typescript
-:!: static/examples/typescript/first_transaction.ts section_7
-```
+* Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript)
+* Open your favorite terminal and navigate to where you downloaded the above example project
+* Install the required libraries: `yarn install`
+* Execute the example: `yarn first_transaction`
 
-  </TabItem>
+</TabItem>
 </Tabs>
 
 The output after executing:

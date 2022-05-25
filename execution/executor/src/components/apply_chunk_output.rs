@@ -176,10 +176,7 @@ impl ApplyChunkOutput {
                 InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes)
             };
 
-            // TODO(aldenhu): hash the write set
-            // let state_change_hash = CryptoHash::hash(&write_set);
-            let state_change_hash = state_checkpoint_hash.unwrap();
-
+            let state_change_hash = CryptoHash::hash(&write_set);
             let txn_info = match &status {
                 TransactionStatus::Keep(status) => TransactionInfo::new(
                     txn.hash(),

@@ -1,0 +1,16 @@
+[package]
+name = "first-coin"
+version = "0.0.1"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Aptos Rust tutorial files: First Coin"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+first-transaction = { path = "../first_transaction" }
+hello-blockchain = { path = "../hello_blockchain" }
+serde_json = "1.0.81"
+hex = "0.4.3"

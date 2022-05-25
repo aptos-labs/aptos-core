@@ -21,7 +21,7 @@ executor = { path = "../execution/executor" }
 storage-interface = { path = "../storage/storage-interface" }
 
 [dev-dependencies]
-rand = "0.8.3"
+rand = "0.8.5"
 
 aptos-crypto = { path = "../crates/aptos-crypto", features = ["fuzzing"] }
 aptos-temppath = { path = "../crates/aptos-temppath" }

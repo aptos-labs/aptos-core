@@ -74,6 +74,10 @@ workspace-members = [
 
     # Don't consider since it includes excluded move crates
     "move-deps",
+
+    # Don't include these since they contain test features that we don't want in production.
+    "forge",
+    "transaction-emitter",
 ]
 
 [hakari.final-excludes]
@@ -81,11 +85,11 @@ third-party = [
     # Exclude the fail crate because the failpoints feature should only be enabled
     # for certain builds.
     { name = "fail" },
-    { name = "move-binary-format", git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" },
-    { name = "move-core-types", git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["address32"] },
-    { name = "move-stdlib", git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" },
-    { name = "move-vm-runtime", git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" },
-    { name = "move-vm-types", git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" },
+    { name = "move-binary-format", git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" },
+    { name = "move-core-types", git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7", features=["address32"] },
+    { name = "move-stdlib", git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" },
+    { name = "move-vm-runtime", git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" },
+    { name = "move-vm-types", git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" },
 ]
 
 # This follows the same syntax as CargoOptionsSummary in guppy.
@@ -184,6 +188,7 @@ members = [
     "memsocket",
     "move-examples",
     "smoke-test",
+    "storage-client",
     "transaction-emitter",
     "x",
     "x-core",
@@ -258,7 +263,7 @@ mark-changed = []
 
 [[determinator.path-rule]]
 # Ignore ecosytem typescript
-globs = ["ecosystem/typescript/**/*", "ecosystem/web-wallet/**/*", "ecosystem/platform/**/*"]
+globs = ["ecosystem/typescript/**/*", "ecosystem/web-wallet/**/*", "ecosystem/platform/**/*", "ecosystem/indexer-server/typescript/**/*", "ecosystem/indexer-server/doc/*"]
 mark-changed = []
 
 [[determinator.path-rule]]

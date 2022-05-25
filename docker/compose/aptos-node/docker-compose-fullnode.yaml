@@ -1,0 +1,45 @@
+# This compose file defines an Aptos Fullnode deployment.
+# Read the README.md files for instruction on how to install aptos-node
+
+version: "3.8"
+services:
+  fullnode:
+    image: "${VALIDATOR_IMAGE_REPO:-aptoslab/validator}:${IMAGE_TAG:-testnet}"
+    networks:
+      shared:
+    volumes:
+      - type: volume
+        source: aptos-fullnode
+        target: /opt/aptos/data
+      - type: bind
+        source: ./fullnode.yaml
+        target: /opt/aptos/etc/fullnode.yaml
+      - type: bind
+        source: ./genesis.blob
+        target: /opt/aptos/genesis/genesis.blob
+      - type: bind
+        source: ./waypoint.txt
+        target: /opt/aptos/genesis/waypoint.txt
+      - type: bind
+        source: ./validator-full-node-identity.yaml
+        target: /opt/aptos/genesis/validator-full-node-identity.yaml
+    command: ["/opt/aptos/bin/aptos-node", "-f", "/opt/aptos/etc/fullnode.yaml"]
+    ports:
+      - "6182:6182"
+      - "80:8080"
+      - "9101:9101"
+    expose:
+      - 6182
+      - 80
+      - 9101
+
+networks:
+  shared:
+    name: "aptos-docker-compose-shared"
+    ipam:
+      config:
+        - subnet: 172.16.1.0/24
+
+volumes:
+  aptos-fullnode:
+    name: aptos-fullnode

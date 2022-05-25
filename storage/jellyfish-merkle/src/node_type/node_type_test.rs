@@ -54,9 +54,17 @@ fn test_encode_decode() {
     let internal_node_key = random_63nibbles_node_key();
 
     let leaf1_keys = gen_leaf_keys(0, internal_node_key.nibble_path(), Nibble::from(1));
-    let leaf1_node = Node::new_leaf(leaf1_keys.1, ValueBlob::from(vec![0x00]));
+    let leaf1_node = Node::new_leaf(
+        leaf1_keys.1,
+        HashValue::random(),
+        (ValueBlob::from(vec![0x00]), 0),
+    );
     let leaf2_keys = gen_leaf_keys(0, internal_node_key.nibble_path(), Nibble::from(2));
-    let leaf2_node = Node::new_leaf(leaf2_keys.1, ValueBlob::from(vec![0x01]));
+    let leaf2_node = Node::new_leaf(
+        leaf2_keys.1,
+        HashValue::random(),
+        (ValueBlob::from(vec![0x01]), 0),
+    );
 
     let mut children = Children::default();
     children.insert(
@@ -71,7 +79,11 @@ fn test_encode_decode() {
     let account_key = HashValue::random();
     let nodes = vec![
         Node::new_internal(children),
-        Node::new_leaf(account_key, ValueBlob::from(vec![0x02])),
+        Node::new_leaf(
+            account_key,
+            HashValue::random(),
+            (ValueBlob::from(vec![0x02]), 0),
+        ),
     ];
     for n in &nodes {
         let v = n.encode().unwrap();
@@ -132,10 +144,10 @@ fn test_internal_validity() {
 fn test_leaf_hash() {
     {
         let address = HashValue::random();
-        let blob = ValueBlob::from(vec![0x02]);
-        let value_hash = blob.hash();
+        let key_blob = ValueBlob::from(vec![0x02]);
+        let value_hash = HashValue::random();
         let hash = hash_leaf(address, value_hash);
-        let leaf_node = Node::new_leaf(address, blob);
+        let leaf_node = Node::new_leaf(address, value_hash, (key_blob, 0 /* version */));
         assert_eq!(leaf_node.hash(), hash);
     }
 }

@@ -5,10 +5,10 @@
 
 //! Provides an mpsc (multi-producer single-consumer) channel wrapped in an
 //! [`IntGauge`](aptos_metrics::IntGauge) that counts the number of currently
-//! queued items. While there is only one [`channel::Receiver`], there can be
-//! many [`channel::Sender`]s, which are also cheap to clone.
+//! queued items. While there is only one [`Receiver`], there can be
+//! many [`Sender`]s, which are also cheap to clone.
 //!
-//! This channel differs from our other channel implementation, [`channel::aptos_channel`],
+//! This channel differs from our other channel implementation, [`aptos_channel`],
 //! in that it is just a single queue (vs. different queues for different keys)
 //! with backpressure (senders will block if the queue is full instead of evicting
 //! another item in the queue) that only implements FIFO (vs. LIFO or KLAST).

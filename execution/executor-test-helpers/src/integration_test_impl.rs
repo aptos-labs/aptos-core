@@ -12,6 +12,7 @@ use aptos_types::{
     account_config::aptos_root_address,
     account_view::AccountView,
     event::EventKey,
+    test_helpers::transaction_test_helpers::block,
     transaction::{
         authenticator::AuthenticationKey, Transaction, TransactionListWithProof,
         TransactionWithProof, WriteSetPayload,
@@ -143,7 +144,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         Some(aptos_stdlib::encode_test_coin_transfer(account3, 70_000)),
     );
 
-    let block1 = vec![tx1, tx2, tx3, txn1, txn2, txn3, txn4, txn5, txn6];
+    let block1 = block(vec![tx1, tx2, tx3, txn1, txn2, txn3, txn4, txn5, txn6]);
     let block1_id = gen_block_id(1);
 
     let mut block2 = vec![];
@@ -159,6 +160,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             Some(aptos_stdlib::encode_test_coin_transfer(account3, 10_000)),
         ));
     }
+    let block2 = block(block2);
 
     let output1 = executor
         .execute_block((block1_id, block1.clone()), parent_block_id)
@@ -175,7 +177,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         _ => panic!("unexpected state change"),
     };
     let current_version = state_proof.latest_ledger_info().version();
-    assert_eq!(trusted_state.version(), 9);
+    assert_eq!(trusted_state.version(), 10);
 
     let t1 = db
         .reader
@@ -254,7 +256,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account1_sent_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account1, 0),
+            &EventKey::new_from_address(&account1, 2),
             0,
             Order::Ascending,
             10,
@@ -265,7 +267,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account2_sent_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account2, 0),
+            &EventKey::new_from_address(&account2, 2),
             0,
             Order::Ascending,
             10,
@@ -276,7 +278,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account3_sent_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account3, 0),
+            &EventKey::new_from_address(&account3, 2),
             0,
             Order::Ascending,
             10,
@@ -293,7 +295,8 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             10,
         )
         .unwrap();
-    assert_eq!(account1_received_events.len(), 0);
+    // Account1 has one deposit event since TestCoin was minted to it.
+    assert_eq!(account1_received_events.len(), 1);
 
     let account2_received_events = db
         .reader
@@ -304,7 +307,8 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             10,
         )
         .unwrap();
-    assert_eq!(account2_received_events.len(), 1);
+    // Account2 has two deposit events: from being minted to and from one transfer.
+    assert_eq!(account2_received_events.len(), 2);
 
     let account3_received_events = db
         .reader
@@ -315,7 +319,8 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             10,
         )
         .unwrap();
-    assert_eq!(account3_received_events.len(), 2);
+    // Account3 has three deposit events: from being minted to and from two transfers.
+    assert_eq!(account3_received_events.len(), 3);
     let account4_resource = db
         .reader
         .state_view_at_version(Some(current_version))
@@ -334,7 +339,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account4_sent_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account4, 0),
+            &EventKey::new_from_address(&account4, 2),
             0,
             Order::Ascending,
             10,
@@ -358,7 +363,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         TrustedStateChange::Version { .. }
     ));
     let current_version = state_proof.latest_ledger_info().version();
-    assert_eq!(current_version, 23);
+    assert_eq!(current_version, 25);
 
     let t7 = db
         .reader
@@ -393,14 +398,14 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     let transaction_list_with_proof = db
         .reader
-        .get_transactions(10, 17, current_version, false)
+        .get_transactions(11, 18, current_version, false)
         .unwrap();
     verify_transactions(&transaction_list_with_proof, &block2[..]).unwrap();
 
     let account1_sent_events_batch1 = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account1, 0),
+            &EventKey::new_from_address(&account1, 2),
             0,
             Order::Ascending,
             10,
@@ -411,7 +416,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account1_sent_events_batch2 = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account1, 0),
+            &EventKey::new_from_address(&account1, 2),
             10,
             Order::Ascending,
             10,
@@ -429,7 +434,8 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         )
         .unwrap();
     assert_eq!(account3_received_events_batch1.len(), 10);
-    assert_eq!(account3_received_events_batch1[0].1.sequence_number(), 15);
+    // Account3 has one extra deposit event from being minted to.
+    assert_eq!(account3_received_events_batch1[0].1.sequence_number(), 16);
 
     let account3_received_events_batch2 = db
         .reader
@@ -464,7 +470,7 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
 
 pub fn get_account_balance(account_state_view: &AccountWithStateView) -> u64 {
     account_state_view
-        .get_balance_resource()
+        .get_coin_store_resource()
         .unwrap()
         .map(|b| b.coin())
         .unwrap_or(0)

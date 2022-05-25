@@ -35,12 +35,13 @@ storage-interface = { path = "../../storage/storage-interface" }
 
 [dev-dependencies]
 proptest = "1.0.0"
-rand = "0.8.3"
+rand = "0.8.5"
 
 aptos-config = { path = "../../config" }
 aptos-genesis-tool = { path = "../../config/management/genesis", features = ["testing"] }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
+aptos-types = { path = "../../types", features = ["fuzzing"] }
 aptosdb = { path = "../../storage/aptosdb" }
 executor-test-helpers = { path = "../executor-test-helpers" }
 move-deps = { path = "../../aptos-move/move-deps" }

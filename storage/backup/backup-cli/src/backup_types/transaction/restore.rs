@@ -410,7 +410,7 @@ impl TransactionRestoreBatchController {
         let first_version = self.replay_from_version.unwrap();
         let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.aptosdb));
         let persisted_view = restore_handler
-            .get_tree_state(first_version)?
+            .get_tree_state(first_version.checked_sub(1))?
             .into_ledger_view(&db.reader)?;
         let chunk_replayer = Arc::new(ChunkExecutor::<AptosVM>::new_with_view(db, persisted_view));
 

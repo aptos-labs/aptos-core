@@ -2,18 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::{
-    init::DEFAULT_FAUCET_URL,
     types::{
-        CliCommand, CliConfig, CliError, CliTypedResult, EncodingOptions, ProfileOptions,
+        CliCommand, CliTypedResult, EncodingOptions, FaucetOptions, ProfileOptions,
         WriteTransactionOptions,
     },
-    utils::submit_transaction,
+    utils::{fund_account, submit_transaction},
 };
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
-use reqwest::Url;
 
 /// Command to create a new account on-chain
 ///
@@ -31,9 +29,8 @@ pub struct CreateAccount {
     /// Flag for using faucet to create the account
     #[clap(long)]
     use_faucet: bool,
-    /// URL for the faucet
-    #[clap(long)]
-    faucet_url: Option<Url>,
+    #[clap(flatten)]
+    faucet_options: FaucetOptions,
     /// Initial coins to fund when using the faucet
     #[clap(long, default_value = "10000")]
     initial_coins: u64,
@@ -48,20 +45,13 @@ impl CliCommand<String> for CreateAccount {
     async fn execute(self) -> CliTypedResult<String> {
         let address = self.account;
         if self.use_faucet {
-            let faucet_url = if let Some(faucet_url) = self.faucet_url {
-                faucet_url
-            } else if let Some(Some(url)) = CliConfig::load_profile(&self.profile_options.profile)?
-                .map(|profile| profile.faucet_url)
-            {
-                Url::parse(&url)
-                    .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))?
-            } else {
-                Url::parse(DEFAULT_FAUCET_URL).map_err(|err| {
-                    CliError::UnexpectedError(format!("Failed to parse default faucet URL {}", err))
-                })?
-            };
-
-            Self::create_account_with_faucet(faucet_url, self.initial_coins, address).await
+            fund_account(
+                self.faucet_options
+                    .faucet_url(&self.profile_options.profile)?,
+                self.initial_coins,
+                self.account,
+            )
+            .await
         } else {
             self.create_account_with_key(address).await
         }
@@ -70,29 +60,6 @@ impl CliCommand<String> for CreateAccount {
 }
 
 impl CreateAccount {
-    pub async fn create_account_with_faucet(
-        faucet_url: Url,
-        initial_coins: u64,
-        address: AccountAddress,
-    ) -> CliTypedResult<()> {
-        let response = reqwest::Client::new()
-            .post(format!(
-                "{}mint?amount={}&auth_key={}",
-                faucet_url, initial_coins, address
-            ))
-            .send()
-            .await
-            .map_err(|err| CliError::ApiError(err.to_string()))?;
-        if response.status() == 200 {
-            Ok(())
-        } else {
-            Err(CliError::ApiError(format!(
-                "Faucet issue: {}",
-                response.status()
-            )))
-        }
-    }
-
     async fn create_account_with_key(self, address: AccountAddress) -> CliTypedResult<()> {
         let sender_key = self.write_options.private_key_options.extract_private_key(
             self.encoding_options.encoding,
