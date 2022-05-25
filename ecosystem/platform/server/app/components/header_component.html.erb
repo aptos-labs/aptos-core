@@ -1,13 +1,13 @@
-<header class="bg-black text-white flex px-4 items-center justify-between sticky top-0 h-16 z-10">
+<%= content_tag :header, **@rest do %>
   <a href="/" title="Aptos - Building the safest and most scalable Layer 1 blockchain">
     <%= render IconComponent.new(:aptos_word, class: 'h-6 md:h-8') %>
   </a>
   <div class="flex gap-8">
-    <%= render ButtonComponent.new(href: 'https://aptos.dev', scheme: :secondary, size: :small, class: '!w-36') do %>
+    <%= render ButtonComponent.new(href: 'https://aptos.dev/', scheme: :secondary, size: :small, class: '!w-36') do %>
       Docs
     <% end %>
     <%= render ButtonComponent.new(href: 'https://explorer.devnet.aptos.dev/', scheme: :secondary, size: :small, class: '!hidden sm:!flex !w-36') do %>
       Explorer
     <% end %>
   </div>
-</header>
+<% end %>

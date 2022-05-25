@@ -16,13 +16,13 @@
 
   <body class="flex flex-col h-screen justify-between bg-neutral-900 antialiased">
     <div class="flex flex-col flex-1">
-      <%= render "layouts/header" unless @hide_header %>
+      <%= render HeaderComponent.new %>
 
       <main class="flex-1">
         <%= yield %>
       </div>
     </main>
 
-    <%= render "layouts/footer" %>
+    <%= render FooterComponent.new %>
   </body>
 </html>

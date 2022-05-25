@@ -1,10 +1,11 @@
+# frozen_string_literal: true
+
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
-# frozen_string_literal: true
 
 require 'rails_helper'
 
-RSpec.describe IconTooltipComponent, type: :component do
+RSpec.describe HeaderComponent, type: :component do
   pending "add some examples to (or delete) #{__FILE__}"
 
   # it "renders something useful" do
