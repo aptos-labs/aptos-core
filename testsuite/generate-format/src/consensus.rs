@@ -68,6 +68,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<consensus::network_interface::ConsensusMsg>(&samples)?;
     tracer.trace_type::<consensus_types::block_data::BlockType>(&samples)?;
     tracer.trace_type::<consensus_types::block_retrieval::BlockRetrievalStatus>(&samples)?;
+    tracer.trace_type::<consensus_types::common::Payload>(&samples)?;
 
     tracer.registry()
 }

@@ -37,6 +37,7 @@ aptos-types = { path = "../types" }
 aptos-workspace-hack = { path = "../crates/aptos-workspace-hack" }
 bounded-executor = { path = "../crates/bounded-executor" }
 channel = { path = "../crates/channel" }
+consensus-types = { path = "../consensus/consensus-types" }
 event-notifications = { path = "../state-sync/inter-component/event-notifications" }
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
 netcore = { path = "../network/netcore" }

@@ -240,6 +240,10 @@ impl MempoolNetworkInterface {
         let _ = std::mem::replace(&mut *prioritized_peers, peers);
     }
 
+    pub fn is_validator(&self) -> bool {
+        self.role.is_validator()
+    }
+
     pub fn is_upstream_peer(
         &self,
         peer: &PeerNetworkId,

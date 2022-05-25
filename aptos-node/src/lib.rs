@@ -168,7 +168,7 @@ pub fn load_test_environment<R>(
             .parse()
             .unwrap();
         if lazy {
-            template.consensus.mempool_poll_count = u64::MAX;
+            template.consensus.quorum_store_poll_count = u64::MAX;
         }
 
         let builder = aptos_genesis_tool::validator_builder::ValidatorBuilder::new(
@@ -718,7 +718,8 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     let api_runtime = bootstrap_api(node_config, chain_id, aptos_db, mp_client_sender).unwrap();
 
     let mut consensus_runtime = None;
-    let (consensus_to_mempool_sender, consensus_requests) = channel(INTRA_NODE_CHANNEL_BUFFER_SIZE);
+    let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
+        channel(INTRA_NODE_CHANNEL_BUFFER_SIZE);
 
     instant = Instant::now();
     let mempool = aptos_mempool::bootstrap(
@@ -726,12 +727,22 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         Arc::clone(&db_rw.reader),
         mempool_network_handles,
         mp_client_events,
-        consensus_requests,
+        consensus_to_mempool_receiver,
         mempool_listener,
         mempool_reconfig_subscription,
         peer_metadata_storage.clone(),
     );
     debug!("Mempool started in {} ms", instant.elapsed().as_millis());
+
+    assert!(
+        !node_config.consensus.use_quorum_store,
+        "QuorumStore is not yet implemented"
+    );
+    assert_ne!(
+        node_config.consensus.use_quorum_store,
+        node_config.mempool.shared_mempool_validator_broadcast,
+        "Shared mempool validator broadcast must be turned off when QuorumStore is on, and vice versa"
+    );
 
     // StateSync should be instantiated and started before Consensus to avoid a cyclic dependency:
     // network provider -> consensus -> state synchronizer -> network provider.  This has resulted

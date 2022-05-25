@@ -170,7 +170,7 @@ impl ConsensusMock {
         mempool: &mut CoreMempool,
         block_size: u64,
     ) -> Vec<SignedTransaction> {
-        let block = mempool.get_block(block_size, self.0.clone());
+        let block = mempool.get_batch(block_size, self.0.clone());
         self.0 = self
             .0
             .union(

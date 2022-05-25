@@ -10,7 +10,7 @@ use crate::liveness::{
 use aptos_types::{block_metadata::NewBlockEvent, validator_signer::ValidatorSigner};
 use consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
-    common::{Author, Round},
+    common::{Author, Payload, Round},
 };
 use itertools::Itertools;
 
@@ -190,7 +190,7 @@ fn test_api() {
     assert!(proposer_election.is_valid_proposer(proposers[expected_index], 42));
     assert!(!proposer_election.is_valid_proposer(proposers[unexpected_index], 42));
     let good_proposal = Block::new_proposal(
-        vec![],
+        Payload::new_empty(),
         round,
         1,
         certificate_for_genesis(),
@@ -198,7 +198,7 @@ fn test_api() {
     );
     assert!(proposer_election.is_valid_proposal(&good_proposal));
     let bad_proposal = Block::new_proposal(
-        vec![],
+        Payload::new_empty(),
         round,
         1,
         certificate_for_genesis(),
@@ -206,7 +206,7 @@ fn test_api() {
     );
     assert!(!proposer_election.is_valid_proposal(&bad_proposal));
     let bad_proposal_2 = Block::new_proposal(
-        vec![],
+        Payload::new_empty(),
         round,
         2,
         certificate_for_genesis(),

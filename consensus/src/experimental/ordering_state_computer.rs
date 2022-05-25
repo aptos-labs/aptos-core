@@ -20,7 +20,7 @@ use futures::{
     channel::{mpsc::UnboundedSender, oneshot},
     SinkExt,
 };
-use std::{boxed::Box, sync::Arc};
+use std::sync::Arc;
 
 /// Ordering-only execution proxy
 /// implements StateComputer traits.

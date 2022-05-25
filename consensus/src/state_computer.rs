@@ -3,9 +3,11 @@
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
+    commit_notifier::CommitNotifier,
     counters,
     error::StateSyncError,
-    state_replication::{StateComputer, StateComputerCommitCallBackType, TxnManager},
+    state_replication::{StateComputer, StateComputerCommitCallBackType},
+    txn_notifier::TxnNotifier,
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
@@ -17,7 +19,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
 };
 use consensus_notifications::ConsensusNotificationSender;
-use consensus_types::{block::Block, executed_block::ExecutedBlock};
+use consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
 use executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
 use fail::fail_point;
 use futures::{SinkExt, StreamExt};
@@ -29,21 +31,26 @@ type NotificationType = (
     Vec<ContractEvent>,
 );
 
+type CommitType = (u64, Round);
+
 /// Basic communication with the Execution module;
 /// implements StateComputer traits.
 pub struct ExecutionProxy {
     executor: Box<dyn BlockExecutorTrait>,
-    mempool_notifier: Arc<dyn TxnManager>,
+    txn_notifier: Arc<dyn TxnNotifier>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     async_state_sync_notifier: channel::Sender<NotificationType>,
+    commit_notifier: Arc<dyn CommitNotifier>,
+    async_commit_notifier: channel::Sender<CommitType>,
     validators: Mutex<Vec<AccountAddress>>,
 }
 
 impl ExecutionProxy {
     pub fn new(
         executor: Box<dyn BlockExecutorTrait>,
-        mempool_notifier: Arc<dyn TxnManager>,
+        txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
+        commit_notifier: Arc<dyn CommitNotifier>,
         handle: &tokio::runtime::Handle,
     ) -> Self {
         let (tx, mut rx) =
@@ -61,11 +68,25 @@ impl ExecutionProxy {
                 callback();
             }
         });
+        let (commit_tx, mut commit_rx) =
+            channel::new::<CommitType>(10, &counters::PENDING_QUORUM_STORE_COMMIT_NOTIFICATION);
+        let notifier = commit_notifier.clone();
+        handle.spawn(async move {
+            while let Some((epoch, round)) = commit_rx.next().await {
+                if let Err(e) =
+                    monitor!("notify_commit", notifier.notify_commit(epoch, round).await)
+                {
+                    error!(error = ?e, "Failed to notify commit notifier");
+                }
+            }
+        });
         Self {
             executor,
-            mempool_notifier,
+            txn_notifier,
             state_sync_notifier,
             async_state_sync_notifier: tx,
+            commit_notifier,
+            async_commit_notifier: commit_tx,
             validators: Mutex::new(vec![]),
         }
     }
@@ -106,7 +127,7 @@ impl StateComputer for ExecutionProxy {
 
         // notify mempool about failed transaction
         if let Err(e) = self
-            .mempool_notifier
+            .txn_notifier
             .notify_failed_txn(block, &compute_result)
             .await
         {
@@ -127,11 +148,21 @@ impl StateComputer for ExecutionProxy {
         let mut block_ids = Vec::new();
         let mut txns = Vec::new();
         let mut reconfig_events = Vec::new();
+        let skip_clean = blocks.is_empty();
+        let mut latest_epoch: u64 = 0;
+        let mut latest_round: u64 = 0;
 
         for block in blocks {
             block_ids.push(block.id());
             txns.extend(block.transactions_to_commit(&self.validators.lock()));
             reconfig_events.extend(block.reconfig_event());
+
+            if block.epoch() > latest_epoch {
+                latest_epoch = block.epoch();
+            }
+            if block.round() > latest_round {
+                latest_round = block.round();
+            }
         }
 
         monitor!(
@@ -150,6 +181,16 @@ impl StateComputer for ExecutionProxy {
             .await
             .expect("Failed to send async state sync notification");
 
+        // If there are no blocks, epoch and round will be invalid.
+        // TODO: is this ever the case? why?
+        if skip_clean {
+            return Ok(());
+        }
+        self.async_commit_notifier
+            .clone()
+            .send((latest_epoch, latest_round))
+            .await
+            .expect("Failed to send async commit notification");
         Ok(())
     }
 

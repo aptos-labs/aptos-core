@@ -17,8 +17,11 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use consensus_types::{
-    block::block_test_utils::certificate_for_genesis, common::Round, executed_block::ExecutedBlock,
-    quorum_cert::QuorumCert, vote_proposal::MaybeSignedVoteProposal,
+    block::block_test_utils::certificate_for_genesis,
+    common::{Payload, Round},
+    executed_block::ExecutedBlock,
+    quorum_cert::QuorumCert,
+    vote_proposal::MaybeSignedVoteProposal,
 };
 use executor_types::StateComputeResult;
 use safety_rules::{
@@ -72,7 +75,14 @@ pub fn prepare_executed_blocks_with_ledger_info(
     assert!(num_blocks > 0);
 
     let p1 = if let Some(parent) = some_parent {
-        make_proposal_with_parent(vec![], init_round, &parent, None, signer, None)
+        make_proposal_with_parent(
+            Payload::new_empty(),
+            init_round,
+            &parent,
+            None,
+            signer,
+            None,
+        )
     } else {
         make_proposal_with_qc(init_round, init_qc.unwrap(), signer, None)
     };
@@ -82,8 +92,14 @@ pub fn prepare_executed_blocks_with_ledger_info(
     for i in 1..num_blocks {
         println!("Generating {}", i);
         let parent = proposals.last().unwrap();
-        let proposal =
-            make_proposal_with_parent(vec![], init_round + i, parent, None, signer, None);
+        let proposal = make_proposal_with_parent(
+            Payload::new_empty(),
+            init_round + i,
+            parent,
+            None,
+            signer,
+            None,
+        );
         proposals.push(proposal);
     }
 

@@ -6,7 +6,7 @@ use crate::{
     network::{MempoolNetworkEvents, MempoolNetworkSender, MempoolSyncMsg},
     shared_mempool::start_shared_mempool,
     tests::common::TestTransaction,
-    ConsensusRequest, MempoolClientRequest, MempoolClientSender,
+    MempoolClientRequest, MempoolClientSender, QuorumStoreRequest,
 };
 use aptos_config::{
     config::NodeConfig,
@@ -44,9 +44,6 @@ use tokio::{runtime::Handle, time::Duration};
 use tokio_stream::StreamExt;
 use vm_validator::mocks::mock_vm_validator::MockVMValidator;
 
-/// An inbound sender for notifications from consensus
-pub type MempoolConsensusSender = futures::channel::mpsc::Sender<ConsensusRequest>;
-
 /// An individual mempool node that runs in it's own runtime.
 ///
 /// TODO: Add ability to mock StateSync updates to remove transactions
@@ -60,8 +57,8 @@ pub struct MempoolNode {
     // Mempool specific channels
     /// Used for incoming JSON-RPC requests (e.g. adding new transactions)
     pub mempool_client_sender: MempoolClientSender,
-    /// Used for Rejections notifications from consensus
-    pub mempool_consensus_sender: MempoolConsensusSender,
+    /// Used for quorum store requests
+    pub consensus_to_mempool_sender: futures::channel::mpsc::Sender<QuorumStoreRequest>,
     /// Used for StateSync commit notifications
     pub mempool_notifications: MempoolNotifier,
 
@@ -152,7 +149,7 @@ impl MempoolNode {
     /// Asynchronously waits for up to 1 second for txns to appear in mempool
     pub async fn wait_on_txns_in_mempool(&self, txns: &[TestTransaction]) {
         for _ in 0..10 {
-            let block = self.mempool.lock().get_block(100, HashSet::new());
+            let block = self.mempool.lock().get_batch(100, HashSet::new());
 
             if block_contains_all_transactions(&block, txns) {
                 break;
@@ -202,7 +199,7 @@ impl MempoolNode {
         txns: &[TestTransaction],
         condition: Condition,
     ) -> Result<(), (Vec<(AccountAddress, u64)>, Vec<(AccountAddress, u64)>)> {
-        let block = self.mempool.lock().get_block(100, HashSet::new());
+        let block = self.mempool.lock().get_batch(100, HashSet::new());
         if !condition(&block, txns) {
             let actual: Vec<_> = block
                 .iter()
@@ -437,7 +434,7 @@ impl TestFramework<MempoolNode> for MempoolTestFramework {
 
         let (application_handles, inbound_handles, outbound_handles, peer_metadata_storage) =
             setup_node_networks(&network_ids);
-        let (mempool_client_sender, mempool_consensus_sender, mempool_notifications, mempool) =
+        let (mempool_client_sender, consensus_to_mempool_sender, mempool_notifications, mempool) =
             setup_mempool(config, application_handles, peer_metadata_storage.clone());
 
         MempoolNode {
@@ -445,7 +442,7 @@ impl TestFramework<MempoolNode> for MempoolTestFramework {
             peer_network_ids: network_id_mapping,
             mempool,
             mempool_client_sender,
-            mempool_consensus_sender,
+            consensus_to_mempool_sender,
             mempool_notifications,
             inbound_handles,
             outbound_handles,
@@ -470,13 +467,13 @@ fn setup_mempool(
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) -> (
     MempoolClientSender,
-    MempoolConsensusSender,
+    futures::channel::mpsc::Sender<QuorumStoreRequest>,
     MempoolNotifier,
     Arc<Mutex<CoreMempool>>,
 ) {
     let (sender, _subscriber) = futures::channel::mpsc::unbounded();
     let (ac_endpoint_sender, ac_endpoint_receiver) = mpsc_channel();
-    let (consensus_sender, consensus_events) = mpsc_channel();
+    let (quorum_store_sender, quorum_store_receiver) = mpsc_channel();
     let (mempool_notifier, mempool_listener) =
         mempool_notifications::new_mempool_notifier_listener_pair();
 
@@ -494,7 +491,7 @@ fn setup_mempool(
         mempool.clone(),
         network_handles,
         ac_endpoint_receiver,
-        consensus_events,
+        quorum_store_receiver,
         mempool_listener,
         reconfig_event_subscriber,
         db_ro,
@@ -505,7 +502,7 @@ fn setup_mempool(
 
     (
         ac_endpoint_sender,
-        consensus_sender,
+        quorum_store_sender,
         mempool_notifier,
         mempool,
     )

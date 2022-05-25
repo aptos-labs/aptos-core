@@ -5,7 +5,7 @@ use crate::{
     core_mempool::{CoreMempool, TimelineState},
     network::{MempoolNetworkEvents, MempoolNetworkSender},
     shared_mempool::start_shared_mempool,
-    ConsensusRequest, MempoolClientSender,
+    MempoolClientSender, QuorumStoreRequest,
 };
 use anyhow::{format_err, Result};
 use aptos_config::{
@@ -39,7 +39,7 @@ pub struct MockSharedMempool {
     _handle: Option<Handle>,
     pub ac_client: MempoolClientSender,
     pub mempool: Arc<Mutex<CoreMempool>>,
-    pub consensus_sender: mpsc::Sender<ConsensusRequest>,
+    pub consensus_to_mempool_sender: mpsc::Sender<QuorumStoreRequest>,
     pub mempool_notifier: MempoolNotifier,
 }
 
@@ -53,7 +53,7 @@ impl MockSharedMempool {
             .enable_all()
             .build()
             .expect("[mock shared mempool] failed to create runtime");
-        let (ac_client, mempool, consensus_sender, mempool_notifier) = Self::start(
+        let (ac_client, mempool, quorum_store_sender, mempool_notifier) = Self::start(
             runtime.handle(),
             &DbReaderWriter::new(MockDbReaderWriter),
             MockVMValidator,
@@ -63,7 +63,7 @@ impl MockSharedMempool {
             _handle: None,
             ac_client,
             mempool,
-            consensus_sender,
+            consensus_to_mempool_sender: quorum_store_sender,
             mempool_notifier,
         }
     }
@@ -75,14 +75,14 @@ impl MockSharedMempool {
         validator: V,
     ) -> Self {
         let handle = Handle::current();
-        let (ac_client, mempool, consensus_sender, mempool_notifier) =
+        let (ac_client, mempool, quorum_store_sender, mempool_notifier) =
             Self::start(&handle, db, validator);
         Self {
             _runtime: None,
             _handle: Some(handle),
             ac_client,
             mempool,
-            consensus_sender,
+            consensus_to_mempool_sender: quorum_store_sender,
             mempool_notifier,
         }
     }
@@ -94,7 +94,7 @@ impl MockSharedMempool {
     ) -> (
         MempoolClientSender,
         Arc<Mutex<CoreMempool>>,
-        mpsc::Sender<ConsensusRequest>,
+        mpsc::Sender<QuorumStoreRequest>,
         MempoolNotifier,
     ) {
         let mut config = NodeConfig::random();
@@ -111,7 +111,7 @@ impl MockSharedMempool {
         );
         let network_events = MempoolNetworkEvents::new(network_notifs_rx, conn_notifs_rx);
         let (ac_client, client_events) = mpsc::channel(1_024);
-        let (consensus_sender, consensus_events) = mpsc::channel(1_024);
+        let (quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
         let (mempool_notifier, mempool_listener) =
             mempool_notifications::new_mempool_notifier_listener_pair();
         let mut event_subscriber = EventSubscriptionService::new(
@@ -128,7 +128,7 @@ impl MockSharedMempool {
             mempool.clone(),
             network_handles,
             client_events,
-            consensus_events,
+            quorum_store_receiver,
             mempool_listener,
             reconfig_event_subscriber,
             db.reader.clone(),
@@ -137,7 +137,7 @@ impl MockSharedMempool {
             peer_metadata_storage,
         );
 
-        (ac_client, mempool, consensus_sender, mempool_notifier)
+        (ac_client, mempool, quorum_store_sender, mempool_notifier)
     }
 
     pub fn add_txns(&self, txns: Vec<SignedTransaction>) -> Result<()> {
@@ -164,7 +164,7 @@ impl MockSharedMempool {
 
     pub fn get_txns(&self, size: u64) -> Vec<SignedTransaction> {
         let pool = self.mempool.lock();
-        pool.get_block(size, HashSet::new())
+        pool.get_batch(size, HashSet::new())
     }
 
     pub fn remove_txn(&self, txn: &SignedTransaction) {

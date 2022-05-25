@@ -302,12 +302,12 @@ impl Block {
         ))
         .chain(
             self.payload()
-                .unwrap_or(&Vec::new())
-                .iter()
-                .cloned()
-                .map(Transaction::UserTransaction)
-                .chain(once(Transaction::StateCheckpoint)),
+                .unwrap_or(&Payload::new_empty())
+                .clone()
+                .into_iter()
+                .map(Transaction::UserTransaction),
         )
+        .chain(once(Transaction::StateCheckpoint))
         .collect()
     }
 
