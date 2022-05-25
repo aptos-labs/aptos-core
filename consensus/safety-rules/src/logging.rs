@@ -41,7 +41,6 @@ impl<'a> SafetyLogSchema<'a> {
 #[serde(rename_all = "snake_case")]
 pub enum LogEntry {
     ConsensusState,
-    ConstructAndSignVote,
     ConstructAndSignVoteTwoChain,
     Epoch,
     Initialize,
@@ -50,7 +49,6 @@ pub enum LogEntry {
     OneChainRound,
     PreferredRound,
     SignProposal,
-    SignTimeout,
     SignTimeoutWithQC,
     State,
     Waypoint,
@@ -61,7 +59,6 @@ impl LogEntry {
     pub fn as_str(&self) -> &'static str {
         match self {
             LogEntry::ConsensusState => "consensus_state",
-            LogEntry::ConstructAndSignVote => "construct_and_sign_vote",
             LogEntry::ConstructAndSignVoteTwoChain => "construct_and_sign_vote_2chain",
             LogEntry::Epoch => "epoch",
             LogEntry::Initialize => "initialize",
@@ -70,7 +67,6 @@ impl LogEntry {
             LogEntry::OneChainRound => "one_chain_round",
             LogEntry::PreferredRound => "preferred_round",
             LogEntry::SignProposal => "sign_proposal",
-            LogEntry::SignTimeout => "sign_timeout",
             LogEntry::SignTimeoutWithQC => "sign_timeout_with_qc",
             LogEntry::State => "state",
             LogEntry::Waypoint => "waypoint",

@@ -200,12 +200,7 @@ pub struct LedgerInfoWithV0 {
 
 impl Display for LedgerInfoWithV0 {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "LedgerInfo {{ commit_info: BlockInfo {{ epoch: {:?}, version: {:?} }} }}",
-            self.ledger_info.commit_info().epoch(),
-            self.ledger_info.commit_info().version()
-        )
+        write!(f, "{}", self.ledger_info)
     }
 }
 

@@ -10,7 +10,6 @@ use aptos_types::{
 };
 use consensus_types::{
     block_data::BlockData,
-    timeout::Timeout,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_proposal::MaybeSignedVoteProposal,
@@ -39,19 +38,8 @@ impl TSafetyRules for LocalClient {
         self.internal.write().initialize(proof)
     }
 
-    fn construct_and_sign_vote(
-        &mut self,
-        vote_proposal: &MaybeSignedVoteProposal,
-    ) -> Result<Vote, Error> {
-        self.internal.write().construct_and_sign_vote(vote_proposal)
-    }
-
     fn sign_proposal(&mut self, block_data: &BlockData) -> Result<Ed25519Signature, Error> {
         self.internal.write().sign_proposal(block_data)
-    }
-
-    fn sign_timeout(&mut self, timeout: &Timeout) -> Result<Ed25519Signature, Error> {
-        self.internal.write().sign_timeout(timeout)
     }
 
     fn sign_timeout_with_qc(

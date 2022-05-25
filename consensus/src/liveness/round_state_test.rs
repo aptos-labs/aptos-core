@@ -14,8 +14,11 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
 use consensus_types::{
-    common::Round, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout::Timeout,
-    timeout_certificate::TimeoutCertificate, vote_data::VoteData,
+    common::Round,
+    quorum_cert::QuorumCert,
+    sync_info::SyncInfo,
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+    vote_data::VoteData,
 };
 use futures::StreamExt;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
@@ -137,6 +140,10 @@ fn generate_sync_info(
         ledger_info,
     );
     let commit_cert = quorum_cert.clone();
-    let timeout_cert = TimeoutCertificate::new(Timeout::new(1, timeout_round));
-    SyncInfo::new(quorum_cert, commit_cert, Some(timeout_cert), None)
+    let tc = TwoChainTimeoutCertificate::new(TwoChainTimeout::new(
+        1,
+        timeout_round,
+        quorum_cert.clone(),
+    ));
+    SyncInfo::new(quorum_cert, commit_cert, Some(tc))
 }

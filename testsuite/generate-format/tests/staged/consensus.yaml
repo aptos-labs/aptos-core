@@ -327,26 +327,9 @@ SyncInfo:
     - highest_ledger_info:
         OPTION:
           TYPENAME: LedgerInfoWithSignatures
-    - highest_timeout_cert:
-        OPTION:
-          TYPENAME: TimeoutCertificate
     - highest_2chain_timeout_cert:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
-Timeout:
-  STRUCT:
-    - epoch: U64
-    - round: U64
-TimeoutCertificate:
-  STRUCT:
-    - timeout:
-        TYPENAME: Timeout
-    - signatures:
-        MAP:
-          KEY:
-            TYPENAME: AccountAddress
-          VALUE:
-            TYPENAME: Ed25519Signature
 Transaction:
   ENUM:
     0:
@@ -494,9 +477,6 @@ Vote:
         TYPENAME: LedgerInfo
     - signature:
         TYPENAME: Ed25519Signature
-    - timeout_signature:
-        OPTION:
-          TYPENAME: Ed25519Signature
     - two_chain_timeout:
         OPTION:
           TUPLE:

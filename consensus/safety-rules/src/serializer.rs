@@ -10,7 +10,6 @@ use aptos_types::{
 };
 use consensus_types::{
     block_data::BlockData,
-    timeout::Timeout,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_proposal::MaybeSignedVoteProposal,
@@ -22,9 +21,7 @@ use std::sync::Arc;
 pub enum SafetyRulesInput {
     ConsensusState,
     Initialize(Box<EpochChangeProof>),
-    ConstructAndSignVote(Box<MaybeSignedVoteProposal>),
     SignProposal(Box<BlockData>),
-    SignTimeout(Box<Timeout>),
     SignTimeoutWithQC(
         Box<TwoChainTimeout>,
         Box<Option<TwoChainTimeoutCertificate>>,
@@ -53,14 +50,8 @@ impl SerializerService {
                 serde_json::to_vec(&self.internal.consensus_state())
             }
             SafetyRulesInput::Initialize(li) => serde_json::to_vec(&self.internal.initialize(&li)),
-            SafetyRulesInput::ConstructAndSignVote(vote_proposal) => {
-                serde_json::to_vec(&self.internal.construct_and_sign_vote(&vote_proposal))
-            }
             SafetyRulesInput::SignProposal(block_data) => {
                 serde_json::to_vec(&self.internal.sign_proposal(&block_data))
-            }
-            SafetyRulesInput::SignTimeout(timeout) => {
-                serde_json::to_vec(&self.internal.sign_timeout(&timeout))
             }
             SafetyRulesInput::SignTimeoutWithQC(timeout, maybe_tc) => serde_json::to_vec(
                 &self
@@ -118,27 +109,10 @@ impl TSafetyRules for SerializerClient {
         serde_json::from_slice(&response)?
     }
 
-    fn construct_and_sign_vote(
-        &mut self,
-        vote_proposal: &MaybeSignedVoteProposal,
-    ) -> Result<Vote, Error> {
-        let _timer = counters::start_timer("external", LogEntry::ConstructAndSignVote.as_str());
-        let response = self.request(SafetyRulesInput::ConstructAndSignVote(Box::new(
-            vote_proposal.clone(),
-        )))?;
-        serde_json::from_slice(&response)?
-    }
-
     fn sign_proposal(&mut self, block_data: &BlockData) -> Result<Ed25519Signature, Error> {
         let _timer = counters::start_timer("external", LogEntry::SignProposal.as_str());
         let response =
             self.request(SafetyRulesInput::SignProposal(Box::new(block_data.clone())))?;
-        serde_json::from_slice(&response)?
-    }
-
-    fn sign_timeout(&mut self, timeout: &Timeout) -> Result<Ed25519Signature, Error> {
-        let _timer = counters::start_timer("external", LogEntry::SignTimeout.as_str());
-        let response = self.request(SafetyRulesInput::SignTimeout(Box::new(timeout.clone())))?;
         serde_json::from_slice(&response)?
     }
 

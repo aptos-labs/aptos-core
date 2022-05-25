@@ -14,8 +14,7 @@ use aptos_types::{
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use consensus_types::{
-    common::Author, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate,
-    timeout_certificate::TimeoutCertificate, vote::Vote,
+    common::Author, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -36,8 +35,6 @@ pub enum VoteReceptionResult {
     EquivocateVote,
     /// This block has just been certified after adding the vote.
     NewQuorumCertificate(Arc<QuorumCert>),
-    /// The vote completes a new TimeoutCertificate
-    NewTimeoutCertificate(Arc<TimeoutCertificate>),
     /// The vote completes a new TwoChainTimeoutCertificate
     New2ChainTimeoutCertificate(Arc<TwoChainTimeoutCertificate>),
     /// There might be some issues adding a vote
@@ -52,9 +49,6 @@ pub struct PendingVotes {
     /// This might keep multiple LedgerInfos for the current round: either due to different proposals (byzantine behavior)
     /// or due to different NIL proposals (clients can have a different view of what block to extend).
     li_digest_to_votes: HashMap<HashValue /* LedgerInfo digest */, LedgerInfoWithSignatures>,
-    /// Tracks all the signatures of the votes for the given round. In case we succeed to
-    /// aggregate 2f+1 signatures a TimeoutCertificate is formed.
-    maybe_partial_tc: Option<TimeoutCertificate>,
     /// Tracks all the signatures of the 2-chain timeout for the given round.
     maybe_partial_2chain_tc: Option<TwoChainTimeoutCertificate>,
     /// Map of Author to vote. This is useful to discard multiple votes.
@@ -66,7 +60,6 @@ impl PendingVotes {
     pub fn new() -> Self {
         PendingVotes {
             li_digest_to_votes: HashMap::new(),
-            maybe_partial_tc: None,
             maybe_partial_2chain_tc: None,
             author_to_vote: HashMap::new(),
         }
@@ -155,42 +148,6 @@ impl PendingVotes {
         // 4. We couldn't form a QC, let's check if we can create a TC
         //
 
-        if let Some(timeout_signature) = vote.timeout_signature() {
-            // form timeout struct
-            // TODO(mimoo): stronger: pass the (epoch, round) tuple as arguments of this function
-            let timeout = vote.generate_timeout();
-
-            // if no partial TC exist, create one
-            let partial_tc = self
-                .maybe_partial_tc
-                .get_or_insert_with(|| TimeoutCertificate::new(timeout));
-
-            // add the timeout signature
-            partial_tc.add_signature(vote.author(), timeout_signature.clone());
-
-            // did the TC reach a threshold?
-            match validator_verifier.check_voting_power(partial_tc.signatures().keys()) {
-                // A quorum of signature was reached, a new TC was formed!
-                Ok(_) => {
-                    return VoteReceptionResult::NewTimeoutCertificate(Arc::new(partial_tc.clone()))
-                }
-
-                // not enough votes
-                Err(VerifyError::TooLittleVotingPower { .. }) => (),
-
-                // error
-                Err(error) => {
-                    error!(
-                        "MUST_FIX: timeout vote received could not be added: {}, vote: {}",
-                        error, vote
-                    );
-                    return VoteReceptionResult::ErrorAddingVote(error);
-                }
-            }
-        }
-
-        // 4.1 process 2-chain timeout vote
-
         if let Some((timeout, signature)) = vote.two_chain_timeout() {
             let partial_tc = self
                 .maybe_partial_2chain_tc
@@ -236,9 +193,9 @@ impl fmt::Display for PendingVotes {
 
         // collect timeout votes
         let timeout_votes = self
-            .maybe_partial_tc
+            .maybe_partial_2chain_tc
             .as_ref()
-            .map(|partial_tc| partial_tc.signatures().keys().collect::<Vec<_>>());
+            .map(|partial_tc| partial_tc.signers().collect::<Vec<_>>());
 
         // write
         write!(f, "PendingVotes: [")?;
@@ -347,58 +304,6 @@ mod tests {
             }
             _ => {
                 panic!("No QC formed.");
-            }
-        };
-    }
-
-    #[test]
-    /// Verify that votes are properly aggregated to TC based on their rounds
-    fn test_tc_aggregation() {
-        ::aptos_logger::Logger::init_for_testing();
-
-        // set up 4 validators
-        let (signers, validator) = random_validator_verifier(4, Some(2), false);
-        let mut pending_votes = PendingVotes::new();
-
-        // submit a new vote from validator[0] -> VoteAdded
-        let li1 = random_ledger_info();
-        let vote1 = random_vote_data();
-        let mut vote1_author_0 = Vote::new(vote1, signers[0].author(), li1, &signers[0]);
-
-        assert_eq!(
-            pending_votes.insert_vote(&vote1_author_0, &validator),
-            VoteReceptionResult::VoteAdded(1)
-        );
-
-        // submit the same vote but enhanced with a timeout -> VoteAdded
-        let timeout = vote1_author_0.generate_timeout();
-        let signature = timeout.sign(&signers[0]);
-        vote1_author_0.add_timeout_signature(signature);
-
-        assert_eq!(
-            pending_votes.insert_vote(&vote1_author_0, &validator),
-            VoteReceptionResult::VoteAdded(1)
-        );
-
-        // another vote for a different block cannot form a TC if it doesn't have a timeout signature
-        let li2 = random_ledger_info();
-        let vote2 = random_vote_data();
-        let mut vote2_author_1 = Vote::new(vote2, signers[1].author(), li2, &signers[1]);
-        assert_eq!(
-            pending_votes.insert_vote(&vote2_author_1, &validator),
-            VoteReceptionResult::VoteAdded(1)
-        );
-
-        // if that vote is now enhanced with a timeout signature -> NewTimeoutCertificate
-        let timeout = vote2_author_1.generate_timeout();
-        let signature = timeout.sign(&signers[1]);
-        vote2_author_1.add_timeout_signature(signature);
-        match pending_votes.insert_vote(&vote2_author_1, &validator) {
-            VoteReceptionResult::NewTimeoutCertificate(tc) => {
-                assert!(validator.check_voting_power(tc.signatures().keys()).is_ok());
-            }
-            _ => {
-                panic!("No TC formed.");
             }
         };
     }

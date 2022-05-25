@@ -56,12 +56,10 @@ impl ConsensusDB {
     ) -> Result<(
         Option<Vec<u8>>,
         Option<Vec<u8>>,
-        Option<Vec<u8>>,
         Vec<Block>,
         Vec<QuorumCert>,
     )> {
         let last_vote = self.get_last_vote()?;
-        let highest_timeout_certificate = self.get_highest_timeout_certificate()?;
         let highest_2chain_timeout_certificate = self.get_highest_2chain_timeout_certificate()?;
         let consensus_blocks = self
             .get_blocks()?
@@ -75,24 +73,10 @@ impl ConsensusDB {
             .collect::<Vec<_>>();
         Ok((
             last_vote,
-            highest_timeout_certificate,
             highest_2chain_timeout_certificate,
             consensus_blocks,
             consensus_qcs,
         ))
-    }
-
-    pub fn save_highest_timeout_certificate(
-        &self,
-        highest_timeout_certificate: Vec<u8>,
-    ) -> Result<(), DbError> {
-        let mut batch = SchemaBatch::new();
-        batch.put::<SingleEntrySchema>(
-            &SingleEntryKey::HighestTimeoutCertificate,
-            &highest_timeout_certificate,
-        )?;
-        self.commit(batch)?;
-        Ok(())
     }
 
     pub fn save_highest_2chain_timeout_certificate(&self, tc: Vec<u8>) -> Result<(), DbError> {
@@ -104,7 +88,7 @@ impl ConsensusDB {
 
     pub fn save_vote(&self, last_vote: Vec<u8>) -> Result<(), DbError> {
         let mut batch = SchemaBatch::new();
-        batch.put::<SingleEntrySchema>(&SingleEntryKey::LastVoteMsg, &last_vote)?;
+        batch.put::<SingleEntrySchema>(&SingleEntryKey::LastVote, &last_vote)?;
         self.commit(batch)
     }
 
@@ -149,24 +133,10 @@ impl ConsensusDB {
     }
 
     /// Get latest timeout certificates (we only store the latest highest timeout certificates).
-    fn get_highest_timeout_certificate(&self) -> Result<Option<Vec<u8>>, DbError> {
-        Ok(self
-            .db
-            .get::<SingleEntrySchema>(&SingleEntryKey::HighestTimeoutCertificate)?)
-    }
-
-    /// Get latest timeout certificates (we only store the latest highest timeout certificates).
     fn get_highest_2chain_timeout_certificate(&self) -> Result<Option<Vec<u8>>, DbError> {
         Ok(self
             .db
             .get::<SingleEntrySchema>(&SingleEntryKey::Highest2ChainTimeoutCert)?)
-    }
-
-    /// Delete the timeout certificates
-    pub fn delete_highest_timeout_certificate(&self) -> Result<(), DbError> {
-        let mut batch = SchemaBatch::new();
-        batch.delete::<SingleEntrySchema>(&SingleEntryKey::HighestTimeoutCertificate)?;
-        self.commit(batch)
     }
 
     pub fn delete_highest_2chain_timeout_certificate(&self) -> Result<(), DbError> {
@@ -178,12 +148,12 @@ impl ConsensusDB {
     fn get_last_vote(&self) -> Result<Option<Vec<u8>>, DbError> {
         Ok(self
             .db
-            .get::<SingleEntrySchema>(&SingleEntryKey::LastVoteMsg)?)
+            .get::<SingleEntrySchema>(&SingleEntryKey::LastVote)?)
     }
 
     pub fn delete_last_vote_msg(&self) -> Result<(), DbError> {
         let mut batch = SchemaBatch::new();
-        batch.delete::<SingleEntrySchema>(&SingleEntryKey::LastVoteMsg)?;
+        batch.delete::<SingleEntrySchema>(&SingleEntryKey::LastVote)?;
         self.commit(batch)?;
         Ok(())
     }

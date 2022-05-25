@@ -85,9 +85,6 @@ impl BlockStore {
         self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever)
             .await?;
 
-        if let Some(tc) = sync_info.highest_timeout_certificate() {
-            self.insert_timeout_certificate(Arc::new(tc.clone()))?;
-        }
         if let Some(tc) = sync_info.highest_2chain_timeout_cert() {
             self.insert_2chain_timeout_certificate(Arc::new(tc.clone()))?;
         }

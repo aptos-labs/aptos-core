@@ -4,20 +4,15 @@
 use crate::{consensusdb::ConsensusDB, epoch_manager::LivenessStorageData, error::DbError};
 use anyhow::{format_err, Context, Result};
 use aptos_config::config::NodeConfig;
-use aptos_crypto::{ed25519::Ed25519Signature, HashValue};
+use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    epoch_change::EpochChangeProof,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    transaction::Version,
+    epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures, transaction::Version,
 };
 use consensus_types::{
-    block::Block, common::Author, quorum_cert::QuorumCert,
-    timeout_2chain::TwoChainTimeoutCertificate, timeout_certificate::TimeoutCertificate,
-    vote::Vote, vote_data::VoteData,
+    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
 };
 use executor::components::in_memory_state_calculator::IntoLedgerView;
-use serde::Deserialize;
 use std::{cmp::max, collections::HashSet, sync::Arc};
 use storage_interface::DbReader;
 
@@ -41,10 +36,6 @@ pub trait PersistentLivenessStorage: Send + Sync {
 
     /// Construct necessary data to start consensus.
     fn start(&self) -> LivenessStorageData;
-
-    /// Persist the highest timeout certificate for improved liveness - proof for other replicas
-    /// to jump to this round
-    fn save_highest_timeout_cert(&self, highest_timeout_cert: TimeoutCertificate) -> Result<()>;
 
     /// Persist the highest 2chain timeout certificate for improved liveness - proof for other replicas
     /// to jump to this round
@@ -184,7 +175,6 @@ pub struct RecoveryData {
     blocks_to_prune: Option<Vec<HashValue>>,
 
     // Liveness data
-    highest_timeout_certificate: Option<TimeoutCertificate>,
     highest_2chain_timeout_certificate: Option<TwoChainTimeoutCertificate>,
 }
 
@@ -195,7 +185,6 @@ impl RecoveryData {
         mut blocks: Vec<Block>,
         root_metadata: RootMetadata,
         mut quorum_certs: Vec<QuorumCert>,
-        highest_timeout_certificate: Option<TimeoutCertificate>,
         highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
     ) -> Result<Self> {
         let root = ledger_recovery_data
@@ -238,10 +227,6 @@ impl RecoveryData {
             blocks,
             quorum_certs,
             blocks_to_prune,
-            highest_timeout_certificate: match highest_timeout_certificate {
-                Some(tc) if tc.epoch() == epoch => Some(tc),
-                _ => None,
-            },
             highest_2chain_timeout_certificate: match highest_2chain_timeout_cert {
                 Some(tc) if tc.epoch() == epoch => Some(tc),
                 _ => None,
@@ -270,10 +255,6 @@ impl RecoveryData {
         self.blocks_to_prune
             .take()
             .expect("blocks_to_prune already taken")
-    }
-
-    pub fn highest_timeout_certificate(&self) -> Option<TimeoutCertificate> {
-        self.highest_timeout_certificate.clone()
     }
 
     pub fn highest_2chain_timeout_certificate(&self) -> Option<TwoChainTimeoutCertificate> {
@@ -353,44 +334,15 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             .get_data()
             .expect("unable to recover consensus data");
 
-        let last_vote = raw_data.0.map(|bytes| {
-            // backward compatible for the 2-chain struct change
-            #[derive(Deserialize)]
-            struct OldVote {
-                pub vote_data: VoteData,
-                pub author: Author,
-                pub ledger_info: LedgerInfo,
-                pub signature: Ed25519Signature,
-                pub timeout_signature: Option<Ed25519Signature>,
-            }
-            match bcs::from_bytes(&bytes[..]) {
-                Ok(v) => v,
-                Err(_) => {
-                    let OldVote {
-                        vote_data,
-                        author,
-                        ledger_info,
-                        signature,
-                        timeout_signature,
-                    } = bcs::from_bytes(&bytes).expect("unable to deserialize last vote");
-                    let mut vote =
-                        Vote::new_with_signature(vote_data, author, ledger_info, signature);
-                    if let Some(sig) = timeout_signature {
-                        vote.add_timeout_signature(sig);
-                    }
-                    vote
-                }
-            }
-        });
+        let last_vote = raw_data
+            .0
+            .map(|bytes| bcs::from_bytes(&bytes[..]).expect("unable to deserialize last vote"));
 
-        let highest_timeout_certificate = raw_data.1.map(|ts| {
-            bcs::from_bytes(&ts[..]).expect("unable to deserialize highest timeout certificate")
-        });
-        let highest_2chain_timeout_cert = raw_data.2.map(|b| {
+        let highest_2chain_timeout_cert = raw_data.1.map(|b| {
             bcs::from_bytes(&b).expect("unable to deserialize highest 2-chain timeout cert")
         });
-        let blocks = raw_data.3;
-        let quorum_certs: Vec<_> = raw_data.4;
+        let blocks = raw_data.2;
+        let quorum_certs: Vec<_> = raw_data.3;
         let blocks_repr: Vec<String> = blocks.iter().map(|b| format!("\n\t{}", b)).collect();
         info!(
             "The following blocks were restored from ConsensusDB : {}",
@@ -430,7 +382,6 @@ impl PersistentLivenessStorage for StorageWriteProxy {
                 frozen_root_hashes,
             ),
             quorum_certs,
-            highest_timeout_certificate,
             highest_2chain_timeout_cert,
         ) {
             Ok(mut initial_data) => {
@@ -442,11 +393,6 @@ impl PersistentLivenessStorage for StorageWriteProxy {
                         .delete_last_vote_msg()
                         .expect("unable to cleanup last vote");
                 }
-                if initial_data.highest_timeout_certificate.is_none() {
-                    self.db
-                        .delete_highest_timeout_certificate()
-                        .expect("unable to cleanup highest timeout cert");
-                }
                 if initial_data.highest_2chain_timeout_certificate.is_none() {
                     self.db
                         .delete_highest_2chain_timeout_certificate()
@@ -455,7 +401,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
                 info!(
                     "Starting up the consensus state machine with recovery data - [last_vote {}], [highest timeout certificate: {}]",
                     initial_data.last_vote.as_ref().map_or("None".to_string(), |v| v.to_string()),
-                    initial_data.highest_timeout_certificate.as_ref().map_or("None".to_string(), |v| v.to_string()),
+                    initial_data.highest_2chain_timeout_certificate().as_ref().map_or("None".to_string(), |v| v.to_string()),
                 );
 
                 LivenessStorageData::RecoveryData(initial_data)
@@ -465,12 +411,6 @@ impl PersistentLivenessStorage for StorageWriteProxy {
                 LivenessStorageData::LedgerRecoveryData(ledger_recovery_data)
             }
         }
-    }
-
-    fn save_highest_timeout_cert(&self, highest_timeout_cert: TimeoutCertificate) -> Result<()> {
-        Ok(self
-            .db
-            .save_highest_timeout_certificate(bcs::to_bytes(&highest_timeout_cert)?)?)
     }
 
     fn save_highest_2chain_timeout_cert(

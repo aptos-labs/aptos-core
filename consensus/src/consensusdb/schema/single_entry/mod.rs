@@ -33,12 +33,10 @@ define_schema!(
 #[derive(Debug, Eq, PartialEq, FromPrimitive, ToPrimitive)]
 #[repr(u8)]
 pub enum SingleEntryKey {
-    // Used to store the highest timeout certificate
-    HighestTimeoutCertificate = 0,
     // Used to store the last vote
-    LastVoteMsg = 1,
+    LastVote = 0,
     // Two chain timeout cert
-    Highest2ChainTimeoutCert = 2,
+    Highest2ChainTimeoutCert = 1,
 }
 
 impl KeyCodec<SingleEntrySchema> for SingleEntryKey {

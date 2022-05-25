@@ -176,12 +176,7 @@ pub fn placeholder_ledger_info() -> LedgerInfo {
 }
 
 pub fn placeholder_sync_info() -> SyncInfo {
-    SyncInfo::new(
-        certificate_for_genesis(),
-        certificate_for_genesis(),
-        None,
-        None,
-    )
+    SyncInfo::new(certificate_for_genesis(), certificate_for_genesis(), None)
 }
 
 fn nocapture() -> bool {

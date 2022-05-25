@@ -23,7 +23,7 @@ use consensus_types::block::Block;
 use consensus_types::{
     block_data::{BlockData, BlockType},
     quorum_cert::QuorumCert,
-    timeout::Timeout,
+    timeout_2chain::TwoChainTimeout,
     vote_data::VoteData,
     vote_proposal::{MaybeSignedVoteProposal, VoteProposal},
 };
@@ -151,8 +151,9 @@ prop_compose! {
     )(
         epoch in any::<u64>(),
         round in any::<u64>(),
-    ) -> Timeout {
-        Timeout::new(epoch, round)
+        qc in arb_quorum_cert(),
+    ) -> TwoChainTimeout {
+        TwoChainTimeout::new(epoch, round, qc)
     }
 }
 
@@ -237,10 +238,13 @@ pub fn arb_safety_rules_input() -> impl Strategy<Value = SafetyRulesInput> {
     prop_oneof![
         Just(SafetyRulesInput::ConsensusState),
         arb_epoch_change_proof().prop_map(|input| SafetyRulesInput::Initialize(Box::new(input))),
-        arb_maybe_signed_vote_proposal()
-            .prop_map(|input| { SafetyRulesInput::ConstructAndSignVote(Box::new(input)) }),
+        arb_maybe_signed_vote_proposal().prop_map(|input| {
+            SafetyRulesInput::ConstructAndSignVoteTwoChain(Box::new(input), Box::new(None))
+        }),
         arb_block_data().prop_map(|input| { SafetyRulesInput::SignProposal(Box::new(input)) }),
-        arb_timeout().prop_map(|input| { SafetyRulesInput::SignTimeout(Box::new(input)) }),
+        arb_timeout().prop_map(|input| {
+            SafetyRulesInput::SignTimeoutWithQC(Box::new(input), Box::new(None))
+        }),
     ]
 }
 
@@ -250,7 +254,8 @@ pub mod fuzzing {
     use aptos_crypto::ed25519::Ed25519Signature;
     use aptos_types::epoch_change::EpochChangeProof;
     use consensus_types::{
-        block_data::BlockData, timeout::Timeout, vote::Vote, vote_proposal::MaybeSignedVoteProposal,
+        block_data::BlockData, timeout_2chain::TwoChainTimeout, vote::Vote,
+        vote_proposal::MaybeSignedVoteProposal,
     };
 
     pub fn fuzz_initialize(proof: EpochChangeProof) -> Result<(), Error> {
@@ -258,11 +263,11 @@ pub mod fuzzing {
         safety_rules.initialize(&proof)
     }
 
-    pub fn fuzz_construct_and_sign_vote(
+    pub fn fuzz_construct_and_sign_vote_two_chain(
         maybe_signed_vote_proposal: MaybeSignedVoteProposal,
     ) -> Result<Vote, Error> {
         let mut safety_rules = test_utils::test_safety_rules();
-        safety_rules.construct_and_sign_vote(&maybe_signed_vote_proposal)
+        safety_rules.construct_and_sign_vote_two_chain(&maybe_signed_vote_proposal, None)
     }
 
     pub fn fuzz_handle_message(safety_rules_input: SafetyRulesInput) -> Result<Vec<u8>, Error> {
@@ -284,9 +289,9 @@ pub mod fuzzing {
         safety_rules.sign_proposal(block_data)
     }
 
-    pub fn fuzz_sign_timeout(timeout: Timeout) -> Result<Ed25519Signature, Error> {
+    pub fn fuzz_sign_timeout_with_qc(timeout: TwoChainTimeout) -> Result<Ed25519Signature, Error> {
         let mut safety_rules = test_utils::test_safety_rules();
-        safety_rules.sign_timeout(&timeout)
+        safety_rules.sign_timeout_with_qc(&timeout, None)
     }
 }
 
@@ -296,8 +301,8 @@ pub mod fuzzing {
 mod tests {
     use crate::{
         fuzzing::{
-            fuzz_construct_and_sign_vote, fuzz_handle_message, fuzz_initialize, fuzz_sign_proposal,
-            fuzz_sign_timeout,
+            fuzz_construct_and_sign_vote_two_chain, fuzz_handle_message, fuzz_initialize,
+            fuzz_sign_proposal, fuzz_sign_timeout_with_qc,
         },
         fuzzing_utils::{
             arb_block_data, arb_epoch_change_proof, arb_maybe_signed_vote_proposal,
@@ -320,8 +325,8 @@ mod tests {
         }
 
         #[test]
-        fn construct_and_sign_vote_proptest(input in arb_maybe_signed_vote_proposal()) {
-            let _ = fuzz_construct_and_sign_vote(input);
+        fn construct_and_sign_vote_two_chain_proptest(input in arb_maybe_signed_vote_proposal()) {
+            let _ = fuzz_construct_and_sign_vote_two_chain(input);
         }
 
         #[test]
@@ -331,7 +336,7 @@ mod tests {
 
         #[test]
         fn sign_timeout_proptest(input in arb_timeout()) {
-            let _ = fuzz_sign_timeout(input);
+            let _ = fuzz_sign_timeout_with_qc(input);
         }
     }
 }

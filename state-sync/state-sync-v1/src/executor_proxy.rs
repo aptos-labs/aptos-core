@@ -225,8 +225,7 @@ mod tests {
         ledger_info::LedgerInfoWithSignatures,
         move_resource::MoveStorage,
         on_chain_config::{
-            ConsensusConfigV1, OnChainConfig, OnChainConsensusConfig, Version,
-            ON_CHAIN_CONFIG_REGISTRY,
+            OnChainConfig, OnChainConsensusConfig, Version, ON_CHAIN_CONFIG_REGISTRY,
         },
         transaction::{Transaction, WriteSetPayload},
     };
@@ -545,10 +544,7 @@ mod tests {
             .on_chain_configs
             .get::<OnChainConsensusConfig>()
             .unwrap();
-        assert_eq!(
-            received_config,
-            OnChainConsensusConfig::V1(ConsensusConfigV1 { two_chain: false })
-        );
+        assert_eq!(received_config, OnChainConsensusConfig::default());
     }
 
     #[test]

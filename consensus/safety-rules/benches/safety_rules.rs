@@ -24,17 +24,23 @@ fn lsr(mut safety_rules: Box<dyn TSafetyRules>, signer: ValidatorSigner, n: u64)
 
     round += 1;
     let mut b0 = test_utils::make_proposal_with_qc(round, genesis_qc, &signer, None);
-    safety_rules.construct_and_sign_vote(&b0).unwrap();
+    safety_rules
+        .construct_and_sign_vote_two_chain(&b0, None)
+        .unwrap();
 
     round += 1;
     let mut b1 =
         test_utils::make_proposal_with_parent(data.clone(), round, &b0, None, &signer, None);
-    safety_rules.construct_and_sign_vote(&b1).unwrap();
+    safety_rules
+        .construct_and_sign_vote_two_chain(&b1, None)
+        .unwrap();
 
     round += 1;
     let mut b2 =
         test_utils::make_proposal_with_parent(data.clone(), round, &b1, None, &signer, None);
-    safety_rules.construct_and_sign_vote(&b2).unwrap();
+    safety_rules
+        .construct_and_sign_vote_two_chain(&b2, None)
+        .unwrap();
 
     for _i in 0..n {
         round += 1;
@@ -47,7 +53,9 @@ fn lsr(mut safety_rules: Box<dyn TSafetyRules>, signer: ValidatorSigner, n: u64)
             None,
         );
 
-        safety_rules.construct_and_sign_vote(&b3).unwrap();
+        safety_rules
+            .construct_and_sign_vote_two_chain(&b3, None)
+            .unwrap();
 
         b0 = b1;
         b1 = b2;

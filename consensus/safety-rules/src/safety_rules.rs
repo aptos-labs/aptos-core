@@ -12,24 +12,21 @@ use crate::{
 };
 use aptos_crypto::{
     ed25519::{Ed25519PublicKey, Ed25519Signature},
-    hash::{CryptoHash, HashValue},
+    hash::CryptoHash,
     traits::Signature,
 };
 use aptos_logger::prelude::*;
 use aptos_types::{
-    block_info::BlockInfo,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     waypoint::Waypoint,
 };
 use consensus_types::{
-    block::Block,
     block_data::BlockData,
     common::{Author, Round},
     quorum_cert::QuorumCert,
     safety_data::SafetyData,
-    timeout::Timeout,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_data::VoteData,
@@ -151,34 +148,6 @@ impl SafetyRules {
             updated = true;
         }
         updated
-    }
-
-    /// Produces a LedgerInfo that either commits a block based upon the 3-chain
-    /// commit rule or an empty LedgerInfo for no commit. The 3-chain commit rule is: B0 and its
-    /// prefixes can be committed if there exist certified blocks B1 and B2 that satisfy:
-    /// 1) B0 <- B1 <- B2 <--
-    /// 2) round(B0) + 1 = round(B1), and
-    /// 3) round(B1) + 1 = round(B2).
-    fn construct_ledger_info(
-        &self,
-        proposed_block: &Block,
-        consensus_data_hash: HashValue,
-    ) -> Result<LedgerInfo, Error> {
-        let block2 = proposed_block.round();
-        let block1 = proposed_block.quorum_cert().certified_block().round();
-        let block0 = proposed_block.quorum_cert().parent_block().round();
-
-        // verify 3-chain rule
-        let commit = next_round(block0)? == block1 && next_round(block1)? == block2;
-
-        // create a ledger info
-        let commit_info = if commit {
-            proposed_block.quorum_cert().parent_block().clone()
-        } else {
-            BlockInfo::empty()
-        };
-
-        Ok(LedgerInfo::new(commit_info, consensus_data_hash))
     }
 
     /// Second voting rule
@@ -355,7 +324,7 @@ impl SafetyRules {
                         author,
                         expected_key,
                     ));
-                    self.sign(&Timeout::new(0, 0))
+                    self.sign(ledger_info)
                         .map(|_signature| ())
                         .map_err(|error| Error::ValidatorKeyNotFound(error.to_string()))
                 }
@@ -368,44 +337,6 @@ impl SafetyRules {
             self.validator_signer = None;
             error
         })
-    }
-
-    fn guarded_construct_and_sign_vote(
-        &mut self,
-        maybe_signed_vote_proposal: &MaybeSignedVoteProposal,
-    ) -> Result<Vote, Error> {
-        // Exit early if we cannot sign
-        self.signer()?;
-
-        let vote_data = self.verify_proposal(maybe_signed_vote_proposal)?;
-        let mut safety_data = self.persistent_storage.safety_data()?;
-
-        let proposed_block = maybe_signed_vote_proposal.vote_proposal.block();
-        // if already voted on this round, send back the previous vote
-        // note: this needs to happen after verifying the epoch as we just check the round here
-        if let Some(vote) = safety_data.last_vote.clone() {
-            if vote.vote_data().proposed().round() == proposed_block.round() {
-                return Ok(vote);
-            }
-        }
-
-        // Two voting rules
-        self.verify_and_update_preferred_round(proposed_block.quorum_cert(), &mut safety_data)?;
-        self.verify_and_update_last_vote_round(
-            proposed_block.block_data().round(),
-            &mut safety_data,
-        )?;
-
-        // Construct and sign vote
-        let author = self.signer()?.author();
-        let ledger_info = self.construct_ledger_info(proposed_block, vote_data.hash())?;
-        let signature = self.sign(&ledger_info)?;
-        let vote = Vote::new_with_signature(vote_data, author, ledger_info, signature);
-
-        safety_data.last_vote = Some(vote.clone());
-        self.persistent_storage.set_safety_data(safety_data)?;
-
-        Ok(vote)
     }
 
     fn guarded_sign_proposal(&mut self, block_data: &BlockData) -> Result<Ed25519Signature, Error> {
@@ -428,33 +359,6 @@ impl SafetyRules {
         // we don't persist the updated preferred round to save latency (it'd be updated upon voting)
 
         let signature = self.sign(block_data)?;
-        Ok(signature)
-    }
-
-    fn guarded_sign_timeout(&mut self, timeout: &Timeout) -> Result<Ed25519Signature, Error> {
-        self.signer()?;
-
-        let mut safety_data = self.persistent_storage.safety_data()?;
-        self.verify_epoch(timeout.epoch(), &safety_data)?;
-
-        if timeout.round() <= safety_data.preferred_round {
-            return Err(Error::IncorrectPreferredRound(
-                timeout.round(),
-                safety_data.preferred_round,
-            ));
-        }
-        if timeout.round() < safety_data.last_voted_round {
-            return Err(Error::IncorrectLastVotedRound(
-                timeout.round(),
-                safety_data.last_voted_round,
-            ));
-        }
-        if timeout.round() > safety_data.last_voted_round {
-            self.verify_and_update_last_vote_round(timeout.round(), &mut safety_data)?;
-            self.persistent_storage.set_safety_data(safety_data)?;
-        }
-
-        let signature = self.sign(timeout)?;
         Ok(signature)
     }
 
@@ -506,24 +410,10 @@ impl TSafetyRules for SafetyRules {
         run_and_log(cb, |log| log, LogEntry::Initialize)
     }
 
-    fn construct_and_sign_vote(
-        &mut self,
-        maybe_signed_vote_proposal: &MaybeSignedVoteProposal,
-    ) -> Result<Vote, Error> {
-        let round = maybe_signed_vote_proposal.vote_proposal.block().round();
-        let cb = || self.guarded_construct_and_sign_vote(maybe_signed_vote_proposal);
-        run_and_log(cb, |log| log.round(round), LogEntry::ConstructAndSignVote)
-    }
-
     fn sign_proposal(&mut self, block_data: &BlockData) -> Result<Ed25519Signature, Error> {
         let round = block_data.round();
         let cb = || self.guarded_sign_proposal(block_data);
         run_and_log(cb, |log| log.round(round), LogEntry::SignProposal)
-    }
-
-    fn sign_timeout(&mut self, timeout: &Timeout) -> Result<Ed25519Signature, Error> {
-        let cb = || self.guarded_sign_timeout(timeout);
-        run_and_log(cb, |log| log.round(timeout.round()), LogEntry::SignTimeout)
     }
 
     fn sign_timeout_with_qc(

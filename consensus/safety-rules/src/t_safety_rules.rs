@@ -9,7 +9,6 @@ use aptos_types::{
 };
 use consensus_types::{
     block_data::BlockData,
-    timeout::Timeout,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_proposal::MaybeSignedVoteProposal,
@@ -27,19 +26,9 @@ pub trait TSafetyRules {
     /// new epoch but SafetyRules did not.
     fn initialize(&mut self, proof: &EpochChangeProof) -> Result<(), Error>;
 
-    /// Attempts to vote for a given proposal following the voting rules.
-    fn construct_and_sign_vote(
-        &mut self,
-        vote_proposal: &MaybeSignedVoteProposal,
-    ) -> Result<Vote, Error>;
-
     /// As the holder of the private key, SafetyRules also signs proposals or blocks.
     /// A Block is a signed BlockData along with some additional metadata.
     fn sign_proposal(&mut self, block_data: &BlockData) -> Result<Ed25519Signature, Error>;
-
-    /// As the holder of the private key, SafetyRules also signs what is effectively a
-    /// timeout message. This returns the signature for that timeout message.
-    fn sign_timeout(&mut self, timeout: &Timeout) -> Result<Ed25519Signature, Error>;
 
     /// Sign the timeout together with highest qc for 2-chain protocol.
     fn sign_timeout_with_qc(
@@ -48,7 +37,7 @@ pub trait TSafetyRules {
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
     ) -> Result<Ed25519Signature, Error>;
 
-    /// Sign the vote with 2-chain protocol.
+    /// Attempts to vote for a given proposal following the 2-chain protocol.
     fn construct_and_sign_vote_two_chain(
         &mut self,
         vote_proposal: &MaybeSignedVoteProposal,
