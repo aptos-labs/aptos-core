@@ -15,7 +15,7 @@ use executor::components::in_memory_state_calculator::IntoLedgerView;
 use fail::fail_point;
 use std::sync::Arc;
 use storage_interface::{
-    state_view::LatestDbStateCheckpointView, verified_state_view::VerifiedStateView, DbReader,
+    cached_state_view::CachedStateView, state_view::LatestDbStateCheckpointView, DbReader,
 };
 
 #[cfg(test)]
@@ -35,7 +35,7 @@ pub trait TransactionValidation: Send + Sync + Clone {
     fn notify_commit(&mut self);
 }
 
-fn latest_state_view(db_reader: &Arc<dyn DbReader>) -> VerifiedStateView {
+fn latest_state_view(db_reader: &Arc<dyn DbReader>) -> CachedStateView {
     let ledger_view = db_reader
         .get_latest_tree_state()
         .expect("Should not fail.")
@@ -53,7 +53,7 @@ fn latest_state_view(db_reader: &Arc<dyn DbReader>) -> VerifiedStateView {
 
 pub struct VMValidator {
     db_reader: Arc<dyn DbReader>,
-    cached_state_view: VerifiedStateView,
+    cached_state_view: CachedStateView,
     vm: AptosVM,
 }
 

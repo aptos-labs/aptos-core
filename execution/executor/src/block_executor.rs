@@ -92,7 +92,7 @@ where
                 "execute_block"
             );
             let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
-            let state_view = parent_view.state_view(
+            let state_view = parent_view.verified_state_view(
                 &committed_block.output.result_view,
                 StateViewId::BlockExecution { block_id },
                 self.db.reader.clone(),

@@ -1088,6 +1088,17 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_state_value_by_version(
+        &self,
+        state_store_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<StateValue>> {
+        gauged_api("get_state_value_at_version", || {
+            self.state_store
+                .get_value_by_version(state_store_key, version)
+        })
+    }
+
     fn get_latest_tree_state(&self) -> Result<TreeState> {
         gauged_api("get_latest_tree_state", || {
             let latest_version = self

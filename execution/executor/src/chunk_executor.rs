@@ -31,7 +31,7 @@ use executor_types::{
 };
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
-use storage_interface::{verified_state_view::VerifiedStateView, DbReaderWriter};
+use storage_interface::{cached_state_view::CachedStateView, DbReaderWriter};
 
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,
@@ -62,8 +62,8 @@ impl<V> ChunkExecutor<V> {
         &self,
         latest_view: &ExecutedTrees,
         persisted_view: &ExecutedTrees,
-    ) -> VerifiedStateView {
-        latest_view.state_view(
+    ) -> CachedStateView {
+        latest_view.verified_state_view(
             persisted_view,
             StateViewId::ChunkExecution {
                 first_version: latest_view.txn_accumulator().num_leaves(),

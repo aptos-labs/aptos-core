@@ -12,7 +12,7 @@ use aptos_vm::VMExecutor;
 use executor_types::{ExecutedChunk, ExecutedTrees};
 use fail::fail_point;
 use std::collections::HashSet;
-use storage_interface::verified_state_view::{StateCache, VerifiedStateView};
+use storage_interface::cached_state_view::{CachedStateView, StateCache};
 
 pub struct ChunkOutput {
     /// Input transactions.
@@ -28,7 +28,7 @@ pub struct ChunkOutput {
 impl ChunkOutput {
     pub fn by_transaction_execution<V: VMExecutor>(
         transactions: Vec<Transaction>,
-        state_view: VerifiedStateView,
+        state_view: CachedStateView,
     ) -> Result<Self> {
         let transaction_outputs = V::execute_block(transactions.clone(), &state_view)?;
 
@@ -41,7 +41,7 @@ impl ChunkOutput {
 
     pub fn by_transaction_output(
         transactions_and_outputs: Vec<(Transaction, TransactionOutput)>,
-        state_view: VerifiedStateView,
+        state_view: CachedStateView,
     ) -> Result<Self> {
         let (transactions, transaction_outputs): (Vec<_>, Vec<_>) =
             transactions_and_outputs.into_iter().unzip();

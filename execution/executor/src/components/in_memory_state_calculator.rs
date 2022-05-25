@@ -25,8 +25,9 @@ use std::{
     sync::Arc,
 };
 use storage_interface::{
+    cached_state_view::{CachedStateView, StateCache},
     in_memory_state::InMemoryState,
-    verified_state_view::{StateCache, VerifiedStateView},
+    sync_proof_fetcher::SyncProofFetcher,
     DbReader, TreeState,
 };
 
@@ -57,12 +58,12 @@ impl IntoLedgerView for TreeState {
                 checkpoint_next_version,
                 self.num_transactions,
             );
-            let checkpoint_state_view = VerifiedStateView::new(
+            let checkpoint_state_view = CachedStateView::new(
                 StateViewId::Miscellaneous,
-                db.clone(),
                 self.state_checkpoint_version,
                 self.state_checkpoint_hash,
                 checkpoint_state.checkpoint.clone(),
+                Arc::new(SyncProofFetcher::new(db.clone())),
             );
             let write_sets = db.get_write_sets(checkpoint_next_version, self.num_transactions)?;
             checkpoint_state_view.prime_cache_by_write_set(&write_sets)?;

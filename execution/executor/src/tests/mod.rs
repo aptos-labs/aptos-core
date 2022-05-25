@@ -390,8 +390,11 @@ fn apply_transaction_by_writeset(
         )))
         .collect();
 
-    let state_view =
-        ledger_view.state_view(&ledger_view, StateViewId::Miscellaneous, db.reader.clone());
+    let state_view = ledger_view.verified_state_view(
+        &ledger_view,
+        StateViewId::Miscellaneous,
+        db.reader.clone(),
+    );
 
     let chunk_output =
         ChunkOutput::by_transaction_output(transactions_and_outputs, state_view).unwrap();
@@ -531,7 +534,11 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
     for txn in transactions {
         let out = ChunkOutput::by_transaction_execution::<MockVM>(
             vec![txn],
-            ledger_view.state_view(&ledger_view, StateViewId::Miscellaneous, db.reader.clone()),
+            ledger_view.verified_state_view(
+                &ledger_view,
+                StateViewId::Miscellaneous,
+                db.reader.clone(),
+            ),
         )
         .unwrap();
         let (executed, _, _) = out.apply_to_ledger(&ledger_view).unwrap();

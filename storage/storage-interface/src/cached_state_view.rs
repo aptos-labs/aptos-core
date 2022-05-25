@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::DbReader;
+use crate::proof_fetcher::ProofFetcher;
 use anyhow::{format_err, Result};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
@@ -21,15 +21,11 @@ use std::{
     sync::Arc,
 };
 
-/// `VerifiedStateView` is like a snapshot of the global state comprised of state view at two
+/// `CachedStateView` is like a snapshot of the global state comprised of state view at two
 /// levels, persistent storage and memory.
-pub struct VerifiedStateView {
+pub struct CachedStateView {
     /// For logging and debugging purpose, identifies what this view is for.
     id: StateViewId,
-
-    /// A gateway implementing persistent storage interface, which can be a RPC client or direct
-    /// accessor.
-    reader: Arc<dyn DbReader>,
 
     /// The most recent version in persistent storage.
     latest_persistent_version: Option<Version>,
@@ -82,19 +78,19 @@ pub struct VerifiedStateView {
     /// the corresponding key has been deleted. This is a temporary hack until we support deletion
     /// in JMT node.
     state_cache: RwLock<HashMap<StateKey, StateValue>>,
-    state_proof_cache: RwLock<HashMap<HashValue, SparseMerkleProof>>,
+    proof_fetcher: Arc<dyn ProofFetcher>,
 }
 
-impl VerifiedStateView {
-    /// Constructs a [`VerifiedStateView`] with persistent state view represented by
+impl CachedStateView {
+    /// Constructs a [`CachedStateView`] with persistent state view represented by
     /// `latest_persistent_state_root` plus a storage reader, and the in-memory speculative state
     /// on top of it represented by `speculative_state`.
     pub fn new(
         id: StateViewId,
-        reader: Arc<dyn DbReader>,
         latest_persistent_version: Option<Version>,
         latest_persistent_state_root: HashValue,
         speculative_state: SparseMerkleTree<StateValue>,
+        proof_fetcher: Arc<dyn ProofFetcher>,
     ) -> Self {
         // Hack: When there's no transaction in the db but state tree root hash is not the
         // placeholder hash, it implies that there's pre-genesis state present.
@@ -107,12 +103,11 @@ impl VerifiedStateView {
         });
         Self {
             id,
-            reader,
             latest_persistent_version,
             latest_persistent_state_root,
             speculative_state: speculative_state.freeze(),
             state_cache: RwLock::new(HashMap::new()),
-            state_proof_cache: RwLock::new(HashMap::new()),
+            proof_fetcher,
         }
     }
 
@@ -130,7 +125,7 @@ impl VerifiedStateView {
         StateCache {
             frozen_base: self.speculative_state,
             state_cache: self.state_cache.into_inner(),
-            proofs: self.state_proof_cache.into_inner(),
+            proofs: self.proof_fetcher.get_proof_cache(),
         }
     }
 
@@ -145,28 +140,26 @@ impl VerifiedStateView {
             StateStoreStatus::ExistsInDB | StateStoreStatus::Unknown => {
                 let (state_value, proof) = match self.latest_persistent_version {
                     Some(version) => self
-                        .reader
-                        .get_state_value_with_proof_by_version(state_key, version)?,
-                    None => (None, SparseMerkleProof::new(None, vec![])),
+                        .proof_fetcher
+                        .fetch_state_value_and_proof(state_key, version)?,
+                    None => (None, Some(SparseMerkleProof::new(None, vec![]))),
                 };
-                proof
-                    .verify(
-                        self.latest_persistent_state_root,
-                        key_hash,
-                        state_value.as_ref(),
-                    )
-                    .map_err(|err| {
-                        format_err!(
-                            "Proof is invalid for key {:?} with state root hash {:?}: {}",
-                            state_key,
+                if let Some(proof) = proof {
+                    proof
+                        .verify(
                             self.latest_persistent_state_root,
-                            err
+                            key_hash,
+                            state_value.as_ref(),
                         )
-                    })?;
-
-                // multiple threads may enter this code, and another thread might add
-                // an address before this one. Thus the insertion might return a None here.
-                self.state_proof_cache.write().insert(key_hash, proof);
+                        .map_err(|err| {
+                            format_err!(
+                                "Proof is invalid for key {:?} with state root hash {:?}: {}",
+                                state_key,
+                                self.latest_persistent_state_root,
+                                err
+                            )
+                        })?;
+                }
                 state_value
             }
         };
@@ -181,7 +174,7 @@ pub struct StateCache {
     pub proofs: HashMap<HashValue, SparseMerkleProof>,
 }
 
-impl StateView for VerifiedStateView {
+impl StateView for CachedStateView {
     fn id(&self) -> StateViewId {
         self.id
     }

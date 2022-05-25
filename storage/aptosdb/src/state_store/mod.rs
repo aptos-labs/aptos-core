@@ -194,7 +194,6 @@ impl StateStore {
     /// Get the state value given the state key and root hash of state Merkle tree by using the
     /// state value index. Only used for testing for now but should replace the
     /// `get_value_with_proof_by_version` call for VM execution to fetch the value without proof.
-    #[cfg(test)]
     pub fn get_value_by_version(
         &self,
         state_key: &StateKey,

@@ -23,9 +23,7 @@ use aptos_vm::VMExecutor;
 use executor_types::ExecutedChunk;
 use move_deps::move_core_types::move_resource::MoveResource;
 use std::{collections::btree_map::BTreeMap, sync::Arc};
-use storage_interface::{
-    verified_state_view::VerifiedStateView, DbReaderWriter, DbWriter, TreeState,
-};
+use storage_interface::{cached_state_view::CachedStateView, DbReaderWriter, DbWriter, TreeState};
 
 pub fn generate_waypoint<V: VMExecutor>(
     db: &DbReaderWriter,
@@ -114,7 +112,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     let genesis_version = tree_state.num_transactions;
     let base_view = tree_state.into_ledger_view(&db.reader)?;
     let base_state_view =
-        base_view.state_view(&base_view, StateViewId::Miscellaneous, db.reader.clone());
+        base_view.verified_state_view(&base_view, StateViewId::Miscellaneous, db.reader.clone());
 
     let epoch = if genesis_version == 0 {
         GENESIS_EPOCH
@@ -134,7 +132,7 @@ pub fn calculate_genesis<V: VMExecutor>(
         // TODO(aldenhu): fix existing tests before using real timestamp and check on-chain epoch.
         GENESIS_TIMESTAMP_USECS
     } else {
-        let state_view = output.result_view.state_view(
+        let state_view = output.result_view.verified_state_view(
             &base_view,
             StateViewId::Miscellaneous,
             db.reader.clone(),
@@ -178,7 +176,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     Ok(committer)
 }
 
-fn get_state_timestamp(state_view: &VerifiedStateView) -> Result<u64> {
+fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
         .get_state_value(&StateKey::AccessPath(AccessPath::new(
             aptos_root_address(),
@@ -189,7 +187,7 @@ fn get_state_timestamp(state_view: &VerifiedStateView) -> Result<u64> {
     Ok(rsrc.timestamp.microseconds)
 }
 
-fn get_state_epoch(state_view: &VerifiedStateView) -> Result<u64> {
+fn get_state_epoch(state_view: &CachedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
         .get_state_value(&StateKey::AccessPath(AccessPath::new(
             config_address(),

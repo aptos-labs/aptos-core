@@ -34,11 +34,14 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
+pub mod cached_state_view;
 pub mod in_memory_state;
 #[cfg(any(feature = "testing", feature = "fuzzing"))]
 pub mod mock;
+pub mod no_proof_fetcher;
+pub mod proof_fetcher;
 pub mod state_view;
-pub mod verified_state_view;
+pub mod sync_proof_fetcher;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct StartupInfo {
@@ -462,7 +465,7 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// Gets an account state by account address, out of the ledger state indicated by the state
+    /// Gets a state value by state key along with the proof, out of the ledger state indicated by the state
     /// Merkle tree root with a sparse merkle proof proving state tree root.
     /// See [AptosDB::get_account_state_with_proof_by_version].
     ///
@@ -475,6 +478,21 @@ pub trait DbReader: Send + Sync {
         state_key: &StateKey,
         version: Version,
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
+        unimplemented!()
+    }
+
+    /// Gets a state value by state key, out of the ledger state indicated by the version
+    /// See [AptosDB::get_account_state_with_proof_by_version].
+    ///
+    /// [AptosDB::get_account_state_with_proof_by_version]:
+    /// ../aptosdb/struct.AptosDB.html#method.get_account_state_with_proof_by_version
+    ///
+    /// This is used by aptos core (executor) internally.
+    fn get_state_value_by_version(
+        &self,
+        state_store_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<StateValue>> {
         unimplemented!()
     }
 

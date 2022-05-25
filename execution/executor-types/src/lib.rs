@@ -34,7 +34,10 @@ use std::{cmp::max, collections::HashMap, sync::Arc};
 use storage_interface::DbReader;
 
 pub use executed_chunk::ExecutedChunk;
-use storage_interface::{in_memory_state::InMemoryState, verified_state_view::VerifiedStateView};
+use storage_interface::{
+    cached_state_view::CachedStateView, in_memory_state::InMemoryState,
+    no_proof_fetcher::NoProofFetcher, sync_proof_fetcher::SyncProofFetcher,
+};
 
 type SparseMerkleProof = aptos_types::proof::SparseMerkleProof;
 
@@ -354,18 +357,33 @@ impl ExecutedTrees {
         self.transaction_accumulator.root_hash() == rhs.transaction_accumulator.root_hash()
     }
 
+    pub fn verified_state_view(
+        &self,
+        persisted_view: &Self,
+        id: StateViewId,
+        reader: Arc<dyn DbReader>,
+    ) -> CachedStateView {
+        CachedStateView::new(
+            id,
+            persisted_view.state.checkpoint_version,
+            persisted_view.state.checkpoint_root_hash(),
+            self.state.current.clone(),
+            Arc::new(SyncProofFetcher::new(reader.clone())),
+        )
+    }
+
     pub fn state_view(
         &self,
         persisted_view: &Self,
         id: StateViewId,
         reader: Arc<dyn DbReader>,
-    ) -> VerifiedStateView {
-        VerifiedStateView::new(
+    ) -> CachedStateView {
+        CachedStateView::new(
             id,
-            reader.clone(),
             persisted_view.state.checkpoint_version,
             persisted_view.state.checkpoint_root_hash(),
             self.state.current.clone(),
+            Arc::new(NoProofFetcher::new(reader.clone())),
         )
     }
 }
