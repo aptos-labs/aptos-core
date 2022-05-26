@@ -32,7 +32,7 @@
       <%= content_tag :div, class: 'overflow-x-auto' do %>
         <%= render TableComponent.new(class: 'w-full table-auto') do |t| %>
           <%= t.with_column(:rank, '#', align: 'right') %>
-          <%= t.with_column('Peer ID', align: 'left') %>
+          <%= t.with_column('Account Address', align: 'left') %>
           <%= t.with_column(:liveness, 'Liveness', align: 'left') do |column| %>
             <%= column.with_tooltip(:info) do |tooltip| %>
               <%= tooltip.with_header do %>
