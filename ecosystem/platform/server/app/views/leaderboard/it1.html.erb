@@ -121,7 +121,9 @@
                   </div>
                 <% end %>
                 <%= tr.with_column(align: 'right') do %>
-                  <%= Time.at(metric.latest_reported_timestamp).to_fs(:db) %>
+                  <% if metric.latest_reported_timestamp %>
+                    <%= Time.at(metric.latest_reported_timestamp).to_fs(:db) %>
+                  <% end %>
                 <% end %>
               <% end %>
             <% end %>
