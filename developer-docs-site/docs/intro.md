@@ -6,7 +6,7 @@ sidebar_position: 0
 hide_table_of_contents: true
 ---
 
-# Aptos Developer Network
+# Aptos Developer Documentation
 
 Welcome! Aptos is building a Layer 1 for everyone. Here in our documentation you can explore tutorials and technical concepts for the Aptos Network.
 
