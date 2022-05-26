@@ -10,13 +10,13 @@ const codeInjector = require("./src/remark/code-injector");
 const config = {
   title: "Aptos Labs",
   tagline: "Developer Documentation",
-  url: "https://docs.aptoslabs.com",
+  url: "https://aptos.dev/",
   baseUrl: "/",
   onBrokenLinks: "warn",
   onBrokenMarkdownLinks: "warn",
   favicon: "img/favicon.ico",
   organizationName: "aptos-labs", // Usually your GitHub org/user name.
-  projectName: "developer-docs", // Usually your repo name.
+  projectName: "aptos-core", // Usually your repo name.
 
   presets: [
     [
@@ -52,6 +52,128 @@ const config = {
           srcDark: "/img/aptos_word.svg",
         },
         items: [
+          {
+            type: 'doc',
+            label: "Start Here",
+            position: "left",
+            docId: 'basics/basics-txns-states',
+          },
+          {
+            type: 'dropdown',
+            label: "Tutorials",
+            position: "left",
+            items: [
+              {
+                type: 'doc',
+                label: "Your First DApp",
+                docId: 'tutorials/first-dapp',
+              },
+              {
+                type: 'doc',
+                label: "Your First NFT",
+                docId: 'tutorials/your-first-nft',
+              },
+              {
+                type: 'doc',
+                label: "Building Wallet Extension",
+                docId: 'tutorials/building-wallet-extension',
+              },
+              {
+                type: 'doc',
+                label: "Your First Coin",
+                docId: 'tutorials/fist-coin',
+              },
+              {
+                label: "Node Tutorials",
+                type: 'doc',
+                docId: 'tutorials/full-node/run-a-fullnode',
+              },
+            ],
+          },
+          {
+            type: 'dropdown',
+            label: "Guides",
+            position: "left",
+            items: [
+              {
+                label: "Life of a Transaction",
+                type: 'doc',
+                docId: 'guides/basics-life-of-txn',
+              },
+              {
+                label: "Interacting with Aptos Blockchain",
+                type: 'doc',
+                docId: 'guides/interfacing-with-the-blockchain',
+              },
+            ],
+          },
+          {
+            type: 'dropdown',
+            label: "Move",
+            position: "left",
+            items: [
+              {
+                label: "Move on Aptos",
+                type: 'doc',
+                docId: 'guides/move',
+              },
+              {
+                label: "Your First Move Module",
+                type: 'doc',
+                docId: 'tutorials/first-move-module',
+              },
+            ],
+          },
+          {
+            type: 'dropdown',
+            label: "Nodes",
+            position: "left",
+            items: [
+              {
+                label: "Node Tutorials",
+                type: 'doc',
+                docId: 'tutorials/full-node/run-a-fullnode',
+              },
+              {
+                label: "Node Liveness Criteria",
+                type: 'doc',
+                docId: 'reference/node-liveness-criteria',
+              },
+              {
+                label: "Local Testnet, Devnet and Incentivized Testnet",
+                type: 'doc',
+                docId: 'tutorials/local-testnet-devnet-incentivized-testnet',
+              },
+              {
+                label: "Incentivized Testnet",
+                type: 'doc',
+                docId: 'tutorials/validator-node/intro',
+              },
+            ],
+          },
+          {
+            type: 'doc',
+            label: "DApps",
+            position: "left",
+            docId: 'tutorials/first-dapp',
+          },
+          {
+            type: 'doc',
+            label: "NFT",
+            position: "left",
+            docId: 'tutorials/your-first-nft',
+          },
+          {
+            type: 'doc',
+            label: "Wallet",
+            position: "left",
+            docId: 'tutorials/building-wallet-extension',
+          },
+          {
+            href: "https://fullnode.devnet.aptoslabs.com/spec.html#/",
+            label: "API",
+            position: "left",
+          },
           {
             href: "https://github.com/aptos-labs/aptos-core/",
             label: "GitHub",

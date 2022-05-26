@@ -1,10 +1,10 @@
 ---
-title: "Getting started"
+title: "Up and Running"
 slug: "getting-started"
 sidebar_position: 0
 ---
 
-# Getting Started
+# Up and Running
 
 This is a guide to kick-start your journey as a developer in the Aptos ecosystem!
 
