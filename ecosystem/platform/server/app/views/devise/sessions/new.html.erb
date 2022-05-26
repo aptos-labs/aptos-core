@@ -3,10 +3,9 @@
     <div class="sm:w-[36rem] mb-8 sm:mb-12 font-light sm:text-lg">
       <%= render 'shared/it1_intro' %>
     </div>
-
-    <div class="flex-1 p-4 rounded-lg bg-neutral-800">
-      <h3 class="font-mono uppercase text-xl mb-4">Sign in</h3>
-      <div class="mb-4"><%= render DividerComponent.new %></div>
+    <div class="flex-1 p-8 rounded-lg bg-neutral-800">
+      <h3 class="font-mono uppercase text-2xl mb-2">Log in</h3>
+      <div class="mb-8"><%= render DividerComponent.new %></div>
       <%= render LoginButtonComponent.new(provider: :github, size: :large, class: 'mb-4 w-full') %>
       <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-full') %>
     </div>

@@ -1,36 +1,34 @@
 <%= content_tag :footer, **@rest do %>
-  <a href="/" title="Aptos - Building the safest and most scalable Layer 1 blockchain">
-    <%= render IconComponent.new(:aptos, class: 'h-[40px]') %>
-  </a>
-
-  <div class="flex-1 font-mono text-xs">
-    <p>© 2022 Matonee Inc. (dba Aptos Labs)</p>
-    <p>
-      <a href="mailto:info@aptoslabs.com" class="underline">info@aptoslabs.com</a>
-      or
-      <a href="mailto:press@aptoslabs.com" class="underline">press@aptoslabs.com</a>
-    </p>
-  </div>
-
-  <div class="flex gap-4 items-center">
-    <a href="https://github.com/aptos-labs" title="Git">
-      <%= render IconComponent.new(:github, class: 'w-[26px]') %>
-    </a>
-
-    <a href="https://discord.gg/zTDYBEud7U" title="Discord">
-      <%= render IconComponent.new(:discord, class: 'w-[26px]') %>
-    </a>
-
-    <a href="https://twitter.com/aptoslabs" title="Twitter">
-      <%= render IconComponent.new(:twitter, class: 'w-[26px]') %>
-    </a>
-
-    <a href="https://aptoslabs.medium.com/" title="Medium">
-      <%= render IconComponent.new(:medium, class: 'w-[26px]') %>
-    </a>
-
-    <a href="https://www.linkedin.com/company/aptoslabs/" title="LinkedIn">
-      <%= render IconComponent.new(:linkedin, class: 'w-[26px]') %>
-    </a>
+  <div class="max-w-screen-2xl mx-auto">
+    <div class="flex items-center flex-col sm:flex-row gap-6 text-center md:text-left">
+      <a href="/" title="Aptos - Building the safest and most scalable Layer 1 blockchain">
+        <%= render IconComponent.new(:aptos, class: 'w-10') %>
+      </a>
+      <div class="flex-1 font-mono text-xs">
+        <p>© 2022 Matonee Inc. (dba Aptos Labs)</p>
+        <p>
+          <a href="mailto:info@aptoslabs.com" class="underline">info@aptoslabs.com</a>
+          or
+          <a href="mailto:press@aptoslabs.com" class="underline">press@aptoslabs.com</a>
+        </p>
+      </div>
+      <div class="flex gap-4 items-center">
+        <a href="https://github.com/aptos-labs" title="Git">
+          <%= render IconComponent.new(:github, class: 'w-[26px]') %>
+        </a>
+        <a href="https://discord.gg/zTDYBEud7U" title="Discord">
+          <%= render IconComponent.new(:discord, class: 'w-[26px]') %>
+        </a>
+        <a href="https://twitter.com/aptoslabs" title="Twitter">
+          <%= render IconComponent.new(:twitter, class: 'w-[26px]') %>
+        </a>
+        <a href="https://aptoslabs.medium.com/" title="Medium">
+          <%= render IconComponent.new(:medium, class: 'w-[26px]') %>
+        </a>
+        <a href="https://www.linkedin.com/company/aptoslabs/" title="LinkedIn">
+          <%= render IconComponent.new(:linkedin, class: 'w-[26px]') %>
+        </a>
+      </div>
+    </div>
   </div>
 <% end %>

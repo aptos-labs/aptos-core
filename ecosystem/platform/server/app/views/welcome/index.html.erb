@@ -3,19 +3,21 @@
     <div class="max-w-prose mb-12 font-light sm:text-lg">
       <%= render 'shared/it1_intro' %>
     </div>
-    <%= render ButtonComponent.new(size: :large, class: 'w-full mb-6 max-w-prose', dialog: @login_dialog) do %>
+    <%= render ButtonComponent.new(size: :large, class: 'w-full mb-6', dialog: @login_dialog) do %>
       Sign up
     <% end %>
-    <%= render ButtonComponent.new(href: new_user_session_path, size: :large, scheme: :secondary, class: 'w-full max-w-prose') do %>
+    <%= render ButtonComponent.new(href: new_user_session_path, size: :large, scheme: :secondary, class: 'w-full') do %>
       Log in
     <% end %>
 		<%= render @login_dialog do |dialog| %>
       <%= dialog.with_title do %>
-        Sign up with
+        Sign up
       <% end %>
       <%= dialog.with_body do %>
-        <%= render LoginButtonComponent.new(provider: :github, size: :large, class: 'mb-8 w-96') %>
-        <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-96') %>
+        <div class="flex flex-col gap-3">
+          <%= render LoginButtonComponent.new(provider: :github, size: :large, class: 'w-full') %>
+          <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-full') %>
+        </div>
       <% end %>
     <% end %>
   </div>
