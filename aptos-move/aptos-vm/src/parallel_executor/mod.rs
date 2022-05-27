@@ -9,6 +9,7 @@ use crate::{
     aptos_vm::AptosVM,
     parallel_executor::vm_wrapper::AptosVMWrapper,
 };
+use aptos_metrics::{register_histogram, Histogram};
 use aptos_parallel_executor::{
     errors::Error,
     executor::ParallelTransactionExecutor,
@@ -21,6 +22,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use move_deps::move_core_types::vm_status::{StatusCode, VMStatus};
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
 
 impl PTransaction for PreprocessedTransaction {
@@ -58,6 +60,16 @@ impl PTransactionOutput for AptosTransactionOutput {
     }
 }
 
+pub static VM_PREPROCESS_TXN: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "vm_preprocess_transaction",
+        // metric description
+        "The total time spent in seconds of block execution in the block executor."
+    )
+    .unwrap()
+});
+
 pub struct ParallelAptosVM();
 
 impl ParallelAptosVM {
@@ -69,10 +81,12 @@ impl ParallelAptosVM {
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
+        let timer = VM_PREPROCESS_TXN.start_timer();
         let signature_verified_block: Vec<PreprocessedTransaction> = transactions
             .par_iter()
             .map(|txn| preprocess_transaction::<AptosVM>(txn.clone()))
             .collect();
+        drop(timer);
 
         match ParallelTransactionExecutor::<PreprocessedTransaction, AptosVMWrapper<S>>::new(
             concurrency_level,

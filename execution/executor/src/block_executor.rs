@@ -12,7 +12,8 @@ use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Transactio
 use aptos_vm::VMExecutor;
 use executor_types::{BlockExecutorTrait, Error, StateComputeResult};
 use fail::fail_point;
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::Arc};
+use storage_interface::async_proof_fetcher::AsyncProofFetcher;
 
 use crate::{
     components::{block_tree::BlockTree, chunk_output::ChunkOutput},
@@ -22,12 +23,14 @@ use crate::{
         APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
-use storage_interface::DbReaderWriter;
+use storage_interface::sync_proof_fetcher::SyncProofFetcher;
+use storage_interface::{proof_fetcher::ProofFetcher, DbReaderWriter};
 
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
     block_tree: BlockTree,
     phantom: PhantomData<V>,
+    proof_fetcher: Arc<dyn ProofFetcher>,
 }
 
 impl<V> BlockExecutor<V>
@@ -36,10 +39,12 @@ where
 {
     pub fn new(db: DbReaderWriter) -> Self {
         let block_tree = BlockTree::new(&db.reader).expect("Block tree failed to init.");
+        let proof_fetcher = Arc::new(AsyncProofFetcher::new(db.reader.clone()));
         Self {
             db,
             block_tree,
             phantom: PhantomData,
+            proof_fetcher,
         }
     }
 }
@@ -95,7 +100,12 @@ where
             let state_view = parent_view.verified_state_view(
                 StateViewId::BlockExecution { block_id },
                 self.db.reader.clone(),
+<<<<<<< HEAD
             )?;
+=======
+                self.proof_fetcher.clone(),
+            );
+>>>>>>> 3790a183e (Various profiling changes)
 
             let chunk_output = {
                 let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();

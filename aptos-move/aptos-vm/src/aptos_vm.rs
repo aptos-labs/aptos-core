@@ -23,6 +23,7 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
+use aptos_metrics::{register_histogram, Histogram};
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
@@ -54,7 +55,7 @@ use move_deps::{
     move_vm_types::{gas_schedule::GasStatus, loaded_data::runtime_types::Type},
 };
 use num_cpus;
-use once_cell::sync::OnceCell;
+use once_cell::sync::{Lazy, OnceCell};
 use std::{
     cmp::min,
     collections::HashSet,
@@ -66,6 +67,36 @@ static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 
 #[derive(Clone)]
 pub struct AptosVM(pub(crate) AptosVMImpl);
+
+pub static VM_VALIDATE_SIGNAGTURE_CHECKED_TXN: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "vm_validate_signature_checked_txn",
+        // metric description
+        "The total time spent in seconds of block execution in the block executor."
+    )
+    .unwrap()
+});
+
+pub static VM_SINGLE_TXN_EXECUTION: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "vm_single_txn_execution",
+        // metric description
+        "The total time spent in seconds of block execution in the block executor."
+    )
+    .unwrap()
+});
+
+pub static VM_EXECUTE_SCRIPT_FN: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "vm_execute_script_fn",
+        // metric description
+        "The total time spent in seconds of block execution in the block executor."
+    )
+    .unwrap()
+});
 
 impl AptosVM {
     pub fn new<S: StateView>(state: &S) -> Self {
@@ -442,7 +473,8 @@ impl AptosVM {
             };
         }
 
-        // Revalidate the transaction.
+        // Revalidate the transaction
+        let timer = VM_VALIDATE_SIGNAGTURE_CHECKED_TXN.start_timer();
         let mut session = self.0.new_session(storage, SessionId::txn(txn));
         if let Err(err) = validate_signature_checked_transaction::<S, Self>(
             self,
@@ -454,10 +486,13 @@ impl AptosVM {
             return discard_error_vm_status(err);
         };
 
+        drop(timer);
+
         let gas_schedule = unwrap_or_discard!(self.0.get_gas_schedule(log_context));
         let txn_data = TransactionMetadata::new(txn);
         let mut gas_status = GasStatus::new(gas_schedule, txn_data.max_gas_amount());
 
+        let timer = VM_EXECUTE_SCRIPT_FN.start_timer();
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
             | payload @ TransactionPayload::ScriptFunction(_) => self
@@ -475,6 +510,7 @@ impl AptosVM {
                 return discard_error_vm_status(VMStatus::Error(StatusCode::UNREACHABLE));
             }
         };
+        drop(timer);
 
         let gas_usage = txn_data
             .max_gas_amount()
@@ -926,6 +962,7 @@ impl VMAdapter for AptosVM {
         data_cache: &S,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutput, Option<String>), VMStatus> {
+        let _timer = VM_SINGLE_TXN_EXECUTION.start_timer();
         Ok(match txn {
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
                 let (vm_status, output) =

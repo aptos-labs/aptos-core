@@ -12,6 +12,7 @@ pub(crate) mod event_accumulator;
 pub(crate) mod event_by_key;
 pub(crate) mod event_by_version;
 pub(crate) mod jellyfish_merkle_node;
+pub(crate) mod latest_state_value;
 pub(crate) mod ledger_counters;
 pub(crate) mod ledger_info;
 pub(crate) mod stale_node_index;
@@ -35,6 +36,7 @@ pub const JELLYFISH_MERKLE_NODE_CF_NAME: ColumnFamilyName = "jellyfish_merkle_no
 pub const LEDGER_COUNTERS_CF_NAME: ColumnFamilyName = "ledger_counters";
 pub const STALE_NODE_INDEX_CF_NAME: ColumnFamilyName = "stale_node_index";
 pub const STATE_VALUE_CF_NAME: ColumnFamilyName = "state_value";
+pub const LATEST_STATE_VALUE_CF_NAME: ColumnFamilyName = "latest_state_value";
 pub const TRANSACTION_CF_NAME: ColumnFamilyName = "transaction";
 pub const TRANSACTION_ACCUMULATOR_CF_NAME: ColumnFamilyName = "transaction_accumulator";
 pub const TRANSACTION_BY_ACCOUNT_CF_NAME: ColumnFamilyName = "transaction_by_account";

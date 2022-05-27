@@ -44,6 +44,16 @@ pub static APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(
     .unwrap()
 });
 
+pub static APTOS_EXECUTOR_VM_PROOF_READ_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_executor_vm_proof_read_seconds",
+        // metric description
+        "The time spent in seconds of vm block execution in Aptos executor"
+    )
+    .unwrap()
+});
+
 pub static APTOS_EXECUTOR_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!("aptos_executor_error_total", "Cumulative number of errors").unwrap()
 });

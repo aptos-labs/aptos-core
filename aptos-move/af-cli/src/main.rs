@@ -9,8 +9,6 @@ use move_deps::{
     move_vm_types::gas_schedule::INITIAL_COST_SCHEDULE,
 };
 
-use crossbeam_channel::unbounded;
-
 #[derive(StructOpt)]
 pub struct AfCli {
     #[structopt(flatten)]
@@ -28,16 +26,15 @@ pub enum AfCommands {
 }
 
 fn main() -> Result<()> {
-    let (s1, r1) = unbounded();
-    let (s2, r2) = (s1.clone(), r1.clone());
-    let (s3, r3) = (s2.clone(), r2.clone());
-
-    s1.send(10).unwrap();
-    s2.send(20).unwrap();
-    s3.send(30).unwrap();
-
-    println!("{:?}", r3.recv());
-    println!("{:?}", r1.recv());
-    println!("{:?}", r2.recv());
-    Ok(())
+    let error_descriptions: ErrorMapping = bcs::from_bytes(cached_framework_packages::error_map())?;
+    let args = AfCli::parse();
+    match &args.cmd {
+        AfCommands::Command(cmd) => move_deps::move_cli::run_cli(
+            aptos_vm::natives::aptos_natives(),
+            &INITIAL_COST_SCHEDULE,
+            &error_descriptions,
+            &args.move_args,
+            cmd,
+        ),
+    }
 }

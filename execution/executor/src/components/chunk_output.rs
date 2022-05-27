@@ -6,11 +6,13 @@
 use crate::components::apply_chunk_output::ApplyChunkOutput;
 use anyhow::Result;
 use aptos_logger::trace;
+use aptos_metrics::{register_histogram, Histogram};
 use aptos_state_view::StateView;
 use aptos_types::transaction::{Transaction, TransactionOutput};
 use aptos_vm::VMExecutor;
 use executor_types::{ExecutedChunk, ExecutedTrees};
 use fail::fail_point;
+use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use storage_interface::cached_state_view::{CachedStateView, StateCache};
 
@@ -25,17 +27,44 @@ pub struct ChunkOutput {
     pub state_cache: StateCache,
 }
 
+pub static VM_EXECUTE_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "vm_execute_block",
+        // metric description
+        "The total time spent in seconds of block execution in the block executor."
+    )
+    .unwrap()
+});
+
+pub static INTO_STATE_CACHE: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "into_state_cache",
+        // metric description
+        "The total time spent in seconds of block execution in the block executor."
+    )
+    .unwrap()
+});
+
 impl ChunkOutput {
     pub fn by_transaction_execution<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
     ) -> Result<Self> {
+        let _timer = VM_EXECUTE_BLOCK.start_timer();
         let transaction_outputs = V::execute_block(transactions.clone(), &state_view)?;
+        drop(_timer);
+
+        let timer = INTO_STATE_CACHE.start_timer();
+        let cache = state_view.into_state_cache();
+
+        drop(timer);
 
         Ok(Self {
             transactions,
             transaction_outputs,
-            state_cache: state_view.into_state_cache(),
+            state_cache: cache,
         })
     }
 

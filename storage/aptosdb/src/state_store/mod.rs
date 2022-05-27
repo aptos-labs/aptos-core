@@ -6,6 +6,7 @@
 #[cfg(test)]
 mod state_store_test;
 
+use crate::latest_state_value::LatestStateValueSchema;
 use crate::{
     change_set::ChangeSet,
     ledger_counters::LedgerCounter,
@@ -215,8 +216,9 @@ impl StateStore {
     pub fn get_value_by_version(
         &self,
         state_key: &StateKey,
-        version: Version,
+        _: Version,
     ) -> Result<Option<StateValue>> {
+<<<<<<< HEAD
         let mut iter = self.db.iter::<StateValueSchema>(Default::default())?;
         iter.seek_for_prev(&(state_key.clone(), version))?;
         iter.next()
@@ -235,6 +237,9 @@ impl StateStore {
                     .transpose()
             })
             .transpose()
+=======
+        self.db.get::<LatestStateValueSchema>(state_key)
+>>>>>>> 3790a183e (Various profiling changes)
     }
 
     /// Gets the proof that proves a range of accounts.
@@ -526,7 +531,11 @@ fn add_node_batch(batch: &mut SchemaBatch, node_batch: &NodeBatch) -> Result<()>
 fn add_kv_batch(batch: &mut SchemaBatch, kv_batch: &StateValueBatch) -> Result<()> {
     kv_batch
         .iter()
-        .map(|(k, v)| batch.put::<StateValueSchema>(k, v))
+        .map(|(k, v)| {
+            batch.put::<StateValueSchema>(k, v)?;
+            batch.put::<LatestStateValueSchema>(&k.0, v)?;
+            Ok(())
+        })
         .collect::<Result<Vec<_>>>()?;
 
     // Add kv_batch

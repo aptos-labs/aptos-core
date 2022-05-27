@@ -34,7 +34,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
-pub mod async_proof_reader;
+pub mod async_proof_fetcher;
 pub mod cached_state_view;
 pub mod in_memory_state;
 #[cfg(any(feature = "testing", feature = "fuzzing"))]
