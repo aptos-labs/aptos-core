@@ -12,7 +12,7 @@ Welcome! Aptos is building a Layer 1 for everyone. Here in our documentation you
 
 ## Want to dive in?
 
-- Start with the basics, such as [Transactions and States](bsics/basics-txns-states) and how [Accounts](/basics/basics-accounts) work. 
+- Start with the basics, such as [Transactions and States](basics/basics-txns-states) and how [Accounts](/basics/basics-accounts) work. 
 
 - Want something a bit more interactive? You can dive right into our [tutorials](/guides/getting-started).
 
