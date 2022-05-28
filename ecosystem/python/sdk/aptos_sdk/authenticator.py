@@ -39,7 +39,9 @@ class Authenticator:
         self.authenticator = authenticator
 
     def __eq__(self, other: Authenticator) -> bool:
-        return self.variant == other.variant and self.authenticator == other.authenticator
+        return (
+            self.variant == other.variant and self.authenticator == other.authenticator
+        )
 
     def __str__(self) -> str:
         return self.authenticator.__str__()

@@ -16,6 +16,7 @@ MAX_U32 = 2**32 - 1
 MAX_U64 = 2**64 - 1
 MAX_U128 = 2**128 - 1
 
+
 class Deserializer:
     _input: io.BytesIO
     _length: int
@@ -94,7 +95,7 @@ class Deserializer:
 
         while value <= MAX_U32:
             byte = self._read_int(1)
-            value |= (byte & 0x7f) << shift
+            value |= (byte & 0x7F) << shift
             if byte & 0x80 == 0:
                 break
             shift += 7
@@ -108,7 +109,9 @@ class Deserializer:
         value = self._input.read(length)
         if value is None or len(value) < length:
             actual_length = 0 if value is None else len(value)
-            error = f"Unexpected end of input. Requested: {length}, found: {actual_length}"
+            error = (
+                f"Unexpected end of input. Requested: {length}, found: {actual_length}"
+            )
             raise Exception(error)
         return value
 
@@ -143,7 +146,9 @@ class Serializer:
     ):
         encoded_values = []
         for (key, value) in values.items():
-            encoded_values.append((encoder(key, key_encoder), encoder(value, value_encoder)))
+            encoded_values.append(
+                (encoder(key, key_encoder), encoder(value, value_encoder))
+            )
         encoded_values.sort(key=lambda item: item[0])
 
         self.uleb128(len(encoded_values))
@@ -202,20 +207,24 @@ class Serializer:
 
         while value >= 0x80:
             # Write 7 (lowest) bits of data and set the 8th bit to 1.
-            byte = (value & 0x7f)
+            byte = value & 0x7F
             self.u8(byte | 0x80)
             value >>= 7
 
         # Write the remaining bits of data and set the highest bit to 0.
-        self.u8(value & 0x7f)
+        self.u8(value & 0x7F)
 
     def _write_int(self, value: int, length: int):
         self._output.write(value.to_bytes(length, "little", signed=False))
 
-def encoder(value: typing.Any, encoder: typing.Callable[[Serializer, typing.Any], None]) -> bytes:
+
+def encoder(
+    value: typing.Any, encoder: typing.Callable[[Serializer, typing.Any], None]
+) -> bytes:
     ser = Serializer()
     encoder(ser, value)
     return ser.output()
+
 
 class Test(unittest.TestCase):
     def test_bool_true(self):
@@ -256,7 +265,7 @@ class Test(unittest.TestCase):
         self.assertEqual(in_value, out_value)
 
     def test_map(self):
-        in_value = {"a" : 12345, "b": 99234, "c": 23829}
+        in_value = {"a": 12345, "b": 99234, "c": 23829}
 
         ser = Serializer()
         ser.map(in_value, Serializer.str, Serializer.u32)
@@ -344,6 +353,7 @@ class Test(unittest.TestCase):
         out_value = der.uleb128()
 
         self.assertEqual(in_value, out_value)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -54,13 +54,15 @@ class RawTransaction:
         self.chain_id = chain_id
 
     def __eq__(self, other: RawTranasction) -> bool:
-        return self.sender == other.sender and \
-            self.sequence_number == other.sequence_number and \
-            self.payload == other.payload and \
-            self.max_gas_amount == other.max_gas_amount and \
-            self.gas_unit_price == other.gas_unit_price and \
-            self.expiration_timestamps_secs == other.expiration_timestamps_secs and \
-            self.chain_id == other.chain_id
+        return (
+            self.sender == other.sender
+            and self.sequence_number == other.sequence_number
+            and self.payload == other.payload
+            and self.max_gas_amount == other.max_gas_amount
+            and self.gas_unit_price == other.gas_unit_price
+            and self.expiration_timestamps_secs == other.expiration_timestamps_secs
+            and self.chain_id == other.chain_id
+        )
 
     def __str__(self):
         return f"""RawTranasction:
@@ -135,8 +137,7 @@ class TransactionPayload:
         self.value = payload
 
     def __eq__(self, other: TransactionPayload) -> bool:
-        return self.variant == other.variant and \
-            self.value == other.value
+        return self.variant == other.variant and self.value == other.value
 
     def __str__(self) -> str:
         return self.value.__str__()
@@ -190,17 +191,21 @@ class ScriptFunction:
     ty_args: List[TypeTag]
     args: List[bytes]
 
-    def __init__(self, module: ModuleId, function: str, ty_args: List[TypeTag], args: List[bytes]):
+    def __init__(
+        self, module: ModuleId, function: str, ty_args: List[TypeTag], args: List[bytes]
+    ):
         self.module = module
         self.function = function
         self.ty_args = ty_args
         self.args = args
 
     def __eq__(self, other: ScriptFunction) -> bool:
-        return self.module == other.module and \
-            self.function == other.function and \
-            self.ty_args == other.ty_args and \
-            self.args == other.args
+        return (
+            self.module == other.module
+            and self.function == other.function
+            and self.ty_args == other.ty_args
+            and self.args == other.args
+        )
 
     def __str__(self):
         return f"{self.module}::{self.function}::<{self.ty_args}>({self.args})"
@@ -278,7 +283,7 @@ class TransactionArgument:
     def __init__(
         self,
         value: typing.Any,
-        encoder: typing.Callable[[Serializer, typing.Any], bytes]
+        encoder: typing.Callable[[Serializer, typing.Any], bytes],
     ):
         self.value = value
         self.encoder = encoder
@@ -353,11 +358,14 @@ class Test(unittest.TestCase):
         signed_transaction = SignedTransaction(raw_transaction, authenticator)
         self.assertTrue(signed_transaction.verify())
 
-
     def test_script_function_with_corpus(self):
         # Define common inputs
-        sender_key_input = "209bf49a6a0755f953811fce125f2683d50429c3bb49e074147e0089a52eae155f"
-        receiver_key_input = "200564f879d27ae3c02ce82834acfa8c793a629f2ca0de6919610be82f411326be"
+        sender_key_input = (
+            "209bf49a6a0755f953811fce125f2683d50429c3bb49e074147e0089a52eae155f"
+        )
+        receiver_key_input = (
+            "200564f879d27ae3c02ce82834acfa8c793a629f2ca0de6919610be82f411326be"
+        )
 
         sequence_number_input = 11
         gas_unit_price_input = 1
@@ -367,11 +375,15 @@ class Test(unittest.TestCase):
         amount_input = 5000
 
         # Accounts and crypto
-        sender_private_key = ed25519.PrivateKey.deserialize(Deserializer(bytes.fromhex(sender_key_input)))
+        sender_private_key = ed25519.PrivateKey.deserialize(
+            Deserializer(bytes.fromhex(sender_key_input))
+        )
         sender_public_key = sender_private_key.public_key()
         sender_account_address = AccountAddress.from_key(sender_public_key)
 
-        receiver_private_key = ed25519.PrivateKey.deserialize(Deserializer(bytes.fromhex(receiver_key_input)))
+        receiver_private_key = ed25519.PrivateKey.deserialize(
+            Deserializer(bytes.fromhex(receiver_key_input))
+        )
         receiver_public_key = receiver_private_key.public_key()
         receiver_account_address = AccountAddress.from_key(receiver_public_key)
 
@@ -401,8 +413,12 @@ class Test(unittest.TestCase):
         signature = raw_transaction_generated.sign(sender_private_key)
         self.assertTrue(raw_transaction_generated.verify(sender_public_key, signature))
 
-        authenticator = Authenticator(Ed25519Authenticator(sender_public_key, signature))
-        signed_transaction_generated = SignedTransaction(raw_transaction_generated, authenticator)
+        authenticator = Authenticator(
+            Ed25519Authenticator(sender_public_key, signature)
+        )
+        signed_transaction_generated = SignedTransaction(
+            raw_transaction_generated, authenticator
+        )
         self.assertTrue(signed_transaction_generated.verify())
 
         # Verify the RawTransaction
@@ -417,14 +433,18 @@ class Test(unittest.TestCase):
 
         raw_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000003000000000000000000000000000000000000000000000000000000000000000104436f696e087472616e73666572010700000000000000000000000000000000000000000000000000000000000000010854657374436f696e0854657374436f696e0002202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9088813000000000000d0070000000000000100000000000000d20296490000000004"
         self.assertEqual(raw_transaction_input, raw_transaction_generated_bytes)
-        raw_transaction = RawTransaction.deserialize(Deserializer(bytes.fromhex(raw_transaction_input)))
+        raw_transaction = RawTransaction.deserialize(
+            Deserializer(bytes.fromhex(raw_transaction_input))
+        )
         self.assertEqual(raw_transaction_generated, raw_transaction)
 
         # Verify the SignedTransaction
 
         signed_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000003000000000000000000000000000000000000000000000000000000000000000104436f696e087472616e73666572010700000000000000000000000000000000000000000000000000000000000000010854657374436f696e0854657374436f696e0002202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9088813000000000000d0070000000000000100000000000000d202964900000000040020b9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200407ebd2803534914639096e34407266fdc5820ec7aef8f1be507fe1bb1a37e41f508749574998273606db8b83628fbd76811e454e2648211abbe6ac96b74ffc60c"
         self.assertEqual(signed_transaction_input, signed_transaction_generated_bytes)
-        signed_transaction = SignedTransaction.deserialize(Deserializer(bytes.fromhex(signed_transaction_input)))
+        signed_transaction = SignedTransaction.deserialize(
+            Deserializer(bytes.fromhex(signed_transaction_input))
+        )
 
         self.assertEqual(signed_transaction.transaction, raw_transaction)
         self.assertEqual(signed_transaction.authenticator, authenticator)

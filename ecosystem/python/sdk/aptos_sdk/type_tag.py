@@ -12,7 +12,7 @@ from bcs import Deserializer, Serializer
 
 
 class TypeTag:
-    """ TypeTag represents a primitive in Move. """
+    """TypeTag represents a primitive in Move."""
 
     BOOL: int = 0
     U8: int = 1
@@ -27,9 +27,11 @@ class TypeTag:
 
     def __init__(self, value: typing.Any):
         self.value = value
-    
+
     def __eq__(self, other: TypeTag) -> bool:
-        return self.value.variant() == other.value.variant() and self.value == other.value
+        return (
+            self.value.variant() == other.value.variant() and self.value == other.value
+        )
 
     def __str__(self):
         return self.value.__str__()
@@ -60,6 +62,7 @@ class TypeTag:
     def serialize(self, serializer: Serializer):
         serializer.uleb128(self.value.variant())
         serializer.struct(self.value)
+
 
 class BoolTag:
     value: bool
@@ -184,10 +187,12 @@ class StructTag:
         self.type_args = type_args
 
     def __eq__(self, other: StructTag) -> bool:
-        return self.address == other.address and \
-            self.module == other.module and \
-            self.name == other.name and \
-            self.type_args == other.type_args
+        return (
+            self.address == other.address
+            and self.module == other.module
+            and self.name == other.name
+            and self.type_args == other.type_args
+        )
 
     def __str__(self) -> str:
         value = f"{self.address}::{self.module}::{self.name}"

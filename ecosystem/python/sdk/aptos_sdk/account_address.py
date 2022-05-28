@@ -10,19 +10,20 @@ import unittest
 from bcs import Deserializer, Serializer
 import ed25519
 
+
 class AccountAddress:
     address: bytes
     LENGTH: int = 32
 
     def __init__(self, address: bytes):
         self.address = address
-        
+
         if len(address) != AccountAddress.LENGTH:
             raise Exception("Expected address of length 32")
 
     def __eq__(self, other: AccountAddress) -> bool:
         return self.address == other.address
-        
+
     def __str__(self):
         return self.hex()
 
@@ -43,7 +44,7 @@ class AccountAddress:
 
     def from_key(key: ed25519.PublicKey) -> AccountAddress:
         hasher = hashlib.sha3_256()
-        hasher.update(key.key.encode() + b'\x00')
+        hasher.update(key.key.encode() + b"\x00")
         return AccountAddress(hasher.digest())
 
     def deserialize(deserializer: Deserializer) -> AccountAddress:
