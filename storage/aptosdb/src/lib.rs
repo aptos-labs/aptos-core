@@ -1066,6 +1066,16 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_proof_for_state_key_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<SparseMerkleProof> {
+        gauged_api("get_proof_for_state_key_by_version", || {
+            self.state_store.get_proof_by_version(state_key, version)
+        })
+    }
+
     fn get_latest_tree_state(&self) -> Result<TreeState> {
         gauged_api("get_latest_tree_state", || {
             let latest_version = self

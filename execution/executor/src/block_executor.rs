@@ -23,8 +23,9 @@ use crate::{
         APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
-use storage_interface::sync_proof_fetcher::SyncProofFetcher;
-use storage_interface::{proof_fetcher::ProofFetcher, DbReaderWriter};
+use storage_interface::{
+    proof_fetcher::ProofFetcher, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
+};
 
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
@@ -100,12 +101,8 @@ where
             let state_view = parent_view.verified_state_view(
                 StateViewId::BlockExecution { block_id },
                 self.db.reader.clone(),
-<<<<<<< HEAD
-            )?;
-=======
                 self.proof_fetcher.clone(),
-            );
->>>>>>> 3790a183e (Various profiling changes)
+            )?;
 
             let chunk_output = {
                 let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();

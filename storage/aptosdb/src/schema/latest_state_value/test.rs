@@ -11,8 +11,8 @@ proptest! {
         state_key in any::<StateKey>(),
         v in any::<StateValue>(),
     ) {
-        assert_encode_decode::<StateValueSchema>(&(state_key), &v);
+        assert_encode_decode::<LatestStateValueSchema>(&(state_key), &v);
     }
 }
 
-test_no_panic_decoding!(StateValueSchema);
+test_no_panic_decoding!(LatestStateValueSchema);

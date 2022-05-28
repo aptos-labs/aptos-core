@@ -1191,6 +1191,7 @@ dependencies = [
  "byteorder",
  "executor-types",
  "itertools",
+ "lru",
  "move-deps",
  "num-derive",
  "num-traits 0.2.15",

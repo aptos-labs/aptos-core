@@ -361,24 +361,15 @@ impl ExecutedTrees {
     pub fn verified_state_view(
         &self,
         id: StateViewId,
-<<<<<<< HEAD
         reader: Arc<dyn DbReader>,
-    ) -> Result<CachedStateView> {
-=======
-        _: Arc<dyn DbReader>,
         proof_fetcher: Arc<dyn ProofFetcher>,
-    ) -> CachedStateView {
->>>>>>> 3790a183e (Various profiling changes)
+    ) -> Result<CachedStateView> {
         CachedStateView::new(
             id,
             reader.clone(),
             self.transaction_accumulator.num_leaves(),
             self.state.current.clone(),
-<<<<<<< HEAD
-            Arc::new(SyncProofFetcher::new(reader)),
-=======
             proof_fetcher,
->>>>>>> 3790a183e (Various profiling changes)
         )
     }
 

@@ -492,6 +492,14 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
+    fn get_proof_for_state_key_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<SparseMerkleProof> {
+        unimplemented!()
+    }
+
     /// Gets the latest TreeState no matter if db has been bootstrapped.
     /// Used by the Db-bootstrapper.
     fn get_latest_tree_state(&self) -> Result<TreeState> {

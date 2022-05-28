@@ -1,21 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-<<<<<<< HEAD
-use crate::async_proof_reader::AsyncProofReader;
 use crate::{proof_fetcher::ProofFetcher, DbReader};
 use anyhow::{format_err, Result};
-use aptos_crypto::{hash::CryptoHash, HashValue};
-=======
-use crate::proof_fetcher::ProofFetcher;
-use anyhow::{format_err, Result};
-use aptos_crypto::_once_cell::sync::Lazy;
 use aptos_crypto::{
+    _once_cell::sync::Lazy,
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
 use aptos_metrics::{register_histogram, Histogram};
->>>>>>> 3790a183e (Various profiling changes)
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     proof::SparseMerkleProof,
@@ -163,7 +156,6 @@ impl CachedStateView {
             // No matter it is in db or unknown, we have to query from db since even the
             // former case, we don't have the blob data but only its hash.
             StateStoreStatus::ExistsInDB | StateStoreStatus::Unknown => {
-<<<<<<< HEAD
                 match self.persisted_checkpoint {
                     Some((version, root_hash)) => {
                         let (value, proof) = self
@@ -185,31 +177,6 @@ impl CachedStateView {
                         value
                     }
                     None => None,
-=======
-                let (state_value, proof) = match self.latest_persistent_version {
-                    Some(version) => {
-                        let _timer = FETCH_STATE_VALUE.start_timer();
-                        self.proof_fetcher
-                            .fetch_state_value_and_proof(state_key, version)?
-                    }
-                    None => (None, Some(SparseMerkleProof::new(None, vec![]))),
-                };
-                if let Some(proof) = proof {
-                    proof
-                        .verify(
-                            self.latest_persistent_state_root,
-                            key_hash,
-                            state_value.as_ref(),
-                        )
-                        .map_err(|err| {
-                            format_err!(
-                                "Proof is invalid for key {:?} with state root hash {:?}: {}",
-                                state_key,
-                                self.latest_persistent_state_root,
-                                err
-                            )
-                        })?;
->>>>>>> 3790a183e (Various profiling changes)
                 }
             }
         };
