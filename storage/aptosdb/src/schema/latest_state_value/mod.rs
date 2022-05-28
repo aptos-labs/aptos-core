@@ -14,18 +14,17 @@
 //! |  state key  | version |  state value  |
 //! ```
 
-use crate::schema::{ensure_slice_len_gt, LATEST_STATE_VALUE_CF_NAME};
+use crate::schema::LATEST_STATE_VALUE_CF_NAME;
 use anyhow::Result;
-use aptos_types::{
-    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
-    transaction::Version,
+use aptos_types::state_store::{
+    state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue,
 };
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+
 use schemadb::{
     define_schema,
     schema::{KeyCodec, SeekKeyCodec, ValueCodec},
 };
-use std::{io::Write, mem::size_of};
+use std::io::Write;
 
 type Key = StateKey;
 

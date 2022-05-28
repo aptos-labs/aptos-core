@@ -18,7 +18,7 @@ use crate::{
 };
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_infallible::{Mutex, RwLock};
+use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{
     iterator::JellyfishMerkleIterator, node_type::NodeKey, restore::StateSnapshotRestore,
     JellyfishMerkleTree, StateValueWriter, TreeReader, TreeWriter,
@@ -47,19 +47,14 @@ pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 #[derive(Debug)]
 pub(crate) struct StateStore {
     db: Arc<DB>,
-<<<<<<< HEAD
     latest_checkpoint: Mutex<Option<(Version, HashValue)>>,
-=======
-    latest_version: Mutex<Option<Version>>,
-    latest_state_value_cache: RwLock<HashMap<StateKey, StateValue>>,
->>>>>>> d90439642 (More changes)
+    // latest_state_value_cache: RwLock<HashMap<StateKey, StateValue>>,
 }
 
 impl StateStore {
     pub fn new(db: Arc<DB>) -> Self {
         let myself = Self {
             db,
-<<<<<<< HEAD
             latest_checkpoint: Mutex::new(None),
         };
 
@@ -71,10 +66,6 @@ impl StateStore {
                 .get_root_hash(version)
                 .expect("Failed to query latest checkpoint root hash on initialization.");
             myself.set_latest_checkpoint(version, root_hash)
-=======
-            latest_version: Mutex::new(latest_version),
-            latest_state_value_cache: RwLock::new(HashMap::new()),
->>>>>>> d90439642 (More changes)
         }
 
         myself
@@ -162,7 +153,7 @@ impl StateStore {
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<(SparseMerkleProof)> {
+    ) -> Result<SparseMerkleProof> {
         let (_, proof) =
             JellyfishMerkleTree::new(self).get_with_proof(state_key.hash(), version)?;
         Ok(proof)
@@ -239,15 +230,15 @@ impl StateStore {
         state_key: &StateKey,
         _: Version,
     ) -> Result<Option<StateValue>> {
-        if let Some(value) = self.latest_state_value_cache.read().get(state_key) {
-            return Ok(Some(value.clone()));
-        }
+        // if let Some(value) = self.latest_state_value_cache.read().get(state_key) {
+        //     return Ok(Some(value.clone()));
+        // }
         let db_value = self.db.get::<LatestStateValueSchema>(state_key)?;
-        if let Some(value) = db_value.clone() {
-            self.latest_state_value_cache
-                .write()
-                .insert(state_key.clone(), value);
-        }
+        // if let Some(value) = db_value.clone() {
+        //     self.latest_state_value_cache
+        //         .write()
+        //         .insert(state_key.clone(), value);
+        // }
         Ok(db_value)
     }
 
@@ -275,14 +266,14 @@ impl StateStore {
                     .map(move |(k, v)| ((k.clone(), first_version + i as Version), v.clone()))
             })
             .collect::<HashMap<_, _>>();
-        add_kv_batch(&mut cs.batch, &kv_batch);
-        kv_batch
-            .into_iter()
-            .for_each(|((state_key, version), value)| {
-                self.latest_state_value_cache
-                    .write()
-                    .insert(state_key, value);
-            });
+        add_kv_batch(&mut cs.batch, &kv_batch)?;
+        // kv_batch
+        //     .into_iter()
+        //     .for_each(|((state_key, version), value)| {
+        //         self.latest_state_value_cache
+        //             .write()
+        //             .insert(state_key, value);
+        //     });
 
         Ok(())
     }

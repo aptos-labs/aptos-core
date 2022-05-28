@@ -37,7 +37,6 @@ pub use executed_chunk::ExecutedChunk;
 use storage_interface::{
     cached_state_view::CachedStateView, in_memory_state::InMemoryState,
     no_proof_fetcher::NoProofFetcher, proof_fetcher::ProofFetcher,
-    sync_proof_fetcher::SyncProofFetcher,
 };
 
 type SparseMerkleProof = aptos_types::proof::SparseMerkleProof;

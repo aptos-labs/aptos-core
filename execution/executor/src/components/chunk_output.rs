@@ -52,14 +52,14 @@ impl ChunkOutput {
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
     ) -> Result<Self> {
-        let _timer = VM_EXECUTE_BLOCK.start_timer();
+        // let _timer = VM_EXECUTE_BLOCK.start_timer();
         let transaction_outputs = V::execute_block(transactions.clone(), &state_view)?;
-        drop(_timer);
+        // drop(_timer);
 
-        let timer = INTO_STATE_CACHE.start_timer();
+        // let timer = INTO_STATE_CACHE.start_timer();
         let cache = state_view.into_state_cache();
 
-        drop(timer);
+        // drop(timer);
 
         Ok(Self {
             transactions,

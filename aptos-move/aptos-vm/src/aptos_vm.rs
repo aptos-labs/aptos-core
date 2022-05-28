@@ -474,7 +474,7 @@ impl AptosVM {
         }
 
         // Revalidate the transaction
-        let timer = VM_VALIDATE_SIGNAGTURE_CHECKED_TXN.start_timer();
+        // let timer = VM_VALIDATE_SIGNAGTURE_CHECKED_TXN.start_timer();
         let mut session = self.0.new_session(storage, SessionId::txn(txn));
         if let Err(err) = validate_signature_checked_transaction::<S, Self>(
             self,
@@ -486,13 +486,13 @@ impl AptosVM {
             return discard_error_vm_status(err);
         };
 
-        drop(timer);
+        // drop(timer);
 
         let gas_schedule = unwrap_or_discard!(self.0.get_gas_schedule(log_context));
         let txn_data = TransactionMetadata::new(txn);
         let mut gas_status = GasStatus::new(gas_schedule, txn_data.max_gas_amount());
 
-        let timer = VM_EXECUTE_SCRIPT_FN.start_timer();
+        // let timer = VM_EXECUTE_SCRIPT_FN.start_timer();
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
             | payload @ TransactionPayload::ScriptFunction(_) => self
@@ -510,7 +510,7 @@ impl AptosVM {
                 return discard_error_vm_status(VMStatus::Error(StatusCode::UNREACHABLE));
             }
         };
-        drop(timer);
+        // drop(timer);
 
         let gas_usage = txn_data
             .max_gas_amount()
@@ -962,7 +962,7 @@ impl VMAdapter for AptosVM {
         data_cache: &S,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutput, Option<String>), VMStatus> {
-        let _timer = VM_SINGLE_TXN_EXECUTION.start_timer();
+        // let _timer = VM_SINGLE_TXN_EXECUTION.start_timer();
         Ok(match txn {
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
                 let (vm_status, output) =

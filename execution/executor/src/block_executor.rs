@@ -23,9 +23,7 @@ use crate::{
         APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
-use storage_interface::{
-    proof_fetcher::ProofFetcher, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
-};
+use storage_interface::{proof_fetcher::ProofFetcher, DbReaderWriter};
 
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,

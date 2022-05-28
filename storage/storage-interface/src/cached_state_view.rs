@@ -3,11 +3,7 @@
 
 use crate::{proof_fetcher::ProofFetcher, DbReader};
 use anyhow::{format_err, Result};
-use aptos_crypto::{
-    _once_cell::sync::Lazy,
-    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
-    HashValue,
-};
+use aptos_crypto::{_once_cell::sync::Lazy, hash::CryptoHash, HashValue};
 use aptos_metrics::{register_histogram, Histogram};
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
@@ -137,9 +133,9 @@ impl CachedStateView {
     }
 
     pub fn into_state_cache(self) -> StateCache {
-        let timer = GET_PROOF_CACHE.start_timer();
+        // let timer = GET_PROOF_CACHE.start_timer();
         let proofs = self.proof_fetcher.get_proof_cache();
-        drop(timer);
+        // drop(timer);
         StateCache {
             frozen_base: self.speculative_state,
             state_cache: self.state_cache.into_inner(),

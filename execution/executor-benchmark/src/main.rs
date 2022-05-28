@@ -26,7 +26,7 @@ impl Opt {
     fn concurrency_level(&self) -> usize {
         match self.concurrency_level {
             None => {
-                let level = 2 * num_cpus::get();
+                let level = num_cpus::get();
                 println!(
                     "\nVM concurrency level defaults to num of cpus: {}\n",
                     level
