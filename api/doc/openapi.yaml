@@ -361,7 +361,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UserCreateSigningMessageRequest"
+              $ref: '#/components/schemas/UserCreateSigningMessageRequest'
       responses:
         "200":
           description: |
@@ -1076,13 +1076,13 @@ components:
     UserCreateSigningMessageRequest:
       title: User Create Signing Message Request
       allOf:
-        - $ref: "#/components/schemas/UserTransactionRequest"
+        - $ref: '#/components/schemas/UserTransactionRequest'
         - type: object
           properties:
             secondary_signers:
               type: array
               items:
-                $ref: "#/components/schemas/MoveModuleId"
+                $ref: '#/components/schemas/MoveModuleId'
     UserTransactionSignature:
       title: User Transaction Signature
       type: object
