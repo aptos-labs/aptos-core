@@ -101,25 +101,25 @@ module AptosFramework::Marketplace {
             });
         };
         let start_time = Timestamp::now_microseconds();
-        let token = Token::withdraw_token(account, &token_id, 1);
+        let token = Token::withdraw_token(account, token_id, 1);
         let locked_tokens =
             &mut borrow_global_mut<TokenEscrow>(account_addr).locked_tokens;
 
         let auction_data = borrow_global_mut<AuctionData>(account_addr);
         let auction_items = &mut auction_data.auction_items;
-        
-        // if auction_items still contain token_id, this means that when account_addr last auctioned this token, 
+
+        // if auction_items still contain token_id, this means that when account_addr last auctioned this token,
         // they did not claim the coins from the highest bidder
         // account_addr has received the same token somehow but has not claimed the coins from the initial auction
-        assert!(!Table::contains(auction_items, &token_id), ERROR_CLAIM_COINS_FIRST);
+        assert!(!Table::contains(auction_items, token_id), ERROR_CLAIM_COINS_FIRST);
 
         Event::emit_event<AuctionEvent>(
             &mut auction_data.auction_events,
             AuctionEvent { id: token_id, min_bid: min_bid, duration: duration },
         );
 
-        Table::add(locked_tokens, &token_id, token);
-        Table::add(auction_items, &token_id, AuctionItem {
+        Table::add(locked_tokens, token_id, token);
+        Table::add(auction_items, token_id, AuctionItem {
             min_bid,
             duration,
             start_time,
@@ -145,7 +145,7 @@ module AptosFramework::Marketplace {
 
         let auction_data = borrow_global_mut<AuctionData>(seller);
         let auction_items = &mut auction_data.auction_items;
-        let auction_item = Table::borrow_mut(auction_items, &token_id);
+        let auction_item = Table::borrow_mut(auction_items, token_id);
         assert!(is_auction_active(auction_item.start_time, auction_item.duration), ERROR_AUCTION_INACTIVE);
 
         assert!(bid > auction_item.curr_bid, ERROR_INSUFFICIENT_BID);
@@ -158,7 +158,7 @@ module AptosFramework::Marketplace {
 
         if (auction_item.curr_bidder != seller) {
             let curr_bidder_locked_coins = &mut borrow_global_mut<CoinEscrow>(auction_item.curr_bidder).locked_coins;
-            let coins = Table::remove(curr_bidder_locked_coins, &token_id);
+            let coins = Table::remove(curr_bidder_locked_coins, token_id);
             Coin::deposit<TestCoin>(auction_item.curr_bidder, coins);
         };
 
@@ -169,7 +169,7 @@ module AptosFramework::Marketplace {
 
         let locked_coins = &mut borrow_global_mut<CoinEscrow>(account_addr).locked_coins;
         let coins = Coin::withdraw<TestCoin>(account, bid);
-        Table::add(locked_coins, &token_id, coins);
+        Table::add(locked_coins, token_id, coins);
         auction_item.curr_bidder = account_addr;
         auction_item.curr_bid = bid;
     }
@@ -180,7 +180,7 @@ module AptosFramework::Marketplace {
 
         let auction_data = borrow_global_mut<AuctionData>(seller);
         let auction_items = &mut auction_data.auction_items;
-        let auction_item = Table::borrow(auction_items, &token_id);
+        let auction_item = Table::borrow(auction_items, token_id);
         assert!(is_auction_complete(auction_item.start_time, auction_item.duration), ERROR_AUCTION_NOT_COMPLETE);
 
         assert!(account_addr == auction_item.curr_bidder, ERROR_NOT_CLAIMABLE);
@@ -191,14 +191,14 @@ module AptosFramework::Marketplace {
         );
 
         let locked_tokens = &mut borrow_global_mut<TokenEscrow>(seller).locked_tokens;
-        let token = Table::remove(locked_tokens, &token_id);
+        let token = Table::remove(locked_tokens, token_id);
         Token::deposit_token(account, token);
 
         // if the locked coins from account_addr doesn't contain the key token_id, the seller has already claimed those coins
         // and the auction item can be removed from the auctiondata of the seller
         let locked_coins = &borrow_global<CoinEscrow>(account_addr).locked_coins;
-        if (!Table::contains(locked_coins, &token_id)){
-            let AuctionItem{min_bid: _, duration: _, start_time: _, curr_bid: _, curr_bidder: _,} = Table::remove(auction_items, &token_id);
+        if (!Table::contains(locked_coins, token_id)){
+            let AuctionItem{min_bid: _, duration: _, start_time: _, curr_bid: _, curr_bidder: _,} = Table::remove(auction_items, token_id);
         };
     }
 
@@ -208,7 +208,7 @@ module AptosFramework::Marketplace {
 
         let auction_data = borrow_global_mut<AuctionData>(account_addr);
         let auction_items = &mut auction_data.auction_items;
-        let auction_item = Table::borrow(auction_items, &token_id);
+        let auction_item = Table::borrow(auction_items, token_id);
         assert!(is_auction_complete(auction_item.start_time, auction_item.duration), ERROR_AUCTION_NOT_COMPLETE);
         assert!(account_addr!=auction_item.curr_bidder, ERROR_NOT_CLAIMABLE);
 
@@ -218,14 +218,14 @@ module AptosFramework::Marketplace {
         );
 
         let locked_coins = &mut borrow_global_mut<CoinEscrow>(auction_item.curr_bidder).locked_coins;
-        let coins = Table::remove(locked_coins, &token_id);
+        let coins = Table::remove(locked_coins, token_id);
         Coin::deposit<TestCoin>(account_addr, coins);
 
         // if the locked token from account_addr doesn't contain the key token_id, the highest bidder has already claimed those coins
         // and the auction item can be removed from the auctiondata of the seller
         let locked_tokens = &borrow_global<TokenEscrow>(account_addr).locked_tokens;
-        if (!Table::contains(locked_tokens, &token_id)){
-            let AuctionItem{min_bid: _, duration: _, start_time: _, curr_bid: _, curr_bidder: _,} = Table::remove(auction_items, &token_id);
+        if (!Table::contains(locked_tokens, token_id)){
+            let AuctionItem{min_bid: _, duration: _, start_time: _, curr_bid: _, curr_bidder: _,} = Table::remove(auction_items, token_id);
         };
     }
 
@@ -245,7 +245,7 @@ module AptosFramework::Marketplace {
                 buying_events: Event::new_event_handle<BuyEvent>(account),
             });
         };
-        let token = Token::withdraw_token(account, &token_id, 1);
+        let token = Token::withdraw_token(account, token_id, 1);
         let locked_tokens =
             &mut borrow_global_mut<TokenEscrow>(account_addr).locked_tokens;
 
@@ -257,8 +257,8 @@ module AptosFramework::Marketplace {
             ListEvent { id: token_id, amount: price },
         );
 
-        Table::add(locked_tokens, &token_id, token);
-        Table::add(listed_items, &token_id, ListedItem {
+        Table::add(locked_tokens, token_id, token);
+        Table::add(listed_items, token_id, ListedItem {
             price
         })
     }
@@ -276,14 +276,14 @@ module AptosFramework::Marketplace {
         );
 
         let listed_items = &mut listedItemsData.listed_items;
-        let listed_item = Table::borrow_mut(listed_items, &token_id);
+        let listed_item = Table::borrow_mut(listed_items, token_id);
 
         Coin::transfer<TestCoin>(account, seller, listed_item.price);
 
         let locked_tokens = &mut borrow_global_mut<TokenEscrow>(seller).locked_tokens;
-        let token = Table::remove(locked_tokens, &token_id);
+        let token = Table::remove(locked_tokens, token_id);
         Token::deposit_token(account, token);
 
-        let ListedItem{price: _,} = Table::remove(listed_items, &token_id);
+        let ListedItem{price: _,} = Table::remove(listed_items, token_id);
     }
 }
