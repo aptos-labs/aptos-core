@@ -115,6 +115,8 @@ impl ProofFetcher for AsyncProofFetcher {
 
 impl Drop for AsyncProofFetcher {
     fn drop(&mut self) {
+        // Drop the sender so that the receiver threads exit
+        drop(self.sender.lock());
         // self.sender
         //     .lock()
         //     .send(ControlCommand::Quit)
@@ -152,15 +154,10 @@ impl Worker {
 
     pub fn work(&mut self) {
         loop {
-            match self
-                .receiver
-                .lock()
-                .recv()
-                .expect("Sender destroyed, exiting worker thread")
+            if let Ok(ControlCommand::AsyncRead { state_key, version }) =
+                self.receiver.lock().recv()
             {
-                ControlCommand::AsyncRead { state_key, version } => {
-                    self.process_proof_read(state_key, version)
-                }
+                self.process_proof_read(state_key, version)
             }
         }
     }
