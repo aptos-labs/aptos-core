@@ -2,12 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
-from nacl.signing import SigningKey, VerifyKey
-import io
-import typing
+
 import unittest
 
 from bcs import Deserializer, Serializer
+from nacl.signing import SigningKey, VerifyKey
 
 
 class PrivateKey:

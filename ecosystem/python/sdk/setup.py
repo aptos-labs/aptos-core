@@ -12,7 +12,7 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     include_package_data=True,
-    install_requires=['pynacl', 'requests'],
+    install_requires=['httpx', 'pynacl'],
     long_description=long_description,
     long_description_content_type="text/markdown",
     name="aptos_sdk",

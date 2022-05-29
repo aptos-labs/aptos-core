@@ -2,10 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
-import hashlib
-import io
+
 import typing
-import unittest
 
 from account_address import AccountAddress
 from bcs import Deserializer, Serializer

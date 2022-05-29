@@ -6,6 +6,7 @@ This is a simple BCS serializer and deserializer. Learn more at https://github.c
 """
 
 from __future__ import annotations
+
 import io
 import typing
 import unittest
@@ -49,7 +50,6 @@ class Deserializer:
         value_decoder: typing.Callable[[Deserializer], typing.Any],
     ) -> Dict[typing.Any, typing.Any]:
         length = self.uleb128()
-        count = 0
         values = {}
         while len(values) < length:
             key = key_decoder(self)
@@ -62,7 +62,6 @@ class Deserializer:
         value_decoder: typing.Callable[[Deserializer], typing.Any],
     ) -> List[typing.Any]:
         length = self.uleb128()
-        count = 0
         values = []
         while len(values) < length:
             values.append(value_decoder(self))

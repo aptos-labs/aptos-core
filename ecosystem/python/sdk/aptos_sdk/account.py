@@ -2,12 +2,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
+
 import json
 import tempfile
 import unittest
 
-from account_address import AccountAddress
 import ed25519
+from account_address import AccountAddress
 
 
 class Account:

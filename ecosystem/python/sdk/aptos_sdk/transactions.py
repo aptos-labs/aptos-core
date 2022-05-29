@@ -6,15 +6,15 @@ This translates Aptos transactions to and from BCS for signing and submitting to
 """
 
 from __future__ import annotations
+
 import hashlib
-import io
 import typing
 import unittest
 
+import ed25519
 from account_address import AccountAddress
 from authenticator import Authenticator, Ed25519Authenticator
 from bcs import Deserializer, Serializer
-import ed25519
 from type_tag import StructTag, TypeTag
 
 
