@@ -7,6 +7,16 @@ from typing import Any, Dict, Optional
 import httpx
 from account import Account
 from account_address import AccountAddress
+from authenticator import Authenticator, Ed25519Authenticator
+from bcs import Serializer
+from transactions import (
+    RawTransaction,
+    ScriptFunction,
+    SignedTransaction,
+    TransactionArgument,
+    TransactionPayload,
+)
+from type_tag import StructTag, TypeTag
 
 TESTNET_URL = "https://fullnode.devnet.aptoslabs.com"
 FAUCET_URL = "https://faucet.devnet.aptoslabs.com"
@@ -15,12 +25,14 @@ FAUCET_URL = "https://faucet.devnet.aptoslabs.com"
 class RestClient:
     """A wrapper around the Aptos-core Rest API"""
 
+    chain_id: int
     client: httpx.Client
     base_url: str
 
     def __init__(self, base_url: str):
         self.base_url = base_url
         self.client = httpx.Client()
+        self.chain_id = int(self.info()["chain_id"])
 
     def account(self, account_address: AccountAddress) -> Dict[str, str]:
         """Returns the sequence number and authentication key for an account"""
@@ -28,6 +40,10 @@ class RestClient:
         response = self.client.get(f"{self.base_url}/accounts/{account_address}")
         assert response.status_code == 200, f"{response.text} - {account_address}"
         return response.json()
+
+    def account_sequence_number(self, account_address: AccountAddress) -> int:
+        account_res = self.account(account_address)
+        return int(account_res["sequence_number"])
 
     def account_resource(
         self, account_address: AccountAddress, resource_type: str
@@ -40,6 +56,23 @@ class RestClient:
         assert response.status_code == 200, response.text
         return response.json()
 
+    def info(self) -> Dict[str, str]:
+        response = self.client.get(self.base_url)
+        assert response.status_code == 200, f"{response.text}"
+        return response.json()
+
+    def submit_bcs_transaction(
+        self, signed_transaction: SignedTransaction
+    ) -> Dict[str, Any]:
+        headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
+        response = self.client.post(
+            f"{self.base_url}/transactions",
+            headers=headers,
+            content=signed_transaction.bytes(),
+        )
+        assert response.status_code == 202, f"{response.text} - {signed_transaction}"
+        return response.json()["hash"]
+
     def submit_transaction(
         self, sender: Account, payload: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -50,11 +83,9 @@ class RestClient:
         4) submits the signed transaction
         """
 
-        account_res = self.account(sender.address())
-        seq_num = int(account_res["sequence_number"])
         txn_request = {
             "sender": f"{sender.address()}",
-            "sequence_number": str(seq_num),
+            "sequence_number": str(self.account_sequence_number(sender.address())),
             "max_gas_amount": "2000",
             "gas_unit_price": "1",
             "expiration_timestamp_secs": str(int(time.time()) + 600),
@@ -121,6 +152,37 @@ class RestClient:
         res = self.submit_transaction(sender, payload)
         return str(res["hash"])
 
+    def bcs_transfer(
+        self, sender: Account, recipient: AccountAddress, amount: int
+    ) -> SignedTransaction:
+        transaction_arguments = [
+            TransactionArgument(recipient, Serializer.struct),
+            TransactionArgument(amount, Serializer.u64),
+        ]
+
+        payload = ScriptFunction.natural(
+            "0x1::Coin",
+            "transfer",
+            [TypeTag(StructTag.from_str("0x1::TestCoin::TestCoin"))],
+            transaction_arguments,
+        )
+
+        raw_transaction = RawTransaction(
+            sender.address(),
+            self.account_sequence_number(sender.address()),
+            TransactionPayload(payload),
+            2000,
+            1,
+            int(time.time()) + 600,
+            self.chain_id,
+        )
+
+        signature = sender.sign(raw_transaction.keyed())
+        authenticator = Authenticator(
+            Ed25519Authenticator(sender.public_key(), signature)
+        )
+        return SignedTransaction(raw_transaction, authenticator)
+
 
 class FaucetClient:
     """Faucet creates and funds accounts. This is a thin wrapper around that."""
@@ -161,9 +223,18 @@ if __name__ == "__main__":
     print(f"Alice: {rest_client.account_balance(alice.address())}")
     print(f"Bob: {rest_client.account_balance(bob.address())}")
 
-    # Have Alice give Bob 10 coins
-    tx_hash = rest_client.transfer(alice, bob.address(), 1_000)
-    rest_client.wait_for_transaction(tx_hash)
+    # Have Alice give Bob 1_000 coins
+    txn_hash = rest_client.transfer(alice, bob.address(), 1_000)
+    rest_client.wait_for_transaction(txn_hash)
+
+    print("\n=== Intermediate Balances ===")
+    print(f"Alice: {rest_client.account_balance(alice.address())}")
+    print(f"Bob: {rest_client.account_balance(bob.address())}")
+
+    # Have Alice give Bob another 1_000 coins using BCS
+    signed_txn = rest_client.bcs_transfer(alice, bob.address(), 1_000)
+    txn_hash = rest_client.submit_bcs_transaction(signed_txn)
+    rest_client.wait_for_transaction(txn_hash)
 
     print("\n=== Final Balances ===")
     print(f"Alice: {rest_client.account_balance(alice.address())}")

@@ -305,6 +305,11 @@ class SignedTransaction:
     def __str__(self) -> str:
         return f"Transaction: {self.transaction}Authenticator: {self.authenticator}"
 
+    def bytes(self) -> bytes:
+        ser = Serializer()
+        ser.struct(self)
+        return ser.output()
+
     def verify(self) -> bool:
         keyed = self.transaction.keyed()
         return self.authenticator.verify(keyed)
