@@ -356,12 +356,12 @@ paths:
       tags:
         - transactions
       requestBody:
-        description: User transaction request
+        description: User create signing message request
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserTransactionRequest'
+              $ref: "#/components/schemas/UserCreateSigningMessageRequest"
       responses:
         "200":
           description: |
@@ -1073,7 +1073,16 @@ components:
         expiration_timestamp_secs:
           $ref: '#/components/schemas/TimestampSec'
         payload:
-          $ref: '#/components/schemas/TransactionPayload'
+    UserCreateSigningMessageRequest:
+      title: User Create Signing Message Request
+      allOf:
+        - $ref: "#/components/schemas/UserTransactionRequest"
+        - type: object
+          properties:
+            secondary_signers:
+              type: array
+              items:
+                $ref: "#/components/schemas/MoveModuleId"
     UserTransactionSignature:
       title: User Transaction Signature
       type: object
