@@ -9,13 +9,8 @@ from account import Account
 from account_address import AccountAddress
 from authenticator import Authenticator, Ed25519Authenticator
 from bcs import Serializer
-from transactions import (
-    RawTransaction,
-    ScriptFunction,
-    SignedTransaction,
-    TransactionArgument,
-    TransactionPayload,
-)
+from transactions import (RawTransaction, ScriptFunction, SignedTransaction,
+                          TransactionArgument, TransactionPayload)
 from type_tag import StructTag, TypeTag
 
 TESTNET_URL = "https://fullnode.devnet.aptoslabs.com"

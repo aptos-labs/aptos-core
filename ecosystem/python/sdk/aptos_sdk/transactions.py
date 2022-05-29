@@ -13,7 +13,8 @@ import unittest
 
 import ed25519
 from account_address import AccountAddress
-from authenticator import Authenticator, Ed25519Authenticator
+from authenticator import (Authenticator, Ed25519Authenticator,
+                           MultiAgentAuthenticator)
 from bcs import Deserializer, Serializer
 from type_tag import StructTag, TypeTag
 
@@ -112,6 +113,42 @@ class RawTransaction:
         serializer.u64(self.gas_unit_price)
         serializer.u64(self.expiration_timestamps_secs)
         serializer.u8(self.chain_id)
+
+
+class MultiAgentRawTransaction:
+    raw_transaction: RawTransaction
+    secondary_signers: List[AccountAddress]
+
+    def __init__(
+        self, raw_transaction: RawTransaction, secondary_signers: List[AccountAddress]
+    ):
+        self.raw_transaction = raw_transaction
+        self.secondary_signers = secondary_signers
+
+    def inner(self) -> RawTransaction:
+        return self.raw_transaction
+
+    def prehash(self) -> bytes:
+        hasher = hashlib.sha3_256()
+        hasher.update(b"APTOS::RawTransactionWithData")
+        return hasher.digest()
+
+    def keyed(self) -> bytes:
+        serializer = Serializer()
+        # This is a type indicator for an enum
+        serializer.u8(0)
+        serializer.struct(self.raw_transaction)
+        serializer.sequence(self.secondary_signers, Serializer.struct)
+
+        prehash = bytearray(self.prehash())
+        prehash.extend(serializer.output())
+        return bytes(prehash)
+
+    def sign(self, key: ed25519.PrivateKey) -> ed25519.Signature:
+        return key.sign(self.keyed())
+
+    def verify(self, key: ed25519.PublicKey, signature: ed25519.Signature) -> bool:
+        return key.verify(self.keyed(), signature)
 
 
 class TransactionPayload:
@@ -302,6 +339,12 @@ class SignedTransaction:
         self.transaction = transaction
         self.authenticator = authenticator
 
+    def __eq__(self, other: SignedTransaction) -> bool:
+        return (
+            self.transaction == other.transaction
+            and self.authenticator == other.authenticator
+        )
+
     def __str__(self) -> str:
         return f"Transaction: {self.transaction}Authenticator: {self.authenticator}"
 
@@ -311,7 +354,13 @@ class SignedTransaction:
         return ser.output()
 
     def verify(self) -> bool:
-        keyed = self.transaction.keyed()
+        if isinstance(self.authenticator.authenticator, MultiAgentAuthenticator):
+            transaction = MultiAgentRawTransaction(
+                self.transaction, self.authenticator.authenticator.secondary_addresses()
+            )
+            keyed = transaction.keyed()
+        else:
+            keyed = self.transaction.keyed()
         return self.authenticator.verify(keyed)
 
     def deserialize(deserializer: Deserializer) -> SignedTransaction:
@@ -366,10 +415,10 @@ class Test(unittest.TestCase):
     def test_script_function_with_corpus(self):
         # Define common inputs
         sender_key_input = (
-            "209bf49a6a0755f953811fce125f2683d50429c3bb49e074147e0089a52eae155f"
+            "9bf49a6a0755f953811fce125f2683d50429c3bb49e074147e0089a52eae155f"
         )
         receiver_key_input = (
-            "200564f879d27ae3c02ce82834acfa8c793a629f2ca0de6919610be82f411326be"
+            "0564f879d27ae3c02ce82834acfa8c793a629f2ca0de6919610be82f411326be"
         )
 
         sequence_number_input = 11
@@ -380,15 +429,11 @@ class Test(unittest.TestCase):
         amount_input = 5000
 
         # Accounts and crypto
-        sender_private_key = ed25519.PrivateKey.deserialize(
-            Deserializer(bytes.fromhex(sender_key_input))
-        )
+        sender_private_key = ed25519.PrivateKey.from_hex(sender_key_input)
         sender_public_key = sender_private_key.public_key()
         sender_account_address = AccountAddress.from_key(sender_public_key)
 
-        receiver_private_key = ed25519.PrivateKey.deserialize(
-            Deserializer(bytes.fromhex(receiver_key_input))
-        )
+        receiver_private_key = ed25519.PrivateKey.from_hex(receiver_key_input)
         receiver_public_key = receiver_private_key.public_key()
         receiver_account_address = AccountAddress.from_key(receiver_public_key)
 
@@ -426,8 +471,123 @@ class Test(unittest.TestCase):
         )
         self.assertTrue(signed_transaction_generated.verify())
 
-        # Verify the RawTransaction
+        # Validated corpus
 
+        raw_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000003000000000000000000000000000000000000000000000000000000000000000104436f696e087472616e73666572010700000000000000000000000000000000000000000000000000000000000000010854657374436f696e0854657374436f696e0002202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9088813000000000000d0070000000000000100000000000000d20296490000000004"
+
+        signed_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000003000000000000000000000000000000000000000000000000000000000000000104436f696e087472616e73666572010700000000000000000000000000000000000000000000000000000000000000010854657374436f696e0854657374436f696e0002202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9088813000000000000d0070000000000000100000000000000d202964900000000040020b9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200407ebd2803534914639096e34407266fdc5820ec7aef8f1be507fe1bb1a37e41f508749574998273606db8b83628fbd76811e454e2648211abbe6ac96b74ffc60c"
+
+        self.verify_transactions(
+            raw_transaction_input,
+            raw_transaction_generated,
+            signed_transaction_input,
+            signed_transaction_generated,
+        )
+
+    def test_script_function_multi_agent_with_corpus(self):
+        # Define common inputs
+        sender_key_input = (
+            "9bf49a6a0755f953811fce125f2683d50429c3bb49e074147e0089a52eae155f"
+        )
+        receiver_key_input = (
+            "0564f879d27ae3c02ce82834acfa8c793a629f2ca0de6919610be82f411326be"
+        )
+
+        sequence_number_input = 11
+        gas_unit_price_input = 1
+        max_gas_amount_input = 2000
+        expiration_timestamps_secs_input = 1234567890
+        chain_id_input = 4
+
+        # Accounts and crypto
+        sender_private_key = ed25519.PrivateKey.from_hex(sender_key_input)
+        sender_public_key = sender_private_key.public_key()
+        sender_account_address = AccountAddress.from_key(sender_public_key)
+
+        receiver_private_key = ed25519.PrivateKey.from_hex(receiver_key_input)
+        receiver_public_key = receiver_private_key.public_key()
+        receiver_account_address = AccountAddress.from_key(receiver_public_key)
+
+        # Generate the transaction locally
+        transaction_arguments = [
+            TransactionArgument(receiver_account_address, Serializer.struct),
+            TransactionArgument("collection_name", Serializer.str),
+            TransactionArgument("token_name", Serializer.str),
+            TransactionArgument(1, Serializer.u64),
+        ]
+
+        payload = ScriptFunction.natural(
+            "0x1::Token",
+            "direct_transfer_script",
+            [],
+            transaction_arguments,
+        )
+
+        raw_transaction_generated = MultiAgentRawTransaction(
+            RawTransaction(
+                sender_account_address,
+                sequence_number_input,
+                TransactionPayload(payload),
+                max_gas_amount_input,
+                gas_unit_price_input,
+                expiration_timestamps_secs_input,
+                chain_id_input,
+            ),
+            [receiver_account_address],
+        )
+
+        sender_signature = raw_transaction_generated.sign(sender_private_key)
+        receiver_signature = raw_transaction_generated.sign(receiver_private_key)
+        self.assertTrue(
+            raw_transaction_generated.verify(sender_public_key, sender_signature)
+        )
+        self.assertTrue(
+            raw_transaction_generated.verify(receiver_public_key, receiver_signature)
+        )
+
+        authenticator = Authenticator(
+            MultiAgentAuthenticator(
+                Authenticator(
+                    Ed25519Authenticator(sender_public_key, sender_signature)
+                ),
+                [
+                    (
+                        receiver_account_address,
+                        Authenticator(
+                            Ed25519Authenticator(
+                                receiver_public_key, receiver_signature
+                            )
+                        ),
+                    )
+                ],
+            )
+        )
+
+        signed_transaction_generated = SignedTransaction(
+            raw_transaction_generated.inner(), authenticator
+        )
+        self.assertTrue(signed_transaction_generated.verify())
+
+        # Validated corpus
+
+        raw_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000003000000000000000000000000000000000000000000000000000000000000000105546f6b656e166469726563745f7472616e736665725f7363726970740004202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9100f636f6c6c656374696f6e5f6e616d650b0a746f6b656e5f6e616d65080100000000000000d0070000000000000100000000000000d20296490000000004"
+        signed_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000003000000000000000000000000000000000000000000000000000000000000000105546f6b656e166469726563745f7472616e736665725f7363726970740004202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9100f636f6c6c656374696f6e5f6e616d650b0a746f6b656e5f6e616d65080100000000000000d0070000000000000100000000000000d20296490000000004020020b9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a4920040c7554ce3d6ed0bcbce3ee6f0e79620d5bb1b319cbaf8e081e1685db7a98b275e89e71ee744ca31cd7c9c545a8c40fa28528c35cef74150cfd27650b024a2c606012d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9010020aef3f4a4b8eca1dfc343361bf8e436bd42de9259c04b8314eb8e2054dd6e82ab400d2cf2ecfa18838d52a96705b34fdb5725e8862607c346feeba5396eeafb1720b1cee9fbd18bea80d058a99109e13f1cf3c229ad22f388a6bc7c743aa4f1bd0c"
+
+        self.verify_transactions(
+            raw_transaction_input,
+            raw_transaction_generated.inner(),
+            signed_transaction_input,
+            signed_transaction_generated,
+        )
+
+    def verify_transactions(
+        self,
+        raw_transaction_input: bytes,
+        raw_transaction_generated: RawTransaction,
+        signed_transaction_input: bytes,
+        signed_transaction_generated: SignedTransaction,
+    ):
+        # Produce serialized generated transactions
         ser = Serializer()
         ser.struct(raw_transaction_generated)
         raw_transaction_generated_bytes = ser.output().hex()
@@ -436,7 +596,7 @@ class Test(unittest.TestCase):
         ser.struct(signed_transaction_generated)
         signed_transaction_generated_bytes = ser.output().hex()
 
-        raw_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000003000000000000000000000000000000000000000000000000000000000000000104436f696e087472616e73666572010700000000000000000000000000000000000000000000000000000000000000010854657374436f696e0854657374436f696e0002202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9088813000000000000d0070000000000000100000000000000d20296490000000004"
+        # Verify the RawTransaction
         self.assertEqual(raw_transaction_input, raw_transaction_generated_bytes)
         raw_transaction = RawTransaction.deserialize(
             Deserializer(bytes.fromhex(raw_transaction_input))
@@ -444,13 +604,11 @@ class Test(unittest.TestCase):
         self.assertEqual(raw_transaction_generated, raw_transaction)
 
         # Verify the SignedTransaction
-
-        signed_transaction_input = "7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d60b0000000000000003000000000000000000000000000000000000000000000000000000000000000104436f696e087472616e73666572010700000000000000000000000000000000000000000000000000000000000000010854657374436f696e0854657374436f696e0002202d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9088813000000000000d0070000000000000100000000000000d202964900000000040020b9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200407ebd2803534914639096e34407266fdc5820ec7aef8f1be507fe1bb1a37e41f508749574998273606db8b83628fbd76811e454e2648211abbe6ac96b74ffc60c"
         self.assertEqual(signed_transaction_input, signed_transaction_generated_bytes)
         signed_transaction = SignedTransaction.deserialize(
             Deserializer(bytes.fromhex(signed_transaction_input))
         )
 
         self.assertEqual(signed_transaction.transaction, raw_transaction)
-        self.assertEqual(signed_transaction.authenticator, authenticator)
+        self.assertEqual(signed_transaction, signed_transaction_generated)
         self.assertTrue(signed_transaction.verify())

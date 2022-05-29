@@ -6,6 +6,7 @@ from __future__ import annotations
 import typing
 
 import ed25519
+from account_address import AccountAddress
 from bcs import Deserializer, Serializer
 
 
@@ -63,7 +64,7 @@ class Authenticator:
 
     def serialize(self, serializer: Serializer):
         serializer.uleb128(self.variant)
-        self.authenticator.serialize(serializer)
+        serializer.struct(self.authenticator)
 
 
 class Ed25519Authenticator:
@@ -89,22 +90,48 @@ class Ed25519Authenticator:
         return Ed25519Authenticator(key, signature)
 
     def serialize(self, serializer: Serializer):
-        self.public_key.serialize(serializer)
-        self.signature.serialize(serializer)
+        serializer.struct(self.public_key)
+        serializer.struct(self.signature)
 
 
 class MultiAgentAuthenticator:
-    def __init__(self):
-        raise NotImplementedError
+    sender: Authenticator
+    secondary_signers: List[(AccountAddress, Authenticator)]
+
+    def __init__(
+        self,
+        sender: Authenticator,
+        secondary_signers: List[(AccountAddress, Authenticator)],
+    ):
+        self.sender = sender
+        self.secondary_signers = secondary_signers
+
+    def __eq__(self, other: MultiAgentAuthenticator) -> bool:
+        return (
+            self.sender == other.sender
+            and self.secondary_signers == other.secondary_signers
+        )
+
+    def secondary_addresses(self) -> List[AccountAddress]:
+        return [x[0] for x in self.secondary_signers]
 
     def verify(self, data: bytes) -> bool:
-        raise NotImplementedError
+        if not self.sender.verify(data):
+            return False
+        return all([x[1].verify(data) for x in self.secondary_signers])
 
-    def deserialize(deserializer: Deserializer) -> MultiEd25519Authenticator:
-        raise NotImplementedError
+    def deserialize(deserializer: Deserializer) -> MultiAgentAuthenticator:
+        sender = deserializer.struct(Authenticator)
+        secondary_addresses = deserializer.sequence(AccountAddress.deserialize)
+        secondary_authenticators = deserializer.sequence(Authenticator.deserialize)
+        return MultiAgentAuthenticator(
+            sender, list(zip(secondary_addresses, secondary_authenticators))
+        )
 
     def serialize(self, serializer: Serializer):
-        raise NotImplementedError
+        serializer.struct(self.sender)
+        serializer.sequence([x[0] for x in self.secondary_signers], Serializer.struct)
+        serializer.sequence([x[1] for x in self.secondary_signers], Serializer.struct)
 
 
 class MultiEd25519Authenticator:
