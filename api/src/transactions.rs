@@ -12,11 +12,12 @@ use crate::{
 use aptos_api_types::{
     mime_types::BCS_SIGNED_TRANSACTION, AsConverter, Error, LedgerInfo, Response, Transaction,
     TransactionData, TransactionId, TransactionOnChainData, TransactionSigningMessage,
-    UserTransactionRequest,
+    UserCreateSigningMessageRequest, UserTransactionRequest,
 };
+use aptos_crypto::signing_message;
 use aptos_types::{
     mempool_status::MempoolStatusCode,
-    transaction::{RawTransaction, SignedTransaction},
+    transaction::{RawTransaction, RawTransactionWithData, SignedTransaction},
 };
 
 use anyhow::Result;
@@ -102,7 +103,7 @@ pub fn create_signing_message(context: Context) -> BoxedFilter<(impl Reply,)> {
         .and(warp::body::content_length_limit(
             context.content_length_limit(),
         ))
-        .and(warp::body::json::<UserTransactionRequest>())
+        .and(warp::body::json::<UserCreateSigningMessageRequest>())
         .and(context.filter())
         .and_then(handle_create_signing_message)
         .with(metrics("create_signing_message"))
@@ -154,7 +155,7 @@ async fn handle_submit_bcs_transactions(
 }
 
 async fn handle_create_signing_message(
-    body: UserTransactionRequest,
+    body: UserCreateSigningMessageRequest,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
     fail_point("endpoint_create_signing_message")?;
@@ -287,18 +288,37 @@ impl Transactions {
         Response::new(self.ledger_info, &txn)
     }
 
-    pub fn signing_message(self, txn: UserTransactionRequest) -> Result<impl Reply, Error> {
+    pub fn signing_message(
+        self,
+        UserCreateSigningMessageRequest {
+            transaction,
+            secondary_signers,
+        }: UserCreateSigningMessageRequest,
+    ) -> Result<impl Reply, Error> {
         let resolver = self.context.move_resolver()?;
         let raw_txn: RawTransaction = resolver
             .as_converter()
-            .try_into_raw_transaction(txn, self.context.chain_id())
+            .try_into_raw_transaction(transaction, self.context.chain_id())
             .map_err(|e| {
                 Error::invalid_request_body(format!("invalid UserTransactionRequest: {:?}", e))
             })?;
 
+        let raw_message = match secondary_signers {
+            Some(secondary_signer_addresses) => {
+                signing_message(&RawTransactionWithData::new_multi_agent(
+                    raw_txn,
+                    secondary_signer_addresses
+                        .into_iter()
+                        .map(|v| v.into())
+                        .collect(),
+                ))
+            }
+            None => raw_txn.signing_message(),
+        };
+
         Response::new(
             self.ledger_info,
-            &TransactionSigningMessage::new(raw_txn.signing_message()),
+            &TransactionSigningMessage::new(raw_message),
         )
     }
 
