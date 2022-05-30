@@ -34,7 +34,7 @@ storage-interface = { path = "../storage-interface" }
 [dev-dependencies]
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
-rand = "0.8.5"
+rand = "0.7.3"
 
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
 aptos-types = { path = "../../types", features = ["fuzzing"] }

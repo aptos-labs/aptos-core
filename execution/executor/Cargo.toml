@@ -35,7 +35,7 @@ storage-interface = { path = "../../storage/storage-interface" }
 
 [dev-dependencies]
 proptest = "1.0.0"
-rand = "0.8.5"
+rand = "0.7.3"
 
 aptos-config = { path = "../../config" }
 aptos-genesis-tool = { path = "../../config/management/genesis", features = ["testing"] }

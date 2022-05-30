@@ -22,7 +22,7 @@ dependencies = [
  "aptos-workspace-hack",
  "mirai-annotations",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
 ]
 
 [[package]]
@@ -156,7 +156,7 @@ dependencies = [
  "hex",
  "itertools",
  "move-deps",
- "rand 0.8.5",
+ "rand 0.7.3",
  "reqwest",
  "serde 1.0.137",
  "serde_json",
@@ -208,7 +208,7 @@ dependencies = [
  "move-deps",
  "once_cell",
  "percent-encoding",
- "rand 0.8.5",
+ "rand 0.7.3",
  "regex",
  "reqwest",
  "serde 1.0.137",
@@ -266,7 +266,7 @@ dependencies = [
  "bcs",
  "get_if_addrs",
  "mirai-annotations",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "serde_yaml",
  "short-hex-str",
@@ -283,6 +283,7 @@ dependencies = [
  "aptos-workspace-hack",
  "bcs",
  "bitvec",
+ "blst",
  "byteorder",
  "bytes",
  "criterion",
@@ -295,8 +296,8 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
- "rand_core 0.6.3",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
  "ripemd160",
  "serde 1.0.137",
  "serde-name",
@@ -344,7 +345,7 @@ dependencies = [
  "maplit",
  "netcore",
  "network",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "short-hex-str",
  "storage-service-client",
@@ -371,7 +372,7 @@ dependencies = [
  "bytes",
  "futures",
  "hex",
- "rand 0.8.5",
+ "rand 0.7.3",
  "reqwest",
  "serde 1.0.137",
  "serde_json",
@@ -420,7 +421,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rusty-fork",
  "safety-rules",
  "scratchpad",
@@ -451,7 +452,7 @@ dependencies = [
  "cached-framework-packages",
  "consensus-types",
  "executor",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "storage-interface",
  "structopt",
@@ -536,7 +537,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "storage-interface",
  "thiserror",
@@ -550,7 +551,7 @@ dependencies = [
  "aptos-types",
  "aptos-workspace-hack",
  "hex",
- "rand 0.8.5",
+ "rand 0.7.3",
 ]
 
 [[package]]
@@ -633,7 +634,7 @@ dependencies = [
  "network",
  "once_cell",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
  "serde 1.0.137",
  "serde_json",
@@ -713,7 +714,7 @@ dependencies = [
  "mempool-notifications",
  "network",
  "network-builder",
- "rand 0.8.5",
+ "rand 0.7.3",
  "state-sync-multiplexer",
  "state-sync-v1",
  "storage-interface",
@@ -749,7 +750,7 @@ dependencies = [
  "move-deps",
  "netcore",
  "network",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "serde_json",
  "serde_yaml",
@@ -776,7 +777,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
 ]
 
@@ -913,7 +914,7 @@ dependencies = [
  "aptos-workspace-hack",
  "bcs",
  "move-deps",
- "rand_core 0.6.3",
+ "rand_core 0.5.1",
  "serde 1.0.137",
 ]
 
@@ -957,7 +958,7 @@ dependencies = [
  "bcs",
  "chrono",
  "enum_dispatch",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "serde_json",
  "thiserror",
@@ -1000,7 +1001,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-workspace-hack",
  "hex",
- "rand 0.8.5",
+ "rand 0.7.3",
 ]
 
 [[package]]
@@ -1088,7 +1089,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
+ "rand 0.7.3",
  "regex",
  "serde 1.0.137",
  "serde_bytes",
@@ -1192,6 +1193,7 @@ dependencies = [
  "num-integer",
  "num-traits 0.2.15",
  "parking_lot 0.12.0",
+ "rand 0.7.3",
  "rand 0.8.5",
  "regex",
  "regex-syntax",
@@ -1261,7 +1263,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
+ "rand 0.7.3",
  "schemadb",
  "scratchpad",
  "serde 1.0.137",
@@ -1404,7 +1406,7 @@ dependencies = [
  "once_cell",
  "pin-project",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "regex",
  "reqwest",
  "serde 1.0.137",
@@ -1616,6 +1618,19 @@ name = "block-padding"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d696c370c750c948ada61c69a0ee2cbbb9c50b1019ddb86d9317157a99c2cae"
+
+[[package]]
+name = "blst"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acb8c0939e210397464ae1857265a7492a2957f915803d43cb9832229100636a"
+dependencies = [
+ "cc",
+ "glob",
+ "threadpool",
+ "zeroize",
+ "zeroize_derive",
+]
 
 [[package]]
 name = "bounded-executor"
@@ -2048,7 +2063,7 @@ dependencies = [
  "num-traits 0.2.15",
  "once_cell",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "safety-rules",
  "schemadb",
  "serde 1.0.137",
@@ -2501,7 +2516,7 @@ dependencies = [
  "futures",
  "network",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "short-hex-str",
  "storage-service-types",
@@ -2598,7 +2613,7 @@ dependencies = [
  "diesel_derives",
  "num-bigint 0.2.6",
  "num-integer",
- "num-traits 0.1.43",
+ "num-traits 0.2.15",
  "pq-sys",
  "r2d2",
  "serde_json",
@@ -2782,11 +2797,12 @@ dependencies = [
 [[package]]
 name = "ed25519-dalek"
 version = "1.0.1"
-source = "git+https://github.com/dalek-cryptography/ed25519-dalek?rev=44488e43b8d61fa8263b146f9a1beba5549f8b0e#44488e43b8d61fa8263b146f9a1beba5549f8b0e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c762bae6dcaf24c4c84667b8579785430908723d5c889f469d76a41d59cc7a9d"
 dependencies = [
  "curve25519-dalek",
  "ed25519",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "serde_bytes",
  "sha2",
@@ -2936,7 +2952,7 @@ dependencies = [
  "move-deps",
  "once_cell",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
  "scratchpad",
  "serde 1.0.137",
@@ -2970,7 +2986,7 @@ dependencies = [
  "indicatif",
  "jemallocator",
  "num_cpus",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
  "schemadb",
  "serde 1.0.137",
@@ -2998,7 +3014,7 @@ dependencies = [
  "executor",
  "executor-types",
  "move-deps",
- "rand 0.8.5",
+ "rand 0.7.3",
  "storage-interface",
  "storage-service",
  "vm-genesis",
@@ -3139,7 +3155,7 @@ dependencies = [
  "hyper-tls",
  "k8s-openapi",
  "kube",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
  "regex",
  "reqwest",
@@ -3336,7 +3352,7 @@ dependencies = [
  "consensus-types",
  "move-deps",
  "network",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection)",
  "serde_yaml",
@@ -4177,7 +4193,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "vm-genesis",
 ]
@@ -5330,8 +5346,8 @@ dependencies = [
  "pin-project",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
- "rand_core 0.6.3",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
  "serde 1.0.137",
  "serde_bytes",
  "serde_json",
@@ -5363,7 +5379,7 @@ dependencies = [
  "netcore",
  "network",
  "network-discovery",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "tokio",
 ]
@@ -5390,7 +5406,7 @@ dependencies = [
  "netcore",
  "network",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde_yaml",
  "short-hex-str",
  "tokio",
@@ -6383,6 +6399,7 @@ dependencies = [
  "rand_chacha 0.2.2",
  "rand_core 0.5.1",
  "rand_hc",
+ "rand_pcg",
 ]
 
 [[package]]
@@ -6439,6 +6456,15 @@ name = "rand_hc"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca3129af7b92a17112d59ad498c6f81eaf463253766b90396d39ea7a39d6613c"
+dependencies = [
+ "rand_core 0.5.1",
+]
+
+[[package]]
+name = "rand_pcg"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16abd0c1b639e9eb4d7c50c0b8100b0d0f849be2349829c740fe8e6eb4816429"
 dependencies = [
  "rand_core 0.5.1",
 ]
@@ -6922,7 +6948,7 @@ dependencies = [
  "criterion",
  "once_cell",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rusty-fork",
  "serde 1.0.137",
  "serde_json",
@@ -6999,7 +7025,7 @@ dependencies = [
  "itertools",
  "once_cell",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
  "storage-interface",
  "thiserror",
@@ -7052,7 +7078,7 @@ dependencies = [
  "aptos-workspace-hack",
  "bcs",
  "hex",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde_yaml",
  "structopt",
  "thiserror",
@@ -7534,7 +7560,7 @@ dependencies = [
  "move-deps",
  "once_cell",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "regex",
  "reqwest",
  "serde_json",
@@ -7687,7 +7713,7 @@ dependencies = [
  "network-builder",
  "once_cell",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "short-hex-str",
  "storage-interface",
@@ -7810,7 +7836,7 @@ dependencies = [
  "bcs",
  "itertools",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "storage-client",
  "storage-interface",
 ]
@@ -8112,7 +8138,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-workspace-hack",
  "forge",
- "rand 0.8.5",
+ "rand 0.7.3",
  "tokio",
 ]
 
@@ -8173,6 +8199,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5516c27b78311c50bf42c071425c560ac799b11c30b31f87e3081965fe5e0180"
 dependencies = [
  "once_cell",
+]
+
+[[package]]
+name = "threadpool"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d050e60b33d41c19108b32cea32164033a9013fe3b46cbd4457559bfbf77afaa"
+dependencies = [
+ "num_cpus",
 ]
 
 [[package]]
@@ -8552,8 +8587,8 @@ dependencies = [
  "aptos-workspace-hack",
  "futures",
  "itertools",
- "rand 0.8.5",
- "rand_core 0.6.3",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
  "reqwest",
  "structopt",
  "termion",
@@ -8892,7 +8927,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
+ "rand 0.7.3",
 ]
 
 [[package]]
@@ -8912,7 +8947,7 @@ dependencies = [
  "executor-test-helpers",
  "fail 0.5.0",
  "move-deps",
- "rand 0.8.5",
+ "rand 0.7.3",
  "storage-interface",
  "vm-genesis",
 ]
@@ -9273,12 +9308,12 @@ dependencies = [
 
 [[package]]
 name = "x25519-dalek"
-version = "2.0.0-pre.1"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5da623d8af10a62342bcbbb230e33e58a63255a58012f8653c578e54bab48df"
+checksum = "2392b6b94a576b4e2bf3c5b2757d63f10ada8020a2e4d08ac849ebcf6ea8e077"
 dependencies = [
  "curve25519-dalek",
- "rand_core 0.6.3",
+ "rand_core 0.5.1",
  "zeroize",
 ]
 
@@ -9299,18 +9334,18 @@ dependencies = [
 
 [[package]]
 name = "zeroize"
-version = "1.5.5"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94693807d016b2f2d2e14420eb3bfcca689311ff775dcf113d74ea624b7cdf07"
+checksum = "4756f7db3f7b5574938c3eb1c117038b8e07f95ee6718c0efad4ac21508f1efd"
 dependencies = [
  "zeroize_derive",
 ]
 
 [[package]]
 name = "zeroize_derive"
-version = "1.3.2"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f8f187641dad4f680d25c4bfc4225b418165984179f26ca76ec4fb6441d3a17"
+checksum = "4eb56561c1f8f5441784ea91f52ae8b44268d920f2a59121968fec9297fa7157"
 dependencies = [
  "proc-macro2 1.0.39",
  "quote 1.0.18",

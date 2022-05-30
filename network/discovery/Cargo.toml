@@ -32,7 +32,7 @@ network = { path = "../../network" }
 short-hex-str = { path = "../../crates/short-hex-str" }
 
 [dev-dependencies]
-rand = "0.8.5"
+rand = "0.7.3"
 
 aptos-config = { path = "../../config", features = ["testing"] }
 aptos-temppath = { path = "../../crates/aptos-temppath" }

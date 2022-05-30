@@ -11,7 +11,7 @@ edition = "2018"
 
 [dependencies]
 serde_json = "1.0.81"
-rand = "0.8.5"
+rand = "0.7.3"
 hex = "0.4.3"
 reqwest = { version = "0.11.10", features = ["blocking", "json"] }
 tiny-keccak = { version = "2.0.2", default-features = false, features = ["sha3"] }

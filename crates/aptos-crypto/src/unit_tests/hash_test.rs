@@ -4,7 +4,7 @@
 use crate::hash::*;
 use bitvec::prelude::*;
 use proptest::{collection::vec, prelude::*};
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::Serialize;
 use std::str::FromStr;
 

@@ -937,7 +937,7 @@ where
                 let txn_factory = transaction_factory.clone().with_chain_id(ChainId::new(255));
                 gen_transfer_txn_request(sender, receiver, num_coins, &txn_factory, gas_price)
             } else {
-                let random_index = rng.gen_range(0..reqs.len());
+                let random_index = rng.gen_range(0, reqs.len());
                 reqs[random_index].clone()
             }
         }
@@ -1020,7 +1020,7 @@ enum InvalidTransactionType {
 
 impl Distribution<InvalidTransactionType> for Standard {
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> InvalidTransactionType {
-        match rng.gen_range(0..=3) {
+        match rng.gen_range(0, 4) {
             0 => InvalidTransactionType::ChainId,
             1 => InvalidTransactionType::Sender,
             2 => InvalidTransactionType::Receiver,

@@ -18,7 +18,7 @@ hyper-proxy = "0.9.1"
 hyper-tls = "0.5.0"
 k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_15"] }
 kube = "0.51.0"
-rand = "0.8.5"
+rand = "0.7.3"
 rayon = "1.5.2"
 regex = "1.5.5"
 reqwest = { version = "0.11.10", features = ["blocking", "json"] }
