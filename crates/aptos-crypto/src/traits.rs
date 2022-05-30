@@ -310,4 +310,8 @@ pub(crate) mod private {
     impl Sealed for crate::multi_ed25519::MultiEd25519PrivateKey {}
     impl Sealed for crate::multi_ed25519::MultiEd25519PublicKey {}
     impl Sealed for crate::multi_ed25519::MultiEd25519Signature {}
+
+    impl Sealed for crate::bls12381::BLS12381PrivateKey {}
+    impl Sealed for crate::bls12381::BLS12381PublicKey {}
+    impl Sealed for crate::bls12381::BLS12381Signature {}
 }
