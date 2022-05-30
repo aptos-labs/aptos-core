@@ -43,7 +43,7 @@ parking_lot = { version = "0.12.0", features = ["send_guard"] }
 rand = { version = "0.8.5", features = ["alloc", "getrandom", "libc", "rand_chacha", "small_rng", "std", "std_rng"] }
 regex = { version = "1.5.5", features = ["aho-corasick", "memchr", "perf", "perf-cache", "perf-dfa", "perf-inline", "perf-literal", "std", "unicode", "unicode-age", "unicode-bool", "unicode-case", "unicode-gencat", "unicode-perl", "unicode-script", "unicode-segment"] }
 regex-syntax = { version = "0.6.25", features = ["unicode", "unicode-age", "unicode-bool", "unicode-case", "unicode-gencat", "unicode-perl", "unicode-script", "unicode-segment"] }
-reqwest = { version = "0.11.10", features = ["__tls", "blocking", "cookie_crate", "cookie_store", "cookies", "default-tls", "hyper-tls", "json", "native-tls-crate", "proc-macro-hack", "serde_json", "stream", "tokio-native-tls", "tokio-util"] }
+reqwest = { version = "0.11.10", features = ["__tls", "blocking", "cookie_crate", "cookie_store", "cookies", "default-tls", "hyper-tls", "json", "mime_guess", "multipart", "native-tls-crate", "proc-macro-hack", "serde_json", "stream", "tokio-native-tls", "tokio-util"] }
 rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
 serde = { version = "1.0.137", features = ["alloc", "derive", "rc", "serde_derive", "std"] }
 serde_json = { version = "1.0.81", features = ["indexmap", "preserve_order", "std"] }
@@ -89,7 +89,7 @@ parking_lot = { version = "0.12.0", features = ["send_guard"] }
 rand = { version = "0.8.5", features = ["alloc", "getrandom", "libc", "rand_chacha", "small_rng", "std", "std_rng"] }
 regex = { version = "1.5.5", features = ["aho-corasick", "memchr", "perf", "perf-cache", "perf-dfa", "perf-inline", "perf-literal", "std", "unicode", "unicode-age", "unicode-bool", "unicode-case", "unicode-gencat", "unicode-perl", "unicode-script", "unicode-segment"] }
 regex-syntax = { version = "0.6.25", features = ["unicode", "unicode-age", "unicode-bool", "unicode-case", "unicode-gencat", "unicode-perl", "unicode-script", "unicode-segment"] }
-reqwest = { version = "0.11.10", features = ["__tls", "blocking", "cookie_crate", "cookie_store", "cookies", "default-tls", "hyper-tls", "json", "native-tls-crate", "proc-macro-hack", "serde_json", "stream", "tokio-native-tls", "tokio-util"] }
+reqwest = { version = "0.11.10", features = ["__tls", "blocking", "cookie_crate", "cookie_store", "cookies", "default-tls", "hyper-tls", "json", "mime_guess", "multipart", "native-tls-crate", "proc-macro-hack", "serde_json", "stream", "tokio-native-tls", "tokio-util"] }
 rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
 serde = { version = "1.0.137", features = ["alloc", "derive", "rc", "serde_derive", "std"] }
 serde_json = { version = "1.0.81", features = ["indexmap", "preserve_order", "std"] }
