@@ -2,14 +2,16 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 from account import Account
 from account_address import AccountAddress
-from authenticator import Authenticator, Ed25519Authenticator
+from authenticator import (Authenticator, Ed25519Authenticator,
+                           MultiAgentAuthenticator)
 from bcs import Serializer
-from transactions import (RawTransaction, ScriptFunction, SignedTransaction,
+from transactions import (MultiAgentRawTransaction, RawTransaction,
+                          ScriptFunction, SignedTransaction,
                           TransactionArgument, TransactionPayload)
 from type_tag import StructTag, TypeTag
 
@@ -29,12 +31,22 @@ class RestClient:
         self.client = httpx.Client()
         self.chain_id = int(self.info()["chain_id"])
 
+    #
+    # Account accessors
+    #
+
     def account(self, account_address: AccountAddress) -> Dict[str, str]:
         """Returns the sequence number and authentication key for an account"""
 
         response = self.client.get(f"{self.base_url}/accounts/{account_address}")
         assert response.status_code == 200, f"{response.text} - {account_address}"
         return response.json()
+
+    def account_balance(self, account_address: str) -> int:
+        """Returns the test coin balance associated with the account"""
+        return self.account_resource(
+            account_address, "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>"
+        )["data"]["coin"]["value"]
 
     def account_sequence_number(self, account_address: AccountAddress) -> int:
         account_res = self.account(account_address)
@@ -51,14 +63,34 @@ class RestClient:
         assert response.status_code == 200, response.text
         return response.json()
 
+    def get_table_item(
+        self, handle: str, key_type: str, value_type: str, key: Any
+    ) -> Any:
+        response = self.client.post(
+            f"{self.base_url}/tables/{handle}/item",
+            json={
+                "key_type": key_type,
+                "value_type": value_type,
+                "key": key,
+            },
+        )
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    #
+    # Ledger accessors
+    #
+
     def info(self) -> Dict[str, str]:
         response = self.client.get(self.base_url)
         assert response.status_code == 200, f"{response.text}"
         return response.json()
 
-    def submit_bcs_transaction(
-        self, signed_transaction: SignedTransaction
-    ) -> Dict[str, Any]:
+    #
+    # Transactions
+    #
+
+    def submit_bcs_transaction(self, signed_transaction: SignedTransaction) -> str:
         headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
         response = self.client.post(
             f"{self.base_url}/transactions",
@@ -68,9 +100,7 @@ class RestClient:
         assert response.status_code == 202, f"{response.text} - {signed_transaction}"
         return response.json()["hash"]
 
-    def submit_transaction(
-        self, sender: Account, payload: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def submit_transaction(self, sender: Account, payload: Dict[str, Any]) -> str:
         """
         1) Generates a transaction request
         2) submits that to produce a raw transaction
@@ -105,7 +135,7 @@ class RestClient:
             f"{self.base_url}/transactions", headers=headers, json=txn_request
         )
         assert response.status_code == 202, f"{response.text} - {txn}"
-        return response.json()
+        return response.json()["hash"]
 
     def transaction_pending(self, txn_hash: str) -> bool:
         response = self.client.get(f"{self.base_url}/transactions/{txn_hash}")
@@ -125,11 +155,72 @@ class RestClient:
         response = self.client.get(f"{self.base_url}/transactions/{txn_hash}")
         assert "success" in response.json(), f"{response.text} - {txn_hash}"
 
-    def account_balance(self, account_address: str) -> int:
-        """Returns the test coin balance associated with the account"""
-        return self.account_resource(
-            account_address, "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>"
-        )["data"]["coin"]["value"]
+    #
+    # Transaction helpers
+    #
+
+    def create_multi_agent_bcs_transaction(
+        self,
+        sender: Account,
+        secondary_accounts: List[Account],
+        payload: TransactionPayload,
+    ) -> SignedTransaction:
+        raw_transaction = MultiAgentRawTransaction(
+            RawTransaction(
+                sender.address(),
+                self.account_sequence_number(sender.address()),
+                payload,
+                2000,
+                1,
+                int(time.time()) + 600,
+                self.chain_id,
+            ),
+            [x.address() for x in secondary_accounts],
+        )
+
+        keyed_txn = raw_transaction.keyed()
+
+        authenticator = Authenticator(
+            MultiAgentAuthenticator(
+                Authenticator(
+                    Ed25519Authenticator(sender.public_key(), sender.sign(keyed_txn))
+                ),
+                [
+                    (
+                        x.address(),
+                        Authenticator(
+                            Ed25519Authenticator(x.public_key(), x.sign(keyed_txn))
+                        ),
+                    )
+                    for x in secondary_accounts
+                ],
+            )
+        )
+
+        return SignedTransaction(raw_transaction.inner(), authenticator)
+
+    def create_single_signer_bcs_transaction(
+        self, sender: Account, payload: TransactionPayload
+    ) -> SignedTransaction:
+        raw_transaction = RawTransaction(
+            sender.address(),
+            self.account_sequence_number(sender.address()),
+            payload,
+            2000,
+            1,
+            int(time.time()) + 600,
+            self.chain_id,
+        )
+
+        signature = sender.sign(raw_transaction.keyed())
+        authenticator = Authenticator(
+            Ed25519Authenticator(sender.public_key(), signature)
+        )
+        return SignedTransaction(raw_transaction, authenticator)
+
+    #
+    # Transaction wrappers
+    #
 
     def transfer(self, sender: Account, recipient: AccountAddress, amount: int) -> str:
         """Transfer a given coin amount from a given Account to the recipient's account address.
@@ -144,12 +235,11 @@ class RestClient:
                 str(amount),
             ],
         }
-        res = self.submit_transaction(sender, payload)
-        return str(res["hash"])
+        return self.submit_transaction(sender, payload)
 
     def bcs_transfer(
         self, sender: Account, recipient: AccountAddress, amount: int
-    ) -> SignedTransaction:
+    ) -> str:
         transaction_arguments = [
             TransactionArgument(recipient, Serializer.struct),
             TransactionArgument(amount, Serializer.u64),
@@ -162,21 +252,210 @@ class RestClient:
             transaction_arguments,
         )
 
-        raw_transaction = RawTransaction(
-            sender.address(),
-            self.account_sequence_number(sender.address()),
-            TransactionPayload(payload),
-            2000,
-            1,
-            int(time.time()) + 600,
-            self.chain_id,
+        signed_transaction = self.create_single_signer_bcs_transaction(
+            sender, TransactionPayload(payload)
+        )
+        return self.submit_bcs_transaction(signed_transaction)
+
+    #
+    # Token transaction wrappers
+    #
+
+    def create_collection(
+        self, account: Account, name: str, description: str, uri: str
+    ) -> str:
+        """Creates a new collection within the specified account"""
+
+        transaction_arguments = [
+            TransactionArgument(name, Serializer.str),
+            TransactionArgument(description, Serializer.str),
+            TransactionArgument(uri, Serializer.str),
+        ]
+
+        payload = ScriptFunction.natural(
+            "0x1::Token",
+            "create_unlimited_collection_script",
+            [],
+            transaction_arguments,
         )
 
-        signature = sender.sign(raw_transaction.keyed())
-        authenticator = Authenticator(
-            Ed25519Authenticator(sender.public_key(), signature)
+        signed_transaction = self.create_single_signer_bcs_transaction(
+            account, TransactionPayload(payload)
         )
-        return SignedTransaction(raw_transaction, authenticator)
+        return self.submit_bcs_transaction(signed_transaction)
+
+    def create_token(
+        self,
+        account: Account,
+        collection_name: str,
+        name: str,
+        description: str,
+        supply: int,
+        uri: str,
+    ) -> str:
+        transaction_arguments = [
+            TransactionArgument(collection_name, Serializer.str),
+            TransactionArgument(name, Serializer.str),
+            TransactionArgument(description, Serializer.str),
+            TransactionArgument(True, Serializer.bool),
+            TransactionArgument(supply, Serializer.u64),
+            TransactionArgument(uri, Serializer.str),
+        ]
+
+        payload = ScriptFunction.natural(
+            "0x1::Token",
+            "create_unlimited_token_script",
+            [],
+            transaction_arguments,
+        )
+        signed_transaction = self.create_single_signer_bcs_transaction(
+            account, TransactionPayload(payload)
+        )
+        return self.submit_bcs_transaction(signed_transaction)
+
+    def offer_token(
+        self,
+        account: Account,
+        receiver: str,
+        creator: str,
+        collection_name: str,
+        token_name: str,
+        amount: int,
+    ) -> str:
+        transaction_arguments = [
+            TransactionArgument(receiver, Serializer.struct),
+            TransactionArgument(creator, Serializer.struct),
+            TransactionArgument(collection_name, Serializer.str),
+            TransactionArgument(token_name, Serializer.str),
+            TransactionArgument(amount, Serializer.u64),
+        ]
+
+        payload = ScriptFunction.natural(
+            "0x1::TokenTransfers",
+            "offer_script",
+            [],
+            transaction_arguments,
+        )
+        signed_transaction = self.create_single_signer_bcs_transaction(
+            account, TransactionPayload(payload)
+        )
+        return self.submit_bcs_transaction(signed_transaction)
+
+    def claim_token(
+        self,
+        account: Account,
+        sender: str,
+        creator: str,
+        collection_name: str,
+        token_name: str,
+    ) -> str:
+        transaction_arguments = [
+            TransactionArgument(sender, Serializer.struct),
+            TransactionArgument(creator, Serializer.struct),
+            TransactionArgument(collection_name, Serializer.str),
+            TransactionArgument(token_name, Serializer.str),
+        ]
+
+        payload = ScriptFunction.natural(
+            "0x1::TokenTransfers",
+            "claim_script",
+            [],
+            transaction_arguments,
+        )
+        signed_transaction = self.create_single_signer_bcs_transaction(
+            account, TransactionPayload(payload)
+        )
+        return self.submit_bcs_transaction(signed_transaction)
+
+    def direct_transfer_token(
+        self,
+        sender: Account,
+        receiver: Account,
+        creators_address: AccountAddress,
+        collection_name: str,
+        token_name: str,
+        amount: int,
+    ) -> str:
+        transaction_arguments = [
+            TransactionArgument(creators_address, Serializer.struct),
+            TransactionArgument(collection_name, Serializer.str),
+            TransactionArgument(token_name, Serializer.str),
+            TransactionArgument(amount, Serializer.u64),
+        ]
+
+        payload = ScriptFunction.natural(
+            "0x1::Token",
+            "direct_transfer_script",
+            [],
+            transaction_arguments,
+        )
+
+        signed_transaction = self.create_multi_agent_bcs_transaction(
+            sender,
+            [receiver],
+            TransactionPayload(payload),
+        )
+        return self.submit_bcs_transaction(signed_transaction)
+
+    #
+    # Token accessors
+    #
+
+    def get_token_balance(
+        self,
+        owner: AccountAddress,
+        creator: AccountAddress,
+        collection_name: str,
+        token_name: str,
+    ) -> Any:
+        token_store = self.account_resource(owner, "0x1::Token::TokenStore")["data"][
+            "tokens"
+        ]["handle"]
+
+        token_id = {
+            "creator": creator.hex(),
+            "collection": collection_name,
+            "name": token_name,
+        }
+
+        return self.get_table_item(
+            token_store,
+            "0x1::Token::TokenId",
+            "0x1::Token::Token",
+            token_id,
+        )["value"]
+
+    def get_token_data(
+        self, creator: AccountAddress, collection_name: str, token_name: str
+    ) -> Any:
+        token_data = self.account_resource(creator, "0x1::Token::Collections")["data"][
+            "token_data"
+        ]["handle"]
+
+        token_id = {
+            "creator": creator.hex(),
+            "collection": collection_name,
+            "name": token_name,
+        }
+
+        return self.get_table_item(
+            token_data,
+            "0x1::Token::TokenId",
+            "0x1::Token::TokenData",
+            token_id,
+        )
+
+    def get_collection(self, creator: AccountAddress, collection_name: str) -> Any:
+        token_data = self.account_resource(creator, "0x1::Token::Collections")["data"][
+            "collections"
+        ]["handle"]
+
+        return self.get_table_item(
+            token_data,
+            "0x1::ASCII::String",
+            "0x1::Token::Collection",
+            collection_name,
+        )
 
 
 class FaucetClient:
@@ -200,7 +479,7 @@ class FaucetClient:
             self.rest_client.wait_for_transaction(txn_hash)
 
 
-if __name__ == "__main__":
+def coin_transfer():
     rest_client = RestClient(TESTNET_URL)
     faucet_client = FaucetClient(FAUCET_URL, rest_client)
 
@@ -227,10 +506,94 @@ if __name__ == "__main__":
     print(f"Bob: {rest_client.account_balance(bob.address())}")
 
     # Have Alice give Bob another 1_000 coins using BCS
-    signed_txn = rest_client.bcs_transfer(alice, bob.address(), 1_000)
-    txn_hash = rest_client.submit_bcs_transaction(signed_txn)
+    txn_hash = rest_client.bcs_transfer(alice, bob.address(), 1_000)
     rest_client.wait_for_transaction(txn_hash)
 
     print("\n=== Final Balances ===")
     print(f"Alice: {rest_client.account_balance(alice.address())}")
     print(f"Bob: {rest_client.account_balance(bob.address())}")
+
+
+def token_transfer():
+    rest_client = RestClient(TESTNET_URL)
+    faucet_client = FaucetClient(FAUCET_URL, rest_client)
+
+    alice = Account.generate()
+    bob = Account.generate()
+
+    collection_name = "Alice's"
+    token_name = "Alice's first token"
+
+    print("\n=== Addresses ===")
+    print(f"Alice: {alice.address()}")
+    print(f"Bob: {bob.address()}")
+
+    faucet_client.fund_account(alice.address(), 10_000_000)
+    faucet_client.fund_account(bob.address(), 10_000_000)
+
+    print("\n=== Initial Balances ===")
+    print(f"Alice: {rest_client.account_balance(alice.address())}")
+    print(f"Bob: {rest_client.account_balance(bob.address())}")
+
+    print("\n=== Creating Collection and Token ===")
+
+    txn_hash = rest_client.create_collection(
+        alice, collection_name, "Alice's simple collection", "https://aptos.dev"
+    )
+    rest_client.wait_for_transaction(txn_hash)
+
+    txn_hash = rest_client.create_token(
+        alice,
+        collection_name,
+        token_name,
+        "Alice's simple token",
+        1,
+        "https://aptos.dev/img/nyan.jpeg",
+    )
+    rest_client.wait_for_transaction(txn_hash)
+
+    print(
+        f"Alice's collection: {rest_client.get_collection(alice.address(), collection_name)}"
+    )
+    print(
+        f"Alice's token balance: {rest_client.get_token_balance(alice.address(), alice.address(), collection_name, token_name)}"
+    )
+    print(
+        f"Alice's token data: {rest_client.get_token_data(alice.address(), collection_name, token_name)}"
+    )
+
+    print("\n=== Transferring the token to Bob ===")
+    txn_hash = rest_client.offer_token(
+        alice, bob.address(), alice.address(), collection_name, token_name, 1
+    )
+    rest_client.wait_for_transaction(txn_hash)
+
+    txn_hash = rest_client.claim_token(
+        bob, alice.address(), alice.address(), collection_name, token_name
+    )
+    rest_client.wait_for_transaction(txn_hash)
+
+    print(
+        f"Alice's token balance: {rest_client.get_token_balance(alice.address(), alice.address(), collection_name, token_name)}"
+    )
+    print(
+        f"Bob's token balance: {rest_client.get_token_balance(bob.address(), alice.address(), collection_name, token_name)}"
+    )
+
+    print("\n=== Transferring the token back to Alice using MultiAgent ===")
+    txn_hash = rest_client.direct_transfer_token(
+        bob, alice, alice.address(), collection_name, token_name, 1
+    )
+    rest_client.wait_for_transaction(txn_hash)
+
+    print(
+        f"Alice's token balance: {rest_client.get_token_balance(alice.address(), alice.address(), collection_name, token_name)}"
+    )
+    print(
+        f"Bob's token balance: {rest_client.get_token_balance(bob.address(), alice.address(), collection_name, token_name)}"
+    )
+
+
+if __name__ == "__main__":
+    coin_transfer()
+    token_transfer()
