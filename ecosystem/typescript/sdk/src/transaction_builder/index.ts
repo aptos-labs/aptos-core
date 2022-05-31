@@ -8,7 +8,7 @@ import {
   SignedTransaction,
   TransactionAuthenticatorVariantEd25519,
 } from "./aptos_types";
-import { BcsSerializer } from "./bcs";
+import { BcsSerializer, bytes } from "./bcs";
 
 const SALT = "APTOS::RawTransaction";
 
@@ -18,7 +18,7 @@ export type TransactionSignature = Uint8Array;
 /** Function that takes in a Signing Message (serialized raw transaction)
  *  and returns a signature
  */
-export type SigningFn = (txn: SigningMessage) => Promise<TransactionSignature>;
+export type SigningFn = (txn: SigningMessage) => TransactionSignature;
 
 class TransactionBuilder<F extends SigningFn> {
   private signingFunction: F;
@@ -31,7 +31,7 @@ class TransactionBuilder<F extends SigningFn> {
   }
 
   /** Generates a Signing Message out of a raw transaction. */
-  static async getSigningMessage(rawTxn: RawTransaction): Promise<SigningMessage> {
+  static getSigningMessage(rawTxn: RawTransaction): SigningMessage {
     const hash = SHA3.sha3_256.create();
     hash.update(Buffer.from(SALT));
 
@@ -43,9 +43,9 @@ class TransactionBuilder<F extends SigningFn> {
     return Buffer.from([...prefix, ...serializer.getBytes()]);
   }
 
-  private async signInternal(rawTxn: RawTransaction): Promise<SignedTransaction> {
-    const signingMessage = await TransactionBuilder.getSigningMessage(rawTxn);
-    const signatureRaw = await this.signingFunction(signingMessage);
+  private signInternal(rawTxn: RawTransaction): SignedTransaction {
+    const signingMessage = TransactionBuilder.getSigningMessage(rawTxn);
+    const signatureRaw = this.signingFunction(signingMessage);
 
     const signature = new Ed25519Signature(signatureRaw);
 
@@ -55,8 +55,8 @@ class TransactionBuilder<F extends SigningFn> {
   }
 
   /** Signs a raw transaction and returns a bcs serialized transaction. */
-  async sign(rawTxn: RawTransaction): Promise<Uint8Array> {
-    const signedTxn = await this.signInternal(rawTxn);
+  sign(rawTxn: RawTransaction): bytes {
+    const signedTxn = this.signInternal(rawTxn);
 
     const signedTxnSerializer = new BcsSerializer();
     signedTxn.serialize(signedTxnSerializer);

@@ -142,7 +142,7 @@ export class AptosClient {
     accountFrom: AptosAccount,
     rawTxn: TxnBuilderTypes.RawTransaction,
   ): Promise<Uint8Array> {
-    const txnBuilder = new TransactionBuilderEd25519(async (signingMessage: SigningMessage) => {
+    const txnBuilder = new TransactionBuilderEd25519((signingMessage: SigningMessage) => {
       // @ts-ignore
       const sigHexStr = accountFrom.signBuffer(signingMessage);
       return sigHexStr.toUint8Array();
