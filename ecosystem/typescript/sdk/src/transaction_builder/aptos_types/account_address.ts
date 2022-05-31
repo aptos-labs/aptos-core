@@ -16,7 +16,7 @@ export class AccountAddress {
   /**
    * Creates AccountAddress from a hex string.
    * @param address Hex string can be with a prefix or without a prefix,
-   * e.g. '0x1aa' or '1aa'. Hex string will be left padded with 0s if too short.
+   *   e.g. '0x1aa' or '1aa'. Hex string will be left padded with 0s if too short.
    */
   static fromHex(address: MaybeHexString): AccountAddress {
     address = HexString.ensure(address);

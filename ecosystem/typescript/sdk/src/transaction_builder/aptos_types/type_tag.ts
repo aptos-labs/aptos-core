@@ -154,6 +154,12 @@ export class StructTag {
     public readonly type_args: Seq<TypeTag>,
   ) {}
 
+  /**
+   * Converts a string literal to a StructTag
+   * @param structTag String literal in format "AcountAddress::ModuleName::ResourceName",
+   *   e.g. "0x01::TestCoin::TestCoin"
+   * @returns
+   */
   static fromString(structTag: string): StructTag {
     // Type args are not supported in string literal
     if (structTag.includes("<")) {

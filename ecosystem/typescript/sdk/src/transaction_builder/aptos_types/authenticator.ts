@@ -20,6 +20,14 @@ export abstract class TransactionAuthenticator {
 }
 
 export class TransactionAuthenticatorVariantEd25519 extends TransactionAuthenticator {
+  /**
+   * An authenticator for single signature.
+   *
+   * @param public_key Client's public key.
+   * @param signature Signature of a raw transaction.
+   * @see {@link https://aptos.dev/guides/creating-a-signed-transaction/ | Creating a Signed Transaction}
+   * for details about generating a signature.
+   */
   constructor(public readonly public_key: Ed25519PublicKey, public readonly signature: Ed25519Signature) {
     super();
   }
@@ -38,6 +46,38 @@ export class TransactionAuthenticatorVariantEd25519 extends TransactionAuthentic
 }
 
 export class TransactionAuthenticatorVariantMultiEd25519 extends TransactionAuthenticator {
+  /**
+   * An authenticator for multiple signatures.
+   *
+   * @param public_key BCS bytes for a list of public keys.
+   *
+   * @example
+   * Developers must manually construct the input to get the BCS bytes.
+   * See below code example for the BCS input.
+   * ```ts
+   * interface  MultiEd25519PublicKey {
+   *   // A list of public keys
+   *   public_keys: Uint8Array[],
+   *   // At least `threshold` signatures must be valid
+   *   threshold: Uint8,
+   * }
+   * ```
+   * @param signature BCS bytes of multiple signatures.
+   *
+   * @example
+   * Developers must manually construct the input to get the BCS bytes.
+   * See below code example for the BCS input.
+   * ```ts
+   * interface  MultiEd25519Signature {
+   *   // A list of signatures
+   *   signatures: Uint8Array[],
+   *   // 4 bytes, at most 32 signatures are supported.
+   *   // If Nth bit value is `1`, the Nth signature should be provided in `signatures`.
+   *   // Bits are read from left to right.
+   *   bitmap: Uint8Array,
+   * }
+   * ```
+   */
   constructor(public readonly public_key: MultiEd25519PublicKey, public readonly signature: MultiEd25519Signature) {
     super();
   }

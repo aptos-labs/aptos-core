@@ -17,6 +17,21 @@ import { Identifier } from "./identifier";
 import { TypeTag } from "./type_tag";
 
 export class RawTransaction {
+  /**
+   * RawTransactions contain the metadata and payloads that can be submitted to Aptos chain for execution.
+   * RawTransactions must be signed before Aptos chain can execute them.
+   *
+   * @param sender Account address of the sender.
+   * @param sequence_number Sequence number of this transaction. This must match the sequence number stored in
+   *   the sender's account at the time the transaction executes.
+   * @param payload Instructions for the Aptos Blockchain, including publishing a module,
+   *   execute a script function or execute a script payload.
+   * @param max_gas_amount Maximum total gas to spend for this transaction. The account must have more
+   *   than this gas or the transaction will be discarded during validation.
+   * @param gas_unit_price Price to be paid per gas unit.
+   * @param expiration_timestamp_secs The blockchain timestamp at which the blockchain would discard this transaction.
+   * @param chain_id The chain ID of the blockchain that this transaction is intended to be run on.
+   */
   constructor(
     public readonly sender: AccountAddress,
     public readonly sequence_number: uint64,
@@ -58,6 +73,24 @@ export class RawTransaction {
 }
 
 export class Script {
+  /**
+   * Scripts contain the Move bytecodes payload that can be submitted to Aptos chain for execution.
+   * @param code Move bytecode
+   * @param ty_args Type arguments that bytecode requires.
+   *
+   * @example
+   * A coin transfer function has one type argument "CoinType".
+   * ```
+   * public(script) fun transfer<CoinType>(from: &signer, to: address, amount: u64,)
+   * ```
+   * @param args Arugments to bytecode function.
+   *
+   * @example
+   * A coin transfer function has three arugments "from", "to" and "amount".
+   * ```
+   * public(script) fun transfer<CoinType>(from: &signer, to: address, amount: u64,)
+   * ```
+   */
   constructor(
     public readonly code: bytes,
     public readonly ty_args: Seq<TypeTag>,
@@ -79,6 +112,25 @@ export class Script {
 }
 
 export class ScriptFunction {
+  /**
+   * Contains the payload to run a function within a module.
+   * @param module_name Fullly qualified module name. ModuleId consists of account address and module name.
+   * @param function_name The function to run.
+   * @param ty_args Type arguments that move function requires.
+   *
+   * @example
+   * A coin transfer function has one type argument "CoinType".
+   * ```
+   * public(script) fun transfer<CoinType>(from: &signer, to: address, amount: u64,)
+   * ```
+   * @param args Arugments to the move function.
+   *
+   * @example
+   * A coin transfer function has three arugments "from", "to" and "amount".
+   * ```
+   * public(script) fun transfer<CoinType>(from: &signer, to: address, amount: u64,)
+   * ```
+   */
   constructor(
     public readonly module_name: ModuleId,
     public readonly function_name: Identifier,
@@ -86,6 +138,26 @@ export class ScriptFunction {
     public readonly args: Seq<bytes>,
   ) {}
 
+  /**
+   *
+   * @param module Fully qualified module name in format "AccountAddress::ModuleName" e.g. "0x1::Coin"
+   * @param func Function name
+   * @param ty_args Type arguments that move function requires.
+   *
+   * @example
+   * A coin transfer function has one type argument "CoinType".
+   * ```
+   * public(script) fun transfer<CoinType>(from: &signer, to: address, amount: u64,)
+   * ```
+   * @param args Arugments to the move function.
+   *
+   * @example
+   * A coin transfer function has three arugments "from", "to" and "amount".
+   * ```
+   * public(script) fun transfer<CoinType>(from: &signer, to: address, amount: u64,)
+   * ```
+   * @returns
+   */
   static natual(module: string, func: string, ty_args: Seq<TypeTag>, args: Seq<bytes>): ScriptFunction {
     return new ScriptFunction(ModuleId.fromStr(module), new Identifier(func), ty_args, args);
   }
@@ -106,7 +178,100 @@ export class ScriptFunction {
   }
 }
 
+export class Module {
+  /**
+   * Contains the bytecode of a Move module that can be published to the Aptos chain.
+   * @param code Move bytecode of a module.
+   */
+  constructor(public readonly code: bytes) {}
+
+  serialize(serializer: Serializer): void {
+    serializer.serializeBytes(this.code);
+  }
+
+  static deserialize(deserializer: Deserializer): Module {
+    const code = deserializer.deserializeBytes();
+    return new Module(code);
+  }
+}
+
+export class ModuleBundle {
+  /**
+   * Contains a list of Modules that can be published together.
+   * @param codes List of modules.
+   */
+  constructor(public readonly codes: Seq<Module>) {}
+
+  serialize(serializer: Serializer): void {
+    serializeVector<Module>(this.codes, serializer);
+  }
+
+  static deserialize(deserializer: Deserializer): ModuleBundle {
+    const codes = deserializeVector(deserializer, Module);
+    return new ModuleBundle(codes);
+  }
+}
+
+export class ModuleId {
+  /**
+   * Full name of a module.
+   * @param address The account address.
+   * @param name The name of the module under the account at "address".
+   */
+  constructor(public readonly address: AccountAddress, public readonly name: Identifier) {}
+
+  static fromStr(moduleId: string): ModuleId {
+    const parts = moduleId.split("::");
+    if (parts.length !== 2) {
+      throw new Error("Invalid module id.");
+    }
+    return new ModuleId(AccountAddress.fromHex(new HexString(parts[0])), new Identifier(parts[1]));
+  }
+
+  serialize(serializer: Serializer): void {
+    this.address.serialize(serializer);
+    this.name.serialize(serializer);
+  }
+
+  static deserialize(deserializer: Deserializer): ModuleId {
+    const address = AccountAddress.deserialize(deserializer);
+    const name = Identifier.deserialize(deserializer);
+    return new ModuleId(address, name);
+  }
+}
+
+export class ChangeSet {
+  serialize(serializer: Serializer): void {
+    throw new Error("Not implemented.");
+  }
+
+  static deserialize(deserializer: Deserializer): ChangeSet {
+    throw new Error("Not implemented.");
+  }
+}
+
+export class WriteSet {
+  serialize(serializer: Serializer): void {
+    throw new Error("Not implmented.");
+  }
+
+  static deserialize(deserializer: Deserializer): WriteSet {
+    throw new Error("Not implmented.");
+  }
+}
+
 export class SignedTransaction {
+  /**
+   * A SignedTransaction consists of a raw transaction and an authenticator. The authenticator
+   * contains a client's public key and the signature of the raw transaction.
+   *
+   * @see {@link https://aptos.dev/guides/creating-a-signed-transaction/ | Creating a Signed Transaction}
+   *
+   * @param raw_txn
+   * @param authenticator Contains a client's public key and the signature of the raw transaction.
+   *   Authenticator has 3 flavors: single signature, multi-signature and multi-agent.
+   *   @see authenticator.ts for details.
+   */
   constructor(public readonly raw_txn: RawTransaction, public readonly authenticator: TransactionAuthenticator) {}
 
   serialize(serializer: Serializer): void {
@@ -199,55 +364,6 @@ export class TransactionPayloadVariantScriptFunction extends TransactionPayload 
   }
 }
 
-export class Module {
-  constructor(public readonly code: bytes) {}
-
-  serialize(serializer: Serializer): void {
-    serializer.serializeBytes(this.code);
-  }
-
-  static deserialize(deserializer: Deserializer): Module {
-    const code = deserializer.deserializeBytes();
-    return new Module(code);
-  }
-}
-
-export class ModuleBundle {
-  constructor(public readonly codes: Seq<Module>) {}
-
-  serialize(serializer: Serializer): void {
-    serializeVector<Module>(this.codes, serializer);
-  }
-
-  static deserialize(deserializer: Deserializer): ModuleBundle {
-    const codes = deserializeVector(deserializer, Module);
-    return new ModuleBundle(codes);
-  }
-}
-
-export class ModuleId {
-  constructor(public readonly address: AccountAddress, public readonly name: Identifier) {}
-
-  static fromStr(moduleId: string): ModuleId {
-    const parts = moduleId.split("::");
-    if (parts.length !== 2) {
-      throw new Error("Invalid module id.");
-    }
-    return new ModuleId(AccountAddress.fromHex(new HexString(parts[0])), new Identifier(parts[1]));
-  }
-
-  serialize(serializer: Serializer): void {
-    this.address.serialize(serializer);
-    this.name.serialize(serializer);
-  }
-
-  static deserialize(deserializer: Deserializer): ModuleId {
-    const address = AccountAddress.deserialize(deserializer);
-    const name = Identifier.deserialize(deserializer);
-    return new ModuleId(address, name);
-  }
-}
-
 export class ChainId {
   constructor(public readonly value: uint8) {}
 
@@ -258,26 +374,6 @@ export class ChainId {
   static deserialize(deserializer: Deserializer): ChainId {
     const value = deserializer.deserializeU8();
     return new ChainId(value);
-  }
-}
-
-export class ChangeSet {
-  serialize(serializer: Serializer): void {
-    throw new Error("Not implemented.");
-  }
-
-  static deserialize(deserializer: Deserializer): ChangeSet {
-    throw new Error("Not implemented.");
-  }
-}
-
-export class WriteSet {
-  serialize(serializer: Serializer): void {
-    throw new Error("Not implmented.");
-  }
-
-  static deserialize(deserializer: Deserializer): WriteSet {
-    throw new Error("Not implmented.");
   }
 }
 
