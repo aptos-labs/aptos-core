@@ -1,2 +1,3 @@
-export * from "./bcsSerializer";
-export * from "./bcsDeserializer";
+export * from "./types";
+export * from "./serializer";
+export * from "./deserializer";

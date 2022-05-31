@@ -14,9 +14,10 @@ import {
   StructTag,
   TransactionPayloadVariantScriptFunction,
   TypeTagVariantstruct,
-} from "./transaction_builder/aptosTypes";
-import { hexToAccountAddress } from "./transaction_builder";
+} from "./transaction_builder/aptos_types";
+import { AccountAddress } from "./transaction_builder/aptos_types";
 import { BcsSerializer } from "./transaction_builder/bcs";
+import { HexString } from "./hex_string";
 
 test("gets genesis account", async () => {
   const client = new AptosClient(NODE_URL);
@@ -120,17 +121,17 @@ test(
     expect((accountResource.data as any).coin.value).toBe("0");
 
     const moduleName = new ModuleId(
-      hexToAccountAddress("0000000000000000000000000000000000000000000000000000000000000001"),
+      AccountAddress.fromHex(new HexString("0000000000000000000000000000000000000000000000000000000000000001")),
       new Identifier("Coin"),
     );
 
     const bcsSerializer = new BcsSerializer();
-    const accountAddress2 = hexToAccountAddress(account2.address().noPrefix());
+    const accountAddress2 = AccountAddress.fromHex(account2.address());
     accountAddress2.serialize(bcsSerializer);
 
     const token = new TypeTagVariantstruct(
       new StructTag(
-        hexToAccountAddress("0000000000000000000000000000000000000000000000000000000000000001"),
+        AccountAddress.fromHex(new HexString("0000000000000000000000000000000000000000000000000000000000000001")),
         new Identifier("TestCoin"),
         new Identifier("TestCoin"),
         [],
@@ -149,7 +150,7 @@ test(
     const { sequence_number } = await client.getAccount(account1.address());
 
     const rawTxn = new RawTransaction(
-      hexToAccountAddress(account1.address().noPrefix()),
+      AccountAddress.fromHex(account1.address()),
       BigInt(sequence_number),
       scriptFunctionPayload,
       BigInt(1000),

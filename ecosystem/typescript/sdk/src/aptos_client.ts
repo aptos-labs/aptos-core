@@ -9,7 +9,7 @@ import { AptosAccount } from "./aptos_account";
 import { Types } from "./types";
 import { Tables } from "./api/Tables";
 import { AptosError } from "./api/data-contracts";
-import * as TxnBuilderTypes from "./transaction_builder/aptosTypes";
+import * as TxnBuilderTypes from "./transaction_builder/aptos_types";
 import { SigningMessage, TransactionBuilderEd25519 } from "./transaction_builder";
 
 export class RequestError extends Error {

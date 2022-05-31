@@ -7,9 +7,8 @@ import {
   RawTransaction,
   SignedTransaction,
   TransactionAuthenticatorVariantEd25519,
-} from "./aptosTypes";
+} from "./aptos_types";
 import { BcsSerializer } from "./bcs";
-import { ListTuple } from "./serde";
 
 const SALT = "APTOS::RawTransaction";
 
@@ -19,7 +18,6 @@ export type TransactionSignature = Uint8Array;
 /** Function that takes in a Signing Message (serialized raw transaction)
  *  and returns a signature
  */
-// eslint-disable-next-line no-unused-vars
 export type SigningFn = (txn: SigningMessage) => Promise<TransactionSignature>;
 
 class TransactionBuilder<F extends SigningFn> {
@@ -70,13 +68,3 @@ class TransactionBuilder<F extends SigningFn> {
 /** Just a syntatic sugar.
  *  TODO: add default signing function for Ed25519 */
 export class TransactionBuilderEd25519 extends TransactionBuilder<SigningFn> {}
-
-/** Helper functions */
-export function hexToAccountAddress(hex: string): AccountAddress {
-  const senderListTuple: ListTuple<[number]> = [];
-  const hexBytes = new HexString(hex).toUint8Array();
-  for (const entry of hexBytes) {
-    senderListTuple.push([entry]);
-  }
-  return new AccountAddress(senderListTuple);
-}

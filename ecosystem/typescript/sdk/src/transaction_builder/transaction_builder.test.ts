@@ -1,14 +1,32 @@
 import * as ed from "@noble/ed25519";
-import * as AptosTypes from "./aptosTypes";
 import { BcsSerializer } from "./bcs";
 import { HexString } from "../hex_string";
 
-import { hexToAccountAddress, TransactionBuilderEd25519 } from "./index";
+import { TransactionBuilderEd25519 } from "./index";
+import {
+  AccountAddress,
+  ChainId,
+  Identifier,
+  Module,
+  ModuleBundle,
+  ModuleId,
+  RawTransaction,
+  Script,
+  ScriptFunction,
+  StructTag,
+  TransactionArgumentVariantAddress,
+  TransactionArgumentVariantU8,
+  TransactionArgumentVariantU8Vector,
+  TransactionPayloadVariantModuleBundle,
+  TransactionPayloadVariantScript,
+  TransactionPayloadVariantScriptFunction,
+  TypeTagVariantstruct,
+} from "./aptos_types";
 
-const ADDRESS1 = "0000000000000000000000000000000000000000000000000000000000001222";
-const ADDRESS2 = "00000000000000000000000000000000000000000000000000000000000000dd";
-const ADDRESS3 = "000000000000000000000000000000000000000000000000000000000a550c18";
-const ADDRESS4 = "0000000000000000000000000000000000000000000000000000000000000001";
+const ADDRESS1 = "0x1222";
+const ADDRESS2 = "0xdd";
+const ADDRESS3 = "0x0a550c18";
+const ADDRESS4 = "0x01";
 const PRIVATE_KEY = "9bf49a6a0755f953811fce125f2683d50429c3bb49e074147e0089a52eae155f";
 const TXN_EXPIRE = "18446744073709551615";
 
@@ -22,13 +40,13 @@ function bcsSerializeUint64(i: BigInt): Uint8Array {
   return bcsSerializer.getBytes();
 }
 
-function bcsSerializeAddress(addr: AptosTypes.AccountAddress): Uint8Array {
+function bcsSerializeAddress(addr: AccountAddress): Uint8Array {
   const bcsSerializer = new BcsSerializer();
   addr.serialize(bcsSerializer);
   return bcsSerializer.getBytes();
 }
 
-async function sign(rawTxn: AptosTypes.RawTransaction): Promise<Uint8Array> {
+async function sign(rawTxn: RawTransaction): Promise<Uint8Array> {
   const privateKey = Uint8Array.from(Buffer.from(PRIVATE_KEY, "hex"));
   const publicKey = await ed.getPublicKey(privateKey);
 
@@ -45,29 +63,27 @@ function hexSignedTxn(signedTxn: Uint8Array): string {
 }
 
 test("serialize script function payload with no type args", async () => {
-  const moduleName = new AptosTypes.ModuleId(hexToAccountAddress(ADDRESS1), new AptosTypes.Identifier("TestCoin"));
-
   const bcsSerializer = new BcsSerializer();
-  const accountAddress = hexToAccountAddress(ADDRESS2);
+  const accountAddress = AccountAddress.fromHex(ADDRESS2);
   accountAddress.serialize(bcsSerializer);
 
-  const scriptFunctionPayload = new AptosTypes.TransactionPayloadVariantScriptFunction(
-    new AptosTypes.ScriptFunction(
-      moduleName,
-      new AptosTypes.Identifier("transfer"),
+  const scriptFunctionPayload = new TransactionPayloadVariantScriptFunction(
+    ScriptFunction.natual(
+      `${ADDRESS1}::TestCoin`,
+      "transfer",
       [],
       [bcsSerializer.getBytes(), bcsSerializeUint64(BigInt(1))],
     ),
   );
 
-  const rawTxn = new AptosTypes.RawTransaction(
-    hexToAccountAddress(ADDRESS3),
+  const rawTxn = new RawTransaction(
+    AccountAddress.fromHex(new HexString(ADDRESS3)),
     BigInt(0),
     scriptFunctionPayload,
     BigInt(2000),
     BigInt(BigInt(0)),
     BigInt(TXN_EXPIRE),
-    new AptosTypes.ChainId(4),
+    new ChainId(4),
   );
 
   const signedTxn = await sign(rawTxn);
@@ -78,34 +94,34 @@ test("serialize script function payload with no type args", async () => {
 });
 
 test("serialize script function payload with type args", async () => {
-  const moduleName = new AptosTypes.ModuleId(hexToAccountAddress(ADDRESS1), new AptosTypes.Identifier("Coin"));
+  const moduleName = ModuleId.fromStr(`${ADDRESS1}::Coin`);
 
-  const token = new AptosTypes.TypeTagVariantstruct(
-    new AptosTypes.StructTag(
-      hexToAccountAddress(ADDRESS4),
-      new AptosTypes.Identifier("TestCoin"),
-      new AptosTypes.Identifier("TestCoin"),
+  const token = new TypeTagVariantstruct(
+    new StructTag(
+      AccountAddress.fromHex(new HexString(ADDRESS4)),
+      new Identifier("TestCoin"),
+      new Identifier("TestCoin"),
       [],
     ),
   );
 
-  const scriptFunctionPayload = new AptosTypes.TransactionPayloadVariantScriptFunction(
-    new AptosTypes.ScriptFunction(
+  const scriptFunctionPayload = new TransactionPayloadVariantScriptFunction(
+    new ScriptFunction(
       moduleName,
-      new AptosTypes.Identifier("transfer"),
+      new Identifier("transfer"),
       [token],
-      [bcsSerializeAddress(hexToAccountAddress(ADDRESS2)), bcsSerializeUint64(BigInt(1))],
+      [bcsSerializeAddress(AccountAddress.fromHex(ADDRESS2)), bcsSerializeUint64(BigInt(1))],
     ),
   );
 
-  const rawTxn = new AptosTypes.RawTransaction(
-    hexToAccountAddress(ADDRESS3),
+  const rawTxn = new RawTransaction(
+    AccountAddress.fromHex(new HexString(ADDRESS3)),
     BigInt(0),
     scriptFunctionPayload,
     BigInt(2000),
     BigInt(0),
     BigInt(TXN_EXPIRE),
-    new AptosTypes.ChainId(4),
+    new ChainId(4),
   );
 
   const signedTxn = await sign(rawTxn);
@@ -116,29 +132,29 @@ test("serialize script function payload with type args", async () => {
 });
 
 test("serialize script function payload with type args but no function args", async () => {
-  const moduleName = new AptosTypes.ModuleId(hexToAccountAddress(ADDRESS1), new AptosTypes.Identifier("Coin"));
+  const moduleName = ModuleId.fromStr(`${ADDRESS1}::Coin`);
 
-  const token = new AptosTypes.TypeTagVariantstruct(
-    new AptosTypes.StructTag(
-      hexToAccountAddress(ADDRESS4),
-      new AptosTypes.Identifier("TestCoin"),
-      new AptosTypes.Identifier("TestCoin"),
+  const token = new TypeTagVariantstruct(
+    new StructTag(
+      AccountAddress.fromHex(new HexString(ADDRESS4)),
+      new Identifier("TestCoin"),
+      new Identifier("TestCoin"),
       [],
     ),
   );
 
-  const scriptFunctionPayload = new AptosTypes.TransactionPayloadVariantScriptFunction(
-    new AptosTypes.ScriptFunction(moduleName, new AptosTypes.Identifier("fake_func"), [token], []),
+  const scriptFunctionPayload = new TransactionPayloadVariantScriptFunction(
+    new ScriptFunction(moduleName, new Identifier("fake_func"), [token], []),
   );
 
-  const rawTxn = new AptosTypes.RawTransaction(
-    hexToAccountAddress(ADDRESS3),
+  const rawTxn = new RawTransaction(
+    AccountAddress.fromHex(ADDRESS3),
     BigInt(0),
     scriptFunctionPayload,
     BigInt(2000),
     BigInt(0),
     BigInt(TXN_EXPIRE),
-    new AptosTypes.ChainId(4),
+    new ChainId(4),
   );
 
   const signedTxn = await sign(rawTxn);
@@ -151,16 +167,16 @@ test("serialize script function payload with type args but no function args", as
 test("serialize script payload with no type args and no function args", async () => {
   const script = hexToBytes("a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102");
 
-  const scriptPayload = new AptosTypes.TransactionPayloadVariantScript(new AptosTypes.Script(script, [], []));
+  const scriptPayload = new TransactionPayloadVariantScript(new Script(script, [], []));
 
-  const rawTxn = new AptosTypes.RawTransaction(
-    hexToAccountAddress(ADDRESS3),
+  const rawTxn = new RawTransaction(
+    AccountAddress.fromHex(ADDRESS3),
     BigInt(0),
     scriptPayload,
     BigInt(2000),
     BigInt(0),
     BigInt(TXN_EXPIRE),
-    new AptosTypes.ChainId(4),
+    new ChainId(4),
   );
 
   const signedTxn = await sign(rawTxn);
@@ -171,27 +187,22 @@ test("serialize script payload with no type args and no function args", async ()
 });
 
 test("serialize script payload with type args but no function args", async () => {
-  const token = new AptosTypes.TypeTagVariantstruct(
-    new AptosTypes.StructTag(
-      hexToAccountAddress(ADDRESS4),
-      new AptosTypes.Identifier("TestCoin"),
-      new AptosTypes.Identifier("TestCoin"),
-      [],
-    ),
+  const token = new TypeTagVariantstruct(
+    new StructTag(AccountAddress.fromHex(ADDRESS4), new Identifier("TestCoin"), new Identifier("TestCoin"), []),
   );
 
   const script = hexToBytes("a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102");
 
-  const scriptPayload = new AptosTypes.TransactionPayloadVariantScript(new AptosTypes.Script(script, [token], []));
+  const scriptPayload = new TransactionPayloadVariantScript(new Script(script, [token], []));
 
-  const rawTxn = new AptosTypes.RawTransaction(
-    hexToAccountAddress(ADDRESS3),
+  const rawTxn = new RawTransaction(
+    AccountAddress.fromHex(ADDRESS3),
     BigInt(0),
     scriptPayload,
     BigInt(2000),
     BigInt(0),
     BigInt(TXN_EXPIRE),
-    new AptosTypes.ChainId(4),
+    new ChainId(4),
   );
 
   const signedTxn = await sign(rawTxn);
@@ -202,28 +213,23 @@ test("serialize script payload with type args but no function args", async () =>
 });
 
 test("serialize script payload with one type arg and one function arg", async () => {
-  const token = new AptosTypes.TypeTagVariantstruct(
-    new AptosTypes.StructTag(
-      hexToAccountAddress(ADDRESS4),
-      new AptosTypes.Identifier("TestCoin"),
-      new AptosTypes.Identifier("TestCoin"),
-      [],
-    ),
+  const token = new TypeTagVariantstruct(
+    new StructTag(AccountAddress.fromHex(ADDRESS4), new Identifier("TestCoin"), new Identifier("TestCoin"), []),
   );
 
-  const argU8 = new AptosTypes.TransactionArgumentVariantU8(2);
+  const argU8 = new TransactionArgumentVariantU8(2);
 
   const script = hexToBytes("a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102");
 
-  const scriptPayload = new AptosTypes.TransactionPayloadVariantScript(new AptosTypes.Script(script, [token], [argU8]));
-  const rawTxn = new AptosTypes.RawTransaction(
-    hexToAccountAddress(ADDRESS3),
+  const scriptPayload = new TransactionPayloadVariantScript(new Script(script, [token], [argU8]));
+  const rawTxn = new RawTransaction(
+    AccountAddress.fromHex(ADDRESS3),
     BigInt(0),
     scriptPayload,
     BigInt(2000),
     BigInt(0),
     BigInt(TXN_EXPIRE),
-    new AptosTypes.ChainId(4),
+    new ChainId(4),
   );
 
   const signedTxn = await sign(rawTxn);
@@ -234,34 +240,27 @@ test("serialize script payload with one type arg and one function arg", async ()
 });
 
 test("serialize script payload with one type arg and two function args", async () => {
-  const token = new AptosTypes.TypeTagVariantstruct(
-    new AptosTypes.StructTag(
-      hexToAccountAddress(ADDRESS4),
-      new AptosTypes.Identifier("TestCoin"),
-      new AptosTypes.Identifier("TestCoin"),
-      [],
-    ),
+  const token = new TypeTagVariantstruct(
+    new StructTag(AccountAddress.fromHex(ADDRESS4), new Identifier("TestCoin"), new Identifier("TestCoin"), []),
   );
 
-  const argU8Vec = new AptosTypes.TransactionArgumentVariantU8Vector(bcsSerializeUint64(BigInt(1)));
-  const argAddress = new AptosTypes.TransactionArgumentVariantAddress(
-    hexToAccountAddress("0000000000000000000000000000000000000000000000000000000000000001"),
+  const argU8Vec = new TransactionArgumentVariantU8Vector(bcsSerializeUint64(BigInt(1)));
+  const argAddress = new TransactionArgumentVariantAddress(
+    AccountAddress.fromHex(new HexString("0000000000000000000000000000000000000000000000000000000000000001")),
   );
 
   const script = hexToBytes("a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102");
 
-  const scriptPayload = new AptosTypes.TransactionPayloadVariantScript(
-    new AptosTypes.Script(script, [token], [argU8Vec, argAddress]),
-  );
+  const scriptPayload = new TransactionPayloadVariantScript(new Script(script, [token], [argU8Vec, argAddress]));
 
-  const rawTxn = new AptosTypes.RawTransaction(
-    hexToAccountAddress(ADDRESS3),
+  const rawTxn = new RawTransaction(
+    AccountAddress.fromHex(ADDRESS3),
     BigInt(0),
     scriptPayload,
     BigInt(2000),
     BigInt(0),
     BigInt(TXN_EXPIRE),
-    new AptosTypes.ChainId(4),
+    new ChainId(4),
   );
 
   const signedTxn = await sign(rawTxn);
@@ -276,18 +275,16 @@ test("serialize module payload", async () => {
     "a11ceb0b0300000006010002030205050703070a0c0816100c260900000001000100000102084d794d6f64756c650269640000000000000000000000000b1e55ed00010000000231010200",
   );
 
-  const modulePayload = new AptosTypes.TransactionPayloadVariantModuleBundle(
-    new AptosTypes.ModuleBundle([new AptosTypes.Module(module)]),
-  );
+  const modulePayload = new TransactionPayloadVariantModuleBundle(new ModuleBundle([new Module(module)]));
 
-  const rawTxn = new AptosTypes.RawTransaction(
-    hexToAccountAddress(ADDRESS3),
+  const rawTxn = new RawTransaction(
+    AccountAddress.fromHex(ADDRESS3),
     BigInt(0),
     modulePayload,
     BigInt(2000),
     BigInt(0),
     BigInt(TXN_EXPIRE),
-    new AptosTypes.ChainId(4),
+    new ChainId(4),
   );
 
   const signedTxn = await sign(rawTxn);
