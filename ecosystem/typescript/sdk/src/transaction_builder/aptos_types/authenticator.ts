@@ -1,6 +1,5 @@
-import { Serializer, Deserializer, bytes, Seq } from "../bcs";
+import { Serializer, Deserializer, bytes, Seq, deserializeVector, serializeVector } from "../bcs";
 import { AccountAddress } from "./account_address";
-import { deserializeVector, serializeVector } from "./helper";
 
 export abstract class TransactionAuthenticator {
   abstract serialize(serializer: Serializer): void;

@@ -1,4 +1,6 @@
-import { Deserializer, Seq, Serializer } from "../bcs";
+import { Deserializer } from "./deserializer";
+import { BcsSerializer, Serializer } from "./serializer";
+import { bytes, Seq } from "./types";
 
 interface Serializable {
   serialize(serializer: Serializer): void;
@@ -18,4 +20,16 @@ export function deserializeVector(deserializer: Deserializer, cls: any) {
     list.push(cls.deserialize(deserializer));
   }
   return list;
+}
+
+export function bcsToBytes<T extends Serializable>(value: T): bytes {
+  const serializer = new BcsSerializer();
+  value.serialize(serializer);
+  return serializer.getBytes();
+}
+
+export function bcsSerializeUint64(value: BigInt | number): bytes {
+  const serializer = new BcsSerializer();
+  serializer.serializeU64(value);
+  return serializer.getBytes();
 }

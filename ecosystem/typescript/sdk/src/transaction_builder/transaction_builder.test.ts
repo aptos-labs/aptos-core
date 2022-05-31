@@ -1,15 +1,13 @@
 import * as ed from "@noble/ed25519";
-import { BcsSerializer } from "./bcs";
+import { bcsSerializeUint64, bcsToBytes } from "./bcs";
 import { HexString } from "../hex_string";
 
 import { TransactionBuilderEd25519 } from "./index";
 import {
   AccountAddress,
   ChainId,
-  Identifier,
   Module,
   ModuleBundle,
-  ModuleId,
   RawTransaction,
   Script,
   ScriptFunction,
@@ -34,16 +32,8 @@ function hexToBytes(hex: string) {
   return new HexString(hex).toUint8Array();
 }
 
-function bcsSerializeUint64(i: BigInt): Uint8Array {
-  const bcsSerializer = new BcsSerializer();
-  bcsSerializer.serializeU64(i);
-  return bcsSerializer.getBytes();
-}
-
-function bcsSerializeAddress(addr: AccountAddress): Uint8Array {
-  const bcsSerializer = new BcsSerializer();
-  addr.serialize(bcsSerializer);
-  return bcsSerializer.getBytes();
+function hexSignedTxn(signedTxn: Uint8Array): string {
+  return Buffer.from(signedTxn).toString("hex");
 }
 
 async function sign(rawTxn: RawTransaction): Promise<Uint8Array> {
@@ -58,30 +48,22 @@ async function sign(rawTxn: RawTransaction): Promise<Uint8Array> {
   return txnBuilder.sign(rawTxn);
 }
 
-function hexSignedTxn(signedTxn: Uint8Array): string {
-  return Buffer.from(signedTxn).toString("hex");
-}
-
 test("serialize script function payload with no type args", async () => {
-  const bcsSerializer = new BcsSerializer();
-  const accountAddress = AccountAddress.fromHex(ADDRESS2);
-  accountAddress.serialize(bcsSerializer);
-
   const scriptFunctionPayload = new TransactionPayloadVariantScriptFunction(
     ScriptFunction.natual(
       `${ADDRESS1}::TestCoin`,
       "transfer",
       [],
-      [bcsSerializer.getBytes(), bcsSerializeUint64(BigInt(1))],
+      [bcsToBytes(AccountAddress.fromHex(ADDRESS2)), bcsSerializeUint64(1)],
     ),
   );
 
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(new HexString(ADDRESS3)),
-    BigInt(0),
+    0n,
     scriptFunctionPayload,
-    BigInt(2000),
-    BigInt(BigInt(0)),
+    2000n,
+    0n,
     BigInt(TXN_EXPIRE),
     new ChainId(4),
   );
@@ -94,32 +76,23 @@ test("serialize script function payload with no type args", async () => {
 });
 
 test("serialize script function payload with type args", async () => {
-  const moduleName = ModuleId.fromStr(`${ADDRESS1}::Coin`);
-
-  const token = new TypeTagVariantstruct(
-    new StructTag(
-      AccountAddress.fromHex(new HexString(ADDRESS4)),
-      new Identifier("TestCoin"),
-      new Identifier("TestCoin"),
-      [],
-    ),
-  );
+  const token = new TypeTagVariantstruct(StructTag.fromString(`${ADDRESS4}::TestCoin::TestCoin`));
 
   const scriptFunctionPayload = new TransactionPayloadVariantScriptFunction(
-    new ScriptFunction(
-      moduleName,
-      new Identifier("transfer"),
+    ScriptFunction.natual(
+      `${ADDRESS1}::Coin`,
+      "transfer",
       [token],
-      [bcsSerializeAddress(AccountAddress.fromHex(ADDRESS2)), bcsSerializeUint64(BigInt(1))],
+      [bcsToBytes(AccountAddress.fromHex(ADDRESS2)), bcsSerializeUint64(1)],
     ),
   );
 
   const rawTxn = new RawTransaction(
-    AccountAddress.fromHex(new HexString(ADDRESS3)),
-    BigInt(0),
+    AccountAddress.fromHex(ADDRESS3),
+    0n,
     scriptFunctionPayload,
-    BigInt(2000),
-    BigInt(0),
+    2000n,
+    0n,
     BigInt(TXN_EXPIRE),
     new ChainId(4),
   );
@@ -132,27 +105,18 @@ test("serialize script function payload with type args", async () => {
 });
 
 test("serialize script function payload with type args but no function args", async () => {
-  const moduleName = ModuleId.fromStr(`${ADDRESS1}::Coin`);
-
-  const token = new TypeTagVariantstruct(
-    new StructTag(
-      AccountAddress.fromHex(new HexString(ADDRESS4)),
-      new Identifier("TestCoin"),
-      new Identifier("TestCoin"),
-      [],
-    ),
-  );
+  const token = new TypeTagVariantstruct(StructTag.fromString(`${ADDRESS4}::TestCoin::TestCoin`));
 
   const scriptFunctionPayload = new TransactionPayloadVariantScriptFunction(
-    new ScriptFunction(moduleName, new Identifier("fake_func"), [token], []),
+    ScriptFunction.natual(`${ADDRESS1}::Coin`, "fake_func", [token], []),
   );
 
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(ADDRESS3),
-    BigInt(0),
+    0n,
     scriptFunctionPayload,
-    BigInt(2000),
-    BigInt(0),
+    2000n,
+    0n,
     BigInt(TXN_EXPIRE),
     new ChainId(4),
   );
@@ -171,10 +135,10 @@ test("serialize script payload with no type args and no function args", async ()
 
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(ADDRESS3),
-    BigInt(0),
+    0n,
     scriptPayload,
-    BigInt(2000),
-    BigInt(0),
+    2000n,
+    0n,
     BigInt(TXN_EXPIRE),
     new ChainId(4),
   );
@@ -187,9 +151,7 @@ test("serialize script payload with no type args and no function args", async ()
 });
 
 test("serialize script payload with type args but no function args", async () => {
-  const token = new TypeTagVariantstruct(
-    new StructTag(AccountAddress.fromHex(ADDRESS4), new Identifier("TestCoin"), new Identifier("TestCoin"), []),
-  );
+  const token = new TypeTagVariantstruct(StructTag.fromString(`${ADDRESS4}::TestCoin::TestCoin`));
 
   const script = hexToBytes("a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102");
 
@@ -197,10 +159,10 @@ test("serialize script payload with type args but no function args", async () =>
 
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(ADDRESS3),
-    BigInt(0),
+    0n,
     scriptPayload,
-    BigInt(2000),
-    BigInt(0),
+    2000n,
+    0n,
     BigInt(TXN_EXPIRE),
     new ChainId(4),
   );
@@ -213,9 +175,7 @@ test("serialize script payload with type args but no function args", async () =>
 });
 
 test("serialize script payload with one type arg and one function arg", async () => {
-  const token = new TypeTagVariantstruct(
-    new StructTag(AccountAddress.fromHex(ADDRESS4), new Identifier("TestCoin"), new Identifier("TestCoin"), []),
-  );
+  const token = new TypeTagVariantstruct(StructTag.fromString(`${ADDRESS4}::TestCoin::TestCoin`));
 
   const argU8 = new TransactionArgumentVariantU8(2);
 
@@ -224,10 +184,10 @@ test("serialize script payload with one type arg and one function arg", async ()
   const scriptPayload = new TransactionPayloadVariantScript(new Script(script, [token], [argU8]));
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(ADDRESS3),
-    BigInt(0),
+    0n,
     scriptPayload,
-    BigInt(2000),
-    BigInt(0),
+    2000n,
+    0n,
     BigInt(TXN_EXPIRE),
     new ChainId(4),
   );
@@ -240,14 +200,10 @@ test("serialize script payload with one type arg and one function arg", async ()
 });
 
 test("serialize script payload with one type arg and two function args", async () => {
-  const token = new TypeTagVariantstruct(
-    new StructTag(AccountAddress.fromHex(ADDRESS4), new Identifier("TestCoin"), new Identifier("TestCoin"), []),
-  );
+  const token = new TypeTagVariantstruct(StructTag.fromString(`${ADDRESS4}::TestCoin::TestCoin`));
 
-  const argU8Vec = new TransactionArgumentVariantU8Vector(bcsSerializeUint64(BigInt(1)));
-  const argAddress = new TransactionArgumentVariantAddress(
-    AccountAddress.fromHex(new HexString("0000000000000000000000000000000000000000000000000000000000000001")),
-  );
+  const argU8Vec = new TransactionArgumentVariantU8Vector(bcsSerializeUint64(1));
+  const argAddress = new TransactionArgumentVariantAddress(AccountAddress.fromHex("0x01"));
 
   const script = hexToBytes("a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102");
 
@@ -255,10 +211,10 @@ test("serialize script payload with one type arg and two function args", async (
 
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(ADDRESS3),
-    BigInt(0),
+    0n,
     scriptPayload,
-    BigInt(2000),
-    BigInt(0),
+    2000n,
+    0n,
     BigInt(TXN_EXPIRE),
     new ChainId(4),
   );
@@ -279,10 +235,10 @@ test("serialize module payload", async () => {
 
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(ADDRESS3),
-    BigInt(0),
+    0n,
     modulePayload,
-    BigInt(2000),
-    BigInt(0),
+    2000n,
+    0n,
     BigInt(TXN_EXPIRE),
     new ChainId(4),
   );

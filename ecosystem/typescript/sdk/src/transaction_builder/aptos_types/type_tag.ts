@@ -1,6 +1,5 @@
-import { Deserializer, Seq, Serializer } from "../bcs";
+import { Deserializer, Seq, Serializer, deserializeVector, serializeVector } from "../bcs";
 import { AccountAddress } from "./account_address";
-import { deserializeVector, serializeVector } from "./helper";
 import { Identifier } from "./identifier";
 
 export abstract class TypeTag {
@@ -154,6 +153,20 @@ export class StructTag {
     public readonly name: Identifier,
     public readonly type_args: Seq<TypeTag>,
   ) {}
+
+  static fromString(structTag: string): StructTag {
+    // Type args are not supported in string literal
+    if (structTag.includes("<")) {
+      throw new Error("Not implemented");
+    }
+
+    const parts = structTag.split("::");
+    if (parts.length !== 3) {
+      throw new Error("Invalid struct tag string literal.");
+    }
+
+    return new StructTag(AccountAddress.fromHex(parts[0]), new Identifier(parts[1]), new Identifier(parts[2]), []);
+  }
 
   serialize(serializer: Serializer): void {
     this.address.serialize(serializer);

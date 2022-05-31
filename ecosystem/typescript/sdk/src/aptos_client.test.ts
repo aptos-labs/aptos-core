@@ -7,8 +7,6 @@ import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";
 import {
   ChainId,
-  Identifier,
-  ModuleId,
   RawTransaction,
   ScriptFunction,
   StructTag,
@@ -16,8 +14,7 @@ import {
   TypeTagVariantstruct,
 } from "./transaction_builder/aptos_types";
 import { AccountAddress } from "./transaction_builder/aptos_types";
-import { BcsSerializer } from "./transaction_builder/bcs";
-import { HexString } from "./hex_string";
+import { bcsSerializeUint64, bcsToBytes } from "./transaction_builder/bcs";
 
 test("gets genesis account", async () => {
   const client = new AptosClient(NODE_URL);
@@ -96,12 +93,6 @@ test("test raiseForStatus", async () => {
   expect(() => raiseForStatus(200, fakeResponse)).toThrow('Status Text - "some string"');
 });
 
-function bcsSerializeUint64(i: BigInt): Uint8Array {
-  const bcsSerializer = new BcsSerializer();
-  bcsSerializer.serializeU64(i);
-  return bcsSerializer.getBytes();
-}
-
 test(
   "submits bcs transaction",
   async () => {
@@ -120,30 +111,14 @@ test(
     accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
     expect((accountResource.data as any).coin.value).toBe("0");
 
-    const moduleName = new ModuleId(
-      AccountAddress.fromHex(new HexString("0000000000000000000000000000000000000000000000000000000000000001")),
-      new Identifier("Coin"),
-    );
-
-    const bcsSerializer = new BcsSerializer();
-    const accountAddress2 = AccountAddress.fromHex(account2.address());
-    accountAddress2.serialize(bcsSerializer);
-
-    const token = new TypeTagVariantstruct(
-      new StructTag(
-        AccountAddress.fromHex(new HexString("0000000000000000000000000000000000000000000000000000000000000001")),
-        new Identifier("TestCoin"),
-        new Identifier("TestCoin"),
-        [],
-      ),
-    );
+    const token = new TypeTagVariantstruct(StructTag.fromString("0x1::TestCoin::TestCoin"));
 
     const scriptFunctionPayload = new TransactionPayloadVariantScriptFunction(
-      new ScriptFunction(
-        moduleName,
-        new Identifier("transfer"),
+      ScriptFunction.natual(
+        "0x1::Coin",
+        "transfer",
         [token],
-        [bcsSerializer.getBytes(), bcsSerializeUint64(BigInt(717))],
+        [bcsToBytes(AccountAddress.fromHex(account2.address())), bcsSerializeUint64(717)],
       ),
     );
 
@@ -153,8 +128,8 @@ test(
       AccountAddress.fromHex(account1.address()),
       BigInt(sequence_number),
       scriptFunctionPayload,
-      BigInt(1000),
-      BigInt(1),
+      1000n,
+      1n,
       BigInt(Math.floor(Date.now() / 1000) + 10),
       new ChainId(parseInt(CHAIN_ID)),
     );

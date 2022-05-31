@@ -1,8 +1,18 @@
 import { HexString } from "../../hex_string";
-import { Deserializer, Serializer, uint64, bytes, Seq, uint8, bool, uint128 } from "../bcs";
+import {
+  Deserializer,
+  Serializer,
+  uint64,
+  bytes,
+  Seq,
+  uint8,
+  bool,
+  uint128,
+  deserializeVector,
+  serializeVector,
+} from "../bcs";
 import { AccountAddress } from "./account_address";
 import { TransactionAuthenticator } from "./authenticator";
-import { deserializeVector, serializeVector } from "./helper";
 import { Identifier } from "./identifier";
 import { TypeTag } from "./type_tag";
 
