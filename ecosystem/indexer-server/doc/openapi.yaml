@@ -298,7 +298,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/Ownerships"
+              $ref: "#/components/schemas/OwnershipIds"
         required: true
       responses:
         "200":
@@ -306,7 +306,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Ownership"
+                $ref: "#/components/schemas/Ownerships"
         '404':
           $ref: "#/components/responses/404"
         '400':
@@ -1750,6 +1750,14 @@ components:
       type: string
       description: Ownership Id has the format of "${tokenID}::${ownerAddress}"
       example:
+    OwnershipIds:
+      type: object
+      properties:
+        ids:
+          type: array
+          description: "List of Ownership Ids"
+          items:
+            $ref: "#/components/schemas/OwnershipId"
     OwnershipSource:
       type: string
       enum:
