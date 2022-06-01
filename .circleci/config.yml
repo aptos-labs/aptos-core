@@ -97,54 +97,6 @@ jobs:
               exit $ret
             fi
 
-  ecr-dockerhub-mirror:
-    executor: ubuntu-medium
-    parameters:
-      addl_tag:
-        description: Additional image tag
-        type: string
-        default: main
-    steps:
-      - checkout
-      - aws-setup
-      - aws-ecr-setup
-      - run: echo "export IMAGE_TAG=dev_$(git rev-parse --short=8 HEAD)" >> $BASH_ENV
-      - run: echo "export ADDL_IMAGE_TAG=<<parameters.addl_tag>>_$(git rev-parse --short=8 HEAD)" >> $BASH_ENV
-      - run:
-          name: Get latest built main image
-          shell: /bin/bash
-          command: |
-            ret=0
-            for img in "${AWS_ECR_IMAGES[@]}"
-            do
-              docker pull "${AWS_ECR_ACCOUNT_URL}/aptos/${img}:${IMAGE_TAG}" || ret=$?
-            done
-            exit $ret
-      - dockerhub-setup
-      - run:
-          name: Tag image
-          shell: /bin/bash
-          command: |
-            ret=0
-            for img in "${DOCKERHUB_IMAGES[@]}"
-            do
-              docker tag "${AWS_ECR_ACCOUNT_URL}/aptos/${img}:${IMAGE_TAG}" "${DOCKERHUB_ORG}/${img}:${IMAGE_TAG}"
-              docker tag "${AWS_ECR_ACCOUNT_URL}/aptos/${img}:${IMAGE_TAG}" "${DOCKERHUB_ORG}/${img}:<<parameters.addl_tag>>"
-              docker tag "${AWS_ECR_ACCOUNT_URL}/aptos/${img}:${IMAGE_TAG}" "${DOCKERHUB_ORG}/${img}:${ADDL_IMAGE_TAG}" || ret=$?
-            done
-            exit $ret
-      - run:
-          name: Push image to Dockerhub
-          shell: /bin/bash
-          command: |
-            ret=0
-            for img in "${DOCKERHUB_IMAGES[@]}"
-            do
-              docker push "${DOCKERHUB_ORG}/${img}:${IMAGE_TAG}"
-              docker push "${DOCKERHUB_ORG}/${img}:<<parameters.addl_tag>>"
-              docker push "${DOCKERHUB_ORG}/${img}:${ADDL_IMAGE_TAG}" || ret=$?
-            done
-            exit $ret
   forge-k8s-test:
     executor: ubuntu-medium
     steps:
@@ -280,38 +232,7 @@ workflows:
           context: aws-dev
           requires:
             - docker-build-push
-  ### on devnet branch update ###
-  # Ensure the latest is built on the "devnet" branch, and mirror from ECR to Dockerhub
-  devnet-branch-cut:
-    when:
-      equal: [devnet, << pipeline.git.branch >>]
-    jobs:
-      - docker-build-push:
-          context: aws-dev
-          addl_tag: devnet
-      - ecr-dockerhub-mirror:
-          context:
-            - aws-dev
-            - docker-aptoslabsbots
-          addl_tag: devnet
-          requires:
-            - docker-build-push
-  ### on testnet branch update ###
-  # Ensure the latest is built on the "testnet" branch, and mirror from ECR to Dockerhub
-  testnet-branch-cut:
-    when:
-      equal: [testnet, << pipeline.git.branch >>]
-    jobs:
-      - docker-build-push:
-          context: aws-dev
-          addl_tag: testnet
-      - ecr-dockerhub-mirror:
-          context:
-            - aws-dev
-            - docker-aptoslabsbots
-          addl_tag: testnet
-          requires:
-            - docker-build-push
+
 commands:
   dev-setup:
     steps:
@@ -356,19 +277,7 @@ commands:
             echo 'export AWS_ECR_ACCOUNT_URL="${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.${AWS_REGION}.amazonaws.com"' >> $BASH_ENV
             echo "export AWS_ECR_IMAGES=( validator forge init validator_tcb tools faucet txn-emitter indexer )" >> $BASH_ENV
       - aws-ecr/ecr-login
-  ### Sets up the permissions for using Dockerhub
-  dockerhub-setup:
-    steps:
-      - run:
-          name: Docker login
-          command: |
-            echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin
-      - run:
-          name: Compose DockerHub Env Variables
-          command: |
-            # the images that exist in dockerhub org
-            echo "export DOCKERHUB_ORG=aptoslab" >> $BASH_ENV
-            echo "export DOCKERHUB_IMAGES=( validator forge init validator_tcb tools faucet indexer )" >> $BASH_ENV
+
   ecosystem-setup:
     steps:
       - checkout
