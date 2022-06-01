@@ -1,0 +1,57 @@
+on:
+  schedule:
+    # mon-fri at 9am PST (16:00 UTC).
+    - cron: "0 16 * * 1-5"
+
+env:
+  GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+
+permissions:
+  contents: read
+  id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
+
+jobs:
+  CopyImagesToDockerHub:
+    strategy:
+      matrix:
+        IMAGE_NAME: [validator, forge, init, validator_tcb, tools, faucet, txn-emitter, indexer]
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - id: auth
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v0"
+        with:
+          create_credentials_file: false
+          token_format: "access_token"
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Login to Google Artifact Registry
+        uses: docker/login-action@v2
+        with:
+          registry: us-west1-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.ENV_DOCKERHUB_USERNAME }}
+          password: ${{ secrets.ENV_DOCKERHUB_PASSWORD }}
+
+      - name: Compute 8-char SHA1
+        id: vars
+        run: echo "::set-output name=short_sha1::$(git rev-parse --short=8 HEAD)"
+
+      - name: Push Images to Dockerhub
+        uses: akhilerm/tag-push-action@v2.0.0
+        with:
+          src: ${{ GCP_DOCKER_ARTIFACT_REPO }}/${{ matrix.IMAGE_NAME }}:${{ GITHUB_SHA }}
+          dst: |
+            docker.io/aptoslab/${{matrix.IMAGE_NAME}}:nightly
+            docker.io/aptoslab/${{matrix.IMAGE_NAME}}:nightly_${{ steps.vars.outputs.short_sha1 }}
+            docker.io/aptoslabs/${{matrix.IMAGE_NAME}}:nightly
+            docker.io/aptoslabs/${{matrix.IMAGE_NAME}}:nightly_${{ steps.vars.outputs.short_sha1 }}

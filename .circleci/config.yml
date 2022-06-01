@@ -96,22 +96,6 @@ jobs:
               done
               exit $ret
             fi
-  build-push-community-platform:
-    executor: ubuntu-medium
-    steps:
-      - checkout
-      - aws-setup
-      - aws-ecr-setup
-      - gcp-gcr/gcr-auth:
-          registry-url: us-west1-docker.pkg.dev
-      - run:
-          name: Build or skip
-          shell: /bin/bash
-          command: |
-            set -e
-            cd ecosystem/platform/server
-            docker buildx create --use
-            GIT_SHA1=${CIRCLE_SHA1} docker buildx bake --progress=plain --push -f ./docker-bake.hcl
 
   ecr-dockerhub-mirror:
     executor: ubuntu-medium
@@ -268,13 +252,6 @@ workflows:
   # Build the PR binaries and run various tests
   # Build the Docker images and run Forge tests
 
-  build-push-community-platform:
-    jobs:
-      - build-push-community-platform:
-          context:
-            - aws-dev
-            - gcp-global
-
   build-test-deploy:
     when:
       not:
@@ -333,35 +310,6 @@ workflows:
             - aws-dev
             - docker-aptoslabsbots
           addl_tag: testnet
-          requires:
-            - docker-build-push
-  ### on continuous_push scheduled pipeline ###
-  # Build the latest on "main" branch
-  continuous-push:
-    when:
-      and:
-        - equal: [scheduled_pipeline, << pipeline.trigger_source >>]
-        - equal: ["continuous_push", << pipeline.schedule.name >>]
-    jobs:
-      - docker-build-push:
-          context: aws-dev
-          addl_tag: main
-  ### on nightly scheduled pipeline ###
-  # Ensure the latest on "main" branch is built, and mirror from ECR to Dockerhub
-  nightly:
-    when:
-      and:
-        - equal: [scheduled_pipeline, << pipeline.trigger_source >>]
-        - equal: ["nightly", << pipeline.schedule.name >>]
-    jobs:
-      - docker-build-push:
-          context: aws-dev
-          addl_tag: main
-      - ecr-dockerhub-mirror:
-          context:
-            - aws-dev
-            - docker-aptoslabsbots
-          addl_tag: main
           requires:
             - docker-build-push
 commands:

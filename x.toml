@@ -130,6 +130,8 @@ whitespace-exceptions = [
     "**/*.errmap",
     "**/*.abi",
     "terraform/**/*",
+    "**/*.yaml",
+    "**/*.yml",
 ]
 
 license-exceptions = [
