@@ -88,7 +88,17 @@ describe("BCS Deserializer", () => {
   });
 
   it("deserializes a uleb128", () => {
-    const deserializer = new Deserializer(new Uint8Array([0xcd, 0xea, 0xec, 0x31]));
+    let deserializer = new Deserializer(new Uint8Array([0xcd, 0xea, 0xec, 0x31]));
     expect(deserializer.deserializeUleb128AsU32()).toEqual(104543565);
+
+    deserializer = new Deserializer(new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x0f]));
+    expect(deserializer.deserializeUleb128AsU32()).toEqual(4294967295);
+  });
+
+  it("throws when deserializing a uleb128 with out ranged value", () => {
+    expect(() => {
+      let deserializer = new Deserializer(new Uint8Array([0x80, 0x80, 0x80, 0x80, 0x10]));
+      deserializer.deserializeUleb128AsU32();
+    }).toThrow("Overflow while parsing uleb128-encoded uint32 value");
   });
 });

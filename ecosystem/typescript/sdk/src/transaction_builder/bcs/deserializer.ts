@@ -153,21 +153,23 @@ export class Deserializer {
    * BCS use uleb128 encoding in two cases: (1) lengths of variable-length sequences and (2) tags of enum values
    */
   deserializeUleb128AsU32(): uint32 {
-    let value = 0;
-    for (let shift = 0; shift < 32; shift += 7) {
-      const x = this.deserializeU8();
-      const digit = x & 0x7f;
-      value |= digit << shift;
-      if (value < 0 || value > MAX_U32_NUMBER) {
-        throw new Error("Overflow while parsing uleb128-encoded uint32 value");
+    let value: bigint = 0n;
+    let shift = 0;
+
+    while (value < MAX_U32_NUMBER) {
+      const byte = this.deserializeU8();
+      value |= BigInt(byte & 0x7f) << BigInt(shift);
+
+      if ((byte & 0x80) === 0) {
+        break;
       }
-      if (digit === x) {
-        if (shift > 0 && digit === 0) {
-          throw new Error("Invalid uleb128 number (unexpected zero digit)");
-        }
-        return value;
-      }
+      shift += 7;
     }
-    throw new Error("Overflow while parsing uleb128-encoded uint32 value");
+
+    if (value > MAX_U32_NUMBER) {
+      throw new Error("Overflow while parsing uleb128-encoded uint32 value");
+    }
+
+    return Number(value);
   }
 }
