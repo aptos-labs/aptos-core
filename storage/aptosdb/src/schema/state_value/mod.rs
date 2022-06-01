@@ -35,7 +35,7 @@ impl KeyCodec<StateValueSchema> for Key {
     fn encode_key(&self) -> Result<Vec<u8>> {
         let mut encoded = vec![];
         encoded.write_all(&self.0.encode()?)?;
-        encoded.write_u64::<BigEndian>(self.1)?;
+        encoded.write_u64::<BigEndian>(!self.1)?;
         Ok(encoded)
     }
 
@@ -45,7 +45,7 @@ impl KeyCodec<StateValueSchema> for Key {
         ensure_slice_len_gt(data, VERSION_SIZE)?;
         let state_key_len = data.len() - VERSION_SIZE;
         let state_key: StateKey = StateKey::decode(&data[..state_key_len])?;
-        let version = (&data[state_key_len..]).read_u64::<BigEndian>()?;
+        let version = !(&data[state_key_len..]).read_u64::<BigEndian>()?;
         Ok((state_key, version))
     }
 }

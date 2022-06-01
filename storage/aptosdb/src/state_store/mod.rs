@@ -33,7 +33,7 @@ use aptos_types::{
     transaction::{Version, PRE_GENESIS_VERSION},
 };
 use schemadb::{SchemaBatch, DB};
-use std::{cmp::Ordering, collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use storage_interface::StateSnapshotReceiver;
 
 type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
@@ -156,34 +156,26 @@ impl StateStore {
     ) -> Result<HashMap<StateKey, StateValue>> {
         let mut iter = self.db.iter::<StateValueSchema>(Default::default())?;
         let mut result = HashMap::new();
+        let mut prev_key = None;
         iter.seek(&(key_prefix))?;
-        while let Some(((state_key, first_version), state_value)) = iter.next().transpose()? {
+        while let Some(((state_key, version), state_value)) = iter.next().transpose()? {
+            // In case the previous seek() ends on the same key with version 0.
+            if Some(&state_key) == prev_key.as_ref() {
+                continue;
+            }
             // Cursor is currently at the first available version of the state key.
             // Check if the key_prefix is a valid prefix of the state_key we got from DB.
-
             if !key_prefix.is_prefix(&state_key)? {
                 // No more keys matching the key_prefix, we can return the result.
-                return Ok(result);
+                break;
             }
-            match first_version.cmp(&desired_version) {
-                Ordering::Less => {
-                    iter.seek_for_prev(&(state_key.clone(), desired_version))?;
-                    let ((state_key, _), state_value) =
-                        iter.next().transpose()?.ok_or_else(|| {
-                            anyhow!(
-                                "Failure seeking to desired version {:?} for state key {:?}",
-                                desired_version,
-                                state_key
-                            )
-                        })?;
-                    result.insert(state_key.clone(), state_value);
-                }
 
-                Ordering::Equal => {
-                    result.insert(state_key.clone(), state_value);
-                }
-                Ordering::Greater => {}
+            if version > desired_version {
+                iter.seek(&(state_key.clone(), desired_version))?;
+                continue;
             }
+
+            result.insert(state_key.clone(), state_value);
             // We don't allow fetching arbitrarily large number of values to be fetched as this can
             // potentially slowdown the DB.
             if result.len() > MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX {
@@ -193,8 +185,9 @@ impl StateStore {
                     MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX
                 ));
             }
-            // Seek to the next key - this can be done by seeking to the current key with max version
-            iter.seek(&(state_key, u64::MAX))?;
+            prev_key = Some(state_key.clone());
+            // Seek to the next key - this can be done by seeking to the current key with version 0
+            iter.seek(&(state_key, 0))?;
         }
         Ok(result)
     }
@@ -218,7 +211,7 @@ impl StateStore {
         version: Version,
     ) -> Result<Option<StateValue>> {
         let mut iter = self.db.iter::<StateValueSchema>(Default::default())?;
-        iter.seek_for_prev(&(state_key.clone(), version))?;
+        iter.seek(&(state_key.clone(), version))?;
         iter.next()
             .transpose()?
             .and_then(|((db_state_key, _), state_value)| {
