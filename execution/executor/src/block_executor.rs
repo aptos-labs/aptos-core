@@ -17,7 +17,7 @@ use aptos_vm::VMExecutor;
 use executor_types::{BlockExecutorTrait, Error, StateComputeResult};
 use fail::fail_point;
 use scratchpad::SparseMerkleTree;
-use std::marker::PhantomData;
+use std::{collections::HashMap, marker::PhantomData};
 
 use crate::{
     components::{block_tree::BlockTree, chunk_output::ChunkOutput},
@@ -27,7 +27,7 @@ use crate::{
         APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
-use storage_interface::{jmt_update_sets, DbReaderWriter};
+use storage_interface::DbReaderWriter;
 
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
@@ -57,7 +57,7 @@ where
         Option<(
             Version,
             SparseMerkleTree<StateValue>,
-            Vec<Vec<(HashValue, (HashValue, StateKey))>>,
+            Vec<HashMap<StateKey, StateValue>>,
         )>,
         Error,
     > {
@@ -118,19 +118,29 @@ where
         };
 
         if merklize_state {
-            let jmt_updates = txns_to_commit
-                .iter()
-                .flat_map(|t| jmt_update_sets(&[t.state_updates()]))
+            Ok(None)
+        } else {
+            let state_updates = txns_to_commit
+                .into_iter()
+                .map(|t| t.into_state_updates())
                 .collect();
 
             Ok(Some((
                 ledger_info_with_sigs.ledger_info().version(),
                 committed_smt,
-                jmt_updates,
+                state_updates,
             )))
-        } else {
-            Ok(None)
         }
+    }
+
+    pub fn root_smt(&self) -> SparseMerkleTree<StateValue> {
+        self.block_tree
+            .root_block()
+            .output
+            .result_view
+            .state()
+            .current
+            .clone()
     }
 }
 
@@ -202,7 +212,10 @@ where
             output
         };
         output.ensure_ends_with_state_checkpoint()?;
-
+        info!(
+            result_version = output.result_view.txn_accumulator().version(),
+            "block add."
+        );
         let block = self
             .block_tree
             .add_block(parent_block_id, block_id, output)?;
@@ -226,7 +239,7 @@ where
         Option<(
             Version,
             SparseMerkleTree<StateValue>,
-            Vec<Vec<(HashValue, (HashValue, StateKey))>>,
+            Vec<HashMap<StateKey, StateValue>>,
         )>,
         Error,
     > {

@@ -120,7 +120,7 @@ pub trait BlockExecutorTrait: Send + Sync {
         Option<(
             Version,
             SparseMerkleTree<StateValue>,
-            Vec<Vec<(HashValue, (HashValue, StateKey))>>,
+            Vec<HashMap<StateKey, StateValue>>,
         )>,
         Error,
     > {

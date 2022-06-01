@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod db_generator;
+pub mod state_committer;
 pub mod transaction_committer;
 pub mod transaction_executor;
 pub mod transaction_generator;
@@ -13,6 +14,7 @@ use crate::{
 use aptos_config::config::{NodeConfig, RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_logger::prelude::*;
 
+use crate::state_committer::StateCommitter;
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use executor::block_executor::BlockExecutor;
@@ -22,10 +24,12 @@ use std::{
     path::Path,
     sync::{mpsc, Arc},
 };
-use storage_interface::{DbReader, DbReaderWriter};
+use storage_interface::{DbReader, DbReaderWriter, DbWriter};
 
-pub fn init_db_and_executor(config: &NodeConfig) -> (Arc<dyn DbReader>, BlockExecutor<AptosVM>) {
-    let (db, dbrw) = DbReaderWriter::wrap(
+pub fn init_db_and_executor(
+    config: &NodeConfig,
+) -> (Arc<dyn DbReader>, Arc<dyn DbWriter>, BlockExecutor<AptosVM>) {
+    let (_db, dbrw) = DbReaderWriter::wrap(
         AptosDB::open(
             &config.storage.dir(),
             false,                       /* readonly */
@@ -35,9 +39,9 @@ pub fn init_db_and_executor(config: &NodeConfig) -> (Arc<dyn DbReader>, BlockExe
         .expect("DB should open."),
     );
 
-    let executor = BlockExecutor::new(dbrw);
+    let executor = BlockExecutor::new(dbrw.clone());
 
-    (db, executor)
+    (dbrw.reader, dbrw.writer, executor)
 }
 
 /// Runs the benchmark with given parameters.
@@ -47,6 +51,7 @@ pub fn run_benchmark(
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
     verify: bool,
+    sync_state_commit: bool,
 ) {
     // Create rocksdb checkpoint.
     if checkpoint_dir.as_ref().exists() {
@@ -67,14 +72,16 @@ pub fn run_benchmark(
     let (mut config, genesis_key) = aptos_genesis_tool::test_config();
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
 
-    let (db, executor) = init_db_and_executor(&config);
-    let start_version = db.get_latest_version().unwrap();
+    let (db_reader, db_writer, executor) = init_db_and_executor(&config);
+    let base_smt = executor.root_smt();
+    let start_version = db_reader.get_latest_version().unwrap();
     let parent_block_id = executor.committed_block_id();
     let executor_1 = Arc::new(executor);
     let executor_2 = executor_1.clone();
 
     let (block_sender, block_receiver) = mpsc::sync_channel(50 /* bound */);
-    let (commit_sender, commit_receiver) = mpsc::sync_channel(3 /* bound */);
+    let (commit_sender, commit_receiver) = mpsc::sync_channel(20 /* bound */);
+    let (state_commit_sender, state_commit_receiver) = mpsc::sync_channel(20 /* bound */);
 
     let mut generator = TransactionGenerator::new_with_existing_db(
         genesis_key,
@@ -110,11 +117,29 @@ pub fn run_benchmark(
     let commit_thread = std::thread::Builder::new()
         .name("txn_committer".to_string())
         .spawn(move || {
-            let mut committer =
-                TransactionCommitter::new(executor_2, start_version, commit_receiver);
+            let mut committer = TransactionCommitter::new(
+                executor_2,
+                start_version,
+                commit_receiver,
+                if !sync_state_commit {
+                    Some(state_commit_sender)
+                } else {
+                    None
+                },
+            );
             committer.run();
         })
         .expect("Failed to spawn transaction committer thread.");
+    if !sync_state_commit {
+        // won't bother to join this thread
+        std::thread::Builder::new()
+            .name("state_committer".to_string())
+            .spawn(move || {
+                let committer = StateCommitter::new(state_commit_receiver, db_writer);
+                committer.run(base_smt);
+            })
+            .expect("Failed to spawn state committer thread.");
+    }
 
     // Wait for generator to finish.
     let mut generator = gen_thread.join().unwrap();
@@ -125,7 +150,7 @@ pub fn run_benchmark(
 
     // Do a sanity check on the sequence number to make sure all transactions are committed.
     if verify {
-        generator.verify_sequence_number(db.clone());
+        generator.verify_sequence_number(db_reader.clone());
     }
 }
 
@@ -153,6 +178,7 @@ mod tests {
             storage_dir.as_ref(),
             checkpoint_dir,
             false,
+            true,
         );
     }
 }

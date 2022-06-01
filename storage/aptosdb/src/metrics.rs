@@ -35,6 +35,14 @@ pub static LATEST_TXN_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static LATEST_STATE_CHECKPOINT_VERSION: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_storage_latest_state_checkpoint_version",
+        "Aptos storage latest state checkpoint version"
+    )
+    .unwrap()
+});
+
 pub static LEDGER_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_storage_ledger_version",

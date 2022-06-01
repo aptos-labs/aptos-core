@@ -15,7 +15,7 @@ use aptos_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher},
     HashValue,
 };
-use aptos_logger::error;
+use aptos_logger::{debug, error};
 use aptos_types::{
     contract_event::ContractEvent,
     nibble::nibble_path::NibblePath,
@@ -131,7 +131,12 @@ impl ApplyChunkOutput {
             .map(|(t, o)| {
                 // In case a new status other than Retry, Keep and Discard is added:
                 if !matches!(o.status(), TransactionStatus::Discard(_)) {
-                    error!("Status other than Retry, Keep or Discard; Transaction discarded.");
+                    error!(
+                        status = o.status(),
+                        "Status other than Retry, Keep or Discard; Transaction discarded."
+                    );
+                } else {
+                    debug!(status = o.status(), "Discarded transaction.",)
                 }
                 // VM shouldn't have output anything for discarded transactions, log if it did.
                 if !o.write_set().is_empty() || !o.events().is_empty() {

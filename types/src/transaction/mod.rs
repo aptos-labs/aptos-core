@@ -1137,6 +1137,10 @@ impl TransactionToCommit {
         &self.state_updates
     }
 
+    pub fn into_state_updates(self) -> HashMap<StateKey, StateValue> {
+        self.state_updates
+    }
+
     pub fn jf_node_hashes(&self) -> Option<&HashMap<NibblePath, HashValue>> {
         self.jf_node_hashes.as_ref()
     }

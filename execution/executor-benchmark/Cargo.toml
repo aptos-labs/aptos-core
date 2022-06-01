@@ -38,6 +38,7 @@ aptosdb = { path = "../../storage/aptosdb" }
 executor = { path = "../executor" }
 executor-types = { path = "../executor-types" }
 schemadb = { path = "../../storage/schemadb" }
+scratchpad = { path = "../../storage/scratchpad" }
 storage-client = { path = "../../storage/storage-client" }
 storage-interface = { path = "../../storage/storage-interface" }
 

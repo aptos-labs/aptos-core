@@ -62,7 +62,7 @@ pub fn run(
     let executor_2 = executor.clone();
     let genesis_block_id = executor.committed_block_id();
     let (block_sender, block_receiver) = mpsc::sync_channel(3 /* bound */);
-    let (commit_sender, commit_receiver) = mpsc::sync_channel(3 /* bound */);
+    let (commit_sender, commit_receiver) = mpsc::sync_channel(100 /* bound */);
 
     // Set a progressing bar
     // Spawn threads to run transaction generator, executor and committer separately.
@@ -97,7 +97,7 @@ pub fn run(
     let commit_thread = std::thread::Builder::new()
         .name("txn_committer".to_string())
         .spawn(move || {
-            let mut committer = TransactionCommitter::new(executor_2, 0, commit_receiver);
+            let mut committer = TransactionCommitter::new(executor_2, 0, commit_receiver, None);
             committer.run();
         })
         .expect("Failed to spawn transaction committer thread.");

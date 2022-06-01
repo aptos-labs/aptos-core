@@ -6,6 +6,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
 use aptos_vm::AptosVM;
@@ -18,8 +19,9 @@ use executor::{
     },
 };
 use executor_types::BlockExecutorTrait;
+use scratchpad::SparseMerkleTree;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     sync::{mpsc, Arc},
     time::{Duration, Instant},
 };
@@ -47,6 +49,13 @@ pub struct TransactionCommitter {
     executor: Arc<BlockExecutor<AptosVM>>,
     version: Version,
     block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
+    state_commit_sender: Option<
+        mpsc::SyncSender<(
+            Version,
+            SparseMerkleTree<StateValue>,
+            Vec<HashMap<StateKey, StateValue>>,
+        )>,
+    >,
 }
 
 impl TransactionCommitter {
@@ -54,11 +63,19 @@ impl TransactionCommitter {
         executor: Arc<BlockExecutor<AptosVM>>,
         version: Version,
         block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
+        state_commit_sender: Option<
+            mpsc::SyncSender<(
+                Version,
+                SparseMerkleTree<StateValue>,
+                Vec<HashMap<StateKey, StateValue>>,
+            )>,
+        >,
     ) -> Self {
         Self {
             version,
             executor,
             block_receiver,
+            state_commit_sender,
         }
     }
 
@@ -78,9 +95,18 @@ impl TransactionCommitter {
             self.version += num_txns as u64;
             let commit_start = std::time::Instant::now();
             let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, self.version);
-            self.executor
-                .commit_blocks(vec![block_id], ledger_info_with_sigs)
-                .unwrap();
+            if let Some(state_commit_sender) = &self.state_commit_sender {
+                let state_commit = self
+                    .executor
+                    .commit_blocks_no_state_merklize(vec![block_id], ledger_info_with_sigs)
+                    .unwrap()
+                    .unwrap();
+                state_commit_sender.send(state_commit).unwrap();
+            } else {
+                self.executor
+                    .commit_blocks(vec![block_id], ledger_info_with_sigs)
+                    .unwrap();
+            }
 
             report_block(
                 start_version,

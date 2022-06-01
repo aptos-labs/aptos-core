@@ -16,6 +16,7 @@ use aptos_types::{
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     move_resource::MoveStorage,
+    nibble::nibble_path::NibblePath,
     on_chain_config::{access_path_for_config, ConfigID},
     proof::{
         definition::LeafCount, AccumulatorConsistencyProof, SparseMerkleProof,
@@ -683,6 +684,15 @@ pub trait DbWriter: Send + Sync {
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         merklize_state: bool,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
+    fn merklize_state(
+        &self,
+        state_updates: HashMap<StateKey, StateValue>,
+        node_hashes: HashMap<NibblePath, HashValue>,
+        version: Version,
     ) -> Result<()> {
         unimplemented!()
     }

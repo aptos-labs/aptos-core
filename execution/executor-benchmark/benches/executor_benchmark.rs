@@ -23,7 +23,7 @@ pub const INITIAL_BALANCE: u64 = 1000000;
 fn executor_benchmark<M: Measurement + 'static>(c: &mut Criterion<M>) {
     let (config, genesis_key) = aptos_genesis_tool::test_config();
 
-    let (_db, executor) = init_db_and_executor(&config);
+    let (_r, _w, executor) = init_db_and_executor(&config);
     let parent_block_id = executor.committed_block_id();
     let executor = Arc::new(executor);
 

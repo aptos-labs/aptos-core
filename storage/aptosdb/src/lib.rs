@@ -58,6 +58,7 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
+    nibble::nibble_path::NibblePath,
     proof::{
         definition::LeafCount, AccumulatorConsistencyProof, EventProof, SparseMerkleProof,
         TransactionInfoListWithProof,
@@ -605,11 +606,11 @@ impl AptosDB {
                 .with_label_values(&["save_transactions_state"])
                 .start_timer();
 
-            let state_updates_vec = txns_to_commit
-                .iter()
-                .map(|txn_to_commit| txn_to_commit.state_updates())
-                .collect::<Vec<_>>();
             let new_state_checkpoint = if merklize_state {
+                let state_updates_vec = txns_to_commit
+                    .iter()
+                    .map(|txn_to_commit| txn_to_commit.state_updates())
+                    .collect::<Vec<_>>();
                 // find the last version with state tree updates -- that's the latest state checkpoint
                 let latest_state_checkpoint_index = state_updates_vec
                     .iter()
@@ -626,6 +627,8 @@ impl AptosDB {
                     first_version,
                     cs,
                 )?;
+                self.state_store
+                    .put_value_sets(state_updates_vec, first_version, cs)?;
                 latest_state_checkpoint_index.map(|idx| {
                     let version = first_version + idx as LeafCount;
                     let root_hash = root_hashes[idx];
@@ -634,9 +637,6 @@ impl AptosDB {
             } else {
                 None
             };
-
-            self.state_store
-                .put_value_sets(state_updates_vec, first_version, cs)?;
 
             new_state_checkpoint
         };
@@ -1373,6 +1373,30 @@ impl DbWriter for AptosDB {
                 NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);
             }
 
+            Ok(())
+        })
+    }
+
+    fn merklize_state(
+        &self,
+        state_updates: HashMap<StateKey, StateValue>,
+        node_hashes: HashMap<NibblePath, HashValue>,
+        version: Version,
+    ) -> Result<()> {
+        gauged_api("merklize_state", || {
+            let jmt_updates = jmt_update_sets(&[&state_updates]);
+            let jmt_updates_ref = jmt_update_ref_sets(&jmt_updates);
+
+            let mut cs = ChangeSet::new();
+            let root_hash = *self
+                .state_store
+                .merklize_value_sets(jmt_updates_ref, Some(vec![&node_hashes]), version, &mut cs)?
+                .first()
+                .expect("One root hash expected");
+            self.state_store
+                .put_value_sets(vec![&state_updates], version, &mut cs)?;
+            self.db.write_schemas(cs.batch)?;
+            self.state_store.set_latest_checkpoint(version, root_hash);
             Ok(())
         })
     }

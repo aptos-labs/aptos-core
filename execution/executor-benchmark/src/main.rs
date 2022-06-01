@@ -75,6 +75,9 @@ enum Command {
             about = "Verify sequence number of all the accounts after execution finishes"
         )]
         verify: bool,
+
+        #[structopt(long, about = "commit state synchronously")]
+        sync_state_commit: bool,
     },
 }
 
@@ -113,6 +116,7 @@ fn main() {
             data_dir,
             checkpoint_dir,
             verify,
+            sync_state_commit,
         } => {
             aptos_logger::Logger::new().init();
             executor_benchmark::run_benchmark(
@@ -121,6 +125,7 @@ fn main() {
                 data_dir,
                 checkpoint_dir,
                 verify,
+                sync_state_commit,
             );
         }
     }

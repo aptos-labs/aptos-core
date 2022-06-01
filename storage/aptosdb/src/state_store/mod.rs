@@ -9,6 +9,7 @@ mod state_store_test;
 use crate::{
     change_set::ChangeSet,
     ledger_counters::LedgerCounter,
+    metrics::LATEST_STATE_CHECKPOINT_VERSION,
     schema::{
         jellyfish_merkle_node::JellyfishMerkleNodeSchema, stale_node_index::StaleNodeIndexSchema,
     },
@@ -22,6 +23,7 @@ use aptos_jellyfish_merkle::{
     iterator::JellyfishMerkleIterator, node_type::NodeKey, restore::StateSnapshotRestore,
     JellyfishMerkleTree, StateValueWriter, TreeReader, TreeWriter,
 };
+use aptos_logger::info;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleRangeProof},
@@ -74,7 +76,9 @@ impl StateStore {
     }
 
     pub fn set_latest_checkpoint(&self, version: Version, root_hash: HashValue) {
-        *self.latest_checkpoint.lock() = Some((version, root_hash))
+        info!(version = version, "set_latest_checkpoint");
+        *self.latest_checkpoint.lock() = Some((version, root_hash));
+        LATEST_STATE_CHECKPOINT_VERSION.set(version as i64);
     }
 
     pub fn get_checkpoint_before(
@@ -103,7 +107,13 @@ impl StateStore {
         &self,
         next_version: Version,
     ) -> Result<Option<Version>> {
-        Ok(self.get_checkpoint_before(next_version)?.map(|(v, _h)| v))
+        let ret = self.get_checkpoint_before(next_version)?.map(|(v, _h)| v);
+        info!(
+            next_version = next_version,
+            ret = ret,
+            "find_latest_version_less_than."
+        );
+        Ok(ret)
     }
 
     fn find_latest_persisted_version_from_db(
