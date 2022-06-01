@@ -52,9 +52,6 @@ export class Deserializer {
    */
   deserializeBytes(): bytes {
     const len = this.deserializeUleb128AsU32();
-    if (len < 0) {
-      throw new Error("Length of a bytes array can't be negative");
-    }
     return new Uint8Array(this.read(len));
   }
 

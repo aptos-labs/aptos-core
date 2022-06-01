@@ -46,7 +46,6 @@ export class AccountAddress {
   }
 
   static deserialize(deserializer: Deserializer): AccountAddress {
-    deserializer.deserializeFixedBytes(AccountAddress.LENGTH);
     return new AccountAddress(deserializer.deserializeFixedBytes(AccountAddress.LENGTH));
   }
 }

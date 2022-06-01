@@ -230,6 +230,12 @@ export class ModuleId {
    */
   constructor(public readonly address: AccountAddress, public readonly name: Identifier) {}
 
+  /**
+   * Converts a string literal to a ModuleId
+   * @param moduleId String literal in format "AcountAddress::ModuleName",
+   *   e.g. "0x01::Coin"
+   * @returns
+   */
   static fromStr(moduleId: string): ModuleId {
     const parts = moduleId.split("::");
     if (parts.length !== 2) {

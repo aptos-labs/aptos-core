@@ -101,4 +101,18 @@ describe("BCS Deserializer", () => {
       deserializer.deserializeUleb128AsU32();
     }).toThrow("Overflow while parsing uleb128-encoded uint32 value");
   });
+
+  it("throws when deserializing against buffer that has been drained", () => {
+    expect(() => {
+      let deserializer = new Deserializer(
+        new Uint8Array([
+          24, 0xc3, 0xa7, 0xc3, 0xa5, 0xe2, 0x88, 0x9e, 0xe2, 0x89, 0xa0, 0xc2, 0xa2, 0xc3, 0xb5, 0xc3, 0x9f, 0xe2,
+          0x88, 0x82, 0xc6, 0x92, 0xe2, 0x88, 0xab,
+        ]),
+      );
+
+      deserializer.deserializeStr();
+      deserializer.deserializeStr();
+    }).toThrow("Reached to the end of buffer");
+  });
 });

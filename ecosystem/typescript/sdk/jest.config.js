@@ -2,7 +2,7 @@
 module.exports = {
   preset: "ts-jest",
   testEnvironment: "node",
-  coveragePathIgnorePatterns: ["api/*", "transaction_builder/*"],
+  coveragePathIgnorePatterns: ["api/*", "transaction_builder/aptos_types/*"],
   testPathIgnorePatterns: ["dist/*"],
   collectCoverage: true,
   coverageThreshold: {
