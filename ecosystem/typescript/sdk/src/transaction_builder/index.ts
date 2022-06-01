@@ -1,14 +1,12 @@
 import * as SHA3 from "js-sha3";
-import { HexString } from "../hex_string";
 import {
-  AccountAddress,
   Ed25519PublicKey,
   Ed25519Signature,
   RawTransaction,
   SignedTransaction,
   TransactionAuthenticatorVariantEd25519,
 } from "./aptos_types";
-import { BcsSerializer, bytes } from "./bcs";
+import { bcsToBytes, bytes } from "./bcs";
 
 const SALT = "APTOS::RawTransaction";
 
@@ -21,9 +19,9 @@ export type TransactionSignature = Uint8Array;
 export type SigningFn = (txn: SigningMessage) => TransactionSignature;
 
 class TransactionBuilder<F extends SigningFn> {
-  private signingFunction: F;
+  private readonly signingFunction: F;
 
-  private publicKey: Uint8Array;
+  private readonly publicKey: Uint8Array;
 
   constructor(signingFunction: F, publicKey: Uint8Array) {
     this.signingFunction = signingFunction;
@@ -37,10 +35,7 @@ class TransactionBuilder<F extends SigningFn> {
 
     const prefix = new Uint8Array(hash.arrayBuffer());
 
-    const serializer = new BcsSerializer();
-    rawTxn.serialize(serializer);
-
-    return Buffer.from([...prefix, ...serializer.getBytes()]);
+    return Buffer.from([...prefix, ...bcsToBytes(rawTxn)]);
   }
 
   private signInternal(rawTxn: RawTransaction): SignedTransaction {
@@ -56,12 +51,7 @@ class TransactionBuilder<F extends SigningFn> {
 
   /** Signs a raw transaction and returns a bcs serialized transaction. */
   sign(rawTxn: RawTransaction): bytes {
-    const signedTxn = this.signInternal(rawTxn);
-
-    const signedTxnSerializer = new BcsSerializer();
-    signedTxn.serialize(signedTxnSerializer);
-
-    return signedTxnSerializer.getBytes();
+    return bcsToBytes(this.signInternal(rawTxn));
   }
 }
 

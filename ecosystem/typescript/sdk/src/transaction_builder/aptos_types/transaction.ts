@@ -6,7 +6,6 @@ import {
   bytes,
   Seq,
   uint8,
-  bool,
   uint128,
   deserializeVector,
   serializeVector,
@@ -166,14 +165,25 @@ export class ScriptFunction {
     this.module_name.serialize(serializer);
     this.function_name.serialize(serializer);
     serializeVector<TypeTag>(this.ty_args, serializer);
-    serializeVectorBytes(this.args, serializer);
+
+    serializer.serializeU32AsUleb128(this.args.length);
+    this.args.forEach((item: bytes) => {
+      serializer.serializeBytes(item);
+    });
   }
 
   static deserialize(deserializer: Deserializer): ScriptFunction {
     const module_name = ModuleId.deserialize(deserializer);
     const function_name = Identifier.deserialize(deserializer);
     const ty_args = deserializeVector(deserializer, TypeTag);
-    const args = deserializeVectorBytes(deserializer);
+
+    const length = deserializer.deserializeUleb128AsU32();
+    const list: Seq<bytes> = [];
+    for (let i = 0; i < length; i++) {
+      list.push(deserializer.deserializeBytes());
+    }
+
+    const args = list;
     return new ScriptFunction(module_name, function_name, ty_args, args);
   }
 }
@@ -482,7 +492,7 @@ export class TransactionArgumentVariantU8Vector extends TransactionArgument {
 }
 
 export class TransactionArgumentVariantBool extends TransactionArgument {
-  constructor(public readonly value: bool) {
+  constructor(public readonly value: boolean) {
     super();
   }
 
@@ -495,20 +505,4 @@ export class TransactionArgumentVariantBool extends TransactionArgument {
     const value = deserializer.deserializeBool();
     return new TransactionArgumentVariantBool(value);
   }
-}
-
-export function serializeVectorBytes(value: Seq<bytes>, serializer: Serializer): void {
-  serializer.serializeU32AsUleb128(value.length);
-  value.forEach((item: bytes) => {
-    serializer.serializeBytes(item);
-  });
-}
-
-export function deserializeVectorBytes(deserializer: Deserializer): Seq<bytes> {
-  const length = deserializer.deserializeUleb128AsU32();
-  const list: Seq<bytes> = [];
-  for (let i = 0; i < length; i++) {
-    list.push(deserializer.deserializeBytes());
-  }
-  return list;
 }
