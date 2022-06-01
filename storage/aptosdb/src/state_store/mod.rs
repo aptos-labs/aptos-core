@@ -261,29 +261,14 @@ impl StateStore {
     /// hashes for each write set.
     pub fn merklize_value_sets(
         &self,
-        value_state_sets: Vec<&HashMap<StateKey, StateValue>>,
+        value_sets: Vec<Vec<(HashValue, &(HashValue, StateKey))>>,
         node_hashes: Option<Vec<&HashMap<NibblePath, HashValue>>>,
         first_version: Version,
         cs: &mut ChangeSet,
     ) -> Result<Vec<HashValue>> {
-        let value_sets: Vec<Vec<_>> = value_state_sets
-            .iter()
-            .map(|value_set| {
-                value_set
-                    .iter()
-                    .map(|(key, value)| (key.hash(), (value.hash(), key.clone())))
-                    .collect::<Vec<_>>()
-            })
-            .collect();
-
-        let value_sets_ref = value_sets
-            .iter()
-            .map(|value_set| value_set.iter().map(|(x, y)| (*x, y)).collect::<Vec<_>>())
-            .collect::<Vec<_>>();
-
         let (new_root_hash_vec, tree_update_batch) = JellyfishMerkleTree::new(self)
             .batch_put_value_sets(
-                value_sets_ref,
+                value_sets,
                 node_hashes,
                 self.find_latest_persisted_version_less_than(first_version)?,
                 first_version,

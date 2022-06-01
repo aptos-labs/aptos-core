@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
+use storage_interface::{jmt_update_ref_sets, jmt_update_sets};
 
 use crate::{change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB};
 
@@ -20,9 +21,15 @@ fn put_value_set(
         .iter()
         .map(|(key, value)| (key.clone(), value.clone()))
         .collect();
+    let jmt_update_sets = jmt_update_sets(&[&value_set]);
 
     let root = state_store
-        .merklize_value_sets(vec![&value_set], None, version, &mut cs)
+        .merklize_value_sets(
+            jmt_update_ref_sets(&jmt_update_sets),
+            None,
+            version,
+            &mut cs,
+        )
         .unwrap()[0];
     state_store
         .put_value_sets(vec![&value_set], version, &mut cs)

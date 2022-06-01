@@ -87,7 +87,10 @@ use std::{
     thread::JoinHandle,
     time::{Duration, Instant},
 };
-use storage_interface::{DbReader, DbWriter, Order, StartupInfo, StateSnapshotReceiver, TreeState};
+use storage_interface::{
+    jmt_update_ref_sets, jmt_update_sets, DbReader, DbWriter, Order, StartupInfo,
+    StateSnapshotReceiver, TreeState,
+};
 
 const MAX_LIMIT: u64 = 5000;
 
@@ -604,6 +607,7 @@ impl AptosDB {
                 .iter()
                 .map(|txn_to_commit| txn_to_commit.state_updates())
                 .collect::<Vec<_>>();
+            let jmt_update_sets = jmt_update_sets(&state_updates_vec);
             // find the last version with state tree updates -- that's the latest state checkpoint
             let latest_state_checkpoint_index = state_updates_vec
                 .iter()
@@ -614,7 +618,7 @@ impl AptosDB {
                 .map(|txn_to_commit| txn_to_commit.jf_node_hashes())
                 .collect::<Option<Vec<_>>>();
             let root_hashes = self.state_store.merklize_value_sets(
-                state_updates_vec.clone(),
+                jmt_update_ref_sets(&jmt_update_sets),
                 node_hashes,
                 first_version,
                 cs,
