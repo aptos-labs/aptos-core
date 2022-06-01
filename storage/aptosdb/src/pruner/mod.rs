@@ -130,8 +130,12 @@ impl Pruner {
         self.ledger_prune_window
     }
 
+    pub fn get_min_readable_version_by_pruner_index(&self, pruner_index: PrunerIndex) -> Version {
+        self.min_readable_version.lock()[pruner_index as usize]
+    }
+
     pub fn get_min_readable_ledger_version(&self) -> Version {
-        self.min_readable_version.lock()[LedgerPrunerIndex as usize]
+        self.get_min_readable_version_by_pruner_index(LedgerPrunerIndex)
     }
     /// Sends pruning command to the worker thread when necessary.
     pub fn maybe_wake_pruner(&self, latest_version: Version) {
@@ -194,6 +198,12 @@ impl Pruner {
             anyhow::bail!("Timeout waiting for pruner worker.");
         }
         Ok(())
+    }
+
+    /// (For tests only.) Updates the minimal readable version kept by pruner.
+    #[cfg(test)]
+    pub fn testonly_update_min_version(&mut self, version: &[Version]) {
+        self.min_readable_version = Arc::new(Mutex::new(version.to_vec()));
     }
 }
 

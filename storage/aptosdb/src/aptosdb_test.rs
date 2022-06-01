@@ -2,10 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    get_first_seq_num_and_limit, test_helper,
+    error_if_version_is_pruned, get_first_seq_num_and_limit,
+    pruner::{Pruner, PrunerIndex},
+    test_helper,
     test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_info},
     AptosDB, ROCKSDB_PROPERTIES,
 };
+use aptos_config::config::StoragePrunerConfig;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -14,7 +17,7 @@ use aptos_types::{
     transaction::{ExecutionStatus, TransactionInfo, PRE_GENESIS_VERSION},
 };
 use proptest::prelude::*;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 use storage_interface::{DbReader, Order, TreeState};
 use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
 
@@ -72,6 +75,44 @@ fn test_too_many_requested() {
 
     assert!(db.get_transactions(0, 1001 /* limit */, 0, true).is_err());
     assert!(db.get_transaction_outputs(0, 1001 /* limit */, 0).is_err());
+}
+
+#[test]
+fn test_error_if_version_is_pruned() {
+    let tmp_dir = TempPath::new();
+    let aptos_db = AptosDB::new_for_test(&tmp_dir);
+    let mut pruner = Pruner::new(
+        Arc::clone(&aptos_db.db),
+        StoragePrunerConfig {
+            state_store_prune_window: Some(0),
+            ledger_prune_window: Some(0),
+            pruning_batch_size: 1,
+        },
+        Arc::clone(&aptos_db.transaction_store),
+        Arc::clone(&aptos_db.ledger_store),
+        Arc::clone(&aptos_db.event_store),
+    );
+    pruner.testonly_update_min_version(&[5, 10]);
+    let pruner = Some(pruner);
+    assert_eq!(
+        error_if_version_is_pruned(&pruner, PrunerIndex::StateStorePrunerIndex, "State", 4)
+            .unwrap_err()
+            .to_string(),
+        "State version 4 is pruned, min available version is 5."
+    );
+    assert!(
+        error_if_version_is_pruned(&pruner, PrunerIndex::StateStorePrunerIndex, "State", 5).is_ok()
+    );
+    assert_eq!(
+        error_if_version_is_pruned(&pruner, PrunerIndex::LedgerPrunerIndex, "Transaction", 9)
+            .unwrap_err()
+            .to_string(),
+        "Transaction version 9 is pruned, min available version is 10."
+    );
+    assert!(
+        error_if_version_is_pruned(&pruner, PrunerIndex::LedgerPrunerIndex, "Transaction", 10)
+            .is_ok()
+    );
 }
 
 #[test]

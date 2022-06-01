@@ -41,7 +41,7 @@ use crate::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
         OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, STATE_ITEM_COUNT,
     },
-    pruner::{utils, Pruner},
+    pruner::{utils, Pruner, PrunerIndex},
     schema::*,
     state_store::StateStore,
     system_store::SystemStore,
@@ -140,6 +140,25 @@ fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<(
     } else {
         Ok(())
     }
+}
+
+fn error_if_version_is_pruned(
+    pruner: &Option<Pruner>,
+    pruner_index: PrunerIndex,
+    data_type: &str,
+    version: Version,
+) -> Result<()> {
+    if let Some(pruner) = pruner.as_ref() {
+        let min_readable_version = pruner.get_min_readable_version_by_pruner_index(pruner_index);
+        ensure!(
+            version >= min_readable_version,
+            "{} version {} is pruned, min available version is {}.",
+            data_type,
+            version,
+            min_readable_version
+        );
+    }
+    Ok(())
 }
 
 fn gen_rocksdb_options(config: &RocksdbConfig) -> Options {
@@ -416,12 +435,20 @@ impl AptosDB {
         Ok((lis, more))
     }
 
+    /// Returns the transaction with proof for a given version, or error if the transaction is not
+    /// found.
     fn get_transaction_with_proof(
         &self,
         version: Version,
         ledger_version: Version,
         fetch_events: bool,
     ) -> Result<TransactionWithProof> {
+        error_if_version_is_pruned(
+            &self.pruner,
+            PrunerIndex::LedgerPrunerIndex,
+            "Transaction",
+            version,
+        )?;
         let proof = self
             .ledger_store
             .get_transaction_info_with_proof(version, ledger_version)?;
@@ -785,7 +812,8 @@ impl DbReader for AptosDB {
         })
     }
 
-    /// Get transaction by version, delegates to `AptosDB::get_transaction_by_hash`
+    /// Returns the transaction by version, delegates to `AptosDB::get_transaction_with_proof`.
+    /// Returns an error if the provided version is not found.
     fn get_transaction_by_version(
         &self,
         version: Version,
@@ -798,7 +826,10 @@ impl DbReader for AptosDB {
     }
 
     // ======================= State Synchronizer Internal APIs ===================================
-    /// Gets a batch of transactions for the purpose of synchronizing state to another node.
+    /// Returns batch of transactions for the purpose of synchronizing state to another node.
+    ///
+    /// If any version beyond ledger_version is requested, it is ignored.
+    /// Returns an error if any version <= ledger_version is requested but not found.
     ///
     /// This is used by the State Synchronizer module internally.
     fn get_transactions(
@@ -814,6 +845,13 @@ impl DbReader for AptosDB {
             if start_version > ledger_version || limit == 0 {
                 return Ok(TransactionListWithProof::new_empty());
             }
+
+            error_if_version_is_pruned(
+                &self.pruner,
+                PrunerIndex::LedgerPrunerIndex,
+                "Transaction",
+                start_version,
+            )?;
 
             let limit = std::cmp::min(limit, ledger_version - start_version + 1);
 
@@ -854,7 +892,7 @@ impl DbReader for AptosDB {
     fn get_first_txn_version(&self) -> Result<Option<Version>> {
         gauged_api("get_first_txn_version", || {
             if let Some(pruner) = self.pruner.as_ref() {
-                // If pruning is enabled, we can get the least readable version from the pruner.
+                // If pruning is enabled, we can get the min readable version from the pruner.
                 Ok(Some(pruner.get_min_readable_ledger_version()))
             } else {
                 self.transaction_store.get_first_txn_version()
@@ -866,7 +904,7 @@ impl DbReader for AptosDB {
     fn get_first_write_set_version(&self) -> Result<Option<Version>> {
         gauged_api("get_first_write_set_version", || {
             if let Some(pruner) = self.pruner.as_ref() {
-                // If pruning is enabled, we can get the least readable version from the pruner.
+                // If pruning is enabled, we can get the min readable version from the pruner.
                 Ok(Some(pruner.get_min_readable_ledger_version()))
             } else {
                 self.transaction_store.get_first_write_set_version()
@@ -874,7 +912,10 @@ impl DbReader for AptosDB {
         })
     }
 
-    /// Gets a batch of transactions for the purpose of synchronizing state to another node.
+    /// Returns a batch of transactions for the purpose of synchronizing state to another node.
+    ///
+    /// If any version beyond ledger_version is requested, it is ignored.
+    /// Returns an error if any version <= ledger_version is requested but not found.
     ///
     /// This is used by the State Synchronizer module internally.
     fn get_transaction_outputs(
@@ -889,6 +930,13 @@ impl DbReader for AptosDB {
             if start_version > ledger_version || limit == 0 {
                 return Ok(TransactionOutputListWithProof::new_empty());
             }
+
+            error_if_version_is_pruned(
+                &self.pruner,
+                PrunerIndex::LedgerPrunerIndex,
+                "Transaction",
+                start_version,
+            )?;
 
             let limit = std::cmp::min(limit, ledger_version - start_version + 1);
 
@@ -926,16 +974,23 @@ impl DbReader for AptosDB {
         })
     }
 
-    /// Get write sets for range [begin_version, end_version).
+    /// Returns write sets for range [begin_version, end_version).
     ///
     /// Used by the executor to build in memory state after a state checkpoint.
-    /// Any missing write set in the entire range results in error.
+    /// Any missing write set in the entire range results in an error.
     fn get_write_sets(
         &self,
         begin_version: Version,
         end_version: Version,
     ) -> Result<Vec<WriteSet>> {
         gauged_api("get_write_sets", || {
+            error_if_version_is_pruned(
+                &self.pruner,
+                PrunerIndex::LedgerPrunerIndex,
+                "Write set",
+                begin_version,
+            )?;
+
             self.transaction_store
                 .get_write_sets(begin_version, end_version)
         })
@@ -972,6 +1027,14 @@ impl DbReader for AptosDB {
                 Some(version) => version,
                 None => self.get_latest_version()?,
             };
+
+            error_if_version_is_pruned(
+                &self.pruner,
+                PrunerIndex::LedgerPrunerIndex,
+                "Event",
+                version,
+            )?;
+
             let events =
                 self.get_events_with_proof_by_event_key(event_key, start, order, limit, version)?;
             Ok(events)
@@ -1025,6 +1088,13 @@ impl DbReader for AptosDB {
         version: Version,
     ) -> Result<Option<StateValue>> {
         gauged_api("get_state_value_by_version", || {
+            error_if_version_is_pruned(
+                &self.pruner,
+                PrunerIndex::StateStorePrunerIndex,
+                "State",
+                version,
+            )?;
+
             self.state_store
                 .get_value_by_version(state_store_key, version)
         })
@@ -1060,6 +1130,13 @@ impl DbReader for AptosDB {
         version: Version,
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
         gauged_api("get_account_state_with_proof_by_version", || {
+            error_if_version_is_pruned(
+                &self.pruner,
+                PrunerIndex::StateStorePrunerIndex,
+                "State",
+                version,
+            )?;
+
             self.state_store
                 .get_value_with_proof_by_version(state_store_key, version)
         })
