@@ -263,6 +263,16 @@ module AptosFramework::Coin {
         Coin<CoinType> { value: amount }
     }
 
+    /// Allows to create multiple `MintCapability` resources for the coins.
+    public fun add_extra_mint_capability<CoinType>(_cap: &MintCapability<CoinType>): MintCapability<CoinType> {
+        MintCapability<CoinType>{ }
+    }
+
+    /// Allows to create multiple `BurnCapability` resources for the coins.
+    public fun add_extra_burn_capability<CoinType>(_cap: &BurnCapability<CoinType>): BurnCapability<CoinType> {
+        BurnCapability<CoinType>{ }
+    }
+
     /// Script function to register to receive a specific `CoinType`. An account that wants to hold a coin type
     /// has to explicitly registers to do so. The register creates a special `CoinStore`
     /// to hold the specified `CoinType`.
@@ -598,5 +608,26 @@ module AptosFramework::Coin {
     public fun mint_for_test<CoinType>(account: &signer, amount: u64) acquires CoinEvents, CoinStore {
         register_internal<CoinType>(account);
         deposit<CoinType>(Signer::address_of(account), Coin<CoinType> {value: amount});
+    }
+
+    #[test(source = @0x1, second_minter = @0x42)]
+    fun test_multiple_capabilities(source: signer, second_minter: signer) acquires CoinInfo {
+        let (mint_cap, burn_cap) = initialize<FakeMoney>(
+            &source,
+            ASCII::string(b"Fake money"),
+            ASCII::string(b"FMD"),
+            1,
+            true
+        );
+        let second_mint_cap = add_extra_mint_capability(&mint_cap);
+        let second_burn_cap = add_extra_burn_capability(&burn_cap);
+
+        let minted = mint<FakeMoney>(100, &second_mint_cap);
+        burn<FakeMoney>(minted, &second_burn_cap);
+
+        move_to(&source, mint_cap);
+        move_to(&source, burn_cap);
+        move_to(&second_minter, second_mint_cap);
+        move_to(&second_minter, second_burn_cap);
     }
 }
