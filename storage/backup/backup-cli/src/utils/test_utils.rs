@@ -34,6 +34,7 @@ pub fn tmp_db_with_random_content() -> (
             txns_to_commit,
             cur_ver, /* first_version */
             Some(ledger_info_with_sigs),
+            true,
         )
         .unwrap();
         cur_ver += txns_to_commit.len() as u64;

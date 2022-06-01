@@ -46,6 +46,7 @@ proptest! {
                 txns_to_commit.clone(),
                 version, /* first_version */
                 Some(ledger_info_with_sigs.clone()),
+                true,
             ).unwrap();
             version += txns_to_commit.len() as u64;
             let mut account_states = HashMap::new();

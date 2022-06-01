@@ -87,6 +87,7 @@ impl DbWriter for FakeDb {
         _txns_to_commit: &[TransactionToCommit],
         _first_version: Version,
         _ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        _merklize_state: bool,
     ) -> Result<()> {
         Ok(())
     }

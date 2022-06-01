@@ -682,6 +682,7 @@ pub trait DbWriter: Send + Sync {
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        merklize_state: bool,
     ) -> Result<()> {
         unimplemented!()
     }

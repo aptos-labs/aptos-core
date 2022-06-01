@@ -70,6 +70,7 @@ impl StorageClient {
         txns_to_commit: Vec<TransactionToCommit>,
         first_version: Version,
         ledger_info_with_sigs: Option<LedgerInfoWithSignatures>,
+        _merklize_state: bool,
     ) -> std::result::Result<(), Error> {
         self.request(StorageRequest::SaveTransactionsRequest(Box::new(
             SaveTransactionsRequest::new(txns_to_commit, first_version, ledger_info_with_sigs),
@@ -97,12 +98,14 @@ impl DbWriter for StorageClient {
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        merklize_state: bool,
     ) -> Result<()> {
         Ok(Self::save_transactions(
             self,
             txns_to_commit.to_vec(),
             first_version,
             ledger_info_with_sigs.cloned(),
+            merklize_state,
         )?)
     }
 }

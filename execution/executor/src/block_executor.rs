@@ -8,10 +8,15 @@ use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Transaction};
+use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures,
+    state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::{Transaction, Version},
+};
 use aptos_vm::VMExecutor;
 use executor_types::{BlockExecutorTrait, Error, StateComputeResult};
 use fail::fail_point;
+use scratchpad::SparseMerkleTree;
 use std::marker::PhantomData;
 
 use crate::{
@@ -22,7 +27,7 @@ use crate::{
         APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
-use storage_interface::DbReaderWriter;
+use storage_interface::{jmt_update_sets, DbReaderWriter};
 
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
@@ -40,6 +45,91 @@ where
             db,
             block_tree,
             phantom: PhantomData,
+        }
+    }
+
+    fn commit_blocks_impl(
+        &self,
+        block_ids: Vec<HashValue>,
+        ledger_info_with_sigs: LedgerInfoWithSignatures,
+        merklize_state: bool,
+    ) -> Result<
+        Option<(
+            Version,
+            SparseMerkleTree<StateValue>,
+            Vec<Vec<(HashValue, (HashValue, StateKey))>>,
+        )>,
+        Error,
+    > {
+        let _timer = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
+        let committed_block = self.block_tree.root_block();
+        if committed_block.num_persisted_transactions()
+            == ledger_info_with_sigs.ledger_info().version() + 1
+        {
+            // a retry
+            return Ok(None);
+        }
+
+        let block_id_to_commit = ledger_info_with_sigs.ledger_info().consensus_block_id();
+        info!(
+            LogSchema::new(LogEntry::BlockExecutor).block_id(block_id_to_commit),
+            "commit_block"
+        );
+
+        let blocks = self.block_tree.get_blocks(&block_ids)?;
+        let txns_to_commit: Vec<_> = blocks
+            .into_iter()
+            .map(|block| block.output.transactions_to_commit())
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .collect();
+        let first_version = committed_block
+            .output
+            .result_view
+            .txn_accumulator()
+            .num_leaves();
+        let to_commit = txns_to_commit.len();
+        let target_version = ledger_info_with_sigs.ledger_info().version();
+        if first_version + txns_to_commit.len() as u64 != target_version + 1 {
+            return Err(Error::BadNumTxnsToCommit {
+                first_version,
+                to_commit,
+                target_version,
+            });
+        }
+
+        let committed_smt = {
+            let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
+            APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
+
+            fail_point!("executor::commit_blocks", |_| {
+                Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
+            });
+            self.db.writer.save_transactions(
+                &txns_to_commit,
+                first_version,
+                Some(&ledger_info_with_sigs),
+                merklize_state,
+            )?;
+            self.block_tree
+                .prune(ledger_info_with_sigs.ledger_info())
+                .expect("Failure pruning block tree.")
+        };
+
+        if merklize_state {
+            let jmt_updates = txns_to_commit
+                .iter()
+                .flat_map(|t| jmt_update_sets(&[t.state_updates()]))
+                .collect();
+
+            Ok(Some((
+                ledger_info_with_sigs.ledger_info().version(),
+                committed_smt,
+                jmt_updates,
+            )))
+        } else {
+            Ok(None)
         }
     }
 }
@@ -124,60 +214,22 @@ where
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
-        let _timer = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
-        let committed_block = self.block_tree.root_block();
-        if committed_block.num_persisted_transactions()
-            == ledger_info_with_sigs.ledger_info().version() + 1
-        {
-            // a retry
-            return Ok(());
-        }
-
-        let block_id_to_commit = ledger_info_with_sigs.ledger_info().consensus_block_id();
-        info!(
-            LogSchema::new(LogEntry::BlockExecutor).block_id(block_id_to_commit),
-            "commit_block"
-        );
-
-        let blocks = self.block_tree.get_blocks(&block_ids)?;
-        let txns_to_commit: Vec<_> = blocks
-            .into_iter()
-            .map(|block| block.output.transactions_to_commit())
-            .collect::<Result<Vec<_>>>()?
-            .into_iter()
-            .flatten()
-            .collect();
-        let first_version = committed_block
-            .output
-            .result_view
-            .txn_accumulator()
-            .num_leaves();
-        let to_commit = txns_to_commit.len();
-        let target_version = ledger_info_with_sigs.ledger_info().version();
-        if first_version + txns_to_commit.len() as u64 != target_version + 1 {
-            return Err(Error::BadNumTxnsToCommit {
-                first_version,
-                to_commit,
-                target_version,
-            });
-        }
-
-        {
-            let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
-            APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
-
-            fail_point!("executor::commit_blocks", |_| {
-                Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
-            });
-            self.db.writer.save_transactions(
-                &txns_to_commit,
-                first_version,
-                Some(&ledger_info_with_sigs),
-            )?;
-            self.block_tree
-                .prune(ledger_info_with_sigs.ledger_info())
-                .expect("Failure pruning block tree.");
-        }
+        self.commit_blocks_impl(block_ids, ledger_info_with_sigs, true)?;
         Ok(())
+    }
+
+    fn commit_blocks_no_state_merklize(
+        &self,
+        block_ids: Vec<HashValue>,
+        ledger_info_with_sigs: LedgerInfoWithSignatures,
+    ) -> Result<
+        Option<(
+            Version,
+            SparseMerkleTree<StateValue>,
+            Vec<Vec<(HashValue, (HashValue, StateKey))>>,
+        )>,
+        Error,
+    > {
+        self.commit_blocks_impl(block_ids, ledger_info_with_sigs, false)
     }
 }

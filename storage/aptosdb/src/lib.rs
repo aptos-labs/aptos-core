@@ -594,10 +594,12 @@ impl AptosDB {
         txns_to_commit: &[TransactionToCommit],
         first_version: u64,
         cs: &mut ChangeSet,
+        merklize_state: bool,
     ) -> Result<(HashValue, Option<(Version, HashValue)>)> {
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
 
-        // Account state updates. Gather account state root hashes
+        // Account state updates.
+        // Optionally update the JMT.
         let new_state_checkpoint = {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["save_transactions_state"])
@@ -607,30 +609,36 @@ impl AptosDB {
                 .iter()
                 .map(|txn_to_commit| txn_to_commit.state_updates())
                 .collect::<Vec<_>>();
-            let jmt_update_sets = jmt_update_sets(&state_updates_vec);
-            // find the last version with state tree updates -- that's the latest state checkpoint
-            let latest_state_checkpoint_index = state_updates_vec
-                .iter()
-                .rposition(|updates| !updates.is_empty());
+            let new_state_checkpoint = if merklize_state {
+                // find the last version with state tree updates -- that's the latest state checkpoint
+                let latest_state_checkpoint_index = state_updates_vec
+                    .iter()
+                    .rposition(|updates| !updates.is_empty());
 
-            let node_hashes = txns_to_commit
-                .iter()
-                .map(|txn_to_commit| txn_to_commit.jf_node_hashes())
-                .collect::<Option<Vec<_>>>();
-            let root_hashes = self.state_store.merklize_value_sets(
-                jmt_update_ref_sets(&jmt_update_sets),
-                node_hashes,
-                first_version,
-                cs,
-            )?;
+                let jmt_update_sets = jmt_update_sets(&state_updates_vec);
+                let node_hashes = txns_to_commit
+                    .iter()
+                    .map(|txn_to_commit| txn_to_commit.jf_node_hashes())
+                    .collect::<Option<Vec<_>>>();
+                let root_hashes = self.state_store.merklize_value_sets(
+                    jmt_update_ref_sets(&jmt_update_sets),
+                    node_hashes,
+                    first_version,
+                    cs,
+                )?;
+                latest_state_checkpoint_index.map(|idx| {
+                    let version = first_version + idx as LeafCount;
+                    let root_hash = root_hashes[idx];
+                    (version, root_hash)
+                })
+            } else {
+                None
+            };
+
             self.state_store
                 .put_value_sets(state_updates_vec, first_version, cs)?;
 
-            latest_state_checkpoint_index.map(|idx| {
-                let version = first_version + idx as LeafCount;
-                let root_hash = root_hashes[idx];
-                (version, root_hash)
-            })
+            new_state_checkpoint
         };
 
         // Event updates. Gather event accumulator root hashes.
@@ -1280,6 +1288,7 @@ impl DbWriter for AptosDB {
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        merklize_state: bool,
     ) -> Result<()> {
         gauged_api("save_transactions", || {
             let num_txns = txns_to_commit.len() as u64;
@@ -1304,8 +1313,12 @@ impl DbWriter for AptosDB {
             // Gather db mutations to `batch`.
             let mut cs = ChangeSet::new();
 
-            let (new_root_hash, new_state_checkpoint) =
-                self.save_transactions_impl(txns_to_commit, first_version, &mut cs)?;
+            let (new_root_hash, new_state_checkpoint) = self.save_transactions_impl(
+                txns_to_commit,
+                first_version,
+                &mut cs,
+                merklize_state,
+            )?;
 
             // If expected ledger info is provided, verify result root hash and save the ledger info.
             if let Some(x) = ledger_info_with_sigs {

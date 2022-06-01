@@ -28,7 +28,7 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use scratchpad::ProofRead;
+use scratchpad::{ProofRead, SparseMerkleTree};
 use serde::{Deserialize, Serialize};
 use std::{cmp::max, collections::HashMap, sync::Arc};
 use storage_interface::DbReader;
@@ -111,6 +111,21 @@ pub trait BlockExecutorTrait: Send + Sync {
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
     ) -> Result<(), Error>;
+
+    fn commit_blocks_no_state_merklize(
+        &self,
+        _block_ids: Vec<HashValue>,
+        _ledger_info_with_sigs: LedgerInfoWithSignatures,
+    ) -> Result<
+        Option<(
+            Version,
+            SparseMerkleTree<StateValue>,
+            Vec<Vec<(HashValue, (HashValue, StateKey))>>,
+        )>,
+        Error,
+    > {
+        unimplemented!()
+    }
 }
 
 pub trait TransactionReplayer: Send {

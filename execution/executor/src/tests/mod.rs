@@ -404,6 +404,7 @@ fn apply_transaction_by_writeset(
             &executed.transactions_to_commit().unwrap(),
             ledger_view.txn_accumulator().num_leaves(),
             None,
+            true,
         )
         .unwrap();
 }
@@ -543,6 +544,7 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
                 &executed.transactions_to_commit().unwrap(),
                 ledger_view.txn_accumulator().num_leaves(),
                 None,
+                true,
             )
             .unwrap();
         ledger_view = executed.result_view;

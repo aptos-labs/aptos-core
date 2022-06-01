@@ -72,6 +72,7 @@ impl StorageService {
             &req.txns_to_commit,
             req.first_version,
             req.ledger_info_with_signatures.as_ref(),
+            true,
         )?)
     }
 

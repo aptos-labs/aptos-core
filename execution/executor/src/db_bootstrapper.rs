@@ -93,6 +93,7 @@ impl GenesisCommitter {
             &self.output.transactions_to_commit()?,
             self.output.result_view.txn_accumulator().version(),
             self.output.ledger_info.as_ref(),
+            true,
         )?;
         info!("Genesis commited.");
         // DB bootstrapped, avoid anything that could fail after this.

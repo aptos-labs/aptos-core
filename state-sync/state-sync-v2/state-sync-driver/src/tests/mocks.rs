@@ -317,6 +317,7 @@ mock! {
             txns_to_commit: &[TransactionToCommit],
             first_version: Version,
             ledger_info_with_sigs: Option<&'a LedgerInfoWithSignatures>,
+            merklize_state: bool,
         ) -> Result<()>;
 
         fn delete_genesis(&self) -> Result<()>;
