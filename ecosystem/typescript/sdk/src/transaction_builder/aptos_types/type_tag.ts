@@ -6,7 +6,7 @@ export abstract class TypeTag {
   abstract serialize(serializer: Serializer): void;
 
   static deserialize(deserializer: Deserializer): TypeTag {
-    const index = deserializer.deserializeVariantIndex();
+    const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
       case 0:
         return TypeTagVariantbool.load(deserializer);
@@ -36,7 +36,7 @@ export class TypeTagVariantbool extends TypeTag {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(0);
+    serializer.serializeU32AsUleb128(0);
   }
 
   static load(deserializer: Deserializer): TypeTagVariantbool {
@@ -50,7 +50,7 @@ export class TypeTagVariantu8 extends TypeTag {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(1);
+    serializer.serializeU32AsUleb128(1);
   }
 
   static load(deserializer: Deserializer): TypeTagVariantu8 {
@@ -64,7 +64,7 @@ export class TypeTagVariantu64 extends TypeTag {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(2);
+    serializer.serializeU32AsUleb128(2);
   }
 
   static load(deserializer: Deserializer): TypeTagVariantu64 {
@@ -78,7 +78,7 @@ export class TypeTagVariantu128 extends TypeTag {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(3);
+    serializer.serializeU32AsUleb128(3);
   }
 
   static load(deserializer: Deserializer): TypeTagVariantu128 {
@@ -92,7 +92,7 @@ export class TypeTagVariantaddress extends TypeTag {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(4);
+    serializer.serializeU32AsUleb128(4);
   }
 
   static load(deserializer: Deserializer): TypeTagVariantaddress {
@@ -106,7 +106,7 @@ export class TypeTagVariantsigner extends TypeTag {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(5);
+    serializer.serializeU32AsUleb128(5);
   }
 
   static load(deserializer: Deserializer): TypeTagVariantsigner {
@@ -120,7 +120,7 @@ export class TypeTagVariantvector extends TypeTag {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(6);
+    serializer.serializeU32AsUleb128(6);
     this.value.serialize(serializer);
   }
 
@@ -136,7 +136,7 @@ export class TypeTagVariantstruct extends TypeTag {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(7);
+    serializer.serializeU32AsUleb128(7);
     this.value.serialize(serializer);
   }
 

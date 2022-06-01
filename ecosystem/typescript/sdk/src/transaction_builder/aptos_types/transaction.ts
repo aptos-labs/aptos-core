@@ -290,7 +290,7 @@ export abstract class TransactionPayload {
   abstract serialize(serializer: Serializer): void;
 
   static deserialize(deserializer: Deserializer): TransactionPayload {
-    const index = deserializer.deserializeVariantIndex();
+    const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
       case 0:
         return TransactionPayloadVariantWriteSet.load(deserializer);
@@ -322,7 +322,7 @@ export class TransactionPayloadVariantScript extends TransactionPayload {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(1);
+    serializer.serializeU32AsUleb128(1);
     this.value.serialize(serializer);
   }
 
@@ -338,7 +338,7 @@ export class TransactionPayloadVariantModuleBundle extends TransactionPayload {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(2);
+    serializer.serializeU32AsUleb128(2);
     this.value.serialize(serializer);
   }
 
@@ -354,7 +354,7 @@ export class TransactionPayloadVariantScriptFunction extends TransactionPayload 
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(3);
+    serializer.serializeU32AsUleb128(3);
     this.value.serialize(serializer);
   }
 
@@ -381,7 +381,7 @@ export abstract class TransactionArgument {
   abstract serialize(serializer: Serializer): void;
 
   static deserialize(deserializer: Deserializer): TransactionArgument {
-    const index = deserializer.deserializeVariantIndex();
+    const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
       case 0:
         return TransactionArgumentVariantU8.load(deserializer);
@@ -407,7 +407,7 @@ export class TransactionArgumentVariantU8 extends TransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(0);
+    serializer.serializeU32AsUleb128(0);
     serializer.serializeU8(this.value);
   }
 
@@ -423,7 +423,7 @@ export class TransactionArgumentVariantU64 extends TransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(1);
+    serializer.serializeU32AsUleb128(1);
     serializer.serializeU64(this.value);
   }
 
@@ -439,7 +439,7 @@ export class TransactionArgumentVariantU128 extends TransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(2);
+    serializer.serializeU32AsUleb128(2);
     serializer.serializeU128(this.value);
   }
 
@@ -455,7 +455,7 @@ export class TransactionArgumentVariantAddress extends TransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(3);
+    serializer.serializeU32AsUleb128(3);
     this.value.serialize(serializer);
   }
 
@@ -471,7 +471,7 @@ export class TransactionArgumentVariantU8Vector extends TransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(4);
+    serializer.serializeU32AsUleb128(4);
     serializer.serializeBytes(this.value);
   }
 
@@ -487,7 +487,7 @@ export class TransactionArgumentVariantBool extends TransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(5);
+    serializer.serializeU32AsUleb128(5);
     serializer.serializeBool(this.value);
   }
 
@@ -498,14 +498,14 @@ export class TransactionArgumentVariantBool extends TransactionArgument {
 }
 
 export function serializeVectorBytes(value: Seq<bytes>, serializer: Serializer): void {
-  serializer.serializeLen(value.length);
+  serializer.serializeU32AsUleb128(value.length);
   value.forEach((item: bytes) => {
     serializer.serializeBytes(item);
   });
 }
 
 export function deserializeVectorBytes(deserializer: Deserializer): Seq<bytes> {
-  const length = deserializer.deserializeLen();
+  const length = deserializer.deserializeUleb128AsU32();
   const list: Seq<bytes> = [];
   for (let i = 0; i < length; i++) {
     list.push(deserializer.deserializeBytes());

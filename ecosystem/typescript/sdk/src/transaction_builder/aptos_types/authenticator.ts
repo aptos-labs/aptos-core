@@ -5,7 +5,7 @@ export abstract class TransactionAuthenticator {
   abstract serialize(serializer: Serializer): void;
 
   static deserialize(deserializer: Deserializer): TransactionAuthenticator {
-    const index = deserializer.deserializeVariantIndex();
+    const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
       case 0:
         return TransactionAuthenticatorVariantEd25519.load(deserializer);
@@ -33,7 +33,7 @@ export class TransactionAuthenticatorVariantEd25519 extends TransactionAuthentic
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(0);
+    serializer.serializeU32AsUleb128(0);
     this.public_key.serialize(serializer);
     this.signature.serialize(serializer);
   }
@@ -83,7 +83,7 @@ export class TransactionAuthenticatorVariantMultiEd25519 extends TransactionAuth
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(1);
+    serializer.serializeU32AsUleb128(1);
     this.public_key.serialize(serializer);
     this.signature.serialize(serializer);
   }
@@ -105,7 +105,7 @@ export class TransactionAuthenticatorVariantMultiAgent extends TransactionAuthen
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(2);
+    serializer.serializeU32AsUleb128(2);
     this.sender.serialize(serializer);
     serializeVector<AccountAddress>(this.secondary_signer_addresses, serializer);
     serializeVector<AccountAuthenticator>(this.secondary_signers, serializer);
@@ -123,7 +123,7 @@ export abstract class AccountAuthenticator {
   abstract serialize(serializer: Serializer): void;
 
   static deserialize(deserializer: Deserializer): AccountAuthenticator {
-    const index = deserializer.deserializeVariantIndex();
+    const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
       case 0:
         return AccountAuthenticatorVariantEd25519.load(deserializer);
@@ -141,7 +141,7 @@ export class AccountAuthenticatorVariantEd25519 extends AccountAuthenticator {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(0);
+    serializer.serializeU32AsUleb128(0);
     this.public_key.serialize(serializer);
     this.signature.serialize(serializer);
   }
@@ -159,7 +159,7 @@ export class AccountAuthenticatorVariantMultiEd25519 extends AccountAuthenticato
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeVariantIndex(1);
+    serializer.serializeU32AsUleb128(1);
     this.public_key.serialize(serializer);
     this.signature.serialize(serializer);
   }
