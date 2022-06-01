@@ -15,6 +15,10 @@ export class Deserializer {
   }
 
   private read(length: number): ArrayBuffer {
+    if (this.offset + length > this.buffer.byteLength) {
+      throw new Error("Reached to the end of buffer");
+    }
+
     const bytes = this.buffer.slice(this.offset, this.offset + length);
     this.offset += length;
     return bytes;
