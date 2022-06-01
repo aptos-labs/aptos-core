@@ -12,7 +12,7 @@ class DialogComponent < ViewComponent::Base
   def initialize(**rest)
     @rest = rest
     @rest[:class] = [
-      'rounded-xl border-none bg-neutral-900 text-white p-8 w-96',
+      'rounded-xl border-none bg-neutral-900 text-white p-8 w-96 fixed',
       @rest[:class]
     ]
 
