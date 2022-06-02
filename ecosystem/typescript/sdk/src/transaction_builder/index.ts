@@ -1,14 +1,14 @@
-import * as SHA3 from "js-sha3";
+import * as SHA3 from 'js-sha3';
 import {
   Ed25519PublicKey,
   Ed25519Signature,
   RawTransaction,
   SignedTransaction,
   TransactionAuthenticatorVariantEd25519,
-} from "./aptos_types";
-import { bcsToBytes, bytes } from "./bcs";
+} from './aptos_types';
+import { bcsToBytes, Bytes } from './bcs';
 
-const SALT = "APTOS::RawTransaction";
+const SALT = 'APTOS::RawTransaction';
 
 export type SigningMessage = Buffer;
 export type TransactionSignature = Uint8Array;
@@ -50,7 +50,7 @@ class TransactionBuilder<F extends SigningFn> {
   }
 
   /** Signs a raw transaction and returns a bcs serialized transaction. */
-  sign(rawTxn: RawTransaction): bytes {
+  sign(rawTxn: RawTransaction): Bytes {
     return bcsToBytes(this.signInternal(rawTxn));
   }
 }

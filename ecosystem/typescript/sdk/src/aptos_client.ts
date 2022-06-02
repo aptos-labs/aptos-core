@@ -1,16 +1,16 @@
-import { AxiosRequestConfig, AxiosResponse } from "axios";
-import { Accounts } from "./api/Accounts";
-import { Events } from "./api/Events";
-import { Transactions } from "./api/Transactions";
-import { HttpClient, RequestParams } from "./api/http-client";
-import { HexString, MaybeHexString } from "./hex_string";
-import { sleep } from "./util";
-import { AptosAccount } from "./aptos_account";
-import { Types } from "./types";
-import { Tables } from "./api/Tables";
-import { AptosError } from "./api/data-contracts";
-import * as TxnBuilderTypes from "./transaction_builder/aptos_types";
-import { SigningMessage, TransactionBuilderEd25519 } from "./transaction_builder";
+import { AxiosRequestConfig, AxiosResponse } from 'axios';
+import { Accounts } from './api/Accounts';
+import { Events } from './api/Events';
+import { Transactions } from './api/Transactions';
+import { HttpClient, RequestParams } from './api/http-client';
+import { HexString, MaybeHexString } from './hex_string';
+import { sleep } from './util';
+import { AptosAccount } from './aptos_account';
+import { Types } from './types';
+import { Tables } from './api/Tables';
+import { AptosError } from './api/data-contracts';
+import * as TxnBuilderTypes from './transaction_builder/aptos_types';
+import { SigningMessage, TransactionBuilderEd25519 } from './transaction_builder';
 
 export class RequestError extends Error {
   response?: AxiosResponse<any, Types.AptosError>;
@@ -19,15 +19,15 @@ export class RequestError extends Error {
 
   constructor(message?: string, response?: AxiosResponse<any, Types.AptosError>, requestBody?: string) {
     const data = JSON.stringify(response.data);
-    const hostAndPath = [response.request?.host, response.request?.path].filter((e) => !!e).join("");
-    super(`${message} - ${data}${hostAndPath ? ` @ ${hostAndPath}` : ""}${requestBody ? ` : ${requestBody}` : ""}`);
+    const hostAndPath = [response.request?.host, response.request?.path].filter((e) => !!e).join('');
+    super(`${message} - ${data}${hostAndPath ? ` @ ${hostAndPath}` : ''}${requestBody ? ` : ${requestBody}` : ''}`);
     this.response = response;
     this.requestBody = requestBody;
     Object.setPrototypeOf(this, new.target.prototype); // restore prototype chain
   }
 }
 
-export type AptosClientConfig = Omit<AxiosRequestConfig, "data" | "cancelToken" | "method">;
+export type AptosClientConfig = Omit<AxiosRequestConfig, 'data' | 'cancelToken' | 'method'>;
 
 export function raiseForStatus<T>(
   expectedStatus: number,
@@ -164,9 +164,9 @@ export class AptosClient {
     return {
       sender: senderAddress.hex(),
       sequence_number: account.sequence_number,
-      max_gas_amount: "1000",
-      gas_unit_price: "1",
-      gas_currency_code: "XUS",
+      max_gas_amount: '1000',
+      gas_unit_price: '1',
+      gas_currency_code: 'XUS',
       // Unix timestamp, in seconds + 10 seconds
       expiration_timestamp_secs: (Math.floor(Date.now() / 1000) + 10).toString(),
       payload,
@@ -195,7 +195,7 @@ export class AptosClient {
     const signatureHex = accountFrom.signHexString(message.substring(2));
 
     const transactionSignature: Types.TransactionSignature = {
-      type: "ed25519_signature",
+      type: 'ed25519_signature',
       public_key: accountFrom.pubKey().hex(),
       signature: signatureHex.hex(),
     };
@@ -238,12 +238,12 @@ export class AptosClient {
     const httpClient = this.transactions.http;
 
     const response = await httpClient.request<Types.PendingTransaction, AptosError>({
-      path: "/transactions",
-      method: "POST",
+      path: '/transactions',
+      method: 'POST',
       body: signedTxn,
       // @ts-ignore
-      type: "application/x.aptos.signed_transaction+bcs",
-      format: "json",
+      type: 'application/x.aptos.signed_transaction+bcs',
+      format: 'json',
     });
 
     raiseForStatus(202, response, signedTxn);
@@ -269,7 +269,7 @@ export class AptosClient {
       return true;
     }
     raiseForStatus(200, response, txnHash);
-    return response.data.type === "pending_transaction";
+    return response.data.type === 'pending_transaction';
   }
 
   /** Waits up to 10 seconds for a transaction to move past pending state */
@@ -288,9 +288,9 @@ export class AptosClient {
 
   async getLedgerInfo(params: RequestParams = {}): Promise<Types.LedgerInfo> {
     const result = await this.client.request<Types.LedgerInfo, AptosError>({
-      path: "/",
-      method: "GET",
-      format: "json",
+      path: '/',
+      method: 'GET',
+      format: 'json',
       ...params,
     });
     return result.data;

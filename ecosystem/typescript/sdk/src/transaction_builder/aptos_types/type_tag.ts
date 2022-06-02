@@ -1,6 +1,8 @@
-import { Deserializer, Seq, Serializer, deserializeVector, serializeVector } from "../bcs";
-import { AccountAddress } from "./account_address";
-import { Identifier } from "./identifier";
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable class-methods-use-this */
+import { Deserializer, Seq, Serializer, deserializeVector, serializeVector } from '../bcs';
+import { AccountAddress } from './account_address';
+import { Identifier } from './identifier';
 
 export abstract class TypeTag {
   abstract serialize(serializer: Serializer): void;
@@ -31,10 +33,6 @@ export abstract class TypeTag {
 }
 
 export class TypeTagVariantbool extends TypeTag {
-  constructor() {
-    super();
-  }
-
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(0);
   }
@@ -45,71 +43,51 @@ export class TypeTagVariantbool extends TypeTag {
 }
 
 export class TypeTagVariantu8 extends TypeTag {
-  constructor() {
-    super();
-  }
-
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(1);
   }
 
-  static load(deserializer: Deserializer): TypeTagVariantu8 {
+  static load(_deserializer: Deserializer): TypeTagVariantu8 {
     return new TypeTagVariantu8();
   }
 }
 
 export class TypeTagVariantu64 extends TypeTag {
-  constructor() {
-    super();
-  }
-
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(2);
   }
 
-  static load(deserializer: Deserializer): TypeTagVariantu64 {
+  static load(_deserializer: Deserializer): TypeTagVariantu64 {
     return new TypeTagVariantu64();
   }
 }
 
 export class TypeTagVariantu128 extends TypeTag {
-  constructor() {
-    super();
-  }
-
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(3);
   }
 
-  static load(deserializer: Deserializer): TypeTagVariantu128 {
+  static load(_deserializer: Deserializer): TypeTagVariantu128 {
     return new TypeTagVariantu128();
   }
 }
 
 export class TypeTagVariantaddress extends TypeTag {
-  constructor() {
-    super();
-  }
-
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(4);
   }
 
-  static load(deserializer: Deserializer): TypeTagVariantaddress {
+  static load(_deserializer: Deserializer): TypeTagVariantaddress {
     return new TypeTagVariantaddress();
   }
 }
 
 export class TypeTagVariantsigner extends TypeTag {
-  constructor() {
-    super();
-  }
-
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(5);
   }
 
-  static load(deserializer: Deserializer): TypeTagVariantsigner {
+  static load(_deserializer: Deserializer): TypeTagVariantsigner {
     return new TypeTagVariantsigner();
   }
 }
@@ -162,13 +140,13 @@ export class StructTag {
    */
   static fromString(structTag: string): StructTag {
     // Type args are not supported in string literal
-    if (structTag.includes("<")) {
-      throw new Error("Not implemented");
+    if (structTag.includes('<')) {
+      throw new Error('Not implemented');
     }
 
-    const parts = structTag.split("::");
+    const parts = structTag.split('::');
     if (parts.length !== 3) {
-      throw new Error("Invalid struct tag string literal.");
+      throw new Error('Invalid struct tag string literal.');
     }
 
     return new StructTag(AccountAddress.fromHex(parts[0]), new Identifier(parts[1]), new Identifier(parts[2]), []);
@@ -183,9 +161,9 @@ export class StructTag {
 
   static deserialize(deserializer: Deserializer): StructTag {
     const address = AccountAddress.deserialize(deserializer);
-    const module_name = Identifier.deserialize(deserializer);
+    const moduleName = Identifier.deserialize(deserializer);
     const name = Identifier.deserialize(deserializer);
-    const type_args = deserializeVector(deserializer, TypeTag);
-    return new StructTag(address, module_name, name, type_args);
+    const typeArgs = deserializeVector(deserializer, TypeTag);
+    return new StructTag(address, moduleName, name, typeArgs);
   }
 }

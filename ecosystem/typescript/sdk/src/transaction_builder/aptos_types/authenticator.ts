@@ -1,5 +1,7 @@
-import { Serializer, Deserializer, bytes, Seq, deserializeVector, serializeVector } from "../bcs";
-import { AccountAddress } from "./account_address";
+/* eslint-disable @typescript-eslint/naming-convention */
+/* eslint-disable max-classes-per-file */
+import { Serializer, Deserializer, Bytes, Seq, deserializeVector, serializeVector } from '../bcs';
+import { AccountAddress } from './account_address';
 
 export abstract class TransactionAuthenticator {
   abstract serialize(serializer: Serializer): void;
@@ -172,7 +174,7 @@ export class AccountAuthenticatorVariantMultiEd25519 extends AccountAuthenticato
 }
 
 export class Ed25519PublicKey {
-  constructor(public readonly value: bytes) {}
+  constructor(public readonly value: Bytes) {}
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.value);
@@ -185,7 +187,7 @@ export class Ed25519PublicKey {
 }
 
 export class Ed25519Signature {
-  constructor(public readonly value: bytes) {}
+  constructor(public readonly value: Bytes) {}
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.value);
@@ -198,7 +200,7 @@ export class Ed25519Signature {
 }
 
 export class MultiEd25519PublicKey {
-  constructor(public readonly value: bytes) {}
+  constructor(public readonly value: Bytes) {}
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.value);
@@ -211,7 +213,7 @@ export class MultiEd25519PublicKey {
 }
 
 export class MultiEd25519Signature {
-  constructor(public readonly value: bytes) {}
+  constructor(public readonly value: Bytes) {}
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.value);

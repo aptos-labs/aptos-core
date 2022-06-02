@@ -1,5 +1,6 @@
-import { MAX_U128_BIG_INT, MAX_U16_NUMBER, MAX_U32_NUMBER, MAX_U64_BIG_INT, MAX_U8_NUMBER } from "./helper";
-import { anynumber, bytes, uint16, uint32, uint8 } from "./types";
+/* eslint-disable no-bitwise */
+import { MAX_U128_BIG_INT, MAX_U16_NUMBER, MAX_U32_NUMBER, MAX_U64_BIG_INT, MAX_U8_NUMBER } from './consts';
+import { AnyNumber, Bytes, Uint16, Uint32, Uint8 } from './types';
 
 export class Serializer {
   private buffer: ArrayBuffer;
@@ -19,7 +20,7 @@ export class Serializer {
     }
   }
 
-  protected serialize(values: bytes) {
+  protected serialize(values: Bytes) {
     this.ensureBufferWillHandleSize(values.length);
     new Uint8Array(this.buffer, this.offset).set(values);
     this.offset += values.length;
@@ -62,7 +63,7 @@ export class Serializer {
    * BCS layout for "bytes": bytes_length | bytes. bytes_length is the length of the bytes array that is
    * uleb128 encoded. bytes_length is a u32 integer.
    */
-  serializeBytes(value: bytes): void {
+  serializeBytes(value: Bytes): void {
     this.serializeU32AsUleb128(value.length);
     this.serialize(value);
   }
@@ -72,7 +73,7 @@ export class Serializer {
    * serialized to help deserialization.  When deserializing, the number of
    * bytes to deserialize needs to be passed in.
    */
-  serializeFixedBytes(value: bytes): void {
+  serializeFixedBytes(value: Bytes): void {
     this.serialize(value);
   }
 
@@ -82,8 +83,8 @@ export class Serializer {
    * BCS layout for "boolean": One byte. "0x01" for True and "0x00" for False.
    */
   serializeBool(value: boolean): void {
-    if (typeof value !== "boolean") {
-      throw new Error("Value needs to be a boolean");
+    if (typeof value !== 'boolean') {
+      throw new Error('Value needs to be a boolean');
     }
     const byteValue = value ? 1 : 0;
     this.serialize(new Uint8Array([byteValue]));
@@ -95,7 +96,7 @@ export class Serializer {
    * BCS layout for "uint8": One byte. Binary format in little-endian representation.
    */
   @checkNumberRange(0, MAX_U8_NUMBER)
-  serializeU8(value: uint8): void {
+  serializeU8(value: Uint8): void {
     this.serialize(new Uint8Array([value]));
   }
 
@@ -111,7 +112,7 @@ export class Serializer {
    * ```
    */
   @checkNumberRange(0, MAX_U16_NUMBER)
-  serializeU16(value: uint16): void {
+  serializeU16(value: Uint16): void {
     this.serializeWithFunction(DataView.prototype.setUint16, 2, value);
   }
 
@@ -127,7 +128,7 @@ export class Serializer {
    * ```
    */
   @checkNumberRange(0, MAX_U32_NUMBER)
-  serializeU32(value: uint32): void {
+  serializeU32(value: Uint32): void {
     this.serializeWithFunction(DataView.prototype.setUint32, 4, value);
   }
 
@@ -143,7 +144,7 @@ export class Serializer {
    * ```
    */
   @checkNumberRange(0n, MAX_U64_BIG_INT)
-  serializeU64(value: anynumber): void {
+  serializeU64(value: AnyNumber): void {
     const low = BigInt(value.toString()) & BigInt(MAX_U32_NUMBER);
     const high = BigInt(value.toString()) >> BigInt(32);
 
@@ -158,7 +159,7 @@ export class Serializer {
    * BCS layout for "uint128": Sixteen bytes. Binary format in little-endian representation.
    */
   @checkNumberRange(0n, MAX_U128_BIG_INT)
-  serializeU128(value: anynumber): void {
+  serializeU128(value: AnyNumber): void {
     const low = BigInt(value.toString()) & MAX_U64_BIG_INT;
     const high = BigInt(value.toString()) >> BigInt(64);
 
@@ -173,7 +174,8 @@ export class Serializer {
    * BCS use uleb128 encoding in two cases: (1) lengths of variable-length sequences and (2) tags of enum values
    */
   @checkNumberRange(0, MAX_U32_NUMBER)
-  serializeU32AsUleb128(value: uint32): void {
+  serializeU32AsUleb128(val: Uint32): void {
+    let value = val;
     const valueArray = [];
     while (value >>> 7 !== 0) {
       valueArray.push((value & 0x7f) | 0x80);
@@ -186,7 +188,7 @@ export class Serializer {
   /**
    * Returns the buffered bytes
    */
-  getBytes(): bytes {
+  getBytes(): Bytes {
     return new Uint8Array(this.buffer).slice(0, this.offset);
   }
 }
@@ -197,13 +199,14 @@ export class Serializer {
  * @param maxValue The arg value of decorated function must <= maxValue
  * @param message Error message
  */
-function checkNumberRange<T extends anynumber>(minValue: T, maxValue: T, message?: string) {
+function checkNumberRange<T extends AnyNumber>(minValue: T, maxValue: T, message?: string) {
   return (target: unknown, propertyKey: string, descriptor: PropertyDescriptor) => {
     const childFunction = descriptor.value;
-    descriptor.value = function (value: anynumber) {
+    // eslint-disable-next-line no-param-reassign
+    descriptor.value = function deco(value: AnyNumber) {
       const valueBigInt = BigInt(value.toString());
       if (valueBigInt > BigInt(maxValue.toString()) || valueBigInt < BigInt(minValue.toString())) {
-        throw new Error(message || "Value is out of range");
+        throw new Error(message || 'Value is out of range');
       }
       childFunction.apply(this, [value]);
     };

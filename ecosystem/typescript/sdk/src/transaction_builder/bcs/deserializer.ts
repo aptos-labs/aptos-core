@@ -1,13 +1,13 @@
 /* eslint-disable no-bitwise */
-import { MAX_U32_NUMBER } from "./helper";
-import { bytes, uint128, uint16, uint32, uint64, uint8 } from "./types";
+import { MAX_U32_NUMBER } from './consts';
+import { Bytes, Uint128, Uint16, Uint32, Uint64, Uint8 } from './types';
 
 export class Deserializer {
   private buffer: ArrayBuffer;
 
   private offset: number;
 
-  constructor(data: bytes) {
+  constructor(data: Bytes) {
     // copies data to prevent outside mutation of buffer.
     this.buffer = new ArrayBuffer(data.length);
     new Uint8Array(this.buffer).set(data, 0);
@@ -16,7 +16,7 @@ export class Deserializer {
 
   private read(length: number): ArrayBuffer {
     if (this.offset + length > this.buffer.byteLength) {
-      throw new Error("Reached to the end of buffer");
+      throw new Error('Reached to the end of buffer');
     }
 
     const bytes = this.buffer.slice(this.offset, this.offset + length);
@@ -50,7 +50,7 @@ export class Deserializer {
    * BCS layout for "bytes": bytes_length | bytes. bytes_length is the length of the bytes array that is
    * uleb128 encoded. bytes_length is a u32 integer.
    */
-  deserializeBytes(): bytes {
+  deserializeBytes(): Bytes {
     const len = this.deserializeUleb128AsU32();
     return new Uint8Array(this.read(len));
   }
@@ -59,7 +59,7 @@ export class Deserializer {
    * Deserializes an array of bytes. The number of bytes to read is already known.
    *
    */
-  deserializeFixedBytes(len: number): bytes {
+  deserializeFixedBytes(len: number): Bytes {
     return new Uint8Array(this.read(len));
   }
 
@@ -71,7 +71,7 @@ export class Deserializer {
   deserializeBool(): boolean {
     const bool = new Uint8Array(this.read(1))[0];
     if (bool !== 1 && bool !== 0) {
-      throw new Error("Invalid boolean value");
+      throw new Error('Invalid boolean value');
     }
     return bool === 1;
   }
@@ -81,7 +81,7 @@ export class Deserializer {
    *
    * BCS layout for "uint8": One byte. Binary format in little-endian representation.
    */
-  deserializeU8(): uint8 {
+  deserializeU8(): Uint8 {
     return new DataView(this.read(1)).getUint8(0);
   }
 
@@ -95,7 +95,7 @@ export class Deserializer {
    * assert(deserializer.deserializeU16() === 4660);
    * ```
    */
-  deserializeU16(): uint16 {
+  deserializeU16(): Uint16 {
     return new DataView(this.read(2)).getUint16(0, true);
   }
 
@@ -109,7 +109,7 @@ export class Deserializer {
    * assert(deserializer.deserializeU32() === 305419896);
    * ```
    */
-  deserializeU32(): uint32 {
+  deserializeU32(): Uint32 {
     return new DataView(this.read(4)).getUint32(0, true);
   }
 
@@ -123,7 +123,7 @@ export class Deserializer {
    * assert(deserializer.deserializeU64() === 1311768467750121216);
    * ```
    */
-  deserializeU64(): uint64 {
+  deserializeU64(): Uint64 {
     const low = this.deserializeU32();
     const high = this.deserializeU32();
 
@@ -136,7 +136,7 @@ export class Deserializer {
    *
    * BCS layout for "uint128": Sixteen bytes. Binary format in little-endian representation.
    */
-  deserializeU128(): uint128 {
+  deserializeU128(): Uint128 {
     const low = this.deserializeU64();
     const high = this.deserializeU64();
 
@@ -149,7 +149,7 @@ export class Deserializer {
    *
    * BCS use uleb128 encoding in two cases: (1) lengths of variable-length sequences and (2) tags of enum values
    */
-  deserializeUleb128AsU32(): uint32 {
+  deserializeUleb128AsU32(): Uint32 {
     let value: bigint = 0n;
     let shift = 0;
 
@@ -164,7 +164,7 @@ export class Deserializer {
     }
 
     if (value > MAX_U32_NUMBER) {
-      throw new Error("Overflow while parsing uleb128-encoded uint32 value");
+      throw new Error('Overflow while parsing uleb128-encoded uint32 value');
     }
 
     return Number(value);

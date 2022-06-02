@@ -1,19 +1,23 @@
-import { HexString } from "../../hex_string";
+/* eslint-disable @typescript-eslint/naming-convention */
+/* eslint-disable class-methods-use-this */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable max-classes-per-file */
+import { HexString } from '../../hex_string';
 import {
   Deserializer,
   Serializer,
-  uint64,
-  bytes,
+  Uint64,
+  Bytes,
   Seq,
-  uint8,
-  uint128,
+  Uint8,
+  Uint128,
   deserializeVector,
   serializeVector,
-} from "../bcs";
-import { AccountAddress } from "./account_address";
-import { TransactionAuthenticator } from "./authenticator";
-import { Identifier } from "./identifier";
-import { TypeTag } from "./type_tag";
+} from '../bcs';
+import { AccountAddress } from './account_address';
+import { TransactionAuthenticator } from './authenticator';
+import { Identifier } from './identifier';
+import { TypeTag } from './type_tag';
 
 export class RawTransaction {
   /**
@@ -33,11 +37,11 @@ export class RawTransaction {
    */
   constructor(
     public readonly sender: AccountAddress,
-    public readonly sequence_number: uint64,
+    public readonly sequence_number: Uint64,
     public readonly payload: TransactionPayload,
-    public readonly max_gas_amount: uint64,
-    public readonly gas_unit_price: uint64,
-    public readonly expiration_timestamp_secs: uint64,
+    public readonly max_gas_amount: Uint64,
+    public readonly gas_unit_price: Uint64,
+    public readonly expiration_timestamp_secs: Uint64,
     public readonly chain_id: ChainId,
   ) {}
 
@@ -91,7 +95,7 @@ export class Script {
    * ```
    */
   constructor(
-    public readonly code: bytes,
+    public readonly code: Bytes,
     public readonly ty_args: Seq<TypeTag>,
     public readonly args: Seq<TransactionArgument>,
   ) {}
@@ -134,7 +138,7 @@ export class ScriptFunction {
     public readonly module_name: ModuleId,
     public readonly function_name: Identifier,
     public readonly ty_args: Seq<TypeTag>,
-    public readonly args: Seq<bytes>,
+    public readonly args: Seq<Bytes>,
   ) {}
 
   /**
@@ -157,7 +161,7 @@ export class ScriptFunction {
    * ```
    * @returns
    */
-  static natual(module: string, func: string, ty_args: Seq<TypeTag>, args: Seq<bytes>): ScriptFunction {
+  static natual(module: string, func: string, ty_args: Seq<TypeTag>, args: Seq<Bytes>): ScriptFunction {
     return new ScriptFunction(ModuleId.fromStr(module), new Identifier(func), ty_args, args);
   }
 
@@ -167,7 +171,7 @@ export class ScriptFunction {
     serializeVector<TypeTag>(this.ty_args, serializer);
 
     serializer.serializeU32AsUleb128(this.args.length);
-    this.args.forEach((item: bytes) => {
+    this.args.forEach((item: Bytes) => {
       serializer.serializeBytes(item);
     });
   }
@@ -178,8 +182,8 @@ export class ScriptFunction {
     const ty_args = deserializeVector(deserializer, TypeTag);
 
     const length = deserializer.deserializeUleb128AsU32();
-    const list: Seq<bytes> = [];
-    for (let i = 0; i < length; i++) {
+    const list: Seq<Bytes> = [];
+    for (let i = 0; i < length; i += 1) {
       list.push(deserializer.deserializeBytes());
     }
 
@@ -193,7 +197,7 @@ export class Module {
    * Contains the bytecode of a Move module that can be published to the Aptos chain.
    * @param code Move bytecode of a module.
    */
-  constructor(public readonly code: bytes) {}
+  constructor(public readonly code: Bytes) {}
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.code);
@@ -237,9 +241,9 @@ export class ModuleId {
    * @returns
    */
   static fromStr(moduleId: string): ModuleId {
-    const parts = moduleId.split("::");
+    const parts = moduleId.split('::');
     if (parts.length !== 2) {
-      throw new Error("Invalid module id.");
+      throw new Error('Invalid module id.');
     }
     return new ModuleId(AccountAddress.fromHex(new HexString(parts[0])), new Identifier(parts[1]));
   }
@@ -258,21 +262,21 @@ export class ModuleId {
 
 export class ChangeSet {
   serialize(serializer: Serializer): void {
-    throw new Error("Not implemented.");
+    throw new Error('Not implemented.');
   }
 
   static deserialize(deserializer: Deserializer): ChangeSet {
-    throw new Error("Not implemented.");
+    throw new Error('Not implemented.');
   }
 }
 
 export class WriteSet {
   serialize(serializer: Serializer): void {
-    throw new Error("Not implmented.");
+    throw new Error('Not implmented.');
   }
 
   static deserialize(deserializer: Deserializer): WriteSet {
-    throw new Error("Not implmented.");
+    throw new Error('Not implmented.');
   }
 }
 
@@ -324,11 +328,11 @@ export abstract class TransactionPayload {
 
 export class TransactionPayloadVariantWriteSet extends TransactionPayload {
   serialize(serializer: Serializer): void {
-    throw new Error("Not implemented");
+    throw new Error('Not implemented');
   }
 
   static load(deserializer: Deserializer): TransactionPayloadVariantWriteSet {
-    throw new Error("Not implemented");
+    throw new Error('Not implemented');
   }
 }
 
@@ -381,7 +385,7 @@ export class TransactionPayloadVariantScriptFunction extends TransactionPayload 
 }
 
 export class ChainId {
-  constructor(public readonly value: uint8) {}
+  constructor(public readonly value: Uint8) {}
 
   serialize(serializer: Serializer): void {
     serializer.serializeU8(this.value);
@@ -418,7 +422,7 @@ export abstract class TransactionArgument {
 }
 
 export class TransactionArgumentVariantU8 extends TransactionArgument {
-  constructor(public readonly value: uint8) {
+  constructor(public readonly value: Uint8) {
     super();
   }
 
@@ -434,7 +438,7 @@ export class TransactionArgumentVariantU8 extends TransactionArgument {
 }
 
 export class TransactionArgumentVariantU64 extends TransactionArgument {
-  constructor(public readonly value: uint64) {
+  constructor(public readonly value: Uint64) {
     super();
   }
 
@@ -450,7 +454,7 @@ export class TransactionArgumentVariantU64 extends TransactionArgument {
 }
 
 export class TransactionArgumentVariantU128 extends TransactionArgument {
-  constructor(public readonly value: uint128) {
+  constructor(public readonly value: Uint128) {
     super();
   }
 
@@ -482,7 +486,7 @@ export class TransactionArgumentVariantAddress extends TransactionArgument {
 }
 
 export class TransactionArgumentVariantU8Vector extends TransactionArgument {
-  constructor(public readonly value: bytes) {
+  constructor(public readonly value: Bytes) {
     super();
   }
 

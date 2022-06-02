@@ -1,9 +1,9 @@
 export type Seq<T> = T[];
 
-export type uint8 = number;
-export type uint16 = number;
-export type uint32 = number;
-export type uint64 = bigint;
-export type uint128 = bigint;
-export type anynumber = bigint | number;
-export type bytes = Uint8Array;
+export type Uint8 = number;
+export type Uint16 = number;
+export type Uint32 = number;
+export type Uint64 = bigint;
+export type Uint128 = bigint;
+export type AnyNumber = bigint | number;
+export type Bytes = Uint8Array;
