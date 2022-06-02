@@ -1073,6 +1073,7 @@ components:
         expiration_timestamp_secs:
           $ref: '#/components/schemas/TimestampSec'
         payload:
+          $ref: '#/components/schemas/TransactionPayload'
     UserCreateSigningMessageRequest:
       title: User Create Signing Message Request
       allOf:
