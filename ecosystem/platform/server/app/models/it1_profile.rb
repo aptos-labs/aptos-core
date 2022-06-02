@@ -33,6 +33,10 @@ class It1Profile < ApplicationRecord
   CHANGES_TO_REVALIDATE = Set.new %w[consensus_key account_key network_key validator_address validator_api_port
                                      validator_metrics_port]
 
+  def account_address
+    self.class.address_from_key account_key
+  end
+
   def validator_port
     self[:validator_port] || 6180
   end

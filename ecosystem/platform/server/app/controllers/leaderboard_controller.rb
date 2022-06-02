@@ -4,8 +4,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class LeaderboardController < ApplicationController
-  It1MetricKeys = %i[rank validator liveness participation latest_reported_timestamp].freeze
-  It1Metric = Struct.new(*It1MetricKeys)
+  IT1_METRIC_KEYS = %i[rank validator liveness participation latest_reported_timestamp].freeze
+  It1Metric = Struct.new(*IT1_METRIC_KEYS)
 
   def it1
     expires_in 1.minute, public: true
