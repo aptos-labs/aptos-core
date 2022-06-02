@@ -1,5 +1,5 @@
 <div class="flex-[2]">
-  <h2 class="text-4xl text-teal-400 font-mono mb-16 mt-8">Welcome, <%= @oauth_username %>!</h2>
+  <h2 class="text-4xl text-teal-400 font-mono mb-16 mt-8">Welcome, <%= @oauth_username || @oauth_email %>!</h2>
 
   <%= render "layouts/flash" %>
 

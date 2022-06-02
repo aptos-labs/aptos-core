@@ -8,7 +8,7 @@ class User < ApplicationRecord
   # :lockable, :timeoutable, :recoverable,
   devise :database_authenticatable, :confirmable,
          :rememberable, :trackable, :validatable,
-         :omniauthable, omniauth_providers: %i[discord github],
+         :omniauthable, omniauth_providers: %i[discord github google],
                         authentication_keys: [:username]
 
   validates :username, uniqueness: { case_sensitive: false }, allow_nil: true
@@ -87,21 +87,21 @@ class User < ApplicationRecord
       refresh_token: data['credentials']['refresh_token'],
       expires_at:,
       email: data.dig('info', 'email')&.downcase,
+      full_name: data.dig('info', 'name'),
       profile_url: data.dig('info', 'image')
     }
     case data['provider']
     when 'github'
       auth = auth.merge({
-                          username: data.dig('info', 'nickname')&.downcase,
-                          full_name: data.dig('info', 'name')
+                          username: data.dig('info', 'nickname')&.downcase
                         })
     when 'discord'
       raw_info = data['extra']['raw_info']
       auth = auth.merge({
-                          username: "#{raw_info['username'].downcase}##{raw_info['discriminator']}",
-                          full_name: data.dig('info', 'name'),
-                          profile_url: data.dig('info', 'image')
+                          username: "#{raw_info['username'].downcase}##{raw_info['discriminator']}"
                         })
+    when 'google'
+      # No additional data from Google.
     else
       raise 'Unknown Provider!'
     end

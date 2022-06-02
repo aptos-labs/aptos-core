@@ -45,6 +45,7 @@ gem 'kaminari'
 gem 'omniauth'
 gem 'omniauth-discord'
 gem 'omniauth-github'
+gem 'omniauth-google-oauth2'
 gem 'omniauth-rails_csrf_protection'
 
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin AJAX possible
