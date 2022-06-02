@@ -73,6 +73,7 @@ def metric_line_to_json(line)
   [key, value, params]
 end
 
+module NodeHelper
   class NodeVerifier
     include Logging::Logs
 
