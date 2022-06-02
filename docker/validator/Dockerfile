@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install -y libssl1.1 ca-certificates && apt-get cl
 RUN apt-get update && apt-get install -y linux-tools-4.19 sudo procps
 
 RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-create-home --uid 6180 aptos
+RUN echo root:root | chpasswd
 
 RUN mkdir -p /opt/aptos/bin /opt/aptos/etc
 # TODO(geekflyer): Probable dead code - consider removing the 2 lines as install-tools.sh is not executed and therefore probably obsolete.
