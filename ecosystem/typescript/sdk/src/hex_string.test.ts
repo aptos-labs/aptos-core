@@ -1,6 +1,6 @@
-import { HexString } from "./hex_string";
+import { HexString } from './hex_string';
 
-const withoutPrefix = "007711b4d0";
+const withoutPrefix = '007711b4d0';
 const withPrefix = `0x${withoutPrefix}`;
 
 function validate(hexString: HexString) {
@@ -10,41 +10,41 @@ function validate(hexString: HexString) {
   expect(hexString.noPrefix()).toBe(withoutPrefix);
 }
 
-test("from/to buffer", () => {
+test('from/to buffer', () => {
   const hs = new HexString(withPrefix);
-  expect(hs.toBuffer().toString("hex")).toBe(withoutPrefix);
+  expect(hs.toBuffer().toString('hex')).toBe(withoutPrefix);
   expect(HexString.fromBuffer(hs.toBuffer()).hex()).toBe(withPrefix);
 });
 
-test("from/to Uint8Array", () => {
+test('from/to Uint8Array', () => {
   const hs = new HexString(withoutPrefix);
   expect(HexString.fromUint8Array(hs.toUint8Array()).hex()).toBe(withPrefix);
 });
 
-test("accepts input without prefix", () => {
+test('accepts input without prefix', () => {
   const hs = new HexString(withoutPrefix);
   validate(hs);
 });
 
-test("accepts input with prefix", () => {
+test('accepts input with prefix', () => {
   const hs = new HexString(withPrefix);
   validate(hs);
 });
 
-test("ensures input when string", () => {
+test('ensures input when string', () => {
   const hs = HexString.ensure(withoutPrefix);
   validate(hs);
 });
 
-test("ensures input when HexString", () => {
+test('ensures input when HexString', () => {
   const hs1 = new HexString(withPrefix);
   const hs = HexString.ensure(hs1);
   validate(hs);
 });
 
-test("short address form correct", () => {
+test('short address form correct', () => {
   const hs1 = new HexString(withoutPrefix);
-  expect(hs1.toShortString()).toBe(`0x7711b4d0`);
-  const hs2 = new HexString("0x2185b82cef9bc46249ff2dbc56c265f6a0e3bdb7b9498cc45e4f6e429530fdc0");
-  expect(hs2.toShortString()).toBe(`0x2185b82cef9bc46249ff2dbc56c265f6a0e3bdb7b9498cc45e4f6e429530fdc0`);
+  expect(hs1.toShortString()).toBe('0x7711b4d0');
+  const hs2 = new HexString('0x2185b82cef9bc46249ff2dbc56c265f6a0e3bdb7b9498cc45e4f6e429530fdc0');
+  expect(hs2.toShortString()).toBe('0x2185b82cef9bc46249ff2dbc56c265f6a0e3bdb7b9498cc45e4f6e429530fdc0');
 });
