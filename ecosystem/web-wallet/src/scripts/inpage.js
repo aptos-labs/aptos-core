@@ -10,31 +10,30 @@ class Web3 {
     this.requestId = 0
   }
 
+  connect () {
+    return this._message(MessageMethod.CONNECT, {})
+  }
+
+  disconnect () {
+    return this._message(MessageMethod.DISCONNECT, {})
+  }
+
+  isConnected () {
+    return this._message(MessageMethod.IS_CONNECTED, {})
+  }
+
   account () {
-    const id = this.requestId++
-    return new Promise(function (resolve, reject) {
-      const method = MessageMethod.GET_ACCOUNT_ADDRESS
-      window.postMessage({ method, id })
-      window.addEventListener('message', function handler (event) {
-        if (event.data.responseMethod === method &&
-            event.data.id === id) {
-          const response = event.data.response
-          this.removeEventListener('message', handler)
-          if (response.address) {
-            resolve(response.address)
-          } else {
-            reject(response.error ?? 'Error')
-          }
-        }
-      })
-    })
+    return this._message(MessageMethod.GET_ACCOUNT_ADDRESS, {})
   }
 
   signAndSubmitTransaction (transaction) {
+    return this._message(MessageMethod.SIGN_TRANSACTION, { transaction })
+  }
+
+  _message(method, args) {
     const id = this.requestId++
     return new Promise(function (resolve, reject) {
-      const method = MessageMethod.SIGN_TRANSACTION
-      window.postMessage({ method, transaction, id })
+      window.postMessage({ method, args, id })
       window.addEventListener('message', function handler (event) {
         if (event.data.responseMethod === method &&
             event.data.id === id) {
