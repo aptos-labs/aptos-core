@@ -14,6 +14,8 @@ variable "GIT_REV" {
   default = substr("${GIT_SHA1}", 0, 8)
 }
 
+variable "GIT_BRANCH" {}
+
 variable "GCP_DOCKER_ARTIFACT_REPO" {}
 
 variable "AWS_ECR_ACCOUNT_NUM" {}
@@ -49,7 +51,7 @@ group "test" {
 target "_common" {
   dockerfile = "docker/rust-all.Dockerfile"
   context    = "."
-  cache-from = [
+  cache-from = flatten([
     // need to repeat all images here until https://github.com/docker/buildx/issues/934 is resolved
     generate_cache_from("validator"),
     generate_cache_from("indexer"),
@@ -59,7 +61,7 @@ target "_common" {
     generate_cache_from("txn-emitter"),
     generate_cache_from("faucet"),
     generate_cache_from("forge"),
-  ]
+  ])
   labels = {
     "org.label-schema.schema-version" = "1.0",
     "org.label-schema.build-date"     = "${BUILD_DATE}"
@@ -134,18 +136,20 @@ target "forge" {
 
 function "generate_cache_from" {
   params = [target]
-  result = "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache"
+  result = [
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-main",
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${GIT_BRANCH}"
+  ]
 }
 
 function "generate_cache_to" {
   params = [target]
-  result = ["type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache,mode=max"]
+  result = ["type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${GIT_BRANCH},mode=max"]
 }
 
 function "generate_tags" {
   params = [target]
   result = [
-
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${GIT_SHA1}",
     "${ecr_base}/${target}:${GIT_SHA1}", // only tag with full GIT_SHA1 unless it turns out we really need any of the other variations
   ]
