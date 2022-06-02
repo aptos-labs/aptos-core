@@ -39,6 +39,20 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
+          "type": "0x1::Stake::ValidatorPerformance",
+          "data": {
+            "missed_votes": [
+              "1"
+            ],
+            "num_blocks": "2"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "",
+        "data": {
           "type": "0x1::Timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "1"

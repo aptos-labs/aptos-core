@@ -62,6 +62,7 @@ impl ValidatorInfo {
             consensus_public_key,
             bcs::to_bytes(&vec![addr.clone()]).unwrap(),
             bcs::to_bytes(&vec![addr]).unwrap(),
+            0,
         );
 
         Self {

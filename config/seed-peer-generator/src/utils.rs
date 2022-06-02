@@ -106,6 +106,7 @@ mod tests {
             consensus_pubkey,
             vec![],
             bcs::to_bytes(fullnode_network_addresses).unwrap(),
+            0,
         );
         let validator_info = ValidatorInfo::new(peer_id, 0, validator_config);
         ValidatorSet::new(vec![validator_info])

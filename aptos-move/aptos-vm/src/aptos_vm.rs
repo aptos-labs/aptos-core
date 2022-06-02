@@ -620,11 +620,26 @@ impl AptosVM {
             .new_session(storage, SessionId::block_meta(&block_metadata));
 
         let (epoch, round, timestamp, previous_vote, proposer) = block_metadata.into_inner();
+        // Convert the previous vote bitmask (true if the validator at that index voted)
+        // into a list of validator indices who missed the votes (previous vote = false).
+        let missed_votes = previous_vote
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, &validator_voted)| {
+                if validator_voted {
+                    None
+                } else {
+                    Some(idx as u64)
+                }
+            })
+            .collect::<Vec<_>>();
+
         let args = serialize_values(&vec![
             MoveValue::Signer(txn_data.sender),
             MoveValue::U64(epoch),
             MoveValue::U64(round),
             MoveValue::Vector(previous_vote.into_iter().map(MoveValue::Bool).collect()),
+            MoveValue::Vector(missed_votes.into_iter().map(MoveValue::U64).collect()),
             MoveValue::Address(proposer),
             MoveValue::U64(timestamp),
         ]);

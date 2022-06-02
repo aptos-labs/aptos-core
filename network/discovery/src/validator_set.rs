@@ -253,6 +253,7 @@ mod tests {
                 consensus_pubkey,
                 validator_encoded_addresses,
                 fullnode_encoded_addresses,
+                0,
             ),
         );
         let validator_set = ValidatorSet::new(vec![validator]);

@@ -39,6 +39,7 @@ pub struct ValidatorConfig {
     pub validator_network_addresses: Vec<u8>,
     /// This is an bcs serialized Vec<NetworkAddress>
     pub fullnode_network_addresses: Vec<u8>,
+    pub validator_index: u64,
 }
 
 impl ValidatorConfig {
@@ -46,11 +47,13 @@ impl ValidatorConfig {
         consensus_public_key: Ed25519PublicKey,
         validator_network_addresses: Vec<u8>,
         fullnode_network_addresses: Vec<u8>,
+        validator_index: u64,
     ) -> Self {
         ValidatorConfig {
             consensus_public_key,
             validator_network_addresses,
             fullnode_network_addresses,
+            validator_index,
         }
     }
 

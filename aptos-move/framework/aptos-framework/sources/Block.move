@@ -60,6 +60,7 @@ module AptosFramework::Block {
         epoch: u64,
         round: u64,
         previous_block_votes: vector<bool>,
+        missed_votes: vector<u64>,
         proposer: address,
         timestamp: u64
     ) acquires BlockMetadata {
@@ -89,7 +90,10 @@ module AptosFramework::Block {
 
         if (timestamp - Reconfiguration::last_reconfiguration_time() > block_metadata_ref.epoch_internal) {
             Reconfiguration::reconfigure();
-        }
+        };
+
+        // Update performance score after potential reconfigure, which resets all performance scores.
+        Stake::update_performance_statistics(missed_votes);
     }
 
     /// Get the current block height

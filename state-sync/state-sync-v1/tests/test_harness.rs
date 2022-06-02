@@ -518,6 +518,7 @@ fn initial_setup(
             signer.public_key(),
             bcs::to_bytes(&vec![addr.clone()]).unwrap(),
             bcs::to_bytes(&vec![addr.clone()]).unwrap(),
+            idx as u64,
         );
         let validator_info = ValidatorInfo::new(peer_id, voting_power, validator_config);
         validator_infos.push(validator_info);
