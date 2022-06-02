@@ -23,7 +23,7 @@ jobs:
         uses: lewagon/wait-on-check-action@v1.0.0
         with:
           ref: ${{ github.ref }}
-          running-workflow-name: "Build+Push Images"
+          check-regexp: "RustImages.*"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - id: auth
