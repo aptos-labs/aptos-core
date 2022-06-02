@@ -38,10 +38,10 @@ RUN apt-get update && apt-get install -y linux-tools-4.19 sudo procps
 RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-create-home --uid 6180 aptos
 
 RUN mkdir -p /opt/aptos/bin /opt/aptos/etc
-COPY --link --from=builder /aptos/target/release/aptos-node /opt/aptos/bin
-COPY --link --from=builder /aptos/target/release/db-backup /opt/aptos/bin
-COPY --link --from=builder /aptos/target/release/db-bootstrapper /opt/aptos/bin
-COPY --link --from=builder /aptos/target/release/db-restore /opt/aptos/bin
+COPY --link --from=builder /aptos/target/release/aptos-node /opt/aptos/bin/
+COPY --link --from=builder /aptos/target/release/db-backup /opt/aptos/bin/
+COPY --link --from=builder /aptos/target/release/db-bootstrapper /opt/aptos/bin/
+COPY --link --from=builder /aptos/target/release/db-restore /opt/aptos/bin/
 
 # Admission control
 EXPOSE 8000
@@ -65,7 +65,7 @@ RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcp
 && apt-get clean && rm -r /var/lib/apt/lists/*
 
 RUN mkdir -p /opt/aptos/bin
-COPY --from=builder /aptos/target/release/aptos-indexer /usr/local/bin
+COPY --from=builder /aptos/target/release/aptos-indexer /usr/local/bin/
 
 
 ### Safety Rules Image ###
@@ -78,7 +78,7 @@ RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-
 
 RUN mkdir -p /opt/aptos/bin /opt/aptos/etc /opt/aptos/data
 
-COPY --from=builder /aptos/target/release/safety-rules /opt/aptos/bin
+COPY --from=builder /aptos/target/release/safety-rules /opt/aptos/bin/
 
 ENV RUST_BACKTRACE 1
 
@@ -100,13 +100,13 @@ COPY docker/tools/boto.cfg /etc
 RUN cd /usr/local/bin && wget https://azcopyvnext.azureedge.net/release20210226/azcopy_linux_amd64_10.9.0.tar.gz -O- | tar --gzip --wildcards --extract '*/azcopy' --strip-components=1 --no-same-owner && chmod +x azcopy
 RUN wget https://storage.googleapis.com/pub/gsutil.tar.gz -O- | tar --gzip --directory /opt --extract && ln -s /opt/gsutil/gsutil /usr/local/bin
 
-COPY --from=builder /aptos/target/release/aptos-genesis-tool /usr/local/bin
-COPY --from=builder /aptos/target/release/aptos-operational-tool /usr/local/bin
-COPY --from=builder /aptos/target/release/db-bootstrapper /usr/local/bin
-COPY --from=builder /aptos/target/release/db-backup /usr/local/bin
-COPY --from=builder /aptos/target/release/db-backup-verify /usr/local/bin
-COPY --from=builder /aptos/target/release/db-restore /usr/local/bin
-COPY --from=builder /aptos/target/release/aptos-transaction-replay /usr/local/bin
+COPY --from=builder /aptos/target/release/aptos-genesis-tool /usr/local/bin/
+COPY --from=builder /aptos/target/release/aptos-operational-tool /usr/local/bin/
+COPY --from=builder /aptos/target/release/db-bootstrapper /usr/local/bin/
+COPY --from=builder /aptos/target/release/db-backup /usr/local/bin/
+COPY --from=builder /aptos/target/release/db-backup-verify /usr/local/bin/
+COPY --from=builder /aptos/target/release/db-restore /usr/local/bin/
+COPY --from=builder /aptos/target/release/aptos-transaction-replay /usr/local/bin/
 
 ### Get Aptos Move modules bytecodes for genesis ceremony
 RUN mkdir -p /aptos-framework/move/build
@@ -127,8 +127,8 @@ RUN cd /usr/local/bin && wget "https://storage.googleapis.com/kubernetes-release
 RUN cd /usr/local/bin && wget "https://releases.hashicorp.com/vault/1.5.0/vault_1.5.0_linux_amd64.zip" -O- | busybox unzip - && chmod +x vault
 
 RUN mkdir -p /opt/aptos/bin
-COPY --from=builder /aptos/target/release/aptos-genesis-tool /usr/local/bin
-COPY --from=builder /aptos/target/release/aptos-operational-tool /usr/local/bin
+COPY --from=builder /aptos/target/release/aptos-genesis-tool /usr/local/bin/
+COPY --from=builder /aptos/target/release/aptos-operational-tool /usr/local/bin/
 
 ### Get Aptos Move modules bytecodes for genesis ceremony
 RUN mkdir -p /aptos-framework/move/build
@@ -145,7 +145,7 @@ FROM debian-base AS txn-emitter
 RUN apt-get update && apt-get -y install libssl1.1 ca-certificates wget busybox gettext-base && apt-get clean && rm -r /var/lib/apt/lists/*
 
 RUN mkdir -p /opt/aptos/bin
-COPY --from=builder /aptos/target/release/transaction-emitter /usr/local/bin
+COPY --from=builder /aptos/target/release/transaction-emitter /usr/local/bin/
 
 
 
@@ -157,7 +157,7 @@ RUN apt-get update && apt-get install -y libssl1.1 ca-certificates nano net-tool
 
 RUN mkdir -p /opt/aptos/bin  /aptos/client/data/wallet/
 
-COPY --from=builder /aptos/target/release/aptos-faucet /opt/aptos/bin
+COPY --from=builder /aptos/target/release/aptos-faucet /opt/aptos/bin/
 
 #install needed tools
 RUN apt-get update && apt-get install -y procps
