@@ -12,11 +12,11 @@ impl DBSubPruner for EventStorePruner {
     fn prune(
         &self,
         db_batch: &mut SchemaBatch,
-        least_readable_version: u64,
+        min_readable_version: u64,
         target_version: u64,
     ) -> anyhow::Result<()> {
         self.event_store
-            .prune_events(least_readable_version, target_version, db_batch)?;
+            .prune_events(min_readable_version, target_version, db_batch)?;
         Ok(())
     }
 }

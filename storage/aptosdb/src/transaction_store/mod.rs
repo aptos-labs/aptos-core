@@ -323,7 +323,7 @@ impl TransactionStore {
         if leaf_index > 0 {
             Position::root_from_leaf_index(leaf_index).left_child()
         } else {
-            // Handle this as a special case when least_readable_version is 0
+            // Handle this as a special case when min_readable_version is 0
             Position::root_from_leaf_index(0)
         }
     }

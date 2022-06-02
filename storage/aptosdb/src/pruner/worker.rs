@@ -21,7 +21,7 @@ pub struct Worker {
     /// Keeps a record of the pruning progress. If this equals to version `V`, we know versions
     /// smaller than `V` are no longer readable.
     /// This being an atomic value is to communicate the info with the Pruner thread (for tests).
-    least_readable_versions: Arc<Mutex<Vec<Version>>>,
+    min_readable_versions: Arc<Mutex<Vec<Version>>>,
     /// Indicates if there's NOT any pending work to do currently, to hint
     /// `Self::receive_commands()` to `recv()` blocking-ly.
     blocking_recv: bool,
@@ -35,7 +35,7 @@ impl Worker {
         ledger_store: Arc<LedgerStore>,
         event_store: Arc<EventStore>,
         command_receiver: Receiver<Command>,
-        least_readable_versions: Arc<Mutex<Vec<Version>>>,
+        min_readable_versions: Arc<Mutex<Vec<Version>>>,
         max_version_to_prune_per_batch: u64,
     ) -> Self {
         let db_pruners =
@@ -44,7 +44,7 @@ impl Worker {
             db: Arc::clone(&db),
             db_pruners,
             command_receiver,
-            least_readable_versions,
+            min_readable_versions,
             blocking_recv: true,
             max_version_to_prune_per_batch,
         }
@@ -82,11 +82,11 @@ impl Worker {
     }
 
     fn record_progress(&mut self) {
-        let mut updated_least_readable_versions: Vec<Version> = Vec::new();
+        let mut updated_min_readable_versions: Vec<Version> = Vec::new();
         for x in &self.db_pruners {
-            updated_least_readable_versions.push(x.lock().least_readable_version())
+            updated_min_readable_versions.push(x.lock().min_readable_version())
         }
-        *self.least_readable_versions.lock() = updated_least_readable_versions;
+        *self.min_readable_versions.lock() = updated_min_readable_versions;
     }
 
     /// Tries to receive all pending commands, blocking waits for the next command if no work needs

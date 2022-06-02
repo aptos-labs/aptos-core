@@ -10,7 +10,7 @@ pub trait DBSubPruner {
     fn prune(
         &self,
         db_batch: &mut SchemaBatch,
-        least_readable_version: u64,
+        min_readable_version: u64,
         target_version: u64,
     ) -> anyhow::Result<()>;
 }

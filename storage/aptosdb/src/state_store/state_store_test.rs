@@ -43,14 +43,14 @@ fn put_value_set(
 
 fn prune_stale_indices(
     store: &StateStore,
-    least_readable_version: Version,
-    target_least_readable_version: Version,
+    min_readable_version: Version,
+    target_min_readable_version: Version,
     limit: usize,
 ) {
     pruner::state_store::prune_state_store(
         Arc::clone(&store.db),
-        least_readable_version,
-        target_least_readable_version,
+        min_readable_version,
+        target_min_readable_version,
         limit,
     )
     .unwrap();
@@ -278,8 +278,8 @@ fn test_retired_records() {
     // Prune with limit=0, nothing is gone.
     {
         prune_stale_indices(
-            store, 0, /* least_readable_version */
-            1, /* target_least_readable_version */
+            store, 0, /* min_readable_version */
+            1, /* target_min_readable_version */
             0, /* limit */
         );
         verify_value_and_proof(store, key1.clone(), Some(&value1), 0, root0);
@@ -287,8 +287,8 @@ fn test_retired_records() {
     // Prune till version=1.
     {
         prune_stale_indices(
-            store, 0,   /* least_readable_version */
-            1,   /* target_least_readable_version */
+            store, 0,   /* min_readable_version */
+            1,   /* target_min_readable_version */
             100, /* limit */
         );
         // root0 is gone.
@@ -301,8 +301,8 @@ fn test_retired_records() {
     // Prune till version=2.
     {
         prune_stale_indices(
-            store, 1,   /* least_readable_version */
-            2,   /* target_least_readable_version */
+            store, 1,   /* min_readable_version */
+            2,   /* target_min_readable_version */
             100, /* limit */
         );
         // root1 is gone.

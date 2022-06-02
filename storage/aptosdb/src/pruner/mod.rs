@@ -52,7 +52,7 @@ pub(crate) struct Pruner {
     /// sets value to `V`, all versions before `V` can no longer be accessed. This is protected by Mutex
     /// as this is accessed both by the Pruner thread and the worker thread.
     #[allow(dead_code)]
-    least_readable_version: Arc<Mutex<Vec<Version>>>,
+    min_readable_version: Arc<Mutex<Vec<Version>>>,
     /// We send a batch of version to the underlying pruners for performance reason. This tracks the
     /// last version we sent to the pruner.
     last_version_sent_to_pruners: Arc<Mutex<Version>>,
@@ -79,8 +79,8 @@ impl Pruner {
     ) -> Self {
         let (command_sender, command_receiver) = channel();
 
-        let least_readable_version = Arc::new(Mutex::new(vec![0, 0, 0, 0, 0]));
-        let worker_progress_clone = Arc::clone(&least_readable_version);
+        let min_readable_version = Arc::new(Mutex::new(vec![0, 0, 0, 0, 0]));
+        let worker_progress_clone = Arc::clone(&min_readable_version);
 
         PRUNER_WINDOW
             .with_label_values(&["state_pruner"])
@@ -98,7 +98,7 @@ impl Pruner {
             ledger_store,
             event_store,
             command_receiver,
-            least_readable_version,
+            min_readable_version,
             storage_pruner_config.pruning_batch_size as u64,
         );
         let worker_thread = std::thread::Builder::new()
@@ -115,7 +115,7 @@ impl Pruner {
                 .expect("Default prune window must be specified"),
             worker_thread: Some(worker_thread),
             command_sender: Mutex::new(command_sender),
-            least_readable_version: worker_progress_clone,
+            min_readable_version: worker_progress_clone,
             last_version_sent_to_pruners: Arc::new(Mutex::new(0)),
             pruning_batch_size: storage_pruner_config.pruning_batch_size,
             latest_version: Arc::new(Mutex::new(0)),
@@ -130,8 +130,8 @@ impl Pruner {
         self.ledger_prune_window
     }
 
-    pub fn get_least_readable_ledger_version(&self) -> Version {
-        self.least_readable_version.lock()[LedgerPrunerIndex as usize]
+    pub fn get_min_readable_ledger_version(&self) -> Version {
+        self.min_readable_version.lock()[LedgerPrunerIndex as usize]
     }
     /// Sends pruning command to the worker thread when necessary.
     pub fn maybe_wake_pruner(&self, latest_version: Version) {
@@ -145,16 +145,16 @@ impl Pruner {
     }
 
     fn wake_pruner(&self, latest_version: Version) {
-        let least_readable_state_store_version =
+        let min_readable_state_store_version =
             latest_version.saturating_sub(self.state_store_prune_window);
-        let least_readable_ledger_version = latest_version.saturating_sub(self.ledger_prune_window);
+        let min_readable_ledger_version = latest_version.saturating_sub(self.ledger_prune_window);
 
         self.command_sender
             .lock()
             .send(Command::Prune {
                 target_db_versions: vec![
-                    least_readable_state_store_version,
-                    least_readable_ledger_version,
+                    min_readable_state_store_version,
+                    min_readable_ledger_version,
                 ],
             })
             .expect("Receiver should not destruct prematurely.");
@@ -178,18 +178,14 @@ impl Pruner {
         if latest_version > self.state_store_prune_window
             || latest_version > self.ledger_prune_window
         {
-            let least_readable_state_store_version = latest_version - self.state_store_prune_window;
+            let min_readable_state_store_version = latest_version - self.state_store_prune_window;
             // Assuming no big pruning chunks will be issued by a test.
             const TIMEOUT: Duration = Duration::from_secs(10);
             let end = Instant::now() + TIMEOUT;
 
             while Instant::now() < end {
-                if *self
-                    .least_readable_version
-                    .lock()
-                    .get(pruner_index)
-                    .unwrap()
-                    >= least_readable_state_store_version
+                if *self.min_readable_version.lock().get(pruner_index).unwrap()
+                    >= min_readable_state_store_version
                 {
                     return Ok(());
                 }

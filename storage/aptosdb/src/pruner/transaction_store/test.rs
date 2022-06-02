@@ -216,14 +216,14 @@ fn put_txn_in_store(
 // position from the DB should be deleted. We need to make several conversion between inorder and
 // postorder transaction because the DB stores the indices in postorder, while the APIs for the
 // accumulator deals with inorder.
-fn verify_transaction_accumulator_pruned(ledger_store: &LedgerStore, least_readable_version: u64) {
-    let least_readable_position = if least_readable_version > 0 {
-        Position::root_from_leaf_index(least_readable_version).left_child()
+fn verify_transaction_accumulator_pruned(ledger_store: &LedgerStore, min_readable_version: u64) {
+    let min_readable_position = if min_readable_version > 0 {
+        Position::root_from_leaf_index(min_readable_version).left_child()
     } else {
-        Position::root_from_leaf_index(least_readable_version)
+        Position::root_from_leaf_index(min_readable_version)
     };
-    let least_readable_position_postorder = least_readable_position.to_postorder_index();
-    for i in 0..least_readable_position_postorder {
+    let min_readable_position_postorder = min_readable_position.to_postorder_index();
+    for i in 0..min_readable_position_postorder {
         assert!(ledger_store
             .get(Position::from_postorder_index(i).unwrap())
             .is_err())

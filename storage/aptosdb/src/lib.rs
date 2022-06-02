@@ -855,7 +855,7 @@ impl DbReader for AptosDB {
         gauged_api("get_first_txn_version", || {
             if let Some(pruner) = self.pruner.as_ref() {
                 // If pruning is enabled, we can get the least readable version from the pruner.
-                Ok(Some(pruner.get_least_readable_ledger_version()))
+                Ok(Some(pruner.get_min_readable_ledger_version()))
             } else {
                 self.transaction_store.get_first_txn_version()
             }
@@ -867,7 +867,7 @@ impl DbReader for AptosDB {
         gauged_api("get_first_write_set_version", || {
             if let Some(pruner) = self.pruner.as_ref() {
                 // If pruning is enabled, we can get the least readable version from the pruner.
-                Ok(Some(pruner.get_least_readable_ledger_version()))
+                Ok(Some(pruner.get_min_readable_ledger_version()))
             } else {
                 self.transaction_store.get_first_write_set_version()
             }
