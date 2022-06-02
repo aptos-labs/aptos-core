@@ -1,6 +1,5 @@
 export const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
 export const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
-export const CHAIN_ID = process.env.APTOS_CHAIN_ID || "14";
 
 test("noop", () => {
   // All TS files are compiled by default into the npm package

@@ -296,6 +296,11 @@ export class AptosClient {
     return result.data;
   }
 
+  async getChainId(params: RequestParams = {}): Promise<number> {
+    const result = await this.getLedgerInfo(params);
+    return result.chain_id;
+  }
+
   async getTableItem(handle: string, data: Types.TableItemRequest, params?: RequestParams): Promise<any> {
     const tableItem = await this.tables.getTableItem(handle, data, params);
     return tableItem;

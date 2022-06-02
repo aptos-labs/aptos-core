@@ -2,7 +2,7 @@ import { AxiosResponse } from "axios";
 import { AptosClient, raiseForStatus } from "./aptos_client";
 import { AnyObject } from "./util";
 
-import { FAUCET_URL, NODE_URL, CHAIN_ID } from "./util.test";
+import { FAUCET_URL, NODE_URL } from "./util.test";
 import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";
 import {
@@ -122,7 +122,10 @@ test(
       ),
     );
 
-    const { sequence_number } = await client.getAccount(account1.address());
+    const [{ sequence_number }, chain_id] = await Promise.all([
+      client.getAccount(account1.address()),
+      client.getChainId(),
+    ]);
 
     const rawTxn = new RawTransaction(
       AccountAddress.fromHex(account1.address()),
@@ -131,7 +134,7 @@ test(
       1000n,
       1n,
       BigInt(Math.floor(Date.now() / 1000) + 10),
-      new ChainId(parseInt(CHAIN_ID)),
+      new ChainId(chain_id),
     );
 
     const bcsTxn = await AptosClient.generateBCSTransaction(account1, rawTxn);
