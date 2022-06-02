@@ -274,6 +274,11 @@ GEM
     omniauth-github (2.0.0)
       omniauth (~> 2.0)
       omniauth-oauth2 (~> 1.7.1)
+    omniauth-google-oauth2 (1.0.1)
+      jwt (>= 2.0)
+      oauth2 (~> 1.1)
+      omniauth (~> 2.0)
+      omniauth-oauth2 (~> 1.7.1)
     omniauth-oauth2 (1.7.2)
       oauth2 (~> 1.4)
       omniauth (>= 1.9, < 3)
@@ -460,6 +465,7 @@ DEPENDENCIES
   omniauth
   omniauth-discord
   omniauth-github
+  omniauth-google-oauth2
   omniauth-rails_csrf_protection
   pg (~> 1.1)
   propshaft

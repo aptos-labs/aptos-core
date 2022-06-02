@@ -8,7 +8,8 @@ class LoginButtonComponent < ViewComponent::Base
 
   PROVIDER_CLASSES = {
     github: '!bg-[#24292f] !text-white',
-    discord: '!bg-[#5964f2] !text-white'
+    discord: '!bg-[#5964f2] !text-white',
+    google: '!bg-white !text-neutral-600'
   }.freeze
 
   def initialize(provider:,
