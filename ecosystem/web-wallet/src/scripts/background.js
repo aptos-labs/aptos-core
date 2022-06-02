@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosClient } from 'aptos'
-import { DEVNET_NODE_URL } from './core/constants'
-import { MessageMethod } from './core/types'
-import { getAptosAccountState } from './core/utils/account'
+import { DEVNET_NODE_URL } from '../core/constants'
+import { MessageMethod } from '../core/types'
+import { getAptosAccountState } from '../core/utils/account'
 
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
   const account = getAptosAccountState()

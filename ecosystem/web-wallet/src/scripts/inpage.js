@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import { MessageMethod } from '../core/types'
+
 class Web3 {
   requestId
 
@@ -11,7 +13,7 @@ class Web3 {
   account () {
     const id = this.requestId++
     return new Promise(function (resolve, reject) {
-      const method = 'getAccountAddress'
+      const method = MessageMethod.GET_ACCOUNT_ADDRESS
       window.postMessage({ method, id })
       window.addEventListener('message', function handler (event) {
         if (event.data.responseMethod === method &&
@@ -31,7 +33,7 @@ class Web3 {
   signAndSubmitTransaction (transaction) {
     const id = this.requestId++
     return new Promise(function (resolve, reject) {
-      const method = 'signTransaction'
+      const method = MessageMethod.SIGN_TRANSACTION
       window.postMessage({ method, transaction, id })
       window.addEventListener('message', function handler (event) {
         if (event.data.responseMethod === method &&
