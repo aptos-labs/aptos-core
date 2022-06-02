@@ -5,9 +5,6 @@ on:
         required: true
         type: string
 
-env:
-  GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
-
 permissions:
   contents: read
   id-token: write #required for GCP Workload Identity federation
@@ -21,6 +18,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
+      - name: Wait for images to have been built
+        uses: lewagon/wait-on-check-action@v1.0.0
+        with:
+          ref: ${{ github.ref }}
+          running-workflow-name: "Build+Push Images"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - id: auth
         name: "Authenticate to Google Cloud"
@@ -51,7 +55,7 @@ jobs:
       - name: Push Images to Dockerhub
         uses: akhilerm/tag-push-action@v2.0.0
         with:
-          src: ${{ GCP_DOCKER_ARTIFACT_REPO }}/${{ matrix.IMAGE_NAME }}:${{ GITHUB_SHA }}
+          src: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/${{ matrix.IMAGE_NAME }}:${{ github.sha }}
           dst: |
             docker.io/aptoslab/${{matrix.IMAGE_NAME}}:${{ inputs.image_tag_prefix }}
             docker.io/aptoslab/${{matrix.IMAGE_NAME}}:${{ inputs.image_tag_prefix }}_${{ steps.vars.outputs.short_sha1 }}

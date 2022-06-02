@@ -1,7 +1,5 @@
 on:
-  workflow_run:
-    workflows: ["Build+Push Images"]
-    types: [completed]
+  push:
     branches:
       - devnet
       - testnet
@@ -12,8 +10,7 @@ permissions:
 
 jobs:
   copy-images-to-docker-hub:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     uses: ./.github/workflows/copy-images-to-dockerhub.yaml
     with:
-      image_tag_prefix: ${{ GITHUB_REF_NAME }}
+      image_tag_prefix: ${{ github.ref_name }}
     secrets: inherit
