@@ -129,7 +129,7 @@ pub struct SetValidatorConfiguration {
     #[clap(long)]
     pub(crate) full_node_host: Option<HostAndPort>,
     /// Stake amount for stake distribution
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value_t = 1)]
     pub(crate) stake_amount: u64,
 }
 

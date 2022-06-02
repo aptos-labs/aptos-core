@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
     collections::{BTreeMap, HashMap},
-    fmt::Debug,
+    fmt::{Debug, Display, Formatter},
     fs::OpenOptions,
     path::{Path, PathBuf},
     str::FromStr,
@@ -254,6 +254,16 @@ pub enum KeyType {
     X25519,
 }
 
+impl Display for KeyType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            KeyType::Ed25519 => "ed25519",
+            KeyType::X25519 => "x25519",
+        };
+        write!(f, "{}", str)
+    }
+}
+
 impl FromStr for KeyType {
     type Err = &'static str;
 
@@ -271,6 +281,14 @@ pub struct ProfileOptions {
     /// Profile to use from config
     #[clap(long, default_value = "default")]
     pub profile: String,
+}
+
+impl Default for ProfileOptions {
+    fn default() -> Self {
+        Self {
+            profile: "default".to_string(),
+        }
+    }
 }
 
 /// Types of encodings used by the blockchain
@@ -332,6 +350,23 @@ impl EncodingType {
     }
 }
 
+impl Default for EncodingType {
+    fn default() -> Self {
+        EncodingType::Hex
+    }
+}
+
+impl Display for EncodingType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            EncodingType::BCS => "bcs",
+            EncodingType::Hex => "hex",
+            EncodingType::Base64 => "base64",
+        };
+        write!(f, "{}", str)
+    }
+}
+
 impl FromStr for EncodingType {
     type Err = &'static str;
 
@@ -366,10 +401,10 @@ impl PromptOptions {
 }
 
 /// An insertable option for use with encodings.
-#[derive(Debug, Parser)]
+#[derive(Debug, Default, Parser)]
 pub struct EncodingOptions {
     /// Encoding of data as `base64`, `bcs`, or `hex`
-    #[clap(long, default_value = "hex")]
+    #[clap(long, default_value_t = EncodingType::Hex)]
     pub encoding: EncodingType,
 }
 
@@ -402,7 +437,7 @@ impl ExtractPublicKey for PublicKeyInputOptions {
     }
 }
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Default, Parser)]
 pub struct PrivateKeyInputOptions {
     /// Private key input file name
     #[clap(long, group = "private_key_input", parse(from_os_str))]
@@ -413,6 +448,17 @@ pub struct PrivateKeyInputOptions {
 }
 
 impl PrivateKeyInputOptions {
+    pub fn from_private_key(private_key: &Ed25519PrivateKey) -> CliTypedResult<Self> {
+        Ok(PrivateKeyInputOptions {
+            private_key: Some(
+                private_key
+                    .to_encoded_string()
+                    .map_err(|err| CliError::UnexpectedError(err.to_string()))?,
+            ),
+            private_key_file: None,
+        })
+    }
+
     /// Extract private key from CLI args with fallback to config
     pub fn extract_private_key(
         &self,
@@ -516,16 +562,20 @@ impl SaveFile {
 }
 
 /// Options specific to using the Rest endpoint
-#[derive(Debug, Parser)]
+#[derive(Debug, Default, Parser)]
 pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
     /// Defaults to <https://fullnode.devnet.aptoslabs.com>
     #[clap(long, parse(try_from_str))]
-    pub url: Option<reqwest::Url>,
+    url: Option<reqwest::Url>,
 }
 
 impl RestOptions {
+    pub fn new(url: Option<reqwest::Url>) -> Self {
+        RestOptions { url }
+    }
+
     /// Retrieve the URL from the profile or the command line
     pub fn url(&self, profile: &str) -> CliTypedResult<reqwest::Url> {
         if let Some(ref url) = self.url {
@@ -541,6 +591,8 @@ impl RestOptions {
     }
 }
 
+const DEFAULT_MAX_GAS: u64 = 1000;
+
 /// Options specific to submitting a private key to the Rest endpoint
 #[derive(Debug, Parser)]
 pub struct WriteTransactionOptions {
@@ -551,8 +603,18 @@ pub struct WriteTransactionOptions {
     /// Maximum gas to be used to publish the package
     ///
     /// Defaults to 1000 gas units
-    #[clap(long, default_value_t = 1000)]
+    #[clap(long, default_value_t = DEFAULT_MAX_GAS)]
     pub max_gas: u64,
+}
+
+impl Default for WriteTransactionOptions {
+    fn default() -> Self {
+        Self {
+            private_key_options: Default::default(),
+            rest_options: Default::default(),
+            max_gas: DEFAULT_MAX_GAS,
+        }
+    }
 }
 
 impl WriteTransactionOptions {
@@ -751,7 +813,7 @@ pub struct ChangeSummary {
     value: Option<String>,
 }
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Default, Parser)]
 pub struct FaucetOptions {
     /// URL for the faucet
     #[clap(long)]
@@ -759,6 +821,10 @@ pub struct FaucetOptions {
 }
 
 impl FaucetOptions {
+    pub fn new(faucet_url: Option<reqwest::Url>) -> Self {
+        FaucetOptions { faucet_url }
+    }
+
     pub fn faucet_url(&self, profile: &str) -> CliTypedResult<reqwest::Url> {
         if let Some(ref faucet_url) = self.faucet_url {
             Ok(faucet_url.clone())

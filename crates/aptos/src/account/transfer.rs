@@ -18,21 +18,21 @@ use std::collections::BTreeMap;
 #[derive(Debug, Parser)]
 pub struct TransferCoins {
     #[clap(flatten)]
-    write_options: WriteTransactionOptions,
+    pub(crate) write_options: WriteTransactionOptions,
 
     #[clap(flatten)]
-    encoding_options: EncodingOptions,
+    pub(crate) encoding_options: EncodingOptions,
 
     #[clap(flatten)]
-    profile_options: ProfileOptions,
+    pub(crate) profile_options: ProfileOptions,
 
     /// Address of account you want to send coins to
     #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
-    account: AccountAddress,
+    pub(crate) account: AccountAddress,
 
     /// Amount of coins to transfer
     #[clap(long)]
-    amount: u64,
+    pub(crate) amount: u64,
 }
 
 #[async_trait]
@@ -68,12 +68,12 @@ const SUPPORTED_COINS: [&str; 1] = ["0x1::Coin::CoinStore<0x1::TestCoin::TestCoi
 /// A shortened transaction output
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct TransferSummary {
-    gas_used: Option<u64>,
-    balance_changes: BTreeMap<AccountAddress, serde_json::Value>,
-    sender: Option<AccountAddress>,
-    success: bool,
-    version: Option<u64>,
-    vm_status: String,
+    pub gas_used: Option<u64>,
+    pub balance_changes: BTreeMap<AccountAddress, serde_json::Value>,
+    pub sender: Option<AccountAddress>,
+    pub success: bool,
+    pub version: Option<u64>,
+    pub vm_status: String,
 }
 
 impl From<Transaction> for TransferSummary {
