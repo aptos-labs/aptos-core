@@ -1,4 +1,5 @@
 import * as SHA3 from 'js-sha3';
+import { Buffer } from 'buffer/';
 import {
   Ed25519PublicKey,
   Ed25519Signature,
