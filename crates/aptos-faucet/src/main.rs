@@ -1,9 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use structopt::StructOpt;
 use aptos_faucet::FaucetArgs;
-
+use structopt::StructOpt;
 
 #[tokio::main]
 async fn main() {

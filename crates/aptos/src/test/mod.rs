@@ -9,10 +9,10 @@ use crate::{
         transfer::{TransferCoins, TransferSummary},
     },
     common::{
-        init::{InitTool, DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
+        init::InitTool,
         types::{
             CliConfig, CliTypedResult, EncodingOptions, PrivateKeyInputOptions, ProfileOptions,
-            PromptOptions,
+            PromptOptions, RestOptions, WriteTransactionOptions,
         },
     },
     op::key::GenerateKey,
@@ -22,7 +22,8 @@ use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_sdk::move_types::account_address::AccountAddress;
 use reqwest::Url;
 use serde_json::Value;
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
+use tokio::time::{sleep, Instant};
 
 /// A framework for testing the CLI
 pub struct CliTestFramework {
@@ -51,7 +52,29 @@ impl CliTestFramework {
         framework
     }
 
-    pub async fn create_account(&self, index: usize) -> CliTypedResult<String> {
+    pub async fn create_account(
+        &self,
+        index: usize,
+        mint_key: &Ed25519PrivateKey,
+    ) -> CliTypedResult<String> {
+        CreateAccount {
+            encoding_options: Default::default(),
+            write_options: WriteTransactionOptions {
+                private_key_options: PrivateKeyInputOptions::from_private_key(mint_key)?,
+                rest_options: RestOptions::new(Some(self.endpoint.clone())),
+                max_gas: 1000,
+            },
+            profile_options: profile(index),
+            account: account_id(index),
+            use_faucet: false,
+            faucet_options: Default::default(),
+            initial_coins: DEFAULT_FUNDED_COINS,
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn create_account_with_faucet(&self, index: usize) -> CliTypedResult<String> {
         CreateAccount {
             encoding_options: Default::default(),
             write_options: Default::default(),
@@ -119,11 +142,27 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn account_balance(&self, index: usize) -> u64 {
-        u64::from_str(
-            self.list_account(index, ListQuery::Balance)
-                .await
-                .unwrap()
+    /// Wait for an account to exist
+    pub async fn wait_for_account(&self, index: usize) -> CliTypedResult<Vec<Value>> {
+        let mut result = self.list_account(index, ListQuery::Balance).await;
+        let start = Instant::now();
+        while start.elapsed() < Duration::from_secs(10) {
+            match result {
+                Ok(_) => return result,
+                _ => {
+                    sleep(Duration::from_millis(500)).await;
+                    result = self.list_account(index, ListQuery::Balance).await;
+                }
+            };
+        }
+
+        result
+    }
+
+    pub async fn account_balance(&self, index: usize) -> CliTypedResult<u64> {
+        Ok(u64::from_str(
+            self.wait_for_account(index)
+                .await?
                 .get(0)
                 .unwrap()
                 .as_object()
@@ -137,7 +176,28 @@ impl CliTestFramework {
                 .as_str()
                 .unwrap(),
         )
-        .unwrap()
+        .unwrap())
+    }
+
+    pub async fn wait_for_balance(
+        &self,
+        index: usize,
+        expected_balance: u64,
+    ) -> CliTypedResult<u64> {
+        let mut result = self.account_balance(index).await;
+        let start = Instant::now();
+        while start.elapsed() < Duration::from_secs(10) {
+            if let Ok(balance) = result {
+                if balance == expected_balance {
+                    return result;
+                }
+            }
+
+            sleep(Duration::from_millis(500)).await;
+            result = self.account_balance(index).await;
+        }
+
+        result
     }
 }
 
@@ -157,32 +217,4 @@ fn profile(index: usize) -> ProfileOptions {
 fn private_key_options(private_key: &Ed25519PrivateKey) -> PrivateKeyInputOptions {
     PrivateKeyInputOptions::from_private_key(private_key)
         .expect("Must serialize private key to hex")
-}
-
-// Ignore test because we don't want to be dependent on testnet
-#[tokio::test]
-#[ignore]
-async fn test_flow() {
-    let framework = CliTestFramework::new(
-        DEFAULT_REST_URL.parse().unwrap(),
-        DEFAULT_FAUCET_URL.parse().unwrap(),
-        2,
-    )
-    .await;
-
-    assert_eq!(DEFAULT_FUNDED_COINS, framework.account_balance(0).await);
-    assert_eq!(DEFAULT_FUNDED_COINS, framework.account_balance(1).await);
-
-    let transfer_amount = 100;
-
-    let response = framework
-        .transfer_coins(0, 1, transfer_amount)
-        .await
-        .unwrap();
-    let expected_sender_amount =
-        DEFAULT_FUNDED_COINS - response.gas_used.unwrap() - transfer_amount;
-    let expected_receiver_amount = DEFAULT_FUNDED_COINS + transfer_amount;
-
-    assert_eq!(expected_sender_amount, framework.account_balance(0).await);
-    assert_eq!(expected_receiver_amount, framework.account_balance(1).await);
 }

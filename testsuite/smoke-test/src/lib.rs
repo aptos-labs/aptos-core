@@ -11,6 +11,8 @@ pub mod transaction;
 
 // Converted to local Forge backend
 #[cfg(test)]
+mod aptos_cli;
+#[cfg(test)]
 mod client;
 #[cfg(test)]
 mod consensus;

@@ -6,11 +6,14 @@ use crate::{
     Validator, Version,
 };
 use anyhow::{anyhow, bail, Result};
-use aptos_config::config::NodeConfig;
+use aptos_config::{config::NodeConfig, keys::ConfigKey};
 use aptos_genesis_tool::{fullnode_builder::FullnodeConfig, validator_builder::ValidatorBuilder};
-use aptos_sdk::types::{
-    chain_id::ChainId, transaction::Transaction, waypoint::Waypoint, AccountKey, LocalAccount,
-    PeerId,
+use aptos_sdk::{
+    crypto::ed25519::Ed25519PrivateKey,
+    types::{
+        chain_id::ChainId, transaction::Transaction, waypoint::Waypoint, AccountKey, LocalAccount,
+        PeerId,
+    },
 };
 use std::{
     collections::HashMap,
@@ -173,10 +176,10 @@ impl LocalSwarmBuilder {
                 Ok((node.peer_id(), node))
             })
             .collect::<Result<HashMap<_, _>>>()?;
-
+        let root_key = ConfigKey::new(root_keys.root_key);
         let root_account = LocalAccount::new(
             aptos_sdk::types::account_config::aptos_root_address(),
-            AccountKey::from_private_key(root_keys.root_key),
+            AccountKey::from_private_key(root_key.private_key()),
             0,
         );
 
@@ -190,6 +193,7 @@ impl LocalSwarmBuilder {
             dir,
             root_account,
             chain_id: ChainId::test(),
+            root_key,
         })
     }
 }
@@ -205,6 +209,7 @@ pub struct LocalSwarm {
     dir: SwarmDirectory,
     root_account: LocalAccount,
     chain_id: ChainId,
+    root_key: ConfigKey<Ed25519PrivateKey>,
 }
 
 impl LocalSwarm {
@@ -336,6 +341,10 @@ impl LocalSwarm {
         self.fullnodes.insert(peer_id, fullnode);
 
         Ok(peer_id)
+    }
+
+    pub fn root_key(&self) -> Ed25519PrivateKey {
+        self.root_key.private_key()
     }
 
     pub fn chain_id(&self) -> ChainId {

@@ -35,6 +35,7 @@ tokio = { version = "1.18.2", features = ["full"] }
 url = "2.2.2"
 
 aptos-config = { path = "../../config" }
+aptos-faucet = { path = "../../crates/aptos-faucet" }
 aptos-genesis-tool = { path = "../../config/management/genesis" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }

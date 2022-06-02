@@ -23,6 +23,7 @@ tokio = { version = "1.18.2", features = ["full"] }
 aptos = { path = "../../crates/aptos" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-faucet = { path = "../../crates/aptos-faucet" }
 aptos-indexer = { path = "../../ecosystem/indexer" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }

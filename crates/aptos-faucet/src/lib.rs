@@ -20,32 +20,32 @@
 //! ```
 
 use anyhow::Result;
+use aptos::common::types::EncodingType;
+use aptos_config::keys::ConfigKey;
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
 use aptos_rest_client::Client;
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{chain_id::ChainId, LocalAccount},
+    types::{
+        account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
+        LocalAccount,
+    },
 };
 use futures::lock::Mutex;
 use reqwest::StatusCode;
-use std::{convert::Infallible, fmt, sync::Arc};
-use std::path::Path;
+use std::{convert::Infallible, fmt, path::Path, sync::Arc};
+use structopt::StructOpt;
 use url::Url;
 use warp::{http, Filter, Rejection, Reply};
-use aptos::common::types::EncodingType;
-use aptos_config::keys::ConfigKey;
-use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_sdk::types::account_address::AccountAddress;
-use aptos_sdk::types::account_config::aptos_root_address;
-use structopt::StructOpt;
 
 pub mod mint;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
-name = "Aptos Faucet",
-author = "Aptos",
-about = "Aptos Testnet utility service for creating test accounts and minting test coins"
+    name = "Aptos Faucet",
+    author = "Aptos",
+    about = "Aptos Testnet utility service for creating test accounts and minting test coins"
 )]
 pub struct FaucetArgs {
     /// Faucet service listen address
@@ -91,13 +91,13 @@ impl FaucetArgs {
             .expect("invalid address or port number");
 
         info!(
-        "[faucet]: chain id: {}, server url: {} . Limit: {:?}",
-        self.chain_id,
-        self.server_url.as_str(),
-        self.maximum_amount,
-    );
+            "[faucet]: chain id: {}, server url: {} . Limit: {:?}",
+            self.chain_id,
+            self.server_url.as_str(),
+            self.maximum_amount,
+        );
 
-        let key = if let Some(key) = self.mint_key {
+        let key = if let Some(ref key) = self.mint_key {
             key.private_key()
         } else {
             EncodingType::BCS
@@ -129,24 +129,21 @@ impl FaucetArgs {
         } else {
             delegate_mint_account(
                 service,
-                self.server_url,
+                self.server_url.clone(),
                 self.chain_id,
                 self.maximum_amount,
             )
-                .await
+            .await
         };
 
         info!(
-        "[faucet]: running on: {}. Minting from {}",
-        address,
-        actual_service.faucet_account.lock().await.address()
-    );
-        warp::serve(routes(actual_service))
-            .run(address)
-            .await;
+            "[faucet]: running on: {}. Minting from {}",
+            address,
+            actual_service.faucet_account.lock().await.address()
+        );
+        warp::serve(routes(actual_service)).run(address).await;
     }
 }
-
 
 pub struct Service {
     pub faucet_account: Mutex<LocalAccount>,

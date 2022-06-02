@@ -3060,6 +3060,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "aptos-config",
+ "aptos-faucet",
  "aptos-genesis-tool",
  "aptos-logger",
  "aptos-rest-client",
@@ -7391,6 +7392,7 @@ dependencies = [
  "aptos",
  "aptos-config",
  "aptos-crypto",
+ "aptos-faucet",
  "aptos-genesis-tool",
  "aptos-global-constants",
  "aptos-indexer",
