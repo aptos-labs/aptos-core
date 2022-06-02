@@ -20,6 +20,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Wait for images to have been built
+        timeout-minutes: 20
         uses: lewagon/wait-on-check-action@v1.0.0
         with:
           ref: ${{ github.ref }}
