@@ -1,11 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-/// The purpose of these tests are to record BCS serialized and Ed25519 signed tests in golden files.
-/// These files will serve as references for the transaction signing implementations in client SDK.
-///
-/// Most of the transactions are with faked transaction payloads. The goal of these tests are verifying
-/// transaction serialization and signing. The type args and arguments in payloads do not always make sense.
+/***************************************************************************************
+ *
+ * Purpose of transaction vector test
+ *
+ *  a. Validates that the BCS and transaction signing code always genereate consistent bytes
+ *  b. The golden files contain the expected outputs for various transaction payloads. These files could be used by
+ *     other languages to verify their implementations of the transaction signing code.
+ *  c. The transaction payload generation heavily relies on proptest. We need to make sure the proptest uses a
+ *     deterministic RNG to not violate the golden file rules.
+ *
+ **************************************************************************************/
 use crate::{current_function_name, tests::new_test_context};
 use aptos_types::{
     account_address::AccountAddress,
@@ -30,7 +36,7 @@ use std::io::{self, Write};
 #[cfg(test)]
 struct U64ToStringFormatter;
 
-/// u64 might get truncated when being serialized into javascript Number.
+/// "u64" might get truncated when being serialized into javascript Number.
 /// This formatter converts u64 numbers into strings in javascript.
 #[cfg(test)]
 impl Formatter for U64ToStringFormatter {
@@ -89,18 +95,12 @@ fn type_tag_strategy() -> impl Strategy<Value = TypeTag> {
 
 #[cfg(test)]
 #[derive(Debug)]
-struct Arg {
-    bcs_bytes: Vec<u8>,
-    literal: String,
-}
+struct Arg(Vec<u8>);
 
 #[cfg(test)]
 impl Arg {
     fn new(arg: impl Serialize) -> Arg {
-        Arg {
-            bcs_bytes: bcs::to_bytes(&arg).unwrap(),
-            literal: serde_json::to_string(&arg).unwrap(),
-        }
+        Arg(bcs::to_bytes(&arg).unwrap())
     }
 }
 
@@ -130,39 +130,17 @@ fn script_function_strategy() -> impl Strategy<Value = ScriptFunction> {
                 ModuleId::new(addr, Identifier::new(coin).unwrap()),
                 Identifier::new(func).unwrap(),
                 type_args,
-                args.iter().map(|arg| arg.bcs_bytes.clone()).collect(),
+                args.iter().map(|arg| arg.0.clone()).collect(),
             )
         })
 }
 
 #[cfg(test)]
-#[derive(Debug)]
-struct HexCode {
-    bytes: Vec<u8>,
-    literal: String,
-}
-
-#[cfg(test)]
-impl HexCode {
-    fn new(hex: String) -> HexCode {
-        HexCode {
-            bytes: hex::decode(&hex).unwrap(),
-            literal: hex,
-        }
-    }
-}
-
-#[cfg(test)]
-fn hex_code_strategy() -> impl Strategy<Value = HexCode> {
+fn bytes_strategy() -> impl Strategy<Value = Vec<u8>> {
     string::string_regex("[a-f0-9]+")
         .unwrap()
         .prop_filter("only even letters count", |s| s.len() % 2 == 0)
-        .prop_map(HexCode::new)
-}
-
-#[cfg(test)]
-fn random_bytes_strategy() -> impl Strategy<Value = Vec<u8>> {
-    hex_code_strategy().prop_map(|h| h.bytes)
+        .prop_map(|s| hex::decode(&s).unwrap())
 }
 
 #[cfg(test)]
@@ -174,18 +152,18 @@ fn transaction_argument_strategy() -> impl Strategy<Value = TransactionArgument>
         // 1 => any::<u128>().prop_map(TransactionArgument::U128),
         1 => any::<bool>().prop_map(TransactionArgument::Bool),
         1 => any::<AccountAddress>().prop_map(TransactionArgument::Address),
-        1 => random_bytes_strategy().prop_map(TransactionArgument::U8Vector),
+        1 => bytes_strategy().prop_map(TransactionArgument::U8Vector),
     ]
 }
 
 #[cfg(test)]
 fn script_strategy() -> impl Strategy<Value = Script> {
     (
-        hex_code_strategy(),
+        bytes_strategy(),
         collection::vec(type_tag_strategy(), 0..=10),
         collection::vec(transaction_argument_strategy(), 0..=10),
     )
-        .prop_map(|(hex_code, type_args, args)| Script::new(hex_code.bytes, type_args, args))
+        .prop_map(|(bytes, type_args, args)| Script::new(bytes, type_args, args))
 }
 
 #[cfg(test)]
@@ -215,7 +193,7 @@ fn gen_script(gen: &mut ValueGenerator) -> Script {
 
 #[cfg(test)]
 fn gen_module_code(gen: &mut ValueGenerator) -> Vec<u8> {
-    gen.generate(random_bytes_strategy())
+    gen.generate(bytes_strategy())
 }
 
 #[cfg(test)]
@@ -224,7 +202,7 @@ fn sign_transaction(raw_txn: RawTransaction) -> serde_json::Value {
     let public_key = Ed25519PublicKey::from(&private_key);
 
     let signature = private_key.sign(&raw_txn);
-    let txn = SignedTransaction::new(raw_txn.clone(), public_key.clone(), signature);
+    let txn = SignedTransaction::new(raw_txn.clone(), public_key, signature);
 
     let mut raw_txn_json_out = Vec::new();
     let formatter = U64ToStringFormatter;
