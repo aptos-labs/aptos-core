@@ -1100,6 +1100,7 @@ components:
         - $ref: '#/components/schemas/GenesisTransaction'
         - $ref: '#/components/schemas/UserTransaction'
         - $ref: '#/components/schemas/BlockMetadataTransaction'
+        - $ref: '#/components/schemas/StateCheckpointTransaction'
       discriminator:
         propertyName: type
         mapping:
@@ -1107,6 +1108,7 @@ components:
           genesis_transaction: '#/components/schemas/GenesisTransaction'
           user_transaction: '#/components/schemas/UserTransaction'
           block_metadata_transaction: '#/components/schemas/BlockMetadataTransaction'
+          state_checkpoint_transaction: '#/components/schemas/StateCheckpointTransaction'
     SubmitTransactionRequest:
       title: Submit Transaction Request
       type: object
@@ -1134,12 +1136,14 @@ components:
         - $ref: '#/components/schemas/GenesisTransaction'
         - $ref: '#/components/schemas/UserTransaction'
         - $ref: '#/components/schemas/BlockMetadataTransaction'
+        - $ref: '#/components/schemas/StateCheckpointTransaction'
       discriminator:
         propertyName: type
         mapping:
           genesis_transaction: '#/components/schemas/GenesisTransaction'
           user_transaction: '#/components/schemas/UserTransaction'
           block_metadata_transaction: '#/components/schemas/BlockMetadataTransaction'
+          state_checkpoint_transaction: '#/components/schemas/StateCheckpointTransaction'
     OnChainTransactionInfo:
       title: On-chain transaction information
       type: object
@@ -1246,6 +1250,20 @@ components:
                 $ref: '#/components/schemas/Event'
             payload:
               $ref: '#/components/schemas/WriteSetPayload'
+        - $ref: '#/components/schemas/OnChainTransactionInfo'
+    StateCheckpointTransaction:
+      title: State Checkpoint Transaction
+      type: object
+      allOf:
+        - required:
+            - type
+            - timestamp
+          properties:
+            type:
+              type: string
+              example: "state_checkpoint_transaction"
+            timestamp:
+              $ref: '#/components/schemas/TimestampUsec'
         - $ref: '#/components/schemas/OnChainTransactionInfo'
     TransactionPayload:
       title: Transaction Payload
