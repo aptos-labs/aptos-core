@@ -330,19 +330,27 @@ impl AptosNetDataClient {
         T: TryFrom<StorageServiceResponse, Error = E>,
         E: Into<Error>,
     {
-        let response = self.send_request_to_peer(peer, request).await?;
+        let response = self.send_request_to_peer(peer, request.clone()).await;
+        match response {
+            Ok(response) => {
+                let (context, payload) = response.into_parts();
+                increment_request_counter(&metrics::SUCCESS_RESPONSES, request.get_label(), peer);
 
-        let (context, payload) = response.into_parts();
-
-        // try to convert the storage service enum into the exact variant we're expecting.
-        match T::try_from(payload) {
-            Ok(new_payload) => Ok(Response::new(context, new_payload)),
-            // if the variant doesn't match what we're expecting, report the issue.
-            Err(err) => {
-                context
-                    .response_callback
-                    .notify_bad_response(ResponseError::InvalidPayloadDataType);
-                Err(err.into())
+                // try to convert the storage service enum into the exact variant we're expecting.
+                match T::try_from(payload) {
+                    Ok(new_payload) => Ok(Response::new(context, new_payload)),
+                    // if the variant doesn't match what we're expecting, report the issue.
+                    Err(err) => {
+                        context
+                            .response_callback
+                            .notify_bad_response(ResponseError::InvalidPayloadDataType);
+                        Err(err.into())
+                    }
+                }
+            }
+            Err(error) => {
+                increment_request_counter(&metrics::ERROR_RESPONSES, error.get_label(), peer);
+                Err(error)
             }
         }
     }
@@ -384,8 +392,6 @@ impl AptosNetDataClient {
                         .request_id(id)
                         .peer(&peer))
                 );
-
-                increment_request_counter(&metrics::SUCCESS_RESPONSES, request.get_label(), peer);
 
                 // For now, record all responses that at least pass the data
                 // client layer successfully. An alternative might also have the
@@ -431,12 +437,6 @@ impl AptosNetDataClient {
                         .request_id(id)
                         .peer(&peer)
                         .error(&client_error))
-                );
-
-                increment_request_counter(
-                    &metrics::ERROR_RESPONSES,
-                    client_error.get_label(),
-                    peer,
                 );
 
                 self.notify_bad_response(id, peer, &request, ErrorType::NotUseful);
@@ -737,10 +737,11 @@ pub(crate) fn poll_peer(
             .send_request_to_peer_and_decode(peer, StorageServiceRequest::GetStorageServerSummary)
             .await
             .map(Response::into_payload);
-        drop(timer);
 
         // Mark the in-flight poll as now complete
         data_client.in_flight_request_complete(&peer);
+
+        drop(timer);
 
         // Check the storage summary response
         let storage_summary = match result {

@@ -23,7 +23,7 @@ impl Default for LoggerConfig {
             chan_size: CHANNEL_SIZE,
             enable_backtrace: false,
             is_async: true,
-            level: Level::Debug,
+            level: Level::Info,
         }
     }
 }

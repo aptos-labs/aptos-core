@@ -9,7 +9,7 @@ use aptos_config::{
     config::{PeerRole, StorageServiceConfig},
     network_id::PeerNetworkId,
 };
-use aptos_logger::debug;
+use aptos_logger::prelude::*;
 use network::application::storage::PeerMetadataStorage;
 use std::{
     cmp::min,
@@ -160,7 +160,7 @@ impl PeerStates {
             .update_score_success();
         let new_score = self.peer_to_state.entry(peer).or_default().score;
         if old_score <= IGNORE_PEER_THRESHOLD && new_score > IGNORE_PEER_THRESHOLD {
-            debug!(
+            info!(
                 (LogSchema::new(LogEntry::PeerStates)
                     .event(LogEvent::PeerNoLongerIgnored)
                     .message("Peer will no longer be ignored")
@@ -178,7 +178,7 @@ impl PeerStates {
             .update_score_error(error);
         let new_score = self.peer_to_state.entry(peer).or_default().score;
         if old_score > IGNORE_PEER_THRESHOLD && new_score <= IGNORE_PEER_THRESHOLD {
-            debug!(
+            info!(
                 (LogSchema::new(LogEntry::PeerStates)
                     .event(LogEvent::PeerIgnored)
                     .message("Peer will be ignored")
