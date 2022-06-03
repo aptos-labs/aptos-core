@@ -5,7 +5,7 @@ use crate::{
     aptosnet::{
         logging::{LogEntry, LogEvent, LogSchema},
         metrics::{
-            increment_request_counter, set_gauge, start_timer, DataType, PRIORITIZED_PEER,
+            increment_request_counter, set_gauge, start_request_timer, DataType, PRIORITIZED_PEER,
             REGULAR_PEER,
         },
         state::{ErrorType, PeerStates},
@@ -316,7 +316,7 @@ impl AptosNetDataClient {
             );
             error
         })?;
-        let _timer = start_timer(&metrics::REQUEST_LATENCIES, request.get_label().into());
+        let _timer = start_request_timer(&metrics::REQUEST_LATENCIES, request.get_label(), peer);
         self.send_request_to_peer_and_decode(peer, request).await
     }
 
@@ -715,17 +715,17 @@ pub(crate) fn poll_peer(
     peer: PeerNetworkId,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
+    // Mark the in-flight poll as started. We do this here to prevent
+    // the main polling loop from selecting the same peer concurrently.
+    data_client.in_flight_request_started(&peer);
+
     // Create the poller for the peer
     let poller = async move {
-        // Mark the in-flight poll as started
-        data_client.in_flight_request_started(&peer);
-
         // Start the peer polling timer
-        let timer = start_timer(
+        let timer = start_request_timer(
             &metrics::REQUEST_LATENCIES,
-            StorageServiceRequest::GetStorageServerSummary
-                .get_label()
-                .into(),
+            StorageServiceRequest::GetStorageServerSummary.get_label(),
+            peer,
         );
 
         // Fetch the storage summary for the peer and stop the timer

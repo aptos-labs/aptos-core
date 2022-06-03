@@ -49,7 +49,7 @@ pub static REQUEST_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_data_client_request_latencies",
         "Counters related to request latencies",
-        &["request_type"]
+        &["request_type", "network", "peer_id"]
     )
     .unwrap()
 });
@@ -145,6 +145,14 @@ pub fn set_gauge(counter: &Lazy<IntGaugeVec>, label: String, value: u64) {
 }
 
 /// Starts the timer for the provided histogram and label values.
-pub fn start_timer(histogram: &Lazy<HistogramVec>, label: String) -> HistogramTimer {
-    histogram.with_label_values(&[&label]).start_timer()
+pub fn start_request_timer(
+    histogram: &Lazy<HistogramVec>,
+    request_label: &str,
+    peer_network_id: PeerNetworkId,
+) -> HistogramTimer {
+    let peer = peer_network_id.peer_id().short_str();
+    let network = peer_network_id.network_id();
+    histogram
+        .with_label_values(&[request_label, network.as_str(), peer.as_str()])
+        .start_timer()
 }

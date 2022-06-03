@@ -602,6 +602,7 @@ async fn in_flight_error_handling() {
     let peer = mock_network.add_peer(true);
 
     // Poll the peer
+    client.in_flight_request_started(&peer);
     let handle = poll_peer(client.clone(), peer, None);
 
     // Respond to the peer poll with an error
