@@ -34,15 +34,22 @@ use serde_json::{self, json, ser::Formatter};
 use std::io::{self, Write};
 
 #[cfg(test)]
-struct U64ToStringFormatter;
+struct NumberToStringFormatter;
 
 /// "u64" might get truncated when being serialized into javascript Number.
 /// This formatter converts u64 numbers into strings in javascript.
 #[cfg(test)]
-impl Formatter for U64ToStringFormatter {
+impl Formatter for NumberToStringFormatter {
     fn write_u64<W>(&mut self, writer: &mut W, value: u64) -> io::Result<()>
     where
         W: ?Sized + Write,
+    {
+        write!(writer, "\"{}\"", value)
+    }
+
+    fn write_number_str<W>(&mut self, writer: &mut W, value: &str) -> io::Result<()>
+    where
+        W: ?Sized + io::Write,
     {
         write!(writer, "\"{}\"", value)
     }
@@ -109,8 +116,7 @@ fn arg_strategy() -> impl Strategy<Value = Arg> {
     prop_oneof![
         1 => any::<u8>().prop_map(Arg::new),
         1 => any::<u64>().prop_map(Arg::new),
-        // u128 is not well supported by serde::json
-        // 1 => any::<u128>().prop_map(Arg::new),
+        1 => any::<u128>().prop_map(Arg::new),
         1 => any::<bool>().prop_map(Arg::new),
         1 => any::<AccountAddress>().prop_map(Arg::new),
     ]
@@ -148,8 +154,7 @@ fn transaction_argument_strategy() -> impl Strategy<Value = TransactionArgument>
     prop_oneof![
         1 => any::<u8>().prop_map(TransactionArgument::U8),
         1 => any::<u64>().prop_map(TransactionArgument::U64),
-        // u128 is not well supported by serde::json
-        // 1 => any::<u128>().prop_map(TransactionArgument::U128),
+        1 => any::<u128>().prop_map(TransactionArgument::U128),
         1 => any::<bool>().prop_map(TransactionArgument::Bool),
         1 => any::<AccountAddress>().prop_map(TransactionArgument::Address),
         1 => bytes_strategy().prop_map(TransactionArgument::U8Vector),
@@ -205,7 +210,7 @@ fn sign_transaction(raw_txn: RawTransaction) -> serde_json::Value {
     let txn = SignedTransaction::new(raw_txn.clone(), public_key, signature);
 
     let mut raw_txn_json_out = Vec::new();
-    let formatter = U64ToStringFormatter;
+    let formatter = NumberToStringFormatter;
     let mut ser = serde_json::Serializer::with_formatter(&mut raw_txn_json_out, formatter);
     raw_txn.serialize(&mut ser).unwrap();
 
