@@ -56,6 +56,7 @@ mod tests;
 const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 5;
 const GLOBAL_DATA_METRIC_FREQ_SECS: u64 = 1;
 const IN_FLIGHT_METRICS_SAMPLE_FREQ: u64 = 5;
+const PEER_LOG_FREQ_SECS: u64 = 10;
 const POLLER_LOG_FREQ_SECS: u64 = 1;
 const REGULAR_PEER_SAMPLE_FREQ: u64 = 3;
 
@@ -279,6 +280,19 @@ impl AptosNetDataClient {
                 regular_peers.push(peer);
             }
         }
+
+        // Log the peers, periodically.
+        sample!(
+            SampleRate::Duration(Duration::from_secs(PEER_LOG_FREQ_SECS)),
+            info!(
+                (LogSchema::new(LogEntry::PeerStates)
+                    .event(LogEvent::PriorityAndRegularPeers)
+                    .message(&format!(
+                        "Current priority peers: {:?} and regular peers: {:?}",
+                        priority_peers, regular_peers,
+                    )))
+            );
+        );
 
         Ok((priority_peers, regular_peers))
     }
