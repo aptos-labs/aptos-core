@@ -1,31 +1,36 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+//! Aptos Rosetta API
+//!
+//! [Rosetta API Spec](https://www.rosetta-api.org/docs/Reference.html)
+
+use crate::types::Network;
 use aptos_api::runtime::WebServer;
 use aptos_config::config::ApiConfig;
 use aptos_rest_client::aptos_api_types::Error;
 use std::convert::Infallible;
 use warp::{
-    filters::BoxedFilter,
     http::{HeaderValue, Method, StatusCode},
     reject::{MethodNotAllowed, PayloadTooLarge, UnsupportedMediaType},
     reply, Filter, Rejection, Reply,
 };
 
+mod account;
+pub mod common;
+pub mod error;
+pub mod types;
+
 /// Rosetta API context for use on all APIs
 #[derive(Clone, Debug)]
 pub struct RosettaContext {
     pub rest_client: aptos_rest_client::Client,
+    pub network: Network,
 }
 
-impl RosettaContext {
-    pub fn filter(self) -> impl Filter<Extract = (Self,), Error = Infallible> + Clone {
-        warp::any().map(move || self.clone())
-    }
-}
-
-/// Creates HTTP server (warp-based) serves for Rosetta
+/// Creates HTTP server (warp-based) for Rosetta
 pub fn bootstrap(
+    network: Network,
     api_config: ApiConfig,
     rest_client: aptos_rest_client::Client,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
@@ -35,22 +40,24 @@ pub fn bootstrap(
         .build()
         .expect("[rosetta] failed to create runtime");
 
-    let api = WebServer::from(api_config.clone());
+    let api = WebServer::from(api_config);
 
     runtime.spawn(async move {
-        let context = RosettaContext { rest_client };
-        let routes = routes(context);
-        api.serve(routes).await;
+        let context = RosettaContext {
+            rest_client,
+            network,
+        };
+        api.serve(routes(context)).await;
     });
     Ok(runtime)
 }
 
+/// Collection of all routes for the server
 pub fn routes(
     context: RosettaContext,
 ) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
-    index(context)
-        // TODO: Add open api spec
-        // TODO: Add health check
+    account::routes(context)
+        // TODO: Add health check?
         .with(
             warp::cors()
                 .allow_any_origin()
@@ -58,44 +65,11 @@ pub fn routes(
                 .allow_headers(vec![warp::http::header::CONTENT_TYPE]),
         )
         .recover(handle_rejection)
-    // TODO Logger
-    // TODO metrics
+    // TODO Logger?
+    // TODO metrics?
 }
 
-// GET /
-pub fn index(context: RosettaContext) -> BoxedFilter<(impl Reply,)> {
-    warp::path::end()
-        .and(warp::get())
-        .and(context.filter())
-        .and_then(handle_index)
-        .boxed()
-}
-
-pub async fn handle_index(context: RosettaContext) -> Result<impl Reply, Rejection> {
-    Ok("Hello")
-}
-
-const OPEN_API_HTML: &str = include_str!("../../../api/doc/spec.html");
-const OPEN_API_SPEC: &str = include_str!("../../../api/doc/openapi.yaml");
-
-fn open_api_html() -> String {
-    OPEN_API_HTML.replace("hideTryIt=\"true\"", "")
-}
-
-// GET /openapi.yaml
-// GET /spec.html
-pub fn openapi_spec() -> BoxedFilter<(impl Reply,)> {
-    let spec = warp::path!("openapi.yaml")
-        .and(warp::get())
-        .map(|| OPEN_API_SPEC)
-        .boxed();
-    let html = warp::path!("spec.html")
-        .and(warp::get())
-        .map(|| reply::html(open_api_html()))
-        .boxed();
-    spec.or(html).boxed()
-}
-
+/// Handle error codes from warp
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
     let code;
     let body;

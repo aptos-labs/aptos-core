@@ -3,12 +3,16 @@
 
 #![forbid(unsafe_code)]
 
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use aptos_config::config::ApiConfig;
-use aptos_rosetta::bootstrap;
+use aptos_rosetta::{bootstrap, types::Network};
 use clap::Parser;
+use std::{
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 #[tokio::main]
 async fn main() {
@@ -19,13 +23,13 @@ async fn main() {
     let api_config = ApiConfig {
         enabled: true,
         address: args.listen_address,
-        tls_cert_path: None,
-        tls_key_path: None,
-        content_length_limit: None
+        tls_cert_path: args.tls_cert_path,
+        tls_key_path: args.tls_key_path,
+        content_length_limit: args.content_length_limit,
     };
 
     // Ensure runtime for Rosetta is up and running
-    let _runtime = bootstrap(api_config, rest_client).expect("Should bootstrap");
+    let _runtime = bootstrap(args.network, api_config, rest_client).expect("Should bootstrap");
 
     // Run until there is an interrupt
     let term = Arc::new(AtomicBool::new(false));
@@ -39,11 +43,23 @@ async fn main() {
 /// Provides an implementation of [Rosetta](https://www.rosetta-api.org/docs/Reference.html) on Aptos.
 #[derive(Debug, Parser)]
 #[clap(name = "aptos-rosetta", author, version, propagate_version = true)]
-struct RosettaServerArgs {
+pub struct RosettaServerArgs {
     /// Listen address for the server. e.g. 127.0.0.1:8080
     #[clap(long, default_value = "127.0.0.1:8080")]
     listen_address: SocketAddr,
     /// URL for the Aptos REST API. e.g. https://fullnode.devnet.aptoslabs.com
     #[clap(long, default_value = "https://fullnode.devnet.aptoslabs.com")]
     rest_api_url: url::Url,
+    /// Network to be used for the server e.g. devnet
+    #[clap(long, default_value_t = Network::Devnet)]
+    network: Network,
+    /// Path to TLS cert for HTTPS support
+    #[clap(long)]
+    tls_cert_path: Option<String>,
+    /// Path to TLS key for HTTPS support
+    #[clap(long)]
+    tls_key_path: Option<String>,
+    /// Limit to content length on all requests
+    #[clap(long)]
+    content_length_limit: Option<u64>,
 }

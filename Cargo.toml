@@ -137,6 +137,7 @@ default-members = [
     "crates/aptos",
     "crates/aptos-faucet",
     "crates/aptos-rate-limiter",
+    "crates/aptos-rosetta",
     "aptos-move/framework",
     "aptos-move/transaction-builder-generator",
     "execution/db-bootstrapper",
