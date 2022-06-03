@@ -7,7 +7,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::aptos_root_address,
-    contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
+    contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     event::EventKey,
@@ -303,19 +303,7 @@ pub trait DbReader: Send + Sync {
         start: u64,
         order: Order,
         limit: u64,
-    ) -> Result<Vec<(u64, ContractEvent)>> {
-        unimplemented!()
-    }
-
-    /// Returns events by given event key
-    fn get_events_with_proofs(
-        &self,
-        event_key: &EventKey,
-        start: u64,
-        order: Order,
-        limit: u64,
-        known_version: Option<u64>,
-    ) -> Result<Vec<EventWithProof>> {
+    ) -> Result<Vec<EventWithVersion>> {
         unimplemented!()
     }
 
@@ -324,17 +312,6 @@ pub trait DbReader: Send + Sync {
     /// [AptosDB::get_block_timestamp]:
     /// ../aptosdb/struct.AptosDB.html#method.get_block_timestamp
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
-        unimplemented!()
-    }
-
-    /// Returns the [`aptos_types::account_config::events::new_block::NewBlockEvent`] for the block
-    /// containing the requested `version` and proof that the block actually contains the `version`.
-    fn get_event_by_version_with_proof(
-        &self,
-        event_key: &EventKey,
-        event_version: u64,
-        proof_version: u64,
-    ) -> Result<EventByVersionWithProof> {
         unimplemented!()
     }
 

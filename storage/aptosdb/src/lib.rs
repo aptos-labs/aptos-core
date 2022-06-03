@@ -54,12 +54,12 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress,
-    contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
+    contract_event::{ContractEvent, EventWithVersion},
     epoch_change::EpochChangeProof,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
-        definition::LeafCount, AccumulatorConsistencyProof, EventProof, SparseMerkleProof,
+        definition::LeafCount, AccumulatorConsistencyProof, SparseMerkleProof,
         TransactionInfoListWithProof,
     },
     state_proof::StateProof,
@@ -574,14 +574,14 @@ impl AptosDB {
     }
 
     // ================================== Private APIs ==================================
-    fn get_events_with_proof_by_event_key(
+    fn get_events_by_event_key(
         &self,
         event_key: &EventKey,
         start_seq_num: u64,
         order: Order,
         limit: u64,
         ledger_version: Version,
-    ) -> Result<Vec<EventWithProof>> {
+    ) -> Result<Vec<EventWithVersion>> {
         error_if_too_many_requested(limit, MAX_LIMIT)?;
         let get_latest = order == Order::Descending && start_seq_num == u64::max_value();
 
@@ -620,30 +620,24 @@ impl AptosDB {
             }
         }
 
-        let mut events_with_proof = event_indices
+        let mut events_with_version = event_indices
             .into_iter()
             .map(|(seq, ver, idx)| {
-                let (event, event_proof) = self
-                    .event_store
-                    .get_event_with_proof_by_version_and_index(ver, idx)?;
+                let event = self.event_store.get_event_by_version_and_index(ver, idx)?;
                 ensure!(
                     seq == event.sequence_number(),
                     "Index broken, expected seq:{}, actual:{}",
                     seq,
                     event.sequence_number()
                 );
-                let txn_info_with_proof = self
-                    .ledger_store
-                    .get_transaction_info_with_proof(ver, ledger_version)?;
-                let proof = EventProof::new(txn_info_with_proof, event_proof);
-                Ok(EventWithProof::new(ver, idx, event, proof))
+                Ok(EventWithVersion::new(ver, event))
             })
             .collect::<Result<Vec<_>>>()?;
         if order == Order::Descending {
-            events_with_proof.reverse();
+            events_with_version.reverse();
         }
 
-        Ok(events_with_proof)
+        Ok(events_with_version)
     }
 
     /// Convert a `ChangeSet` to `SealedChangeSet`.
@@ -1058,42 +1052,9 @@ impl DbReader for AptosDB {
         start: u64,
         order: Order,
         limit: u64,
-    ) -> Result<Vec<(u64, ContractEvent)>> {
+    ) -> Result<Vec<EventWithVersion>> {
         gauged_api("get_events", || {
-            let events_with_proofs =
-                self.get_events_with_proofs(event_key, start, order, limit, None)?;
-            let events = events_with_proofs
-                .into_iter()
-                .map(|e| (e.transaction_version, e.event))
-                .collect();
-            Ok(events)
-        })
-    }
-
-    fn get_events_with_proofs(
-        &self,
-        event_key: &EventKey,
-        start: u64,
-        order: Order,
-        limit: u64,
-        known_version: Option<u64>,
-    ) -> Result<Vec<EventWithProof>> {
-        gauged_api("get_events_with_proofs", || {
-            let version = match known_version {
-                Some(version) => version,
-                None => self.get_latest_version()?,
-            };
-
-            error_if_version_is_pruned(
-                &self.pruner,
-                PrunerIndex::LedgerPrunerIndex,
-                "Event",
-                version,
-            )?;
-
-            let events =
-                self.get_events_with_proof_by_event_key(event_key, start, order, limit, version)?;
-            Ok(events)
+            self.get_events_by_event_key(event_key, start, order, limit, self.get_latest_version()?)
         })
     }
 
@@ -1220,85 +1181,6 @@ impl DbReader for AptosDB {
                 None => 0,
             };
             Ok(ts)
-        })
-    }
-
-    fn get_event_by_version_with_proof(
-        &self,
-        event_key: &EventKey,
-        event_version: u64,
-        proof_version: u64,
-    ) -> Result<EventByVersionWithProof> {
-        gauged_api("get_event_by_version_with_proof", || {
-            let latest_version = self.get_latest_version()?;
-            ensure!(
-                proof_version <= latest_version,
-                "cannot construct proofs for a version that doesn't exist yet: proof_version: {}, latest_version: {}",
-                proof_version, latest_version,
-            );
-            ensure!(
-                event_version <= proof_version,
-                "event_version {} must be <= proof_version {}",
-                event_version,
-                proof_version,
-            );
-
-            // Get the latest sequence number of an event at or before the
-            // requested event_version.
-            let maybe_seq_num = self
-                .event_store
-                .get_latest_sequence_number(event_version, event_key)?;
-
-            let (lower_bound_incl, upper_bound_excl) = if let Some(seq_num) = maybe_seq_num {
-                // We need to request the surrounding events (surrounding
-                // as in E_i.version <= event_version < E_{i+1}.version) in order
-                // to prove that there are no intermediate events, i.e.,
-                // E_j, where E_i.version < E_j.version <= event_version.
-                //
-                // This limit also works for the case where `event_version` is
-                // after the latest event, since the upper bound will just be None.
-                let limit = 2;
-
-                let events = self.get_events_with_proof_by_event_key(
-                    event_key,
-                    seq_num,
-                    Order::Ascending,
-                    limit,
-                    proof_version,
-                )?;
-
-                let mut events_iter = events.into_iter();
-                let lower_bound_incl = events_iter.next();
-                let upper_bound_excl = events_iter.next();
-                assert_eq!(events_iter.len(), 0);
-
-                (lower_bound_incl, upper_bound_excl)
-            } else {
-                // Since there is no event at or before `event_version`, we need to
-                // show that either (1.) there are no events or (2.) events start
-                // at some later version.
-                let seq_num = 0;
-                let limit = 1;
-
-                let events = self.get_events_with_proof_by_event_key(
-                    event_key,
-                    seq_num,
-                    Order::Ascending,
-                    limit,
-                    proof_version,
-                )?;
-
-                let mut events_iter = events.into_iter();
-                let upper_bound_excl = events_iter.next();
-                assert_eq!(events_iter.len(), 0);
-
-                (None, upper_bound_excl)
-            };
-
-            Ok(EventByVersionWithProof::new(
-                lower_bound_incl,
-                upper_bound_excl,
-            ))
         })
     }
 

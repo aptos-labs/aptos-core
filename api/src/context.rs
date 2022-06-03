@@ -249,8 +249,8 @@ impl Context {
             .get_events(event_key, start, Order::Ascending, limit as u64)?;
         Ok(events
             .into_iter()
-            .filter(|(version, _event)| version <= &ledger_version)
-            .map(|(_, event)| event)
+            .filter(|event| event.transaction_version <= ledger_version)
+            .map(|event| event.event)
             .collect::<Vec<_>>())
     }
 

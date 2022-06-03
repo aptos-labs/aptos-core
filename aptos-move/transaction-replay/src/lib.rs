@@ -11,7 +11,7 @@ use aptos_types::{
     account_config::aptos_root_address,
     account_state::AccountState,
     account_view::AccountView,
-    contract_event::{ContractEvent, EventWithProof},
+    contract_event::{ContractEvent, EventWithVersion},
     event::EventKey,
     transaction::{ChangeSet, Transaction, TransactionOutput, Version, WriteSetPayload},
     write_set::WriteOp,
@@ -238,15 +238,14 @@ impl AptosDebugger {
     ) -> Result<()> {
         let events = self.debugger.get_events(event_key, start_seq, limit)?;
         let events_data = self.annotate_events(events.as_slice())?;
-        for (event_proof, event_data) in events.iter().zip(events_data.iter()) {
-            println!("Transaction Version: {}", event_proof.transaction_version);
-            println!("Event index: {}", event_proof.event_index);
+        for (event, event_data) in events.iter().zip(events_data.iter()) {
+            println!("Transaction Version: {}", event.transaction_version);
             println!("Event payload: {}", event_data);
         }
         Ok(())
     }
 
-    pub fn annotate_events(&self, events: &[EventWithProof]) -> Result<Vec<AnnotatedMoveStruct>> {
+    pub fn annotate_events(&self, events: &[EventWithVersion]) -> Result<Vec<AnnotatedMoveStruct>> {
         let version = self.debugger.get_latest_version()?;
         let state_view = DebuggerStateView::new(&*self.debugger, Some(version));
         let remote_storage = RemoteStorage::new(&state_view);

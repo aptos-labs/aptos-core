@@ -5,32 +5,28 @@ use crate::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
-    chain_id::ChainId,
     contract_event::ContractEvent,
     event::EventKey,
     ledger_info::LedgerInfo,
     proof::{
-        definition::{EventProof, MAX_ACCUMULATOR_PROOF_DEPTH},
-        AccumulatorExtensionProof, AccumulatorRangeProof, EventAccumulatorInternalNode,
-        EventAccumulatorProof, SparseMerkleInternalNode, SparseMerkleLeafNode,
-        TestAccumulatorInternalNode, TestAccumulatorProof, TransactionAccumulatorInternalNode,
-        TransactionAccumulatorProof, TransactionInfoListWithProof, TransactionInfoWithProof,
+        definition::MAX_ACCUMULATOR_PROOF_DEPTH, AccumulatorExtensionProof, AccumulatorRangeProof,
+        SparseMerkleInternalNode, SparseMerkleLeafNode, TestAccumulatorInternalNode,
+        TestAccumulatorProof, TransactionAccumulatorInternalNode, TransactionAccumulatorProof,
+        TransactionInfoListWithProof, TransactionInfoWithProof,
     },
     state_store::state_value::StateValue,
     transaction::{
-        ExecutionStatus, RawTransaction, Script, Transaction, TransactionInfo,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionStatus,
+        ExecutionStatus, Transaction, TransactionInfo, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionStatus,
     },
     write_set::WriteSet,
 };
 use aptos_crypto::{
-    ed25519::Ed25519PrivateKey,
     hash::{
         CryptoHash, TestOnlyHash, TestOnlyHasher, ACCUMULATOR_PLACEHOLDER_HASH, GENESIS_BLOCK_ID,
         SPARSE_MERKLE_PLACEHOLDER_HASH,
     },
-    HashValue, PrivateKey, Uniform,
+    HashValue,
 };
 use move_deps::move_core_types::language_storage::TypeTag;
 
@@ -326,128 +322,6 @@ fn test_verify_transaction() {
     );
     let proof = TransactionInfoWithProof::new(ledger_info_to_transaction_info_proof, fake_txn_info);
     assert!(proof.verify(&ledger_info, 1).is_err());
-}
-
-#[test]
-fn test_verify_state_store_resource_and_event() {
-    //                  root
-    //                 /     \
-    //               /         \
-    //             a             b
-    //            / \           / \
-    //        txn0   txn1   txn2   default
-    //                       ^
-    //                       |
-    //                 transaction_info2
-    //                /    /           \
-    //              /     /              \
-    //           txn  state_root          event_root
-    //                  /    \               / \
-    //                 c      default  event0   event1
-    //                / \
-    //            key1   d
-    //                  / \
-    //              key2   key3
-    let key1 = b"hello".test_only_hash();
-    let key2 = b"world".test_only_hash();
-    let key3 = b"!".test_only_hash();
-    let non_existing_key = b"#".test_only_hash();
-    assert_eq!(key1[0], 0b0011_0011);
-    assert_eq!(key2[0], 0b0100_0010);
-    assert_eq!(key3[0], 0b0110_1001);
-    assert_eq!(non_existing_key[0], 0b0100_0001);
-
-    let blob1 = StateValue::from(b"value1".to_vec());
-    let blob2 = StateValue::from(b"value2".to_vec());
-    let blob3 = StateValue::from(b"value3".to_vec());
-
-    let leaf1_hash = SparseMerkleLeafNode::new(key1, blob1.hash()).hash();
-    let leaf2 = SparseMerkleLeafNode::new(key2, blob2.hash());
-    let leaf2_hash = leaf2.hash();
-    let leaf3_hash = SparseMerkleLeafNode::new(key3, blob3.hash()).hash();
-    let internal_d_hash = SparseMerkleInternalNode::new(leaf2_hash, leaf3_hash).hash();
-    let internal_c_hash = SparseMerkleInternalNode::new(leaf1_hash, internal_d_hash).hash();
-    let state_root_hash =
-        SparseMerkleInternalNode::new(internal_c_hash, *SPARSE_MERKLE_PLACEHOLDER_HASH).hash();
-
-    let txn_info0_hash = b"hellohello".test_only_hash();
-    let txn_info1_hash = b"worldworld".test_only_hash();
-
-    let privkey = Ed25519PrivateKey::generate_for_testing();
-    let pubkey = privkey.public_key();
-    let txn2_hash = Transaction::UserTransaction(
-        RawTransaction::new_script(
-            crate::account_address::from_public_key(&pubkey),
-            /* sequence_number = */ 0,
-            Script::new(vec![], vec![], vec![]),
-            /* max_gas_amount = */ 0,
-            /* gas_unit_price = */ 0,
-            /* expiration_timestamp_secs = */ 0,
-            ChainId::test(),
-        )
-        .sign(&privkey, pubkey)
-        .expect("Signing failed.")
-        .into_inner(),
-    )
-    .hash();
-
-    let event0_hash = b"event0".test_only_hash();
-    let event1_hash = b"event1".test_only_hash();
-    let event_root_hash = EventAccumulatorInternalNode::new(event0_hash, event1_hash).hash();
-
-    let txn_info2 = TransactionInfo::new(
-        txn2_hash,
-        HashValue::zero(),
-        event_root_hash,
-        Some(state_root_hash),
-        /* gas_used = */ 0,
-        /* major_status = */ ExecutionStatus::Success,
-    );
-    let txn_info2_hash = txn_info2.hash();
-
-    let internal_a_hash =
-        TransactionAccumulatorInternalNode::new(txn_info0_hash, txn_info1_hash).hash();
-    let internal_b_hash =
-        TransactionAccumulatorInternalNode::new(txn_info2_hash, *ACCUMULATOR_PLACEHOLDER_HASH)
-            .hash();
-    let root_hash =
-        TransactionAccumulatorInternalNode::new(internal_a_hash, internal_b_hash).hash();
-
-    // consensus_data_hash isn't used in proofs, but we need it to construct LedgerInfo.
-    let consensus_data_hash = b"consensus_data".test_only_hash();
-    let ledger_info = LedgerInfo::new(
-        BlockInfo::new(0, 0, *GENESIS_BLOCK_ID, root_hash, 2, 10000, None),
-        consensus_data_hash,
-    );
-
-    let ledger_info_to_transaction_info_proof =
-        TransactionAccumulatorProof::new(vec![*ACCUMULATOR_PLACEHOLDER_HASH, internal_a_hash]);
-
-    let transaction_info_to_event_proof = EventAccumulatorProof::new(vec![event1_hash]);
-    let event_proof = EventProof::new(
-        TransactionInfoWithProof::new(ledger_info_to_transaction_info_proof, txn_info2),
-        transaction_info_to_event_proof,
-    );
-
-    // Prove that the first event within transaction 2 is `event0`.
-    assert!(event_proof
-        .verify(
-            &ledger_info,
-            event0_hash,
-            /* transaction_version = */ 2,
-            /* event_version_within_transaction = */ 0,
-        )
-        .is_ok());
-
-    let bad_event0_hash = b"event1".test_only_hash();
-    assert!(event_proof
-        .verify(
-            &ledger_info,
-            bad_event0_hash,
-            /* transaction_version = */ 2,
-            /* event_version_within_transaction = */ 0,
-        )
-        .is_err());
 }
 
 // This test does the following:

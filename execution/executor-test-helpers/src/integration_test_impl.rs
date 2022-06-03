@@ -435,7 +435,10 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .unwrap();
     assert_eq!(account3_received_events_batch1.len(), 10);
     // Account3 has one extra deposit event from being minted to.
-    assert_eq!(account3_received_events_batch1[0].1.sequence_number(), 16);
+    assert_eq!(
+        account3_received_events_batch1[0].event.sequence_number(),
+        16
+    );
 
     let account3_received_events_batch2 = db
         .reader
@@ -447,7 +450,10 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         )
         .unwrap();
     assert_eq!(account3_received_events_batch2.len(), 7);
-    assert_eq!(account3_received_events_batch2[0].1.sequence_number(), 6);
+    assert_eq!(
+        account3_received_events_batch2[0].event.sequence_number(),
+        6
+    );
 
     aptos_db
 }

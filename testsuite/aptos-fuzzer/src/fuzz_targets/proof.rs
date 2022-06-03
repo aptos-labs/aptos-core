@@ -7,7 +7,7 @@ use aptos_proptest_helpers::ValueGenerator;
 use aptos_types::{
     ledger_info::LedgerInfo,
     proof::{
-        EventProof, SparseMerkleProof, TestAccumulatorProof, TestAccumulatorRangeProof,
+        SparseMerkleProof, TestAccumulatorProof, TestAccumulatorRangeProof,
         TransactionInfoListWithProof, TransactionInfoWithProof,
     },
     state_store::state_value::StateValue,
@@ -136,38 +136,6 @@ impl FuzzTargetImpl for TransactionInfoWithProofFuzzer {
         let _res = input
             .proof
             .verify(&input.ledger_info, input.transaction_version);
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct EventProofFuzzer;
-
-#[derive(Debug, Arbitrary)]
-struct EventProofFuzzerInput {
-    proof: EventProof,
-    ledger_info: LedgerInfo,
-    event_hash: HashValue,
-    transaction_version: Version,
-    event_version_within_transaction: Version,
-}
-
-impl FuzzTargetImpl for EventProofFuzzer {
-    fn description(&self) -> &'static str {
-        "Proof: EventProof"
-    }
-
-    fn generate(&self, _idx: usize, _gen: &mut ValueGenerator) -> Option<Vec<u8>> {
-        Some(corpus_from_strategy(any::<EventProofFuzzerInput>()))
-    }
-
-    fn fuzz(&self, data: &[u8]) {
-        let input = fuzz_data_to_value(data, any::<EventProofFuzzerInput>());
-        let _res = input.proof.verify(
-            &input.ledger_info,
-            input.event_hash,
-            input.transaction_version,
-            input.event_version_within_transaction,
-        );
     }
 }
 

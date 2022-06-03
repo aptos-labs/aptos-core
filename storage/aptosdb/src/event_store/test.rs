@@ -52,33 +52,29 @@ fn test_error_on_get_from_empty() {
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.event_store;
 
-    assert!(store
-        .get_event_with_proof_by_version_and_index(100, 0)
-        .is_err());
+    assert!(store.get_event_by_version_and_index(100, 0).is_err());
 }
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
     #[test]
-    fn test_put_get_verify(events in vec(any::<ContractEvent>().no_shrink(), 1..100)) {
+    fn test_put_get(events in vec(any::<ContractEvent>().no_shrink(), 1..100)) {
         let tmp_dir = TempPath::new();
         let db = AptosDB::new_for_test(&tmp_dir);
         let store = &db.event_store;
 
         let root_hash = save(store, 100, &events);
 
-        // get and verify each and every event with proof
         for (idx, expected_event) in events.iter().enumerate() {
-            let (event, proof) = store
-                .get_event_with_proof_by_version_and_index(100, idx as u64)
+            let event = store
+                .get_event_by_version_and_index(100, idx as u64)
                 .unwrap();
             prop_assert_eq!(&event, expected_event);
-            proof.verify(root_hash, event.hash(), idx as u64).unwrap();
         }
         // error on index >= num_events
         prop_assert!(store
-            .get_event_with_proof_by_version_and_index(100, events.len() as u64)
+            .get_event_by_version_and_index(100, events.len() as u64)
             .is_err());
     }
 
@@ -154,12 +150,7 @@ fn traverse_events_by_key(
 
     event_keys
         .into_iter()
-        .map(|(_seq, ver, idx)| {
-            store
-                .get_event_with_proof_by_version_and_index(ver, idx)
-                .unwrap()
-                .0
-        })
+        .map(|(_seq, ver, idx)| store.get_event_by_version_and_index(ver, idx).unwrap())
         .collect()
 }
 

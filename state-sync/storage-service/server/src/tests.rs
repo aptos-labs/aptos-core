@@ -13,7 +13,7 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     chain_id::ChainId,
-    contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
+    contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
     event::EventKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -1469,25 +1469,9 @@ mock! {
             start: u64,
             order: Order,
             limit: u64,
-        ) -> Result<Vec<(u64, ContractEvent)>>;
-
-        fn get_events_with_proofs(
-            &self,
-            event_key: &EventKey,
-            start: u64,
-            order: Order,
-            limit: u64,
-            known_version: Option<u64>,
-        ) -> Result<Vec<EventWithProof>>;
+        ) -> Result<Vec<EventWithVersion>>;
 
         fn get_block_timestamp(&self, version: u64) -> Result<u64>;
-
-        fn get_event_by_version_with_proof(
-            &self,
-            event_key: &EventKey,
-            event_version: u64,
-            proof_version: u64,
-        ) -> Result<EventByVersionWithProof>;
 
         fn get_last_version_before_timestamp(
             &self,
