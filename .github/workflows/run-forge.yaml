@@ -1,0 +1,82 @@
+name: Run Forge
+
+on:
+  # this is called from within the build-images.yaml workflow since we depend on the images having been built before
+  workflow_call:
+    inputs:
+      GIT_SHA:
+        required: true
+        type: string
+        description:
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_REGION: us-west-2
+  IMAGE_TAG: ${{ inputs.GIT_SHA }}
+
+jobs:
+  forge:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.GIT_SHA }}
+
+      - name: Ensure image exists
+        run: aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG
+      - name: Run Forge
+        shell: bash
+        run: |
+          set +e
+          FGI_REPRO_CMD="./scripts/fgi/run --tag $IMAGE_TAG --suite land_blocking --report forge_report.json"
+          eval $FGI_REPRO_CMD
+          FGI_EXIT_CODE=$?
+          echo "FGI_REPRO_CMD='$FGI_REPRO_CMD'" >> $GITHUB_ENV
+          echo "FGI_EXIT_CODE=$FGI_EXIT_CODE" >> $GITHUB_ENV
+
+      - name: Post Forge test results
+        shell: bash
+        env:
+          PUSH_GATEWAY: ${{ secrets.PUSH_GATEWAY }}
+          PUSH_GATEWAY_USER: ${{ secrets.PUSH_GATEWAY_USER }}
+          PUSH_GATEWAY_PASSWORD: ${{ secrets.PUSH_GATEWAY_PASSWORD }}
+          PR_NUMBER: ${{ github.event.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -x
+
+          # if PR_NUMBER isn't set on the action context (due to the action not being run on a PR)
+          # we infer the originating PR from the commit message.
+          # This is necessary due the way how bors-rs works, which tests the PR commits on a seperate "auto"/"canary" branch instead of on the PR branch directly.
+          # If get rid of bors-rs this might become unnecessary.
+
+          commit_message=$(git log -1 --pretty=%B)
+          PR_NUMBER="${PR_NUMBER:-$(echo "${commit_message}" | grep 'Closes: #' | tail -1 | sed 's/Closes: #//')}" 
+
+          echo "Repro: $FGI_REPRO_CMD"
+
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+          echo "FORGE_REPORT_TXT=$(cat forge_report.json | jq -r .text)" >> $GITHUB_ENV
+
+          # TODO(rustielin): report cluster name
+          echo "forge_job_status {FGI_EXIT_CODE=\"$FGI_EXIT_CODE\"} $GITHUB_RUN_ID" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
+
+      - name: Post result as PR comment
+        uses: thollander/actions-comment-pull-request@v1
+        with:
+          message: |
+            Forge run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Forge test result: `${{ env.FORGE_REPORT_TXT }}`
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          pr_number: ${{ env.PR_NUMBER }}
+
+      - name: Check Forge status
+        shell: bash
+        run: |
+          if [ -n "$FORGE_BLOCKING" ]; then
+            exit $FGI_EXIT_CODE
+          fi

@@ -228,10 +228,10 @@ workflows:
           context: aws-dev
           requires:
             - docker-build-push
-      - forge-k8s-test:
-          context: aws-dev
-          requires:
-            - docker-build-push
+      # - forge-k8s-test:
+      #     context: aws-dev
+      #     requires:
+      #       - docker-build-push
 
 commands:
   dev-setup:

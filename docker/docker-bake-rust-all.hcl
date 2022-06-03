@@ -5,13 +5,13 @@
 variable "BUILD_DATE" {}
 
 variable "GITHUB_SHA" {}
-// this is the full GIT_SHA1 - let's use that as primary identifier going forward
-variable "GIT_SHA1" {
+// this is the full GIT_SHA - let's use that as primary identifier going forward
+variable "GIT_SHA" {
   default = "${GITHUB_SHA}"
 }
-// this is the short GIT_SHA1 (8 chars). Tagging our docker images with that one is kinda deprecated and we might remove this in future.
+// this is the short GIT_SHA (8 chars). Tagging our docker images with that one is kinda deprecated and we might remove this in future.
 variable "GIT_REV" {
-  default = substr("${GIT_SHA1}", 0, 8)
+  default = substr("${GIT_SHA}", 0, 8)
 }
 
 variable "GIT_BRANCH" {}
@@ -138,6 +138,7 @@ function "generate_cache_from" {
   params = [target]
   result = [
     "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-main",
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-auto",
     "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${GIT_BRANCH}"
   ]
 }
@@ -150,7 +151,7 @@ function "generate_cache_to" {
 function "generate_tags" {
   params = [target]
   result = [
-    "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${GIT_SHA1}",
-    "${ecr_base}/${target}:${GIT_SHA1}", // only tag with full GIT_SHA1 unless it turns out we really need any of the other variations
+    "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${GIT_SHA}",
+    "${ecr_base}/${target}:${GIT_SHA}", // only tag with full GIT_SHA unless it turns out we really need any of the other variations
   ]
 }

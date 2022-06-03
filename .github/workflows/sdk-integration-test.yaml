@@ -2,6 +2,11 @@ name: "SDK Integration Test"
 on:
   # this is called from within the build-images.yaml workflow since we depend on the images having been built before
   workflow_call:
+    inputs:
+      GIT_SHA:
+        required: true
+        type: string
+        description:
 
 jobs:
   test:
@@ -11,6 +16,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.GIT_SHA }}
 
       - uses: ./.github/actions/gar-auth
         with:
@@ -24,7 +31,7 @@ jobs:
       - run: docker-compose up --detach
         working-directory: docker/compose/validator-testnet
         env:
-          IMAGE_TAG: ${{ github.sha }}
+          IMAGE_TAG: ${{ inputs.GIT_SHA }}
           VALIDATOR_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/validator
           FAUCET_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/faucet
 

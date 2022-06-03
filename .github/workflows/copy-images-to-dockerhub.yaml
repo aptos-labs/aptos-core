@@ -4,6 +4,7 @@ on:
       image_tag_prefix:
         required: true
         type: string
+        description: a prefix to use for image tags. E.g. `devnet`. It results in an image tag like `:devnet_<git_sha>`
 
 permissions:
   contents: read
