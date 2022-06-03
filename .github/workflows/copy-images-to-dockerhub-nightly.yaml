@@ -1,3 +1,4 @@
+name: Copy images to dockerhub nightly
 on:
   schedule:
     # mon-fri at 9am PST (16:00 UTC).

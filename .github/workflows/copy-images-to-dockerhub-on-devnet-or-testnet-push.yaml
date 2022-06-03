@@ -1,3 +1,4 @@
+name: Copy images to dockerhub devnet/testnet
 on:
   push:
     branches:

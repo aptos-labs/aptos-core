@@ -24,7 +24,7 @@ permissions:
   id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
 
 jobs:
-  RustImages:
+  rust-images:
     # trigger only for push events (on protected branches as defined above) OR on PR events with the "CICD:build-images" label.
     if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'CICD:build-images') }}
     strategy:
@@ -35,21 +35,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - id: auth
-        name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v0"
+      - uses: ./.github/actions/gar-auth
         with:
-          create_credentials_file: false
-          token_format: "access_token"
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-
-      - name: Login to Google Artifact Registry
-        uses: docker/login-action@v2
-        with:
-          registry: us-west1-docker.pkg.dev
-          username: oauth2accesstoken
-          password: ${{ steps.auth.outputs.access_token }}
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
 
       - name: Login to ECR
         uses: docker/login-action@v2
@@ -58,41 +47,29 @@ jobs:
           username: ${{ secrets.AWS_ACCESS_KEY_ID }}
           password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: setup docker context for buildx
-        id: buildx-context
-        run: docker context create builders
-
-      - name: setup docker buildx
-        uses: docker/setup-buildx-action@v1
-        with:
-          endpoint: builders
+      - uses: ./.github/actions/docker-buildx-setup
 
       - name: Build and Push Rust images
         run: docker/docker-bake-rust-all.sh
         env:
           IMAGE_TARGET: ${{ matrix.IMAGE_TARGET }}
+          GIT_BRANCH: ${{ github.head_ref }}
 
-  CommunityPlatform:
+  sdk-integration-test:
+    needs: rust-images
+    uses: ./.github/workflows/sdk-integration-test.yaml
+    secrets: inherit
+
+  community-platform:
     if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'CICD:build-images') }}
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
 
-      - id: auth
-        name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v0"
+      - uses: ./.github/actions/gar-auth
         with:
-          create_credentials_file: false
-          token_format: "access_token"
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-
-      - name: Login to Google Artifact Registry
-        uses: docker/login-action@v2
-        with:
-          registry: us-west1-docker.pkg.dev
-          username: oauth2accesstoken
-          password: ${{ steps.auth.outputs.access_token }}
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
 
       - name: Login to ECR
         uses: docker/login-action@v2
@@ -101,14 +78,7 @@ jobs:
           username: ${{ secrets.AWS_ACCESS_KEY_ID }}
           password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: setup docker context for buildx
-        id: buildx-context
-        run: docker context create builders
-
-      - name: setup docker buildx
-        uses: docker/setup-buildx-action@v1
-        with:
-          endpoint: builders
+      - uses: ./.github/actions/docker-buildx-setup
 
       - name: Build and Push Community Platform image
         run: |

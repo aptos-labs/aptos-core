@@ -23,6 +23,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
     #[test]
+    #[ignore] // ignore due to flakiness - TODO: @sitalkedia to fix it
     fn test_txn_store_pruner(txns in vec(
         prop_oneof![
             any::<BlockMetadata>().prop_map(Transaction::BlockMetadata),
