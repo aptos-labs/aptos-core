@@ -148,11 +148,17 @@ mod tests {
     use serde::Serialize;
     use std::{
         collections::HashMap,
-        convert::{TryFrom, TryInto},
+        convert::{Infallible, TryFrom, TryInto},
         sync::{Arc, Mutex},
     };
     use tokio::task::yield_now;
-    use warp::{Filter, Rejection, Reply};
+    use warp::{
+        body::BodyDeserializeError,
+        cors::CorsForbidden,
+        http::{header, HeaderValue, StatusCode},
+        reject::{LengthRequired, MethodNotAllowed, PayloadTooLarge, UnsupportedMediaType},
+        reply, Filter, Rejection, Reply,
+    };
 
     type AccountStates = Arc<RwLock<HashMap<AccountAddress, AccountState>>>;
     #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -201,7 +207,14 @@ mod tests {
                 .and(warp::post())
                 .and(warp::body::bytes())
                 .and(warp::any().map(move || (accounts_cloned_1.clone(), last_txn.clone())))
-                .and_then(handle_submit_transaction));
+                .and_then(handle_submit_transaction))
+            .with(
+                warp::cors()
+                    .allow_any_origin()
+                    .allow_methods(vec!["POST", "GET"])
+                    .allow_headers(vec![header::CONTENT_TYPE]),
+            )
+            .recover(handle_rejection);
         let (address, future) = warp::serve(stub).bind_ephemeral(([127, 0, 0, 1], 0));
         tokio::task::spawn(async move { future.await });
 
@@ -332,6 +345,63 @@ mod tests {
                 events: Vec::new(),
             }),
         })
+    }
+
+    #[derive(Clone, Debug, Serialize, PartialEq)]
+    pub struct Error {
+        pub code: u16,
+        pub message: String,
+    }
+
+    impl Error {
+        fn new(code: StatusCode, message: String) -> Error {
+            Error {
+                code: code.as_u16(),
+                message,
+            }
+        }
+
+        fn status_code(&self) -> StatusCode {
+            StatusCode::from_u16(self.code).unwrap()
+        }
+    }
+
+    async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
+        let code;
+        let body;
+
+        if err.is_not_found() {
+            code = StatusCode::NOT_FOUND;
+            body = reply::json(&Error::new(code, "Not Found".to_owned()));
+        } else if let Some(error) = err.find::<Error>() {
+            code = error.status_code();
+            body = reply::json(error);
+        } else if let Some(cause) = err.find::<CorsForbidden>() {
+            code = StatusCode::FORBIDDEN;
+            body = reply::json(&Error::new(code, cause.to_string()));
+        } else if let Some(cause) = err.find::<BodyDeserializeError>() {
+            code = StatusCode::BAD_REQUEST;
+            body = reply::json(&Error::new(code, cause.to_string()));
+        } else if let Some(cause) = err.find::<LengthRequired>() {
+            code = StatusCode::LENGTH_REQUIRED;
+            body = reply::json(&Error::new(code, cause.to_string()));
+        } else if let Some(cause) = err.find::<PayloadTooLarge>() {
+            code = StatusCode::PAYLOAD_TOO_LARGE;
+            body = reply::json(&Error::new(code, cause.to_string()));
+        } else if let Some(cause) = err.find::<UnsupportedMediaType>() {
+            code = StatusCode::UNSUPPORTED_MEDIA_TYPE;
+            body = reply::json(&Error::new(code, cause.to_string()));
+        } else if let Some(cause) = err.find::<MethodNotAllowed>() {
+            code = StatusCode::METHOD_NOT_ALLOWED;
+            body = reply::json(&Error::new(code, cause.to_string()));
+        } else {
+            code = StatusCode::INTERNAL_SERVER_ERROR;
+            body = reply::json(&Error::new(code, format!("unexpected error: {:?}", err)));
+        }
+        let mut rep = reply::with_status(body, code).into_response();
+        rep.headers_mut()
+            .insert("access-control-allow-origin", HeaderValue::from_static("*"));
+        Ok(rep)
     }
 
     #[tokio::test]
