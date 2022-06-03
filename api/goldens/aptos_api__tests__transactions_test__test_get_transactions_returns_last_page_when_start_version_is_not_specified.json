@@ -176,7 +176,7 @@
         }
       }
     ],
-    "timestamp": "1"
+    "timestamp": "12"
   },
   {
     "type": "state_checkpoint_transaction",
@@ -189,7 +189,7 @@
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
     "changes": [],
-    "timestamp": "1"
+    "timestamp": "12"
   },
   {
     "type": "block_metadata_transaction",
