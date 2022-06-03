@@ -10,8 +10,8 @@ import {
   RawTransaction,
   ScriptFunction,
   StructTag,
-  TransactionPayloadVariantScriptFunction,
-  TypeTagVariantstruct,
+  TransactionPayloadScriptFunction,
+  TypeTagStruct,
   AccountAddress,
 } from './transaction_builder/aptos_types';
 import { bcsSerializeUint64, bcsToBytes } from './transaction_builder/bcs';
@@ -111,9 +111,9 @@ test(
     accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
     expect((accountResource.data as any).coin.value).toBe('0');
 
-    const token = new TypeTagVariantstruct(StructTag.fromString('0x1::TestCoin::TestCoin'));
+    const token = new TypeTagStruct(StructTag.fromString('0x1::TestCoin::TestCoin'));
 
-    const scriptFunctionPayload = new TransactionPayloadVariantScriptFunction(
+    const scriptFunctionPayload = new TransactionPayloadScriptFunction(
       ScriptFunction.natual(
         '0x1::Coin',
         'transfer',

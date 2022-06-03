@@ -11,88 +11,88 @@ export abstract class TypeTag {
     const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
       case 0:
-        return TypeTagVariantbool.load(deserializer);
+        return TypeTagBool.load(deserializer);
       case 1:
-        return TypeTagVariantu8.load(deserializer);
+        return TypeTagU8.load(deserializer);
       case 2:
-        return TypeTagVariantu64.load(deserializer);
+        return TypeTagU64.load(deserializer);
       case 3:
-        return TypeTagVariantu128.load(deserializer);
+        return TypeTagU128.load(deserializer);
       case 4:
-        return TypeTagVariantaddress.load(deserializer);
+        return TypeTagAddress.load(deserializer);
       case 5:
-        return TypeTagVariantsigner.load(deserializer);
+        return TypeTagSigner.load(deserializer);
       case 6:
-        return TypeTagVariantvector.load(deserializer);
+        return TypeTagVector.load(deserializer);
       case 7:
-        return TypeTagVariantstruct.load(deserializer);
+        return TypeTagStruct.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TypeTag: ${index}`);
     }
   }
 }
 
-export class TypeTagVariantbool extends TypeTag {
+export class TypeTagBool extends TypeTag {
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(0);
   }
 
-  static load(deserializer: Deserializer): TypeTagVariantbool {
-    return new TypeTagVariantbool();
+  static load(deserializer: Deserializer): TypeTagBool {
+    return new TypeTagBool();
   }
 }
 
-export class TypeTagVariantu8 extends TypeTag {
+export class TypeTagU8 extends TypeTag {
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(1);
   }
 
-  static load(_deserializer: Deserializer): TypeTagVariantu8 {
-    return new TypeTagVariantu8();
+  static load(_deserializer: Deserializer): TypeTagU8 {
+    return new TypeTagU8();
   }
 }
 
-export class TypeTagVariantu64 extends TypeTag {
+export class TypeTagU64 extends TypeTag {
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(2);
   }
 
-  static load(_deserializer: Deserializer): TypeTagVariantu64 {
-    return new TypeTagVariantu64();
+  static load(_deserializer: Deserializer): TypeTagU64 {
+    return new TypeTagU64();
   }
 }
 
-export class TypeTagVariantu128 extends TypeTag {
+export class TypeTagU128 extends TypeTag {
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(3);
   }
 
-  static load(_deserializer: Deserializer): TypeTagVariantu128 {
-    return new TypeTagVariantu128();
+  static load(_deserializer: Deserializer): TypeTagU128 {
+    return new TypeTagU128();
   }
 }
 
-export class TypeTagVariantaddress extends TypeTag {
+export class TypeTagAddress extends TypeTag {
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(4);
   }
 
-  static load(_deserializer: Deserializer): TypeTagVariantaddress {
-    return new TypeTagVariantaddress();
+  static load(_deserializer: Deserializer): TypeTagAddress {
+    return new TypeTagAddress();
   }
 }
 
-export class TypeTagVariantsigner extends TypeTag {
+export class TypeTagSigner extends TypeTag {
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(5);
   }
 
-  static load(_deserializer: Deserializer): TypeTagVariantsigner {
-    return new TypeTagVariantsigner();
+  static load(_deserializer: Deserializer): TypeTagSigner {
+    return new TypeTagSigner();
   }
 }
 
-export class TypeTagVariantvector extends TypeTag {
+export class TypeTagVector extends TypeTag {
   constructor(public readonly value: TypeTag) {
     super();
   }
@@ -102,13 +102,13 @@ export class TypeTagVariantvector extends TypeTag {
     this.value.serialize(serializer);
   }
 
-  static load(deserializer: Deserializer): TypeTagVariantvector {
+  static load(deserializer: Deserializer): TypeTagVector {
     const value = TypeTag.deserialize(deserializer);
-    return new TypeTagVariantvector(value);
+    return new TypeTagVector(value);
   }
 }
 
-export class TypeTagVariantstruct extends TypeTag {
+export class TypeTagStruct extends TypeTag {
   constructor(public readonly value: StructTag) {
     super();
   }
@@ -118,9 +118,9 @@ export class TypeTagVariantstruct extends TypeTag {
     this.value.serialize(serializer);
   }
 
-  static load(deserializer: Deserializer): TypeTagVariantstruct {
+  static load(deserializer: Deserializer): TypeTagStruct {
     const value = StructTag.deserialize(deserializer);
-    return new TypeTagVariantstruct(value);
+    return new TypeTagStruct(value);
   }
 }
 

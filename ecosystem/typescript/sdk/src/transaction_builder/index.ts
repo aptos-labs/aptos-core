@@ -5,7 +5,7 @@ import {
   Ed25519Signature,
   RawTransaction,
   SignedTransaction,
-  TransactionAuthenticatorVariantEd25519,
+  TransactionAuthenticatorEd25519,
 } from './aptos_types';
 import { bcsToBytes, Bytes } from './bcs';
 
@@ -45,7 +45,7 @@ class TransactionBuilder<F extends SigningFn> {
 
     const signature = new Ed25519Signature(signatureRaw);
 
-    const authenticator = new TransactionAuthenticatorVariantEd25519(new Ed25519PublicKey(this.publicKey), signature);
+    const authenticator = new TransactionAuthenticatorEd25519(new Ed25519PublicKey(this.publicKey), signature);
 
     return new SignedTransaction(rawTxn, authenticator);
   }

@@ -313,30 +313,30 @@ export abstract class TransactionPayload {
     const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
       case 0:
-        return TransactionPayloadVariantWriteSet.load(deserializer);
+        return TransactionPayloadWriteSet.load(deserializer);
       case 1:
-        return TransactionPayloadVariantScript.load(deserializer);
+        return TransactionPayloadScript.load(deserializer);
       case 2:
-        return TransactionPayloadVariantModuleBundle.load(deserializer);
+        return TransactionPayloadModuleBundle.load(deserializer);
       case 3:
-        return TransactionPayloadVariantScriptFunction.load(deserializer);
+        return TransactionPayloadScriptFunction.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionPayload: ${index}`);
     }
   }
 }
 
-export class TransactionPayloadVariantWriteSet extends TransactionPayload {
+export class TransactionPayloadWriteSet extends TransactionPayload {
   serialize(serializer: Serializer): void {
     throw new Error('Not implemented');
   }
 
-  static load(deserializer: Deserializer): TransactionPayloadVariantWriteSet {
+  static load(deserializer: Deserializer): TransactionPayloadWriteSet {
     throw new Error('Not implemented');
   }
 }
 
-export class TransactionPayloadVariantScript extends TransactionPayload {
+export class TransactionPayloadScript extends TransactionPayload {
   constructor(public readonly value: Script) {
     super();
   }
@@ -346,13 +346,13 @@ export class TransactionPayloadVariantScript extends TransactionPayload {
     this.value.serialize(serializer);
   }
 
-  static load(deserializer: Deserializer): TransactionPayloadVariantScript {
+  static load(deserializer: Deserializer): TransactionPayloadScript {
     const value = Script.deserialize(deserializer);
-    return new TransactionPayloadVariantScript(value);
+    return new TransactionPayloadScript(value);
   }
 }
 
-export class TransactionPayloadVariantModuleBundle extends TransactionPayload {
+export class TransactionPayloadModuleBundle extends TransactionPayload {
   constructor(public readonly value: ModuleBundle) {
     super();
   }
@@ -362,13 +362,13 @@ export class TransactionPayloadVariantModuleBundle extends TransactionPayload {
     this.value.serialize(serializer);
   }
 
-  static load(deserializer: Deserializer): TransactionPayloadVariantModuleBundle {
+  static load(deserializer: Deserializer): TransactionPayloadModuleBundle {
     const value = ModuleBundle.deserialize(deserializer);
-    return new TransactionPayloadVariantModuleBundle(value);
+    return new TransactionPayloadModuleBundle(value);
   }
 }
 
-export class TransactionPayloadVariantScriptFunction extends TransactionPayload {
+export class TransactionPayloadScriptFunction extends TransactionPayload {
   constructor(public readonly value: ScriptFunction) {
     super();
   }
@@ -378,9 +378,9 @@ export class TransactionPayloadVariantScriptFunction extends TransactionPayload 
     this.value.serialize(serializer);
   }
 
-  static load(deserializer: Deserializer): TransactionPayloadVariantScriptFunction {
+  static load(deserializer: Deserializer): TransactionPayloadScriptFunction {
     const value = ScriptFunction.deserialize(deserializer);
-    return new TransactionPayloadVariantScriptFunction(value);
+    return new TransactionPayloadScriptFunction(value);
   }
 }
 
@@ -404,24 +404,24 @@ export abstract class TransactionArgument {
     const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
       case 0:
-        return TransactionArgumentVariantU8.load(deserializer);
+        return TransactionArgumentU8.load(deserializer);
       case 1:
-        return TransactionArgumentVariantU64.load(deserializer);
+        return TransactionArgumentU64.load(deserializer);
       case 2:
-        return TransactionArgumentVariantU128.load(deserializer);
+        return TransactionArgumentU128.load(deserializer);
       case 3:
-        return TransactionArgumentVariantAddress.load(deserializer);
+        return TransactionArgumentAddress.load(deserializer);
       case 4:
-        return TransactionArgumentVariantU8Vector.load(deserializer);
+        return TransactionArgumentU8Vector.load(deserializer);
       case 5:
-        return TransactionArgumentVariantBool.load(deserializer);
+        return TransactionArgumentBool.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionArgument: ${index}`);
     }
   }
 }
 
-export class TransactionArgumentVariantU8 extends TransactionArgument {
+export class TransactionArgumentU8 extends TransactionArgument {
   constructor(public readonly value: Uint8) {
     super();
   }
@@ -431,13 +431,13 @@ export class TransactionArgumentVariantU8 extends TransactionArgument {
     serializer.serializeU8(this.value);
   }
 
-  static load(deserializer: Deserializer): TransactionArgumentVariantU8 {
+  static load(deserializer: Deserializer): TransactionArgumentU8 {
     const value = deserializer.deserializeU8();
-    return new TransactionArgumentVariantU8(value);
+    return new TransactionArgumentU8(value);
   }
 }
 
-export class TransactionArgumentVariantU64 extends TransactionArgument {
+export class TransactionArgumentU64 extends TransactionArgument {
   constructor(public readonly value: Uint64) {
     super();
   }
@@ -447,13 +447,13 @@ export class TransactionArgumentVariantU64 extends TransactionArgument {
     serializer.serializeU64(this.value);
   }
 
-  static load(deserializer: Deserializer): TransactionArgumentVariantU64 {
+  static load(deserializer: Deserializer): TransactionArgumentU64 {
     const value = deserializer.deserializeU64();
-    return new TransactionArgumentVariantU64(value);
+    return new TransactionArgumentU64(value);
   }
 }
 
-export class TransactionArgumentVariantU128 extends TransactionArgument {
+export class TransactionArgumentU128 extends TransactionArgument {
   constructor(public readonly value: Uint128) {
     super();
   }
@@ -463,13 +463,13 @@ export class TransactionArgumentVariantU128 extends TransactionArgument {
     serializer.serializeU128(this.value);
   }
 
-  static load(deserializer: Deserializer): TransactionArgumentVariantU128 {
+  static load(deserializer: Deserializer): TransactionArgumentU128 {
     const value = deserializer.deserializeU128();
-    return new TransactionArgumentVariantU128(value);
+    return new TransactionArgumentU128(value);
   }
 }
 
-export class TransactionArgumentVariantAddress extends TransactionArgument {
+export class TransactionArgumentAddress extends TransactionArgument {
   constructor(public readonly value: AccountAddress) {
     super();
   }
@@ -479,13 +479,13 @@ export class TransactionArgumentVariantAddress extends TransactionArgument {
     this.value.serialize(serializer);
   }
 
-  static load(deserializer: Deserializer): TransactionArgumentVariantAddress {
+  static load(deserializer: Deserializer): TransactionArgumentAddress {
     const value = AccountAddress.deserialize(deserializer);
-    return new TransactionArgumentVariantAddress(value);
+    return new TransactionArgumentAddress(value);
   }
 }
 
-export class TransactionArgumentVariantU8Vector extends TransactionArgument {
+export class TransactionArgumentU8Vector extends TransactionArgument {
   constructor(public readonly value: Bytes) {
     super();
   }
@@ -495,13 +495,13 @@ export class TransactionArgumentVariantU8Vector extends TransactionArgument {
     serializer.serializeBytes(this.value);
   }
 
-  static load(deserializer: Deserializer): TransactionArgumentVariantU8Vector {
+  static load(deserializer: Deserializer): TransactionArgumentU8Vector {
     const value = deserializer.deserializeBytes();
-    return new TransactionArgumentVariantU8Vector(value);
+    return new TransactionArgumentU8Vector(value);
   }
 }
 
-export class TransactionArgumentVariantBool extends TransactionArgument {
+export class TransactionArgumentBool extends TransactionArgument {
   constructor(public readonly value: boolean) {
     super();
   }
@@ -511,8 +511,8 @@ export class TransactionArgumentVariantBool extends TransactionArgument {
     serializer.serializeBool(this.value);
   }
 
-  static load(deserializer: Deserializer): TransactionArgumentVariantBool {
+  static load(deserializer: Deserializer): TransactionArgumentBool {
     const value = deserializer.deserializeBool();
-    return new TransactionArgumentVariantBool(value);
+    return new TransactionArgumentBool(value);
   }
 }

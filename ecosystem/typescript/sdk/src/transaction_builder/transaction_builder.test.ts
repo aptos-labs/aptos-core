@@ -13,19 +13,19 @@ import {
   Script,
   ScriptFunction,
   StructTag,
-  TransactionArgumentVariantAddress,
-  TransactionArgumentVariantU8,
-  TransactionArgumentVariantU8Vector,
-  TransactionPayloadVariantModuleBundle,
-  TransactionPayloadVariantScript,
-  TransactionPayloadVariantScriptFunction,
-  TypeTagVariantstruct,
+  TransactionArgumentAddress,
+  TransactionArgumentU8,
+  TransactionArgumentU8Vector,
+  TransactionPayloadModuleBundle,
+  TransactionPayloadScript,
+  TransactionPayloadScriptFunction,
+  TypeTagStruct,
 } from './aptos_types';
 
-const ADDRESS1 = '0x1222';
-const ADDRESS2 = '0xdd';
-const ADDRESS3 = '0x0a550c18';
-const ADDRESS4 = '0x01';
+const ADDRESS_1 = '0x1222';
+const ADDRESS_2 = '0xdd';
+const ADDRESS_3 = '0x0a550c18';
+const ADDRESS_4 = '0x01';
 const PRIVATE_KEY = '9bf49a6a0755f953811fce125f2683d50429c3bb49e074147e0089a52eae155f';
 const TXN_EXPIRE = '18446744073709551615';
 
@@ -51,17 +51,17 @@ function sign(rawTxn: RawTransaction): Bytes {
 }
 
 test('serialize script function payload with no type args', () => {
-  const scriptFunctionPayload = new TransactionPayloadVariantScriptFunction(
+  const scriptFunctionPayload = new TransactionPayloadScriptFunction(
     ScriptFunction.natual(
-      `${ADDRESS1}::TestCoin`,
+      `${ADDRESS_1}::TestCoin`,
       'transfer',
       [],
-      [bcsToBytes(AccountAddress.fromHex(ADDRESS2)), bcsSerializeUint64(1)],
+      [bcsToBytes(AccountAddress.fromHex(ADDRESS_2)), bcsSerializeUint64(1)],
     ),
   );
 
   const rawTxn = new RawTransaction(
-    AccountAddress.fromHex(new HexString(ADDRESS3)),
+    AccountAddress.fromHex(new HexString(ADDRESS_3)),
     0n,
     scriptFunctionPayload,
     2000n,
@@ -78,19 +78,19 @@ test('serialize script function payload with no type args', () => {
 });
 
 test('serialize script function payload with type args', () => {
-  const token = new TypeTagVariantstruct(StructTag.fromString(`${ADDRESS4}::TestCoin::TestCoin`));
+  const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::TestCoin::TestCoin`));
 
-  const scriptFunctionPayload = new TransactionPayloadVariantScriptFunction(
+  const scriptFunctionPayload = new TransactionPayloadScriptFunction(
     ScriptFunction.natual(
-      `${ADDRESS1}::Coin`,
+      `${ADDRESS_1}::Coin`,
       'transfer',
       [token],
-      [bcsToBytes(AccountAddress.fromHex(ADDRESS2)), bcsSerializeUint64(1)],
+      [bcsToBytes(AccountAddress.fromHex(ADDRESS_2)), bcsSerializeUint64(1)],
     ),
   );
 
   const rawTxn = new RawTransaction(
-    AccountAddress.fromHex(ADDRESS3),
+    AccountAddress.fromHex(ADDRESS_3),
     0n,
     scriptFunctionPayload,
     2000n,
@@ -107,14 +107,14 @@ test('serialize script function payload with type args', () => {
 });
 
 test('serialize script function payload with type args but no function args', () => {
-  const token = new TypeTagVariantstruct(StructTag.fromString(`${ADDRESS4}::TestCoin::TestCoin`));
+  const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::TestCoin::TestCoin`));
 
-  const scriptFunctionPayload = new TransactionPayloadVariantScriptFunction(
-    ScriptFunction.natual(`${ADDRESS1}::Coin`, 'fake_func', [token], []),
+  const scriptFunctionPayload = new TransactionPayloadScriptFunction(
+    ScriptFunction.natual(`${ADDRESS_1}::Coin`, 'fake_func', [token], []),
   );
 
   const rawTxn = new RawTransaction(
-    AccountAddress.fromHex(ADDRESS3),
+    AccountAddress.fromHex(ADDRESS_3),
     0n,
     scriptFunctionPayload,
     2000n,
@@ -133,10 +133,10 @@ test('serialize script function payload with type args but no function args', ()
 test('serialize script payload with no type args and no function args', () => {
   const script = hexToBytes('a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102');
 
-  const scriptPayload = new TransactionPayloadVariantScript(new Script(script, [], []));
+  const scriptPayload = new TransactionPayloadScript(new Script(script, [], []));
 
   const rawTxn = new RawTransaction(
-    AccountAddress.fromHex(ADDRESS3),
+    AccountAddress.fromHex(ADDRESS_3),
     0n,
     scriptPayload,
     2000n,
@@ -153,14 +153,14 @@ test('serialize script payload with no type args and no function args', () => {
 });
 
 test('serialize script payload with type args but no function args', () => {
-  const token = new TypeTagVariantstruct(StructTag.fromString(`${ADDRESS4}::TestCoin::TestCoin`));
+  const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::TestCoin::TestCoin`));
 
   const script = hexToBytes('a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102');
 
-  const scriptPayload = new TransactionPayloadVariantScript(new Script(script, [token], []));
+  const scriptPayload = new TransactionPayloadScript(new Script(script, [token], []));
 
   const rawTxn = new RawTransaction(
-    AccountAddress.fromHex(ADDRESS3),
+    AccountAddress.fromHex(ADDRESS_3),
     0n,
     scriptPayload,
     2000n,
@@ -177,15 +177,15 @@ test('serialize script payload with type args but no function args', () => {
 });
 
 test('serialize script payload with one type arg and one function arg', () => {
-  const token = new TypeTagVariantstruct(StructTag.fromString(`${ADDRESS4}::TestCoin::TestCoin`));
+  const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::TestCoin::TestCoin`));
 
-  const argU8 = new TransactionArgumentVariantU8(2);
+  const argU8 = new TransactionArgumentU8(2);
 
   const script = hexToBytes('a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102');
 
-  const scriptPayload = new TransactionPayloadVariantScript(new Script(script, [token], [argU8]));
+  const scriptPayload = new TransactionPayloadScript(new Script(script, [token], [argU8]));
   const rawTxn = new RawTransaction(
-    AccountAddress.fromHex(ADDRESS3),
+    AccountAddress.fromHex(ADDRESS_3),
     0n,
     scriptPayload,
     2000n,
@@ -202,17 +202,17 @@ test('serialize script payload with one type arg and one function arg', () => {
 });
 
 test('serialize script payload with one type arg and two function args', () => {
-  const token = new TypeTagVariantstruct(StructTag.fromString(`${ADDRESS4}::TestCoin::TestCoin`));
+  const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::TestCoin::TestCoin`));
 
-  const argU8Vec = new TransactionArgumentVariantU8Vector(bcsSerializeUint64(1));
-  const argAddress = new TransactionArgumentVariantAddress(AccountAddress.fromHex('0x01'));
+  const argU8Vec = new TransactionArgumentU8Vector(bcsSerializeUint64(1));
+  const argAddress = new TransactionArgumentAddress(AccountAddress.fromHex('0x01'));
 
   const script = hexToBytes('a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102');
 
-  const scriptPayload = new TransactionPayloadVariantScript(new Script(script, [token], [argU8Vec, argAddress]));
+  const scriptPayload = new TransactionPayloadScript(new Script(script, [token], [argU8Vec, argAddress]));
 
   const rawTxn = new RawTransaction(
-    AccountAddress.fromHex(ADDRESS3),
+    AccountAddress.fromHex(ADDRESS_3),
     0n,
     scriptPayload,
     2000n,
@@ -233,10 +233,10 @@ test('serialize module payload', () => {
     'a11ceb0b0300000006010002030205050703070a0c0816100c260900000001000100000102084d794d6f64756c650269640000000000000000000000000b1e55ed00010000000231010200',
   );
 
-  const modulePayload = new TransactionPayloadVariantModuleBundle(new ModuleBundle([new Module(module)]));
+  const modulePayload = new TransactionPayloadModuleBundle(new ModuleBundle([new Module(module)]));
 
   const rawTxn = new RawTransaction(
-    AccountAddress.fromHex(ADDRESS3),
+    AccountAddress.fromHex(ADDRESS_3),
     0n,
     modulePayload,
     2000n,

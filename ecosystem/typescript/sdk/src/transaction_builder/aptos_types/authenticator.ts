@@ -10,18 +10,18 @@ export abstract class TransactionAuthenticator {
     const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
       case 0:
-        return TransactionAuthenticatorVariantEd25519.load(deserializer);
+        return TransactionAuthenticatorEd25519.load(deserializer);
       case 1:
-        return TransactionAuthenticatorVariantMultiEd25519.load(deserializer);
+        return TransactionAuthenticatorMultiEd25519.load(deserializer);
       case 2:
-        return TransactionAuthenticatorVariantMultiAgent.load(deserializer);
+        return TransactionAuthenticatorMultiAgent.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionAuthenticator: ${index}`);
     }
   }
 }
 
-export class TransactionAuthenticatorVariantEd25519 extends TransactionAuthenticator {
+export class TransactionAuthenticatorEd25519 extends TransactionAuthenticator {
   /**
    * An authenticator for single signature.
    *
@@ -40,14 +40,14 @@ export class TransactionAuthenticatorVariantEd25519 extends TransactionAuthentic
     this.signature.serialize(serializer);
   }
 
-  static load(deserializer: Deserializer): TransactionAuthenticatorVariantEd25519 {
+  static load(deserializer: Deserializer): TransactionAuthenticatorEd25519 {
     const public_key = Ed25519PublicKey.deserialize(deserializer);
     const signature = Ed25519Signature.deserialize(deserializer);
-    return new TransactionAuthenticatorVariantEd25519(public_key, signature);
+    return new TransactionAuthenticatorEd25519(public_key, signature);
   }
 }
 
-export class TransactionAuthenticatorVariantMultiEd25519 extends TransactionAuthenticator {
+export class TransactionAuthenticatorMultiEd25519 extends TransactionAuthenticator {
   /**
    * An authenticator for multiple signatures.
    *
@@ -90,14 +90,14 @@ export class TransactionAuthenticatorVariantMultiEd25519 extends TransactionAuth
     this.signature.serialize(serializer);
   }
 
-  static load(deserializer: Deserializer): TransactionAuthenticatorVariantMultiEd25519 {
+  static load(deserializer: Deserializer): TransactionAuthenticatorMultiEd25519 {
     const public_key = MultiEd25519PublicKey.deserialize(deserializer);
     const signature = MultiEd25519Signature.deserialize(deserializer);
-    return new TransactionAuthenticatorVariantMultiEd25519(public_key, signature);
+    return new TransactionAuthenticatorMultiEd25519(public_key, signature);
   }
 }
 
-export class TransactionAuthenticatorVariantMultiAgent extends TransactionAuthenticator {
+export class TransactionAuthenticatorMultiAgent extends TransactionAuthenticator {
   constructor(
     public readonly sender: AccountAuthenticator,
     public readonly secondary_signer_addresses: Seq<AccountAddress>,
@@ -113,11 +113,11 @@ export class TransactionAuthenticatorVariantMultiAgent extends TransactionAuthen
     serializeVector<AccountAuthenticator>(this.secondary_signers, serializer);
   }
 
-  static load(deserializer: Deserializer): TransactionAuthenticatorVariantMultiAgent {
+  static load(deserializer: Deserializer): TransactionAuthenticatorMultiAgent {
     const sender = AccountAuthenticator.deserialize(deserializer);
     const secondary_signer_addresses = deserializeVector(deserializer, AccountAddress);
     const secondary_signers = deserializeVector(deserializer, AccountAuthenticator);
-    return new TransactionAuthenticatorVariantMultiAgent(sender, secondary_signer_addresses, secondary_signers);
+    return new TransactionAuthenticatorMultiAgent(sender, secondary_signer_addresses, secondary_signers);
   }
 }
 
@@ -128,16 +128,16 @@ export abstract class AccountAuthenticator {
     const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
       case 0:
-        return AccountAuthenticatorVariantEd25519.load(deserializer);
+        return AccountAuthenticatorEd25519.load(deserializer);
       case 1:
-        return AccountAuthenticatorVariantMultiEd25519.load(deserializer);
+        return AccountAuthenticatorMultiEd25519.load(deserializer);
       default:
         throw new Error(`Unknown variant index for AccountAuthenticator: ${index}`);
     }
   }
 }
 
-export class AccountAuthenticatorVariantEd25519 extends AccountAuthenticator {
+export class AccountAuthenticatorEd25519 extends AccountAuthenticator {
   constructor(public readonly public_key: Ed25519PublicKey, public readonly signature: Ed25519Signature) {
     super();
   }
@@ -148,14 +148,14 @@ export class AccountAuthenticatorVariantEd25519 extends AccountAuthenticator {
     this.signature.serialize(serializer);
   }
 
-  static load(deserializer: Deserializer): AccountAuthenticatorVariantEd25519 {
+  static load(deserializer: Deserializer): AccountAuthenticatorEd25519 {
     const public_key = Ed25519PublicKey.deserialize(deserializer);
     const signature = Ed25519Signature.deserialize(deserializer);
-    return new AccountAuthenticatorVariantEd25519(public_key, signature);
+    return new AccountAuthenticatorEd25519(public_key, signature);
   }
 }
 
-export class AccountAuthenticatorVariantMultiEd25519 extends AccountAuthenticator {
+export class AccountAuthenticatorMultiEd25519 extends AccountAuthenticator {
   constructor(public readonly public_key: MultiEd25519PublicKey, public readonly signature: MultiEd25519Signature) {
     super();
   }
@@ -166,10 +166,10 @@ export class AccountAuthenticatorVariantMultiEd25519 extends AccountAuthenticato
     this.signature.serialize(serializer);
   }
 
-  static load(deserializer: Deserializer): AccountAuthenticatorVariantMultiEd25519 {
+  static load(deserializer: Deserializer): AccountAuthenticatorMultiEd25519 {
     const public_key = MultiEd25519PublicKey.deserialize(deserializer);
     const signature = MultiEd25519Signature.deserialize(deserializer);
-    return new AccountAuthenticatorVariantMultiEd25519(public_key, signature);
+    return new AccountAuthenticatorMultiEd25519(public_key, signature);
   }
 }
 
