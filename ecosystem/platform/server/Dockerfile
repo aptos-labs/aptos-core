@@ -1,54 +1,38 @@
 # syntax=docker/dockerfile:1.4
 
-FROM golang:1.18.2-buster@sha256:72506be8130fd4c98a032a497db82234aaace7eb48a90aee161e821c767111f1 as aws-env
+FROM phusion/passenger-full:2.3.0
 
-# build aws-env which is used to inject load AWS Secrets as environment variables at init time.
-RUN git clone --depth=1 --branch v1.3.0 https://github.com/aptos-labs/aws-env src \
-    && cd src/cmd/aws-env \
-    && CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -ldflags '-w -s' -o /aws-env && chmod +x /aws-env
+ADD nginx.conf /etc/nginx/sites-enabled/webapp.conf
 
-FROM ruby:3.1.2-slim
+RUN npm install -g yarn && \
+  rm -f /etc/service/nginx/down && \
+  rm -f /etc/nginx/sites-enabled/default && \
+  mkdir /home/app/webapp && \
+  chown app: /home/app/webapp
 
-RUN apt-get update -qq && apt-get install -yq --no-install-recommends \
-  build-essential \
-  gnupg2 \
-  less \
-  git \
-  libpq-dev \
-  postgresql-client \
-  curl \
-  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-# Install yarn
-RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg -o /root/yarn-pubkey.gpg && apt-key add /root/yarn-pubkey.gpg
-RUN echo "deb https://dl.yarnpkg.com/debian/ stable main" > /etc/apt/sources.list.d/yarn.list
-RUN apt-get update && apt-get install -y --no-install-recommends nodejs yarn
-
-RUN gem update --system && gem install bundler
-
-WORKDIR /usr/src/app
-
-COPY --link Gemfile Gemfile.lock ./
-
+USER app
+ENV HOME /home/app
 ENV RAILS_ENV production
-ENV RAILS_SERVE_STATIC_FILES true
 ENV RAILS_LOG_TO_STDOUT true
+ENV NODE_ENV production
+WORKDIR /home/app/webapp
 
-RUN bundle config --global frozen 1
-RUN bundle config set --local without 'development test'
-RUN bundle install
+COPY --chown=app:app Gemfile Gemfile.lock .
 
-COPY --link . /usr/src/app
+RUN bundle config --global frozen 1 && \
+  bundle config set --local without 'development test' && \
+  bundle install
 
-# this is a fake secret key just to get it to compile the assets
-ENV SECRET_KEY_BASE=18ff7d41b9da02d394434e2eb140611516707334b7d7a7e15cf8b567061f30e9400a82e61aa772b9e6ccb72853932769d03bbbb9d78f62333c8f7adb95cc727d
+COPY --chown=app:app package.json yarn.lock .
 
-# Yes, this should run twice
-# https://github.com/rails/tailwindcss-rails/issues/158
-RUN SKIP_DB_CHECK=1 bundle exec rake assets:precompile && SKIP_DB_CHECK=1 bundle exec rake assets:precompile
+RUN yarn install
 
-COPY --link --from=aws-env /aws-env /aws-env
+COPY --chown=app:app . /home/app/webapp
+
+RUN yarn build && yarn build:css && \
+  SECRET_KEY_BASE=$(bin/rake secret) SKIP_DB_CHECK=1 bundle exec rake assets:precompile
 
 EXPOSE 3000
 
-CMD ["/aws-env", "exec", "--", "bundle", "exec", "rails", "s", "-b", "0.0.0.0"]
+USER root
+CMD ["/sbin/my_init"]
