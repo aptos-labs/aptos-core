@@ -409,11 +409,11 @@ impl AptosNetDataClient {
                 };
                 Ok(Response::new(context, response))
             }
-            Err(err) => {
+            Err(error) => {
                 // Convert network error and storage service error types into
                 // data client errors. Also categorize the error type for scoring
                 // purposes.
-                let client_err = match err {
+                let client_error = match error {
                     storage_service_client::Error::RpcError(err) => match err {
                         RpcError::NotConnected(_) => Error::DataIsUnavailable(err.to_string()),
                         RpcError::TimedOut => Error::TimeoutWaitingForResponse(err.to_string()),
@@ -430,13 +430,17 @@ impl AptosNetDataClient {
                         .request_type(request.get_label())
                         .request_id(id)
                         .peer(&peer)
-                        .error(&client_err))
+                        .error(&client_error))
                 );
 
-                increment_request_counter(&metrics::ERROR_RESPONSES, request.get_label(), peer);
+                increment_request_counter(
+                    &metrics::ERROR_RESPONSES,
+                    client_error.get_label(),
+                    peer,
+                );
 
                 self.notify_bad_response(id, peer, &request, ErrorType::NotUseful);
-                Err(client_err)
+                Err(client_error)
             }
         }
     }

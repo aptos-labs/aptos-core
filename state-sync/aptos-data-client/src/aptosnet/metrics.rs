@@ -126,13 +126,13 @@ impl DataType {
 /// Increments the given request counter with the provided values.
 pub fn increment_request_counter(
     counter: &Lazy<IntCounterVec>,
-    request_label: &str,
+    label: &str,
     peer_network_id: PeerNetworkId,
 ) {
     let peer = peer_network_id.peer_id().short_str();
     let network = peer_network_id.network_id();
     counter
-        .with_label_values(&[request_label, network.as_str(), peer.as_str()])
+        .with_label_values(&[label, network.as_str(), peer.as_str()])
         .inc();
     counter
         .with_label_values(&[TOTAL_COUNT_LABEL, network.as_str(), peer.as_str()])
