@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable max-classes-per-file */
-import { Serializer, Deserializer, Bytes, Seq, deserializeVector, serializeVector } from '../bcs';
-import { AccountAddress } from './account_address';
+import { Serializer, Deserializer, Bytes, Seq, deserializeVector, serializeVector } from "../bcs";
+import { AccountAddress } from "./account_address";
 
 export abstract class TransactionAuthenticator {
   abstract serialize(serializer: Serializer): void;

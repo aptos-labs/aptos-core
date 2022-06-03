@@ -2,7 +2,7 @@
 /* eslint-disable class-methods-use-this */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable max-classes-per-file */
-import { HexString } from '../../hex_string';
+import { HexString } from "../../hex_string";
 import {
   Deserializer,
   Serializer,
@@ -13,11 +13,11 @@ import {
   Uint128,
   deserializeVector,
   serializeVector,
-} from '../bcs';
-import { AccountAddress } from './account_address';
-import { TransactionAuthenticator } from './authenticator';
-import { Identifier } from './identifier';
-import { TypeTag } from './type_tag';
+} from "../bcs";
+import { AccountAddress } from "./account_address";
+import { TransactionAuthenticator } from "./authenticator";
+import { Identifier } from "./identifier";
+import { TypeTag } from "./type_tag";
 
 export class RawTransaction {
   /**
@@ -241,9 +241,9 @@ export class ModuleId {
    * @returns
    */
   static fromStr(moduleId: string): ModuleId {
-    const parts = moduleId.split('::');
+    const parts = moduleId.split("::");
     if (parts.length !== 2) {
-      throw new Error('Invalid module id.');
+      throw new Error("Invalid module id.");
     }
     return new ModuleId(AccountAddress.fromHex(new HexString(parts[0])), new Identifier(parts[1]));
   }
@@ -262,21 +262,21 @@ export class ModuleId {
 
 export class ChangeSet {
   serialize(serializer: Serializer): void {
-    throw new Error('Not implemented.');
+    throw new Error("Not implemented.");
   }
 
   static deserialize(deserializer: Deserializer): ChangeSet {
-    throw new Error('Not implemented.');
+    throw new Error("Not implemented.");
   }
 }
 
 export class WriteSet {
   serialize(serializer: Serializer): void {
-    throw new Error('Not implmented.');
+    throw new Error("Not implmented.");
   }
 
   static deserialize(deserializer: Deserializer): WriteSet {
-    throw new Error('Not implmented.');
+    throw new Error("Not implmented.");
   }
 }
 
@@ -328,11 +328,11 @@ export abstract class TransactionPayload {
 
 export class TransactionPayloadWriteSet extends TransactionPayload {
   serialize(serializer: Serializer): void {
-    throw new Error('Not implemented');
+    throw new Error("Not implemented");
   }
 
   static load(deserializer: Deserializer): TransactionPayloadWriteSet {
-    throw new Error('Not implemented');
+    throw new Error("Not implemented");
   }
 }
 

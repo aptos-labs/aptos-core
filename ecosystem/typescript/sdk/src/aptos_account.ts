@@ -1,8 +1,8 @@
-import * as Nacl from 'tweetnacl';
-import * as SHA3 from 'js-sha3';
-import { Buffer } from 'buffer/'; // the trailing slash is important!
-import { HexString, MaybeHexString } from './hex_string';
-import { Types } from './types';
+import * as Nacl from "tweetnacl";
+import * as SHA3 from "js-sha3";
+import { Buffer } from "buffer/"; // the trailing slash is important!
+import { HexString, MaybeHexString } from "./hex_string";
+import { Types } from "./types";
 
 export interface AptosAccountObject {
   address?: string;
@@ -42,7 +42,7 @@ export class AptosAccount {
     if (!this.authKeyCached) {
       const hash = SHA3.sha3_256.create();
       hash.update(Buffer.from(this.signingKey.publicKey));
-      hash.update('\x00');
+      hash.update("\x00");
       this.authKeyCached = new HexString(hash.hex());
     }
     return this.authKeyCached;
@@ -50,12 +50,12 @@ export class AptosAccount {
 
   /** Returns the public key for the associated account */
   pubKey(): HexString {
-    return HexString.ensure(Buffer.from(this.signingKey.publicKey).toString('hex'));
+    return HexString.ensure(Buffer.from(this.signingKey.publicKey).toString("hex"));
   }
 
   signBuffer(buffer: Buffer): HexString {
     const signature = Nacl.sign(buffer, this.signingKey.secretKey);
-    return HexString.ensure(Buffer.from(signature).toString('hex').slice(0, 128));
+    return HexString.ensure(Buffer.from(signature).toString("hex").slice(0, 128));
   }
 
   signHexString(hexString: MaybeHexString): HexString {

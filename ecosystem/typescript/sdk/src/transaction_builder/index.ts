@@ -1,15 +1,15 @@
-import * as SHA3 from 'js-sha3';
-import { Buffer } from 'buffer/';
+import * as SHA3 from "js-sha3";
+import { Buffer } from "buffer/";
 import {
   Ed25519PublicKey,
   Ed25519Signature,
   RawTransaction,
   SignedTransaction,
   TransactionAuthenticatorEd25519,
-} from './aptos_types';
-import { bcsToBytes, Bytes } from './bcs';
+} from "./aptos_types";
+import { bcsToBytes, Bytes } from "./bcs";
 
-const SALT = 'APTOS::RawTransaction';
+const SALT = "APTOS::RawTransaction";
 
 export type SigningMessage = Buffer;
 export type TransactionSignature = Uint8Array;

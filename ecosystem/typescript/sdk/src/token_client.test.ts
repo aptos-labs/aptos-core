@@ -1,12 +1,12 @@
-import { FaucetClient } from './faucet_client';
-import { AptosAccount } from './aptos_account';
-import { AptosClient } from './aptos_client';
-import { TokenClient } from './token_client';
+import { FaucetClient } from "./faucet_client";
+import { AptosAccount } from "./aptos_account";
+import { AptosClient } from "./aptos_client";
+import { TokenClient } from "./token_client";
 
-import { NODE_URL, FAUCET_URL } from './util.test';
+import { NODE_URL, FAUCET_URL } from "./util.test";
 
 test(
-  'full tutorial nft token flow',
+  "full tutorial nft token flow",
   async () => {
     const client = new AptosClient(NODE_URL);
     const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
@@ -19,12 +19,12 @@ test(
     await faucetClient.fundAccount(alice.address(), 10000);
     await faucetClient.fundAccount(bob.address(), 5000);
 
-    const collectionName = 'AliceCollection';
-    const tokenName = 'Alice Token';
+    const collectionName = "AliceCollection";
+    const tokenName = "Alice Token";
 
     // Create collection and token on Alice's account
     // eslint-disable-next-line quotes
-    await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", 'https://aptos.dev');
+    await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev");
 
     await tokenClient.createToken(
       alice,
@@ -33,7 +33,7 @@ test(
       // eslint-disable-next-line quotes
       "Alice's simple token",
       1,
-      'https://aptos.dev/img/nyan.jpeg',
+      "https://aptos.dev/img/nyan.jpeg",
     );
 
     // Transfer Token from Alice's Account to Bob's Account

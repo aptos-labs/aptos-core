@@ -1,6 +1,6 @@
-import { Deserializer } from './deserializer';
-import { Serializer } from './serializer';
-import { Bytes, Seq } from './types';
+import { Deserializer } from "./deserializer";
+import { Serializer } from "./serializer";
+import { Bytes, Seq } from "./types";
 
 interface Serializable {
   serialize(serializer: Serializer): void;
