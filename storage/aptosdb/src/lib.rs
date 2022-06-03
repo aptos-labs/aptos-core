@@ -1159,7 +1159,7 @@ impl DbReader for AptosDB {
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
         gauged_api("get_block_timestamp", || {
             let ts = match self.transaction_store.get_block_metadata(version)? {
-                Some((_v, block_meta)) => block_meta.into_inner().2,
+                Some((_v, block_meta)) => block_meta.timestamp_usecs(),
                 // genesis timestamp is 0
                 None => 0,
             };
