@@ -345,6 +345,7 @@ dependencies = [
  "network",
  "rand 0.8.5",
  "serde 1.0.137",
+ "short-hex-str",
  "storage-service-client",
  "storage-service-server",
  "storage-service-types",

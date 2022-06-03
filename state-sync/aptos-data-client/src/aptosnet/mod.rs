@@ -5,7 +5,8 @@ use crate::{
     aptosnet::{
         logging::{LogEntry, LogEvent, LogSchema},
         metrics::{
-            increment_counter, set_gauge, start_timer, DataType, PRIORITIZED_PEER, REGULAR_PEER,
+            increment_request_counter, set_gauge, start_timer, DataType, PRIORITIZED_PEER,
+            REGULAR_PEER,
         },
         state::{ErrorType, PeerStates},
     },
@@ -363,7 +364,7 @@ impl AptosNetDataClient {
                 .request_data(&request))
         );
 
-        increment_counter(&metrics::SENT_REQUESTS, request.get_label().into());
+        increment_request_counter(&metrics::SENT_REQUESTS, request.get_label(), peer);
 
         let result = self
             .network_client
@@ -384,7 +385,7 @@ impl AptosNetDataClient {
                         .peer(&peer))
                 );
 
-                increment_counter(&metrics::SUCCESS_RESPONSES, request.get_label().into());
+                increment_request_counter(&metrics::SUCCESS_RESPONSES, request.get_label(), peer);
 
                 // For now, record all responses that at least pass the data
                 // client layer successfully. An alternative might also have the
@@ -432,7 +433,7 @@ impl AptosNetDataClient {
                         .error(&client_err))
                 );
 
-                increment_counter(&metrics::ERROR_RESPONSES, request.get_label().into());
+                increment_request_counter(&metrics::ERROR_RESPONSES, request.get_label(), peer);
 
                 self.notify_bad_response(id, peer, &request, ErrorType::NotUseful);
                 Err(client_err)
