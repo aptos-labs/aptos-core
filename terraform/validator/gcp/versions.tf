@@ -19,9 +19,6 @@ terraform {
     random = {
       source  = "hashicorp/random"
     }
-    template = {
-      source  = "hashicorp/template"
-    }
     time = {
       source  = "hashicorp/time"
     }
