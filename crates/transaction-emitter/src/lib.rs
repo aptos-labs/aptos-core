@@ -459,7 +459,7 @@ impl<'t> TxnEmitter<'t> {
             if total_requested_accounts / req.rest_clients.len() > MAX_CHILD_VASP_NUM {
                 total_requested_accounts / MAX_CHILD_VASP_NUM + 1
             } else {
-                req.rest_clients.len()
+                (total_requested_accounts / 50).max(1)
             };
         let num_accounts = total_requested_accounts - self.accounts.len(); // Only minting extra accounts
         let coins_per_account = SEND_AMOUNT * MAX_TXNS * 10; // extra coins for secure to pay none zero gas price
@@ -490,11 +490,12 @@ impl<'t> TxnEmitter<'t> {
         .await
         .map_err(|e| format_err!("Failed to mint seed_accounts: {}", e))?;
         println!(
-            "Completed minting seed accounts, each with {} coins",
+            "Completed minting {} seed accounts, each with {} coins",
+            seed_accounts.len(),
             coins_per_seed_account
         );
         println!(
-            "Minting additional {} accounts wtih {} coins each",
+            "Minting additional {} accounts with {} coins each",
             num_accounts, coins_per_account
         );
         // tokio::time::sleep(Duration::from_secs(10)).await;
