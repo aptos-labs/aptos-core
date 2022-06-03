@@ -313,12 +313,12 @@ paths:
           $ref: "#/components/responses/400"
         '500':
           $ref: "#/components/responses/500"
-  /collections/{CollectionId}:
+  /collections/{collectionId}:
     get:
       description: "Returns collection by collection id"
       operationId: getCollectionById
       parameters:
-        - name: "CollectionId"
+        - name: "collectionId"
           in: path
           required: true
           description: "Id of the collection"

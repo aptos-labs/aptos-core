@@ -54,7 +54,8 @@ struct IndexerArgs {
     #[clap(long, default_value_t = 1000)]
     emit_every: usize,
 
-    /// whether run indexer to get token data
+    /// Turn on the indexer to collect token, ownership, collection and metadata and store them
+    /// in the postgres DB tables.
     #[clap(long)]
     index_token_data: bool,
 }
