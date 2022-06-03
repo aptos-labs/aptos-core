@@ -1,0 +1,22 @@
+{
+  "name": "@aptos/ts-tasks",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "task": "yarn install --frozen-lockfile --silent && ts-node ./tasksfile.ts"
+  },
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@actions/core": "^1.6.0",
+    "@actions/exec": "^1.1.1",
+    "@actions/github": "^5.0.3",
+    "@actions/glob": "^0.3.0",
+    "find-git-root": "^1.0.4",
+    "tasksfile": "^5.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^16.10.5",
+    "ts-node": "^10.8.0",
+    "typescript": "^4.4.4"
+  }
+}

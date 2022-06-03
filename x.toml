@@ -255,7 +255,7 @@ mark-changed = "all"
 
 # Core devtools files.
 [[determinator.path-rule]]
-globs = [".config/nextest.toml", "scripts/dev_setup.sh", "x.toml", ".node-version"]
+globs = [".config/nextest.toml", "scripts/dev_setup.sh", "x.toml", ".node-version", ".prettierrc"]
 mark-changed = "all"
 
 [[determinator.path-rule]]

@@ -1,0 +1,25 @@
+# This workflow runs periodically to delete obsolete workflow runs of workflows that don't exist anymore in the repo.
+# This is the keep the Workflow list on the left here https://github.com/aptos-labs/aptos-core/actions tidy.
+# The only way to remove a workflow from that list is to delete _all_ runs of a workflow.
+name: Prune old workflow runs
+on:
+  workflow_dispatch:
+  schedule:
+    # every day at 3am PST
+    - cron: "0 10 * * *"
+
+permissions:
+  actions: write
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+      - run: yarn task pruneGithubWorkflowRuns
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        working-directory: .github/ts-tasks
