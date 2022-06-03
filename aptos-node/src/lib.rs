@@ -69,6 +69,8 @@ use storage_service_server::{
 use tokio::runtime::{Builder, Runtime};
 use tokio_stream::wrappers::IntervalStream;
 
+use opentelemetry::{global, KeyValue};
+
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
 const MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE: usize = 1_024;
@@ -401,6 +403,16 @@ async fn periodic_telemetry_dump(node_config: NodeConfig, db: DbReaderWriter) {
     loop {
         futures::select! {
             _ = dump_interval.select_next_some() => {
+
+
+                // get a meter from a provider
+                let meter = global::meter("aptos_node_metrics");
+
+                // create an instrument
+                let counter = meter.u64_counter("aptos_my_counter").init();
+
+                // record a measurement
+                counter.add(1, &[KeyValue::new("peer_id", "abc123")]);
 
                 // Build the params from internal prometheus metrics
                 let mut metrics_params: HashMap<String, String> = HashMap::new();

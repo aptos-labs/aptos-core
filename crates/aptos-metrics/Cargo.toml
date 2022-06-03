@@ -17,6 +17,8 @@ prometheus = { version = "0.13.0", default-features = false }
 serde_json = "1.0.81"
 sysinfo = "0.23.11"
 tokio = { version = "1.18.2", features = ["full"] }
+opentelemetry = { version = "0.17.0", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.10.0", features = ["metrics"] }
 
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics-core = { path = "../aptos-metrics-core" }

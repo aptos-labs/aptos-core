@@ -25,6 +25,13 @@ use std::{
 };
 use tokio::runtime;
 
+use opentelemetry::{KeyValue, trace::Tracer};
+use opentelemetry::sdk::{trace::{self, IdGenerator, Sampler}, Resource};
+use opentelemetry::sdk::metrics::{selectors, PushController};
+use opentelemetry::util::tokio_interval_stream;
+use opentelemetry_otlp::{Protocol, WithExportConfig, ExportConfig};
+use std::time::Duration;
+
 fn encode_metrics(encoder: impl Encoder, whitelist: &'static [&'static str]) -> Vec<u8> {
     let mut metric_families = gather_metrics();
     if !whitelist.is_empty() {
@@ -216,10 +223,29 @@ pub fn start_server(host: String, port: u16, public_metric: bool) {
                 make_service_fn(|_| future::ok::<_, hyper::Error>(service_fn(serve_metrics)));
 
             let rt = runtime::Builder::new_current_thread()
-                .enable_io()
+                .enable_all()
                 .build()
                 .unwrap();
             rt.block_on(async {
+                let export_config = ExportConfig {
+                    endpoint: "http://localhost:4317".to_string(),
+                    timeout: Duration::from_secs(3),
+                    protocol: Protocol::Grpc
+                };
+            
+                let _meter = opentelemetry_otlp::new_pipeline()
+                    .metrics(tokio::spawn, tokio_interval_stream)
+                    .with_exporter(
+                        opentelemetry_otlp::new_exporter()
+                            .tonic()
+                            .with_export_config(export_config),
+                            // can also config it using with_* functions like the tracing part above.
+                    )
+                    .with_period(Duration::from_secs(3))
+                    .with_timeout(Duration::from_secs(10))
+                    .with_aggregator_selector(selectors::simple::Selector::Exact)
+                    .build();
+            
                 let server = Server::bind(&addr).serve(make_service);
                 server.await
             })
