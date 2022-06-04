@@ -87,7 +87,7 @@ impl MockNetwork {
             )
         });
 
-        let peer_infos = PeerMetadataStorage::new(&[NetworkId::Validator, NetworkId::Vfn]);
+        let peer_infos = PeerMetadataStorage::new(&[NetworkId::Validator, NetworkId::Public]);
         let network_client = StorageServiceClient::new(network_sender, peer_infos.clone());
 
         let mock_time = TimeService::mock();
@@ -113,7 +113,7 @@ impl MockNetwork {
         let network_id = if priority {
             NetworkId::Validator
         } else {
-            NetworkId::Vfn
+            NetworkId::Public
         };
 
         // Create and add a peer

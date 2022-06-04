@@ -5,16 +5,11 @@ use crate::{
     aptosnet::logging::{LogEntry, LogEvent, LogSchema},
     AdvertisedData, GlobalDataSummary, OptimalChunkSizes, ResponseError,
 };
-use aptos_config::{
-    config::{PeerRole, StorageServiceConfig},
-    network_id::PeerNetworkId,
-};
+use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_logger::prelude::*;
-use network::application::storage::PeerMetadataStorage;
 use std::{
     cmp::min,
     collections::{HashMap, HashSet},
-    sync::Arc,
 };
 use storage_service_types::{StorageServerSummary, StorageServiceRequest};
 
@@ -108,20 +103,15 @@ pub(crate) struct PeerStates {
     peer_to_state: HashMap<PeerNetworkId, PeerState>,
     in_flight_priority_polls: HashSet<PeerNetworkId>, // The priority peers with in-flight polls
     in_flight_regular_polls: HashSet<PeerNetworkId>,  // The regular peers with in-flight polls
-    peer_metadata_storage: Arc<PeerMetadataStorage>,
 }
 
 impl PeerStates {
-    pub fn new(
-        config: StorageServiceConfig,
-        peer_metadata_storage: Arc<PeerMetadataStorage>,
-    ) -> Self {
+    pub fn new(config: StorageServiceConfig) -> Self {
         Self {
             config,
             peer_to_state: HashMap::new(),
             in_flight_priority_polls: HashSet::new(),
             in_flight_regular_polls: HashSet::new(),
-            peer_metadata_storage,
         }
     }
 
@@ -253,27 +243,8 @@ impl PeerStates {
     ///
     /// TODO(joshlind): make this less hacky using network topological awareness.
     pub fn is_priority_peer(&self, peer: &PeerNetworkId) -> bool {
-        if peer.network_id().is_validator_network() {
-            return true;
-        }
-
-        let peer_role = self
-            .peer_metadata_storage
-            .read(*peer)
-            .map(|peer| peer.active_connection.role);
-        if let Some(peer_role) = peer_role {
-            if peer.network_id().is_vfn_network() {
-                match peer_role {
-                    PeerRole::Validator
-                    | PeerRole::ValidatorFullNode
-                    | PeerRole::PreferredUpstream
-                    | PeerRole::Upstream => return true,
-                    _ => return false,
-                }
-            }
-        }
-
-        false
+        let network_id = peer.network_id();
+        network_id.is_validator_network() || network_id.is_vfn_network()
     }
 
     /// Updates the storage summary for the given peer
