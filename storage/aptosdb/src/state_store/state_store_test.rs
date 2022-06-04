@@ -36,7 +36,7 @@ fn put_value_set(
     state_store
         .put_value_sets(vec![&value_set], version, &mut cs)
         .unwrap();
-    state_store.db.write_schemas(cs.batch).unwrap();
+    state_store.ledger_db.write_schemas(cs.batch).unwrap();
     state_store.set_latest_checkpoint(version, root);
     root
 }
@@ -48,7 +48,7 @@ fn prune_stale_indices(
     limit: usize,
 ) {
     pruner::state_store::prune_state_store(
-        Arc::clone(&store.db),
+        &store.state_merkle_db,
         min_readable_version,
         target_min_readable_version,
         limit,
@@ -683,7 +683,7 @@ fn update_store(
         store
             .put_value_sets(vec![&value_state_set], version, &mut cs)
             .unwrap();
-        store.db.write_schemas(cs.batch).unwrap();
+        store.ledger_db.write_schemas(cs.batch).unwrap();
         store.set_latest_checkpoint(version, root_hashes[0]);
     }
 }

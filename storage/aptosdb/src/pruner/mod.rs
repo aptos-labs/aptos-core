@@ -18,7 +18,7 @@ use crate::metrics::{PRUNER_BATCH_SIZE, PRUNER_WINDOW};
 use aptos_config::config::StoragePrunerConfig;
 use aptos_infallible::Mutex;
 
-use crate::{pruner::PrunerIndex::LedgerPrunerIndex, EventStore, LedgerStore, TransactionStore};
+use crate::pruner::PrunerIndex::LedgerPrunerIndex;
 use aptos_types::transaction::Version;
 use schemadb::DB;
 use std::{
@@ -71,11 +71,9 @@ pub enum PrunerIndex {
 impl Pruner {
     /// Creates a worker thread that waits on a channel for pruning commands.
     pub fn new(
-        db: Arc<DB>,
+        ledger_rocksdb: Arc<DB>,
+        state_merkle_rocksdb: Arc<DB>,
         storage_pruner_config: StoragePrunerConfig,
-        transaction_store: Arc<TransactionStore>,
-        ledger_store: Arc<LedgerStore>,
-        event_store: Arc<EventStore>,
     ) -> Self {
         let (command_sender, command_receiver) = channel();
 
@@ -93,10 +91,8 @@ impl Pruner {
         PRUNER_BATCH_SIZE.set(storage_pruner_config.pruning_batch_size as i64);
 
         let worker = Worker::new(
-            db,
-            transaction_store,
-            ledger_store,
-            event_store,
+            ledger_rocksdb,
+            state_merkle_rocksdb,
             command_receiver,
             min_readable_version,
             storage_pruner_config.pruning_batch_size as u64,

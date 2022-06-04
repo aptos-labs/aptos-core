@@ -35,14 +35,18 @@ impl DBPruner for StateStorePruner {
         STATE_STORE_PRUNER_NAME
     }
 
-    fn prune(&self, _db_batch: &mut SchemaBatch, max_versions: u64) -> anyhow::Result<Version> {
+    fn prune(
+        &self,
+        _ledger_db_batch: &mut SchemaBatch,
+        max_versions: u64,
+    ) -> anyhow::Result<Version> {
         if !self.is_pruning_pending() {
             return Ok(self.min_readable_version());
         }
         let min_readable_version = self.min_readable_version.load(Ordering::Relaxed);
         let target_version = self.target_version();
         return match prune_state_store(
-            self.db.clone(),
+            &self.db,
             min_readable_version,
             target_version,
             max_versions as usize,
@@ -161,18 +165,17 @@ impl StateStorePruner {
 }
 
 pub fn prune_state_store(
-    db: Arc<DB>,
+    db: &DB,
     min_readable_version: Version,
     target_version: Version,
     max_versions: usize,
 ) -> anyhow::Result<Version> {
-    let indices =
-        StaleNodeIndicesByVersionIterator::new(&db, min_readable_version, target_version)?
-            .take(max_versions) // Iterator<Item = Result<Vec<StaleNodeIndex>>>
-            .collect::<anyhow::Result<Vec<_>>>()? // now Vec<Vec<StaleNodeIndex>>
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>();
+    let indices = StaleNodeIndicesByVersionIterator::new(db, min_readable_version, target_version)?
+        .take(max_versions) // Iterator<Item = Result<Vec<StaleNodeIndex>>>
+        .collect::<anyhow::Result<Vec<_>>>()? // now Vec<Vec<StaleNodeIndex>>
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
 
     if indices.is_empty() {
         Ok(min_readable_version)

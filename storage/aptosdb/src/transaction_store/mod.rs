@@ -25,7 +25,7 @@ use aptos_types::{
 use schemadb::{ReadOptions, SchemaBatch, SchemaIterator, DB};
 use std::sync::Arc;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TransactionStore {
     db: Arc<DB>,
 }

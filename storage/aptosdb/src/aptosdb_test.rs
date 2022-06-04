@@ -82,15 +82,13 @@ fn test_error_if_version_is_pruned() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let mut pruner = Pruner::new(
-        Arc::clone(&aptos_db.db),
+        Arc::clone(&aptos_db.ledger_db),
+        Arc::clone(&aptos_db.state_merkle_db),
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
             ledger_prune_window: Some(0),
             pruning_batch_size: 1,
         },
-        Arc::clone(&aptos_db.transaction_store),
-        Arc::clone(&aptos_db.ledger_store),
-        Arc::clone(&aptos_db.event_store),
     );
     pruner.testonly_update_min_version(&[5, 10]);
     let pruner = Some(pruner);

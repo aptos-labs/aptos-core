@@ -89,6 +89,9 @@ use std::{
 };
 use storage_interface::{DbReader, DbWriter, Order, StartupInfo, StateSnapshotReceiver, TreeState};
 
+pub const LEDGER_DB_NAME: &str = "ledger_db";
+pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
+
 const MAX_LIMIT: u64 = 5000;
 
 // TODO: Either implement an iteration API to allow a very old client to loop through a long history
@@ -134,6 +137,35 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
     .collect()
 });
 
+fn ledger_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_CF_NAME,
+        EPOCH_BY_VERSION_CF_NAME,
+        EVENT_ACCUMULATOR_CF_NAME,
+        EVENT_BY_KEY_CF_NAME,
+        EVENT_BY_VERSION_CF_NAME,
+        EVENT_CF_NAME,
+        LEDGER_COUNTERS_CF_NAME,
+        LEDGER_INFO_CF_NAME,
+        STALE_NODE_INDEX_CF_NAME,
+        STATE_VALUE_CF_NAME,
+        TRANSACTION_CF_NAME,
+        TRANSACTION_ACCUMULATOR_CF_NAME,
+        TRANSACTION_BY_ACCOUNT_CF_NAME,
+        TRANSACTION_BY_HASH_CF_NAME,
+        TRANSACTION_INFO_CF_NAME,
+        WRITE_SET_CF_NAME,
+    ]
+}
+
+fn state_merkle_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_CF_NAME,
+        JELLYFISH_MERKLE_NODE_CF_NAME,
+        STALE_NODE_INDEX_CF_NAME,
+    ]
+}
+
 fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<()> {
     if num_requested > max_allowed {
         Err(AptosDbError::TooManyRequested(num_requested, max_allowed).into())
@@ -168,15 +200,22 @@ fn gen_rocksdb_options(config: &RocksdbConfig) -> Options {
     db_opts
 }
 
-fn update_rocksdb_properties(db: &DB) -> Result<()> {
+fn update_rocksdb_properties(ledger_rocksdb: &DB, state_merkle_rocksdb: &DB) -> Result<()> {
     let _timer = OTHER_TIMERS_SECONDS
         .with_label_values(&["update_rocksdb_properties"])
         .start_timer();
-    for cf_name in AptosDB::column_families() {
+    for cf_name in ledger_db_column_families() {
         for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
             ROCKSDB_PROPERTIES
                 .with_label_values(&[cf_name, aptos_rocksdb_property_name])
-                .set(db.get_property(cf_name, rockdb_property_name)? as i64);
+                .set(ledger_rocksdb.get_property(cf_name, rockdb_property_name)? as i64);
+        }
+    }
+    for cf_name in state_merkle_db_column_families() {
+        for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
+            ROCKSDB_PROPERTIES
+                .with_label_values(&[cf_name, aptos_rocksdb_property_name])
+                .set(state_merkle_rocksdb.get_property(cf_name, rockdb_property_name)? as i64);
         }
     }
     Ok(())
@@ -189,10 +228,10 @@ struct RocksdbPropertyReporter {
 }
 
 impl RocksdbPropertyReporter {
-    fn new(db: Arc<DB>) -> Self {
+    fn new(ledger_rocksdb: Arc<DB>, state_merkle_rocksdb: Arc<DB>) -> Self {
         let (send, recv) = mpsc::channel();
         let join_handle = Some(thread::spawn(move || loop {
-            if let Err(e) = update_rocksdb_properties(&db) {
+            if let Err(e) = update_rocksdb_properties(&ledger_rocksdb, &state_merkle_rocksdb) {
                 warn!(
                     error = ?e,
                     "Updating rocksdb property failed."
@@ -230,63 +269,48 @@ impl Drop for RocksdbPropertyReporter {
 /// access to the core Aptos data structures.
 #[derive(Debug)]
 pub struct AptosDB {
-    db: Arc<DB>,
-    ledger_store: Arc<LedgerStore>,
-    transaction_store: Arc<TransactionStore>,
-    state_store: Arc<StateStore>,
+    ledger_db: Arc<DB>,
+    state_merkle_db: Arc<DB>,
     event_store: Arc<EventStore>,
+    ledger_store: Arc<LedgerStore>,
+    state_store: Arc<StateStore>,
     system_store: Arc<SystemStore>,
+    transaction_store: Arc<TransactionStore>,
     pruner: Option<Pruner>,
     _rocksdb_property_reporter: RocksdbPropertyReporter,
 }
 
 impl AptosDB {
-    fn column_families() -> Vec<ColumnFamilyName> {
-        vec![
-            /* LedgerInfo CF = */ DEFAULT_CF_NAME,
-            EPOCH_BY_VERSION_CF_NAME,
-            EVENT_ACCUMULATOR_CF_NAME,
-            EVENT_BY_KEY_CF_NAME,
-            EVENT_BY_VERSION_CF_NAME,
-            EVENT_CF_NAME,
-            JELLYFISH_MERKLE_NODE_CF_NAME,
-            LEDGER_COUNTERS_CF_NAME,
-            STALE_NODE_INDEX_CF_NAME,
-            STATE_VALUE_CF_NAME,
-            TRANSACTION_CF_NAME,
-            TRANSACTION_ACCUMULATOR_CF_NAME,
-            TRANSACTION_BY_ACCOUNT_CF_NAME,
-            TRANSACTION_BY_HASH_CF_NAME,
-            TRANSACTION_INFO_CF_NAME,
-            WRITE_SET_CF_NAME,
-        ]
-    }
-
-    fn new_with_db(db: DB, storage_pruner_config: StoragePrunerConfig) -> Self {
-        let db = Arc::new(db);
-        let transaction_store = Arc::new(TransactionStore::new(Arc::clone(&db)));
-        let event_store = Arc::new(EventStore::new(Arc::clone(&db)));
-        let ledger_store = Arc::new(LedgerStore::new(Arc::clone(&db)));
-        let system_store = Arc::new(SystemStore::new(Arc::clone(&db)));
-
+    fn new_with_dbs(
+        ledger_rocksdb: DB,
+        state_merkle_rocksdb: DB,
+        storage_pruner_config: StoragePrunerConfig,
+    ) -> Self {
+        let arc_ledger_rocksdb = Arc::new(ledger_rocksdb);
+        let arc_state_merkle_rocksdb = Arc::new(state_merkle_rocksdb);
         AptosDB {
-            db: Arc::clone(&db),
-            event_store: Arc::clone(&event_store),
-            ledger_store: Arc::clone(&ledger_store),
-            state_store: Arc::new(StateStore::new(Arc::clone(&db))),
-            transaction_store: Arc::clone(&transaction_store),
-            system_store: Arc::clone(&system_store),
+            ledger_db: Arc::clone(&arc_ledger_rocksdb),
+            state_merkle_db: Arc::clone(&arc_state_merkle_rocksdb),
+            event_store: Arc::new(EventStore::new(Arc::clone(&arc_ledger_rocksdb))),
+            ledger_store: Arc::new(LedgerStore::new(Arc::clone(&arc_ledger_rocksdb))),
+            state_store: Arc::new(StateStore::new(
+                Arc::clone(&arc_ledger_rocksdb),
+                Arc::clone(&arc_state_merkle_rocksdb),
+            )),
+            system_store: Arc::new(SystemStore::new(Arc::clone(&arc_ledger_rocksdb))),
+            transaction_store: Arc::new(TransactionStore::new(Arc::clone(&arc_ledger_rocksdb))),
             pruner: match storage_pruner_config {
                 NO_OP_STORAGE_PRUNER_CONFIG => None,
                 _ => Some(Pruner::new(
-                    Arc::clone(&db),
+                    Arc::clone(&arc_ledger_rocksdb),
+                    Arc::clone(&arc_state_merkle_rocksdb),
                     storage_pruner_config,
-                    transaction_store,
-                    ledger_store,
-                    event_store,
                 )),
             },
-            _rocksdb_property_reporter: RocksdbPropertyReporter::new(Arc::clone(&db)),
+            _rocksdb_property_reporter: RocksdbPropertyReporter::new(
+                Arc::clone(&arc_ledger_rocksdb),
+                Arc::clone(&arc_state_merkle_rocksdb),
+            ),
         }
     }
 
@@ -301,55 +325,84 @@ impl AptosDB {
             "Do not set prune_window when opening readonly.",
         );
 
-        let path = db_root_path.as_ref().join("aptosdb");
+        let ledger_db_path = db_root_path.as_ref().join(LEDGER_DB_NAME);
+        let state_merkle_db_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
         let instant = Instant::now();
 
         let mut rocksdb_opts = gen_rocksdb_options(&rocksdb_config);
 
-        let db = if readonly {
-            DB::open_readonly(
-                path.clone(),
-                "aptosdb_ro",
-                Self::column_families(),
-                &rocksdb_opts,
-            )?
+        let (ledger_db, state_merkle_db) = if readonly {
+            (
+                DB::open_readonly(
+                    ledger_db_path.clone(),
+                    "ledger_db_ro",
+                    ledger_db_column_families(),
+                    &rocksdb_opts,
+                )?,
+                DB::open_readonly(
+                    state_merkle_db_path.clone(),
+                    "state_merkle_db_ro",
+                    state_merkle_db_column_families(),
+                    &rocksdb_opts,
+                )?,
+            )
         } else {
             rocksdb_opts.create_if_missing(true);
             rocksdb_opts.create_missing_column_families(true);
-            DB::open(
-                path.clone(),
-                "aptosdb",
-                Self::column_families(),
-                &rocksdb_opts,
-            )?
+            (
+                DB::open(
+                    ledger_db_path.clone(),
+                    "ledger_db",
+                    ledger_db_column_families(),
+                    &rocksdb_opts,
+                )?,
+                DB::open(
+                    state_merkle_db_path.clone(),
+                    "state_merkle_db",
+                    state_merkle_db_column_families(),
+                    &rocksdb_opts,
+                )?,
+            )
         };
 
-        let ret = Self::new_with_db(db, storage_pruner_config);
+        let ret = Self::new_with_dbs(ledger_db, state_merkle_db, storage_pruner_config);
         info!(
-            path = path,
+            ledger_db_path = ledger_db_path,
+            state_merkle_db_path = state_merkle_db_path,
             time_ms = %instant.elapsed().as_millis(),
-            "Opened AptosDB.",
+            "Opened AptosDB (LedgerDB + StateMerkleDB).",
         );
         Ok(ret)
     }
 
     pub fn open_as_secondary<P: AsRef<Path> + Clone>(
         db_root_path: P,
-        secondary_path: P,
+        ledger_db_secondary_path: P,
+        state_merkle_db_secondary_path: P,
         mut rocksdb_config: RocksdbConfig,
     ) -> Result<Self> {
-        let primary_path = db_root_path.as_ref().join("aptosdb");
-        let secondary_path = secondary_path.as_ref().to_path_buf();
+        let ledger_db_primary_path = db_root_path.as_ref().join(LEDGER_DB_NAME);
+        let ledger_db_secondary_path = ledger_db_secondary_path.as_ref().to_path_buf();
+        let state_merkle_db_primary_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
+        let state_merkle_db_secondary_path = state_merkle_db_secondary_path.as_ref().to_path_buf();
+
         // Secondary needs `max_open_files = -1` per https://github.com/facebook/rocksdb/wiki/Secondary-instance
         rocksdb_config.max_open_files = -1;
         let rocksdb_opts = gen_rocksdb_options(&rocksdb_config);
 
-        Ok(Self::new_with_db(
+        Ok(Self::new_with_dbs(
             DB::open_as_secondary(
-                primary_path,
-                secondary_path,
-                "aptosdb_sec",
-                Self::column_families(),
+                ledger_db_primary_path,
+                ledger_db_secondary_path,
+                "ledgerdb_sec",
+                ledger_db_column_families(),
+                &rocksdb_opts,
+            )?,
+            DB::open_as_secondary(
+                state_merkle_db_primary_path,
+                state_merkle_db_secondary_path,
+                "state_merkle_db_sec",
+                state_merkle_db_column_families(),
                 &rocksdb_opts,
             )?,
             NO_OP_STORAGE_PRUNER_CONFIG,
@@ -370,7 +423,7 @@ impl AptosDB {
 
     /// This force the db to update rocksdb properties immediately.
     pub fn update_rocksdb_properties(&self) -> Result<()> {
-        update_rocksdb_properties(&self.db)
+        update_rocksdb_properties(&self.ledger_db, &self.state_merkle_db)
     }
 
     /// Returns ledger infos reflecting epoch bumps starting with the given epoch. If there are no
@@ -507,13 +560,17 @@ impl AptosDB {
     /// Creates new physical DB checkpoint in directory specified by `path`.
     pub fn create_checkpoint<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let start = Instant::now();
-        self.db.create_checkpoint(&path).map(|_| {
-            info!(
-                path = path.as_ref(),
-                time_ms = %start.elapsed().as_millis(),
-                "Made AptosDB checkpoint."
-            );
-        })
+        let ledger_db_path = path.as_ref().join(LEDGER_DB_NAME);
+        let state_merkle_db_path = path.as_ref().join(STATE_MERKLE_DB_NAME);
+        self.ledger_db.create_checkpoint(&ledger_db_path)?;
+        self.state_merkle_db
+            .create_checkpoint(&state_merkle_db_path)?;
+        info!(
+            path = path.as_ref(),
+            time_ms = %start.elapsed().as_millis(),
+            "Made AptosDB checkpoint."
+        );
+        Ok(())
     }
 
     // ================================== Private APIs ==================================
@@ -698,8 +755,7 @@ impl AptosDB {
     /// state of some transaction by leveraging rocksdb atomicity support. Also committed are the
     /// LedgerCounters.
     fn commit(&self, sealed_cs: SealedChangeSet) -> Result<()> {
-        self.db.write_schemas(sealed_cs.batch)?;
-
+        self.ledger_db.write_schemas(sealed_cs.batch)?;
         Ok(())
     }
 
@@ -1336,7 +1392,7 @@ impl DbWriter for AptosDB {
     fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {
         gauged_api("save_ledger_infos", || {
             restore_utils::save_ledger_infos(
-                self.db.clone(),
+                self.ledger_db.clone(),
                 self.ledger_store.clone(),
                 ledger_infos,
             )
@@ -1474,7 +1530,7 @@ impl DbWriter for AptosDB {
                 .ledger_info_to_transaction_infos_proof
                 .left_siblings();
             restore_utils::confirm_or_save_frozen_subtrees(
-                self.db.clone(),
+                self.ledger_db.clone(),
                 version,
                 frozen_subtrees,
             )?;
@@ -1492,7 +1548,7 @@ impl DbWriter for AptosDB {
                 .collect::<Vec<_>>();
             let transaction_infos = output_with_proof.proof.transaction_infos;
             restore_utils::save_transactions(
-                self.db.clone(),
+                self.ledger_db.clone(),
                 self.ledger_store.clone(),
                 self.transaction_store.clone(),
                 self.event_store.clone(),
@@ -1502,7 +1558,7 @@ impl DbWriter for AptosDB {
                 &events,
             )?;
             restore_utils::save_transaction_outputs(
-                self.db.clone(),
+                self.ledger_db.clone(),
                 self.transaction_store.clone(),
                 version,
                 outputs,
@@ -1514,10 +1570,8 @@ impl DbWriter for AptosDB {
         gauged_api("delete_genesis", || {
             // Create all the db pruners
             let db_pruners = utils::create_db_pruners(
-                self.db.clone(),
-                self.transaction_store.clone(),
-                self.ledger_store.clone(),
-                self.event_store.clone(),
+                Arc::clone(&self.ledger_db),
+                Arc::clone(&self.state_merkle_db),
             );
 
             // Execute each pruner to clean up the genesis state
@@ -1528,7 +1582,7 @@ impl DbWriter for AptosDB {
                 db_pruner.lock().set_target_version(target_version);
                 db_pruner.lock().prune(&mut db_batch, max_version)?;
             }
-            self.db.write_schemas(db_batch)
+            self.ledger_db.write_schemas(db_batch)
         })
     }
 }
@@ -1554,7 +1608,7 @@ pub trait GetRestoreHandler {
 impl GetRestoreHandler for Arc<AptosDB> {
     fn get_restore_handler(&self) -> RestoreHandler {
         RestoreHandler::new(
-            Arc::clone(&self.db),
+            Arc::clone(&self.ledger_db),
             Arc::clone(self),
             Arc::clone(&self.ledger_store),
             Arc::clone(&self.transaction_store),

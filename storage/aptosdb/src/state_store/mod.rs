@@ -45,14 +45,16 @@ pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 
 #[derive(Debug)]
 pub(crate) struct StateStore {
-    db: Arc<DB>,
+    ledger_db: Arc<DB>,
+    state_merkle_db: Arc<DB>,
     latest_checkpoint: Mutex<Option<(Version, HashValue)>>,
 }
 
 impl StateStore {
-    pub fn new(db: Arc<DB>) -> Self {
+    pub fn new(ledger_db: Arc<DB>, state_merkle_db: Arc<DB>) -> Self {
         let myself = Self {
-            db,
+            ledger_db,
+            state_merkle_db,
             latest_checkpoint: Mutex::new(None),
         };
 
@@ -113,7 +115,7 @@ impl StateStore {
         if next_version > 0 {
             let max_possible_version = next_version - 1;
             let mut iter = self
-                .db
+                .state_merkle_db
                 .rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
             iter.seek_for_prev(&NodeKey::new_empty_path(max_possible_version))?;
             if let Some((key, _node)) = iter.next().transpose()? {
@@ -124,7 +126,7 @@ impl StateStore {
         }
         // try PRE_GENESIS
         Ok(self
-            .db
+            .state_merkle_db
             .get::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(PRE_GENESIS_VERSION))?
             .map(|_pre_genesis_root| PRE_GENESIS_VERSION))
     }
@@ -154,7 +156,9 @@ impl StateStore {
         key_prefix: &StateKeyPrefix,
         desired_version: Version,
     ) -> Result<HashMap<StateKey, StateValue>> {
-        let mut iter = self.db.iter::<StateValueSchema>(Default::default())?;
+        let mut iter = self
+            .ledger_db
+            .iter::<StateValueSchema>(Default::default())?;
         let mut result = HashMap::new();
         let mut prev_key = None;
         iter.seek(&(key_prefix))?;
@@ -195,7 +199,7 @@ impl StateStore {
     /// Read the value for a specific version and require its existence. Call `get_value_by_value`
     /// for most use cases.
     fn get_value_at_version(&self, key_and_version: &(StateKey, Version)) -> Result<StateValue> {
-        self.db
+        self.ledger_db
             .get::<StateValueSchema>(key_and_version)
             .and_then(|v| {
                 v.ok_or_else(|| format_err!("State Value is missing for {:?}", *key_and_version))
@@ -210,7 +214,9 @@ impl StateStore {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<StateValue>> {
-        let mut iter = self.db.iter::<StateValueSchema>(Default::default())?;
+        let mut iter = self
+            .ledger_db
+            .iter::<StateValueSchema>(Default::default())?;
         iter.seek(&(state_key.clone(), version))?;
         iter.next()
             .transpose()?
@@ -223,7 +229,7 @@ impl StateStore {
             })
             // A hack to deal with PRE_GENESIS_VERSION
             .or_else(|| {
-                self.db
+                self.ledger_db
                     .get::<StateValueSchema>(&(state_key.clone(), PRE_GENESIS_VERSION))
                     .transpose()
             })
@@ -264,7 +270,7 @@ impl StateStore {
         value_state_sets: Vec<&HashMap<StateKey, StateValue>>,
         node_hashes: Option<Vec<&HashMap<NibblePath, HashValue>>>,
         first_version: Version,
-        cs: &mut ChangeSet,
+        ledger_db_cs: &mut ChangeSet,
     ) -> Result<Vec<HashValue>> {
         let value_sets: Vec<Vec<_>> = value_state_sets
             .iter()
@@ -297,20 +303,24 @@ impl StateStore {
             .iter()
             .enumerate()
             .for_each(|(i, stats)| {
-                let counter_bumps = cs.counter_bumps(first_version + i as u64);
+                let counter_bumps = ledger_db_cs.counter_bumps(first_version + i as u64);
                 counter_bumps.bump(LedgerCounter::NewStateNodes, stats.new_nodes);
                 counter_bumps.bump(LedgerCounter::NewStateLeaves, stats.new_leaves);
                 counter_bumps.bump(LedgerCounter::StaleStateNodes, stats.stale_nodes);
                 counter_bumps.bump(LedgerCounter::StaleStateLeaves, stats.stale_leaves);
             });
 
-        add_node_batch(&mut cs.batch, &tree_update_batch.node_batch)?;
+        let mut batch = SchemaBatch::new();
+        add_node_batch(&mut batch, &tree_update_batch.node_batch)?;
 
         tree_update_batch
             .stale_node_index_batch
             .iter()
-            .map(|row| cs.batch.put::<StaleNodeIndexSchema>(row, &()))
+            .map(|row| batch.put::<StaleNodeIndexSchema>(row, &()))
             .collect::<Result<Vec<()>>>()?;
+
+        // commit jellyfish merkle nodes
+        self.state_merkle_db.write_schemas(batch)?;
 
         Ok(new_root_hash_vec)
     }
@@ -329,7 +339,7 @@ impl StateStore {
         let mut ret = None;
 
         let mut iter = self
-            .db
+            .state_merkle_db
             .iter::<JellyfishMerkleNodeSchema>(Default::default())?;
         iter.seek_to_first();
 
@@ -421,14 +431,15 @@ impl StateStore {
 
 impl TreeReader<StateKey> for StateStore {
     fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node>> {
-        self.db.get::<JellyfishMerkleNodeSchema>(node_key)
+        self.state_merkle_db
+            .get::<JellyfishMerkleNodeSchema>(node_key)
     }
 
     fn get_rightmost_leaf(&self) -> Result<Option<(NodeKey, LeafNode)>> {
         // Since everything has the same version during restore, we seek to the first node and get
         // its version.
         let mut iter = self
-            .db
+            .state_merkle_db
             .iter::<JellyfishMerkleNodeSchema>(Default::default())?;
         iter.seek_to_first();
         let version = match iter.next().transpose()? {
@@ -457,7 +468,7 @@ impl TreeReader<StateKey> for StateStore {
 
         for num_nibbles in 1..=ROOT_NIBBLE_HEIGHT + 1 {
             let mut iter = self
-                .db
+                .state_merkle_db
                 .iter::<JellyfishMerkleNodeSchema>(Default::default())?;
             // nibble_path is always non-empty except for the root, so if we use an empty nibble
             // path as the seek key, the iterator will end up pointing to the end of the previous
@@ -490,7 +501,7 @@ impl TreeWriter<StateKey> for StateStore {
     fn write_node_batch(&self, node_batch: &NodeBatch) -> Result<()> {
         let mut batch = SchemaBatch::new();
         add_node_batch(&mut batch, node_batch)?;
-        self.db.write_schemas(batch)
+        self.state_merkle_db.write_schemas(batch)
     }
 
     fn finish_version(&self, version: Version, root_hash: HashValue) {
@@ -502,7 +513,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
     fn write_kv_batch(&self, node_batch: &StateValueBatch) -> Result<()> {
         let mut batch = SchemaBatch::new();
         add_kv_batch(&mut batch, node_batch)?;
-        self.db.write_schemas(batch)
+        self.ledger_db.write_schemas(batch)
     }
 }
 

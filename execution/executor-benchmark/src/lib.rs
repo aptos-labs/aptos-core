@@ -50,7 +50,7 @@ pub fn run_benchmark(
 ) {
     // Create rocksdb checkpoint.
     if checkpoint_dir.as_ref().exists() {
-        fs::remove_dir_all(checkpoint_dir.as_ref().join("aptosdb")).unwrap_or(());
+        fs::remove_dir_all(checkpoint_dir.as_ref()).unwrap_or(());
     }
     std::fs::create_dir_all(checkpoint_dir.as_ref()).unwrap();
 
@@ -61,7 +61,7 @@ pub fn run_benchmark(
         RocksdbConfig::default(),
     )
     .expect("db open failure.")
-    .create_checkpoint(checkpoint_dir.as_ref().join("aptosdb"))
+    .create_checkpoint(checkpoint_dir.as_ref())
     .expect("db checkpoint creation fails.");
 
     let (mut config, genesis_key) = aptos_genesis_tool::test_config();
