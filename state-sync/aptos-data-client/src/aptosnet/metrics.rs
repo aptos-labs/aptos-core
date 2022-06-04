@@ -1,11 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_config::network_id::PeerNetworkId;
 use aptos_crypto::_once_cell::sync::Lazy;
 use aptos_metrics::{
     register_histogram_vec, register_int_counter_vec, register_int_gauge_vec, HistogramTimer,
     HistogramVec, IntCounterVec, IntGaugeVec,
 };
+use short_hex_str::AsShortHexStr;
 
 /// The special label TOTAL_COUNT stores the sum of all values in the counter.
 pub const TOTAL_COUNT_LABEL: &str = "TOTAL_COUNT";
@@ -17,7 +19,7 @@ pub static SENT_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_data_client_sent_requests",
         "Counters related to sent requests",
-        &["request_types"]
+        &["request_types", "network", "peer_id"]
     )
     .unwrap()
 });
@@ -27,7 +29,7 @@ pub static SUCCESS_RESPONSES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_data_client_success_responses",
         "Counters related to success responses",
-        &["response_type"]
+        &["response_type", "network", "peer_id"]
     )
     .unwrap()
 });
@@ -37,7 +39,7 @@ pub static ERROR_RESPONSES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_data_client_error_responses",
         "Counters related to error responses",
-        &["response_type"]
+        &["response_type", "network", "peer_id"]
     )
     .unwrap()
 });
@@ -47,7 +49,7 @@ pub static REQUEST_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_data_client_request_latencies",
         "Counters related to request latencies",
-        &["request_type"]
+        &["request_type", "network", "peer_id"]
     )
     .unwrap()
 });
@@ -121,10 +123,20 @@ impl DataType {
     }
 }
 
-/// Increments the given counter with the provided label values.
-pub fn increment_counter(counter: &Lazy<IntCounterVec>, label: String) {
-    counter.with_label_values(&[&label]).inc();
-    counter.with_label_values(&[TOTAL_COUNT_LABEL]).inc();
+/// Increments the given request counter with the provided values.
+pub fn increment_request_counter(
+    counter: &Lazy<IntCounterVec>,
+    label: &str,
+    peer_network_id: PeerNetworkId,
+) {
+    let peer = peer_network_id.peer_id().short_str();
+    let network = peer_network_id.network_id();
+    counter
+        .with_label_values(&[label, network.as_str(), peer.as_str()])
+        .inc();
+    counter
+        .with_label_values(&[TOTAL_COUNT_LABEL, network.as_str(), peer.as_str()])
+        .inc();
 }
 
 /// Sets the gauge with the specific label and value
@@ -133,6 +145,14 @@ pub fn set_gauge(counter: &Lazy<IntGaugeVec>, label: String, value: u64) {
 }
 
 /// Starts the timer for the provided histogram and label values.
-pub fn start_timer(histogram: &Lazy<HistogramVec>, label: String) -> HistogramTimer {
-    histogram.with_label_values(&[&label]).start_timer()
+pub fn start_request_timer(
+    histogram: &Lazy<HistogramVec>,
+    request_label: &str,
+    peer_network_id: PeerNetworkId,
+) -> HistogramTimer {
+    let peer = peer_network_id.peer_id().short_str();
+    let network = peer_network_id.network_id();
+    histogram
+        .with_label_values(&[request_label, network.as_str(), peer.as_str()])
+        .start_timer()
 }

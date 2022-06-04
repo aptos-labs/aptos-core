@@ -27,7 +27,9 @@ aptos-metrics = { path = "../../crates/aptos-metrics" }
 aptos-time-service = { path = "../../crates/aptos-time-service", features = ["async"] }
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+netcore = { path = "../../network/netcore" }
 network = { path = "../../network" }
+short-hex-str = { path = "../../crates/short-hex-str" }
 storage-service-client = { path = "../storage-service/client" }
 storage-service-types = { path = "../storage-service/types" }
 

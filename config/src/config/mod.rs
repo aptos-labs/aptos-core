@@ -91,7 +91,7 @@ pub struct NodeConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct BaseConfig {
-    data_dir: PathBuf,
+    pub data_dir: PathBuf,
     pub role: RoleType,
     pub waypoint: WaypointConfig,
 }

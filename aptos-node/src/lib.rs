@@ -4,7 +4,7 @@
 use aptos_api::runtime::bootstrap as bootstrap_api;
 use aptos_config::{
     config::{
-        AptosDataClientConfig, DataStreamingServiceConfig, NetworkConfig, NodeConfig,
+        AptosDataClientConfig, BaseConfig, DataStreamingServiceConfig, NetworkConfig, NodeConfig,
         PersistableConfig, StorageServiceConfig,
     },
     network_id::NetworkId,
@@ -270,6 +270,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
     let (aptos_data_client, aptos_data_client_runtime) = setup_aptos_data_client(
         node_config.state_sync.storage_service,
         node_config.state_sync.aptos_data_client,
+        node_config.base.clone(),
         storage_service_client_network_handles,
         peer_metadata_storage,
     );
@@ -332,6 +333,7 @@ fn setup_data_streaming_service(
 fn setup_aptos_data_client(
     storage_service_config: StorageServiceConfig,
     aptos_data_client_config: AptosDataClientConfig,
+    base_config: BaseConfig,
     network_handles: HashMap<NetworkId, storage_service_client::StorageServiceNetworkSender>,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) -> (AptosNetDataClient, Runtime) {
@@ -351,6 +353,7 @@ fn setup_aptos_data_client(
     // Create the data client and spawn the data poller
     let (aptos_data_client, data_summary_poller) = AptosNetDataClient::new(
         aptos_data_client_config,
+        base_config,
         storage_service_config,
         TimeService::real(),
         network_client,
