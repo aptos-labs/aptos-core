@@ -6,7 +6,7 @@ sidebar_position: 14
 
 # Connecting to Aptos Incentivized Testnet
 
-Only do this if you got confirmation email from Aptos team for your eligibility. Nodes not selected will not be included in the genesis, thus not be able to connecting to incentivized testnet as a validator node. You can still run public fullnode in this case if you want.
+Only do this if you got confirmation email from Aptos team for your eligibility. Nodes not selected will not be included in the genesis, thus not be able to connect to incentivized testnet as a validator node. You can still run public fullnode in this case if you want.
 
 ## Using source code
 
