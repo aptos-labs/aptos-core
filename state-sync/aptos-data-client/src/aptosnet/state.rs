@@ -208,20 +208,45 @@ impl PeerStates {
 
     /// Creates a new pending in-flight request for the specified peer
     pub fn new_in_flight_request(&mut self, peer: &PeerNetworkId) {
-        if self.is_priority_peer(peer) {
-            let _ = self.in_flight_priority_polls.insert(*peer);
-        } else {
-            let _ = self.in_flight_regular_polls.insert(*peer);
-        };
+        let is_priority_peer = self.is_priority_peer(peer);
+        let in_flight_polls = self.get_in_flight_polls(is_priority_peer);
+        if !in_flight_polls.insert(*peer) {
+            error!(
+                (LogSchema::new(LogEntry::PeerStates)
+                    .event(LogEvent::PriorityAndRegularPeers)
+                    .message(&format!(
+                        "Peer already found with an in-flight poll! Priority: {:?}",
+                        is_priority_peer
+                    ))
+                    .peer(peer))
+            );
+        }
     }
 
     /// Marks the pending in-flight request as complete for the specified peer
     pub fn mark_in_flight_request_complete(&mut self, peer: &PeerNetworkId) {
-        if self.is_priority_peer(peer) {
-            let _ = self.in_flight_priority_polls.remove(peer);
+        let is_priority_peer = self.is_priority_peer(peer);
+        let in_flight_polls = self.get_in_flight_polls(is_priority_peer);
+        if !in_flight_polls.remove(peer) {
+            error!(
+                (LogSchema::new(LogEntry::PeerStates)
+                    .event(LogEvent::PriorityAndRegularPeers)
+                    .message(&format!(
+                        "Peer not found with an in-flight poll! Priority: {:?}",
+                        is_priority_peer
+                    ))
+                    .peer(peer))
+            );
+        }
+    }
+
+    /// Returns the in-flight polls based on the priority
+    fn get_in_flight_polls(&mut self, is_priority_peer: bool) -> &mut HashSet<PeerNetworkId> {
+        if is_priority_peer {
+            &mut self.in_flight_priority_polls
         } else {
-            let _ = self.in_flight_regular_polls.remove(peer);
-        };
+            &mut self.in_flight_regular_polls
+        }
     }
 
     /// Returns true iff the given peer is high-priority.
