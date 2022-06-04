@@ -33,7 +33,7 @@ use network::{
     application::interface::NetworkInterface,
     protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId},
 };
-use rand::seq::SliceRandom;
+use rand::{seq::SliceRandom, Rng};
 use std::{convert::TryFrom, fmt, sync::Arc, time::Duration};
 use storage_service_client::StorageServiceClient;
 use storage_service_types::{
@@ -334,10 +334,9 @@ impl AptosNetDataClient {
         match response {
             Ok(response) => {
                 let (context, payload) = response.into_parts();
-                increment_request_counter(&metrics::SUCCESS_RESPONSES, request.get_label(), peer);
 
                 // try to convert the storage service enum into the exact variant we're expecting.
-                match T::try_from(payload) {
+                let result = match T::try_from(payload) {
                     Ok(new_payload) => Ok(Response::new(context, new_payload)),
                     // if the variant doesn't match what we're expecting, report the issue.
                     Err(err) => {
@@ -346,7 +345,9 @@ impl AptosNetDataClient {
                             .notify_bad_response(ResponseError::InvalidPayloadDataType);
                         Err(err.into())
                     }
-                }
+                };
+                increment_request_counter(&metrics::SUCCESS_RESPONSES, request.get_label(), peer);
+                result
             }
             Err(error) => {
                 increment_request_counter(&metrics::ERROR_RESPONSES, error.get_label(), peer);
@@ -626,6 +627,7 @@ impl DataSummaryPoller {
         loop {
             // Wait for next round before polling
             ticker.next().await;
+            info!((LogSchema::new(LogEntry::DataSummaryPoller).message("Next poll time!")));
 
             // Update the global storage summary
             self.data_client.update_global_summary_cache();
@@ -633,6 +635,13 @@ impl DataSummaryPoller {
             // Fetch the prioritized and regular peers to poll (if any)
             let prioritized_peer = self.try_fetch_peer(true);
             let regular_peer = self.fetch_regular_peer(prioritized_peer.is_none());
+
+            if prioritized_peer.is_none() {
+                error!(
+                    (LogSchema::new(LogEntry::DataSummaryPoller)
+                        .message("Prioritized peer is none!!!"))
+                );
+            }
 
             // Ensure the peers to poll exist
             if prioritized_peer.is_none() && regular_peer.is_none() {
@@ -719,6 +728,18 @@ pub(crate) fn poll_peer(
     peer: PeerNetworkId,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
+    let random_num = rand::thread_rng().gen_range(0..9999999);
+    if peer.network_id().is_vfn_network() {
+        info!(
+            (LogSchema::new(LogEntry::DataSummaryPoller)
+                .event(LogEvent::PeerPollingError)
+                .message(&format!(
+                    "Mark peer in-flight! Random number: {:?}",
+                    random_num
+                ))
+                .peer(&peer))
+        );
+    }
     // Mark the in-flight poll as started. We do this here to prevent
     // the main polling loop from selecting the same peer concurrently.
     data_client.in_flight_request_started(&peer);
@@ -737,6 +758,18 @@ pub(crate) fn poll_peer(
             .send_request_to_peer_and_decode(peer, StorageServiceRequest::GetStorageServerSummary)
             .await
             .map(Response::into_payload);
+
+        if peer.network_id().is_vfn_network() {
+            info!(
+                (LogSchema::new(LogEntry::DataSummaryPoller)
+                    .event(LogEvent::PeerPollingError)
+                    .message(&format!(
+                        "Mark peer out-of-flight! Random number: {:?}",
+                        random_num
+                    ))
+                    .peer(&peer))
+            );
+        }
 
         // Mark the in-flight poll as now complete
         data_client.in_flight_request_complete(&peer);
