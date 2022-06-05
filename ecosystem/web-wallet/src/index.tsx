@@ -25,6 +25,7 @@ const theme: ThemeConfig = extendTheme({
     global: {
       'html, body': {
         margin: 0,
+        overflow: (process.env.NODE_ENV !== 'development') ? 'hidden' : undefined,
         padding: 0,
       },
     },

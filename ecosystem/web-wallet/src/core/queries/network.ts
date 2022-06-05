@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import axios from 'axios';
 import { LOCAL_FAUCET_URL, LOCAL_NODE_URL } from 'core/constants';
 
@@ -17,7 +20,7 @@ export const getLocalhostIsLive = async () => {
     // behavior is that it just assumes its live if localFaucet returns an error.
     // Should be fixed so that CORS errors are eliminated and we can accurately
     // tell if the network is live or not
-    if (err.config.url === 'http://0.0.0.0:8000') {
+    if (err.config.url === LOCAL_FAUCET_URL) {
       return true;
     }
     return false;

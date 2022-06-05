@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import {
   Heading, Text, useColorMode, VStack,
 } from '@chakra-ui/react';

@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { useToast } from '@chakra-ui/react';
 import { FaucetClient } from 'aptos';
 import { LOCAL_NODE_URL } from 'core/constants';
