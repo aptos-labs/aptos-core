@@ -7,3 +7,6 @@ runs:
       with:
         override: true
         components: rustfmt, clippy
+    - uses: bmwill/rust-cache@v1
+      with:
+        path: ~/.cargo/registry/src/**/librocksdb-sys-*
