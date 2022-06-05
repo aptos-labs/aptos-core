@@ -32,7 +32,7 @@
     "lint": "eslint ./src",
     "lint:fix": "eslint ./src --fix",
     "prebuild": "rimraf build",
-    "build": "npm run lint:fix && npm-run-all build:*",
+    "build": "yarn run lint:fix && yarn run build:app && yarn run build:bg",
     "build:app": "INLINE_RUNTIME_CHUNK=false react-scripts build",
     "build:bg": "webpack --mode production ./src/background.js --output-path ./build --output-filename background.js",
     "test": "react-scripts test",
