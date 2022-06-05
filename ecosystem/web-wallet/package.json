@@ -33,7 +33,7 @@
     "lint:fix": "eslint ./src --fix",
     "tauri": "tauri",
     "prebuild": "rimraf build",
-    "build": "yarn run lint:fix && npm-run-all build:*",
+    "build": "yarn run lint:fix && yarn run build:app && yarn run build:bg",
     "build:tauri": "yarn tauri build --target aarch64-apple-darwin",
     "build:app": "INLINE_RUNTIME_CHUNK=false react-scripts build",
     "build:bg": "webpack --mode production ./src/background.js --output-path ./build --output-filename background.js",

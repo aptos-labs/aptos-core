@@ -68,7 +68,7 @@ function TransferDrawer() {
         return;
       }
       queryClient.invalidateQueries('getAccountResources');
-      const txn = await getUserTransaction({ txnHashOrVersion: txnHash });
+      const txn = await getUserTransaction({ nodeUrl: aptosNetwork, txnHashOrVersion: txnHash });
       const amount = (txn?.payload)
         ? (txn.payload as { arguments: string[] }).arguments[1]
         : undefined;

@@ -21,6 +21,7 @@ import CreateWalletHeader from 'core/components/CreateWalletHeader';
 import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import { createNewAccount } from 'core/utils/account';
 import { secondaryBgColor } from 'core/constants';
+import { ChevronRightIcon } from '@chakra-ui/icons';
 
 export interface CredentialHeaderAndBodyProps {
   body?: string;
@@ -88,10 +89,10 @@ function NewAccountState() {
               <>
                 <Heading fontSize="xl" pb={4}>Account credentials</Heading>
                 <Text fontSize="sm" maxW="100%" wordBreak="break-word">
-                  Please DO NOT lose these credentials, this is the only
-                  time you will be able to store your them.
+                  Please DO NOT lose these credentials,
+                  and do not give your private key out to others.
                 </Text>
-                <VStack mt={4} spacing={4}>
+                <VStack mt={4} spacing={4} alignItems="flex-start">
                   <CredentialHeaderAndBody
                     header="Private key"
                     body={privateKeyHex}
@@ -105,9 +106,9 @@ function NewAccountState() {
                     body={address}
                   />
                 </VStack>
-                <Flex width="100%" pt={4}>
+                <Flex width="100%" pt={12}>
                   <ChakraLink to="/">
-                    <Button colorScheme="teal" size="sm">
+                    <Button colorScheme="teal" size="md" rightIcon={<ChevronRightIcon />}>
                       Proceed to wallet
                     </Button>
                   </ChakraLink>
