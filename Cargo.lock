@@ -834,15 +834,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-retrier"
-version = "0.1.0"
-dependencies = [
- "aptos-logger",
- "aptos-workspace-hack",
- "tokio",
-]
-
-[[package]]
 name = "aptos-sdk"
 version = "0.0.3"
 dependencies = [
@@ -1196,7 +1187,6 @@ dependencies = [
  "move-deps",
  "num-derive",
  "num-traits 0.2.15",
- "num-variants",
  "once_cell",
  "proptest",
  "proptest-derive",
@@ -3063,7 +3053,6 @@ dependencies = [
  "aptos-genesis-tool",
  "aptos-logger",
  "aptos-rest-client",
- "aptos-retrier",
  "aptos-sdk",
  "aptos-secure-storage",
  "aptos-transaction-builder",
@@ -5263,7 +5252,6 @@ dependencies = [
  "memsocket",
  "netcore",
  "network-builder",
- "num-variants",
  "once_cell",
  "pin-project",
  "proptest",
@@ -5530,16 +5518,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "578ede34cf02f8924ab9447f50c28075b4d3e5b269972345e7e0372b38c6cdcd"
 dependencies = [
  "autocfg",
-]
-
-[[package]]
-name = "num-variants"
-version = "0.1.0"
-dependencies = [
- "aptos-workspace-hack",
- "proc-macro2 1.0.39",
- "quote 1.0.18",
- "syn 1.0.95",
 ]
 
 [[package]]

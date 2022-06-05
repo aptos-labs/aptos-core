@@ -38,7 +38,6 @@ aptos-config = { path = "../../config" }
 aptos-genesis-tool = { path = "../../config/management/genesis" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
-aptos-retrier = { path = "../../crates/aptos-retrier" }
 aptos-sdk = { path = "../../sdk" }
 aptos-secure-storage = { path = "../../secure/storage" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
