@@ -11,7 +11,7 @@
 *todo: Add a release build folder so you don't have to yarn build*
 
 **B. Webpage**
-1. `yarn start`
+1. `yarn run`
 
 ## Linting
 ```bash
