@@ -4,9 +4,18 @@
 import { useState, useCallback } from 'react';
 import constate from 'constate';
 import { getAptosAccountState, getLocalStorageState } from 'core/utils/account';
-import { WALLET_STATE_LOCAL_STORAGE_KEY, WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY } from 'core/constants';
+import {
+  WALLET_STATE_FAUCET_LOCAL_STORAGE_KEY,
+  WALLET_STATE_LOCAL_STORAGE_KEY,
+  WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY,
+} from 'core/constants';
 import { AptosAccountState, LocalStorageState } from 'core/types';
-import { AptosNetwork, getLocalStorageNetworkState } from 'core/utils/network';
+import {
+  AptosFaucet,
+  AptosNetwork,
+  getLocalStorageFaucetState,
+  getLocalStorageNetworkState,
+} from 'core/utils/network';
 
 const defaultValue: LocalStorageState = {
   aptosAccountObject: undefined,
@@ -24,6 +33,9 @@ export default function useWalletState() {
   const [aptosAccount, setAptosAccount] = useState<AptosAccountState>(() => getAptosAccountState());
   const [aptosNetwork, setAptosNetwork] = useState<AptosNetwork | null>(
     () => getLocalStorageNetworkState(),
+  );
+  const [aptosFaucet, setAptosFaucet] = useState<AptosFaucet | null>(
+    () => getLocalStorageFaucetState(),
   );
 
   const updateWalletState = useCallback(({ aptosAccountState }: UpdateWalletStateProps) => {
@@ -48,6 +60,16 @@ export default function useWalletState() {
     }
   }, []);
 
+  const updateFaucetState = useCallback((faucet: AptosFaucet) => {
+    try {
+      setAptosFaucet(faucet);
+      window.localStorage.setItem(WALLET_STATE_FAUCET_LOCAL_STORAGE_KEY, faucet);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+    }
+  }, []);
+
   const signOut = useCallback(() => {
     setAptosAccount(undefined);
     setLocalStorageState({ aptosAccountObject: undefined });
@@ -56,8 +78,10 @@ export default function useWalletState() {
 
   return {
     aptosAccount,
+    aptosFaucet,
     aptosNetwork,
     signOut,
+    updateFaucetState,
     updateNetworkState,
     updateWalletState,
     walletState: localStorageState,

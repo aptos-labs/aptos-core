@@ -16,6 +16,7 @@ import {
   Input,
   InputGroup,
   InputRightAddon,
+  Select,
   Text,
   useColorMode,
   VStack,
@@ -23,9 +24,15 @@ import {
 import { SubmitHandler, useForm } from 'react-hook-form';
 import ChakraLink from 'core/components/ChakraLink';
 import useWalletState from 'core/hooks/useWalletState';
+import { AptosFaucet, AptosNetwork } from 'core/utils/network';
 import { AptosWhiteLogo, AptosBlackLogo } from 'core/components/AptosLogo';
 import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
-import { secondaryBgColor, secondaryErrorMessageColor } from 'core/constants';
+import {
+  secondaryBgColor,
+  secondaryErrorMessageColor,
+  LOCAL_URL_CONFIG,
+  DEVNET_URL_CONFIG,
+} from 'core/constants';
 import { getAccountResources } from 'core/queries/account';
 
 export const secondaryTextColor = {
@@ -35,7 +42,12 @@ export const secondaryTextColor = {
 
 function Login() {
   const { colorMode } = useColorMode();
-  const { aptosAccount, updateWalletState } = useWalletState();
+  const {
+    aptosAccount,
+    updateFaucetState,
+    updateNetworkState,
+    updateWalletState,
+  } = useWalletState();
   const navigate = useNavigate();
   const {
     formState: { errors }, handleSubmit, register, setError, watch,
@@ -126,6 +138,32 @@ function Login() {
             </ChakraLink>
           </VStack>
         </form>
+        <Select
+          placeholder="Choose network"
+          justifyContent="center"
+          alignSelf="center"
+          marginTop={4}
+          w="80%"
+          maxW="350px"
+          onChange={
+            (n) => {
+              switch (n.target.value) {
+                case 'devnet':
+                  updateFaucetState(DEVNET_URL_CONFIG.faucet as AptosFaucet);
+                  updateNetworkState(DEVNET_URL_CONFIG.network as AptosNetwork);
+                  break;
+
+                default:
+                  updateFaucetState(LOCAL_URL_CONFIG.faucet as AptosFaucet);
+                  updateNetworkState(LOCAL_URL_CONFIG.network as AptosNetwork);
+                  break;
+              }
+            }
+          }
+        >
+          <option value="localnet">localnet</option>
+          <option value="devnet">devnet</option>
+        </Select>
       </Flex>
       {/* TODO: Fill this in later */}
       {/* <HStack spacing={2} color={secondaryTextColor[colorMode]}>
