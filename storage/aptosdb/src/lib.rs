@@ -19,6 +19,7 @@ pub mod metrics;
 pub mod schema;
 
 mod change_set;
+mod db_options;
 mod event_store;
 mod ledger_counters;
 mod ledger_store;
@@ -33,6 +34,10 @@ mod aptosdb_test;
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
     change_set::{ChangeSet, SealedChangeSet},
+    db_options::{
+        gen_ledger_cfds, gen_rocksdb_options, gen_state_merkle_cfds, ledger_db_column_families,
+        state_merkle_db_column_families,
+    },
     errors::AptosDbError,
     event_store::EventStore,
     ledger_counters::LedgerCounters,
@@ -77,7 +82,7 @@ use aptos_types::{
 };
 use itertools::zip_eq;
 use once_cell::sync::Lazy;
-use schemadb::{ColumnFamilyName, Options, SchemaBatch, DB, DEFAULT_CF_NAME};
+use schemadb::{SchemaBatch, DB};
 use std::{
     collections::HashMap,
     iter::Iterator,
@@ -137,35 +142,6 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
     .collect()
 });
 
-fn ledger_db_column_families() -> Vec<ColumnFamilyName> {
-    vec![
-        /* empty cf */ DEFAULT_CF_NAME,
-        EPOCH_BY_VERSION_CF_NAME,
-        EVENT_ACCUMULATOR_CF_NAME,
-        EVENT_BY_KEY_CF_NAME,
-        EVENT_BY_VERSION_CF_NAME,
-        EVENT_CF_NAME,
-        LEDGER_COUNTERS_CF_NAME,
-        LEDGER_INFO_CF_NAME,
-        STALE_NODE_INDEX_CF_NAME,
-        STATE_VALUE_CF_NAME,
-        TRANSACTION_CF_NAME,
-        TRANSACTION_ACCUMULATOR_CF_NAME,
-        TRANSACTION_BY_ACCOUNT_CF_NAME,
-        TRANSACTION_BY_HASH_CF_NAME,
-        TRANSACTION_INFO_CF_NAME,
-        WRITE_SET_CF_NAME,
-    ]
-}
-
-fn state_merkle_db_column_families() -> Vec<ColumnFamilyName> {
-    vec![
-        /* empty cf */ DEFAULT_CF_NAME,
-        JELLYFISH_MERKLE_NODE_CF_NAME,
-        STALE_NODE_INDEX_CF_NAME,
-    ]
-}
-
 fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<()> {
     if num_requested > max_allowed {
         Err(AptosDbError::TooManyRequested(num_requested, max_allowed).into())
@@ -193,25 +169,18 @@ fn error_if_version_is_pruned(
     Ok(())
 }
 
-fn gen_rocksdb_options(config: &RocksdbConfig) -> Options {
-    let mut db_opts = Options::default();
-    db_opts.set_max_open_files(config.max_open_files);
-    db_opts.set_max_total_wal_size(config.max_total_wal_size);
-    db_opts
-}
-
 fn update_rocksdb_properties(ledger_rocksdb: &DB, state_merkle_rocksdb: &DB) -> Result<()> {
     let _timer = OTHER_TIMERS_SECONDS
         .with_label_values(&["update_rocksdb_properties"])
         .start_timer();
-    for cf_name in ledger_db_column_families() {
+    for cf_name in db_options::ledger_db_column_families() {
         for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
             ROCKSDB_PROPERTIES
                 .with_label_values(&[cf_name, aptos_rocksdb_property_name])
                 .set(ledger_rocksdb.get_property(cf_name, rockdb_property_name)? as i64);
         }
     }
-    for cf_name in state_merkle_db_column_families() {
+    for cf_name in db_options::state_merkle_db_column_families() {
         for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
             ROCKSDB_PROPERTIES
                 .with_label_values(&[cf_name, aptos_rocksdb_property_name])
@@ -329,38 +298,38 @@ impl AptosDB {
         let state_merkle_db_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
         let instant = Instant::now();
 
-        let mut rocksdb_opts = gen_rocksdb_options(&rocksdb_config);
+        let mut db_opts = gen_rocksdb_options(&rocksdb_config);
 
         let (ledger_db, state_merkle_db) = if readonly {
             (
-                DB::open_readonly(
+                DB::open_cf_readonly(
+                    &db_opts,
                     ledger_db_path.clone(),
                     "ledger_db_ro",
                     ledger_db_column_families(),
-                    &rocksdb_opts,
                 )?,
-                DB::open_readonly(
+                DB::open_cf_readonly(
+                    &db_opts,
                     state_merkle_db_path.clone(),
                     "state_merkle_db_ro",
                     state_merkle_db_column_families(),
-                    &rocksdb_opts,
                 )?,
             )
         } else {
-            rocksdb_opts.create_if_missing(true);
-            rocksdb_opts.create_missing_column_families(true);
+            db_opts.create_if_missing(true);
+            db_opts.create_missing_column_families(true);
             (
-                DB::open(
+                DB::open_cf(
+                    &db_opts,
                     ledger_db_path.clone(),
                     "ledger_db",
-                    ledger_db_column_families(),
-                    &rocksdb_opts,
+                    gen_ledger_cfds(),
                 )?,
-                DB::open(
+                DB::open_cf(
+                    &db_opts,
                     state_merkle_db_path.clone(),
                     "state_merkle_db",
-                    state_merkle_db_column_families(),
-                    &rocksdb_opts,
+                    gen_state_merkle_cfds(),
                 )?,
             )
         };
@@ -388,22 +357,22 @@ impl AptosDB {
 
         // Secondary needs `max_open_files = -1` per https://github.com/facebook/rocksdb/wiki/Secondary-instance
         rocksdb_config.max_open_files = -1;
-        let rocksdb_opts = gen_rocksdb_options(&rocksdb_config);
+        let db_opts = gen_rocksdb_options(&rocksdb_config);
 
         Ok(Self::new_with_dbs(
-            DB::open_as_secondary(
+            DB::open_cf_as_secondary(
+                &db_opts,
                 ledger_db_primary_path,
                 ledger_db_secondary_path,
                 "ledgerdb_sec",
                 ledger_db_column_families(),
-                &rocksdb_opts,
             )?,
-            DB::open_as_secondary(
+            DB::open_cf_as_secondary(
+                &db_opts,
                 state_merkle_db_primary_path,
                 state_merkle_db_secondary_path,
                 "state_merkle_db_sec",
                 state_merkle_db_column_families(),
-                &rocksdb_opts,
             )?,
             NO_OP_STORAGE_PRUNER_CONFIG,
         ))

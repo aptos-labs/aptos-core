@@ -11,8 +11,8 @@ use crate::{
     ledger_counters::LedgerCounter,
     schema::{
         jellyfish_merkle_node::JellyfishMerkleNodeSchema, stale_node_index::StaleNodeIndexSchema,
+        state_value::StateValueSchema,
     },
-    state_value::StateValueSchema,
     AptosDbError,
 };
 use anyhow::{anyhow, ensure, format_err, Result};
@@ -32,7 +32,7 @@ use aptos_types::{
     },
     transaction::{Version, PRE_GENESIS_VERSION},
 };
-use schemadb::{SchemaBatch, DB};
+use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::{collections::HashMap, sync::Arc};
 use storage_interface::StateSnapshotReceiver;
 
@@ -156,9 +156,17 @@ impl StateStore {
         key_prefix: &StateKeyPrefix,
         desired_version: Version,
     ) -> Result<HashMap<StateKey, StateValue>> {
-        let mut iter = self
-            .ledger_db
-            .iter::<StateValueSchema>(Default::default())?;
+        let mut read_opts = ReadOptions::default();
+        // Without this, iterators are not guaranteed a total order of all keys, but only keys for the same prefix.
+        // For example,
+        // aptos/abc|0
+        // aptos/abc|1
+        // aptos/abd|1
+        // if we seek('aptos/'), and call next, we may not reach `aptos/abd/1` because the prefix extractor we adopted
+        // here will stick with prefix `aptos/abc` and return `None` or any arbitrary result after visited all the
+        // keys starting with `aptos/abc`.
+        read_opts.set_total_order_seek(true);
+        let mut iter = self.ledger_db.iter::<StateValueSchema>(read_opts)?;
         let mut result = HashMap::new();
         let mut prev_key = None;
         iter.seek(&(key_prefix))?;
@@ -214,19 +222,14 @@ impl StateStore {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<StateValue>> {
-        let mut iter = self
-            .ledger_db
-            .iter::<StateValueSchema>(Default::default())?;
+        let mut read_opts = ReadOptions::default();
+        // We want `None` if the state_key changes in iteration.
+        read_opts.set_prefix_same_as_start(true);
+        let mut iter = self.ledger_db.iter::<StateValueSchema>(read_opts)?;
         iter.seek(&(state_key.clone(), version))?;
         iter.next()
             .transpose()?
-            .and_then(|((db_state_key, _), state_value)| {
-                if *state_key == db_state_key {
-                    Some(Ok(state_value))
-                } else {
-                    None
-                }
-            })
+            .map(|(_, state_value)| Ok(state_value))
             // A hack to deal with PRE_GENESIS_VERSION
             .or_else(|| {
                 self.ledger_db
