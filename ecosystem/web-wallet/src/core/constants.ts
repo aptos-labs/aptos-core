@@ -21,12 +21,6 @@ export const DEVNET_URL_CONFIG = {
   network: DEVNET_NODE_URL,
 };
 
-export const NODE_URL = LOCAL_NODE_URL;
-export const FAUCET_URL = LOCAL_FAUCET_URL;
-
-// export const NODE_URL = DEVNET_NODE_URL;
-// export const FAUCET_URL = DEVNET_FAUCET_URL;
-
 export const secondaryBgColor = {
   dark: 'gray.900',
   light: 'white',
