@@ -12,7 +12,7 @@ class DialogComponent < ViewComponent::Base
   def initialize(**rest)
     @rest = rest
     @rest[:class] = [
-      'rounded-xl border-none bg-neutral-900 text-white p-8 w-96 fixed',
+      'rounded-xl border-none bg-neutral-900 text-white w-96 fixed p-0',
       @rest[:class]
     ]
 
@@ -21,5 +21,6 @@ class DialogComponent < ViewComponent::Base
 
     @rest[:data] ||= {}
     @rest[:data][:controller] = 'dialog'
+    @rest[:data][:action] = 'click->dialog#handleClick'
   end
 end
