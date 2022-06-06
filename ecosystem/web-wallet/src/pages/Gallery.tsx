@@ -19,11 +19,12 @@ import SquareBox from 'core/components/SquareBox';
 import CreateNFTModal from 'core/components/CreateNFTModal';
 import GalleryItem from 'core/components/GalleryItem';
 import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
-import { NODE_URL, validStorageUris } from 'core/constants';
+import { validStorageUris } from 'core/constants';
 import useWalletState from 'core/hooks/useWalletState';
 import WalletLayout from 'core/layouts/WalletLayout';
 import { MetadataJson } from 'core/types/TokenMetadata';
 import { AptosAccountState } from 'core/types';
+import { AptosNetwork } from 'core/utils/network';
 
 interface TokenAttributes {
   description?: string;
@@ -38,7 +39,8 @@ type CollectionDict = Record<string, TokenAttributes[]>;
 type StorageDict = Record<string, MetadataJson>;
 
 interface GetGalleryItemsProps {
-  aptosAccount: AptosAccountState
+  aptosAccount: AptosAccountState,
+  aptosNetwork: AptosNetwork,
 }
 
 const secondaryBorderColor = {
@@ -49,11 +51,12 @@ const secondaryBorderColor = {
 // this is a temporary workaround until we get the indexer working
 const getGalleryItems = async ({
   aptosAccount,
+  aptosNetwork,
 }: GetGalleryItemsProps) => {
   if (!aptosAccount) {
     return undefined;
   }
-  const aptosClient = new AptosClient(NODE_URL);
+  const aptosClient = new AptosClient(aptosNetwork as string);
   const hexAddress = aptosAccount?.address().hex();
   if (hexAddress) {
     const collectionDict: CollectionDict = {};
@@ -125,11 +128,11 @@ const getGalleryItems = async ({
 };
 
 function Gallery() {
-  const { aptosAccount } = useWalletState();
+  const { aptosAccount, aptosNetwork } = useWalletState();
   const { colorMode } = useColorMode();
   const {
     data: galleryItems,
-  } = useQuery('gallery-items', () => getGalleryItems({ aptosAccount }));
+  } = useQuery('gallery-items', () => getGalleryItems({ aptosAccount, aptosNetwork }));
 
   return (
     <WalletLayout>

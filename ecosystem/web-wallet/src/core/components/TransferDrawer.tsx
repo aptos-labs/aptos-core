@@ -38,7 +38,6 @@ import { useMutation, useQuery, useQueryClient } from 'react-query';
 import { getUserTransaction } from 'core/queries/transaction';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import {
-  NODE_URL,
   secondaryErrorMessageColor, STATIC_GAS_AMOUNT,
 } from 'core/constants';
 import numeral from 'numeral';
@@ -52,7 +51,7 @@ export const secondaryDividerColor = {
 
 function TransferDrawer() {
   const { colorMode } = useColorMode();
-  const { aptosAccount } = useWalletState();
+  const { aptosAccount, aptosNetwork } = useWalletState();
   const toast = useToast();
   const queryClient = useQueryClient();
   const {
@@ -109,7 +108,7 @@ function TransferDrawer() {
       }
       const fromAccountResources = await getAccountResources({
         address: aptosAccount.address().hex(),
-        nodeUrl: NODE_URL,
+        nodeUrl: aptosNetwork as string,
       });
       const tokenBalance = getTestCoinTokenBalanceFromAccountResources({
         accountResources: fromAccountResources,

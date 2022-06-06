@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { FaucetClient } from 'aptos';
-import { FAUCET_URL, NODE_URL } from 'core/constants';
+import { LOCAL_FAUCET_URL, LOCAL_NODE_URL } from 'core/constants';
 
 export interface FundAccountWithFaucetProps {
   address: string;
@@ -11,8 +11,8 @@ export interface FundAccountWithFaucetProps {
 }
 
 export const fundAccountWithFaucet = async ({
-  nodeUrl = NODE_URL,
-  faucetUrl = FAUCET_URL,
+  nodeUrl = LOCAL_NODE_URL,
+  faucetUrl = LOCAL_FAUCET_URL,
   address,
 }: FundAccountWithFaucetProps): Promise<void> => {
   const faucetClient = new FaucetClient(nodeUrl, faucetUrl);
