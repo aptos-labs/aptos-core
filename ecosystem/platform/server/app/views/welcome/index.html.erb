@@ -15,7 +15,6 @@
       <% end %>
       <%= dialog.with_body do %>
         <div class="flex flex-col gap-3 outline-none" autofocus tabindex="-1">
-          <%= render LoginButtonComponent.new(provider: :github, size: :large, class: 'w-full') %>
           <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-full') %>
         </div>
       <% end %>
