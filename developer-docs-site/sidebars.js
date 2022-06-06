@@ -96,6 +96,11 @@ const sidebars = {
     "reference/node-liveness-criteria",
     "reference/telemetry",
     "reference/glossary",
+    {
+      type: "link",
+      href: "https://fullnode.devnet.aptoslabs.com/spec.html#",
+      label: "API Docs",
+    },
   ],
 };
 
