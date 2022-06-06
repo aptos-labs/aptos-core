@@ -37,6 +37,16 @@ jobs:
       - run: cd ./ecosystem/indexer-server/typescript && yarn install
       - run: cd ./ecosystem/indexer-server/typescript && yarn lint
 
+  docs-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+      - run: yarn lint
+        working-directory: developer-docs-site
+
   rust-lint:
     runs-on: high-perf-docker
     steps:

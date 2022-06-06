@@ -1,17 +1,17 @@
-import React from 'react';
-import PropTypes from 'prop-types';
+import React from "react";
+import PropTypes from "prop-types";
 import Link from "../Link";
 
-const PublicationLink = ({image, doc_link, title}) => (
+const PublicationLink = ({ image, doc_link, title }) => (
   <div>
     <p>
       <a href={doc_link} target="_blank">
-        <img className="deep-dive-image" src={image} alt={`${title} PDF Download`}/>
+        <img className="deep-dive-image" src={image} alt={`${title} PDF Download`} />
       </a>
     </p>
     <Link href="/technical-papers/publication-archive">Previous versions</Link>
   </div>
-)
+);
 
 PublicationLink.propTypes = {
   image: PropTypes.string.isRequired,

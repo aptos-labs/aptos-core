@@ -7,19 +7,16 @@ import { Account, RestClient, TESTNET_URL, FAUCET_URL, FaucetClient } from "./fi
 
 const readline = require("readline").createInterface({
   input: process.stdin,
-  output: process.stdout
+  output: process.stdout,
 });
 
 //:!:>section_1
 export class HelloBlockchainClient extends RestClient {
-
   /** Publish a new module to the blockchain within the specified account */
   async publishModule(accountFrom: Account, moduleHex: string): Promise<string> {
     const payload = {
-      "type": "module_bundle_payload",
-      "modules": [
-        {"bytecode": `0x${moduleHex}`},
-      ],
+      type: "module_bundle_payload",
+      modules: [{ bytecode: `0x${moduleHex}` }],
     };
     const txnRequest = await this.generateTransaction(accountFrom.address(), payload);
     const signedTxn = await this.signTransaction(accountFrom, txnRequest);
@@ -34,7 +31,7 @@ export class HelloBlockchainClient extends RestClient {
     if (resource == null) {
       return null;
     } else {
-      return resource["data"]["message"]
+      return resource["data"]["message"];
     }
   }
   //<:!:section_2
@@ -43,12 +40,10 @@ export class HelloBlockchainClient extends RestClient {
   async setMessage(contractAddress: string, accountFrom: Account, message: string): Promise<string> {
     let payload: { function: string; arguments: string[]; type: string; type_arguments: any[] };
     payload = {
-      "type": "script_function_payload",
-      "function": `0x${contractAddress}::Message::set_message`,
-      "type_arguments": [],
-      "arguments": [
-        Buffer.from(message, "utf-8").toString("hex")
-      ]
+      type: "script_function_payload",
+      function: `0x${contractAddress}::Message::set_message`,
+      type_arguments: [],
+      arguments: [Buffer.from(message, "utf-8").toString("hex")],
     };
 
     const txnRequest = await this.generateTransaction(accountFrom.address(), payload);
@@ -56,7 +51,6 @@ export class HelloBlockchainClient extends RestClient {
     const res = await this.submitTransaction(signedTxn);
     return res["hash"];
   }
-
 }
 //<:!:section_3
 
@@ -82,11 +76,14 @@ async function main() {
   console.log(`Alice: ${await restClient.accountBalance(alice.address())}`);
   console.log(`Bob: ${await restClient.accountBalance(bob.address())}`);
 
-  await new Promise<void>(resolve => {
-    readline.question("Update the module with Alice's address, build, copy to the provided path, and press enter.", () => {
-      resolve();
-      readline.close();
-    });
+  await new Promise<void>((resolve) => {
+    readline.question(
+      "Update the module with Alice's address, build, copy to the provided path, and press enter.",
+      () => {
+        resolve();
+        readline.close();
+      },
+    );
   });
   const modulePath = process.argv[2];
   const moduleHex = fs.readFileSync(modulePath).toString("hex");
@@ -98,14 +95,14 @@ async function main() {
   await restClient.waitForTransaction(txHash);
   console.log(`Initial value: ${await restClient.getMessage(alice.address(), alice.address())}`);
 
-  console.log("Setting the message to \"Hello, Blockchain\"");
+  console.log('Setting the message to "Hello, Blockchain"');
   txHash = await restClient.setMessage(alice.address(), alice, "Hello, Blockchain");
   await restClient.waitForTransaction(txHash);
   console.log(`New value: ${await restClient.getMessage(alice.address(), alice.address())}`);
 
   console.log("\n=== Testing Bob ===");
   console.log(`Initial value: ${await restClient.getMessage(alice.address(), bob.address())}`);
-  console.log("Setting the message to \"Hello, Blockchain\"");
+  console.log('Setting the message to "Hello, Blockchain"');
   txHash = await restClient.setMessage(alice.address(), bob, "Hello, Blockchain");
   await restClient.waitForTransaction(txHash);
   console.log(`New value: ${await restClient.getMessage(alice.address(), bob.address())}`);

@@ -1,7 +1,6 @@
 // const visitChildren = import("unist-util-visit-children");
 const fs = require("fs");
 
-
 /**
  * This allows injecting code from files so we only need to keep one copy of the code.
  * Used as such, from within any markdown file:
@@ -26,8 +25,8 @@ const fs = require("fs");
  * ```
  */
 
-const startTag = " ?\:\!\:\>";
-const endTag = " ?\<\:\!\:";
+const startTag = " ?:!:>";
+const endTag = " ?<:!:";
 
 const plugin = (options) => {
   return async (ast) => {
@@ -42,7 +41,7 @@ const plugin = (options) => {
         const fileContent = readFile(filepath).toString();
 
         let matches;
-        const re = new RegExp(startTag + sectionName + "\n?(.*?)\n?(\/\/)?(\#)?\s*" + endTag + sectionName, "s");
+        const re = new RegExp(startTag + sectionName + "\n?(.*?)\n?(//)?(#)?s*" + endTag + sectionName, "s");
         matches = fileContent.match(re);
 
         if (!matches) {
@@ -57,7 +56,7 @@ const plugin = (options) => {
 
 function readFile(filepath) {
   try {
-    return fs.readFileSync(filepath, {encoding: "utf8"});
+    return fs.readFileSync(filepath, { encoding: "utf8" });
   } catch (e) {
     throw new Error(`Failed to read file: ${filepath}`);
   }
