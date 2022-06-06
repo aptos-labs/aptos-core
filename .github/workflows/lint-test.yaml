@@ -29,7 +29,9 @@ jobs:
       # install packages for examples
       - run: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install
       - run: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install
-      # - run: failthing
+
+      # - if: ${{ github.ref != 'refs/heads/feature5' }}
+      #   run: failthing
       # Run package build+lint + tests
       - run: cd ./ecosystem/typescript/sdk && yarn install
       - run: cd ./ecosystem/typescript/sdk && yarn lint
