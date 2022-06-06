@@ -1,0 +1,12 @@
+queue_rules:
+  - name: default
+    conditions: []  # no extra conditions needed to get merged
+
+pull_request_rules:
+  - name: merge using the merge queue
+    conditions:
+      - base=main
+      - check-success=Travis CI - Pull Request
+    actions:
+      queue:
+        name: default
