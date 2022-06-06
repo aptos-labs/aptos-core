@@ -1,5 +1,5 @@
 ---
-title: "Transactions and states"
+title: "Transactions and States"
 slug: "basics-txns-states"
 ---
 The two fundamental concepts at the heart of the Aptos Blockchain are transactions and states:

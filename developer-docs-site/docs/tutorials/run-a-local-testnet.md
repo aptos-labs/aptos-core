@@ -1,5 +1,5 @@
 ---
-title: "Run a local testnet"
+title: "Run a Local Testnet"
 slug: "run-a-local-testnet"
 sidebar_position: 9
 ---

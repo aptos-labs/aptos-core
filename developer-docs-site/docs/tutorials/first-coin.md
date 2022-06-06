@@ -1,5 +1,5 @@
 ---
-title: "Your first Coin"
+title: "Your First Coin"
 slug: "your-first-coin"
 sidebar_position: 2
 ---
@@ -7,7 +7,7 @@ sidebar_position: 2
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Your first Coin
+# Your First Coin
 
 This tutorial details how to deploy and manage a new Coin. The steps are:
 

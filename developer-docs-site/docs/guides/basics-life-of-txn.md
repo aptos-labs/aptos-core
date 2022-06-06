@@ -1,5 +1,5 @@
 ---
-title: "Life of a transaction"
+title: "Life of a Transaction"
 slug: "basics-life-of-txn"
 sidebar_position: 1
 ---
