@@ -6,7 +6,8 @@ pull_request_rules:
   - name: merge using the merge queue
     conditions:
       - base=main
-      - check-success=Travis CI - Pull Request
+      - check-success=ecosystem-lint
+      - label=automerge
     actions:
       queue:
         name: default
