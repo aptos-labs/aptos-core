@@ -10,7 +10,7 @@ const codeInjector = require("./src/remark/code-injector");
 const config = {
   title: "Aptos Labs",
   tagline: "Developer Documentation",
-  url: "https://docs.aptoslabs.com",
+  url: "https://aptos.dev",
   baseUrl: "/",
   onBrokenLinks: "warn",
   onBrokenMarkdownLinks: "warn",
