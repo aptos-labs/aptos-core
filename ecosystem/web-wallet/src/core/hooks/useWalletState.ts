@@ -8,6 +8,7 @@ import {
   WALLET_STATE_FAUCET_LOCAL_STORAGE_KEY,
   WALLET_STATE_LOCAL_STORAGE_KEY,
   WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY,
+  LOCAL_URL_CONFIG,
 } from 'core/constants';
 import { AptosAccountState, LocalStorageState } from 'core/types';
 import {
@@ -31,11 +32,11 @@ export default function useWalletState() {
   );
 
   const [aptosAccount, setAptosAccount] = useState<AptosAccountState>(() => getAptosAccountState());
-  const [aptosNetwork, setAptosNetwork] = useState<AptosNetwork | null>(
-    () => getLocalStorageNetworkState(),
+  const [aptosNetwork, setAptosNetwork] = useState<AptosNetwork>(
+    () => (getLocalStorageNetworkState() || LOCAL_URL_CONFIG.network as AptosNetwork),
   );
-  const [aptosFaucet, setAptosFaucet] = useState<AptosFaucet | null>(
-    () => getLocalStorageFaucetState(),
+  const [aptosFaucet, setAptosFaucet] = useState<AptosFaucet>(
+    () => (getLocalStorageFaucetState() || LOCAL_URL_CONFIG.faucet as AptosFaucet),
   );
 
   const updateWalletState = useCallback(({ aptosAccountState }: UpdateWalletStateProps) => {
