@@ -49,7 +49,7 @@ const config = {
         logo: {
           alt: "Aptos Labs Logo",
           src: "img/aptos_word.svg",
-          srcDark: "/img/aptos_word.svg",
+          srcDark: "img/aptos_word_dark.svg",
         },
         items: [
           {
