@@ -36,10 +36,11 @@ use std::io::{self, Write};
 #[cfg(test)]
 struct NumberToStringFormatter;
 
-/// "u64" might get truncated when being serialized into javascript Number.
-/// This formatter converts u64 numbers into strings in javascript.
+/// "u64" and "u128" might get truncated when being serialized into javascript Number.
+/// This formatter converts u64 and u128 numbers into strings in javascript.
 #[cfg(test)]
 impl Formatter for NumberToStringFormatter {
+    // Formats u64 as a string
     fn write_u64<W>(&mut self, writer: &mut W, value: u64) -> io::Result<()>
     where
         W: ?Sized + Write,
@@ -47,6 +48,7 @@ impl Formatter for NumberToStringFormatter {
         write!(writer, "\"{}\"", value)
     }
 
+    // Formats u128 as a string
     fn write_number_str<W>(&mut self, writer: &mut W, value: &str) -> io::Result<()>
     where
         W: ?Sized + io::Write,
@@ -221,8 +223,43 @@ fn sign_transaction(raw_txn: RawTransaction) -> serde_json::Value {
     })
 }
 
+#[cfg(test)]
+fn visit_json_field<'a>(v: &'a mut serde_json::Value, paths: &[&str]) -> &'a mut serde_json::Value {
+    let mut field = v;
+    for p in paths {
+        let obj = field.as_object_mut().unwrap();
+        field = obj.get_mut(*p).unwrap();
+    }
+    field
+}
+
+#[cfg(test)]
+fn byte_array_to_hex(v: &mut serde_json::Value) -> serde_json::Value {
+    let mut byte_array: Vec<u8> = vec![];
+    for b in v.as_array_mut().unwrap() {
+        byte_array.push(b.as_u64().unwrap() as u8);
+    }
+    serde_json::Value::String(hex::encode(byte_array))
+}
+
 #[tokio::test]
 async fn test_script_function_payload() {
+    // The purpose of patches is to convert bytes arrays to hex-coded strings.
+    // Patches the serde_json result is easier comparing to implement a customized serializer.
+    fn patch(raw_txn_json: &mut serde_json::Value) {
+        let args = visit_json_field(
+            raw_txn_json,
+            &["raw_txn", "payload", "ScriptFunction", "args"],
+        );
+
+        let mut hex_args: Vec<serde_json::Value> = vec![];
+        for arg in args.as_array_mut().unwrap() {
+            hex_args.push(byte_array_to_hex(arg));
+        }
+
+        *args = json!(hex_args);
+    }
+
     let mut context = new_test_context(current_function_name!());
 
     let mut value_gen = ValueGenerator::deterministic();
@@ -238,7 +275,9 @@ async fn test_script_function_payload() {
             .gas_unit_price(gen_u64(&mut value_gen))
             .chain_id(ChainId::new(gen_chain_id(&mut value_gen)))
             .build();
-        txns.push(sign_transaction(raw_txn));
+        let mut signed_txn = sign_transaction(raw_txn);
+        patch(&mut signed_txn);
+        txns.push(signed_txn);
     }
 
     context.check_golden_output(json!(txns));
@@ -246,6 +285,22 @@ async fn test_script_function_payload() {
 
 #[tokio::test]
 async fn test_script_payload() {
+    fn patch(raw_txn_json: &mut serde_json::Value) {
+        let code = visit_json_field(raw_txn_json, &["raw_txn", "payload", "Script", "code"]);
+        *code = byte_array_to_hex(code);
+
+        let args = visit_json_field(raw_txn_json, &["raw_txn", "payload", "Script", "args"]);
+
+        for arg in args.as_array_mut().unwrap() {
+            let arg_obj = arg.as_object_mut().unwrap();
+
+            match arg_obj.get_mut("U8Vector") {
+                Some(val) => *val = byte_array_to_hex(val),
+                None => {}
+            }
+        }
+    }
+
     let mut context = new_test_context(current_function_name!());
 
     let mut value_gen = ValueGenerator::deterministic();
@@ -261,7 +316,9 @@ async fn test_script_payload() {
             .gas_unit_price(gen_u64(&mut value_gen))
             .chain_id(ChainId::new(gen_chain_id(&mut value_gen)))
             .build();
-        txns.push(sign_transaction(raw_txn));
+        let mut signed_txn = sign_transaction(raw_txn);
+        patch(&mut signed_txn);
+        txns.push(signed_txn);
     }
 
     context.check_golden_output(json!(txns));
@@ -269,6 +326,19 @@ async fn test_script_payload() {
 
 #[tokio::test]
 async fn test_module_payload() {
+    fn patch(raw_txn_json: &mut serde_json::Value) {
+        let codes = visit_json_field(
+            raw_txn_json,
+            &["raw_txn", "payload", "ModuleBundle", "codes"],
+        );
+
+        for code_element in codes.as_array_mut().unwrap() {
+            let code_obj = code_element.as_object_mut().unwrap();
+            let code = code_obj.get_mut("code").unwrap();
+            *code = byte_array_to_hex(code);
+        }
+    }
+
     let mut context = new_test_context(current_function_name!());
 
     let mut value_gen = ValueGenerator::deterministic();
@@ -284,7 +354,9 @@ async fn test_module_payload() {
             .gas_unit_price(gen_u64(&mut value_gen))
             .chain_id(ChainId::new(gen_chain_id(&mut value_gen)))
             .build();
-        txns.push(sign_transaction(raw_txn));
+        let mut signed_txn = sign_transaction(raw_txn);
+        patch(&mut signed_txn);
+        txns.push(signed_txn);
     }
 
     context.check_golden_output(json!(txns));
