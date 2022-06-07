@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable max-classes-per-file */
-import { Serializer, Deserializer, Bytes, Seq, deserializeVector, serializeVector } from '../bcs';
+import assert from 'assert';
+import { Serializer, Deserializer, Bytes, Seq, deserializeVector, serializeVector, Uint8 } from '../bcs';
 import { AccountAddress } from './account_address';
+
+/**
+ * MultiEd25519 currently supports at most 32 signatures.
+ */
+const MAX_SIGNATURES_SUPPORTED = 32;
 
 export abstract class TransactionAuthenticator {
   abstract serialize(serializer: Serializer): void;
@@ -51,34 +57,9 @@ export class TransactionAuthenticatorMultiEd25519 extends TransactionAuthenticat
   /**
    * An authenticator for multiple signatures.
    *
-   * @param public_key BCS bytes for a list of public keys.
+   * @param public_key
+   * @param signature
    *
-   * @example
-   * Developers must manually construct the input to get the BCS bytes.
-   * See below code example for the BCS input.
-   * ```ts
-   * interface  MultiEd25519PublicKey {
-   *   // A list of public keys
-   *   public_keys: Uint8Array[],
-   *   // At least `threshold` signatures must be valid
-   *   threshold: Uint8,
-   * }
-   * ```
-   * @param signature BCS bytes of multiple signatures.
-   *
-   * @example
-   * Developers must manually construct the input to get the BCS bytes.
-   * See below code example for the BCS input.
-   * ```ts
-   * interface  MultiEd25519Signature {
-   *   // A list of signatures
-   *   signatures: Uint8Array[],
-   *   // 4 bytes, at most 32 signatures are supported.
-   *   // If Nth bit value is `1`, the Nth signature should be provided in `signatures`.
-   *   // Bits are read from left to right.
-   *   bitmap: Uint8Array,
-   * }
-   * ```
    */
   constructor(public readonly public_key: MultiEd25519PublicKey, public readonly signature: MultiEd25519Signature) {
     super();
@@ -174,7 +155,16 @@ export class AccountAuthenticatorMultiEd25519 extends AccountAuthenticator {
 }
 
 export class Ed25519PublicKey {
-  constructor(public readonly value: Bytes) {}
+  static readonly LENGTH: number = 32;
+
+  readonly value: Bytes;
+
+  constructor(value: Bytes) {
+    if (value.length !== Ed25519PublicKey.LENGTH) {
+      throw new Error(`Ed25519PublicKey length should be ${Ed25519PublicKey.LENGTH}`);
+    }
+    this.value = value;
+  }
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.value);
@@ -187,7 +177,13 @@ export class Ed25519PublicKey {
 }
 
 export class Ed25519Signature {
-  constructor(public readonly value: Bytes) {}
+  static readonly LENGTH = 64;
+
+  constructor(public readonly value: Bytes) {
+    if (value.length !== Ed25519Signature.LENGTH) {
+      throw new Error(`Ed25519Signature length should be ${Ed25519Signature.LENGTH}`);
+    }
+  }
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.value);
@@ -200,27 +196,94 @@ export class Ed25519Signature {
 }
 
 export class MultiEd25519PublicKey {
-  constructor(public readonly value: Bytes) {}
+  /**
+   * Public key for a K-of-N multisig transaction. A K-of-N multisig transaction means that for such a
+   * transaction to be executed, at least K out of the N authorized signers have signed the transaction
+   * and passed the check conducted by the chain.
+   *
+   * @see {@link
+   * https://aptos.dev/guides/creating-a-signed-transaction#multisignature-transactions | Creating a Signed Transaction}
+   *
+   * @param public_keys A list of public keys
+   * @param threshold At least "threshold" signatures must be valid
+   */
+  constructor(public readonly public_keys: Seq<Ed25519PublicKey>, public readonly threshold: Uint8) {
+    if (threshold > MAX_SIGNATURES_SUPPORTED) {
+      throw new Error(`"threshold" cannot be larger than ${MAX_SIGNATURES_SUPPORTED}`);
+    }
+  }
+
+  toBytes(): Bytes {
+    const bytes = new Uint8Array(this.public_keys.length * Ed25519PublicKey.LENGTH + 1);
+    this.public_keys.forEach((k: Ed25519PublicKey, i: number) => {
+      bytes.set(k.value, i * Ed25519PublicKey.LENGTH);
+    });
+
+    bytes[this.public_keys.length * Ed25519PublicKey.LENGTH] = this.threshold;
+
+    return bytes;
+  }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeBytes(this.value);
+    serializer.serializeBytes(this.toBytes());
   }
 
   static deserialize(deserializer: Deserializer): MultiEd25519PublicKey {
-    const value = deserializer.deserializeBytes();
-    return new MultiEd25519PublicKey(value);
+    const bytes = deserializer.deserializeBytes();
+    const threshold = bytes[bytes.length - 1];
+
+    const keys: Seq<Ed25519PublicKey> = [];
+
+    for (let i = 0; i < bytes.length; i += Ed25519PublicKey.LENGTH) {
+      const begin = i * Ed25519PublicKey.LENGTH;
+      keys.push(new Ed25519PublicKey(bytes.subarray(begin, begin + Ed25519PublicKey.LENGTH)));
+    }
+    return new MultiEd25519PublicKey(keys, threshold);
   }
 }
 
 export class MultiEd25519Signature {
-  constructor(public readonly value: Bytes) {}
+  static BITMAP_LEN: Uint8 = 4;
+
+  /**
+   * Signature for a K-of-N multisig transaction.
+   *
+   * @see {@link
+   * https://aptos.dev/guides/creating-a-signed-transaction#multisignature-transactions | Creating a Signed Transaction}
+   *
+   * @param signatures A list of ed25519 signatures
+   * @param bitmap 4 bytes, at most 32 signatures are supported. If Nth bit value is `1`, the Nth
+   * signature should be provided in `signatures`. Bits are read from left to right
+   */
+  constructor(public readonly signatures: Seq<Ed25519Signature>, public readonly bitmap: Uint8Array) {
+    assert(bitmap.length === MultiEd25519Signature.BITMAP_LEN);
+  }
+
+  toBytes(): Bytes {
+    const bytes = new Uint8Array(this.signatures.length * Ed25519Signature.LENGTH + MultiEd25519Signature.BITMAP_LEN);
+    this.signatures.forEach((k: Ed25519Signature, i: number) => {
+      bytes.set(k.value, i * Ed25519Signature.LENGTH);
+    });
+
+    bytes.set(this.bitmap, this.signatures.length * Ed25519Signature.LENGTH);
+
+    return bytes;
+  }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeBytes(this.value);
+    serializer.serializeBytes(this.toBytes());
   }
 
   static deserialize(deserializer: Deserializer): MultiEd25519Signature {
-    const value = deserializer.deserializeBytes();
-    return new MultiEd25519Signature(value);
+    const bytes = deserializer.deserializeBytes();
+    const bitmap = bytes.subarray(bytes.length - 4);
+
+    const sigs: Seq<Ed25519Signature> = [];
+
+    for (let i = 0; i < bytes.length; i += Ed25519Signature.LENGTH) {
+      const begin = i * Ed25519Signature.LENGTH;
+      sigs.push(new Ed25519Signature(bytes.subarray(begin, begin + Ed25519Signature.LENGTH)));
+    }
+    return new MultiEd25519Signature(sigs, bitmap);
   }
 }

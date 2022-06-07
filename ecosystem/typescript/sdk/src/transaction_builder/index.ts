@@ -3,30 +3,29 @@ import { Buffer } from 'buffer/';
 import {
   Ed25519PublicKey,
   Ed25519Signature,
+  MultiEd25519PublicKey,
+  MultiEd25519Signature,
   RawTransaction,
   SignedTransaction,
   TransactionAuthenticatorEd25519,
+  TransactionAuthenticatorMultiEd25519,
 } from './aptos_types';
 import { bcsToBytes, Bytes } from './bcs';
 
 const SALT = 'APTOS::RawTransaction';
 
 export type SigningMessage = Buffer;
-export type TransactionSignature = Uint8Array;
 
 /** Function that takes in a Signing Message (serialized raw transaction)
  *  and returns a signature
  */
-export type SigningFn = (txn: SigningMessage) => TransactionSignature;
+export type SigningFn = (txn: SigningMessage) => Ed25519Signature | MultiEd25519Signature;
 
 class TransactionBuilder<F extends SigningFn> {
-  private readonly signingFunction: F;
+  protected readonly signingFunction: F;
 
-  private readonly publicKey: Uint8Array;
-
-  constructor(signingFunction: F, publicKey: Uint8Array) {
+  constructor(signingFunction: F) {
     this.signingFunction = signingFunction;
-    this.publicKey = publicKey;
   }
 
   /** Generates a Signing Message out of a raw transaction. */
@@ -38,14 +37,24 @@ class TransactionBuilder<F extends SigningFn> {
 
     return Buffer.from([...prefix, ...bcsToBytes(rawTxn)]);
   }
+}
+
+export class TransactionBuilderEd25519 extends TransactionBuilder<SigningFn> {
+  private readonly publicKey: Uint8Array;
+
+  constructor(signingFunction: SigningFn, publicKey: Uint8Array) {
+    super(signingFunction);
+    this.publicKey = publicKey;
+  }
 
   private signInternal(rawTxn: RawTransaction): SignedTransaction {
     const signingMessage = TransactionBuilder.getSigningMessage(rawTxn);
-    const signatureRaw = this.signingFunction(signingMessage);
+    const signature = this.signingFunction(signingMessage);
 
-    const signature = new Ed25519Signature(signatureRaw);
-
-    const authenticator = new TransactionAuthenticatorEd25519(new Ed25519PublicKey(this.publicKey), signature);
+    const authenticator = new TransactionAuthenticatorEd25519(
+      new Ed25519PublicKey(this.publicKey),
+      signature as Ed25519Signature,
+    );
 
     return new SignedTransaction(rawTxn, authenticator);
   }
@@ -56,6 +65,25 @@ class TransactionBuilder<F extends SigningFn> {
   }
 }
 
-/** Just a syntatic sugar.
- *  TODO: add default signing function for Ed25519 */
-export class TransactionBuilderEd25519 extends TransactionBuilder<SigningFn> {}
+export class TransactionBuilderMultiEd25519 extends TransactionBuilder<SigningFn> {
+  private readonly publicKey: MultiEd25519PublicKey;
+
+  constructor(signingFunction: SigningFn, publicKey: MultiEd25519PublicKey) {
+    super(signingFunction);
+    this.publicKey = publicKey;
+  }
+
+  private signInternal(rawTxn: RawTransaction): SignedTransaction {
+    const signingMessage = TransactionBuilder.getSigningMessage(rawTxn);
+    const signature = this.signingFunction(signingMessage);
+
+    const authenticator = new TransactionAuthenticatorMultiEd25519(this.publicKey, signature as MultiEd25519Signature);
+
+    return new SignedTransaction(rawTxn, authenticator);
+  }
+
+  /** Signs a raw transaction and returns a bcs serialized transaction. */
+  sign(rawTxn: RawTransaction): Bytes {
+    return bcsToBytes(this.signInternal(rawTxn));
+  }
+}

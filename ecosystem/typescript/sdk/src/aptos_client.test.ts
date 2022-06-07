@@ -1,3 +1,4 @@
+/* eslint-disable no-bitwise */
 import { AxiosResponse } from 'axios';
 import { AptosClient, raiseForStatus } from './aptos_client';
 import { AnyObject } from './util';
@@ -13,8 +14,14 @@ import {
   TransactionPayloadScriptFunction,
   TypeTagStruct,
   AccountAddress,
+  MultiEd25519PublicKey,
+  Ed25519PublicKey,
+  MultiEd25519Signature,
+  Ed25519Signature,
 } from './transaction_builder/aptos_types';
-import { bcsSerializeUint64, bcsToBytes } from './transaction_builder/bcs';
+import { bcsSerializeUint32, bcsSerializeUint64, bcsToBytes } from './transaction_builder/bcs';
+import { AuthenticationKey } from './transaction_builder/aptos_types/authentication_key';
+import { SigningMessage, TransactionBuilderMultiEd25519 } from './transaction_builder';
 
 test('gets genesis account', async () => {
   const client = new AptosClient(NODE_URL);
@@ -137,7 +144,7 @@ test(
       new ChainId(chainId),
     );
 
-    const bcsTxn = await AptosClient.generateBCSTransaction(account1, rawTxn);
+    const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
     const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
 
     await client.waitForTransaction(transactionRes.hash);
@@ -145,6 +152,92 @@ test(
     resources = await client.getAccountResources(account2.address());
     accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
     expect((accountResource.data as any).coin.value).toBe('717');
+  },
+  30 * 1000,
+);
+
+test(
+  'submits multisig transaction',
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL, null);
+
+    const account1 = new AptosAccount();
+    const account2 = new AptosAccount();
+    const account3 = new AptosAccount();
+    const multiSigPublicKey = new MultiEd25519PublicKey(
+      [
+        new Ed25519PublicKey(account1.signingKey.publicKey),
+        new Ed25519PublicKey(account2.signingKey.publicKey),
+        new Ed25519PublicKey(account3.signingKey.publicKey),
+      ],
+      2,
+    );
+
+    const authKey = AuthenticationKey.fromMultiEd25519PublicKey(multiSigPublicKey);
+
+    const mutisigAccountAddress = authKey.derivedAddress();
+    await faucetClient.fundAccount(mutisigAccountAddress, 5000);
+
+    let resources = await client.getAccountResources(mutisigAccountAddress);
+    let accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
+    expect((accountResource.data as any).coin.value).toBe('5000');
+
+    const account4 = new AptosAccount();
+    await faucetClient.fundAccount(account4.address(), 0);
+    resources = await client.getAccountResources(account4.address());
+    accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
+    expect((accountResource.data as any).coin.value).toBe('0');
+
+    const token = new TypeTagStruct(StructTag.fromString('0x1::TestCoin::TestCoin'));
+
+    const scriptFunctionPayload = new TransactionPayloadScriptFunction(
+      ScriptFunction.natual(
+        '0x1::Coin',
+        'transfer',
+        [token],
+        [bcsToBytes(AccountAddress.fromHex(account4.address())), bcsSerializeUint64(123)],
+      ),
+    );
+
+    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
+      client.getAccount(mutisigAccountAddress),
+      client.getChainId(),
+    ]);
+
+    const rawTxn = new RawTransaction(
+      AccountAddress.fromHex(mutisigAccountAddress),
+      BigInt(sequnceNumber),
+      scriptFunctionPayload,
+      1000n,
+      1n,
+      BigInt(Math.floor(Date.now() / 1000) + 10),
+      new ChainId(chainId),
+    );
+
+    const txnBuilder = new TransactionBuilderMultiEd25519((signingMessage: SigningMessage) => {
+      const sigHexStr1 = account1.signBuffer(signingMessage);
+      const sigHexStr3 = account3.signBuffer(signingMessage);
+      let bitmap = 0;
+      bitmap |= 128;
+      bitmap |= 128 >> 2;
+
+      const muliEd25519Sig = new MultiEd25519Signature(
+        [new Ed25519Signature(sigHexStr1.toUint8Array()), new Ed25519Signature(sigHexStr3.toUint8Array())],
+        bcsSerializeUint32(bitmap),
+      );
+
+      return muliEd25519Sig;
+    }, multiSigPublicKey);
+
+    const bcsTxn = txnBuilder.sign(rawTxn);
+    const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
+
+    await client.waitForTransaction(transactionRes.hash);
+
+    resources = await client.getAccountResources(account4.address());
+    accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
+    expect((accountResource.data as any).coin.value).toBe('123');
   },
   30 * 1000,
 );
