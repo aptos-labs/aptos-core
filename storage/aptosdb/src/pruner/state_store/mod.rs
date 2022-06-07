@@ -35,11 +35,7 @@ impl DBPruner for StateStorePruner {
         STATE_STORE_PRUNER_NAME
     }
 
-    fn prune(
-        &self,
-        _ledger_db_batch: &mut SchemaBatch,
-        max_versions: u64,
-    ) -> anyhow::Result<Version> {
+    fn prune(&self, max_versions: u64) -> anyhow::Result<Version> {
         if !self.is_pruning_pending() {
             return Ok(self.min_readable_version());
         }

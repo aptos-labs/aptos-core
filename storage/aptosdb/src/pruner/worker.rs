@@ -1,17 +1,21 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use aptos_types::transaction::Version;
-use schemadb::{SchemaBatch, DB};
+use schemadb::DB;
 
 use crate::pruner::{db_pruner::DBPruner, utils};
 use aptos_infallible::Mutex;
 use itertools::zip_eq;
-use std::sync::{mpsc::Receiver, Arc};
+use rayon::prelude::*;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    mpsc::Receiver,
+    Arc,
+};
 
 /// Maintains all the DBPruners and periodically calls the db_pruner's prune method to prune the DB.
 /// This also exposes API to report the progress to the parent thread.
 pub struct Worker {
-    ledger_db: Arc<DB>,
     command_receiver: Receiver<Command>,
     /// Keeps tracks of all the DB pruners
     db_pruners: Vec<Mutex<Arc<dyn DBPruner + Send + Sync>>>,
@@ -33,9 +37,8 @@ impl Worker {
         min_readable_versions: Arc<Mutex<Vec<Version>>>,
         max_version_to_prune_per_batch: u64,
     ) -> Self {
-        let db_pruners = utils::create_db_pruners(ledger_db.clone(), state_merkle_db);
+        let db_pruners = utils::create_db_pruners(ledger_db, state_merkle_db);
         Self {
-            ledger_db: Arc::clone(&ledger_db),
             db_pruners,
             command_receiver,
             min_readable_versions,
@@ -48,19 +51,14 @@ impl Worker {
         while self.receive_commands() {
             // Process a reasonably small batch of work before trying to receive commands again,
             // in case `Command::Quit` is received (that's when we should quit.)
-            let mut error_in_pruning = false;
-            let mut ledger_db_batch = SchemaBatch::new();
-            for db_pruner in &self.db_pruners {
-                let result = db_pruner
-                    .lock()
-                    .prune(&mut ledger_db_batch, self.max_version_to_prune_per_batch);
-                result.map_err(|_| error_in_pruning = true).ok();
-            }
-            // Commit all the changes to DB atomically
-            self.ledger_db
-                .write_schemas(ledger_db_batch)
-                .map_err(|_| error_in_pruning = true)
-                .ok();
+            let error_in_pruning = AtomicBool::new(false);
+            let max_version_to_pruner = self.max_version_to_prune_per_batch;
+            self.db_pruners.par_iter().for_each(|db_pruner| {
+                let result = db_pruner.lock().prune(max_version_to_pruner);
+                result
+                    .map_err(|_| error_in_pruning.store(true, Ordering::Relaxed))
+                    .ok();
+            });
             let mut pruning_pending = false;
             for db_pruner in &self.db_pruners {
                 // if any of the pruner has pending pruning, then we don't block on receive
@@ -68,7 +66,7 @@ impl Worker {
                     pruning_pending = true;
                 }
             }
-            if !pruning_pending || error_in_pruning {
+            if !pruning_pending || error_in_pruning.load(Ordering::Relaxed) {
                 self.blocking_recv = true;
             } else {
                 self.blocking_recv = false;

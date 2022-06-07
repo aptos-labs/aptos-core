@@ -3,7 +3,7 @@
 
 use aptos_logger::{error, info};
 use aptos_types::transaction::Version;
-use schemadb::SchemaBatch;
+
 use std::{cmp::min, thread::sleep, time::Duration};
 
 /// Defines the trait for pruner for different DB
@@ -38,11 +38,7 @@ pub trait DBPruner {
 
     /// Performs the actual pruning, a target version is passed, which is the target the pruner
     /// tries to prune.
-    fn prune(
-        &self,
-        ledger_db_batch: &mut SchemaBatch,
-        max_versions: u64,
-    ) -> anyhow::Result<Version>;
+    fn prune(&self, max_versions: u64) -> anyhow::Result<Version>;
 
     /// Initializes the least readable version stored in underlying DB storage
     fn initialize_min_readable_version(&self) -> anyhow::Result<Version>;

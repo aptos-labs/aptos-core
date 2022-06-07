@@ -82,7 +82,7 @@ use aptos_types::{
 };
 use itertools::zip_eq;
 use once_cell::sync::Lazy;
-use schemadb::{SchemaBatch, DB};
+use schemadb::DB;
 use std::{
     collections::HashMap,
     iter::Iterator,
@@ -1428,12 +1428,11 @@ impl DbWriter for AptosDB {
             // Execute each pruner to clean up the genesis state
             let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive).
             let max_version = 1; // We should only really be pruning at a single version.
-            let mut db_batch = SchemaBatch::new();
             for db_pruner in db_pruners {
                 db_pruner.lock().set_target_version(target_version);
-                db_pruner.lock().prune(&mut db_batch, max_version)?;
+                db_pruner.lock().prune(max_version)?;
             }
-            self.ledger_db.write_schemas(db_batch)
+            Ok(())
         })
     }
 }

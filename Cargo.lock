@@ -1203,6 +1203,7 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rand 0.8.5",
+ "rayon",
  "schemadb",
  "scratchpad",
  "serde 1.0.137",
