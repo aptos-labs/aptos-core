@@ -23,6 +23,8 @@ mod network;
 #[cfg(test)]
 mod operational_tooling;
 #[cfg(test)]
+mod rosetta;
+#[cfg(test)]
 mod state_sync;
 #[cfg(test)]
 mod state_sync_v2;

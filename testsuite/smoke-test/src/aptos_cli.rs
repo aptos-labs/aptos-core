@@ -28,7 +28,7 @@ pub async fn setup_test(num_nodes: usize) -> (LocalSwarm, CliTestFramework) {
     (swarm, tool)
 }
 
-fn launch_faucet(
+pub fn launch_faucet(
     endpoint: reqwest::Url,
     mint_key: Ed25519PrivateKey,
     chain_id: ChainId,

@@ -7481,6 +7481,7 @@ dependencies = [
  "aptos-management",
  "aptos-operational-tool",
  "aptos-rest-client",
+ "aptos-rosetta",
  "aptos-sdk",
  "aptos-secure-storage",
  "aptos-temppath",
