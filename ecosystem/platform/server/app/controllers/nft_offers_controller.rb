@@ -12,13 +12,7 @@ class NftOffersController < ApplicationController
 
   def update
     nft = Nft.find_by(user: current_user, nft_offer: @nft_offer)
-
-    # TODO: Compute image_url depending on nft_offer.name.
-    image_url = "https://example.com/#{Random.uuid}"
-    nft ||= Nft.create(user: current_user, nft_offer: @nft_offer, image_url:)
-
-    # TODO: Mint the NFT on devnet and save the address.
-
+    nft ||= Nft.create(user: current_user, nft_offer: @nft_offer)
     redirect_to nft_path(nft)
   end
 
@@ -39,7 +33,7 @@ class NftOffersController < ApplicationController
   def offer_dependent_logic
     case @nft_offer.name
     when 'nft_nyc'
-      ensure_google!
+      redirect_to nft_nyc_path unless current_user.authorizations.where(provider: :google).exists?
     end
   end
 end

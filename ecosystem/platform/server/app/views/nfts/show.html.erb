@@ -7,6 +7,6 @@
       <%= render DividerComponent.new(scheme: :primary) %>
     </div>
 
-    <img class="w-64 h-64 border border-white rounded-lg mb-8" src="<%= @nft.image_url %>" alt="The image that this NFT points to"></img>
+    <img class="w-64 h-64 border border-white rounded-lg mb-8" src="<%= nft_image_url(@nft) %>" alt="The image that this NFT points to"></img>
   </div>
 </div>
