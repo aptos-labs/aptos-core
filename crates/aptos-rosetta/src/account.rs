@@ -7,14 +7,12 @@
 //!
 
 use crate::{
-    common::{check_network, handle_request, with_context},
-    error::ApiError,
+    common::{check_network, get_account, get_account_balance, handle_request, with_context},
+    error::{ApiError, ApiResult},
     types::{AccountBalanceRequest, AccountBalanceResponse, Amount, BlockIdentifier, Currency},
-    RosettaContext,
+    RosettaContext, CURRENCY, NUM_DECIMALS,
 };
 use aptos_logger::{debug, trace};
-use aptos_types::account_address::AccountAddress;
-use std::str::FromStr;
 use warp::Filter;
 
 /// Account routes e.g. balance
@@ -35,7 +33,7 @@ pub fn routes(
 async fn account_balance(
     request: AccountBalanceRequest,
     server_context: RosettaContext,
-) -> Result<AccountBalanceResponse, ApiError> {
+) -> ApiResult<AccountBalanceResponse> {
     debug!("/account/balance");
     trace!(
         request = ?request,
@@ -52,13 +50,9 @@ async fn account_balance(
     if request.block_identifier.is_some() {
         return Err(ApiError::HistoricBalancesUnsupported);
     }
-
     let rest_client = server_context.rest_client;
-
-    let address = AccountAddress::from_str(&request.account_identifier.address)
-        .map_err(|err| ApiError::AptosError(err.to_string()))?;
-    let response = rest_client.get_account(address).await;
-    let response = response.map_err(|_| ApiError::AccountNotFound)?;
+    let address = request.account_identifier.account_address()?;
+    let response = get_account(&rest_client, address).await?;
     let state = response.state();
     let txns = rest_client
         .get_transactions(Some(state.version), Some(1))
@@ -78,18 +72,15 @@ async fn account_balance(
         hash: txn_info.hash.to_string(),
     };
 
-    let response = rest_client
-        .get_account_balance(address)
-        .await
-        .map_err(|err| ApiError::AptosError(err.to_string()))?;
+    let response = get_account_balance(&rest_client, address).await?;
     let balance = response.into_inner();
 
     // TODO: Cleanup to match reality
     let balances = vec![Amount {
         value: balance.coin.value.to_string(),
         currency: Currency {
-            symbol: "APTOS".to_string(),
-            decimals: 6,
+            symbol: CURRENCY.to_string(),
+            decimals: NUM_DECIMALS,
         },
     }];
 

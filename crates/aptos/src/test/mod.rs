@@ -65,7 +65,7 @@ impl CliTestFramework {
                 max_gas: 1000,
             },
             profile_options: profile(index),
-            account: account_id(index),
+            account: Self::account_id(index),
             use_faucet: false,
             faucet_options: Default::default(),
             initial_coins: DEFAULT_FUNDED_COINS,
@@ -79,7 +79,7 @@ impl CliTestFramework {
             encoding_options: Default::default(),
             write_options: Default::default(),
             profile_options: profile(index),
-            account: account_id(index),
+            account: Self::account_id(index),
             use_faucet: true,
             faucet_options: Default::default(),
             initial_coins: 0,
@@ -91,7 +91,7 @@ impl CliTestFramework {
     pub async fn fund_account(&self, index: usize) -> CliTypedResult<String> {
         FundAccount {
             profile_options: profile(index),
-            account: account_id(index),
+            account: Self::account_id(index),
             faucet_options: Default::default(),
             num_coins: DEFAULT_FUNDED_COINS,
         }
@@ -103,7 +103,7 @@ impl CliTestFramework {
         ListAccount {
             rest_options: Default::default(),
             profile_options: profile(index),
-            account: Some(account_id(index)),
+            account: Some(Self::account_id(index)),
             query,
         }
         .execute()
@@ -116,7 +116,7 @@ impl CliTestFramework {
         receiver_index: usize,
         amount: u64,
     ) -> CliTypedResult<TransferSummary> {
-        let receiver_account = account_id(receiver_index);
+        let receiver_account = Self::account_id(receiver_index);
 
         TransferCoins {
             write_options: Default::default(),
@@ -199,13 +199,13 @@ impl CliTestFramework {
 
         result
     }
-}
 
-fn account_id(index: usize) -> AccountAddress {
-    let profile = CliConfig::load_profile(&index.to_string())
-        .expect("Must select account in bounds")
-        .expect("Expected to already be initialized");
-    profile.account.expect("Expected to have account address")
+    pub fn account_id(index: usize) -> AccountAddress {
+        let profile = CliConfig::load_profile(&index.to_string())
+            .expect("Must select account in bounds")
+            .expect("Expected to already be initialized");
+        profile.account.expect("Expected to have account address")
+    }
 }
 
 fn profile(index: usize) -> ProfileOptions {

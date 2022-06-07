@@ -1,7 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::ApiError, types::NetworkIdentifier, Network, RosettaContext};
+use crate::{
+    error::{ApiError, ApiResult},
+    types::NetworkIdentifier,
+    RosettaContext,
+};
+use aptos_rest_client::{aptos::Balance, Account, Response};
+use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use std::{convert::Infallible, future::Future, str::FromStr};
@@ -13,9 +19,9 @@ pub const BLOCKCHAIN: &str = "aptos";
 pub fn check_network(
     network_identifier: NetworkIdentifier,
     server_context: &RosettaContext,
-) -> Result<(), ApiError> {
+) -> ApiResult<()> {
     if network_identifier.blockchain == BLOCKCHAIN
-        || Network::from_str(network_identifier.network.trim())? == server_context.network
+        || ChainId::from_str(network_identifier.network.trim())? == server_context.chain_id
     {
         Ok(())
     } else {
@@ -62,4 +68,24 @@ where
         };
         Box::pin(fut)
     }
+}
+
+pub async fn get_account(
+    rest_client: &aptos_rest_client::Client,
+    address: AccountAddress,
+) -> ApiResult<Response<Account>> {
+    rest_client
+        .get_account(address)
+        .await
+        .map_err(|_| ApiError::AccountNotFound)
+}
+
+pub async fn get_account_balance(
+    rest_client: &aptos_rest_client::Client,
+    address: AccountAddress,
+) -> Result<Response<Balance>, ApiError> {
+    rest_client
+        .get_account_balance(address)
+        .await
+        .map_err(|_| ApiError::AccountNotFound)
 }

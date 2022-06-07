@@ -5,11 +5,12 @@
 //!
 //! [Rosetta API Spec](https://www.rosetta-api.org/docs/Reference.html)
 
-use crate::types::Network;
 use aptos_api::runtime::WebServer;
 use aptos_config::config::ApiConfig;
 use aptos_rest_client::aptos_api_types::Error;
+use aptos_types::chain_id::ChainId;
 use std::convert::Infallible;
+use tokio::task::JoinHandle;
 use warp::{
     http::{HeaderValue, Method, StatusCode},
     reject::{MethodNotAllowed, PayloadTooLarge, UnsupportedMediaType},
@@ -17,20 +18,24 @@ use warp::{
 };
 
 mod account;
+pub mod client;
 pub mod common;
 pub mod error;
 pub mod types;
+
+pub const CURRENCY: &str = "APTOS";
+pub const NUM_DECIMALS: u64 = 6;
 
 /// Rosetta API context for use on all APIs
 #[derive(Clone, Debug)]
 pub struct RosettaContext {
     pub rest_client: aptos_rest_client::Client,
-    pub network: Network,
+    pub chain_id: ChainId,
 }
 
 /// Creates HTTP server (warp-based) for Rosetta
 pub fn bootstrap(
-    network: Network,
+    chain_id: ChainId,
     api_config: ApiConfig,
     rest_client: aptos_rest_client::Client,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
@@ -45,11 +50,27 @@ pub fn bootstrap(
     runtime.spawn(async move {
         let context = RosettaContext {
             rest_client,
-            network,
+            chain_id,
         };
         api.serve(routes(context)).await;
     });
     Ok(runtime)
+}
+
+pub async fn bootstrap_async(
+    chain_id: ChainId,
+    api_config: ApiConfig,
+    rest_client: aptos_rest_client::Client,
+) -> anyhow::Result<JoinHandle<()>> {
+    let api = WebServer::from(api_config);
+    let handle = tokio::spawn(async move {
+        let context = RosettaContext {
+            rest_client,
+            chain_id,
+        };
+        api.serve(routes(context)).await;
+    });
+    Ok(handle)
 }
 
 /// Collection of all routes for the server

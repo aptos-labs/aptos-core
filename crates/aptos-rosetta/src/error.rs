@@ -2,10 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{types, types::ErrorDetails};
+use hex::FromHexError;
+use move_deps::move_core_types::account_address::AccountAddressParseError;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use warp::{http::StatusCode, reply::Reply};
 
-#[derive(Debug, Error)]
+pub type ApiResult<T> = Result<T, ApiError>;
+
+#[derive(Debug, Deserialize, Serialize, Error)]
 pub enum ApiError {
     #[error("Aptos error {0}")]
     AptosError(String),
@@ -19,8 +24,6 @@ pub enum ApiError {
     BadTransferOperations(String),
     #[error("account not found")]
     AccountNotFound,
-    #[error("system time error: {0:?}")]
-    SystemTimeError(#[from] std::time::SystemTimeError),
     #[error("bad signature")]
     BadSignature,
     #[error("bad signature type")]
@@ -46,7 +49,6 @@ impl ApiError {
             ApiError::DeserializationFailed(_) => 50,
             ApiError::BadTransferOperations(_) => 70,
             ApiError::AccountNotFound => 80,
-            ApiError::SystemTimeError(_) => 90,
             ApiError::BadSignature => 110,
             ApiError::BadSignatureType => 120,
             ApiError::BadTransactionScript => 130,
@@ -65,7 +67,6 @@ impl ApiError {
             ApiError::DeserializationFailed(_) => false,
             ApiError::BadTransferOperations(_) => false,
             ApiError::AccountNotFound => true,
-            ApiError::SystemTimeError(_) => true,
             ApiError::BadSignature => false,
             ApiError::BadSignatureType => false,
             ApiError::BadTransactionScript => false,
@@ -84,7 +85,6 @@ impl ApiError {
             ApiError::DeserializationFailed(_) => StatusCode::BAD_REQUEST,
             ApiError::BadTransferOperations(_) => StatusCode::BAD_REQUEST,
             ApiError::AccountNotFound => StatusCode::NOT_FOUND,
-            ApiError::SystemTimeError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ApiError::BadSignature => StatusCode::BAD_REQUEST,
             ApiError::BadSignatureType => StatusCode::BAD_REQUEST,
             ApiError::BadTransactionScript => StatusCode::BAD_REQUEST,
@@ -116,7 +116,32 @@ impl ApiError {
             code: self.code(),
             retriable: self.retriable(),
             details: Some(self.details()),
+            description: None,
         }
+    }
+}
+
+impl From<AccountAddressParseError> for ApiError {
+    fn from(err: AccountAddressParseError) -> Self {
+        ApiError::AptosError(err.to_string())
+    }
+}
+
+impl From<FromHexError> for ApiError {
+    fn from(err: FromHexError) -> Self {
+        ApiError::AptosError(err.to_string())
+    }
+}
+
+impl From<bcs::Error> for ApiError {
+    fn from(err: bcs::Error) -> Self {
+        ApiError::AptosError(err.to_string())
+    }
+}
+
+impl From<anyhow::Error> for ApiError {
+    fn from(err: anyhow::Error) -> Self {
+        ApiError::AptosError(err.to_string())
     }
 }
 

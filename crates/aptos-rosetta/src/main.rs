@@ -4,7 +4,8 @@
 #![forbid(unsafe_code)]
 
 use aptos_config::config::ApiConfig;
-use aptos_rosetta::{bootstrap, types::Network};
+use aptos_rosetta::bootstrap;
+use aptos_types::chain_id::ChainId;
 use clap::Parser;
 use std::{
     net::SocketAddr,
@@ -29,7 +30,7 @@ async fn main() {
     };
 
     // Ensure runtime for Rosetta is up and running
-    let _runtime = bootstrap(args.network, api_config, rest_client).expect("Should bootstrap");
+    let _runtime = bootstrap(args.chain_id, api_config, rest_client).expect("Should bootstrap");
 
     // Run until there is an interrupt
     let term = Arc::new(AtomicBool::new(false));
@@ -50,9 +51,9 @@ pub struct RosettaServerArgs {
     /// URL for the Aptos REST API. e.g. https://fullnode.devnet.aptoslabs.com
     #[clap(long, default_value = "https://fullnode.devnet.aptoslabs.com")]
     rest_api_url: url::Url,
-    /// Network to be used for the server e.g. devnet
-    #[clap(long, default_value_t = Network::Devnet)]
-    network: Network,
+    /// ChainId to be used for the server e.g. TESTNET
+    #[clap(long, default_value = "TESTING")]
+    chain_id: ChainId,
     /// Path to TLS cert for HTTPS support
     #[clap(long)]
     tls_cert_path: Option<String>,
