@@ -178,6 +178,7 @@ members = [
     "aptos-keygen",
     "aptos-proptest-helpers",
     "aptos-retrier",
+    "aptos-rosetta-cli",
     "aptos-transaction-benchmarks",
     "aptos-writeset-generator",
     "executor-benchmark",

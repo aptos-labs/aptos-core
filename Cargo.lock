@@ -874,6 +874,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-rosetta-cli"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-api",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-rest-client",
+ "aptos-rosetta",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "async-trait",
+ "bcs",
+ "clap 3.1.18",
+ "framework",
+ "futures",
+ "hex",
+ "move-deps",
+ "reqwest",
+ "serde 1.0.137",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "url",
+ "warp",
+]
+
+[[package]]
 name = "aptos-sdk"
 version = "0.0.3"
 dependencies = [
