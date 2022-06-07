@@ -257,6 +257,17 @@ impl AptosDB {
     ) -> Self {
         let arc_ledger_rocksdb = Arc::new(ledger_rocksdb);
         let arc_state_merkle_rocksdb = Arc::new(state_merkle_rocksdb);
+        let pruner = if storage_pruner_config.ledger_prune_window.is_none()
+            && storage_pruner_config.state_store_prune_window.is_none()
+        {
+            None
+        } else {
+            Some(Pruner::new(
+                Arc::clone(&arc_ledger_rocksdb),
+                Arc::clone(&arc_state_merkle_rocksdb),
+                storage_pruner_config,
+            ))
+        };
         AptosDB {
             ledger_db: Arc::clone(&arc_ledger_rocksdb),
             state_merkle_db: Arc::clone(&arc_state_merkle_rocksdb),
@@ -268,14 +279,7 @@ impl AptosDB {
             )),
             system_store: Arc::new(SystemStore::new(Arc::clone(&arc_ledger_rocksdb))),
             transaction_store: Arc::new(TransactionStore::new(Arc::clone(&arc_ledger_rocksdb))),
-            pruner: match storage_pruner_config {
-                NO_OP_STORAGE_PRUNER_CONFIG => None,
-                _ => Some(Pruner::new(
-                    Arc::clone(&arc_ledger_rocksdb),
-                    Arc::clone(&arc_state_merkle_rocksdb),
-                    storage_pruner_config,
-                )),
-            },
+            pruner,
             _rocksdb_property_reporter: RocksdbPropertyReporter::new(
                 Arc::clone(&arc_ledger_rocksdb),
                 Arc::clone(&arc_state_merkle_rocksdb),
