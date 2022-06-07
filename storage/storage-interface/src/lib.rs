@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, format_err, Result};
-use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_crypto::{
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    HashValue,
+};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -740,4 +743,27 @@ impl SaveTransactionsRequest {
             ledger_info_with_signatures,
         }
     }
+}
+
+pub fn jmt_update_sets(
+    state_update_sets: &[&HashMap<StateKey, StateValue>],
+) -> Vec<Vec<(HashValue, (HashValue, StateKey))>> {
+    state_update_sets
+        .iter()
+        .map(|updates| {
+            updates
+                .iter()
+                .map(|(k, v)| (k.hash(), (v.hash(), k.clone())))
+                .collect()
+        })
+        .collect()
+}
+
+pub fn jmt_update_ref_sets(
+    jmt_update_sets: &[Vec<(HashValue, (HashValue, StateKey))>],
+) -> Vec<Vec<(HashValue, &(HashValue, StateKey))>> {
+    jmt_update_sets
+        .iter()
+        .map(|vec| vec.iter().map(|(x, y)| (*x, y)).collect())
+        .collect()
 }
