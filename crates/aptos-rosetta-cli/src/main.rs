@@ -18,6 +18,7 @@
 #![forbid(unsafe_code)]
 
 mod account;
+mod block;
 mod common;
 mod network;
 

@@ -19,6 +19,7 @@ use warp::{
 };
 
 mod account;
+mod block;
 mod network;
 
 pub mod client;
@@ -86,6 +87,7 @@ pub fn routes(
     context: RosettaContext,
 ) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
     account::routes(context.clone())
+        .or(block::routes(context.clone()))
         .or(network::routes(context))
         // TODO: Add health check?
         .with(

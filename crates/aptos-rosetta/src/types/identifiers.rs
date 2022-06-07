@@ -22,7 +22,10 @@ pub struct AccountIdentifier {
 
 impl AccountIdentifier {
     pub fn account_address(&self) -> ApiResult<AccountAddress> {
-        Ok(AccountAddress::from_str(&self.address)?)
+        // Allow 0x in front of account address
+        Ok(AccountAddress::from_str(
+            self.address.strip_prefix("0x").unwrap(),
+        )?)
     }
 }
 

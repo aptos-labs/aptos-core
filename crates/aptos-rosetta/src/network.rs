@@ -3,8 +3,8 @@
 
 use crate::{
     common::{
-        check_network, get_genesis_transaction, handle_request, with_context, with_empty_request,
-        EmptyRequest,
+        check_network, get_genesis_transaction, get_timestamp, handle_request, with_context,
+        with_empty_request, EmptyRequest,
     },
     error::ApiError,
     types::{
@@ -139,8 +139,7 @@ async fn network_status(
     let transaction = response.inner();
     let latest_txn = BlockIdentifier::from(transaction.transaction_info()?);
 
-    // note: timestamps are in microseconds, so we convert to milliseconds
-    let current_block_timestamp = state.timestamp_usecs / 1000;
+    let current_block_timestamp = get_timestamp(&response);
 
     // TODO: add peers
     let peers: Vec<Peer> = vec![];

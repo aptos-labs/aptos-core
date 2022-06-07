@@ -102,3 +102,9 @@ pub async fn get_genesis_transaction(
 ) -> ApiResult<Response<Transaction>> {
     Ok(rest_client.get_transaction_by_version(0).await?)
 }
+
+/// Retrieve the timestamp according ot the Rosetta spec (milliseconds)
+pub fn get_timestamp<T>(response: &Response<T>) -> u64 {
+    // note: timestamps are in microseconds, so we convert to milliseconds
+    response.state().timestamp_usecs / 1000
+}

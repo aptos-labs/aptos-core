@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{account, network};
+use crate::{account, block, network};
 use aptos_rosetta::{
     client::RosettaClient,
     types::{NetworkIdentifier, NetworkRequest},
@@ -19,6 +19,8 @@ pub enum RosettaCliArgs {
     #[clap(subcommand)]
     Account(account::AccountCommand),
     #[clap(subcommand)]
+    Block(block::BlockCommand),
+    #[clap(subcommand)]
     Network(network::NetworkCommand),
 }
 
@@ -26,6 +28,7 @@ impl RosettaCliArgs {
     pub async fn execute(self) -> anyhow::Result<String> {
         match self {
             RosettaCliArgs::Account(inner) => inner.execute().await,
+            RosettaCliArgs::Block(inner) => inner.execute().await,
             RosettaCliArgs::Network(inner) => inner.execute().await,
         }
     }

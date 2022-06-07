@@ -4,8 +4,8 @@
 use crate::{
     common::EmptyRequest,
     types::{
-        AccountBalanceRequest, AccountBalanceResponse, NetworkListResponse, NetworkOptionsResponse,
-        NetworkRequest, NetworkStatusResponse,
+        AccountBalanceRequest, AccountBalanceResponse, BlockRequest, BlockResponse,
+        NetworkListResponse, NetworkOptionsResponse, NetworkRequest, NetworkStatusResponse,
     },
 };
 use aptos_rest_client::aptos_api_types::mime_types::JSON;
@@ -47,6 +47,18 @@ impl RosettaClient {
         let response = self
             .inner
             .post(self.address.join("account/balance").unwrap())
+            .header(CONTENT_TYPE, JSON)
+            .body(serde_json::to_string(request)?)
+            .send()
+            .await?;
+
+        self.json(response).await
+    }
+
+    pub async fn block(&self, request: &BlockRequest) -> anyhow::Result<BlockResponse> {
+        let response = self
+            .inner
+            .post(self.address.join("block").unwrap())
             .header(CONTENT_TYPE, JSON)
             .body(serde_json::to_string(request)?)
             .send()
