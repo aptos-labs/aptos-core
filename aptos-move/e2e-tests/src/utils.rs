@@ -33,7 +33,7 @@ pub fn close_module_publishing(
     *dr_seqno = dr_seqno.checked_add(1).unwrap();
 }
 
-pub fn start_with_released_df() -> (FakeExecutor, Account) {
+pub fn start_with_released_af() -> (FakeExecutor, Account) {
     let executor = FakeExecutor::from_fresh_genesis();
     let mut dr_account = Account::new_aptos_root();
 

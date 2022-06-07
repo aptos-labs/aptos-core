@@ -12,8 +12,11 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics::monitor;
 use aptos_types::{
-    account_address::AccountAddress, contract_event::ContractEvent, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
+    account_address::AccountAddress,
+    contract_event::ContractEvent,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{ExecutionStatus, Transaction, TransactionStatus},
 };
 use consensus_notifications::ConsensusNotificationSender;
 use consensus_types::{block::Block, executed_block::ExecutedBlock};
@@ -90,7 +93,6 @@ impl StateComputer for ExecutionProxy {
             "Executing block",
         );
 
-        // TODO: figure out error handling for the prologue txn
         let compute_result = monitor!(
             "execute_block",
             self.executor.execute_block(
@@ -101,6 +103,16 @@ impl StateComputer for ExecutionProxy {
                 parent_block_id
             )
         )?;
+        // TODO: figure out error handling for the prologue txn
+        // assert block prologue transaction succeed
+        if compute_result.compute_status()[0] != TransactionStatus::Keep(ExecutionStatus::Success) {
+            return Err(ExecutionError::InternalError {
+                error: format!(
+                    "Block metadata txn failed execution {:?}",
+                    compute_result.compute_status()[0]
+                ),
+            });
+        }
 
         // notify mempool about failed transaction
         if let Err(e) = self

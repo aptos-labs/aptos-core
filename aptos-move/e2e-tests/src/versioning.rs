@@ -20,7 +20,7 @@ pub struct VersionedTestEnv {
 impl VersionedTestEnv {
     // At each release, this function will need to be updated to handle the release logic
     pub fn new(version_number: u64) -> Option<Self> {
-        let (executor, dr_account) = utils::start_with_released_df();
+        let (executor, dr_account) = utils::start_with_released_af();
         let dr_sequence_number = 0;
 
         Some(Self {

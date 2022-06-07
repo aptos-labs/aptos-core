@@ -12,7 +12,6 @@ use crate::{
     },
     counters::*,
     data_cache::StateViewCache,
-    errors::expect_only_successful_execution,
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     script_to_script_function,
@@ -601,7 +600,6 @@ impl AptosVM {
         &self,
         storage: &S,
         block_metadata: BlockMetadata,
-        log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
         fail_point!("move_adapter::process_block_prologue", |_| {
             Err(VMStatus::Error(
@@ -628,28 +626,40 @@ impl AptosVM {
             MoveValue::Address(proposer),
             MoveValue::U64(timestamp),
         ]);
-        session
-            .execute_function_bypass_visibility(
-                &BLOCK_MODULE,
-                BLOCK_PROLOGUE,
-                vec![],
-                args,
-                &mut gas_status,
-            )
-            .map(|_return_vals| ())
-            .or_else(|e| {
-                expect_only_successful_execution(e, BLOCK_PROLOGUE.as_str(), log_context)
-            })?;
+        let result = match session.execute_function_bypass_visibility(
+            &BLOCK_MODULE,
+            BLOCK_PROLOGUE,
+            vec![],
+            args,
+            &mut gas_status,
+        ) {
+            Ok(_) => {
+                let output = get_transaction_output(
+                    &mut (),
+                    session,
+                    gas_status.remaining_gas(),
+                    &txn_data,
+                    ExecutionStatus::Success,
+                )?;
+                (VMStatus::Executed, output)
+            }
+            Err(e) => {
+                // make sure the error is propagated back as transaction error
+                let vm_status = e.into_vm_status();
+                let transaction_status = TransactionStatus::from(vm_status.clone());
+                let output = match transaction_status {
+                    TransactionStatus::Keep(_) => {
+                        TransactionOutput::new(WriteSet::default(), vec![], 0, transaction_status)
+                    }
+                    TransactionStatus::Discard(error_code) => discard_error_output(error_code),
+                    TransactionStatus::Retry => unreachable!("VM should never return retry"),
+                };
+                (vm_status, output)
+            }
+        };
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        let output = get_transaction_output(
-            &mut (),
-            session,
-            gas_status.remaining_gas(),
-            &txn_data,
-            ExecutionStatus::Success,
-        )?;
-        Ok((VMStatus::Executed, output))
+        Ok(result)
     }
 
     pub(crate) fn process_writeset_transaction<S: MoveResolverExt + StateView>(
@@ -929,7 +939,7 @@ impl VMAdapter for AptosVM {
         Ok(match txn {
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
                 let (vm_status, output) =
-                    self.process_block_prologue(data_cache, block_metadata.clone(), log_context)?;
+                    self.process_block_prologue(data_cache, block_metadata.clone())?;
                 (vm_status, output, Some("block_prologue".to_string()))
             }
             PreprocessedTransaction::WaypointWriteSet(write_set_payload) => {
