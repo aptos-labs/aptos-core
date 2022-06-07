@@ -48,3 +48,10 @@ pub struct SyncStatus {
     stage: Option<String>,
     synced: bool,
 }
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct Version {
+    pub rosetta_version: String,
+    pub node_version: String,
+    pub middleware_version: String,
+}

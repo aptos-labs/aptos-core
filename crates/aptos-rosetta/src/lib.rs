@@ -7,6 +7,7 @@
 
 use aptos_api::runtime::WebServer;
 use aptos_config::config::ApiConfig;
+use aptos_logger::debug;
 use aptos_rest_client::aptos_api_types::Error;
 use aptos_types::chain_id::ChainId;
 use std::convert::Infallible;
@@ -18,6 +19,8 @@ use warp::{
 };
 
 mod account;
+mod network;
+
 pub mod client;
 pub mod common;
 pub mod error;
@@ -25,6 +28,9 @@ pub mod types;
 
 pub const CURRENCY: &str = "APTOS";
 pub const NUM_DECIMALS: u64 = 6;
+pub const MIDDLEWARE_VERSION: &str = "1.0.0";
+pub const NODE_VERSION: &str = "0.1";
+pub const ROSETTA_VERSION: &str = "1.4.12";
 
 /// Rosetta API context for use on all APIs
 #[derive(Clone, Debug)]
@@ -45,6 +51,7 @@ pub fn bootstrap(
         .build()
         .expect("[rosetta] failed to create runtime");
 
+    debug!("Starting up Rosetta server with {:?}", api_config);
     let api = WebServer::from(api_config);
 
     runtime.spawn(async move {
@@ -62,6 +69,7 @@ pub async fn bootstrap_async(
     api_config: ApiConfig,
     rest_client: aptos_rest_client::Client,
 ) -> anyhow::Result<JoinHandle<()>> {
+    debug!("Starting up Rosetta server with {:?}", api_config);
     let api = WebServer::from(api_config);
     let handle = tokio::spawn(async move {
         let context = RosettaContext {
@@ -77,7 +85,8 @@ pub async fn bootstrap_async(
 pub fn routes(
     context: RosettaContext,
 ) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
-    account::routes(context)
+    account::routes(context.clone())
+        .or(network::routes(context))
         // TODO: Add health check?
         .with(
             warp::cors()

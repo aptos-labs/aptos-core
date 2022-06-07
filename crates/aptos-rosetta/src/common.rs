@@ -6,7 +6,7 @@ use crate::{
     types::NetworkIdentifier,
     RosettaContext,
 };
-use aptos_rest_client::{aptos::Balance, Account, Response};
+use aptos_rest_client::{aptos::Balance, Account, Response, Transaction};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
@@ -34,6 +34,13 @@ pub fn with_context(
     context: RosettaContext,
 ) -> impl Filter<Extract = (RosettaContext,), Error = Infallible> + Clone {
     warp::any().map(move || context.clone())
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct EmptyRequest;
+
+pub fn with_empty_request() -> impl Filter<Extract = (EmptyRequest,), Error = Infallible> + Clone {
+    warp::any().map(move || EmptyRequest)
 }
 
 /// Handles a generic request to warp
@@ -83,9 +90,15 @@ pub async fn get_account(
 pub async fn get_account_balance(
     rest_client: &aptos_rest_client::Client,
     address: AccountAddress,
-) -> Result<Response<Balance>, ApiError> {
+) -> ApiResult<Response<Balance>> {
     rest_client
         .get_account_balance(address)
         .await
         .map_err(|_| ApiError::AccountNotFound)
+}
+
+pub async fn get_genesis_transaction(
+    rest_client: &aptos_rest_client::Client,
+) -> ApiResult<Response<Transaction>> {
+    Ok(rest_client.get_transaction_by_version(0).await?)
 }

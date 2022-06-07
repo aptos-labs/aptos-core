@@ -41,6 +41,24 @@ pub enum ApiError {
 }
 
 impl ApiError {
+    pub fn all() -> Vec<ApiError> {
+        vec![
+            ApiError::AptosError(String::new()),
+            ApiError::BadBlockRequest,
+            ApiError::BadNetwork,
+            ApiError::DeserializationFailed(String::new()),
+            ApiError::BadTransferOperations(String::new()),
+            ApiError::AccountNotFound,
+            ApiError::BadSignature,
+            ApiError::BadSignatureType,
+            ApiError::BadTransactionScript,
+            ApiError::BadTransactionPayload,
+            ApiError::BadCoin,
+            ApiError::BadSignatureCount,
+            ApiError::HistoricBalancesUnsupported,
+        ]
+    }
+
     pub fn code(&self) -> u64 {
         match self {
             ApiError::AptosError(_) => 10,
@@ -111,11 +129,29 @@ impl ApiError {
     }
 
     pub fn into_error(self) -> types::Error {
+        self.into()
+    }
+}
+
+impl From<ApiError> for types::Error {
+    fn from(error: ApiError) -> Self {
         types::Error {
-            message: self.message(),
-            code: self.code(),
-            retriable: self.retriable(),
-            details: Some(self.details()),
+            message: error.message(),
+            code: error.code(),
+            retriable: error.retriable(),
+            details: Some(error.details()),
+            description: None,
+        }
+    }
+}
+
+impl From<&ApiError> for types::Error {
+    fn from(error: &ApiError) -> Self {
+        types::Error {
+            message: error.message(),
+            code: error.code(),
+            retriable: error.retriable(),
+            details: Some(error.details()),
             description: None,
         }
     }

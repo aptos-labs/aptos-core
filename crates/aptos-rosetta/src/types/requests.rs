@@ -4,9 +4,8 @@
 use crate::types::{
     AccountIdentifier, Allow, Amount, Block, BlockIdentifier, Currency, NetworkIdentifier,
     Operation, PartialBlockIdentifier, Peer, PublicKey, Signature, SigningPayload, SyncStatus,
-    Transaction, TransactionIdentifier,
+    Transaction, TransactionIdentifier, Version,
 };
-use aptos_types::transaction::Version;
 use serde::{Deserialize, Serialize};
 
 /// [API Spec](https://www.rosetta-api.org/docs/models/AccountBalanceRequest.html)

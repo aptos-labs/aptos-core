@@ -34,6 +34,3 @@ aptos-types = { path = "../../types" }
 aptos-workspace-hack = { path = "../aptos-workspace-hack" }
 framework = { path = '../../aptos-move/framework' }
 move-deps = { path = "../../aptos-move/move-deps" }
-
-[[bin]]
-name = "aptos-rosetta"
