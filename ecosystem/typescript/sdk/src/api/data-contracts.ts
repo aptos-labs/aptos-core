@@ -396,7 +396,7 @@ export interface MoveStructField {
 export interface MoveFunction {
   /** Move function name */
   name: string;
-  visibility: "public" | "script" | "friend";
+  visibility: 'public' | 'script' | 'friend';
   generic_type_params: { constraints: MoveAbility[] }[];
   params: MoveTypeId[];
   return: MoveTypeId[];
@@ -409,10 +409,10 @@ See [doc](https://diem.github.io/move/abilities.html) for more details.
 * @example key
 */
 export enum MoveAbility {
-  Copy = "copy",
-  Drop = "drop",
-  Store = "store",
-  Key = "key",
+  Copy = 'copy',
+  Drop = 'drop',
+  Store = 'store',
+  Key = 'key',
 }
 
 /**
@@ -1001,8 +1001,6 @@ export interface Ed25519Signature {
 export interface MultiEd25519Signature {
   /** @example multi_ed25519_signature */
   type: string;
-
-  /** all public keys of the sender account */
   public_keys: HexEncodedBytes[];
 
   /** signatures created based on the `threshold` */
@@ -1171,4 +1169,40 @@ export interface TableItemRequest {
    * * [0x1::ASCII::String](https://github.com/aptos-labs/aptos-core/blob/main/language/move-stdlib/docs/ASCII.md) is serialized into `string`. For example, struct value `0x1::ASCII::String{bytes: b"hello world"}` is serialized as `"hello world"` in JSON.
    */
   key: MoveValue;
+}
+
+export interface TokenData {
+  /** Unique name within this creator's account for this Token's collection */
+  collection: string;
+
+  /** Description of Token */
+  description: string;
+
+  /** Name of Token */
+  name: string;
+
+  /** Optional maximum number of this Token */
+  maximum?: number;
+
+  /** Total number of this type of Token */
+  supply: number;
+
+  /** URL for additional information / media */
+  uri: string;
+}
+
+export interface TokenId {
+  /** Token creator address */
+  creator: string;
+
+  /** Unique name within this creator's account for this Token's collection */
+  collection: string;
+
+  /** Name of Token */
+  name: string;
+}
+
+export interface Token {
+  id: TokenId;
+  value: number;
 }
