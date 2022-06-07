@@ -1538,27 +1538,21 @@ components:
       required:
         - type
         - state_key_hash
-        - data
+        - handle
+        - key
+        - value
       properties:
         type:
           type: string
           example: "write_table_item"
         state_key_hash:
           $ref: '#/components/schemas/HexEncodedBytes'
-        data:
-          title: Table item write
-          type: object
-          required:
-            - handle
-            - key
-            - value
-          properties:
-            handle:
-              $ref: '#/components/schemas/HexEncodedBytes'
-            key:
-              $ref: '#/components/schemas/HexEncodedBytes'
-            value:
-              $ref: '#/components/schemas/HexEncodedBytes'
+        handle:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        key:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        value:
+          $ref: '#/components/schemas/HexEncodedBytes'
     Script:
       title: Script
       type: object
