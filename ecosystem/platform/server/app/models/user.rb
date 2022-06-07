@@ -20,6 +20,7 @@ class User < ApplicationRecord
 
   has_many :authorizations, dependent: :destroy
   has_one :it1_profile
+  has_many :nfts
 
   def self.from_omniauth(auth, current_user = nil)
     # find an existing user or create a user and authorizations

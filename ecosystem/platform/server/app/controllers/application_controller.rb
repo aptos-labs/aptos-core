@@ -42,6 +42,10 @@ class ApplicationController < ActionController::Base
     redirect_to root_path unless current_user && current_user.authorizations.where(provider: :discord).exists?
   end
 
+  def ensure_google!
+    redirect_to root_path unless current_user && current_user.authorizations.where(provider: :google).exists?
+  end
+
   def ensure_confirmed!
     redirect_to onboarding_email_path unless current_user&.confirmed?
   end

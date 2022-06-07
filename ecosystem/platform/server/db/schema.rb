@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2022_06_02_180010) do
+ActiveRecord::Schema[7.0].define(version: 2022_06_07_180333) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -155,6 +155,26 @@ ActiveRecord::Schema[7.0].define(version: 2022_06_02_180010) do
     t.index ["item_type", "item_id"], name: "index_locations_on_item"
   end
 
+  create_table "nft_offers", force: :cascade do |t|
+    t.string "name", null: false
+    t.datetime "valid_from"
+    t.datetime "valid_until"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_nft_offers_on_name", unique: true
+  end
+
+  create_table "nfts", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "nft_offer_id", null: false
+    t.string "image_url", null: false, comment: "The image that the NFT points to."
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["image_url"], name: "index_nfts_on_image_url", unique: true
+    t.index ["nft_offer_id"], name: "index_nfts_on_nft_offer_id"
+    t.index ["user_id"], name: "index_nfts_on_user_id"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "username"
     t.string "email"
@@ -191,4 +211,6 @@ ActiveRecord::Schema[7.0].define(version: 2022_06_02_180010) do
   end
 
   add_foreign_key "it1_profiles", "users"
+  add_foreign_key "nfts", "nft_offers"
+  add_foreign_key "nfts", "users"
 end
