@@ -449,7 +449,7 @@ export interface UserTransactionRequest {
   gas_unit_price: Uint64;
 
   /** @example XDX */
-  gas_currency_code: string;
+  gas_currency_code?: string;
 
   /**
    * Timestamp in seconds, e.g. transaction expiration timestamp.
@@ -459,6 +459,8 @@ export interface UserTransactionRequest {
   payload: TransactionPayload;
 }
 
+export type UserCreateSigningMessageRequest = UserTransactionRequest & { secondary_signers?: Address[] };
+
 /**
  * This schema is used for appending `signature` field to another schema.
  */
@@ -466,14 +468,23 @@ export interface UserTransactionSignature {
   signature: TransactionSignature;
 }
 
-export type Transaction = PendingTransaction | GenesisTransaction | UserTransaction | BlockMetadataTransaction;
+export type Transaction =
+  | PendingTransaction
+  | GenesisTransaction
+  | UserTransaction
+  | BlockMetadataTransaction
+  | StateCheckpointTransaction;
 
 export type SubmitTransactionRequest = UserTransactionRequest & UserTransactionSignature;
 
 export type PendingTransaction = { type: string; hash: HexEncodedBytes } & UserTransactionRequest &
   UserTransactionSignature;
 
-export type OnChainTransaction = GenesisTransaction | UserTransaction | BlockMetadataTransaction;
+export type OnChainTransaction =
+  | GenesisTransaction
+  | UserTransaction
+  | BlockMetadataTransaction
+  | StateCheckpointTransaction;
 
 export interface OnChainTransactionInfo {
   /** Unsigned int64 type value */
@@ -543,6 +554,8 @@ export type BlockMetadataTransaction = {
 } & OnChainTransactionInfo;
 
 export type GenesisTransaction = { type: string; events: Event[]; payload: WriteSetPayload } & OnChainTransactionInfo;
+
+export type StateCheckpointTransaction = { type: string; timestamp: TimestampUsec } & OnChainTransactionInfo;
 
 export type TransactionPayload = ScriptFunctionPayload | ScriptPayload | ModuleBundlePayload | WriteSetPayload;
 
@@ -787,8 +800,29 @@ export interface WriteTableItem {
    */
   state_key_hash: HexEncodedBytes;
 
-  /** Table item write */
-  data: { handle: HexEncodedBytes; key: HexEncodedBytes; value: HexEncodedBytes };
+  /**
+   * All bytes data are represented as hex-encoded string prefixed with `0x` and fulfilled with
+   * two hex digits per byte.
+   *
+   * Different with `Address` type, hex-encoded bytes should not trim any zeros.
+   */
+  handle: HexEncodedBytes;
+
+  /**
+   * All bytes data are represented as hex-encoded string prefixed with `0x` and fulfilled with
+   * two hex digits per byte.
+   *
+   * Different with `Address` type, hex-encoded bytes should not trim any zeros.
+   */
+  key: HexEncodedBytes;
+
+  /**
+   * All bytes data are represented as hex-encoded string prefixed with `0x` and fulfilled with
+   * two hex digits per byte.
+   *
+   * Different with `Address` type, hex-encoded bytes should not trim any zeros.
+   */
+  value: HexEncodedBytes;
 }
 
 export interface Script {

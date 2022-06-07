@@ -41,7 +41,7 @@ sudo apt-get install nodejs yarn
 Originally created with this:
 
 ```bash
-$  npx swagger-typescript-api -p ../../../api/doc/openapi.yaml -o ./src/api --modular --axios --single-http-client
+$  npx swagger-typescript-api@latest -p ../../../api/doc/openapi.yaml -o ./src/api --modular --axios --single-http-client
 ```
 
 #### Changes to make after generation:

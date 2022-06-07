@@ -16,7 +16,7 @@ import {
   PendingTransaction,
   SubmitTransactionRequest,
   Transaction,
-  UserTransactionRequest,
+  UserCreateSigningMessageRequest,
 } from "./data-contracts";
 import { ContentType, HttpClient, RequestParams } from "./http-client";
 
@@ -83,7 +83,7 @@ export class Transactions<SecurityDataType = unknown> {
    * @summary Create transaction signing message
    * @request POST:/transactions/signing_message
    */
-  createSigningMessage = (data: UserTransactionRequest, params: RequestParams = {}) =>
+  createSigningMessage = (data: UserCreateSigningMessageRequest, params: RequestParams = {}) =>
     this.http.request<{ message: HexEncodedBytes }, AptosError>({
       path: `/transactions/signing_message`,
       method: "POST",
