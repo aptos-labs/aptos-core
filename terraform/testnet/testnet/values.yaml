@@ -174,6 +174,8 @@ load_test:
   tolerations: []
   affinity: {}
   intervalMins: 15
+  rust_log: info
+  rust_log_remote: debug,hyper=off
   config:
     duration: 300
     accounts_per_client: 12

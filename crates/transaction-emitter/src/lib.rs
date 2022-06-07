@@ -216,7 +216,7 @@ impl SubmissionWorker {
                 self.stats.submitted.fetch_add(1, Ordering::Relaxed);
                 let resp = self.client.submit(&request).await;
                 if let Err(e) = resp {
-                    warn!("[{:?}] Failed to submit request: {:?}", self.client, e);
+                    println!("[{:?}] Failed to submit request: {:?}", self.client, e);
                 }
             }
             if self.params.wait_committed {
@@ -524,9 +524,10 @@ impl<'t> TxnEmitter<'t> {
                     },
                 )
             });
+
         let mut minted_accounts = try_join_all(account_futures)
-            .await
-            .context("Failed to mint accounts")?
+            .await?
+            //.context("Failed to mint accounts")?
             .into_iter()
             .flatten()
             .collect();
@@ -700,10 +701,7 @@ pub async fn execute_and_wait_transactions(
         try_join_all(txns.iter().map(|t| client.submit(t))).await?;
 
     for pt in pending_txns {
-        client
-            .wait_for_transaction(&pt.into_inner())
-            .await
-            .context("wait for transactions failed")?;
+        client.wait_for_transaction(&pt.into_inner()).await?;
     }
 
     debug!(
