@@ -97,7 +97,7 @@ impl Default for StorageConfig {
             // conservatively safe minimal prune window. It'll take a few Gigabytes of disk space
             // depending on the size of an average account blob.
             storage_pruner_config: StoragePrunerConfig {
-                state_store_prune_window: Some(1_000_000),
+                state_store_prune_window: Some(10_000_000),
                 ledger_prune_window: Some(10_000_000),
                 pruning_batch_size: 500,
             },
