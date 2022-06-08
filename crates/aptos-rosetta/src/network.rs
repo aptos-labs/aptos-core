@@ -38,6 +38,8 @@ pub fn routes(
 
 /// List [`NetworkIdentifier`]s supported by this proxy aka [`ChainId`]s
 ///
+/// This should be able to run without a running full node connection
+///
 /// [API Spec](https://www.rosetta-api.org/docs/NetworkApi.html#networklist)
 async fn network_list(
     _empty: EmptyRequest,
@@ -59,6 +61,7 @@ async fn network_list(
 /// Get Network options
 ///
 /// This lists out all errors, operations, and statuses, along with versioning information.
+/// This should be able to run without a running full node connection
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/NetworkApi.html#networkoptions)
 async fn network_options(
