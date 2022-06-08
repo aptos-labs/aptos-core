@@ -247,6 +247,7 @@ pub struct PublicKey {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct RelatedTransaction {
     /// Network of transaction.  [`None`] means same network as original transaction
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub network_identifier: Option<NetworkIdentifier>,
     /// Transaction identifier of the related transaction
     pub transaction_identifier: TransactionIdentifier,
@@ -290,8 +291,10 @@ pub enum SignatureType {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SigningPayload {
     /// Deprecated field, replaced with account_identifier
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub address: Option<String>,
     /// Account identifier of the signer
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub account_identifier: Option<AccountIdentifier>,
     /// Hex encoded string of payload bytes to be signed
     pub hex_bytes: String,
@@ -310,5 +313,6 @@ pub struct Transaction {
     /// Individual operations (write set changes) in a transaction
     pub operations: Vec<Operation>,
     /// Related transactions
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub related_transactions: Option<Vec<RelatedTransaction>>,
 }
