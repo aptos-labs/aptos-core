@@ -19,6 +19,12 @@ jobs:
       - run: shellcheck scripts/dockerhub_prune.sh
       - run: shellcheck scripts/weekly-dep-report.sh
 
+  e2e-test:
+    if: github.event_name == 'push' 
+    runs-on: ubuntu-latest
+    steps:
+      - run: sleep 120 && crash
+
   ecosystem-lint:
     runs-on: ubuntu-latest
     steps:
