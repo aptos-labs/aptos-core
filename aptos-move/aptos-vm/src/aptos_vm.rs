@@ -23,6 +23,7 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
+use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
@@ -40,12 +41,17 @@ use fail::fail_point;
 use move_deps::{
     move_binary_format::{
         access::ModuleAccess,
-        errors::{verification_error, Location, VMResult},
+        binary_views::BinaryIndexedView,
+        errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
+        file_format::{SignatureIndex, Visibility},
         CompiledModule, IndexKind,
     },
+    move_bytecode_verifier::script_signature::verify_module_function_signature_by_name,
     move_core_types::{
         account_address::AccountAddress,
         gas_schedule::{GasAlgebra, GasUnits},
+        ident_str,
+        identifier::IdentStr,
         language_storage::ModuleId,
         transaction_argument::convert_txn_args,
         value::{serialize_values, MoveValue},
@@ -392,6 +398,50 @@ impl AptosVM {
         Ok(())
     }
 
+    fn execute_module_initialization<S: MoveResolverExt>(
+        &self,
+        session: &mut SessionExt<S>,
+        gas_status: &mut GasStatus,
+        modules: &ModuleBundle,
+        senders: &[AccountAddress],
+    ) -> VMResult<()> {
+        let init_func_name = ident_str!("init_module");
+        for module_blob in modules.iter() {
+            let args: Vec<Vec<u8>> = senders
+                .iter()
+                .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
+                .collect();
+            match CompiledModule::deserialize(module_blob.code()) {
+                Ok(module) => {
+                    let init_function =
+                        session.load_function(&module.self_id(), init_func_name, &[]);
+                    // it is ok to not have init_module function
+                    // init_module function should be (1) private and (2) has no return value
+                    if init_function.is_ok() {
+                        if verify_module_init_function(&module).is_ok() {
+                            session.execute_function_bypass_visibility(
+                                &module.self_id(),
+                                init_func_name,
+                                vec![],
+                                args,
+                                gas_status,
+                            )?;
+                        }
+                        else {
+                            return Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
+                                .finish(Location::Undefined))
+                        }
+                    }
+                },
+                Err(_err) => {
+                    return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                        .finish(Location::Undefined))
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn execute_modules<S: MoveResolverExt>(
         &self,
         mut session: SessionExt<S>,
@@ -423,6 +473,14 @@ impl AptosVM {
             .map_err(|e| e.into_vm_status())?;
 
         charge_global_write_gas_usage(gas_status, &session, &txn_data.sender())?;
+
+        // call init function of the each module
+        self.execute_module_initialization(
+            &mut session,
+            gas_status,
+            modules,
+            &[txn_data.sender()],
+        )?;
 
         self.success_transaction_cleanup(session, gas_status, txn_data, log_context)
     }

@@ -14,6 +14,7 @@ use crate::{
     },
     CliCommand, CliResult,
 };
+use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
 use async_trait::async_trait;
@@ -169,11 +170,11 @@ impl CliCommand<Vec<String>> for CompilePackage {
         };
         let compiled_package = compile_move(build_config, self.move_options.package_dir.as_path())?;
         let mut ids = Vec::new();
-        compiled_package
-            .root_modules_map()
-            .iter_modules()
-            .iter()
-            .for_each(|module| ids.push(module.self_id().to_string()));
+        for &module in compiled_package.root_modules_map().iter_modules().iter() {
+            verify_module_init_function(module)
+                .map_err(|e| CliError::MoveCompilationError(e.to_string()))?;
+            ids.push(module.self_id().to_string());
+        }
         Ok(ids)
     }
 }
