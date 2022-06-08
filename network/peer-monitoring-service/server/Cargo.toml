@@ -27,7 +27,7 @@ bounded-executor = { path = "../../../crates/bounded-executor" }
 channel = { path = "../../../crates/channel" }
 netcore = { path = "../../netcore" }
 network = { path = "../../../network" }
-peer-monitoring-service-types = { path = "../types"}
+peer-monitoring-service-types = { path = "../types" }
 
 [dev-dependencies]
 claim = "0.5.0"
