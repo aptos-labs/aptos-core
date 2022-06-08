@@ -4,13 +4,24 @@
 use crate::{get_validators, k8s_retry_strategy, nodes_healthcheck, Result};
 use ::aptos_logger::*;
 use anyhow::{bail, format_err};
+use futures::future::try_join_all;
+use hyper::{Client, Uri};
+use hyper_proxy::{Intercept, Proxy, ProxyConnector};
+use hyper_tls::HttpsConnector;
 use k8s_openapi::api::batch::v1::Job;
 use kube::{api::Api, client::Client as K8sClient, Config};
 use rand::Rng;
 use rayon::prelude::*;
 use regex::Regex;
+use rusoto_core::Region;
+use rusoto_credential::EnvironmentProvider;
+use rusoto_eks::{
+    DescribeUpdateRequest, Eks, EksClient, NodegroupScalingConfig, UpdateNodegroupConfigRequest,
+};
+use rusoto_sts::WebIdentityProvider;
 use serde_json::Value;
 use std::{
+    cmp,
     convert::TryFrom,
     env,
     fs::File,
@@ -24,6 +35,8 @@ const HELM_BIN: &str = "helm";
 const KUBECTL_BIN: &str = "kubectl";
 const MAX_NUM_VALIDATORS: usize = 30;
 const HEALTH_CHECK_URL: &str = "http://127.0.0.1:8001";
+const VALIDATOR_SCALING_FACTOR: i64 = 3;
+const UTILITIES_SCALING_FACTOR: i64 = 3;
 
 const GENESIS_MODULES_DIR: &str = "/aptos-framework/move/modules";
 
@@ -42,6 +55,38 @@ async fn wait_genesis_job(kube_client: &K8sClient, era: &str) -> Result<()> {
                     Ok(())
                 }
                 _ => bail!("Genesis job not completed"),
+            }
+        })
+    })
+    .await
+}
+
+async fn nodegroup_state_check(desire_size: i64) -> Result<()> {
+    // we do not check node state for scaling down
+    if desire_size == 0 {
+        return Ok(());
+    }
+
+    aptos_retrier::retry_async(k8s_retry_strategy(), || {
+        Box::pin(async move {
+            let status_args = ["get", "nodes"];
+            let raw_nodegroup_values = Command::new(KUBECTL_BIN)
+                .args(&status_args)
+                .output()
+                .unwrap_or_else(|_| panic!("failed to nodegroup status"));
+
+            let nodegroup_states = String::from_utf8(raw_nodegroup_values.stdout).unwrap();
+            let v: Vec<_> = nodegroup_states.match_indices("Ready").collect();
+            println!(
+                "Desire size of nodegroup is {}, currently {} nodes are ready to schedule",
+                desire_size,
+                v.len()
+            );
+            if v.len() < desire_size as usize {
+                bail!("nodegroup is not healthy");
+            } else {
+                println!("All nodes are ready");
+                Ok(())
             }
         })
     })
@@ -341,6 +386,200 @@ pub async fn create_k8s_client() -> K8sClient {
         reqwest::Url::parse(HEALTH_CHECK_URL).expect("Failed to parse kubernetes endpoint url"),
     );
     K8sClient::try_from(config).unwrap()
+}
+
+fn create_eks_client(auth_with_k8s_env: bool) -> Result<EksClient> {
+    let connector = HttpsConnector::new();
+    let http_connector: hyper_proxy::ProxyConnector<
+        hyper_tls::HttpsConnector<hyper::client::HttpConnector>,
+    > = if let Ok(proxy_url) = std::env::var("HTTP_PROXY") {
+        let proxy = Proxy::new(Intercept::All, proxy_url.parse::<Uri>()?);
+        ProxyConnector::from_proxy(connector, proxy)
+    } else {
+        ProxyConnector::new(connector)
+    }?;
+
+    let mut hyper_builder = Client::builder();
+    // disabling due to connection closed issue
+    hyper_builder.pool_max_idle_per_host(0);
+    let dispatcher = rusoto_core::HttpClient::from_builder(hyper_builder, http_connector);
+    let eks_client = if auth_with_k8s_env {
+        EksClient::new_with(
+            dispatcher,
+            WebIdentityProvider::from_k8s_env(),
+            Region::UsWest2,
+        )
+    } else {
+        EksClient::new_with(dispatcher, EnvironmentProvider::default(), Region::UsWest2)
+    };
+    Ok(eks_client)
+}
+
+fn create_update_nodegroup_config_request(
+    cluster_name: &str,
+    nodegroup_name: &str,
+    nodegroup_scaling_config: NodegroupScalingConfig,
+) -> UpdateNodegroupConfigRequest {
+    UpdateNodegroupConfigRequest {
+        client_request_token: None,
+        cluster_name: cluster_name.to_string(),
+        labels: None,
+        nodegroup_name: nodegroup_name.to_string(),
+        scaling_config: Some(nodegroup_scaling_config),
+    }
+}
+
+async fn submit_update_nodegroup_config_request(
+    eks_client: &EksClient,
+    cluster_name: &str,
+    nodegroup_name: &str,
+    nodegroup_scaling_config: NodegroupScalingConfig,
+) -> Result<String> {
+    let update_nodegroup_request = create_update_nodegroup_config_request(
+        cluster_name,
+        nodegroup_name,
+        nodegroup_scaling_config,
+    );
+    let update_response = eks_client
+        .update_nodegroup_config(update_nodegroup_request)
+        .await;
+    let update_id = update_response.unwrap().update.unwrap().id.unwrap();
+    println!(
+        "Created {} nodegroup update request with ID: {}",
+        nodegroup_name, update_id
+    );
+    Ok(update_id)
+}
+
+pub async fn set_eks_nodegroup_size(
+    cluster_name: String,
+    num_validators: usize,
+    auth_with_k8s_env: bool,
+) -> Result<()> {
+    // https://github.com/lucdew/rusoto-example/blob/master/src/client.rs
+    // Create rusoto client through an http proxy
+    let eks_client = create_eks_client(auth_with_k8s_env)?;
+    println!("Created rusoto http client");
+
+    // nodegroup scaling factors
+    let max_surge = 2; // multiplier for max size
+    let num_validators: i64 = num_validators as i64;
+    let idle_utilities_size = 10; // keep extra utilities nodes around for forge pods and monitoring
+    let buffer_node = if num_validators != 0 {
+        cmp::max(5, num_validators / 5)
+    } else {
+        0
+    };
+    let validator_scaling = NodegroupScalingConfig {
+        desired_size: Some(cmp::max(
+            num_validators * VALIDATOR_SCALING_FACTOR + buffer_node,
+            1,
+        )),
+        max_size: Some(cmp::max(
+            (num_validators * VALIDATOR_SCALING_FACTOR + 1) * max_surge,
+            1,
+        )),
+        min_size: Some(cmp::max(num_validators * VALIDATOR_SCALING_FACTOR, 1)),
+    };
+    let utilities_scaling = NodegroupScalingConfig {
+        desired_size: Some(cmp::max(
+            num_validators * UTILITIES_SCALING_FACTOR + buffer_node,
+            idle_utilities_size,
+        )),
+        max_size: Some(cmp::max(
+            num_validators * UTILITIES_SCALING_FACTOR * max_surge,
+            idle_utilities_size,
+        )),
+        min_size: Some(cmp::max(
+            num_validators * UTILITIES_SCALING_FACTOR,
+            idle_utilities_size,
+        )),
+    };
+    let desire_nodegroup_size =
+        num_validators * (VALIDATOR_SCALING_FACTOR + UTILITIES_SCALING_FACTOR);
+
+    // submit the scaling requests
+    let validators_update_id = submit_update_nodegroup_config_request(
+        &eks_client,
+        &cluster_name,
+        "validators",
+        validator_scaling,
+    )
+    .await?;
+    let utilities_update_id = submit_update_nodegroup_config_request(
+        &eks_client,
+        &cluster_name,
+        "utilities",
+        utilities_scaling,
+    )
+    .await?;
+
+    // wait for nodegroup updates
+    let updates: Vec<(&str, &str)> = vec![
+        ("validators", &validators_update_id),
+        ("utilities", &utilities_update_id),
+    ];
+    try_join_all(updates.into_iter().map(|(nodegroup_name, update_id)| {
+        describe_update(
+            eks_client.clone(),
+            cluster_name.clone(),
+            nodegroup_name.to_string(),
+            update_id.to_string(),
+        )
+    }))
+    .await
+    .unwrap();
+
+    nodegroup_state_check(desire_nodegroup_size).await.unwrap();
+
+    Ok(())
+}
+
+async fn describe_update(
+    eks_client: EksClient,
+    cluster_name: String,
+    nodegroup_name: String,
+    update_id: String,
+) -> Result<()> {
+    aptos_retrier::retry_async(k8s_retry_strategy(), || {
+        let client = eks_client.clone();
+        let nodegroup_name = nodegroup_name.clone();
+        let update_id = update_id.clone();
+        let request = DescribeUpdateRequest {
+            addon_name: None,
+            name: cluster_name.clone(),
+            nodegroup_name: Some(nodegroup_name.clone()),
+            update_id: update_id.clone(),
+        };
+        Box::pin(async move {
+            let describe_update = match client.describe_update(request).await {
+                Ok(resp) => resp.update.unwrap(),
+                Err(err) => bail!(err),
+            };
+            if let Some(s) = describe_update.status {
+                match s.as_str() {
+                    "Failed" => bail!("Nodegroup update failed"),
+                    "Successful" => {
+                        println!(
+                            "{} nodegroup update {} successful!!!",
+                            &nodegroup_name, update_id
+                        );
+                        Ok(())
+                    }
+                    &_ => {
+                        println!(
+                            "Waiting for {} update {}: {} ...",
+                            &nodegroup_name, update_id, s
+                        );
+                        bail!("Waiting for valid update status")
+                    }
+                }
+            } else {
+                bail!("Failed to describe nodegroup update")
+            }
+        })
+    })
+    .await
 }
 
 pub fn scale_sts_replica(sts_name: &str, replica_num: u64) -> Result<()> {

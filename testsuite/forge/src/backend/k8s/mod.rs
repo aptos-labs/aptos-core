@@ -5,6 +5,7 @@ use crate::{Factory, GenesisConfig, Result, Swarm, Version};
 use anyhow::{bail, format_err};
 use rand::rngs::StdRng;
 use std::{env, fs::File, io::Read, num::NonZeroUsize, path::PathBuf};
+use tokio::runtime::Runtime;
 
 mod cluster_helper;
 mod node;
@@ -19,13 +20,19 @@ use aptos_secure_storage::{CryptoStorage, KVStorage, VaultStorage};
 
 pub struct K8sFactory {
     root_key: [u8; ED25519_PRIVATE_KEY_LENGTH],
+    cluster_name: String,
     helm_repo: String,
     image_tag: String,
     base_image_tag: String,
 }
 
 impl K8sFactory {
-    pub fn new(helm_repo: String, image_tag: String, base_image_tag: String) -> Result<K8sFactory> {
+    pub fn new(
+        cluster_name: String,
+        helm_repo: String,
+        image_tag: String,
+        base_image_tag: String,
+    ) -> Result<K8sFactory> {
         let vault_addr = env::var("VAULT_ADDR")
             .map_err(|_| format_err!("Expected environment variable VAULT_ADDR"))?;
         let vault_cacert = env::var("VAULT_CACERT")
@@ -59,6 +66,7 @@ impl K8sFactory {
 
         Ok(Self {
             root_key,
+            cluster_name,
             helm_repo,
             image_tag,
             base_image_tag,
@@ -67,9 +75,13 @@ impl K8sFactory {
 }
 
 impl Drop for K8sFactory {
-    // When the K8sSwarm struct goes out of scope we need to wipe the chain state
+    // When the K8sSwarm struct goes out of scope we need to wipe the chain state and scale down
     fn drop(&mut self) {
         uninstall_from_k8s_cluster().unwrap();
+        let runtime = Runtime::new().unwrap();
+        runtime
+            .block_on(set_eks_nodegroup_size(self.cluster_name.clone(), 0, true))
+            .unwrap();
     }
 }
 
@@ -101,6 +113,7 @@ impl Factory for K8sFactory {
             None => None,
         };
 
+        set_eks_nodegroup_size(self.cluster_name.clone(), node_num.get(), true).await?;
         uninstall_from_k8s_cluster()?;
         let era = clean_k8s_cluster(
             self.helm_repo.clone(),
@@ -114,6 +127,7 @@ impl Factory for K8sFactory {
 
         let swarm = K8sSwarm::new(
             &self.root_key,
+            &self.cluster_name,
             &self.helm_repo,
             &self.image_tag,
             &self.base_image_tag,

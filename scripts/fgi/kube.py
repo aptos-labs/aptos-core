@@ -74,7 +74,7 @@ def create_forge_job(context, user, tag, base_tag, timeout_secs, forge_envs, for
     cmd = template["spec"]["template"]["spec"]["containers"][0]["command"][2]
     template["spec"]["template"]["spec"]["containers"][0]["command"][2] = cmd.replace(
         "tail -f /dev/null",
-        f"timeout {timeout_secs} forge {' '.join(forge_args)} test k8s-swarm --image-tag {tag} --base-image-tag {base_tag}".strip(),
+        f"timeout {timeout_secs} forge {' '.join(forge_args)} test k8s-swarm --cluster-name {cluster_name} --image-tag {tag} --base-image-tag {base_tag}".strip(),
     )
     # additional environment variables
     for env_var in forge_envs:
