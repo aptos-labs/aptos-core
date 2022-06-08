@@ -36,9 +36,12 @@ impl TryFrom<&AccountIdentifier> for AccountAddress {
 
     fn try_from(account: &AccountIdentifier) -> Result<Self, Self::Error> {
         // Allow 0x in front of account address
-        Ok(AccountAddress::from_str(
-            account.address.strip_prefix("0x").unwrap(),
-        )?)
+        let address = account
+            .address
+            .strip_prefix("0x")
+            .unwrap_or(&account.address);
+
+        Ok(AccountAddress::from_str(address)?)
     }
 }
 
