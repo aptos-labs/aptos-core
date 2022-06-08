@@ -6,4 +6,4 @@ version = 1
 
 method = "squash"
 
-merge.dont_wait_on_status_checks = ["ecosystem-lint", "scripts-lint"]
+dont_wait_on_status_checks = ["ecosystem-lint", "scripts-lint"]
