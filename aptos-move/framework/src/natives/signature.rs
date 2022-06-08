@@ -4,6 +4,7 @@
 use aptos_crypto::{ed25519, traits::*};
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
+    move_core_types::gas_schedule::GasCost,
     move_vm_runtime::native_functions::NativeContext,
     move_vm_types::{
         gas_schedule::NativeCostIndex,
@@ -72,5 +73,66 @@ pub fn native_ed25519_signature_verification(
     Ok(NativeResult::ok(
         cost,
         smallvec![Value::bool(verify_result)],
+    ))
+}
+
+pub fn native_secp256k1_recover(
+    _context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    debug_assert!(_ty_args.is_empty());
+    debug_assert!(arguments.len() == 3);
+
+    let signature = pop_arg!(arguments, Vec<u8>);
+    let recovery_id = pop_arg!(arguments, u8);
+    let msg = pop_arg!(arguments, Vec<u8>);
+
+    let cost = GasCost::new(super::cost::APTOS_SECP256K1_RECOVER, 1).total();
+
+    let msg = match libsecp256k1::Message::parse_slice(&msg) {
+        Ok(msg) => msg,
+        Err(_) => {
+            return Ok(NativeResult::ok(
+                cost,
+                smallvec![Value::vector_u8([0u8; 0]), Value::bool(false)],
+            ));
+        }
+    };
+    let rid = match libsecp256k1::RecoveryId::parse(recovery_id) {
+        Ok(rid) => rid,
+        Err(_) => {
+            return Ok(NativeResult::ok(
+                cost,
+                smallvec![Value::vector_u8([0u8; 0]), Value::bool(false)],
+            ));
+        }
+    };
+    let sig = match libsecp256k1::Signature::parse_standard_slice(&signature) {
+        Ok(sig) => sig,
+        Err(_) => {
+            return Ok(NativeResult::ok(
+                cost,
+                smallvec![Value::vector_u8([0u8; 0]), Value::bool(false)],
+            ));
+        }
+    };
+
+    let pk = match libsecp256k1::recover(&msg, &sig, &rid) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Ok(NativeResult::ok(
+                cost,
+                smallvec![Value::vector_u8([0u8; 0]), Value::bool(false)],
+            ));
+        }
+    };
+
+    Ok(NativeResult::ok(
+        cost,
+        smallvec![
+            Value::vector_u8(pk.serialize()[1..].to_vec()),
+            Value::bool(true)
+        ],
     ))
 }
