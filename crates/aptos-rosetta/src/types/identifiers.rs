@@ -149,6 +149,7 @@ pub struct OperationIdentifier {
     /// It must be 0 to n within the transaction.
     pub index: u64,
     /// Only necessary if operation order is required
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub network_index: Option<u64>,
 }
 

@@ -18,6 +18,7 @@ pub struct Error {
     /// Message that always matches the error code
     pub message: String,
     /// Possible generic information about an error code
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Whether a call can retry on the error
     pub retriable: bool,
@@ -53,8 +54,11 @@ pub struct Peer {
 /// [API Spec](https://www.rosetta-api.org/docs/models/SyncStatus.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SyncStatus {
+    #[serde(skip_serializing_if = "Option::is_none")]
     current_index: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     target_index: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     stage: Option<String>,
     synced: bool,
 }

@@ -51,6 +51,7 @@ pub struct BlockResponse {
     /// The block requested.  This should always be populated for a given valid version
     pub block: Option<Block>,
     /// Transactions that weren't included in the block
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub other_transactions: Option<Vec<TransactionIdentifier>>,
 }
 
@@ -80,6 +81,7 @@ pub struct ConstructionDeriveRequest {
 /// [API Spec](https://www.rosetta-api.org/docs/models/ConstructionDeriveResponse.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConstructionDeriveResponse {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub account_identifier: Option<AccountIdentifier>,
 }
 
@@ -108,6 +110,7 @@ pub struct MetadataOptions {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConstructionMetadataResponse {
     pub metadata: ConstructionMetadata,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub suggested_fee: Option<Vec<Amount>>,
 }
 
@@ -129,6 +132,7 @@ pub struct ConstructionParseRequest {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConstructionParseResponse {
     pub operations: Vec<Operation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub account_identifier_signers: Option<Vec<AccountIdentifier>>,
 }
 
@@ -137,7 +141,9 @@ pub struct ConstructionParseResponse {
 pub struct ConstructionPayloadsRequest {
     pub network_identifier: NetworkIdentifier,
     pub operations: Vec<Operation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ConstructionMetadata>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub public_keys: Option<Vec<PublicKey>>,
 }
 
@@ -153,14 +159,18 @@ pub struct ConstructionPayloadsResponse {
 pub struct ConstructionPreprocessRequest {
     pub network_identifier: NetworkIdentifier,
     pub operations: Vec<Operation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub max_fee: Option<Vec<Amount>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub suggested_fee_multiplier: Option<f64>,
 }
 
 /// [API Spec](https://www.rosetta-api.org/docs/models/ConstructionPreprocessResponse.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConstructionPreprocessResponse {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub options: Option<MetadataOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub required_public_keys: Option<Vec<AccountIdentifier>>,
 }
 
@@ -231,7 +241,9 @@ pub struct NetworkStatusResponse {
     pub current_block_identifier: BlockIdentifier,
     pub current_block_timestamp: u64,
     pub genesis_block_identifier: BlockIdentifier,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub oldest_block_identifier: Option<BlockIdentifier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sync_status: Option<SyncStatus>,
     pub peers: Vec<Peer>,
 }
