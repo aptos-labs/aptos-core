@@ -16,6 +16,7 @@ use aptos_types::{
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     move_resource::MoveStorage,
+    nibble::nibble_path::NibblePath,
     on_chain_config::{access_path_for_config, ConfigID},
     proof::{
         definition::LeafCount, AccumulatorConsistencyProof, SparseMerkleProof,
@@ -659,6 +660,19 @@ pub trait DbWriter: Send + Sync {
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
+    /// Persists merklized states as authenticated state checkpoint.
+    /// See [`AptosDB::save_state_snapshot`].
+    ///
+    /// [`AptosDB::save_state_snapshot`]: ../aptosdb/struct.AptosDB.html#method.save_state_snapshot
+    fn save_state_snapshot(
+        &self,
+        jmt_updates: &[Vec<(HashValue, (HashValue, StateKey))>],
+        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
+        version: Version,
     ) -> Result<()> {
         unimplemented!()
     }

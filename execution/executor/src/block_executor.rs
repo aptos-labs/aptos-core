@@ -10,7 +10,7 @@ use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Transaction};
 use aptos_vm::VMExecutor;
-use executor_types::{BlockExecutorTrait, Error, StateComputeResult};
+use executor_types::{BlockExecutorTrait, Error, StateComputeResult, StateSnapshotDelta};
 use fail::fail_point;
 use std::marker::PhantomData;
 
@@ -22,7 +22,7 @@ use crate::{
         APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
-use storage_interface::DbReaderWriter;
+use storage_interface::{jmt_update_sets, DbReaderWriter};
 
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
@@ -123,14 +123,14 @@ where
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-    ) -> Result<(), Error> {
+    ) -> Result<Option<StateSnapshotDelta>, Error> {
         let _timer = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
         let committed_block = self.block_tree.root_block();
         if committed_block.num_persisted_transactions()
             == ledger_info_with_sigs.ledger_info().version() + 1
         {
             // a retry
-            return Ok(());
+            return Ok(None);
         }
 
         let block_id_to_commit = ledger_info_with_sigs.ledger_info().consensus_block_id();
@@ -162,7 +162,7 @@ where
             });
         }
 
-        {
+        let committed_smt = {
             let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
             APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
 
@@ -176,8 +176,16 @@ where
             )?;
             self.block_tree
                 .prune(ledger_info_with_sigs.ledger_info())
-                .expect("Failure pruning block tree.");
-        }
-        Ok(())
+                .expect("Failure pruning block tree.")
+        };
+        let jmt_updates = txns_to_commit
+            .iter()
+            .flat_map(|t| jmt_update_sets(&[t.state_updates()]))
+            .collect();
+        Ok(Some(StateSnapshotDelta {
+            version: ledger_info_with_sigs.ledger_info().version(),
+            smt: committed_smt,
+            value_sets: jmt_updates,
+        }))
     }
 }

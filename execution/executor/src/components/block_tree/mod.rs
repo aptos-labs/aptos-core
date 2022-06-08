@@ -14,9 +14,12 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
-use aptos_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
+use aptos_types::{
+    ledger_info::LedgerInfo, proof::definition::LeafCount, state_store::state_value::StateValue,
+};
 use consensus_types::block::Block as ConsensusBlock;
 use executor_types::{Error, ExecutedChunk};
+use scratchpad::SparseMerkleTree;
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::{Arc, Weak},
@@ -226,7 +229,7 @@ impl BlockTree {
         block_lookup.fetch_or_add_block(id, ExecutedChunk::new_empty(result_view), None)
     }
 
-    pub fn prune(&self, ledger_info: &LedgerInfo) -> Result<()> {
+    pub fn prune(&self, ledger_info: &LedgerInfo) -> Result<SparseMerkleTree<StateValue>> {
         let committed_block_id = ledger_info.consensus_block_id();
         let last_committed_block = self.get_block(committed_block_id)?;
 
@@ -251,8 +254,10 @@ impl BlockTree {
             last_committed_block
         };
 
+        let root_smt = root.output.result_view.state().current.clone();
         *self.root.lock() = root;
-        Ok(())
+
+        Ok(root_smt)
     }
 
     pub fn add_block(

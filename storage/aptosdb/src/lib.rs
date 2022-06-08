@@ -63,6 +63,7 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
+    nibble::nibble_path::NibblePath,
     proof::{
         definition::LeafCount, AccumulatorConsistencyProof, SparseMerkleProof,
         TransactionInfoListWithProof,
@@ -645,11 +646,11 @@ impl AptosDB {
         txns_to_commit: &[TransactionToCommit],
         first_version: u64,
         cs: &mut ChangeSet,
-    ) -> Result<(HashValue, Option<(Version, HashValue)>)> {
+    ) -> Result<HashValue> {
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
 
-        // Account state updates. Gather account state root hashes
-        let new_state_checkpoint = {
+        // Account state updates.
+        {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["save_transactions_state"])
                 .start_timer();
@@ -658,31 +659,9 @@ impl AptosDB {
                 .iter()
                 .map(|txn_to_commit| txn_to_commit.state_updates())
                 .collect::<Vec<_>>();
-            let jmt_update_sets = jmt_update_sets(&state_updates_vec);
-            // find the last version with state tree updates -- that's the latest state checkpoint
-            let latest_state_checkpoint_index = state_updates_vec
-                .iter()
-                .rposition(|updates| !updates.is_empty());
-
-            let node_hashes = txns_to_commit
-                .iter()
-                .map(|txn_to_commit| txn_to_commit.jf_node_hashes())
-                .collect::<Option<Vec<_>>>();
-            let root_hashes = self.state_store.merklize_value_sets(
-                jmt_update_ref_sets(&jmt_update_sets),
-                node_hashes,
-                first_version,
-                cs,
-            )?;
             self.state_store
                 .put_value_sets(state_updates_vec, first_version, cs)?;
-
-            latest_state_checkpoint_index.map(|idx| {
-                let version = first_version + idx as LeafCount;
-                let root_hash = root_hashes[idx];
-                (version, root_hash)
-            })
-        };
+        }
 
         // Event updates. Gather event accumulator root hashes.
         {
@@ -718,8 +697,7 @@ impl AptosDB {
             self.ledger_store
                 .put_transaction_infos(first_version, &txn_infos, cs)?
         };
-
-        Ok((new_root_hash, new_state_checkpoint))
+        Ok(new_root_hash)
     }
 
     /// Write the whole schema batch including all data necessary to mutate the ledger
@@ -1258,6 +1236,33 @@ impl DbWriter for AptosDB {
         })
     }
 
+    /// Snapshots are persisted checkpoints that merklize global state key-value pairs.
+    fn save_state_snapshot(
+        &self,
+        jmt_updates: &[Vec<(HashValue, (HashValue, StateKey))>],
+        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
+        version: Version,
+    ) -> Result<()> {
+        gauged_api("save_state_snapshot", || {
+            let jmt_updates_ref = jmt_update_ref_sets(jmt_updates);
+
+            let mut cs = ChangeSet::new();
+            let root_hash = *self
+                .state_store
+                .merklize_value_sets(
+                    jmt_updates_ref,
+                    node_hashes.map(|x| vec![x]),
+                    version,
+                    &mut cs,
+                )?
+                .first()
+                .expect("One root hash expected");
+            self.ledger_db.write_schemas(cs.batch)?;
+            self.state_store.set_latest_checkpoint(version, root_hash);
+            Ok(())
+        })
+    }
+
     /// `first_version` is the version of the first transaction in `txns_to_commit`.
     /// When `ledger_info_with_sigs` is provided, verify that the transaction accumulator root hash
     /// it carries is generated after the `txns_to_commit` are applied.
@@ -1292,8 +1297,28 @@ impl DbWriter for AptosDB {
             // Gather db mutations to `batch`.
             let mut cs = ChangeSet::new();
 
-            let (new_root_hash, new_state_checkpoint) =
+            let new_root_hash =
                 self.save_transactions_impl(txns_to_commit, first_version, &mut cs)?;
+
+            // find all the checkpoint versions
+            for (idx, value_set, jf_node_hashes) in txns_to_commit
+                .iter()
+                .enumerate()
+                .filter(|(_idx, txn_to_commit)| !txn_to_commit.state_updates().is_empty())
+                .map(|(idx, txn_to_commit)| {
+                    (
+                        idx,
+                        jmt_update_sets(vec![txn_to_commit.state_updates()].as_slice()),
+                        txn_to_commit.jf_node_hashes(),
+                    )
+                })
+            {
+                self.save_state_snapshot(
+                    &value_set,
+                    jf_node_hashes,
+                    first_version + idx as LeafCount,
+                )?;
+            }
 
             // If expected ledger info is provided, verify result root hash and save the ledger info.
             if let Some(x) = ledger_info_with_sigs {
@@ -1315,10 +1340,6 @@ impl DbWriter for AptosDB {
                     .with_label_values(&["save_transactions_commit"])
                     .start_timer();
                 self.commit(sealed_cs)?;
-            }
-
-            if let Some((version, root_hash)) = new_state_checkpoint {
-                self.state_store.set_latest_checkpoint(version, root_hash);
             }
 
             // Only increment counter if commit succeeds and there are at least one transaction written
