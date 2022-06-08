@@ -1,7 +1,7 @@
 queue_rules:
   - name: default
     speculative_checks: 10
-    conditions: []  # no extra conditions needed to get merged
+    conditions: [] # no extra conditions needed to get merged
     allow_inplace_checks: false
 
 pull_request_rules:
