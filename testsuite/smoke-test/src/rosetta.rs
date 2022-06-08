@@ -87,11 +87,13 @@ async fn test_block() {
         genesis_block.parent_block_identifier
     );
 
-    // TODO: Verify timestamp
+    // Genesis timestamp is always 0
+    assert_eq!(0, genesis_block.timestamp);
 
-    // TODO: Verify operations
+    // There should only be the genesis transaction
     assert_eq!(1, genesis_block.transactions.len());
     let genesis_txn = genesis_block.transactions.first().unwrap();
+    // TODO: Verify operations
 
     // Get genesis txn by hash
     let request_genesis_by_hash =
@@ -118,26 +120,50 @@ async fn test_block() {
     let request_latest = BlockRequest::latest(chain_id);
     let response = rosetta_client.block(&request_latest).await.unwrap();
     let latest_block = response.block.unwrap();
-    assert!(latest_block.block_identifier.index > genesis_block.block_identifier.index);
 
-    // TODO: Verify other fields in the latest txn
+    // The latest block should always come after genesis
+    assert!(latest_block.block_identifier.index > genesis_block.block_identifier.index);
+    assert!(latest_block.timestamp > genesis_block.timestamp);
+
+    // The parent should always be exactly one version before
+    assert_eq!(
+        latest_block.parent_block_identifier.index,
+        latest_block.block_identifier.index - 1
+    );
+
+    // There should be exactly one txn
+    assert_eq!(1, latest_block.transactions.len());
 
     // We should be able to query it again by hash or by version and it is the same
     let request_latest_by_version =
         BlockRequest::by_version(chain_id, latest_block.block_identifier.index);
-    let response = rosetta_client
+    let latest_block_by_version = rosetta_client
         .block(&request_latest_by_version)
         .await
+        .unwrap()
+        .block
         .unwrap();
-    let latest_block_by_version = response.block.unwrap();
-
     let request_latest_by_hash =
         BlockRequest::by_hash(chain_id, latest_block.block_identifier.hash.clone());
-    let response = rosetta_client.block(&request_latest_by_hash).await.unwrap();
-    let latest_block_by_hash = response.block.unwrap();
+    let latest_block_by_hash = rosetta_client
+        .block(&request_latest_by_hash)
+        .await
+        .unwrap()
+        .block
+        .unwrap();
 
     assert_eq!(latest_block, latest_block_by_version);
     assert_eq!(latest_block_by_hash, latest_block_by_version);
+
+    // And querying latest again should get yet another transaction in the future
+    let newer_block = rosetta_client
+        .block(&request_latest)
+        .await
+        .unwrap()
+        .block
+        .unwrap();
+    assert!(newer_block.block_identifier.index > latest_block.block_identifier.index);
+    assert!(newer_block.timestamp > latest_block.timestamp);
 }
 
 /// Try for 2 seconds to get a response.  This handles the fact that it's starting async

@@ -220,3 +220,11 @@ pub struct SubNetworkIdentifier {
 pub struct TransactionIdentifier {
     pub hash: String,
 }
+
+impl From<&TransactionInfo> for TransactionIdentifier {
+    fn from(txn: &TransactionInfo) -> Self {
+        TransactionIdentifier {
+            hash: txn.hash.to_string(),
+        }
+    }
+}
