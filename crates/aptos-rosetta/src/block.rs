@@ -44,16 +44,24 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
     let rest_client = &server_context.rest_client;
 
     // Retrieve by block or by hash, both or neither is not allowed
-    let response = match (
+    let transaction = match (
         &request.block_identifier.index,
         &request.block_identifier.hash,
     ) {
-        (Some(version), None) => rest_client.get_transaction_by_version(*version).await?,
+        (Some(version), None) => rest_client
+            .get_transaction_by_version(*version)
+            .await?
+            .into_inner(),
         (None, Some(hash)) => {
             // Allow 0x in front of hash
             let hash = HashValue::from_str(hash.strip_prefix("0x").unwrap())
                 .map_err(|err| ApiError::AptosError(err.to_string()))?;
-            rest_client.get_transaction(hash).await?
+            rest_client.get_transaction(hash).await?.into_inner()
+        }
+        (None, None) => {
+            // Get current version
+            let txn = rest_client.get_transactions(None, Some(1)).await?;
+            txn.into_inner().first().unwrap()
         }
         (_, _) => return Err(ApiError::BadBlockRequest),
     };

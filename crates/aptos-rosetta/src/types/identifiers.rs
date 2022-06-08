@@ -8,21 +8,36 @@ use crate::{
 use aptos_rest_client::{aptos_api_types::TransactionInfo, Transaction};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, str::FromStr};
+use std::{
+    convert::{TryFrom, TryInto},
+    str::FromStr,
+};
 
+/// Account identifier, specified as a hex encoded account address (with leading 0x)
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/AccountIdentifier.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AccountIdentifier {
+    /// Hex encoded AccountAddress beginning with 0x
     pub address: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sub_account: Option<SubAccountIdentifier>,
 }
 
 impl AccountIdentifier {
+    /// Convert [`AccountIdentifier`] to an [`AccountAddress`]
     pub fn account_address(&self) -> ApiResult<AccountAddress> {
+        self.try_into()
+    }
+}
+
+impl TryFrom<AccountIdentifier> for AccountAddress {
+    type Error = ApiError;
+
+    fn try_from(account: AccountIdentifier) -> Result<Self, Self::Error> {
         // Allow 0x in front of account address
         Ok(AccountAddress::from_str(
-            self.address.strip_prefix("0x").unwrap(),
+            account.address.strip_prefix("0x").unwrap(),
         )?)
     }
 }
@@ -30,18 +45,21 @@ impl AccountIdentifier {
 impl From<AccountAddress> for AccountIdentifier {
     fn from(address: AccountAddress) -> Self {
         AccountIdentifier {
-            address: address.to_string(),
+            address: format!("{:#x}", address),
             sub_account: None,
         }
     }
 }
 
+/// Identifier for a "block".  In aptos, we use a transaction model, so the version
+/// represents a single transaction that we use for this.
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/BlockIdentifier.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockIdentifier {
-    /// Version number usually known as height
+    /// Version number usually known as height, and specifies one transaction
     pub index: u64,
-    /// Version Hash
+    /// Transaction hash
     pub hash: String,
 }
 
@@ -82,10 +100,14 @@ impl TryFrom<&PartialBlockIdentifier> for BlockIdentifier {
     }
 }
 
+/// Identifier for this specific network deployment
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/NetworkIdentifier.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct NetworkIdentifier {
+    /// Blockchain name, should always be `aptos` and be hardcoded
     pub blockchain: String,
+    /// Network name which we use ChainId for it
     pub network: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sub_network_identifier: Option<SubNetworkIdentifier>,
@@ -93,7 +115,16 @@ pub struct NetworkIdentifier {
 
 impl NetworkIdentifier {
     pub fn chain_id(&self) -> ApiResult<ChainId> {
-        ChainId::from_str(self.network.trim()).map_err(|err| ApiError::AptosError(err.to_string()))
+        self.try_into()
+    }
+}
+
+impl TryFrom<NetworkIdentifier> for ChainId {
+    type Error = ApiError;
+
+    fn try_from(network_identifier: NetworkIdentifier) -> Result<Self, Self::Error> {
+        ChainId::from_str(network_identifier.network.trim())
+            .map_err(|err| ApiError::AptosError(err.to_string()))
     }
 }
 
@@ -109,15 +140,21 @@ impl From<ChainId> for NetworkIdentifier {
 
 /// Identifies a specific [`crate::types::Operation`] within a [`Transaction`]
 ///
-/// It must be 0 to n within the transaction.
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/OperationIdentifier.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct OperationIdentifier {
+    /// The unique index of the operation within a transaction
+    ///
+    /// It must be 0 to n within the transaction.
     pub index: u64,
+    /// Only necessary if operation order is required
     pub network_index: Option<u64>,
 }
 
+/// Partial block identifier for querying by version or by hash.  Both should not be
+/// provided at the same time.
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/PartialBlockIdentifier.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct PartialBlockIdentifier {
@@ -136,20 +173,25 @@ impl From<&BlockIdentifier> for PartialBlockIdentifier {
     }
 }
 
+/// Sub account identifier if there are sub accounts
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/SubAccountIdentifier.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SubAccountIdentifier {
     pub address: String,
 }
 
+/// Sub network identifier if there are sub networks
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/SubNetworkIdentifier.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SubNetworkIdentifier {
     pub network: String,
 }
 
-/// [API Spec](https://www.rosetta-api.org/docs/models/TransactionIdentifier.html)
+/// TransactionIdentifier to represent a transaction by hash
 ///
+/// [API Spec](https://www.rosetta-api.org/docs/models/TransactionIdentifier.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TransactionIdentifier {
     pub hash: String,
