@@ -33,22 +33,29 @@ jobs:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
 
+      - name: Login to ECR
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com
+          username: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.ENV_DOCKERHUB_USERNAME }}
           password: ${{ secrets.ENV_DOCKERHUB_PASSWORD }}
 
-      - name: Compute 8-char SHA1
-        id: vars
-        run: echo "::set-output name=short_sha1::$(git rev-parse --short=8 HEAD)"
-
       - name: Push Images to Dockerhub
         uses: akhilerm/tag-push-action@v2.0.0
         with:
           src: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/${{ matrix.IMAGE_NAME }}:${{ github.sha }}
           dst: |
-            docker.io/aptoslab/${{matrix.IMAGE_NAME}}:${{ inputs.image_tag_prefix }}
-            docker.io/aptoslab/${{matrix.IMAGE_NAME}}:${{ inputs.image_tag_prefix }}_${{ steps.vars.outputs.short_sha1 }}
-            docker.io/aptoslabs/${{matrix.IMAGE_NAME}}:${{ inputs.image_tag_prefix }}
-            docker.io/aptoslabs/${{matrix.IMAGE_NAME}}:${{ inputs.image_tag_prefix }}_${{ steps.vars.outputs.short_sha1 }}
+            docker.io/aptoslab/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}
+            docker.io/aptoslab/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}_${{ github.sha }}
+            docker.io/aptoslabs/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}
+            docker.io/aptoslabs/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}_${{ github.sha }}
+            ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}
+            ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}_${{ github.sha }}
+            ${{ secrets.AWS_ECR_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com/aptos/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}
+            ${{ secrets.AWS_ECR_ACCOUNT_NUM }}.dkr.ecr.us-west-2.amazonaws.com/aptos/${{ matrix.IMAGE_NAME }}:${{ inputs.image_tag_prefix }}_${{ github.sha }}
