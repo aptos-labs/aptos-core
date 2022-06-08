@@ -9,7 +9,6 @@ use crate::{
     },
 };
 use aptos_rest_client::aptos_api_types::mime_types::JSON;
-use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient};
 use url::Url;
 
@@ -24,20 +23,6 @@ impl RosettaClient {
             address,
             inner: ReqwestClient::new(),
         }
-    }
-
-    pub async fn account_balance_simple(
-        &self,
-        account: AccountAddress,
-        chain_id: ChainId,
-    ) -> anyhow::Result<AccountBalanceResponse> {
-        let request = AccountBalanceRequest {
-            network_identifier: chain_id.into(),
-            account_identifier: account.into(),
-            block_identifier: None,
-            currencies: None,
-        };
-        self.account_balance(&request).await
     }
 
     pub async fn account_balance(

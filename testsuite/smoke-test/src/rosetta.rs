@@ -4,7 +4,10 @@
 use crate::{aptos_cli::launch_faucet, smoke_test_environment::new_local_swarm_with_aptos};
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_config::config::ApiConfig;
-use aptos_rosetta::{client::RosettaClient, types::BlockRequest, CURRENCY, NUM_DECIMALS};
+use aptos_rosetta::{
+    client::RosettaClient,
+    types::{AccountBalanceRequest, BlockRequest, Currency},
+};
 use forge::{LocalSwarm, Node};
 use std::{future::Future, str::FromStr, time::Duration};
 
@@ -59,15 +62,20 @@ async fn test_account_balance() {
     let (swarm, _cli, rosetta_client) = setup_test(1, 1).await;
     let account = CliTestFramework::account_id(0);
     let chain_id = swarm.chain_id();
-    let response = try_until_ok(|| rosetta_client.account_balance_simple(account, chain_id))
+    let request = AccountBalanceRequest {
+        network_identifier: chain_id.into(),
+        account_identifier: account.into(),
+        block_identifier: None,
+        currencies: None,
+    };
+
+    let response = try_until_ok(|| rosetta_client.account_balance(&request))
         .await
         .unwrap();
     assert_eq!(1, response.balances.len());
     let balance = response.balances.first().unwrap();
-    let currency = &balance.currency;
-    assert_eq!(CURRENCY, currency.symbol);
-    assert_eq!(NUM_DECIMALS, currency.decimals);
     assert_eq!(DEFAULT_FUNDED_COINS, u64::from_str(&balance.value).unwrap());
+    assert_eq!(&Currency::test_coin(), &balance.currency);
 }
 
 #[tokio::test]
