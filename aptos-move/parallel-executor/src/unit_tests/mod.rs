@@ -291,8 +291,6 @@ fn scheduler_incarnation() {
             SchedulerTask::ExecutionTask((j, 0), None, _) if j == i
         ));
     }
-    // Should not matter since drain_idx is already 5.
-    s.set_stop_idx(3);
 
     // execution index = 5
     assert!(s.wait_for_dependency(1, 0).is_some());
@@ -378,7 +376,7 @@ fn scheduler_incarnation() {
 
 #[test]
 fn scheduler_stop_idx() {
-    let s = Scheduler::new(5);
+    let s = Scheduler::new(3);
     let fake_counter = AtomicUsize::new(0);
 
     for i in 0..2 {
@@ -388,8 +386,6 @@ fn scheduler_stop_idx() {
             SchedulerTask::ExecutionTask((j, 0), None, _) if j == i
         ));
     }
-    // stop_idx is now 3, no txn > 2 has been scheduled, so txns 3,4 won't ever execute.
-    s.set_stop_idx(3);
 
     assert!(matches!(
         s.next_task(),
@@ -427,7 +423,7 @@ fn scheduler_stop_idx() {
 
 #[test]
 fn scheduler_drain_idx() {
-    let s = Scheduler::new(5);
+    let s = Scheduler::new(3);
     let fake_counter = AtomicUsize::new(0);
 
     for i in 0..3 {
@@ -437,8 +433,6 @@ fn scheduler_drain_idx() {
             SchedulerTask::ExecutionTask((j, 0), None, _) if j == i
         ));
     }
-    // 3 txns have already been scheduled, will finish at 3 despite stop idx 2.
-    s.set_stop_idx(2);
 
     // Finish executions & dispatch validation tasks.
     assert!(matches!(

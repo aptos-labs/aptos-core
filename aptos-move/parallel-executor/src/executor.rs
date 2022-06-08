@@ -13,7 +13,16 @@ use mvhashmap::MVHashMap;
 use num_cpus;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
-use std::{collections::HashSet, hash::Hash, marker::PhantomData, sync::Arc, thread::spawn};
+use std::{
+    collections::HashSet,
+    hash::Hash,
+    marker::PhantomData,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    thread::spawn,
+};
 
 static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -166,20 +175,22 @@ where
         };
 
         let result = match execute_result {
+            // These statuses are the results of speculative execution, so even for
+            // SkipRest (skip the rest of transactions) and Abort (abort execution with
+            // user defined error), no immediate action is taken. Instead the statuses
+            // are recorded and (final statuses) are analyzed when the block is executed.
             ExecutionStatus::Success(output) => {
-                // Commit the side effects to the versioned_data_cache.
+                // Apply the writes to the versioned_data_cache.
                 apply_writes(&output);
                 ExecutionStatus::Success(output)
             }
             ExecutionStatus::SkipRest(output) => {
-                // Commit and skip the rest of the transactions.
+                // Apply the writes and record status indicating skip.
                 apply_writes(&output);
-                scheduler.set_stop_idx(idx_to_execute + 1);
                 ExecutionStatus::SkipRest(output)
             }
             ExecutionStatus::Abort(err) => {
-                // Abort the execution with user defined error.
-                scheduler.set_stop_idx(idx_to_execute + 1);
+                // Record the status indicating abort.
                 ExecutionStatus::Abort(Error::UserError(err))
             }
         };
@@ -313,16 +324,20 @@ where
         });
 
         // Extract outputs in parallel.
-        let valid_results_size = scheduler.num_txn_to_execute();
-        let chunk_size =
-            (valid_results_size + 4 * self.concurrency_level - 1) / (4 * self.concurrency_level);
+        let num_txns = scheduler.num_txn_to_execute();
+        let valid_results_size = AtomicUsize::new(num_txns);
+        let chunk_size = (num_txns + 4 * self.concurrency_level - 1) / (4 * self.concurrency_level);
         RAYON_EXEC_POOL.install(|| {
-            (0..valid_results_size)
+            (0..num_txns)
                 .collect::<Vec<TxnIndex>>()
                 .par_chunks(chunk_size)
                 .map(|chunk| {
                     for idx in chunk.iter() {
-                        outcomes.set_result(*idx, last_input_output.take_output(*idx));
+                        let res = last_input_output.take_output(*idx);
+                        if matches!(res, ExecutionStatus::SkipRest(_)) {
+                            valid_results_size.fetch_min(*idx + 1, Ordering::SeqCst);
+                        }
+                        outcomes.set_result(*idx, res);
                     }
                 })
                 .collect::<()>();
@@ -335,6 +350,6 @@ where
             drop(versioned_data_cache);
             drop(scheduler);
         });
-        outcomes.get_all_results(valid_results_size)
+        outcomes.get_all_results(valid_results_size.load(Ordering::SeqCst))
     }
 }
