@@ -1,0 +1,13 @@
+name: "On"
+on:
+  check_run:
+    types: [created]
+
+jobs:
+  scripts-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - run: $NAME
+        env:
+          NAME: ${{ github.event.check_run.name }}
