@@ -100,7 +100,7 @@ async fn network_options(
         operation_types,
         errors,
         historical_balance_lookup: false,
-        timestamp_start_index: Some(3), // FIXME: hardcoded based on current testnet
+        timestamp_start_index: None,
         call_methods: vec![],
         balance_exemptions: vec![],
         mempool_coins: false,
