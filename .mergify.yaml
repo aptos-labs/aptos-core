@@ -2,6 +2,7 @@ queue_rules:
   - name: default
     speculative_checks: 10
     conditions: []  # no extra conditions needed to get merged
+    allow_inplace_checks: false
 
 pull_request_rules:
   - name: merge using the merge queue
