@@ -33,13 +33,13 @@ const sidebars = {
         "basics/basics-node-networks-sync",
       ],
     },
+    "guides/getting-started",
     {
       type: "category",
       label: "Guides",
       collapsible: true,
       collapsed: true,
       items: [
-        "guides/getting-started",
         "guides/basics-life-of-txn",
         "guides/sign-a-transaction",
         "guides/move",
