@@ -1119,7 +1119,7 @@ impl DbReader for AptosDB {
         state_store_key: &StateKey,
         version: Version,
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        gauged_api("get_account_state_with_proof_by_version", || {
+        gauged_api("get_state_value_with_proof_by_version", || {
             error_if_version_is_pruned(
                 &self.pruner,
                 PrunerIndex::StateStorePrunerIndex,
