@@ -4,7 +4,7 @@
 use aptos_infallible::Mutex;
 use crossbeam::utils::CachePadded;
 use std::{
-    cmp::{max, min},
+    cmp::min,
     hint,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -105,6 +105,9 @@ impl PartialEq for TransactionStatus {
 }
 
 pub struct Scheduler {
+    /// Shared number of txns to execute.
+    num_txns: AtomicUsize,
+
     /// A shared index that tracks the minimum of all transaction indices that require execution.
     /// The threads increment the index and attempt to create an execution task for the corresponding
     /// transaction, if the status of the txn is 'ReadyToExecute'. This implements a counting-based
@@ -127,14 +130,6 @@ pub struct Scheduler {
     /// Shared marker that is set when a thread detects that all txns can be committed.
     done_marker: AtomicBool,
 
-    /// Shared number of txns to execute: updated before executing a block or when an error or
-    /// reconfiguration leads to early stopping (at that transaction idx).
-    stop_idx: AtomicUsize,
-    /// When stop_idx is reduced, we should stop creating tasks for higher indices, and let
-    /// existing tasks with higher indices drain. To not drain the whole block, drain_idx counts
-    /// the number of transactions that we ever scheduled for execution.
-    drain_idx: AtomicUsize,
-
     /// An index i maps to indices of other transactions that depend on transaction i, i.e. they
     /// should be re-executed once transaction i's next incarnation finishes.
     txn_dependency: Vec<CachePadded<Mutex<Vec<TxnIndex>>>>,
@@ -146,13 +141,12 @@ pub struct Scheduler {
 impl Scheduler {
     pub fn new(num_txns: usize) -> Self {
         Self {
+            num_txns: AtomicUsize::new(num_txns),
             execution_idx: AtomicUsize::new(0),
             validation_idx: AtomicUsize::new(0),
             decrease_cnt: AtomicUsize::new(0),
             num_active_tasks: AtomicUsize::new(0),
             done_marker: AtomicBool::new(false),
-            stop_idx: AtomicUsize::new(num_txns),
-            drain_idx: AtomicUsize::new(0),
             txn_dependency: (0..num_txns)
                 .map(|_| CachePadded::new(Mutex::new(Vec::new())))
                 .collect(),
@@ -162,15 +156,9 @@ impl Scheduler {
         }
     }
 
-    /// Reset txn_idx to end the execution earlier. The executor will stop at the smallest
-    /// `stop_idx` when there are multiple concurrent invocation.
-    pub fn set_stop_idx(&self, stop_idx: TxnIndex) {
-        self.stop_idx.fetch_min(stop_idx, Ordering::Relaxed);
-    }
-
     /// Return the number of transactions to be executed from the block.
     pub fn num_txn_to_execute(&self) -> usize {
-        self.stop_idx.load(Ordering::Relaxed)
+        self.num_txns.load(Ordering::Relaxed)
     }
 
     /// Try to abort version = (txn_idx, incarnation), called upon validation failure.
@@ -405,11 +393,7 @@ impl Scheduler {
     fn try_validate_next_version(&self) -> Option<(Version, TaskGuard)> {
         let idx_to_validate = self.validation_idx.load(Ordering::SeqCst);
 
-        // Optimization for check-done, to avoid num_tasks going up and down.
-        let num_txns = max(
-            self.num_txn_to_execute(),
-            self.drain_idx.load(Ordering::Acquire),
-        );
+        let num_txns = self.num_txn_to_execute();
         if idx_to_validate >= num_txns {
             if !self.check_done(num_txns) {
                 // Avoid pointlessly spinning, and give priority to other threads that may
@@ -440,11 +424,7 @@ impl Scheduler {
     fn try_execute_next_version(&self) -> Option<(Version, Option<DependencyCondvar>, TaskGuard)> {
         let idx_to_execute = self.execution_idx.load(Ordering::SeqCst);
 
-        // Optimization for check-done, to avoid num_tasks going up and down.
-        let num_txns = max(
-            self.num_txn_to_execute(),
-            self.drain_idx.load(Ordering::Acquire),
-        );
+        let num_txns = self.num_txn_to_execute();
         if idx_to_execute >= num_txns {
             if !self.check_done(num_txns) {
                 // Avoid pointlessly spinning, and give priority to other threads that may
@@ -463,11 +443,6 @@ impl Scheduler {
         // return version and guard for execution task, otherwise None.
         self.try_incarnate(idx_to_execute)
             .map(|(incarnation, maybe_condvar)| {
-                if incarnation == 0 {
-                    // counting transactions that ever got scheduled for execution.
-                    self.drain_idx.fetch_add(1, Ordering::SeqCst);
-                }
-
                 ((idx_to_execute, incarnation), maybe_condvar, guard)
             })
     }
