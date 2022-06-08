@@ -1,12 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::vm_status::VMStatus;
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt::{Display, Formatter},
-    str::FromStr,
-};
 
 ///
 ///
