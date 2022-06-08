@@ -50,6 +50,7 @@ pub async fn setup_test(num_nodes: usize) -> (LocalSwarm, CliTestFramework, Rose
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_account_balance() {
     let (_swarm, cli, rosetta_client) = setup_test(1).await;
 
