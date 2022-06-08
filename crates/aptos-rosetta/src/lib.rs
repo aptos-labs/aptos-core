@@ -5,6 +5,8 @@
 //!
 //! [Rosetta API Spec](https://www.rosetta-api.org/docs/Reference.html)
 
+extern crate core;
+
 use aptos_api::runtime::WebServer;
 use aptos_config::config::ApiConfig;
 use aptos_logger::debug;
