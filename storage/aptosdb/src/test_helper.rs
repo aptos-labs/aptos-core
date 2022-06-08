@@ -10,6 +10,7 @@ use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumula
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 use aptos_temppath::TempPath;
 use aptos_types::{
+    contract_event::ContractEvent,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::accumulator::InMemoryAccumulator,
     proptest_types::{AccountInfoUniverse, BlockGen},
