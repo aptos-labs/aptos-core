@@ -1,4 +1,4 @@
-name: "On"
+name: "Top Of Queue Check"
 on:
   check_run:
     types: [created]
