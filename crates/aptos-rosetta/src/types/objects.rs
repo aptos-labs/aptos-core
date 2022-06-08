@@ -29,8 +29,8 @@ pub struct Allow {
     pub timestamp_start_index: Option<u64>,
     /// All call methods supported
     pub call_methods: Vec<String>,
-    /// A list of balance exemptions, where these accounts change their balance
-    /// without an operation
+    /// A list of balance exemptions.  These should be as minimal as possible, otherwise it becomes
+    /// more complicated for users
     pub balance_exemptions: Vec<BalanceExemption>,
     /// Determines if mempool can change the balance on an account
     /// This should be set to false
@@ -54,42 +54,55 @@ pub struct Amount {
     pub currency: Currency,
 }
 
-///
+/// Balance exemptions where the current balance of an account can change without a transaction
+/// operation.  This is typically e
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/BalanceExemption.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BalanceExemption {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sub_account_address: Option<String>,
+    /// The currency that can change based on the exemption
     #[serde(skip_serializing_if = "Option::is_none")]
     pub currency: Option<Currency>,
+    /// The exemption type of which direction a balance can change
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exemption_type: Option<ExemptionType>,
 }
 
-///
+/// Representation of a Block for a blockchain.  For aptos it is the version
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/Block.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Block {
+    /// Block identifier of the current block
     pub block_identifier: BlockIdentifier,
+    /// Block identifier of the previous block
     pub parent_block_identifier: BlockIdentifier,
+    /// Timestamp in milliseconds to the block from the UNIX_EPOCH
     pub timestamp: u64,
+    /// Transactions associated with the version.  In aptos there should only be one transaction
     pub transactions: Vec<Transaction>,
 }
 
-///
+/// Events that allow lighter weight block updates of add and removing block
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/BlockEvent.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockEvent {
+    /// Ordered event index for events on a NetworkIdentifier (likely the same as version)
     pub sequence: u64,
+    /// Block identifier of the block to change
     pub block_identifier: BlockIdentifier,
+    /// Block event type add or remove block
     #[serde(rename = "type")]
     pub block_event_type: BlockEventType,
+    /// Transactions associated with the update, it should be only one transaction in Aptos.
     pub transactions: Vec<Transaction>,
 }
 
+/// Determines if the event is about adding or removing blocks
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/BlockEventType.html)
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -98,14 +111,19 @@ pub enum BlockEventType {
     BlockRemoved,
 }
 
+/// A combination of a transaction and the block associated.  In Aptos, this is just the same
+/// as the version associated with the transaction
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/BlockTransaction.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockTransaction {
+    /// Block associated with transaction
     block_identifier: BlockIdentifier,
+    /// Transaction associated with block
     transaction: Transaction,
 }
 
-/// Tells
+/// Tells what cases are supported in hashes. Having no value is case insensitive.
 ///
 ///[API Spec](https://www.rosetta-api.org/docs/models/Case.html)
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -139,20 +157,30 @@ pub enum CurveType {
     Pallas,
 }
 
+/// Used for related transactions to determine direction of relation
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/Direction.html)
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Direction {
+    /// Associated to a later transaction
     Forward,
+    /// Associated to an earlier transaction
     Backward,
 }
 
+/// Tells how balances can change without a specific transaction on the account
+/// TODO: Determine if we need to set these for staking
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/ExemptionType.html)
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ExemptionType {
+    /// Balance can be greater than or equal to the current balance e.g. staking
     GreaterOrEqual,
+    /// Balance can be less than or equal to the current balance
     LessOrEqual,
+    /// Balance can be less than or greater than the current balance e.g. dynamic supplies
     Dynamic,
 }
 
@@ -183,6 +211,9 @@ pub struct Operation {
     pub amount: Option<Amount>,
 }
 
+/// Used for query operations to apply conditions.  Defaults to [`Operator::And`] if no value is
+/// present
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/Operator.html)
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -197,32 +228,50 @@ impl Default for Operator {
     }
 }
 
+/// Public key used for the rosetta implementation.  All private keys will never be handled
+/// in the Rosetta implementation.
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/PublicKey.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct PublicKey {
     /// Hex encoded public key bytes
     pub hex_bytes: String,
+    /// Curve type associated with the key
     pub curve_type: CurveType,
 }
 
+/// Related Transaction allows for connecting related transactions across shards, networks or
+/// other boundaries.
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/RelatedTransaction.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct RelatedTransaction {
+    /// Network of transaction.  [`None`] means same network as original transaction
     pub network_identifier: Option<NetworkIdentifier>,
+    /// Transaction identifier of the related transaction
     pub transaction_identifier: TransactionIdentifier,
+    /// Direction of the relation (forward or backward in time)
     pub direction: Direction,
 }
 
+/// Signature containing the signed payload and the encoded signed payload
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/Signature.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Signature {
+    /// Payload to be signed
     pub signing_payload: SigningPayload,
+    /// Public key related to the signature
     pub public_key: PublicKey,
+    /// Cryptographic signature type
     pub signature_type: SignatureType,
-    /// Hex bytes of
+    /// Hex bytes of the signature
     pub hex_bytes: String,
 }
 
+/// Cryptographic signature type used for signing transactions.  Aptos only uses
+/// [`SignatureType::Ed25519`]
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/SignatureType.html)
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -235,24 +284,31 @@ pub enum SignatureType {
     SchnoorPoseidon,
 }
 
+/// Signing payload should be signed by the client with their own private key
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/SigningPayload.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SigningPayload {
     /// Deprecated field, replaced with account_identifier
     pub address: Option<String>,
+    /// Account identifier of the signer
     pub account_identifier: Option<AccountIdentifier>,
-    /// Hex encoded string of payload bytes
+    /// Hex encoded string of payload bytes to be signed
     pub hex_bytes: String,
+    /// Signature type to sign with
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature_type: Option<SignatureType>,
 }
 
-///
+/// A representation of a transaction by it's underlying operations (write set changes)
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/Transaction.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Transaction {
+    /// The identifying hash of the transaction
     pub transaction_identifier: TransactionIdentifier,
+    /// Individual operations (write set changes) in a transaction
     pub operations: Vec<Operation>,
+    /// Related transactions
     pub related_transactions: Option<Vec<RelatedTransaction>>,
 }

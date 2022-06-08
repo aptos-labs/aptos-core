@@ -8,17 +8,23 @@ use crate::types::{
 };
 use serde::{Deserialize, Serialize};
 
+/// Request for an account's currency balance either now, or historically
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/AccountBalanceRequest.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AccountBalanceRequest {
     pub network_identifier: NetworkIdentifier,
     pub account_identifier: AccountIdentifier,
+    /// For historical balance lookups by either hash or version
     #[serde(skip_serializing_if = "Option::is_none")]
     pub block_identifier: Option<PartialBlockIdentifier>,
+    /// For filtering which currencies to show
     #[serde(skip_serializing_if = "Option::is_none")]
     pub currencies: Option<Vec<Currency>>,
 }
 
+/// Response with the version associated and the balances of the account
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/AccountBalanceResponse.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AccountBalanceResponse {
@@ -26,6 +32,10 @@ pub struct AccountBalanceResponse {
     pub balances: Vec<Amount>,
 }
 
+/// Reqyest a block (version) on the account
+///
+/// With neither value for PartialBlockIdentifier, get the latest version
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/BlockRequest.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockRequest {
@@ -33,27 +43,19 @@ pub struct BlockRequest {
     pub block_identifier: PartialBlockIdentifier,
 }
 
+/// Response that will always have a valid block populated
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/BlockResponse.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockResponse {
+    /// The block requested.  This should always be populated for a given valid version
     pub block: Option<Block>,
+    /// Transactions that weren't included in the block
     pub other_transactions: Option<Vec<TransactionIdentifier>>,
 }
 
-/// [API Spec](https://www.rosetta-api.org/docs/models/BlockTransactionRequest.html)
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct BlockTransactionRequest {
-    pub network_identifier: NetworkIdentifier,
-    pub block_identifier: BlockIdentifier,
-    pub transaction_identifier: TransactionIdentifier,
-}
-
-/// [API Spec](https://www.rosetta-api.org/docs/models/BlockTransactionResponse.html)
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct BlockTransactionResponse {
-    pub transaction: Transaction,
-}
-
+///
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/ConstructionCombineRequest.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConstructionCombineRequest {

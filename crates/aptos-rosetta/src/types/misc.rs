@@ -8,6 +8,8 @@ use std::{
     str::FromStr,
 };
 
+///
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/Error.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Error {
@@ -19,6 +21,7 @@ pub struct Error {
     pub description: Option<String>,
     /// Whether a call can retry on the error
     pub retriable: bool,
+    /// Specific details of the error e.g. stack trace
     #[serde(skip_serializing_if = "Option::is_none")]
     pub details: Option<ErrorDetails>,
 }
