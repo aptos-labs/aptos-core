@@ -4,7 +4,7 @@
 use crate::{
     common::{check_network, handle_request, strip_hex_prefix, with_context},
     error::{ApiError, ApiResult},
-    types::{Block, BlockIdentifier, BlockRequest, BlockResponse, TransactionIdentifier},
+    types::{Block, BlockRequest, BlockResponse},
     RosettaContext,
 };
 use aptos_crypto::HashValue;
@@ -43,57 +43,77 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
     let rest_client = &server_context.rest_client;
 
     // Retrieve by block or by hash, both or neither is not allowed
-    let (transaction, state): (Transaction, _) = match (
+    let (parent_transaction, transaction): (Transaction, _) = match (
         &request.block_identifier.index,
         &request.block_identifier.hash,
     ) {
         (Some(version), None) => {
-            let response = rest_client.get_transaction_by_version(*version).await?;
-            let state = response.state().clone();
-            (response.into_inner(), state)
+            // For the genesis block, we populate parent_block_identifier with the
+            // same genesis block. Refer to
+            // https://www.rosetta-api.org/docs/common_mistakes.html#malformed-genesis-block
+            if *version == 0 {
+                let response = rest_client.get_transaction_by_version(*version).await?;
+                let txn = response.into_inner();
+                (txn.clone(), txn)
+            } else {
+                let response = rest_client
+                    .get_transactions(Some(*version - 1), Some(2))
+                    .await?;
+                let txns = response.into_inner();
+                if txns.len() != 2 {
+                    return Err(ApiError::AptosError(
+                        "Failed to get transaction and parent transaction".to_string(),
+                    ));
+                }
+                (
+                    txns.first().cloned().unwrap(),
+                    txns.last().cloned().unwrap(),
+                )
+            }
         }
         (None, Some(hash)) => {
             // Allow 0x in front of hash
             let hash = HashValue::from_str(strip_hex_prefix(hash))
                 .map_err(|err| ApiError::AptosError(err.to_string()))?;
             let response = rest_client.get_transaction(hash).await?;
-            let state = response.state().clone();
-            (response.into_inner(), state)
+            let txn = response.into_inner();
+            let version = txn.version().unwrap();
+
+            // If this is genesis, set parent to genesis txn
+            if version == 0 {
+                (txn.clone(), txn)
+            } else {
+                let parent_response = rest_client.get_transaction_by_version(version - 1).await?;
+                (parent_response.into_inner(), txn)
+            }
         }
         (None, None) => {
             // Get current version
-            let response = rest_client.get_transactions(None, Some(1)).await?;
-            let state = response.state().clone();
+            let response = rest_client.get_transactions(None, Some(2)).await?;
             let txns = response.into_inner();
-            (txns.first().cloned().unwrap(), state)
+            if txns.len() != 2 {
+                return Err(ApiError::AptosError(
+                    "Failed to get transaction and parent transaction".to_string(),
+                ));
+            }
+            (
+                txns.first().cloned().unwrap(),
+                txns.last().cloned().unwrap(),
+            )
         }
         (_, _) => return Err(ApiError::BadBlockRequest),
     };
 
     // Build up the transaction, which should contain the `operations` as the change set
     let transaction_info = transaction.transaction_info()?;
-    let transactions = vec![crate::types::Transaction {
-        transaction_identifier: TransactionIdentifier {
-            hash: transaction_info.hash.to_string(),
-        },
-        // TODO: Add operations
-        operations: vec![],
-        related_transactions: None,
-    }];
-
-    let block_identifier: BlockIdentifier = transaction_info.into();
-    // For the genesis block, we populate parent_block_identifier with the
-    // same genesis block. Refer to
-    // https://www.rosetta-api.org/docs/common_mistakes.html#malformed-genesis-block
-    // TODO: Retrieve the previous block? (if not genesis)
-    let parent_block_identifier = block_identifier.clone();
+    let transactions = vec![transaction_info.into()];
 
     // note: timestamps are in microseconds, so we convert to milliseconds
-    let timestamp = state.timestamp_usecs / 1000;
+    let timestamp = transaction.timestamp() / 1000;
 
     let block = Block {
-        block_identifier,
-        parent_block_identifier,
+        block_identifier: transaction_info.into(),
+        parent_block_identifier: parent_transaction.transaction_info()?.into(),
         timestamp,
         transactions,
     };

@@ -8,7 +8,7 @@ use crate::{
     },
     CURRENCY, NUM_DECIMALS,
 };
-use aptos_rest_client::aptos::Balance;
+use aptos_rest_client::{aptos::Balance, aptos_api_types::TransactionInfo};
 use serde::{Deserialize, Serialize};
 
 /// A description of all types used by the Rosetta implementation.
@@ -338,4 +338,14 @@ pub struct Transaction {
     /// Related transactions
     #[serde(skip_serializing_if = "Option::is_none")]
     pub related_transactions: Option<Vec<RelatedTransaction>>,
+}
+
+impl From<&TransactionInfo> for Transaction {
+    fn from(txn: &TransactionInfo) -> Self {
+        Transaction {
+            transaction_identifier: txn.into(),
+            operations: vec![],
+            related_transactions: None,
+        }
+    }
 }
