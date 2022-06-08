@@ -59,7 +59,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress,
-    contract_event::{ContractEvent, EventWithVersion},
+    contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,

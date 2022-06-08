@@ -9,8 +9,8 @@
 //!     2. The version associated with the key
 //! The value associated with the key is the the serialized State Value.
 //!
-//! //! ```text
-//! |<-------- key -------->|<-- value --->|
+//! ```text
+//! |<-------- key -------->|<--- value --->|
 //! |  state key  | version |  state value  |
 //! ```
 
