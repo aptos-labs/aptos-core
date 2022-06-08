@@ -1,7 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_types::vm_status::VMStatus;
 use serde::{Deserialize, Serialize};
+use std::{
+    fmt::{Display, Formatter},
+    str::FromStr,
+};
 
 /// [API Spec](https://www.rosetta-api.org/docs/models/Error.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -25,6 +30,8 @@ pub struct ErrorDetails {
     pub error: String,
 }
 
+/// Status of an operation
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/OperationStatus.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct OperationStatus {
@@ -32,9 +39,9 @@ pub struct OperationStatus {
     pub successful: bool,
 }
 
-/// [API Spec](https://www.rosetta-api.org/docs/models/Peer.html)
+/// Represents a Peer, used for discovery
 ///
-/// TODO: Metadata?
+/// [API Spec](https://www.rosetta-api.org/docs/models/Peer.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Peer {
     peer_id: String,
@@ -49,9 +56,15 @@ pub struct SyncStatus {
     synced: bool,
 }
 
+/// Version information for the current deployment to handle software version matching
+///
+/// [API Spec](https://www.rosetta-api.org/docs/models/Version.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Version {
+    /// Rosetta version, this should be hardcoded
     pub rosetta_version: String,
+    /// Node version, this should come from the node
     pub node_version: String,
+    /// Middleware version, this should be the version of this software
     pub middleware_version: String,
 }

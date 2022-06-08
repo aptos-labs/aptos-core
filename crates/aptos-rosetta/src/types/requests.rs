@@ -69,8 +69,6 @@ pub struct ConstructionCombineResponse {
 }
 
 /// [API Spec](https://www.rosetta-api.org/docs/models/ConstructionDeriveRequest.html)
-///
-/// TODO: Metadata?
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConstructionDeriveRequest {
     pub network_identifier: NetworkIdentifier,
@@ -78,8 +76,6 @@ pub struct ConstructionDeriveRequest {
 }
 
 /// [API Spec](https://www.rosetta-api.org/docs/models/ConstructionDeriveResponse.html)
-///
-/// TODO: Metadata?
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConstructionDeriveResponse {
     pub account_identifier: Option<AccountIdentifier>,
@@ -128,8 +124,6 @@ pub struct ConstructionParseRequest {
 }
 
 /// [API Spec](https://www.rosetta-api.org/docs/models/ConstructionParseResponse.html)
-///
-/// TODO: Metadata
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConstructionParseResponse {
     pub operations: Vec<Operation>,

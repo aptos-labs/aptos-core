@@ -11,8 +11,6 @@ use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, str::FromStr};
 
 /// [API Spec](https://www.rosetta-api.org/docs/models/AccountIdentifier.html)
-///
-/// TODO: Metadata?
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AccountIdentifier {
     pub address: String,
@@ -109,6 +107,10 @@ impl From<ChainId> for NetworkIdentifier {
     }
 }
 
+/// Identifies a specific [`crate::types::Operation`] within a [`Transaction`]
+///
+/// It must be 0 to n within the transaction.
+///
 /// [API Spec](https://www.rosetta-api.org/docs/models/OperationIdentifier.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct OperationIdentifier {
@@ -135,16 +137,12 @@ impl From<&BlockIdentifier> for PartialBlockIdentifier {
 }
 
 /// [API Spec](https://www.rosetta-api.org/docs/models/SubAccountIdentifier.html)
-///
-/// TODO: Metadata?
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SubAccountIdentifier {
     pub address: String,
 }
 
 /// [API Spec](https://www.rosetta-api.org/docs/models/SubNetworkIdentifier.html)
-///
-/// TODO: Metadata?
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SubNetworkIdentifier {
     pub network: String,
