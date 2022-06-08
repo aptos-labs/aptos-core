@@ -13,7 +13,7 @@ use aptos_config::{
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, Logger};
-use aptos_metrics::{get_public_json_metrics, metric_server};
+use aptos_metrics::metric_server;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_telemetry::{
     constants::{
@@ -408,11 +408,6 @@ async fn periodic_telemetry_dump(node_config: NodeConfig, db: DbReaderWriter) {
                 // Build the params from internal prometheus metrics
                 let mut metrics_params: HashMap<String, String> = HashMap::new();
 
-                let met = get_public_json_metrics();
-                for (k, v) in &met {
-                    metrics_params.insert(k.to_string(), v.to_string());
-                }
-
                 // get some data we do not currently have metrics for
                 let chain_id = fetch_chain_id(&db).id(); // get the chain_id as its u8 id for consistency of schema
                 let peer_id = match node_config.peer_id() {
@@ -479,12 +474,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
     let metrics_port = node_config.debug_interface.metrics_server_port;
     let metric_host = node_config.debug_interface.address.clone();
-    thread::spawn(move || metric_server::start_server(metric_host, metrics_port, false));
-    let public_metrics_port = node_config.debug_interface.public_metrics_server_port;
-    let public_metric_host = node_config.debug_interface.address.clone();
-    thread::spawn(move || {
-        metric_server::start_server(public_metric_host, public_metrics_port, true)
-    });
+    thread::spawn(move || metric_server::start_server(metric_host, metrics_port));
 
     let mut instant = Instant::now();
     let (aptos_db, db_rw) = DbReaderWriter::wrap(

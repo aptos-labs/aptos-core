@@ -50,7 +50,6 @@
 mod json_encoder;
 pub mod json_metrics;
 pub mod metric_server;
-mod public_metrics;
 pub mod system_metrics;
 
 mod op_counters;
@@ -60,7 +59,7 @@ pub use op_counters::{DurationHistogram, OpMetrics};
 mod unit_tests;
 
 // Re-export counter types from prometheus crate
-pub use crate::metric_server::{get_all_metrics, get_public_json_metrics, get_public_metrics};
+pub use crate::metric_server::get_all_metrics;
 pub use aptos_metrics_core::{
     register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
     register_int_gauge, register_int_gauge_vec, Histogram, HistogramTimer, HistogramVec,
