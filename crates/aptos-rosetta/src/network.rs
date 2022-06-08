@@ -9,7 +9,7 @@ use crate::{
     error::ApiError,
     types::{
         Allow, BlockIdentifier, NetworkListResponse, NetworkOptionsResponse, NetworkRequest,
-        NetworkStatusResponse, Peer, Version,
+        NetworkStatusResponse, OperationStatusType, OperationType, Peer, Version,
     },
     RosettaContext, MIDDLEWARE_VERSION, NODE_VERSION, ROSETTA_VERSION,
 };
@@ -85,14 +85,14 @@ async fn network_options(
         middleware_version: MIDDLEWARE_VERSION.to_string(),
     };
 
-    let operation_statuses = vec![
-        // TODO: Add statuses
-    ];
-
-    let operation_types = vec![
-        // TODO: Add operations
-    ];
-
+    let operation_statuses = OperationStatusType::all()
+        .into_iter()
+        .map(|status| status.into())
+        .collect();
+    let operation_types = OperationType::all()
+        .into_iter()
+        .map(|op| op.to_string())
+        .collect();
     let errors = ApiError::all().into_iter().map(|err| err.into()).collect();
 
     let allow = Allow {
