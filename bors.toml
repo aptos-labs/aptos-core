@@ -1,4 +1,4 @@
 #CircleCI using GitHub Checks
 status = [
-  "workflow-name" 
+  "e2e-test", "scripts-lint" 
 ]
