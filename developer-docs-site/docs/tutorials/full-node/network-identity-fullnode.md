@@ -42,10 +42,10 @@ To create a static identity for your FullNode:
 
 Follow the below detailed steps:
 
-1. Fork and clone the [aptos-labs/aptos-core](https://github.com/aptos-labs/aptos-core) repo. For example:
+1. Clone the [aptos-labs/aptos-core](https://github.com/aptos-labs/aptos-core) repo. For example:
 
     ```
-    $ git clone https://github.com/<YOUR-GITHUB-USERID>/aptos-core.git
+    $ git clone https://github.com/aptos-labs/aptos-core.git
     $ cd aptos-core
     $ ./scripts/dev_setup.sh
     $ source ~/.cargo/env
