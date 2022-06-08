@@ -1,10 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{
-    AccountIdentifier, BlockIdentifier, Error, NetworkIdentifier, OperationIdentifier,
-    OperationStatus, TransactionIdentifier,
+use crate::{
+    types::{
+        AccountIdentifier, BlockIdentifier, Error, NetworkIdentifier, OperationIdentifier,
+        OperationStatus, TransactionIdentifier,
+    },
+    CURRENCY, NUM_DECIMALS,
 };
+use aptos_rest_client::aptos::Balance;
 use serde::{Deserialize, Serialize};
 
 /// A description of all types used by the Rosetta implementation.
@@ -52,6 +56,16 @@ pub struct Amount {
     pub value: String,
     /// [`Currency`]
     pub currency: Currency,
+}
+
+impl From<Balance> for Amount {
+    fn from(balance: Balance) -> Self {
+        Amount {
+            value: balance.coin.value.to_string(),
+            // TODO: Support other currencies
+            currency: Currency::test_coin(),
+        }
+    }
 }
 
 /// Balance exemptions where the current balance of an account can change without a transaction
@@ -141,8 +155,17 @@ pub enum Case {
 pub struct Currency {
     /// Symbol of currency
     pub symbol: String,
-    /// Number of decimals to be considered in the currecny
+    /// Number of decimals to be considered in the currency
     pub decimals: u64,
+}
+
+impl Currency {
+    pub fn test_coin() -> Self {
+        Currency {
+            symbol: CURRENCY.to_string(),
+            decimals: NUM_DECIMALS,
+        }
+    }
 }
 
 /// Various signing curves supported by Rosetta.  We only use [`CurveType::Edwards25519`]

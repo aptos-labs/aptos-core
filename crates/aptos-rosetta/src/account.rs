@@ -9,8 +9,8 @@
 use crate::{
     common::{check_network, get_account, get_account_balance, handle_request, with_context},
     error::{ApiError, ApiResult},
-    types::{AccountBalanceRequest, AccountBalanceResponse, Amount, BlockIdentifier, Currency},
-    RosettaContext, CURRENCY, NUM_DECIMALS,
+    types::{AccountBalanceRequest, AccountBalanceResponse},
+    RosettaContext,
 };
 use aptos_logger::{debug, trace};
 use warp::Filter;
@@ -67,26 +67,12 @@ async fn account_balance(
         .transaction_info()
         .map_err(|err| ApiError::AptosError(err.to_string()))?;
 
-    let block_identifier = BlockIdentifier {
-        index: txn_info.version.0,
-        hash: txn_info.hash.to_string(),
-    };
-
     let response = get_account_balance(&rest_client, address).await?;
     let balance = response.into_inner();
 
-    // TODO: Cleanup to match reality
-    let balances = vec![Amount {
-        value: balance.coin.value.to_string(),
-        currency: Currency {
-            symbol: CURRENCY.to_string(),
-            decimals: NUM_DECIMALS,
-        },
-    }];
-
     let response = AccountBalanceResponse {
-        block_identifier,
-        balances,
+        block_identifier: txn_info.into(),
+        balances: vec![balance.into()],
     };
 
     Ok(response)
