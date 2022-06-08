@@ -2,15 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::{check_network, get_timestamp, handle_request, with_context},
+    common::{check_network, handle_request, with_context},
     error::{ApiError, ApiResult},
-    types::{
-        Block, BlockIdentifier, BlockRequest, BlockResponse, Transaction, TransactionIdentifier,
-    },
+    types::{Block, BlockIdentifier, BlockRequest, BlockResponse, TransactionIdentifier},
     RosettaContext,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, trace};
+use aptos_rest_client::Transaction;
 use std::str::FromStr;
 use warp::Filter;
 
@@ -44,31 +43,36 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
     let rest_client = &server_context.rest_client;
 
     // Retrieve by block or by hash, both or neither is not allowed
-    let transaction = match (
+    let (transaction, state): (Transaction, _) = match (
         &request.block_identifier.index,
         &request.block_identifier.hash,
     ) {
-        (Some(version), None) => rest_client
-            .get_transaction_by_version(*version)
-            .await?
-            .into_inner(),
+        (Some(version), None) => {
+            let response = rest_client.get_transaction_by_version(*version).await?;
+            let state = response.state().clone();
+            (response.into_inner(), state)
+        }
         (None, Some(hash)) => {
             // Allow 0x in front of hash
             let hash = HashValue::from_str(hash.strip_prefix("0x").unwrap())
                 .map_err(|err| ApiError::AptosError(err.to_string()))?;
-            rest_client.get_transaction(hash).await?.into_inner()
+            let response = rest_client.get_transaction(hash).await?;
+            let state = response.state().clone();
+            (response.into_inner(), state)
         }
         (None, None) => {
             // Get current version
-            let txn = rest_client.get_transactions(None, Some(1)).await?;
-            txn.into_inner().first().unwrap()
+            let response = rest_client.get_transactions(None, Some(1)).await?;
+            let state = response.state().clone();
+            let txns = response.into_inner();
+            (txns.first().cloned().unwrap(), state)
         }
         (_, _) => return Err(ApiError::BadBlockRequest),
     };
 
     // Build up the transaction, which should contain the `operations` as the change set
-    let transaction_info = response.inner().transaction_info()?;
-    let transactions = vec![Transaction {
+    let transaction_info = transaction.transaction_info()?;
+    let transactions = vec![crate::types::Transaction {
         transaction_identifier: TransactionIdentifier {
             hash: transaction_info.hash.to_string(),
         },
@@ -84,10 +88,13 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
     // TODO: Retrieve the previous block? (if not genesis)
     let parent_block_identifier = block_identifier.clone();
 
+    // note: timestamps are in microseconds, so we convert to milliseconds
+    let timestamp = state.timestamp_usecs / 1000;
+
     let block = Block {
         block_identifier,
         parent_block_identifier,
-        timestamp: get_timestamp(&response),
+        timestamp,
         transactions,
     };
 

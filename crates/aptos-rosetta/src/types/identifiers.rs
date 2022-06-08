@@ -31,10 +31,10 @@ impl AccountIdentifier {
     }
 }
 
-impl TryFrom<AccountIdentifier> for AccountAddress {
+impl TryFrom<&AccountIdentifier> for AccountAddress {
     type Error = ApiError;
 
-    fn try_from(account: AccountIdentifier) -> Result<Self, Self::Error> {
+    fn try_from(account: &AccountIdentifier) -> Result<Self, Self::Error> {
         // Allow 0x in front of account address
         Ok(AccountAddress::from_str(
             account.address.strip_prefix("0x").unwrap(),
@@ -119,10 +119,10 @@ impl NetworkIdentifier {
     }
 }
 
-impl TryFrom<NetworkIdentifier> for ChainId {
+impl TryFrom<&NetworkIdentifier> for ChainId {
     type Error = ApiError;
 
-    fn try_from(network_identifier: NetworkIdentifier) -> Result<Self, Self::Error> {
+    fn try_from(network_identifier: &NetworkIdentifier) -> Result<Self, Self::Error> {
         ChainId::from_str(network_identifier.network.trim())
             .map_err(|err| ApiError::AptosError(err.to_string()))
     }

@@ -103,6 +103,9 @@ async fn network_options(
         timestamp_start_index: Some(3), // FIXME: hardcoded based on current testnet
         call_methods: vec![],
         balance_exemptions: vec![],
+        mempool_coins: false,
+        block_hash_case: None,
+        transaction_hash_case: None,
     };
 
     let response = NetworkOptionsResponse { version, allow };
