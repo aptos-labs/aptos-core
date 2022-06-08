@@ -138,6 +138,7 @@ dependencies = [
  "aptos-github-client",
  "aptos-keygen",
  "aptos-logger",
+ "aptos-module-verifier",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-secure-storage",
@@ -741,6 +742,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-module-verifier"
+version = "0.1.0"
+dependencies = [
+ "aptos-workspace-hack",
+ "move-deps",
+]
+
+[[package]]
 name = "aptos-node"
 version = "0.1.0"
 dependencies = [
@@ -1249,6 +1258,7 @@ dependencies = [
  "aptos-crypto-derive",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-module-verifier",
  "aptos-parallel-executor",
  "aptos-state-view",
  "aptos-types",
