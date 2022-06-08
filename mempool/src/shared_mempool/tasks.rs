@@ -27,7 +27,7 @@ use aptos_types::{
 };
 use futures::{channel::oneshot, stream::FuturesUnordered};
 use network::application::interface::NetworkInterface;
-use rayon::prelude::*;
+// use once_cell::sync::Lazy;
 use std::{
     cmp,
     collections::HashSet,
@@ -220,6 +220,15 @@ pub(crate) fn update_ack_counter(
     }
 }
 
+/*
+static RAYON_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(num_cpus::get())
+        .build()
+        .unwrap()
+});
+ */
+
 /// Submits a list of SignedTransaction to the local mempool
 /// and returns a vector containing AdmissionControlStatus.
 pub(crate) fn process_incoming_transactions<V>(
@@ -235,7 +244,7 @@ where
     let start_storage_read = Instant::now();
     // Track latency: fetching seq number
     let seq_numbers = transactions
-        .par_iter()
+        .iter()
         .map(|t| {
             get_account_sequence_number(smp.db.clone(), t.sender()).map_err(|e| {
                 error!(LogSchema::new(LogEntry::DBError).error(&e));

@@ -631,6 +631,7 @@ dependencies = [
  "mirai-annotations",
  "netcore",
  "network",
+ "num_cpus",
  "once_cell",
  "proptest",
  "rand 0.8.5",
