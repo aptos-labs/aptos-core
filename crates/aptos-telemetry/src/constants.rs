@@ -16,9 +16,12 @@ pub const GA4_URL: &str = "https://www.google-analytics.com/mp/collect";
 
 // Timeouts
 pub const NETWORK_PUSH_TIME_SECS: u64 = 30;
-pub const NODE_PUSH_TIME_SECS: u64 = 30;
+pub const NODE_PUSH_METRICS_FREQ_SECS: u64 = 30;
+pub const NODE_SYS_INFO_FREQ_SECS: u64 = 5 * 60; // 5 minutes
 
 // Metrics events
+pub const APTOS_NODE_BUILD_INFORMATION: &str = "APTOS_NODE_BUILD_INFORMATION";
+pub const APTOS_NODE_SYSTEM_INFORMATION: &str = "APTOS_NODE_SYSTEM_INFORMATION";
 pub const APTOS_CLI_PUSH_METRICS: &str = "APTOS_CLI_PUSH_METRICS";
 pub const APTOS_NETWORK_PUSH_METRICS: &str = "APTOS_NETWORK_PUSH_METRICS";
 pub const APTOS_NODE_PUSH_METRICS: &str = "APTOS_NODE_PUSH_METRICS";

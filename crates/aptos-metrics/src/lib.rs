@@ -45,11 +45,10 @@
 //! ```
 
 #![forbid(unsafe_code)]
-#![recursion_limit = "128"]
 
 mod json_encoder;
-pub mod json_metrics;
 pub mod metric_server;
+pub mod system_information;
 pub mod system_metrics;
 
 mod op_counters;

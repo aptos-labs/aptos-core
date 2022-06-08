@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    gather_metrics, json_encoder::JsonEncoder, json_metrics::get_json_metrics,
-    system_metrics::refresh_system_metrics, NUM_METRICS,
+    gather_metrics, json_encoder::JsonEncoder, system_information::get_system_information,
+    system_metrics::update_system_metrics, NUM_METRICS,
 };
 use futures::future;
 use hyper::{
@@ -107,11 +107,11 @@ async fn serve_metrics(req: Request<Body>) -> Result<Response<Body>, hyper::Erro
             let buffer = encode_metrics(encoder, &[]);
             *resp.body_mut() = Body::from(buffer);
         }
-        // expose non-numeric metrics to host:port/json_metrics
-        (&Method::GET, "/json_metrics") => {
-            let json_metrics = get_json_metrics();
-            let encoded_metrics = serde_json::to_string(&json_metrics).unwrap();
-            *resp.body_mut() = Body::from(encoded_metrics);
+        // Expose system information to host:port/system_information
+        (&Method::GET, "/system_information") => {
+            let system_information = get_system_information();
+            let encoded_information = serde_json::to_string(&system_information).unwrap();
+            *resp.body_mut() = Body::from(encoded_information);
         }
         (&Method::GET, "/counters") => {
             // Json encoded aptos_metrics;
@@ -128,8 +128,8 @@ async fn serve_metrics(req: Request<Body>) -> Result<Response<Body>, hyper::Erro
 }
 
 pub fn start_server(host: String, port: u16) {
-    // Collect system metrics
-    refresh_system_metrics();
+    // Update system metrics on startup
+    update_system_metrics();
 
     // Only called from places that guarantee that host is parsable, but this must be assumed.
     let addr: SocketAddr = (host.as_str(), port)
