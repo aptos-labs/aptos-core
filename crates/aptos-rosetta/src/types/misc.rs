@@ -1,7 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::error::ApiError;
 use serde::{Deserialize, Serialize};
+use std::{
+    convert::TryFrom,
+    fmt::{Display, Formatter},
+    str::FromStr,
+};
 
 ///
 ///
@@ -69,4 +75,100 @@ pub struct Version {
     pub node_version: String,
     /// Middleware version, this should be the version of this software
     pub middleware_version: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum OperationType {
+    Transfer,
+}
+
+impl OperationType {
+    const TRANSFER: &'static str = "transfer";
+
+    pub fn all() -> Vec<OperationType> {
+        vec![OperationType::Transfer]
+    }
+}
+
+impl FromStr for OperationType {
+    type Err = ApiError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().trim() {
+            Self::TRANSFER => Ok(OperationType::Transfer),
+            _ => Err(ApiError::DeserializationFailed(format!(
+                "Invalid OperationType: {}",
+                s
+            ))),
+        }
+    }
+}
+
+impl Display for OperationType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            OperationType::Transfer => Self::TRANSFER,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum OperationStatusType {
+    Success,
+    Failure,
+}
+
+impl OperationStatusType {
+    const SUCCESS: &'static str = "success";
+    const FAILURE: &'static str = "failure";
+
+    pub fn all() -> Vec<OperationStatusType> {
+        vec![OperationStatusType::Success, OperationStatusType::Failure]
+    }
+}
+
+impl From<OperationStatusType> for OperationStatus {
+    fn from(status: OperationStatusType) -> Self {
+        let successful = match status {
+            OperationStatusType::Success => true,
+            OperationStatusType::Failure => false,
+        };
+
+        OperationStatus {
+            status: status.to_string(),
+            successful,
+        }
+    }
+}
+
+impl TryFrom<OperationStatus> for OperationStatusType {
+    type Error = ApiError;
+
+    fn try_from(status: OperationStatus) -> Result<Self, Self::Error> {
+        OperationStatusType::from_str(&status.status)
+    }
+}
+
+impl FromStr for OperationStatusType {
+    type Err = ApiError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().trim() {
+            Self::SUCCESS => Ok(OperationStatusType::Success),
+            Self::FAILURE => Ok(OperationStatusType::Failure),
+            _ => Err(ApiError::DeserializationFailed(format!(
+                "Invalid OperationStatusType: {}",
+                s
+            ))),
+        }
+    }
+}
+
+impl Display for OperationStatusType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            OperationStatusType::Success => Self::SUCCESS,
+            OperationStatusType::Failure => Self::FAILURE,
+        })
+    }
 }
