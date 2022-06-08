@@ -18,4 +18,4 @@ aptos-types = { path = "../../../types" }
 aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
 channel = { path = "../../../crates/channel" }
 network = { path = "../../../network" }
-peer-monitoring-service-types = { path = "../types"}
+peer-monitoring-service-types = { path = "../types" }
