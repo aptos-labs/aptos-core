@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+extern crate core;
+
 // Defines Forge Tests
 pub mod aptos;
 pub mod fullnode;

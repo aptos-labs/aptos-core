@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::BLOCKCHAIN,
+    common::{strip_hex_prefix, BLOCKCHAIN},
     error::{ApiError, ApiResult},
 };
 use aptos_rest_client::{aptos_api_types::TransactionInfo, Transaction};
@@ -36,12 +36,9 @@ impl TryFrom<&AccountIdentifier> for AccountAddress {
 
     fn try_from(account: &AccountIdentifier) -> Result<Self, Self::Error> {
         // Allow 0x in front of account address
-        let address = account
-            .address
-            .strip_prefix("0x")
-            .unwrap_or(&account.address);
-
-        Ok(AccountAddress::from_str(address)?)
+        Ok(AccountAddress::from_str(strip_hex_prefix(
+            &account.address,
+        ))?)
     }
 }
 
@@ -166,6 +163,29 @@ pub struct PartialBlockIdentifier {
     pub index: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<String>,
+}
+
+impl PartialBlockIdentifier {
+    pub fn latest() -> Self {
+        Self {
+            index: None,
+            hash: None,
+        }
+    }
+
+    pub fn by_hash(hash: String) -> Self {
+        Self {
+            index: None,
+            hash: Some(hash),
+        }
+    }
+
+    pub fn by_version(version: u64) -> Self {
+        Self {
+            index: Some(version),
+            hash: None,
+        }
+    }
 }
 
 impl From<&BlockIdentifier> for PartialBlockIdentifier {

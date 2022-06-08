@@ -108,3 +108,8 @@ pub fn get_timestamp<T>(response: &Response<T>) -> u64 {
     // note: timestamps are in microseconds, so we convert to milliseconds
     response.state().timestamp_usecs / 1000
 }
+
+/// Strips the `0x` prefix on hex strings
+pub fn strip_hex_prefix(str: &str) -> &str {
+    str.strip_prefix("0x").unwrap_or(str)
+}

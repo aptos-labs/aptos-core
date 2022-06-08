@@ -4,12 +4,14 @@
 use crate::{aptos_cli::launch_faucet, smoke_test_environment::new_local_swarm_with_aptos};
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_config::config::ApiConfig;
-use aptos_rosetta::{client::RosettaClient, types::AccountBalanceResponse, CURRENCY, NUM_DECIMALS};
-use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
+use aptos_rosetta::{client::RosettaClient, types::BlockRequest, CURRENCY, NUM_DECIMALS};
 use forge::{LocalSwarm, Node};
-use std::{str::FromStr, time::Duration};
+use std::{future::Future, str::FromStr, time::Duration};
 
-pub async fn setup_test(num_nodes: usize) -> (LocalSwarm, CliTestFramework, RosettaClient) {
+pub async fn setup_test(
+    num_nodes: usize,
+    num_accounts: usize,
+) -> (LocalSwarm, CliTestFramework, RosettaClient) {
     let swarm = new_local_swarm_with_aptos(num_nodes).await;
     let chain_id = swarm.chain_id();
     let validator = swarm.validators().next().unwrap();
@@ -28,7 +30,6 @@ pub async fn setup_test(num_nodes: usize) -> (LocalSwarm, CliTestFramework, Rose
     let rosetta_socket_addr = "127.0.0.1:9997";
     let rosetta_url = format!("http://{}", rosetta_socket_addr).parse().unwrap();
     let rosetta_client = RosettaClient::new(rosetta_url);
-    let rosetta_socket_addr = "127.0.0.1:9997";
     let api_config = ApiConfig {
         enabled: true,
         address: rosetta_socket_addr.parse().unwrap(),
@@ -38,7 +39,7 @@ pub async fn setup_test(num_nodes: usize) -> (LocalSwarm, CliTestFramework, Rose
     };
 
     // Start the server
-    let _ = aptos_rosetta::bootstrap_async(
+    let _rosetta = aptos_rosetta::bootstrap_async(
         swarm.chain_id(),
         api_config,
         aptos_rest_client::Client::new(validator.rest_api_endpoint()),
@@ -46,17 +47,19 @@ pub async fn setup_test(num_nodes: usize) -> (LocalSwarm, CliTestFramework, Rose
     .await
     .unwrap();
 
+    // Create accounts
+    for i in 0..num_accounts {
+        tool.create_account_with_faucet(i).await.unwrap();
+    }
     (swarm, tool, rosetta_client)
 }
 
 #[tokio::test]
 async fn test_account_balance() {
-    let (_swarm, cli, rosetta_client) = setup_test(1).await;
-
-    cli.create_account_with_faucet(0).await.unwrap();
+    let (swarm, _cli, rosetta_client) = setup_test(1, 1).await;
     let account = CliTestFramework::account_id(0);
-
-    let response = get_account_balance_once_ready(&rosetta_client, account)
+    let chain_id = swarm.chain_id();
+    let response = try_until_ok(|| rosetta_client.account_balance_simple(account, chain_id))
         .await
         .unwrap();
     assert_eq!(1, response.balances.len());
@@ -67,15 +70,85 @@ async fn test_account_balance() {
     assert_eq!(DEFAULT_FUNDED_COINS, u64::from_str(&balance.value).unwrap());
 }
 
-async fn get_account_balance_once_ready(
-    rosetta_client: &RosettaClient,
-    account: AccountAddress,
-) -> anyhow::Result<AccountBalanceResponse> {
-    let mut result = Err(anyhow::Error::msg("Failed to get balance"));
+#[tokio::test]
+async fn test_block() {
+    let (swarm, _cli, rosetta_client) = setup_test(1, 0).await;
+    let chain_id = swarm.chain_id();
+
+    let request_genesis = BlockRequest::by_version(chain_id, 0);
+    let by_version_response = try_until_ok(|| rosetta_client.block(&request_genesis))
+        .await
+        .unwrap();
+    let genesis_block = by_version_response.block.unwrap();
+
+    // Genesis txn should always have parent be same as block
+    assert_eq!(
+        genesis_block.block_identifier,
+        genesis_block.parent_block_identifier
+    );
+
+    // TODO: Verify timestamp
+
+    // TODO: Verify operations
+    assert_eq!(1, genesis_block.transactions.len());
+    let genesis_txn = genesis_block.transactions.first().unwrap();
+
+    // Get genesis txn by hash
+    let request_genesis_by_hash =
+        BlockRequest::by_hash(chain_id, genesis_txn.transaction_identifier.hash.clone());
+    let by_hash_response = rosetta_client
+        .block(&request_genesis_by_hash)
+        .await
+        .unwrap();
+    let genesis_block_by_hash = by_hash_response.block.unwrap();
+
+    // Both blocks should be the same
+    assert_eq!(genesis_block, genesis_block_by_hash);
+
+    // Responses should be idempotent
+    let response = rosetta_client.block(&request_genesis).await.unwrap();
+    assert_eq!(response.block.unwrap(), genesis_block_by_hash);
+    let response = rosetta_client
+        .block(&request_genesis_by_hash)
+        .await
+        .unwrap();
+    assert_eq!(response.block.unwrap(), genesis_block_by_hash);
+
+    // No input should give the latest version, not the genesis txn
+    let request_latest = BlockRequest::latest(chain_id);
+    let response = rosetta_client.block(&request_latest).await.unwrap();
+    let latest_block = response.block.unwrap();
+    assert!(latest_block.block_identifier.index > genesis_block.block_identifier.index);
+
+    // TODO: Verify other fields in the latest txn
+
+    // We should be able to query it again by hash or by version and it is the same
+    let request_latest_by_version =
+        BlockRequest::by_version(chain_id, latest_block.block_identifier.index);
+    let response = rosetta_client
+        .block(&request_latest_by_version)
+        .await
+        .unwrap();
+    let latest_block_by_version = response.block.unwrap();
+
+    let request_latest_by_hash =
+        BlockRequest::by_hash(chain_id, latest_block.block_identifier.hash.clone());
+    let response = rosetta_client.block(&request_latest_by_hash).await.unwrap();
+    let latest_block_by_hash = response.block.unwrap();
+
+    assert_eq!(latest_block, latest_block_by_version);
+    assert_eq!(latest_block_by_hash, latest_block_by_version);
+}
+
+/// Try for 2 seconds to get a response.  This handles the fact that it's starting async
+async fn try_until_ok<F, Fut, T>(function: F) -> anyhow::Result<T>
+where
+    F: Fn() -> Fut,
+    Fut: Future<Output = anyhow::Result<T>>,
+{
+    let mut result = Err(anyhow::Error::msg("Failed to get response"));
     for _ in 1..10 {
-        result = rosetta_client
-            .account_balance_simple(account, ChainId::test())
-            .await;
+        result = function().await;
         if result.is_ok() {
             break;
         }

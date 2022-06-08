@@ -6,6 +6,7 @@ use crate::types::{
     Operation, PartialBlockIdentifier, Peer, PublicKey, Signature, SigningPayload, SyncStatus,
     Transaction, TransactionIdentifier, Version,
 };
+use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 
 /// Request for an account's currency balance either now, or historically
@@ -41,6 +42,25 @@ pub struct AccountBalanceResponse {
 pub struct BlockRequest {
     pub network_identifier: NetworkIdentifier,
     pub block_identifier: PartialBlockIdentifier,
+}
+
+impl BlockRequest {
+    fn new(chain_id: ChainId, block_identifier: PartialBlockIdentifier) -> Self {
+        Self {
+            network_identifier: chain_id.into(),
+            block_identifier,
+        }
+    }
+
+    pub fn latest(chain_id: ChainId) -> Self {
+        Self::new(chain_id, PartialBlockIdentifier::latest())
+    }
+    pub fn by_hash(chain_id: ChainId, hash: String) -> Self {
+        Self::new(chain_id, PartialBlockIdentifier::by_hash(hash))
+    }
+    pub fn by_version(chain_id: ChainId, version: u64) -> Self {
+        Self::new(chain_id, PartialBlockIdentifier::by_version(version))
+    }
 }
 
 /// Response that will always have a valid block populated
