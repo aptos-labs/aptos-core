@@ -21,7 +21,7 @@ const sidebars = {
       type: 'category',
       label: 'Start Here',
       "collapsible": true,
-      "collapsed": false,
+      "collapsed": true,
       items: [
         'basics/basics-txns-states',
         'basics/basics-accounts',
