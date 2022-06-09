@@ -9,9 +9,7 @@ import { AptosAccount } from './aptos_account';
 import { Types } from './types';
 import { Tables } from './api/Tables';
 import { AptosError } from './api/data-contracts';
-import * as TxnBuilderTypes from './transaction_builder/aptos_types';
-import { SigningMessage, TransactionBuilderEd25519 } from './transaction_builder';
-import { Ed25519Signature } from './transaction_builder/aptos_types';
+import { TxnBuilderTypes, TransactionBuilderEd25519 } from './transaction_builder';
 
 export class RequestError extends Error {
   response?: AxiosResponse<any, Types.AptosError>;
@@ -208,10 +206,10 @@ export class AptosClient {
 
   /** Generates a signed transaction that can be submitted to the chain for execution. */
   static generateBCSTransaction(accountFrom: AptosAccount, rawTxn: TxnBuilderTypes.RawTransaction): Uint8Array {
-    const txnBuilder = new TransactionBuilderEd25519((signingMessage: SigningMessage) => {
+    const txnBuilder = new TransactionBuilderEd25519((signingMessage: TxnBuilderTypes.SigningMessage) => {
       // @ts-ignore
       const sigHexStr = accountFrom.signBuffer(signingMessage);
-      return new Ed25519Signature(sigHexStr.toUint8Array());
+      return new TxnBuilderTypes.Ed25519Signature(sigHexStr.toUint8Array());
     }, accountFrom.pubKey().toUint8Array());
 
     return txnBuilder.sign(rawTxn);
