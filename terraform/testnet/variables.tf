@@ -190,7 +190,7 @@ variable "enable_cluster_autoscaler" {
   default     = false
 }
 
-variable "enable_chaos" {
-  description = "Enable chaos testing framework"
+variable "enable_chaos_mesh" {
+  description = "Enable Chaos Mesh testing framework"
   default     = false
 }

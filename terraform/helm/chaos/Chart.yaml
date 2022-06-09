@@ -1,6 +1,6 @@
 apiVersion: v2
 name: chaos
-description: Aptos chaos test framework
+description: Chaos Mesh for Aptos
 version: 0.1.0
 
 dependencies:

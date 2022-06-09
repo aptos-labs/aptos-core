@@ -102,22 +102,22 @@ resource "aws_iam_role_policy" "cluster-autoscaler" {
   policy = data.aws_iam_policy_document.cluster-autoscaler[0].json
 }
 
-resource "kubernetes_namespace" "chaos-testing" {
-  count = var.enable_chaos ? 1 : 0
+resource "kubernetes_namespace" "chaos-mesh" {
+  count = var.enable_chaos_mesh ? 1 : 0
 
   metadata {
     annotations = {
-      name = "chaos-testing"
+      name = "chaos-mesh"
     }
 
-    name = "chaos-testing"
+    name = "chaos-mesh"
   }
 }
 
 resource "helm_release" "chaos-mesh" {
-  count     = var.enable_chaos ? 1 : 0
+  count     = var.enable_chaos_mesh ? 1 : 0
   name      = "chaos-mesh"
-  namespace = kubernetes_namespace.chaos-testing[0].metadata[0].name
+  namespace = kubernetes_namespace.chaos-mesh[0].metadata[0].name
 
   chart       = "${path.module}/../helm/chaos"
   max_history = 10
