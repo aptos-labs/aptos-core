@@ -4,18 +4,17 @@
 import {
   AptosClient, MaybeHexString, Types,
 } from 'aptos';
-import { NODE_URL } from 'core/constants';
 import { AptosAccountState } from 'core/types';
 import { AptosNetwork } from 'core/utils/network';
 
 export interface GetAccountResourcesProps {
   address?: MaybeHexString;
-  nodeUrl?: string;
+  nodeUrl: string;
 }
 
 export const getAccountResources = async ({
-  nodeUrl = NODE_URL,
   address,
+  nodeUrl,
 }: GetAccountResourcesProps) => {
   const client = new AptosClient(nodeUrl);
   return (address) ? (client.getAccountResources(address)) : undefined;
@@ -62,8 +61,8 @@ export const getTestCoinTokenBalanceFromAccountResources = ({
 };
 
 export const getAccountExists = async ({
-  nodeUrl = NODE_URL,
   address,
+  nodeUrl,
 }: GetAccountResourcesProps) => {
   const client = new AptosClient(nodeUrl);
   try {

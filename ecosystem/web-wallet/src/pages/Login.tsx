@@ -35,7 +35,7 @@ export const secondaryTextColor = {
 
 function Login() {
   const { colorMode } = useColorMode();
-  const { aptosAccount, updateWalletState } = useWalletState();
+  const { aptosAccount, aptosNetwork, updateWalletState } = useWalletState();
   const navigate = useNavigate();
   const {
     formState: { errors }, handleSubmit, register, setError, watch,
@@ -48,7 +48,10 @@ function Login() {
       const nonHexKey = (key.startsWith('0x')) ? key.substring(2) : key;
       const encodedKey = Uint8Array.from(Buffer.from(nonHexKey, 'hex'));
       const account = new AptosAccount(encodedKey, undefined);
-      const response = await getAccountResources({ address: account.address().hex() });
+      const response = await getAccountResources({
+        address: account.address().hex(),
+        nodeUrl: aptosNetwork,
+      });
       if (!response) {
         setError('privateKey', { message: 'Account not found', type: 'custom' });
         return;

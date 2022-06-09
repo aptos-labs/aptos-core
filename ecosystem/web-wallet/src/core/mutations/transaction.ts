@@ -4,20 +4,19 @@
 import {
   AptosAccount, AptosClient, MaybeHexString, Types,
 } from 'aptos';
-import { NODE_URL } from 'core/constants';
 import {
   type GetTestCoinTokenBalanceFromAccountResourcesProps,
 } from 'core/queries/account';
 
 export interface SubmitTransactionProps {
   fromAccount: AptosAccount;
-  nodeUrl?: string;
+  nodeUrl: string;
   payload: Types.TransactionPayload,
 }
 
 export const submitTransaction = async ({
   fromAccount,
-  nodeUrl = NODE_URL,
+  nodeUrl,
   payload,
 }: SubmitTransactionProps) => {
   const client = new AptosClient(nodeUrl);
@@ -38,7 +37,7 @@ export type SendTestCoinTransactionProps = Omit<SubmitTransactionProps & TestCoi
 export const sendTestCoinTransaction = async ({
   amount,
   fromAccount,
-  nodeUrl = NODE_URL,
+  nodeUrl,
   toAddress,
 }: SendTestCoinTransactionProps) => {
   const payload: Types.TransactionPayload = {

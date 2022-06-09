@@ -2,16 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosClient } from 'aptos';
-import { NODE_URL } from 'core/constants';
 
 export interface GetTransactionProps {
-  nodeUrl?: string,
+  nodeUrl: string,
   txnHashOrVersion?: string;
 }
 
 export const getTransaction = async ({
+  nodeUrl,
   txnHashOrVersion,
-  nodeUrl = NODE_URL,
 }: GetTransactionProps) => {
   const aptosClient = new AptosClient(nodeUrl);
   if (txnHashOrVersion) {
@@ -22,8 +21,8 @@ export const getTransaction = async ({
 };
 
 export const getUserTransaction = async ({
+  nodeUrl,
   txnHashOrVersion,
-  nodeUrl = NODE_URL,
 }: GetTransactionProps) => {
   const aptosClient = new AptosClient(nodeUrl);
   if (txnHashOrVersion) {
