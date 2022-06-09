@@ -33,6 +33,7 @@ pub fn run(
     block_size: usize,
     db_dir: impl AsRef<Path>,
     storage_pruner_config: StoragePrunerConfig,
+    verify_sequence_numbers: bool,
 ) {
     println!("Initializing...");
 
@@ -108,8 +109,10 @@ pub fn run(
     // Wait until all transactions are committed.
     exe_thread.join().unwrap();
     commit_thread.join().unwrap();
-    // Do a sanity check on the sequence number to make sure all transactions are committed.
-    generator.verify_sequence_number(db.clone());
+    if verify_sequence_numbers {
+        // Do a sanity check on the sequence number to make sure all transactions are committed.
+        generator.verify_sequence_numbers(db.clone());
+    }
 
     let final_version = generator.version();
     // Write metadata

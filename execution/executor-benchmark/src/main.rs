@@ -20,6 +20,12 @@ struct Opt {
 
     #[structopt(subcommand)]
     cmd: Command,
+
+    #[structopt(
+        long,
+        about = "Verify sequence number of all the accounts after execution finishes"
+    )]
+    verify_sequence_numbers: bool,
 }
 
 impl Opt {
@@ -69,12 +75,6 @@ enum Command {
 
         #[structopt(long, parse(from_os_str))]
         checkpoint_dir: PathBuf,
-
-        #[structopt(
-            long,
-            about = "Verify sequence number of all the accounts after execution finishes"
-        )]
-        verify: bool,
     },
 }
 
@@ -106,13 +106,13 @@ fn main() {
                     Some(default_store_prune_window.unwrap_or(10_000_000)),
                     10_000,
                 ),
+                opt.verify_sequence_numbers,
             );
         }
         Command::RunExecutor {
             blocks,
             data_dir,
             checkpoint_dir,
-            verify,
         } => {
             aptos_logger::Logger::new().init();
             executor_benchmark::run_benchmark(
@@ -120,7 +120,7 @@ fn main() {
                 blocks,
                 data_dir,
                 checkpoint_dir,
-                verify,
+                opt.verify_sequence_numbers,
             );
         }
     }

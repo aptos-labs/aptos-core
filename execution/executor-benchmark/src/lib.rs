@@ -46,7 +46,7 @@ pub fn run_benchmark(
     num_transfer_blocks: usize,
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
-    verify: bool,
+    verify_sequence_numbers: bool,
 ) {
     // Create rocksdb checkpoint.
     if checkpoint_dir.as_ref().exists() {
@@ -124,8 +124,8 @@ pub fn run_benchmark(
     commit_thread.join().unwrap();
 
     // Do a sanity check on the sequence number to make sure all transactions are committed.
-    if verify {
-        generator.verify_sequence_number(db.clone());
+    if verify_sequence_numbers {
+        generator.verify_sequence_numbers(db.clone());
     }
 }
 
@@ -145,6 +145,7 @@ mod tests {
             5,     /* block_size */
             storage_dir.as_ref(),
             NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
+            true,
         );
 
         super::run_benchmark(
@@ -152,7 +153,7 @@ mod tests {
             5, /* num_transfer_blocks */
             storage_dir.as_ref(),
             checkpoint_dir,
-            false,
+            true,
         );
     }
 }

@@ -34,10 +34,9 @@ const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
 
 fn get_progress_bar(num_accounts: usize) -> ProgressBar {
     let bar = ProgressBar::new(num_accounts as u64);
-    bar.set_style(
-        ProgressStyle::default_bar()
-            .template("[{elapsed_precise} {per_sec}] {bar:100.cyan/blue} {percent}% ETA {eta_precise}"),
-    );
+    bar.set_style(ProgressStyle::default_bar().template(
+        "[{elapsed_precise} {per_sec}] {bar:100.cyan/blue} {percent}% ETA {eta_precise}",
+    ));
     bar
 }
 
@@ -422,7 +421,7 @@ impl TransactionGenerator {
     }
 
     /// Verifies the sequence numbers in storage match what we have locally.
-    pub fn verify_sequence_number(&self, db: Arc<dyn DbReader>) {
+    pub fn verify_sequence_numbers(&self, db: Arc<dyn DbReader>) {
         println!(
             "[{}] verify {} account sequence numbers.",
             now_fmt!(),
