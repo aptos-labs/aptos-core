@@ -40,6 +40,57 @@ jobs:
       - run: cd ./ecosystem/indexer-server/typescript && yarn install
       - run: cd ./ecosystem/indexer-server/typescript && yarn lint
 
+  webplatform-lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ecosystem/platform/server
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: 'ecosystem/platform/server'
+          bundler-cache: true
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+      - run: bundle exec bundler-audit --update
+      - run: bundle exec brakeman -q -w2
+      - run: bundle exec rubocop
+      - run: yarn run tsc
+
+  webplatform-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:11-alpine
+        ports:
+          - "5432:5432"
+        env:
+          POSTGRES_DB: web_platform_test
+          POSTGRES_USER: webplat
+          POSTGRES_PASSWORD: password
+    env:
+      RAILS_ENV: test
+      COMMUNITY_DB_USER: webplat
+      COMMUNITY_DB_PASS: password
+      COMMUNITY_DB_HOST: localhost
+      COMMUNITY_DB_PORT: 5432
+    defaults:
+      run:
+        working-directory: ecosystem/platform/server
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: 'ecosystem/platform/server'
+          bundler-cache: true
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+      - run: bin/setup
+      - run: bin/rails test
+
   docs-lint:
     runs-on: ubuntu-latest
     steps:
