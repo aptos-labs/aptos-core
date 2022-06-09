@@ -13,6 +13,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     return
   }
 
+  const client = new AptosClient(DEVNET_NODE_URL)
   switch (request.method) {
     case MessageMethod.CONNECT:
       connect(account, sendResponse)
@@ -26,8 +27,11 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     case MessageMethod.GET_ACCOUNT_ADDRESS:
       getAccountAddress(account, sendResponse)
       break
+    case MessageMethod.SIGN_AND_SUBMIT_TRANSACTION:
+      signAndSubmitTransaction(client, account, request.args.transaction, sendResponse)
+      break
     case MessageMethod.SIGN_TRANSACTION:
-      signTransaction(account, request.args.transaction, sendResponse)
+      signTransactionAndSendResponse(client, account, request.args.transaction, sendResponse)
       break
     default:
       throw new Error(request.method + ' method is not supported')
@@ -57,15 +61,27 @@ function getAccountAddress (account, sendResponse) {
   }
 }
 
-async function signTransaction (account, transaction, sendResponse) {
+async function signAndSubmitTransaction (client, account, transaction, sendResponse) {
   try {
-    const client = new AptosClient(DEVNET_NODE_URL)
-    const address = account.address()
-    const txn = await client.generateTransaction(address, transaction)
-    const signedTxn = await client.signTransaction(account, txn)
-    const response = await client.submitTransaction(account, signedTxn)
+    const signedTransaction = signTransaction(client, account, transaction)
+    const response = await client.submitTransaction(account, signedTransaction)
     sendResponse(response)
   } catch (error) {
     sendResponse({ error })
   }
+}
+
+async function signTransactionAndSendResponse (client, account, transaction, sendResponse) {
+  try {
+    const signedTransaction = signTransaction(client, account, transaction)
+    sendResponse({ signedTransaction })
+  } catch (error) {
+    sendResponse({ error })
+  }
+}
+
+async function signTransaction (client, account, transaction) {
+  const address = account.address()
+  const txn = await client.generateTransaction(address, transaction)
+  return await client.signTransaction(account, txn)
 }

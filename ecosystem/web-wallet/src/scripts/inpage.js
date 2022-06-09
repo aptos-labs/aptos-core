@@ -27,6 +27,10 @@ class Web3 {
   }
 
   signAndSubmitTransaction (transaction) {
+    return this._message(MessageMethod.SIGN_AND_SUBMIT_TRANSACTION, { transaction })
+  }
+
+  signTransaction (transaction) {
     return this._message(MessageMethod.SIGN_TRANSACTION, { transaction })
   }
 
