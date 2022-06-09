@@ -670,7 +670,7 @@ pub trait DbWriter: Send + Sync {
     /// [`AptosDB::save_state_snapshot`]: ../aptosdb/struct.AptosDB.html#method.save_state_snapshot
     fn save_state_snapshot(
         &self,
-        jmt_updates: &[Vec<(HashValue, (HashValue, StateKey))>],
+        jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         version: Version,
     ) -> Result<()> {
