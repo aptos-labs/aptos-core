@@ -1,4 +1,4 @@
-# Chaos Mesh manager can edit API resources
+# Chaos Mesh manager can edit chaos-mesh API resources and read cluster resources
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -8,6 +8,9 @@ rules:
       - chaos-mesh.org
     resources: ['*']
     verbs: ['get', 'list', 'watch', 'create', 'delete', 'patch', 'update']
+  - apiGroups: [""]
+    resources: ['*']
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
