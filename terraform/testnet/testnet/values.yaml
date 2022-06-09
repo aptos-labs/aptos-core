@@ -210,7 +210,3 @@ aws:
 # (Since the testnet sym links to the same alert.yml file the validator uses.)
 backup:
   enable: false
-
-### Used for testing purposes only!
-# Use a local vault backend rather than dedicated vault server for each validator
-localVaultBackend: false

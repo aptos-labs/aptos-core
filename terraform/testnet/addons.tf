@@ -10,7 +10,6 @@ resource "helm_release" "metrics-server" {
     jsonencode({
       coredns = {
         maxReplicas = var.num_validators
-        minReplicas = var.coredns_min_replicas
       }
       autoscaler = {
         enabled     = var.enable_cluster_autoscaler

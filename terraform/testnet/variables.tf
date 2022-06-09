@@ -163,11 +163,7 @@ variable "num_trusted_instance" {
   default     = 0
 }
 
-variable "enable_dev_vault" {
-  description = "TEST ONLY: Enables Vault in Dev Mode for all validators"
-  default     = false
-}
-
+### Indexer
 variable "enable_indexer" {
   description = "Enable Aptos indexer"
   default     = false
@@ -183,6 +179,7 @@ variable "indexer_db_publicly_accessible" {
   description = "Determines if indexer RDS instance is publicly accessible"
 }
 
+### Cluster addons
 variable "enable_k8s_metrics_server" {
   description = "Installs kubernetes metrics server: https://github.com/kubernetes-sigs/metrics-server"
   default     = false
@@ -191,11 +188,6 @@ variable "enable_k8s_metrics_server" {
 variable "enable_cluster_autoscaler" {
   description = "Enable cluster autoscaler: https://docs.aws.amazon.com/eks/latest/userguide/autoscaling.html"
   default     = false
-}
-
-variable "coredns_min_replicas" {
-  description = "Minimal replica numbers for core dns"
-  default     = 2
 }
 
 variable "enable_chaos" {
