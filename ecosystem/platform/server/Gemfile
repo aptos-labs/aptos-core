@@ -113,7 +113,7 @@ group :development, :test do
   gem 'rubocop-rails'
   # security lints
   gem 'brakeman'
-  gem "bundler-audit", "~> 0.9.1"
+  gem 'bundler-audit', '~> 0.9.1'
 
   # Testing
   gem 'database_cleaner'
