@@ -125,30 +125,19 @@ resource "helm_release" "chaos-mesh" {
 
   values = [
     jsonencode({
+      # Only create the ingress if an ACM certificate exists
+      ingress = {
+        enable                   = length(aws_acm_certificate.ingress) > 0 ? true : false
+        domain                   = "chaos.${local.domain}"
+        acm_certificate          = length(aws_acm_certificate.ingress) > 0 ? aws_acm_certificate.ingress[0].arn : null
+        loadBalancerSourceRanges = join(",", var.client_sources_ipv4)
+        aws_tags                 = local.aws_tags
+      }
       chaos-mesh = {
         chaosDaemon = {
           podSecurityPolicy = true
           # tolerate pod assignment on nodes in the validator nodegroup
           tolerations = jsondecode(module.validator.helm_values)["validator"]["tolerations"]
-        }
-        dashboard = {
-          ingress = {
-            enabled = true
-            annotations = {
-              "kubernetes.io/ingress.class"               = "alb"
-              "alb.ingress.kubernetes.io/scheme"          = "internet-facing"
-              "alb.ingress.kubernetes.io/tags"            = local.aws_tags
-              "alb.ingress.kubernetes.io/inbound-cidrs"   = join(",", var.client_sources_ipv4)
-              "external-dns.alpha.kubernetes.io/hostname" = "chaos.${local.domain}"
-              "alb.ingress.kubernetes.io/certificate-arn" = var.zone_id != "" ? aws_acm_certificate.ingress[0].arn : null
-            }
-            hosts = [
-              {
-                name  = "chaos.${local.domain}"
-                paths = ["/*"]
-              }
-            ]
-          }
         }
       }
     })
