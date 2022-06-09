@@ -19,7 +19,7 @@ import {
   MultiEd25519Signature,
   Ed25519Signature,
 } from './transaction_builder/aptos_types';
-import { bcsSerializeUint32, bcsSerializeUint64, bcsToBytes } from './transaction_builder/bcs';
+import { bcsSerializeUint64, bcsToBytes } from './transaction_builder/bcs';
 import { AuthenticationKey } from './transaction_builder/aptos_types/authentication_key';
 import { SigningMessage, TransactionBuilderMultiEd25519 } from './transaction_builder';
 
@@ -218,13 +218,11 @@ test(
     const txnBuilder = new TransactionBuilderMultiEd25519((signingMessage: SigningMessage) => {
       const sigHexStr1 = account1.signBuffer(signingMessage);
       const sigHexStr3 = account3.signBuffer(signingMessage);
-      let bitmap = 0;
-      bitmap |= 128;
-      bitmap |= 128 >> 2;
+      const bitmap = MultiEd25519Signature.createBitmap([0, 2]);
 
       const muliEd25519Sig = new MultiEd25519Signature(
         [new Ed25519Signature(sigHexStr1.toUint8Array()), new Ed25519Signature(sigHexStr3.toUint8Array())],
-        bcsSerializeUint32(bitmap),
+        bitmap,
       );
 
       return muliEd25519Sig;

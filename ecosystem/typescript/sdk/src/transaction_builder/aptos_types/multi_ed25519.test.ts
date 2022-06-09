@@ -44,4 +44,22 @@ describe('MultiEd25519', () => {
       'e6f3ba05469b2388492397840183945d4291f0dd3989150de3248e06b4cefe0ddf6180a80a0f04c045ee8f362870cb46918478cd9b56c66076f94f3efd5a88052ae0818b7e51b853f1e43dc4c89a1f5fabc9cb256030a908f9872f3eaeb048fb1e2b4ffd5a9d5d1caedd0c8b7d6155ed8071e913536fa5c5a64327b6f2d9a102c0000000',
     );
   });
+
+  it('creates a valid bitmap', () => {
+    expect(MultiEd25519Signature.createBitmap([0, 2, 31])).toEqual(
+      new Uint8Array([0b10100000, 0b00000000, 0b00000000, 0b00000001]),
+    );
+  });
+
+  it('throws exception when creating a bitmap with wrong bits', async () => {
+    expect(() => {
+      MultiEd25519Signature.createBitmap([32]);
+    }).toThrow('Invalid bit value 32.');
+  });
+
+  it('throws exception when creating a bitmap with duplicate bits', async () => {
+    expect(() => {
+      MultiEd25519Signature.createBitmap([2, 2]);
+    }).toThrow('Duplicated bits detected.');
+  });
 });

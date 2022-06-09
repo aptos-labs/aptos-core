@@ -1,3 +1,4 @@
+/* eslint-disable no-bitwise */
 import { Bytes, Deserializer, Seq, Serializer, Uint8 } from '../bcs';
 import { Ed25519PublicKey, Ed25519Signature } from './ed25519';
 
@@ -87,6 +88,52 @@ export class MultiEd25519Signature {
     bytes.set(this.bitmap, this.signatures.length * Ed25519Signature.LENGTH);
 
     return bytes;
+  }
+
+  /**
+   * Helper method to create a bitmap out of the specified bit positions
+   * @param bits The bitmap positions that should be set. A position starts at index 0.
+   * Valid position should range between 0 and 31.
+   * @example
+   * Here's an example of valid `bits`
+   * ```
+   * [0, 2, 31]
+   * ```
+   * `[0, 2, 31]` means the 1st, 3rd and 32nd bits should be set in the bitmap.
+   * The result bitmap should be 0b1010000000000000000000000000001
+   *
+   * @returns bitmap that is 32bit long
+   */
+  static createBitmap(bits: Seq<Uint8>): Uint8Array {
+    // Bits are read from left to right. e.g. 0b10000000 represents the first bit is set in one byte.
+    // The decimal value of 0b10000000 is 128.
+    const firstBitInByte = 128;
+    const bitmap = new Uint8Array([0, 0, 0, 0]);
+
+    // Check if duplicates exist in bits
+    const dupCheckSet = new Set();
+
+    bits.forEach((bit: number) => {
+      if (bit >= MAX_SIGNATURES_SUPPORTED) {
+        throw new Error(`Invalid bit value ${bit}.`);
+      }
+
+      if (dupCheckSet.has(bit)) {
+        throw new Error('Duplicated bits detected.');
+      }
+
+      dupCheckSet.add(bit);
+
+      const byteOffset = Math.floor(bit / 8);
+
+      let byte = bitmap[byteOffset];
+
+      byte |= firstBitInByte >> bit % 8;
+
+      bitmap[byteOffset] = byte;
+    });
+
+    return bitmap;
   }
 
   serialize(serializer: Serializer): void {

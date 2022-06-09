@@ -1,7 +1,6 @@
 import * as SHA3 from 'js-sha3';
 import { HexString } from '../../hex_string';
 import { Bytes } from '../bcs';
-import { AccountAddress } from './account_address';
 import { MultiEd25519PublicKey } from './multi_ed25519';
 
 /**
@@ -43,6 +42,6 @@ export class AuthenticationKey {
    * AuthenticationKey bytes are directly translated to AccountAddress.
    */
   derivedAddress(): HexString {
-    return HexString.fromUint8Array(this.bytes.subarray(AuthenticationKey.LENGTH - AccountAddress.LENGTH));
+    return HexString.fromUint8Array(this.bytes);
   }
 }
