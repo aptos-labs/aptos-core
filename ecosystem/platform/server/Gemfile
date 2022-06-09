@@ -113,6 +113,7 @@ group :development, :test do
   gem 'rubocop-rails'
   # security lints
   gem 'brakeman'
+  gem "bundler-audit", "~> 0.9.1"
 
   # Testing
   gem 'database_cleaner'
@@ -138,5 +139,3 @@ group :test do
   gem 'selenium-webdriver'
   gem 'webdrivers'
 end
-
-gem "bundler-audit", "~> 0.9.1", :groups => [:development, :test]
