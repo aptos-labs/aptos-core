@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    errors::*,
-    outcome_array::OutcomeArray,
+    errors::{Error, *},
     scheduler::{Scheduler, SchedulerTask, TaskGuard, TxnIndex, Version},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_last_input_output::{ReadDescriptor, TxnLastInputOutput},
@@ -13,16 +12,7 @@ use mvhashmap::MVHashMap;
 use num_cpus;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
-use std::{
-    collections::HashSet,
-    hash::Hash,
-    marker::PhantomData,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-    thread::spawn,
-};
+use std::{collections::HashSet, hash::Hash, marker::PhantomData, sync::Arc, thread::spawn};
 
 static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -30,6 +20,42 @@ static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .build()
         .unwrap()
 });
+
+// Struct to find the lowest skip_rest or abort status among transaction outputs.
+struct ExecutionStatusInfo<E: ExecutorTask> {
+    successful_prefix_size: usize,
+    maybe_error: Option<Error<E::Error>>,
+}
+
+impl<E: ExecutorTask> ExecutionStatusInfo<E> {
+    pub fn new(num_txns: usize) -> Self {
+        Self {
+            successful_prefix_size: num_txns,
+            maybe_error: None,
+        }
+    }
+
+    pub fn process_skip_rest(&mut self, index: usize) {
+        if self.successful_prefix_size > index + 1 {
+            self.successful_prefix_size = index + 1;
+            self.maybe_error = None;
+        }
+    }
+
+    pub fn process_abort(&mut self, index: usize, err: Error<E::Error>) {
+        if self.successful_prefix_size > index + 1 {
+            self.successful_prefix_size = index + 1;
+            self.maybe_error = Some(err);
+        }
+    }
+
+    pub fn num_results(&mut self) -> Result<usize, E::Error> {
+        if let Some(err) = self.maybe_error.take() {
+            return Err(err);
+        }
+        Ok(self.successful_prefix_size)
+    }
+}
 
 /// A struct that is always used by a single thread performing an execution task. The struct is
 /// passed to the VM and acts as a proxy to resolve reads first in the shared multi-version
@@ -305,7 +331,6 @@ where
 
         let num_txns = signature_verified_block.len();
         let versioned_data_cache = MVHashMap::new();
-        let outcomes = OutcomeArray::new(num_txns);
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
@@ -325,22 +350,33 @@ where
 
         // Extract outputs in parallel.
         let num_txns = scheduler.num_txn_to_execute();
-        let valid_results_size = AtomicUsize::new(num_txns);
+        let results_info = Mutex::new(ExecutionStatusInfo::<E>::new(num_txns));
         let chunk_size = (num_txns + 4 * self.concurrency_level - 1) / (4 * self.concurrency_level);
-        RAYON_EXEC_POOL.install(|| {
+        let final_results = RAYON_EXEC_POOL.install(|| {
             (0..num_txns)
                 .collect::<Vec<TxnIndex>>()
                 .par_chunks(chunk_size)
-                .map(|chunk| {
+                .flat_map(|chunk| {
+                    let mut chunk_results = Vec::with_capacity(chunk_size);
                     for idx in chunk.iter() {
                         let res = last_input_output.take_output(*idx);
-                        if matches!(res, ExecutionStatus::SkipRest(_)) {
-                            valid_results_size.fetch_min(*idx + 1, Ordering::SeqCst);
-                        }
-                        outcomes.set_result(*idx, res);
+
+                        match res {
+                            ExecutionStatus::Success(t) => {
+                                chunk_results.push(t);
+                            }
+                            ExecutionStatus::SkipRest(t) => {
+                                chunk_results.push(t);
+                                results_info.lock().process_skip_rest(*idx);
+                            }
+                            ExecutionStatus::Abort(err) => {
+                                results_info.lock().process_abort(*idx, err);
+                            }
+                        };
                     }
+                    chunk_results
                 })
-                .collect::<()>();
+                .collect::<Vec<E::Output>>()
         });
 
         spawn(move || {
@@ -350,6 +386,13 @@ where
             drop(versioned_data_cache);
             drop(scheduler);
         });
-        outcomes.get_all_results(valid_results_size.load(Ordering::SeqCst))
+
+        let num_results = results_info.lock().num_results()?;
+        let mut final_results = final_results
+            .into_iter()
+            .take(num_results)
+            .collect::<Vec<E::Output>>();
+        final_results.resize_with(num_txns, E::Output::skip_output);
+        Ok(final_results)
     }
 }
