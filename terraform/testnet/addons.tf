@@ -1,5 +1,5 @@
 resource "helm_release" "metrics-server" {
-  count       = var.enable_k8s_metrics_server ? 1 : 0
+  count       = var.enable_k8s_metrics_server || var.enable_cluster_autoscaler ? 1 : 0
   name        = "metrics-server"
   namespace   = "kube-system"
   chart       = "${path.module}/../helm/k8s-metrics"
@@ -101,4 +101,57 @@ resource "aws_iam_role_policy" "cluster-autoscaler" {
   name   = "Helm"
   role   = aws_iam_role.cluster-autoscaler[0].name
   policy = data.aws_iam_policy_document.cluster-autoscaler[0].json
+}
+
+resource "kubernetes_namespace" "chaos-testing" {
+  count = var.enable_chaos ? 1 : 0
+
+  metadata {
+    annotations = {
+      name = "chaos-testing"
+    }
+
+    name = "chaos-testing"
+  }
+}
+
+resource "helm_release" "chaos-mesh" {
+  count     = var.enable_chaos ? 1 : 0
+  name      = "chaos-mesh"
+  namespace = kubernetes_namespace.chaos-testing[0].metadata[0].name
+
+  chart       = "${path.module}/../helm/chaos"
+  max_history = 10
+  wait        = false
+
+  values = [
+    jsonencode({
+      chaos-mesh = {
+        chaosDaemon = {
+          podSecurityPolicy = true
+          # tolerate pod assignment on nodes in the validator nodegroup
+          tolerations = jsondecode(module.validator.helm_values)["validator"]["tolerations"]
+        }
+        dashboard = {
+          ingress = {
+            enabled = true
+            annotations = {
+              "kubernetes.io/ingress.class"               = "alb"
+              "alb.ingress.kubernetes.io/scheme"          = "internet-facing"
+              "alb.ingress.kubernetes.io/tags"            = local.aws_tags
+              "alb.ingress.kubernetes.io/inbound-cidrs"   = join(",", var.client_sources_ipv4)
+              "external-dns.alpha.kubernetes.io/hostname" = "chaos.${local.domain}"
+              "alb.ingress.kubernetes.io/certificate-arn" = var.zone_id != "" ? aws_acm_certificate.ingress[0].arn : null
+            }
+            hosts = [
+              {
+                name  = "chaos.${local.domain}"
+                paths = ["/*"]
+              }
+            ]
+          }
+        }
+      }
+    })
+  ]
 }

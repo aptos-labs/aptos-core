@@ -197,3 +197,8 @@ variable "coredns_min_replicas" {
   description = "Minimal replica numbers for core dns"
   default     = 2
 }
+
+variable "enable_chaos" {
+  description = "Enable chaos testing framework"
+  default     = false
+}
