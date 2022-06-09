@@ -13,11 +13,12 @@ use aptos_config::{
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, Logger};
-use aptos_metrics::metric_server;
+use aptos_metrics::{metric_server, system_information};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_telemetry::{
     constants::{
-        APTOS_NODE_PUSH_METRICS, CHAIN_ID_METRIC, NODE_PUSH_TIME_SECS, PEER_ID_METRIC,
+        APTOS_NODE_BUILD_INFORMATION, APTOS_NODE_PUSH_METRICS, APTOS_NODE_SYSTEM_INFORMATION,
+        CHAIN_ID_METRIC, NODE_PUSH_METRICS_FREQ_SECS, NODE_SYS_INFO_FREQ_SECS, PEER_ID_METRIC,
         SYNCED_VERSION_METRIC,
     },
     send_env_data,
@@ -39,7 +40,7 @@ use data_streaming_service::{
 use debug_interface::node_debug_service::NodeDebugService;
 use event_notifications::EventSubscriptionService;
 use executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
-use futures::channel::mpsc::channel;
+use futures::{channel::mpsc::channel, stream::StreamExt};
 use mempool_notifications::MempoolNotificationSender;
 use network::application::storage::PeerMetadataStorage;
 use network_builder::builder::NetworkBuilder;
@@ -49,7 +50,7 @@ use state_sync_multiplexer::{
 use state_sync_v1::network::{StateSyncEvents, StateSyncSender};
 use std::{
     boxed::Box,
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     io::Write,
     net::ToSocketAddrs,
     path::PathBuf,
@@ -392,42 +393,96 @@ fn setup_state_sync_storage_service(
     storage_service_runtime
 }
 
+// TODO(joshlind): clean me up and make everything configurable!
 async fn periodic_telemetry_dump(node_config: NodeConfig, db: DbReaderWriter) {
-    use futures::stream::StreamExt;
-    let mut dump_interval = IntervalStream::new(tokio::time::interval(
-        std::time::Duration::from_secs(NODE_PUSH_TIME_SECS),
+    // Grab the peer id and chain id
+    let peer_id = match node_config.peer_id() {
+        Some(p) => p.to_string(),
+        None => String::new(),
+    };
+    let chain_id = fetch_chain_id(&db).id().to_string(); // Get the chain_id as u8 for schema consistency
+
+    // Send build information once, only on startup.
+    send_build_information(peer_id.clone()).await;
+
+    // Send system information every 5 minutes
+    let mut system_information_interval = IntervalStream::new(tokio::time::interval(
+        std::time::Duration::from_secs(NODE_SYS_INFO_FREQ_SECS),
+    ))
+    .fuse();
+
+    // Send node metrics every 30 seconds
+    let mut node_metrics_interval = IntervalStream::new(tokio::time::interval(
+        std::time::Duration::from_secs(NODE_PUSH_METRICS_FREQ_SECS),
     ))
     .fuse();
 
     info!("periodic_telemetry_dump task started");
-
     loop {
         futures::select! {
-            _ = dump_interval.select_next_some() => {
-
-                // Build the params from internal prometheus metrics
-                let mut metrics_params: HashMap<String, String> = HashMap::new();
-
-                // get some data we do not currently have metrics for
-                let chain_id = fetch_chain_id(&db).id(); // get the chain_id as its u8 id for consistency of schema
-                let peer_id = match node_config.peer_id() {
-                    Some(p) => p.to_string(),
-                    None => String::new()
-                };
-                let synced_version = (&*db.reader).fetch_synced_version().unwrap_or(0);
-
-                metrics_params.insert(SYNCED_VERSION_METRIC.to_string(), synced_version.to_string());
-                metrics_params.insert(CHAIN_ID_METRIC.to_string(), chain_id.to_string());
-                metrics_params.insert(PEER_ID_METRIC.to_string(), peer_id.to_string());
-                send_env_data(APTOS_NODE_PUSH_METRICS.to_string(), peer_id.to_string(), metrics_params).await;
+            _ = system_information_interval.select_next_some() => {
+                send_system_information(peer_id.clone()).await;
+            }
+            _ = node_metrics_interval.select_next_some() => {
+                send_node_metrics(peer_id.clone(), chain_id.clone(), db.clone()).await;
             }
         }
     }
 }
 
-async fn periodic_state_dump(node_config: NodeConfig, db: DbReaderWriter) {
-    use futures::stream::StreamExt;
+async fn send_build_information(peer_id: String) {
+    // Collect the build information
+    let build_information = system_information::get_build_information();
+    let build_information = convert_btree_to_hashmap(build_information);
 
+    // Send the build information
+    send_env_data(
+        APTOS_NODE_BUILD_INFORMATION.to_string(),
+        peer_id.to_string(),
+        build_information,
+    )
+    .await;
+}
+
+async fn send_system_information(peer_id: String) {
+    // Collect the system information
+    let system_information = system_information::get_system_information();
+    let system_information = convert_btree_to_hashmap(system_information);
+
+    // Send the system information
+    send_env_data(
+        APTOS_NODE_SYSTEM_INFORMATION.to_string(),
+        peer_id.to_string(),
+        system_information,
+    )
+    .await;
+}
+
+async fn send_node_metrics(peer_id: String, chain_id: String, db: DbReaderWriter) {
+    // Fetch the synced version
+    let synced_version = (&*db.reader).fetch_synced_version().unwrap_or(0);
+
+    // Send the node metrics
+    let mut node_metrics: HashMap<String, String> = HashMap::new();
+    node_metrics.insert(
+        SYNCED_VERSION_METRIC.to_string(),
+        synced_version.to_string(),
+    );
+    node_metrics.insert(CHAIN_ID_METRIC.to_string(), chain_id);
+    node_metrics.insert(PEER_ID_METRIC.to_string(), peer_id.clone());
+    send_env_data(APTOS_NODE_PUSH_METRICS.to_string(), peer_id, node_metrics).await;
+}
+
+// TODO(joshlind): avoid the need to convert!
+fn convert_btree_to_hashmap(btree: BTreeMap<String, String>) -> HashMap<String, String> {
+    let mut hashmap = HashMap::new();
+    for (key, value) in btree {
+        hashmap.insert(key, value);
+    }
+    hashmap
+}
+
+async fn periodic_state_dump(node_config: NodeConfig, db: DbReaderWriter) {
     let args: Vec<String> = ::std::env::args().collect();
 
     // Once an hour
