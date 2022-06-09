@@ -7,7 +7,7 @@
 pub mod constants;
 
 use aptos_logger::prelude::*;
-use aptos_metrics::{register_int_counter_vec, system_information::get_git_rev, IntCounterVec};
+use aptos_metrics::{json_metrics::get_git_rev, register_int_counter_vec, IntCounterVec};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{

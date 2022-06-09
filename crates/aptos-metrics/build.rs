@@ -6,7 +6,7 @@ use std::{env, path::Path, process::Command};
 const GIT_INDEX: &str = "../../.git/index";
 
 /// Save revision info to environment variable
-fn main() -> shadow_rs::SdResult<()> {
+fn main() {
     if Path::new(GIT_INDEX).exists() {
         println!("cargo:rerun-if-changed={}", GIT_INDEX);
     }
@@ -18,5 +18,4 @@ fn main() -> shadow_rs::SdResult<()> {
         let git_rev = String::from_utf8(output.stdout).unwrap();
         println!("cargo:rustc-env=GIT_REV={}", git_rev);
     }
-    shadow_rs::new()
 }
