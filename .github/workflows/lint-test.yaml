@@ -60,6 +60,7 @@ jobs:
       - run: bundle exec bundler-audit --update
       - run: bundle exec brakeman -q -w2
       - run: bundle exec rubocop
+      - run: yarn install
       - run: yarn run tsc
 
   webplatform-test:
