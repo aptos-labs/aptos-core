@@ -399,6 +399,12 @@ async fn periodic_telemetry_dump(node_config: NodeConfig, db: DbReaderWriter) {
     ))
     .fuse();
 
+    let chain_id = fetch_chain_id(&db).id(); // get the chain_id as its u8 id for consistency of schema
+    let peer_id = match node_config.peer_id() {
+        Some(p) => p.to_string(),
+        None => String::new(),
+    };
+
     info!("periodic_telemetry_dump task started");
 
     loop {
@@ -408,12 +414,6 @@ async fn periodic_telemetry_dump(node_config: NodeConfig, db: DbReaderWriter) {
                 // Build the params from internal prometheus metrics
                 let mut metrics_params: HashMap<String, String> = HashMap::new();
 
-                // get some data we do not currently have metrics for
-                let chain_id = fetch_chain_id(&db).id(); // get the chain_id as its u8 id for consistency of schema
-                let peer_id = match node_config.peer_id() {
-                    Some(p) => p.to_string(),
-                    None => String::new()
-                };
                 let synced_version = (&*db.reader).fetch_synced_version().unwrap_or(0);
 
                 metrics_params.insert(SYNCED_VERSION_METRIC.to_string(), synced_version.to_string());
