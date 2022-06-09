@@ -57,12 +57,15 @@ impl fmt::Debug for Block {
 
 impl Display for Block {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        let nil_marker = if self.is_nil_block() { " (NIL)" } else { "" };
+        let author = self
+            .author()
+            .map(|addr| format!("{}", addr))
+            .unwrap_or_else(|| "(NIL)".to_string());
         write!(
             f,
-            "[id: {}{}, epoch: {}, round: {:02}, parent_id: {}, timestamp: {}]",
+            "[id: {}, author: {}, epoch: {}, round: {:02}, parent_id: {}, timestamp: {}]",
             self.id,
-            nil_marker,
+            author,
             self.epoch(),
             self.round(),
             self.quorum_cert().certified_block().id(),

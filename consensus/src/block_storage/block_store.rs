@@ -360,7 +360,17 @@ impl BlockStore {
 
         // ensure local time past the block time
         let block_time = Duration::from_micros(executed_block.timestamp_usecs());
-        self.time_service.wait_until(block_time);
+        let current_timestamp = self.time_service.get_current_timestamp();
+        if let Some(t) = block_time.checked_sub(current_timestamp) {
+            if t > Duration::from_secs(1) {
+                error!(
+                    "Long wait time {}ms for block {}",
+                    t.as_millis(),
+                    executed_block.block()
+                );
+            }
+            self.time_service.wait_until(block_time);
+        }
         self.storage
             .save_tree(vec![executed_block.block().clone()], vec![])
             .context("Insert block failed when saving block")?;
@@ -374,7 +384,6 @@ impl BlockStore {
             .state_computer
             .compute(&block, block.parent_id())
             .await?;
-        observe_block(block.timestamp_usecs(), BlockStage::EXECUTED);
 
         Ok(ExecutedBlock::new(block, state_compute_result))
     }

@@ -176,7 +176,7 @@ impl BlockStore {
         )
         .await?
         .take();
-        debug!(
+        info!(
             LogSchema::new(LogEvent::CommitViaSync).round(self.ordered_root().round()),
             committed_round = root.0.round(),
             block_id = root.0.id(),
@@ -203,7 +203,7 @@ impl BlockStore {
         storage: Arc<dyn PersistentLivenessStorage>,
         state_computer: Arc<dyn StateComputer>,
     ) -> anyhow::Result<RecoveryData> {
-        debug!(
+        info!(
             LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
             "Start state sync with peer to block: {}",
             highest_ordered_cert.commit_info(),

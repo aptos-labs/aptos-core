@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    block_storage::tracing::{observe_block, BlockStage},
     counters,
     error::StateSyncError,
     state_replication::{StateComputer, StateComputerCommitCallBackType, TxnManager},
@@ -101,6 +102,7 @@ impl StateComputer for ExecutionProxy {
                 parent_block_id
             )
         )?;
+        observe_block(block.timestamp_usecs(), BlockStage::EXECUTED);
 
         // notify mempool about failed transaction
         if let Err(e) = self
