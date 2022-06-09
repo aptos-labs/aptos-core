@@ -141,7 +141,7 @@ impl StateStore {
             JellyfishMerkleTree::new(self).get_with_proof(state_key.hash(), version)?;
         Ok((
             match leaf_data {
-                Some(x) => Some(self.get_value_at_version(&x.1)?),
+                Some((_, (key, version))) => Some(self.expect_value_by_version(&key, version)?),
                 None => None,
             },
             proof,
@@ -204,13 +204,20 @@ impl StateStore {
         Ok(result)
     }
 
-    /// Read the value for a specific version and require its existence. Call `get_value_by_value`
-    /// for most use cases.
-    fn get_value_at_version(&self, key_and_version: &(StateKey, Version)) -> Result<StateValue> {
-        self.ledger_db
-            .get::<StateValueSchema>(key_and_version)
-            .and_then(|v| {
-                v.ok_or_else(|| format_err!("State Value is missing for {:?}", *key_and_version))
+    fn expect_value_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<StateValue> {
+        self.get_value_by_version(state_key, version)
+            .and_then(|opt| {
+                opt.ok_or_else(|| {
+                    format_err!(
+                        "State Value is missing for key {:?} by version {}",
+                        state_key,
+                        version
+                    )
+                })
             })
     }
 
@@ -360,10 +367,9 @@ impl StateStore {
         Ok(
             JellyfishMerkleIterator::new(Arc::clone(self), version, start_hashed_key)?.map(
                 move |res| match res {
-                    Ok((_hashed_key, key_and_version)) => Ok((
-                        key_and_version.0.clone(),
-                        store.get_value_at_version(&key_and_version)?,
-                    )),
+                    Ok((_hashed_key, (key, version))) => {
+                        Ok((key.clone(), store.expect_value_by_version(&key, version)?))
+                    }
                     Err(err) => Err(err),
                 },
             ),
@@ -381,7 +387,11 @@ impl StateStore {
                 .take(chunk_size);
         let state_key_values: Vec<(StateKey, StateValue)> = result_iter
             .into_iter()
-            .map(|res| res.and_then(|(_, k)| Ok((k.0.clone(), self.get_value_at_version(&k)?))))
+            .map(|res| {
+                res.and_then(|(_, (key, version))| {
+                    Ok((key.clone(), self.expect_value_by_version(&key, version)?))
+                })
+            })
             .collect::<Result<Vec<_>>>()?;
         ensure!(
             !state_key_values.is_empty(),
