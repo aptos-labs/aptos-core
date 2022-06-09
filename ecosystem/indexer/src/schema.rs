@@ -16,7 +16,8 @@ table! {
 }
 
 table! {
-    collections (creator, name) {
+    collections (collection_id) {
+        collection_id -> Varchar,
         creator -> Varchar,
         name -> Varchar,
         description -> Varchar,
@@ -57,9 +58,10 @@ table! {
 }
 
 table! {
-    ownerships (token_id, owner) {
-        token_id -> Varchar,
-        owner -> Varchar,
+    ownerships (ownership_id) {
+        ownership_id -> Varchar,
+        token_id -> Nullable<Varchar>,
+        owner -> Nullable<Varchar>,
         amount -> Int8,
         updated_at -> Timestamp,
         inserted_at -> Timestamp,
