@@ -1,12 +1,12 @@
 openapi: 3.0.3
 info:
-  title: Aptos Dev API Specification
+  title: Aptos Indexer API Specification
   description: >
-    The Aptos Node API is a RESTful API for client applications to interact with the Aptos blockchain.
+    The Aptos Indexer API is a RESTful API for client applications to read Aptos Blockchain Data.
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
-  version: 0.1.1
+  version: 1
   contact:
     name: Aptos
     url: https://github.com/aptos-labs/aptos-core
@@ -59,7 +59,7 @@ paths:
           description: Returns OpenAPI specification YAML document.
         "400":
           description: Bad Request
-  /tokens/all:
+  /v1/tokens/all:
     get:
       description: "Returns all tokens"
       operationId: getAllTokens
@@ -88,7 +88,7 @@ paths:
           $ref: "#/components/responses/400"
         '500':
           $ref: "#/components/responses/500"
-  /tokens/{tokenId}:
+  /v1/tokens/{tokenId}:
     get:
       description: "Returns Token by Id"
       operationId: getTokenById
@@ -112,7 +112,7 @@ paths:
           $ref: '#/components/responses/400'
         '500':
           $ref: '#/components/responses/500'
-  /tokens/{tokenId}/meta:
+  /v1/tokens/{tokenId}/meta:
     get:
       description: "Returns token metadata by Id"
       operationId: getTokenMetaDataById
@@ -136,7 +136,7 @@ paths:
           $ref: '#/components/responses/400'
         '500':
           $ref: '#/components/responses/500'
-  /tokens/{tokenId}/royalties:
+  /v1/tokens/{tokenId}/royalties:
     get:
       description: Returns token royalty by tokenId
       operationId: getTokenRoyaltiesById
@@ -157,7 +157,7 @@ paths:
           $ref: "#/components/responses/400"
         '500':
           $ref: "#/components/responses/500"
-  /metadata/byIds:
+  /v1/metadata/byIds:
     post:
       description: "Returns Token MetaData by tokenIds"
       operationId: getTokenMetaDataByIds
@@ -179,7 +179,7 @@ paths:
           $ref: '#/components/responses/400'
         '500':
           $ref: '#/components/responses/500'
-  /tokens/byIds:
+  /v1/tokens/byIds:
     post:
       description: "Returns Tokens by tokenIds"
       operationId: getTokenByIds
@@ -202,7 +202,7 @@ paths:
           $ref: "#/components/responses/400"
         '500':
           $ref: "#/components/responses/500"
-  /ownerships/all:
+  /v1/ownerships/all:
     get:
       description: "Returns all ownerships"
       operationId: getAllOwnerships
@@ -232,7 +232,7 @@ paths:
           $ref: "#/components/responses/400"
         '500':
           $ref: "#/components/responses/500"
-  /ownerships/{ownershipId}:
+  /v1/ownerships/{ownershipId}:
     get:
       description: "Returns ownership by ownershipId"
       operationId: getOwnershipById
@@ -256,7 +256,7 @@ paths:
           $ref: "#/components/responses/400"
         '500':
           $ref: "#/components/responses/500"
-  /ownerships/byToken:
+  /v1/ownerships/byToken:
     get:
       description: "Returns ownerships by token"
       operationId: getOwnershipsByToken
@@ -290,7 +290,7 @@ paths:
           $ref: "#/components/responses/400"
         '500':
           $ref: "#/components/responses/500"
-  /ownerships/byIds:
+  /v1/ownerships/byIds:
     post:
       description: "Returns Ownerships by ownershipIds"
       operationId: getOwnershipsByIds
@@ -313,7 +313,7 @@ paths:
           $ref: "#/components/responses/400"
         '500':
           $ref: "#/components/responses/500"
-  /collections/{collectionId}:
+  /v1/collections/{collectionId}:
     get:
       description: "Returns collection by collection id"
       operationId: getCollectionById
@@ -337,7 +337,7 @@ paths:
           $ref: "#/components/responses/400"
         '500':
           $ref: "#/components/responses/500"
-  /collections/all:
+  /v1/collections/all:
     get:
       description: "Returns all collections"
       operationId: getAllCollections
@@ -367,7 +367,7 @@ paths:
           $ref: "#/components/responses/400"
         '500':
           $ref: "#/components/responses/500"
-  /activities/byUser:
+  /v1/activities/byUser:
     get:
       tags:
         - activity-controller
