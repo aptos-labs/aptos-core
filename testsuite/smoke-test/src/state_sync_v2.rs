@@ -383,6 +383,7 @@ async fn test_all_validator_failures(mut swarm: LocalSwarm) {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_single_validator_failure() {
     // Create a swarm of 1 validator
     let mut swarm = new_local_swarm_with_aptos(1).await;

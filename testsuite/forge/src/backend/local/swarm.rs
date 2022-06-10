@@ -246,10 +246,18 @@ impl LocalSwarm {
                     Ok(()) => *done = true,
 
                     Err(HealthCheckError::Unknown(e)) => {
-                        return Err(anyhow!("Node '{}' is not running: {}", node.name(), e));
+                        return Err(anyhow!(
+                            "Node '{}' is not running! Error: {}",
+                            node.name(),
+                            e
+                        ));
                     }
-                    Err(HealthCheckError::NotRunning) => {
-                        return Err(anyhow!("Node '{}' is not running", node.name()));
+                    Err(HealthCheckError::NotRunning(error)) => {
+                        return Err(anyhow!(
+                            "Node '{}' is not running! Error: {:?}",
+                            node.name(),
+                            error
+                        ));
                     }
                     Err(HealthCheckError::Failure(e)) => {
                         println!("health check failure: {}", e);

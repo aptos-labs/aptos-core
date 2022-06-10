@@ -5,7 +5,7 @@
 
 use aptos_config::config::NodeConfig;
 use aptos_logger::{info, Filter, Logger};
-use aptos_metrics::json_metrics::get_git_rev;
+use aptos_metrics::system_information::get_git_rev;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::runtime::{Builder, Runtime};

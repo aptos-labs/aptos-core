@@ -651,6 +651,7 @@ dependencies = [
 name = "aptos-metrics"
 version = "0.1.0"
 dependencies = [
+ "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-workspace-hack",
@@ -661,6 +662,7 @@ dependencies = [
  "prometheus",
  "rusty-fork",
  "serde_json",
+ "shadow-rs",
  "sysinfo",
  "tokio",
 ]
@@ -2613,7 +2615,7 @@ dependencies = [
  "diesel_derives",
  "num-bigint 0.2.6",
  "num-integer",
- "num-traits 0.2.15",
+ "num-traits 0.1.43",
  "pq-sys",
  "r2d2",
  "serde_json",
@@ -7998,9 +8000,9 @@ dependencies = [
 
 [[package]]
 name = "sysinfo"
-version = "0.23.12"
+version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56b1e20ee77901236c389ff74618a899ff5fd34719a7ff0fd1d64f0acca5179a"
+checksum = "9a2809487b962344ca55d9aea565f9ffbcb6929780802217acc82561f6746770"
 dependencies = [
  "cfg-if 1.0.0",
  "core-foundation-sys",

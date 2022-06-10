@@ -15,7 +15,7 @@ use url::Url;
 
 #[derive(Debug)]
 pub enum HealthCheckError {
-    NotRunning,
+    NotRunning(String),
     Failure(anyhow::Error),
     Unknown(anyhow::Error),
 }
@@ -196,11 +196,12 @@ pub trait NodeExt: Node {
         while Instant::now() < deadline {
             match self.health_check().await {
                 Ok(()) => return Ok(()),
-                Err(HealthCheckError::NotRunning) => {
+                Err(HealthCheckError::NotRunning(error)) => {
                     return Err(anyhow::anyhow!(
-                        "Node {}:{} not running",
+                        "Node {}:{} not running! Error: {:?}",
                         self.name(),
-                        self.peer_id()
+                        self.peer_id(),
+                        error,
                     ))
                 }
                 Err(_) => {} // For other errors we'll retry
