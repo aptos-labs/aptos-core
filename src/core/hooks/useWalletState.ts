@@ -39,6 +39,7 @@ export default function useWalletState() {
       setAptosAccount(aptosAccountState);
       setLocalStorageState({ aptosAccountObject: privateKeyObject });
       window.localStorage.setItem(WALLET_STATE_LOCAL_STORAGE_KEY, JSON.stringify(privateKeyObject));
+      chrome.storage.local.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: privateKeyObject });
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log(error);
@@ -59,6 +60,7 @@ export default function useWalletState() {
     setAptosAccount(undefined);
     setLocalStorageState({ aptosAccountObject: undefined });
     window.localStorage.removeItem(WALLET_STATE_LOCAL_STORAGE_KEY);
+    chrome.storage.local.remove(WALLET_STATE_LOCAL_STORAGE_KEY);
   }, []);
 
   return {

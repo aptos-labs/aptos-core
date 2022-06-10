@@ -47,3 +47,13 @@ export function getAptosAccountState(): AptosAccountState {
   }
   return undefined;
 }
+
+export function getBackgroundAptosAccountState(): Promise<AptosAccountState> {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get([WALLET_STATE_LOCAL_STORAGE_KEY], function (result) {
+      const aptosAccountObject: AptosAccountObject = result[WALLET_STATE_LOCAL_STORAGE_KEY];
+      resolve(aptosAccountObject ? AptosAccount.fromAptosAccountObject(aptosAccountObject) : undefined);
+    });
+  })
+  
+}

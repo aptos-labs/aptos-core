@@ -4,10 +4,19 @@
 import { AptosClient } from 'aptos'
 import { DEVNET_NODE_URL } from '../core/constants'
 import { MessageMethod } from '../core/types'
-import { getAptosAccountState } from '../core/utils/account'
+import { getBackgroundAptosAccountState } from '../core/utils/account'
 
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
-  const account = getAptosAccountState()
+  try {
+    handleDappRequest(request, sendResponse)
+  } catch (error) {
+    sendResponse({ error })
+  }
+  return true
+})
+
+async function handleDappRequest (request, sendResponse) {
+  const account = await getBackgroundAptosAccountState()
   if (account === undefined) {
     sendResponse({ error: 'No Accounts' })
     return
@@ -36,8 +45,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     default:
       throw new Error(request.method + ' method is not supported')
   }
-  return true
-})
+}
 
 function connect (account, sendResponse) {
   // todo: register caller for permission checking purposes
