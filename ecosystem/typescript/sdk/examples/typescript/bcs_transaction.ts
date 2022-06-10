@@ -1,0 +1,87 @@
+/* eslint-disable no-console */
+import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes } from 'aptos';
+
+const NODE_URL = process.env.APTOS_NODE_URL || 'https://fullnode.devnet.aptoslabs.com';
+const FAUCET_URL = process.env.APTOS_FAUCET_URL || 'https://faucet.devnet.aptoslabs.com';
+
+const {
+  AccountAddress,
+  TypeTagStruct,
+  ScriptFunction,
+  StructTag,
+  TransactionPayloadScriptFunction,
+  RawTransaction,
+  ChainId,
+} = TxnBuilderTypes;
+
+/**
+ * This code example demonstrates the process of moving test coins from one account to another.
+ */
+(async () => {
+  const client = new AptosClient(NODE_URL);
+  const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL, null);
+
+  // Generates key pair for a new account
+  const account1 = new AptosAccount();
+  // Creates the account on Aptos chain and fund the account with 5000 TestCoin
+  await faucetClient.fundAccount(account1.address(), 5000);
+  let resources = await client.getAccountResources(account1.address());
+  let accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
+  console.log(`account2 coins: ${(accountResource.data as any).coin.value}. Should be 5000!`);
+
+  const account2 = new AptosAccount();
+  // Creates the second account and fund the account with 0 TestCoin
+  await faucetClient.fundAccount(account2.address(), 0);
+  resources = await client.getAccountResources(account2.address());
+  accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
+  console.log(`account2 coins: ${(accountResource.data as any).coin.value}. Should be 0!`);
+
+  const token = new TypeTagStruct(StructTag.fromString('0x1::TestCoin::TestCoin'));
+
+  // TS SDK support 3 types of transaction payloads: `ScriptFunction`, `Script` and `Module`.
+  // See https://aptos-labs.github.io/ts-sdk-doc/ for the details.
+  const scriptFunctionPayload = new TransactionPayloadScriptFunction(
+    ScriptFunction.natual(
+      // Fully qualified module name, `AccountAddress::ModuleName`
+      '0x1::Coin',
+      // Module function
+      'transfer',
+      // The coin type to transfer
+      [token],
+      // Arguments for function `transfer`: receiver account address and amount to transfer
+      [BCS.bcsToBytes(AccountAddress.fromHex(account2.address())), BCS.bcsSerializeUint64(717)],
+    ),
+  );
+
+  const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
+    client.getAccount(account1.address()),
+    client.getChainId(),
+  ]);
+
+  // See class definiton here
+  // https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.RawTransaction.html#constructor.
+  const rawTxn = new RawTransaction(
+    // Transaction sender account address
+    AccountAddress.fromHex(account1.address()),
+    BigInt(sequnceNumber),
+    scriptFunctionPayload,
+    // Max gas unit to spend
+    1000n,
+    // Gas price per unit
+    1n,
+    // Expiration timestamp. Transaction is discarded if it is not executed within 10 seconds from now.
+    BigInt(Math.floor(Date.now() / 1000) + 10),
+    new ChainId(chainId),
+  );
+
+  // Sign the raw transaction with account1's private key
+  const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
+
+  const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
+
+  await client.waitForTransaction(transactionRes.hash);
+
+  resources = await client.getAccountResources(account2.address());
+  accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
+  console.log(`account2 coins: ${(accountResource.data as any).coin.value}. Should be 717!`);
+})();
