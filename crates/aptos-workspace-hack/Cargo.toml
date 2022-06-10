@@ -34,6 +34,7 @@ hashbrown = { version = "0.11.2", features = ["ahash", "inline-more", "raw"] }
 hyper = { version = "0.14.18", features = ["client", "full", "h2", "http1", "http2", "runtime", "server", "socket2", "stream", "tcp"] }
 include_dir = { version = "0.7.2", features = ["glob"] }
 itertools = { version = "0.10.3", features = ["use_alloc", "use_std"] }
+libc = { version = "0.2.126", features = ["std"] }
 log = { version = "0.4.17", default-features = false, features = ["std"] }
 memchr = { version = "2.5.0", features = ["std", "use_std"] }
 num-integer = { version = "0.1.45", features = ["std"] }
@@ -80,6 +81,7 @@ hashbrown = { version = "0.11.2", features = ["ahash", "inline-more", "raw"] }
 hyper = { version = "0.14.18", features = ["client", "full", "h2", "http1", "http2", "runtime", "server", "socket2", "stream", "tcp"] }
 include_dir = { version = "0.7.2", features = ["glob"] }
 itertools = { version = "0.10.3", features = ["use_alloc", "use_std"] }
+libc = { version = "0.2.126", features = ["std"] }
 log = { version = "0.4.17", default-features = false, features = ["std"] }
 memchr = { version = "2.5.0", features = ["std", "use_std"] }
 num-integer = { version = "0.1.45", features = ["std"] }
@@ -103,22 +105,22 @@ tracing-core = { version = "0.1.26", features = ["lazy_static", "std"] }
 warp = { version = "0.3.2", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
-libc = { version = "0.2.126", features = ["std"] }
+futures-task = { version = "0.3.21", default-features = false, features = ["alloc", "std"] }
 standback = { version = "0.2.17", default-features = false, features = ["std"] }
 tokio-util-3b31131e45eafb45 = { package = "tokio-util", version = "0.6.10", features = ["codec", "io"] }
 
 [target.x86_64-unknown-linux-gnu.build-dependencies]
-libc = { version = "0.2.126", features = ["std"] }
+futures-task = { version = "0.3.21", default-features = false, features = ["alloc", "std"] }
 standback = { version = "0.2.17", default-features = false, features = ["std"] }
 tokio-util-3b31131e45eafb45 = { package = "tokio-util", version = "0.6.10", features = ["codec", "io"] }
 
 [target.x86_64-apple-darwin.dependencies]
-libc = { version = "0.2.126", features = ["std"] }
+futures-task = { version = "0.3.21", default-features = false, features = ["alloc", "std"] }
 standback = { version = "0.2.17", default-features = false, features = ["std"] }
 tokio-util-3b31131e45eafb45 = { package = "tokio-util", version = "0.6.10", features = ["codec", "io"] }
 
 [target.x86_64-apple-darwin.build-dependencies]
-libc = { version = "0.2.126", features = ["std"] }
+futures-task = { version = "0.3.21", default-features = false, features = ["alloc", "std"] }
 standback = { version = "0.2.17", default-features = false, features = ["std"] }
 tokio-util-3b31131e45eafb45 = { package = "tokio-util", version = "0.6.10", features = ["codec", "io"] }
 

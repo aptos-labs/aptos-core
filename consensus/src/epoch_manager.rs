@@ -31,7 +31,7 @@ use anyhow::{bail, ensure, Context};
 use aptos_config::config::{ConsensusConfig, ConsensusProposerType, NodeConfig};
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
-use aptos_metrics::monitor;
+use aptos_metrics_core::monitor;
 use aptos_types::{
     account_address::AccountAddress,
     epoch_change::EpochChangeProof,

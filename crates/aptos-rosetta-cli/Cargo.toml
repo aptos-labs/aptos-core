@@ -28,7 +28,7 @@ aptos-api = { path = "../../api" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }
 aptos-logger = { path = "../aptos-logger" }
-aptos-metrics = { path = "../aptos-metrics" }
+aptos-metrics-core = { path = "../aptos-metrics-core" }
 aptos-rest-client = { path = "../aptos-rest-client" }
 aptos-rosetta = { path = "../aptos-rosetta" }
 aptos-types = { path = "../../types" }

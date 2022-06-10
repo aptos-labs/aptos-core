@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_metrics::{register_histogram_vec, HistogramVec};
+use aptos_metrics_core::{register_histogram_vec, HistogramVec};
 
 use once_cell::sync::Lazy;
 use warp::log::{custom, Info, Log};

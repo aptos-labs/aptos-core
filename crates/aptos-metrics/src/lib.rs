@@ -51,21 +51,13 @@ pub mod metric_server;
 pub mod system_information;
 pub mod system_metrics;
 
-mod op_counters;
-pub use op_counters::{DurationHistogram, OpMetrics};
+pub use aptos_metrics_core::op_counters::{DurationHistogram, OpMetrics};
 
 #[cfg(test)]
 mod unit_tests;
 
-// Re-export counter types from prometheus crate
-pub use crate::metric_server::get_all_metrics;
-pub use aptos_metrics_core::{
-    register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
-    register_int_gauge, register_int_gauge_vec, Histogram, HistogramTimer, HistogramVec,
-    IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
-};
-
 use aptos_logger::prelude::*;
+use aptos_metrics_core::{register_int_counter_vec, IntCounterVec};
 use once_cell::sync::Lazy;
 
 pub static NUM_METRICS: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -106,20 +98,4 @@ pub fn gather_metrics() -> Vec<prometheus::proto::MetricFamily> {
         .inc_by(families_over_1000);
 
     metric_families
-}
-
-/// Helper function to record metrics for external calls.
-/// Include call counts, time, and whether it's inside or not (1 or 0).
-/// It assumes a OpMetrics defined as OP_COUNTERS in crate::counters;
-#[macro_export]
-macro_rules! monitor {
-    ( $name:literal, $fn:expr ) => {{
-        use crate::counters::OP_COUNTERS;
-        let _timer = OP_COUNTERS.timer($name);
-        let gauge = OP_COUNTERS.gauge(concat!($name, "_running"));
-        gauge.inc();
-        let result = $fn;
-        gauge.dec();
-        result
-    }};
 }

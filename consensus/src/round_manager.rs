@@ -23,7 +23,7 @@ use crate::{
 use anyhow::{bail, ensure, Context, Result};
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
-use aptos_metrics::monitor;
+use aptos_metrics_core::monitor;
 use aptos_types::{
     epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
     validator_verifier::ValidatorVerifier,

@@ -3,7 +3,7 @@
 
 use aptos_config::network_id::PeerNetworkId;
 use aptos_crypto::_once_cell::sync::Lazy;
-use aptos_metrics::{
+use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, register_int_gauge_vec, HistogramTimer,
     HistogramVec, IntCounterVec, IntGaugeVec,
 };

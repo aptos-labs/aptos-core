@@ -5,7 +5,7 @@ use crate::{error::MempoolError, state_replication::TxnManager};
 use anyhow::{format_err, Result};
 use aptos_logger::prelude::*;
 use aptos_mempool::{ConsensusRequest, ConsensusResponse, TransactionSummary};
-use aptos_metrics::monitor;
+use aptos_metrics_core::monitor;
 use aptos_types::transaction::TransactionStatus;
 use consensus_types::{block::Block, common::Payload};
 use executor_types::StateComputeResult;

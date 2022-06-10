@@ -20,7 +20,7 @@ tokio = { version = "1.18.2", features = ["full"] }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-metrics = { path = "../../crates/aptos-metrics" }
+aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 aptos-secure-storage = { path = "../../secure/storage" }
 aptos-time-service = { path = "../../crates/aptos-time-service" }
 aptos-types = { path = "../../types" }

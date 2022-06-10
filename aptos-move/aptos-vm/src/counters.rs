@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_metrics::{
+use aptos_metrics_core::{
     register_histogram, register_int_counter, register_int_counter_vec, Histogram, IntCounter,
     IntCounterVec,
 };

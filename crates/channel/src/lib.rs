@@ -13,7 +13,7 @@
 //! with backpressure (senders will block if the queue is full instead of evicting
 //! another item in the queue) that only implements FIFO (vs. LIFO or KLAST).
 
-use aptos_metrics::IntGauge;
+use aptos_metrics_core::IntGauge;
 use futures::{
     channel::mpsc,
     sink::Sink,

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_metrics::{register_histogram, register_int_counter, Histogram, IntCounter};
+use aptos_metrics_core::{register_histogram, register_int_counter, Histogram, IntCounter};
 use once_cell::sync::Lazy;
 
 pub static APTOS_EXECUTOR_EXECUTE_CHUNK_SECONDS: Lazy<Histogram> = Lazy::new(|| {

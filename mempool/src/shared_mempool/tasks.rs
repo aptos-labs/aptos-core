@@ -18,7 +18,7 @@ use aptos_config::network_id::PeerNetworkId;
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
-use aptos_metrics::HistogramTimer;
+use aptos_metrics_core::HistogramTimer;
 use aptos_types::{
     mempool_status::{MempoolStatus, MempoolStatusCode},
     on_chain_config::OnChainConfigPayload,

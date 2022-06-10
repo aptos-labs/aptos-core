@@ -11,7 +11,7 @@ use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_metrics::monitor;
+use aptos_metrics_core::monitor;
 use aptos_types::{
     account_address::AccountAddress, contract_event::ContractEvent, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures, transaction::Transaction,

@@ -5,7 +5,7 @@
 
 use aptos_config::config::NodeConfig;
 use aptos_logger::{info, Filter, Logger};
-use aptos_metrics::system_information::get_git_rev;
+use aptos_metrics::{metric_server, system_information::get_git_rev};
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::runtime::{Builder, Runtime};
@@ -34,7 +34,7 @@ impl NodeDebugService {
 
         // GET /metrics
         let metrics =
-            warp::path("metrics").map(|| warp::reply::json(&aptos_metrics::get_all_metrics()));
+            warp::path("metrics").map(|| warp::reply::json(&metric_server::get_all_metrics()));
 
         // Post /log/filter
         let local_filter = {

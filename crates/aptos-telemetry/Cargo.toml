@@ -19,5 +19,5 @@ tokio = { version = "1.18.2" }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 
 aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-metrics = { path = "../../crates/aptos-metrics" }
+aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 aptos-workspace-hack = { path = "../aptos-workspace-hack" }

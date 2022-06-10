@@ -25,7 +25,7 @@ aptos-data-client = { path = "../../aptos-data-client" }
 aptos-id-generator = { path = "../../../crates/aptos-id-generator" }
 aptos-infallible = { path = "../../../crates/aptos-infallible" }
 aptos-logger = { path = "../../../crates/aptos-logger" }
-aptos-metrics = { path = "../../../crates/aptos-metrics" }
+aptos-metrics-core = { path = "../../../crates/aptos-metrics-core" }
 aptos-types = { path = "../../../types" }
 aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
 channel = { path = "../../../crates/channel" }
