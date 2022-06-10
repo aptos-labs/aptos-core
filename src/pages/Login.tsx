@@ -67,7 +67,7 @@ function Login() {
     if (aptosAccount) {
       navigate('/wallet');
     }
-  }, []);
+  }, [aptosAccount, navigate]);
 
   return (
     <VStack
