@@ -92,3 +92,13 @@ jobs:
         env:
           RUST_BACKTRACE: full
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+      - name: 'Upload smoke test logs for failures'
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: failed-smoke-test-logs
+          # Retain all smoke test data except for the db (which may be large).
+          path: |
+            /tmp/.tmp*
+            !/tmp/.tmp*/**/db/
+          retention-days: 1
