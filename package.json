@@ -17,6 +17,7 @@
     "buffer": "^6.0.3",
     "constate": "^3.3.2",
     "framer-motion": "^6",
+    "lodash": "^4.17.21",
     "numeral": "^2.0.6",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",

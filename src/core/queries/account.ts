@@ -4,8 +4,11 @@
 import {
   AptosClient, MaybeHexString, Types,
 } from 'aptos';
+import useWalletState from 'core/hooks/useWalletState';
 import { AptosAccountState } from 'core/types';
 import { AptosNetwork } from 'core/utils/network';
+import { useCallback } from 'react';
+import { useQuery } from 'react-query';
 
 export interface GetAccountResourcesProps {
   address?: MaybeHexString;
@@ -84,6 +87,11 @@ interface GetToAddressAccountExistsProps {
   })[]
 }
 
+export const accountQueryKeys = Object.freeze({
+  getAccountExists: 'getAccountExists',
+  getAccountResources: 'getAccountResources',
+} as const);
+
 export const getToAddressAccountExists = async (
   { queryKey }: GetToAddressAccountExistsProps,
 ) => {
@@ -95,4 +103,37 @@ export const getToAddressAccountExists = async (
     return doesAccountExist;
   }
   return false;
+};
+
+interface UseAccountExistsProps {
+  address: MaybeHexString;
+  // miliseconds
+  debounceTimeout?: number;
+}
+
+export const useAccountExists = ({
+  address,
+}: UseAccountExistsProps) => {
+  const { aptosNetwork } = useWalletState();
+
+  const getAccountExistsQuery = useCallback(async () => {
+    const accountExists = await getAccountExists({ address, nodeUrl: aptosNetwork });
+    return accountExists;
+  }, [address, aptosNetwork]);
+
+  // fires query everytime address changes
+  return useQuery([accountQueryKeys.getAccountExists, address], getAccountExistsQuery);
+};
+
+export const useAccountResources = () => {
+  const { aptosAccount, aptosNetwork } = useWalletState();
+
+  return useQuery(
+    accountQueryKeys.getAccountResources,
+    () => getAccountResources({
+      address: aptosAccount?.address(),
+      nodeUrl: aptosNetwork,
+    }),
+    { refetchInterval: 2000 },
+  );
 };

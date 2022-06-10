@@ -7,14 +7,12 @@ import {
   SimpleGrid,
   Heading,
   useRadioGroup,
-  useToast,
 } from '@chakra-ui/react';
 import React, { useEffect, useState } from 'react';
 import { AptosNetwork } from 'core/utils/network';
 import { DEVNET_NODE_URL, LOCAL_NODE_URL } from 'core/constants';
 import useWalletState from 'core/hooks/useWalletState';
-import { useQuery } from 'react-query';
-import { getLocalhostIsLive } from 'core/queries/network';
+import { useTestnetStatus } from 'core/queries/network';
 import useSwitchNetwork from 'core/mutations/network';
 import NetworkListItem from './NetworkListItem';
 
@@ -39,11 +37,9 @@ export default function NetworkBody() {
   const {
     aptosNetwork,
   } = useWalletState();
-  const { data: localTestnetIsLive } = useQuery('getTestnetStatus', getLocalhostIsLive, { refetchInterval: 1000 });
+  const { data: localTestnetIsLive } = useTestnetStatus();
   const { isLoading, mutateAsync } = useSwitchNetwork();
   const [error, setError] = useState<boolean>(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const toast = useToast();
 
   const onClick = async (event: AptosNetwork) => {
     try {
@@ -53,7 +49,6 @@ export default function NetworkBody() {
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { getRadioProps, getRootProps, setValue: radioSetValue } = useRadioGroup({
     defaultValue: aptosNetwork,
     name: 'aptosNetwork',

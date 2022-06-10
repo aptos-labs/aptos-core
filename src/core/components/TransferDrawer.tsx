@@ -20,7 +20,6 @@ import {
   Text,
   useColorMode,
   useDisclosure,
-  useToast,
   VStack,
 } from '@chakra-ui/react';
 import { SubmitHandler, useForm } from 'react-hook-form';
@@ -31,11 +30,9 @@ import {
   getAccountExists,
   getAccountResources,
   getTestCoinTokenBalanceFromAccountResources,
-  getToAddressAccountExists,
+  useAccountExists,
 } from 'core/queries/account';
-import { submitTestCoinTransferTransaction } from 'core/mutations/transaction';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
-import { getUserTransaction } from 'core/queries/transaction';
+import { useSubmitTestCoinTransfer } from 'core/mutations/transaction';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import {
   secondaryErrorMessageColor, STATIC_GAS_AMOUNT,
@@ -52,8 +49,6 @@ export const secondaryDividerColor = {
 function TransferDrawer() {
   const { colorMode } = useColorMode();
   const { aptosAccount, aptosNetwork } = useWalletState();
-  const toast = useToast();
-  const queryClient = useQueryClient();
   const {
     formState: { errors }, handleSubmit, register, setError, watch,
   } = useForm();
@@ -62,26 +57,7 @@ function TransferDrawer() {
   const {
     isLoading: isTransferLoading,
     mutateAsync: submitSendTransaction,
-  } = useMutation(submitTestCoinTransferTransaction, {
-    onSettled: async (txnHash) => {
-      if (!txnHash) {
-        return;
-      }
-      queryClient.invalidateQueries('getAccountResources');
-      const txn = await getUserTransaction({ nodeUrl: aptosNetwork, txnHashOrVersion: txnHash });
-      const amount = (txn?.payload)
-        ? (txn.payload as { arguments: string[] }).arguments[1]
-        : undefined;
-      toast({
-        description: (txn?.success) ? `Amount transferred: ${amount}, gas consumed: ${txn?.gas_used}` : `Transfer failed, gas consumed: ${txn?.gas_used}`,
-        duration: 5000,
-        isClosable: true,
-        status: (txn?.success) ? 'success' : 'error',
-        title: `Transaction ${txn?.success ? 'success' : 'error'}`,
-        variant: 'solid',
-      });
-    },
-  });
+  } = useSubmitTestCoinTransfer();
 
   const transferAmount: string | undefined | null = watch('transferAmount');
   const transferAmountNumeral = numeral(transferAmount).format('0,0');
@@ -93,10 +69,10 @@ function TransferDrawer() {
   } = { ...register('toAddress') };
   const toAddress: string | undefined | null = watch('toAddress');
   const explorerAddress = `https://explorer.devnet.aptos.dev/account/${toAddress}`;
-  const { data: toAddressAccountExists } = useQuery(
-    ['getToAddressAccountExists', { aptosAccount, nodeUrl: aptosNetwork, toAddress }],
-    getToAddressAccountExists,
-  );
+  const { data: toAddressAccountExists } = useAccountExists({
+    address: toAddress || '',
+    debounceTimeout: 5000,
+  });
 
   const onSubmit: SubmitHandler<Record<string, any>> = async (data, event) => {
     event?.preventDefault();
@@ -135,6 +111,7 @@ function TransferDrawer() {
     }
     return 'Invalid address';
   }, [toAddressAccountExists, toAddress]);
+
   return (
     <>
       <Button
