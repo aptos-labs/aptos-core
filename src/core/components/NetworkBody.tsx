@@ -64,7 +64,7 @@ export default function NetworkBody() {
 
   useEffect(() => {
     radioSetValue(aptosNetwork);
-  }, [error]);
+  }, [aptosNetwork, error, radioSetValue]);
 
   return (
     <>

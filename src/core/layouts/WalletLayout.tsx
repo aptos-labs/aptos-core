@@ -26,7 +26,7 @@ export default function WalletLayout({
     if (!aptosAccount) {
       navigate('/');
     }
-  }, []);
+  }, [aptosAccount, navigate]);
 
   return (
     <Grid
