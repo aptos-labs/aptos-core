@@ -1,0 +1,87 @@
+{
+  "name": "web-wallet",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@chakra-ui/icons": "^2.0.1",
+    "@chakra-ui/react": "^2.1.2",
+    "@emotion/react": "^11",
+    "@emotion/styled": "^11",
+    "@types/jest": "^27.4.1",
+    "@types/node": "^17.0.25",
+    "@types/numeral": "^2.0.2",
+    "@types/react-dom": "^18.0.2",
+    "@types/react-router-dom": "^5.3.3",
+    "aptos": "^0.0.20",
+    "axios": "^0.27.2",
+    "buffer": "^6.0.3",
+    "constate": "^3.3.2",
+    "framer-motion": "^6",
+    "numeral": "^2.0.6",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "react-hook-form": "^7.30.0",
+    "react-icons": "^4.3.1",
+    "react-query": "^3.39.0",
+    "react-router-dom": "^6.3.0",
+    "react-scripts": "5.0.1",
+    "webextension-polyfill": "^0.9.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "lint": "eslint ./src",
+    "lint:fix": "eslint ./src --fix",
+    "tauri": "tauri",
+    "prebuild": "rimraf build",
+    "build": "yarn run lint:fix && yarn run build:app && yarn run build:bg && yarn run build:inpage",
+    "build:tauri": "yarn tauri build --target aarch64-apple-darwin",
+    "build:app": "INLINE_RUNTIME_CHUNK=false react-scripts build",
+    "build:bg": "webpack --mode production ./src/scripts/background.js --output-path ./build --output-filename background.js",
+    "build:inpage": "webpack --mode production ./src/scripts/inpage.js --output-path ./build --output-filename inpage.js",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^1.0.0-rc.13",
+    "@types/chrome": "^0.0.183",
+    "@types/react": "^18.0.6",
+    "@types/webextension-polyfill": "^0.8.3",
+    "@typescript-eslint/eslint-plugin": "^5.20.0",
+    "@typescript-eslint/parser": "^5.20.0",
+    "eslint": "^8.13.0",
+    "eslint-config-airbnb": "^19.0.4",
+    "eslint-config-airbnb-typescript": "^17.0.0",
+    "eslint-config-standard": "^17.0.0",
+    "eslint-plugin-import": "^2.26.0",
+    "eslint-plugin-n": "^15.1.0",
+    "eslint-plugin-promise": "^6.0.0",
+    "eslint-plugin-react": "^7.29.4",
+    "eslint-plugin-sort-class-members": "^1.14.1",
+    "eslint-plugin-sort-destructure-keys": "^1.4.0",
+    "eslint-plugin-sort-keys-fix": "^1.1.2",
+    "eslint-plugin-typescript-sort-keys": "^2.1.0",
+    "npm-run-all": "^4.1.5",
+    "ts-loader": "^9.3.0",
+    "tsconfig-paths-webpack-plugin": "^3.5.2",
+    "typescript": "^4.6.3",
+    "webpack-cli": "^4.9.2"
+  }
+}
