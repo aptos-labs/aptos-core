@@ -9,11 +9,15 @@ on:
       release_tag:
         type: string
         required: true
-        description: "The release tag to create. E.g. `aptos-cli-v0.2.3` :"
+        description: "The release tag to create. E.g. `aptos-cli-v0.2.3`:"
       source_git_ref_override:
         type: string
         required: false
-        description: "GIT_SHA_OVERRIDE: Use this to override the Git SHA1, branch or tag to build the binaries from. Defaults to the workflow Git REV, but can be different than that:"
+        description: "GIT_SHA_OVERRIDE: Use this to override the Git SHA1, branch name (e.g. devnet) or tag to build the binaries from. Defaults to the workflow Git REV, but can be different than that:"
+      release_title:
+        type: string
+        required: false
+        description: "Name of the release, e.g. \"Aptos CLI devnet release 2022-06-09\":"
 
 jobs:
   build-linux-binary:
@@ -64,5 +68,6 @@ jobs:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           automatic_release_tag: "${{ github.event.inputs.release_tag }}"
           prerelease: false
+          title: "${{ github.event.inputs.release_title }}"
           files: |
             aptos-cli-*.zip
