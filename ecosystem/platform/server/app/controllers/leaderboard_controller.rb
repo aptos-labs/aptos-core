@@ -13,7 +13,11 @@ class LeaderboardController < ApplicationController
     default_sort = [[:participation, -1], [:liveness, -1], [:latest_reported_timestamp, -1]]
     @metrics, @last_updated = Rails.cache.fetch(:it1_leaderboard, expires_in: 1.minute) do
       metrics = JSON.parse(IT1_RESULTS).map do |metric|
-        timestamp = metric['latest_reported_timestamp']&.blank? ? nil : DateTime.parse(metric['latest_reported_timestamp']).to_f
+        timestamp = if metric['latest_reported_timestamp'].blank?
+                      nil
+                    else
+                      DateTime.parse(metric['latest_reported_timestamp']).to_f
+                    end
         It1Metric.new(
           -1,
           metric['validator'],
