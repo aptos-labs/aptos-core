@@ -7,4 +7,6 @@
 class Nft < ApplicationRecord
   belongs_to :user
   belongs_to :nft_offer
+  validates :explorer_url, format: { with: %r{\Ahttps://explorer\.devnet\.aptos\.dev/txn/\d+\z} }, allow_nil: true,
+                           allow_blank: true
 end

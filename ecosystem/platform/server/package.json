@@ -7,6 +7,7 @@
     "@tailwindcss/aspect-ratio": "^0.4.0",
     "@tailwindcss/forms": "^0.5.1",
     "@tailwindcss/typography": "^0.5.2",
+    "aptos": "^1.0.0",
     "autoprefixer": "^10.4.7",
     "dialog-polyfill": "^0.5.6",
     "esbuild": "^0.14.39",
@@ -14,7 +15,7 @@
     "tailwindcss": "^3.0.24"
   },
   "scripts": {
-    "build": "esbuild app/javascript/application.ts --bundle --minify --target=es2017 --sourcemap --outdir=app/assets/builds",
+    "build": "esbuild app/javascript/application.ts --bundle --minify --target=es2020 --sourcemap --outdir=app/assets/builds",
     "build:css": "tailwindcss -i ./app/assets/stylesheets/application.tailwind.css -o ./app/assets/builds/application.css --minify",
     "failure:js": "rm ./app/assets/builds/application.js && rm ./app/assets/builds/application.js.map",
     "dev": "tsc-watch --noClear -p tsconfig.json --onSuccess \"yarn build\" --onFailure \"yarn failure:js\""

@@ -8,7 +8,7 @@ module NftHelper
     case nft.nft_offer.name
     when 'nft_nyc'
       # TODO: Implement the real image for nft_nyc.
-      "https://example.com/#{Random.uuid}"
+      'https://picsum.photos/500'
     end
   end
 end

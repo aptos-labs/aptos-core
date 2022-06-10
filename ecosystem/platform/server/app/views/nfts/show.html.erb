@@ -7,6 +7,28 @@
       <%= render DividerComponent.new(scheme: :primary) %>
     </div>
 
-    <img class="w-64 h-64 border border-white rounded-lg mb-8" src="<%= nft_image_url(@nft) %>" alt="The image that this NFT points to"></img>
+    <%= render CardOutlineComponent.new(class: 'w-fit mx-auto') do %>
+      <div class="flex flex-col md:flex-row gap-8">
+        <div class="flex flex-col gap-8 lg:w-96 lg:h-96 items-center justify-center">
+          <p class="font-light text-xl">Lorem ipsum dolor sit amet</p>
+          <%= turbo_frame_tag 'explorer_link', data: {controller: 'nft'}, format: :turbo_stream do %>
+            <% if @nft.explorer_url %>
+              <%= render ButtonComponent.new(href: @nft.explorer_url, target: '_blank') do %>
+                View in Explorer
+              <% end %>
+            <% else %>
+              <%= form_with(model: @nft, data: {"nft-target": "form"}) do |f| %>
+                <%= f.hidden_field :explorer_url, "data-nft-target": "explorerUrl" %>
+                <%= render ButtonComponent.new(disabled: true) do %>
+                  Minting...
+                <% end %>
+              <% end %>
+            <% end %>
+          <% end %>
+        </div>
+        <div class="flex order-first md:order-last w-64 h-64 lg:w-96 lg:h-96 items-center justify-center rounded-lg bg-neutral-800 text-neutral-900" style="background-image: url(<%= nft_image_url(@nft) %>)">
+        </div>
+      </div>
+    <% end %>
   </div>
 </div>

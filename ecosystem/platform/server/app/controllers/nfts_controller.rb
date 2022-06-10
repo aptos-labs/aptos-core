@@ -9,6 +9,15 @@ class NftsController < ApplicationController
 
   def show; end
 
+  def update
+    nft_params = params.fetch(:nft, {}).permit(:explorer_url)
+    if @nft.update(nft_params)
+      redirect_to nft_path(@nft)
+    else
+      render :show, status: :unprocessable_entity
+    end
+  end
+
   private
 
   def set_nft
