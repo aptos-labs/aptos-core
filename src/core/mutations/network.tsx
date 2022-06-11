@@ -6,6 +6,7 @@ import { FaucetClient } from 'aptos';
 import { LOCAL_NODE_URL } from 'core/constants';
 import useWalletState from 'core/hooks/useWalletState';
 import { getAccountExists } from 'core/queries/account';
+import queryKeys from 'core/queries/queryKeys';
 import { AptosNetwork, getFaucetNetworkFromAptosNetwork, networkUriMap } from 'core/utils/network';
 import { useMutation, useQueryClient } from 'react-query';
 
@@ -61,7 +62,7 @@ export const useSwitchNetwork = () => {
       }
     }
     updateNetworkState(newAptosNetwork);
-    queryClient.invalidateQueries('getAccountResources');
+    queryClient.invalidateQueries(queryKeys.getAccountResources);
   };
 
   return useMutation(mutation);

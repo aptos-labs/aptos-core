@@ -40,3 +40,12 @@ export type MetadataJson = {
   seller_fee_basis_points: number;
   symbol: string;
 };
+
+export interface TokenAttributes {
+  description?: string;
+  imageUri?: string;
+  metadata?: MetadataJson,
+  name: string;
+  supply?: number;
+  uri: string;
+}

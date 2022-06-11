@@ -3,6 +3,7 @@
 
 import axios from 'axios';
 import { LOCAL_FAUCET_URL, LOCAL_NODE_URL } from 'core/constants';
+import { useQuery } from 'react-query';
 
 export const getLocalhostIsLive = async () => {
   try {
@@ -26,5 +27,15 @@ export const getLocalhostIsLive = async () => {
     return false;
   }
 };
+
+export const networkQueryKeys = Object.freeze({
+  getTestnetStatus: 'getTestnetStatus',
+} as const);
+
+export const useTestnetStatus = () => useQuery(
+  networkQueryKeys.getTestnetStatus,
+  getLocalhostIsLive,
+  { refetchInterval: 1000 },
+);
 
 export default getLocalhostIsLive;
