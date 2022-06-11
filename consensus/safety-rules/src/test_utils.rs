@@ -5,12 +5,7 @@ use crate::{
     persistent_safety_storage::PersistentSafetyStorage, serializer::SerializerService, SafetyRules,
     TSafetyRules,
 };
-use aptos_crypto::{
-    ed25519::Ed25519PrivateKey,
-    hash::{CryptoHash, TransactionAccumulatorHasher},
-    traits::SigningKey,
-    Uniform,
-};
+use aptos_crypto::hash::{CryptoHash, TransactionAccumulatorHasher};
 use aptos_secure_storage::{InMemoryStorage, Storage};
 use aptos_types::{
     block_info::BlockInfo,
@@ -58,7 +53,6 @@ pub fn make_proposal_with_qc_and_proof(
     proof: Proof,
     qc: QuorumCert,
     validator_signer: &ValidatorSigner,
-    exec_key: Option<&Ed25519PrivateKey>,
 ) -> MaybeSignedVoteProposal {
     let vote_proposal = VoteProposal::new(
         proof,
@@ -72,10 +66,9 @@ pub fn make_proposal_with_qc_and_proof(
         None,
         false,
     );
-    let signature = exec_key.map(|key| key.sign(&vote_proposal));
     MaybeSignedVoteProposal {
         vote_proposal,
-        signature,
+        signature: None,
     }
 }
 
@@ -83,7 +76,6 @@ pub fn make_proposal_with_qc(
     round: Round,
     qc: QuorumCert,
     validator_signer: &ValidatorSigner,
-    exec_key: Option<&Ed25519PrivateKey>,
 ) -> MaybeSignedVoteProposal {
     make_proposal_with_qc_and_proof(
         Payload::new_empty(),
@@ -91,7 +83,6 @@ pub fn make_proposal_with_qc(
         empty_proof(),
         qc,
         validator_signer,
-        exec_key,
     )
 }
 
@@ -103,7 +94,6 @@ pub fn make_proposal_with_parent_and_overrides(
     validator_signer: &ValidatorSigner,
     epoch: Option<u64>,
     next_epoch_state: Option<EpochState>,
-    exec_key: Option<&Ed25519PrivateKey>,
 ) -> MaybeSignedVoteProposal {
     let block_epoch = match epoch {
         Some(e) => e,
@@ -182,7 +172,7 @@ pub fn make_proposal_with_parent_and_overrides(
 
     let qc = QuorumCert::new(vote_data, ledger_info_with_signatures);
 
-    make_proposal_with_qc_and_proof(payload, round, proof, qc, validator_signer, exec_key)
+    make_proposal_with_qc_and_proof(payload, round, proof, qc, validator_signer)
 }
 
 pub fn make_proposal_with_parent(
@@ -191,7 +181,6 @@ pub fn make_proposal_with_parent(
     parent: &MaybeSignedVoteProposal,
     committed: Option<&MaybeSignedVoteProposal>,
     validator_signer: &ValidatorSigner,
-    exec_key: Option<&Ed25519PrivateKey>,
 ) -> MaybeSignedVoteProposal {
     make_proposal_with_parent_and_overrides(
         payload,
@@ -201,7 +190,6 @@ pub fn make_proposal_with_parent(
         validator_signer,
         None,
         None,
-        exec_key,
     )
 }
 
@@ -237,7 +225,6 @@ pub fn test_storage(signer: &ValidatorSigner) -> PersistentSafetyStorage {
         storage,
         signer.author(),
         signer.private_key().clone(),
-        Ed25519PrivateKey::generate_for_testing(),
         waypoint,
         true,
     )

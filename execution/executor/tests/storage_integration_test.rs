@@ -73,7 +73,10 @@ fn test_reconfiguration() {
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
     let (_, db, executor, _waypoint) = create_db_and_executor(path.path(), &genesis_txn);
     let parent_block_id = executor.committed_block_id();
-    let signer = ValidatorSigner::new(validators[0].data.address, validators[0].key.clone());
+    let signer = ValidatorSigner::new(
+        validators[0].data.address,
+        validators[0].consensus_key.clone(),
+    );
     let validator_account = signer.author();
 
     // test the current keys in the validator's account equals to the key in the validator set

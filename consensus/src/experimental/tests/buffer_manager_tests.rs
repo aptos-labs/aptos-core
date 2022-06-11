@@ -23,9 +23,7 @@ use crate::{
         RandomComputeResultStateComputer,
     },
 };
-use aptos_crypto::{
-    ed25519::Ed25519PrivateKey, hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue, Uniform,
-};
+use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::Mutex;
 use aptos_secure_storage::Storage;
 use aptos_types::{
@@ -79,13 +77,12 @@ pub fn prepare_buffer_manager() -> (
         Storage::from(aptos_secure_storage::InMemoryStorage::new()),
         signer.author(),
         signer.private_key().clone(),
-        Ed25519PrivateKey::generate_for_testing(),
         waypoint,
         true,
     );
     let (_, storage) = MockStorage::start_for_testing((&validators).into());
 
-    let safety_rules_manager = SafetyRulesManager::new_local(safety_storage, false, false);
+    let safety_rules_manager = SafetyRulesManager::new_local(safety_storage, false, true);
 
     let mut safety_rules = MetricsSafetyRules::new(safety_rules_manager.client(), storage);
     safety_rules.perform_initialize().unwrap();

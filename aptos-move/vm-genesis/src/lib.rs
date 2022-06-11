@@ -7,6 +7,7 @@ mod genesis_context;
 
 use crate::genesis_context::GenesisStateView;
 use aptos_crypto::{
+    bls12381,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     HashValue, PrivateKey, Uniform,
 };
@@ -371,6 +372,7 @@ pub struct Validator {
 
 pub struct TestValidator {
     pub key: Ed25519PrivateKey,
+    pub consensus_key: bls12381::PrivateKey,
     pub data: Validator,
 }
 
@@ -387,7 +389,8 @@ impl TestValidator {
         let address = aptos_config::utils::validator_owner_account_from_name(&name);
         let key = Ed25519PrivateKey::generate(rng);
         let auth_key = AuthenticationKey::ed25519(&key.public_key());
-        let consensus_pubkey = key.public_key().to_bytes().to_vec();
+        let consensus_privkey = bls12381::PrivateKey::generate(rng);
+        let consensus_pubkey = consensus_privkey.public_key().to_bytes().to_vec();
         let operator_auth_key = auth_key;
         let operator_address = operator_auth_key.derived_address();
         let network_address = [0u8; 0].to_vec();
@@ -403,7 +406,11 @@ impl TestValidator {
             full_node_network_address,
             stake_amount: 1,
         };
-        Self { key, data }
+        Self {
+            key,
+            consensus_key: consensus_privkey,
+            data,
+        }
     }
 }
 

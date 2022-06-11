@@ -16,6 +16,7 @@ futures = "0.3.12"
 itertools = "0.10.3"
 mirai-annotations = { version = "1.12.0", default-features = false }
 proptest = { version = "1.0.0", optional = true }
+rand = "0.7.3"
 serde = { version = "1.0.137", default-features = false }
 
 aptos-crypto = { path = "../../crates/aptos-crypto" }

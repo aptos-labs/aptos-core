@@ -10,7 +10,7 @@ pub use error::Error;
 
 use anyhow::Result;
 use aptos_crypto::{
-    ed25519::Ed25519Signature,
+    bls12381,
     hash::{EventAccumulatorHasher, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
 };
@@ -186,7 +186,7 @@ pub struct StateComputeResult {
     transaction_info_hashes: Vec<HashValue>,
 
     /// The signature of the VoteProposal corresponding to this block.
-    signature: Option<Ed25519Signature>,
+    signature: Option<bls12381::Signature>,
 
     reconfig_events: Vec<ContractEvent>,
 }
@@ -299,11 +299,11 @@ impl StateComputeResult {
         &self.reconfig_events
     }
 
-    pub fn signature(&self) -> &Option<Ed25519Signature> {
+    pub fn signature(&self) -> &Option<bls12381::Signature> {
         &self.signature
     }
 
-    pub fn set_signature(&mut self, sig: Ed25519Signature) {
+    pub fn set_signature(&mut self, sig: bls12381::Signature) {
         self.signature = Some(sig);
     }
 }

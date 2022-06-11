@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{auto_validate::AutoValidate, rest_client::RestClient, TransactionContext};
-use aptos_crypto::{ed25519::Ed25519PublicKey, x25519};
+use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519};
 use aptos_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OPERATOR_ACCOUNT, OWNER_ACCOUNT, VALIDATOR_NETWORK_KEY,
 };
@@ -156,7 +156,8 @@ impl RotateKey {
         // current key (to resynchronize the validator config on the blockchain).
         let mut storage_key = storage.ed25519_public_from_private(key_name)?;
         let keys_match = match key_name {
-            CONSENSUS_KEY => storage_key == validator_config.consensus_public_key,
+            // TODO: add support for rotating bls12381 keys
+            // CONSENSUS_KEY => storage_key == validator_config.consensus_public_key,
             VALIDATOR_NETWORK_KEY => {
                 Some(to_x25519(storage_key.clone())?)
                     == validator_config
@@ -284,7 +285,7 @@ impl ValidatorConfig {
 #[derive(Serialize)]
 pub struct DecodedValidatorConfig {
     pub name: String,
-    pub consensus_public_key: Ed25519PublicKey,
+    pub consensus_public_key: bls12381::PublicKey,
     pub validator_network_address: NetworkAddress,
     pub fullnode_network_address: NetworkAddress,
 }

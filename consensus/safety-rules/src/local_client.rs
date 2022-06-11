@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{ConsensusState, Error, SafetyRules, TSafetyRules};
-use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_crypto::bls12381;
 use aptos_infallible::RwLock;
 use aptos_types::{
     epoch_change::EpochChangeProof,
@@ -38,7 +38,7 @@ impl TSafetyRules for LocalClient {
         self.internal.write().initialize(proof)
     }
 
-    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<Ed25519Signature, Error> {
+    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<bls12381::Signature, Error> {
         self.internal.write().sign_proposal(block_data)
     }
 
@@ -46,7 +46,7 @@ impl TSafetyRules for LocalClient {
         &mut self,
         timeout: &TwoChainTimeout,
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
-    ) -> Result<Ed25519Signature, Error> {
+    ) -> Result<bls12381::Signature, Error> {
         self.internal
             .write()
             .sign_timeout_with_qc(timeout, timeout_cert)
@@ -66,7 +66,7 @@ impl TSafetyRules for LocalClient {
         &mut self,
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
-    ) -> Result<Ed25519Signature, Error> {
+    ) -> Result<bls12381::Signature, Error> {
         self.internal
             .write()
             .sign_commit_vote(ledger_info, new_ledger_info)

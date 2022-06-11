@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{ConsensusState, Error};
-use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_crypto::bls12381;
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -28,14 +28,14 @@ pub trait TSafetyRules {
 
     /// As the holder of the private key, SafetyRules also signs proposals or blocks.
     /// A Block is a signed BlockData along with some additional metadata.
-    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<Ed25519Signature, Error>;
+    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<bls12381::Signature, Error>;
 
     /// Sign the timeout together with highest qc for 2-chain protocol.
     fn sign_timeout_with_qc(
         &mut self,
         timeout: &TwoChainTimeout,
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
-    ) -> Result<Ed25519Signature, Error>;
+    ) -> Result<bls12381::Signature, Error>;
 
     /// Attempts to vote for a given proposal following the 2-chain protocol.
     fn construct_and_sign_vote_two_chain(
@@ -50,5 +50,5 @@ pub trait TSafetyRules {
         &mut self,
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
-    ) -> Result<Ed25519Signature, Error>;
+    ) -> Result<bls12381::Signature, Error>;
 }

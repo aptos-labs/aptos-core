@@ -12,7 +12,7 @@ use crate::{
     CliCommand, CliResult,
 };
 use aptos_config::config::{Peer, PeerRole};
-use aptos_crypto::{ed25519, x25519, PrivateKey, Uniform, ValidCryptoMaterial};
+use aptos_crypto::{bls12381, ed25519, x25519, PrivateKey, Uniform, ValidCryptoMaterial};
 use aptos_types::account_address::{from_identity_public_key, AccountAddress};
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
@@ -183,6 +183,10 @@ impl GenerateKey {
         ed25519::Ed25519PrivateKey::generate(&mut rng)
     }
 
+    pub fn generate_bls12381_in_memory() -> bls12381::PrivateKey {
+        let mut rng = rand::rngs::StdRng::from_entropy();
+        bls12381::PrivateKey::generate(&mut rng)
+    }
     pub fn generate_x25519_in_memory() -> CliTypedResult<x25519::PrivateKey> {
         let key = Self::generate_ed25519_in_memory();
         x25519::PrivateKey::from_ed25519_private_bytes(&key.to_bytes()).map_err(|err| {

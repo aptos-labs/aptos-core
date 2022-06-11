@@ -42,7 +42,7 @@ mod test_config;
 pub use test_config::*;
 mod api_config;
 pub use api_config::*;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, x25519};
+use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519};
 use aptos_types::account_address::AccountAddress;
 
 /// Represents a deprecated config that provides no field verification.
@@ -173,7 +173,7 @@ pub struct IdentityBlob {
     pub account_private_key: Option<Ed25519PrivateKey>,
     /// Optional consensus key.  Only used for validators
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub consensus_private_key: Option<Ed25519PrivateKey>,
+    pub consensus_private_key: Option<bls12381::PrivateKey>,
     /// Network private key.  Peer id is derived from this if account address is not present
     pub network_private_key: x25519::PrivateKey,
 }
@@ -355,13 +355,9 @@ impl NodeConfig {
 
             let validator_network = self.validator_network.as_mut().unwrap();
             validator_network.random_with_peer_id(rng, Some(peer_id));
-            // We want to produce this key twice
-            let mut cloned_rng = rng.clone();
-            test.random_execution_key(rng);
 
             let mut safety_rules_test_config = SafetyRulesTestConfig::new(peer_id);
             safety_rules_test_config.random_consensus_key(rng);
-            safety_rules_test_config.random_execution_key(&mut cloned_rng);
             self.consensus.safety_rules.test = Some(safety_rules_test_config);
         } else {
             self.validator_network = None;

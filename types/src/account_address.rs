@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::transaction::authenticator::AuthenticationKey;
 use aptos_crypto::{
+    bls12381,
     ed25519::Ed25519PublicKey,
     hash::{CryptoHasher, HashValue},
     x25519,
@@ -9,8 +10,17 @@ use aptos_crypto::{
 
 pub use move_deps::move_core_types::account_address::AccountAddress;
 
-pub fn from_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
+pub fn from_ed25519_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
     AuthenticationKey::ed25519(public_key).derived_address()
+}
+
+// TODO: add BLS12381 to AuthenticationKey scheme
+pub fn from_bls12381_public_key(public_key: &bls12381::PublicKey) -> AccountAddress {
+    let mut array = [0u8; AccountAddress::LENGTH];
+    let pubkey_slice = public_key.to_bytes();
+    // keep only the last AccountAddress::LENGTH bytes
+    array.copy_from_slice(&pubkey_slice[bls12381::PublicKey::LENGTH - AccountAddress::LENGTH..]);
+    AccountAddress::new(array)
 }
 
 // Note: This is inconsistent with current types because AccountAddress is derived
@@ -21,7 +31,7 @@ pub fn from_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
 pub fn from_identity_public_key(identity_public_key: x25519::PublicKey) -> AccountAddress {
     let mut array = [0u8; AccountAddress::LENGTH];
     let pubkey_slice = identity_public_key.as_slice();
-    // keep only the last 16 bytes
+    // keep only the last AccountAddress::LENGTH bytes
     array.copy_from_slice(&pubkey_slice[x25519::PUBLIC_KEY_SIZE - AccountAddress::LENGTH..]);
     AccountAddress::new(array)
 }

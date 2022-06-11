@@ -10,8 +10,10 @@ use crate::{
     vote_data::VoteData,
 };
 use aptos_crypto::{
+    bls12381,
     ed25519::Ed25519PrivateKey,
     hash::{CryptoHash, HashValue},
+    PrivateKey, Uniform,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -21,6 +23,7 @@ use aptos_types::{
     validator_signer::{proptests, ValidatorSigner},
 };
 use proptest::prelude::*;
+use rand::rngs::OsRng;
 use std::collections::BTreeMap;
 
 type LinearizedBlockForest = Vec<Block>;
@@ -151,7 +154,7 @@ prop_compose! {
 /// vector
 fn block_forest_from_keys(
     depth: u32,
-    keypairs: Vec<Ed25519PrivateKey>,
+    keypairs: Vec<bls12381::PrivateKey>,
 ) -> impl Strategy<Value = LinearizedBlockForest> {
     let leaf = leaf_strategy().prop_map(|block| vec![block]);
     // Note that having `expected_branch_size` of 1 seems to generate significantly larger trees
@@ -166,7 +169,7 @@ fn block_forest_from_keys(
 pub fn block_forest_and_its_keys(
     quorum_size: usize,
     depth: u32,
-) -> impl Strategy<Value = (Vec<Ed25519PrivateKey>, LinearizedBlockForest)> {
+) -> impl Strategy<Value = (Vec<bls12381::PrivateKey>, LinearizedBlockForest)> {
     proptest::collection::vec(proptests::arb_signing_key(), quorum_size).prop_flat_map(
         move |private_key| {
             (
@@ -267,18 +270,12 @@ pub fn certificate_for_genesis() -> QuorumCert {
 
 pub fn random_payload(count: usize) -> Payload {
     let address = AccountAddress::random();
-    let signer = ValidatorSigner::random(None);
+    let mut rng = OsRng;
+    let private_key = Ed25519PrivateKey::generate(&mut rng);
+    let public_key = private_key.public_key();
     Payload::DirectMempool(
         (0..count)
-            .map(|i| {
-                get_test_signed_txn(
-                    address,
-                    i as u64,
-                    signer.private_key(),
-                    signer.public_key(),
-                    None,
-                )
-            })
+            .map(|i| get_test_signed_txn(address, i as u64, &private_key, public_key.clone(), None))
             .collect(),
     )
 }

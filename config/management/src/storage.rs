@@ -3,8 +3,9 @@
 
 use crate::error::Error;
 use aptos_crypto::{
+    bls12381,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    x25519,
+    x25519, PrivateKey,
 };
 use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
 use aptos_types::{
@@ -69,6 +70,13 @@ impl StorageWrapper {
         self.storage
             .rotate_key(name)
             .map_err(|e| Error::StorageWriteError(self.storage_name, name, e.to_string()))
+    }
+
+    pub fn bls12381_public_from_private(
+        &self,
+        key_name: &'static str,
+    ) -> Result<bls12381::PublicKey, Error> {
+        Ok(self.value::<bls12381::PrivateKey>(key_name)?.public_key())
     }
 
     /// Retrieves public key from the stored private key

@@ -5,7 +5,7 @@ use crate::{
     config::{IdentityBlob, LoggerConfig, SecureBackend, WaypointConfig},
     keys::ConfigKey,
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, Uniform};
+use aptos_crypto::{bls12381, Uniform};
 use aptos_types::{network_address::NetworkAddress, waypoint::Waypoint, PeerId};
 use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
@@ -117,8 +117,7 @@ impl RemoteService {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct SafetyRulesTestConfig {
     pub author: PeerId,
-    pub consensus_key: Option<ConfigKey<Ed25519PrivateKey>>,
-    pub execution_key: Option<ConfigKey<Ed25519PrivateKey>>,
+    pub consensus_key: Option<ConfigKey<bls12381::PrivateKey>>,
     pub waypoint: Option<Waypoint>,
 }
 
@@ -127,26 +126,16 @@ impl SafetyRulesTestConfig {
         Self {
             author,
             consensus_key: None,
-            execution_key: None,
             waypoint: None,
         }
     }
 
-    pub fn consensus_key(&mut self, key: Ed25519PrivateKey) {
+    pub fn consensus_key(&mut self, key: bls12381::PrivateKey) {
         self.consensus_key = Some(ConfigKey::new(key));
     }
 
-    pub fn execution_key(&mut self, key: Ed25519PrivateKey) {
-        self.execution_key = Some(ConfigKey::new(key));
-    }
-
     pub fn random_consensus_key(&mut self, rng: &mut StdRng) {
-        let privkey = Ed25519PrivateKey::generate(rng);
-        self.consensus_key = Some(ConfigKey::<Ed25519PrivateKey>::new(privkey));
-    }
-
-    pub fn random_execution_key(&mut self, rng: &mut StdRng) {
-        let privkey = Ed25519PrivateKey::generate(rng);
-        self.execution_key = Some(ConfigKey::<Ed25519PrivateKey>::new(privkey));
+        let privkey = bls12381::PrivateKey::generate(rng);
+        self.consensus_key = Some(ConfigKey::<bls12381::PrivateKey>::new(privkey));
     }
 }

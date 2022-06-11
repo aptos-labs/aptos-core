@@ -22,7 +22,7 @@ use crate::{
     util::time_service::{ClockTimeService, TimeService},
 };
 use aptos_config::network_id::NetworkId;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, Uniform};
+use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_secure_storage::Storage;
 use aptos_types::{
@@ -122,11 +122,10 @@ impl NodeSetup {
                 Storage::from(aptos_secure_storage::InMemoryStorage::new()),
                 signer.author(),
                 signer.private_key().clone(),
-                Ed25519PrivateKey::generate_for_testing(),
                 waypoint,
                 true,
             );
-            let safety_rules_manager = SafetyRulesManager::new_local(safety_storage, false, false);
+            let safety_rules_manager = SafetyRulesManager::new_local(safety_storage, false, true);
 
             nodes.push(Self::new(
                 playground,
@@ -913,12 +912,11 @@ fn safety_rules_crash() {
             Storage::from(aptos_secure_storage::InMemoryStorage::new()),
             node.signer.author(),
             node.signer.private_key().clone(),
-            Ed25519PrivateKey::generate_for_testing(),
             node.round_manager.consensus_state().waypoint(),
             true,
         );
 
-        node.safety_rules_manager = SafetyRulesManager::new_local(safety_storage, false, false);
+        node.safety_rules_manager = SafetyRulesManager::new_local(safety_storage, false, true);
         let safety_rules =
             MetricsSafetyRules::new(node.safety_rules_manager.client(), node.storage.clone());
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));

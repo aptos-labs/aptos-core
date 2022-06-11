@@ -2,11 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{metrics_safety_rules::MetricsSafetyRules, test_utils::MockStorage};
-use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519Signature},
-    hash::ACCUMULATOR_PLACEHOLDER_HASH,
-    HashValue, Uniform,
-};
+use aptos_crypto::{bls12381, hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::Mutex;
 use aptos_secure_storage::Storage;
 use aptos_types::{
@@ -45,13 +41,12 @@ pub fn prepare_safety_rules() -> (Arc<Mutex<MetricsSafetyRules>>, Vec<ValidatorS
         Storage::from(aptos_secure_storage::InMemoryStorage::new()),
         signer.author(),
         signer.private_key().clone(),
-        Ed25519PrivateKey::generate_for_testing(),
         waypoint,
         true,
     );
     let (_, storage) = MockStorage::start_for_testing((&validators).into());
 
-    let safety_rules_manager = SafetyRulesManager::new_local(safety_storage, false, false);
+    let safety_rules_manager = SafetyRulesManager::new_local(safety_storage, false, true);
     let mut safety_rules = MetricsSafetyRules::new(safety_rules_manager.client(), storage);
     safety_rules.perform_initialize().unwrap();
 
@@ -75,16 +70,9 @@ pub fn prepare_executed_blocks_with_ledger_info(
     assert!(num_blocks > 0);
 
     let p1 = if let Some(parent) = some_parent {
-        make_proposal_with_parent(
-            Payload::new_empty(),
-            init_round,
-            &parent,
-            None,
-            signer,
-            None,
-        )
+        make_proposal_with_parent(Payload::new_empty(), init_round, &parent, None, signer)
     } else {
-        make_proposal_with_qc(init_round, init_qc.unwrap(), signer, None)
+        make_proposal_with_qc(init_round, init_qc.unwrap(), signer)
     };
 
     let mut proposals: Vec<MaybeSignedVoteProposal> = vec![p1];
@@ -92,14 +80,8 @@ pub fn prepare_executed_blocks_with_ledger_info(
     for i in 1..num_blocks {
         println!("Generating {}", i);
         let parent = proposals.last().unwrap();
-        let proposal = make_proposal_with_parent(
-            Payload::new_empty(),
-            init_round + i,
-            parent,
-            None,
-            signer,
-            None,
-        );
+        let proposal =
+            make_proposal_with_parent(Payload::new_empty(), init_round + i, parent, None, signer);
         proposals.push(proposal);
     }
 
@@ -126,7 +108,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
 
     let mut li_sig = LedgerInfoWithSignatures::new(
         li.clone(),
-        BTreeMap::<AccountAddress, Ed25519Signature>::new(),
+        BTreeMap::<AccountAddress, bls12381::Signature>::new(),
     );
 
     li_sig.add_signature(signer.author(), signer.sign(&li));

@@ -2,11 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{account_address::AccountAddress, on_chain_config::ValidatorSet};
-use aptos_crypto::{
-    ed25519::{Ed25519PublicKey, Ed25519Signature},
-    hash::CryptoHash,
-    Signature, VerifyingKey,
-};
+use aptos_crypto::{bls12381, hash::CryptoHash, Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt};
 use thiserror::Error;
@@ -43,25 +39,32 @@ pub enum VerifyError {
     #[error("Signature is invalid")]
     /// The signature does not match the hash.
     InvalidSignature,
-    #[error("Inconsistent Block Info")]
-    InconsistentBlockInfo,
 }
 
 /// Helper struct to manage validator information for validation
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ValidatorConsensusInfo {
-    public_key: Ed25519PublicKey,
+    // index of the sorted validator set based on account address
+    index: usize,
+    public_key: bls12381::PublicKey,
     voting_power: u64,
 }
 
 impl ValidatorConsensusInfo {
-    pub fn new(public_key: Ed25519PublicKey, voting_power: u64) -> Self {
+    pub fn new(index: usize, public_key: bls12381::PublicKey, voting_power: u64) -> Self {
         ValidatorConsensusInfo {
+            index,
             public_key,
             voting_power,
         }
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct MultiBLS12381Siganture {
+    public_keys_index: Vec<bool>,
+    signature: bls12381::Signature,
 }
 
 /// Supports validation of signatures for known authors with individual voting powers. This struct
@@ -73,6 +76,8 @@ pub struct ValidatorVerifier {
     /// An ordered map of each validator's on-chain account address to its pubkeys
     /// and voting power.
     address_to_validator_info: BTreeMap<AccountAddress, ValidatorConsensusInfo>,
+    /// An ordered vector of each validator's on-chain account address to its pubkeys and voting power.
+    index_to_validator_info: Vec<(AccountAddress, ValidatorConsensusInfo)>,
     /// The minimum voting power required to achieve a quorum
     quorum_voting_power: u64,
     /// Total voting power of all validators (cached from address_to_validator_info)
@@ -85,14 +90,23 @@ impl ValidatorVerifier {
     pub fn new(
         address_to_validator_info: BTreeMap<AccountAddress, ValidatorConsensusInfo>,
     ) -> Self {
+        debug_assert!(
+            address_to_validator_info
+                .values()
+                .enumerate()
+                .all(|(index, info)| index == info.index),
+            "validator info is not sorted correctly"
+        );
         let total_voting_power = sum_voting_power(&address_to_validator_info);
         let quorum_voting_power = if address_to_validator_info.is_empty() {
             0
         } else {
             total_voting_power * 2 / 3 + 1
         };
+        let index_to_validator_info = address_to_validator_info.clone().into_iter().collect();
         ValidatorVerifier {
             address_to_validator_info,
+            index_to_validator_info,
             quorum_voting_power,
             total_voting_power,
         }
@@ -104,19 +118,16 @@ impl ValidatorVerifier {
         address_to_validator_info: BTreeMap<AccountAddress, ValidatorConsensusInfo>,
         quorum_voting_power: u64,
     ) -> Result<Self> {
-        let total_voting_power = sum_voting_power(&address_to_validator_info);
+        let mut ret = Self::new(address_to_validator_info);
         ensure!(
-            quorum_voting_power <= total_voting_power,
+            quorum_voting_power <= ret.total_voting_power,
             "Quorum voting power is greater than the sum of all voting power of authors: {}, \
              quorum_size: {}.",
             quorum_voting_power,
-            total_voting_power
+            ret.total_voting_power
         );
-        Ok(ValidatorVerifier {
-            address_to_validator_info,
-            quorum_voting_power,
-            total_voting_power,
-        })
+        ret.quorum_voting_power = quorum_voting_power;
+        Ok(ret)
     }
 
     /// Initializes a validator verifier with a specified quorum voting power and total power.
@@ -127,17 +138,16 @@ impl ValidatorVerifier {
         quorum_voting_power: u64,
         total_voting_power: u64,
     ) -> Self {
-        ValidatorVerifier {
-            address_to_validator_info,
-            quorum_voting_power,
-            total_voting_power,
-        }
+        let mut ret = Self::new(address_to_validator_info);
+        ret.quorum_voting_power = quorum_voting_power;
+        ret.total_voting_power = total_voting_power;
+        ret
     }
 
     /// Helper method to initialize with a single author and public key with quorum voting power 1.
-    pub fn new_single(author: AccountAddress, public_key: Ed25519PublicKey) -> Self {
+    pub fn new_single(author: AccountAddress, public_key: bls12381::PublicKey) -> Self {
         let mut author_to_validator_info = BTreeMap::new();
-        author_to_validator_info.insert(author, ValidatorConsensusInfo::new(public_key, 1));
+        author_to_validator_info.insert(author, ValidatorConsensusInfo::new(0, public_key, 1));
         Self::new(author_to_validator_info)
     }
 
@@ -146,7 +156,7 @@ impl ValidatorVerifier {
         &self,
         author: AccountAddress,
         message: &T,
-        signature: &Ed25519Signature,
+        signature: &bls12381::Signature,
     ) -> std::result::Result<(), VerifyError> {
         match self.get_public_key(&author) {
             Some(public_key) => {
@@ -163,6 +173,37 @@ impl ValidatorVerifier {
         }
     }
 
+    /// This function will successfully return when the multi-sig verifies against the public keys
+    /// carried in the bitmask and corresponding to at least quorum size voting power.
+    pub fn verify_multi_signature<T: Serialize + CryptoHash>(
+        &self,
+        message: &T,
+        sig: &MultiBLS12381Siganture,
+    ) -> Result<(), VerifyError> {
+        if sig.public_keys_index.len() != self.index_to_validator_info.len() {
+            return Err(VerifyError::UnknownAuthor);
+        }
+        let mut addrs = vec![];
+        let mut pks = vec![];
+        for (index, signed) in sig.public_keys_index.iter().enumerate() {
+            if *signed {
+                let (addr, info) = self
+                    .index_to_validator_info
+                    .get(index)
+                    .ok_or(VerifyError::UnknownAuthor)?;
+                addrs.push(addr);
+                pks.push(&info.public_key);
+            }
+        }
+        self.check_voting_power(addrs.into_iter())?;
+        let agg_pk = bls12381::PublicKey::aggregate(pks)
+            .expect("Aggregate known public keys should succeed");
+        sig.signature
+            .verify(message, &agg_pk)
+            .map_err(|_| VerifyError::InvalidSignature)?;
+        Ok(())
+    }
+
     /// This function will successfully return when at least quorum_size signatures of known authors
     /// are successfully verified. Also, an aggregated signature is considered invalid if any of the
     /// attached signatures is invalid or it does not correspond to a known author. The latter is to
@@ -171,7 +212,7 @@ impl ValidatorVerifier {
     pub fn verify_aggregated_struct_signature<T: CryptoHash + Serialize>(
         &self,
         message: &T,
-        aggregated_signature: &BTreeMap<AccountAddress, Ed25519Signature>,
+        aggregated_signature: &BTreeMap<AccountAddress, bls12381::Signature>,
     ) -> std::result::Result<(), VerifyError> {
         self.check_num_of_signatures(aggregated_signature)?;
         self.check_voting_power(aggregated_signature.keys())?;
@@ -186,19 +227,20 @@ impl ValidatorVerifier {
     pub fn batch_verify_aggregated_signatures<T: CryptoHash + Serialize>(
         &self,
         message: &T,
-        aggregated_signature: &BTreeMap<AccountAddress, Ed25519Signature>,
+        aggregated_signature: &BTreeMap<AccountAddress, bls12381::Signature>,
     ) -> std::result::Result<(), VerifyError> {
         self.check_num_of_signatures(aggregated_signature)?;
         self.check_voting_power(aggregated_signature.keys())?;
-        let keys_and_signatures: Vec<(Ed25519PublicKey, Ed25519Signature)> = aggregated_signature
-            .iter()
-            .flat_map(|(address, signature)| {
-                let sig = signature.clone();
-                self.get_public_key(address).map(|pub_key| (pub_key, sig))
-            })
-            .collect();
+        let keys_and_signatures: Vec<(bls12381::PublicKey, bls12381::Signature)> =
+            aggregated_signature
+                .iter()
+                .flat_map(|(address, signature)| {
+                    let sig = signature.clone();
+                    self.get_public_key(address).map(|pub_key| (pub_key, sig))
+                })
+                .collect();
         // Fallback is required to identify the source of the problem if batching fails.
-        if Ed25519Signature::batch_verify(message, keys_and_signatures).is_err() {
+        if bls12381::Signature::batch_verify(message, keys_and_signatures).is_err() {
             self.verify_aggregated_struct_signature(message, aggregated_signature)?
         }
         Ok(())
@@ -207,7 +249,7 @@ impl ValidatorVerifier {
     /// Ensure there are not more than the maximum expected signatures (all possible signatures).
     fn check_num_of_signatures(
         &self,
-        aggregated_signature: &BTreeMap<AccountAddress, Ed25519Signature>,
+        aggregated_signature: &BTreeMap<AccountAddress, bls12381::Signature>,
     ) -> std::result::Result<(), VerifyError> {
         let num_of_signatures = aggregated_signature.len();
         if num_of_signatures > self.len() {
@@ -218,6 +260,7 @@ impl ValidatorVerifier {
         }
         Ok(())
     }
+
     /// Ensure there is at least quorum_voting_power in the provided signatures and there
     /// are only known authors. According to the threshold verification policy,
     /// invalid public keys are not allowed.
@@ -243,11 +286,38 @@ impl ValidatorVerifier {
         Ok(())
     }
 
+    /// Aggregate into a MultiSignature with corresponding bitmask over the known public keys set.
+    pub fn aggregate_into_multi_signature<'a>(
+        &self,
+        authors_and_signatures: impl Iterator<Item = (&'a AccountAddress, &'a bls12381::Signature)>,
+    ) -> Result<MultiBLS12381Siganture, VerifyError> {
+        let mut mask = vec![false; self.address_to_validator_info.len()];
+        let mut sigs = vec![];
+        for (addr, sig) in authors_and_signatures {
+            let index = self.get_index(addr).ok_or(VerifyError::UnknownAuthor)?;
+            mask[index] = true;
+            sigs.push(sig.clone());
+        }
+        let agg_sig =
+            bls12381::Signature::aggregate(sigs).map_err(|_| VerifyError::InvalidSignature)?;
+        Ok(MultiBLS12381Siganture {
+            public_keys_index: mask,
+            signature: agg_sig,
+        })
+    }
+
     /// Returns the public key for this address.
-    pub fn get_public_key(&self, author: &AccountAddress) -> Option<Ed25519PublicKey> {
+    pub fn get_public_key(&self, author: &AccountAddress) -> Option<bls12381::PublicKey> {
         self.address_to_validator_info
             .get(author)
             .map(|validator_info| validator_info.public_key.clone())
+    }
+
+    /// Returns the index for this address.
+    pub fn get_index(&self, author: &AccountAddress) -> Option<usize> {
+        self.address_to_validator_info
+            .get(author)
+            .map(|validator_info| validator_info.index)
     }
 
     /// Returns the voting power for this address.
@@ -302,12 +372,15 @@ impl fmt::Display for ValidatorVerifier {
 
 impl From<&ValidatorSet> for ValidatorVerifier {
     fn from(validator_set: &ValidatorSet) -> Self {
-        ValidatorVerifier::new(validator_set.payload().fold(
+        let mut validators: Vec<_> = validator_set.payload().cloned().collect();
+        validators.sort_by(|a, b| a.account_address().cmp(b.account_address()));
+        ValidatorVerifier::new(validators.into_iter().enumerate().fold(
             BTreeMap::new(),
-            |mut map, validator| {
+            |mut map, (index, validator)| {
                 map.insert(
                     *validator.account_address(),
                     ValidatorConsensusInfo::new(
+                        index,
                         validator.consensus_public_key().clone(),
                         validator.consensus_voting_power(),
                     ),
@@ -356,11 +429,14 @@ pub fn random_validator_verifier(
         } else {
             crate::validator_signer::ValidatorSigner::random([i as u8; 32])
         };
-        account_address_to_validator_info.insert(
-            random_signer.author(),
-            crate::validator_verifier::ValidatorConsensusInfo::new(random_signer.public_key(), 1),
-        );
         signers.push(random_signer);
+    }
+    signers.sort_by(|a, b| a.author().cmp(&b.author()));
+    for (index, signer) in signers.iter().enumerate() {
+        account_address_to_validator_info.insert(
+            signer.author(),
+            ValidatorConsensusInfo::new(index, signer.public_key(), 1),
+        );
     }
     (
         signers,
@@ -439,17 +515,18 @@ mod tests {
     fn test_equal_vote_quorum_validators() {
         const NUM_SIGNERS: u8 = 7;
         // Generate NUM_SIGNERS random signers.
-        let validator_signers: Vec<ValidatorSigner> = (0..NUM_SIGNERS)
+        let mut validator_signers: Vec<ValidatorSigner> = (0..NUM_SIGNERS)
             .map(|i| ValidatorSigner::random([i; 32]))
             .collect();
+        validator_signers.sort_by(|a, b| a.author().cmp(&b.author()));
         let dummy_struct = TestAptosCrypto("Hello, World".to_string());
 
         // Create a map from authors to public keys with equal voting power.
         let mut author_to_public_key_map = BTreeMap::new();
-        for validator in validator_signers.iter() {
+        for (index, validator) in validator_signers.iter().enumerate() {
             author_to_public_key_map.insert(
                 validator.author(),
-                ValidatorConsensusInfo::new(validator.public_key(), 1),
+                ValidatorConsensusInfo::new(index, validator.public_key(), 1),
             );
         }
 
@@ -465,10 +542,13 @@ mod tests {
             ValidatorVerifier::new_with_quorum_voting_power(author_to_public_key_map, 5)
                 .expect("Incorrect quorum size.");
 
+        let multi_sig = validator_verifier
+            .aggregate_into_multi_signature(author_to_signature_map.iter())
+            .unwrap();
+
         // Check against signatures == N; this will pass.
         assert_eq!(
-            validator_verifier
-                .batch_verify_aggregated_signatures(&dummy_struct, &author_to_signature_map),
+            validator_verifier.verify_multi_signature(&dummy_struct, &multi_sig),
             Ok(())
         );
 
@@ -478,12 +558,8 @@ mod tests {
         author_to_signature_map
             .insert(unknown_validator_signer.author(), unknown_signature.clone());
         assert_eq!(
-            validator_verifier
-                .batch_verify_aggregated_signatures(&dummy_struct, &author_to_signature_map),
-            Err(VerifyError::TooManySignatures {
-                num_of_signatures: 8,
-                num_of_authors: 7
-            })
+            validator_verifier.aggregate_into_multi_signature(author_to_signature_map.iter()),
+            Err(VerifyError::UnknownAuthor),
         );
 
         // Add 5 valid signers only (quorum threshold is met); this will pass.
@@ -491,9 +567,11 @@ mod tests {
         for validator in validator_signers.iter().take(5) {
             author_to_signature_map.insert(validator.author(), validator.sign(&dummy_struct));
         }
+        let multi_sig = validator_verifier
+            .aggregate_into_multi_signature(author_to_signature_map.iter())
+            .unwrap();
         assert_eq!(
-            validator_verifier
-                .batch_verify_aggregated_signatures(&dummy_struct, &author_to_signature_map),
+            validator_verifier.verify_multi_signature(&dummy_struct, &multi_sig),
             Ok(())
         );
 
@@ -502,8 +580,7 @@ mod tests {
         author_to_signature_map
             .insert(unknown_validator_signer.author(), unknown_signature.clone());
         assert_eq!(
-            validator_verifier
-                .batch_verify_aggregated_signatures(&dummy_struct, &author_to_signature_map),
+            validator_verifier.aggregate_into_multi_signature(author_to_signature_map.iter()),
             Err(VerifyError::UnknownAuthor)
         );
 
@@ -512,9 +589,11 @@ mod tests {
         for validator in validator_signers.iter().take(4) {
             author_to_signature_map.insert(validator.author(), validator.sign(&dummy_struct));
         }
+        let multi_sig = validator_verifier
+            .aggregate_into_multi_signature(author_to_signature_map.iter())
+            .unwrap();
         assert_eq!(
-            validator_verifier
-                .batch_verify_aggregated_signatures(&dummy_struct, &author_to_signature_map),
+            validator_verifier.verify_multi_signature(&dummy_struct, &multi_sig),
             Err(VerifyError::TooLittleVotingPower {
                 voting_power: 4,
                 quorum_voting_power: 5
@@ -524,8 +603,7 @@ mod tests {
         // Add an unknown signer, we have 5 signers, but one of them is invalid; this will fail.
         author_to_signature_map.insert(unknown_validator_signer.author(), unknown_signature);
         assert_eq!(
-            validator_verifier
-                .batch_verify_aggregated_signatures(&dummy_struct, &author_to_signature_map),
+            validator_verifier.aggregate_into_multi_signature(author_to_signature_map.iter()),
             Err(VerifyError::UnknownAuthor)
         );
     }
@@ -535,15 +613,15 @@ mod tests {
     fn test_very_unequal_vote_quorum_validators() {
         const NUM_SIGNERS: u8 = 4;
         // Generate NUM_SIGNERS random signers.
-        let validator_signers: Vec<ValidatorSigner> = (0..NUM_SIGNERS)
+        let mut validator_signers: Vec<ValidatorSigner> = (0..NUM_SIGNERS)
             .map(|i| ValidatorSigner::random([i; 32]))
             .collect();
+        validator_signers.sort_by(|a, b| a.author().cmp(&b.author()));
         let dummy_struct = TestAptosCrypto("Hello, World".to_string());
 
         // Create a map from authors to public keys with increasing weights (0, 1, 2, 3) and
         // a map of author to signature.
         let mut author_to_public_key_map = BTreeMap::new();
-        let mut author_to_signature_map = BTreeMap::new();
         for (i, validator_signer) in validator_signers.iter().enumerate() {
             let mut voting_power: u64 = i as u64;
             if i == 3 {
@@ -551,11 +629,7 @@ mod tests {
             }
             author_to_public_key_map.insert(
                 validator_signer.author(),
-                ValidatorConsensusInfo::new(validator_signer.public_key(), voting_power),
-            );
-            author_to_signature_map.insert(
-                validator_signer.author(),
-                validator_signer.sign(&dummy_struct),
+                ValidatorConsensusInfo::new(i, validator_signer.public_key(), voting_power),
             );
         }
 
@@ -567,9 +641,10 @@ mod tests {
     fn test_unequal_vote_quorum_validators() {
         const NUM_SIGNERS: u8 = 4;
         // Generate NUM_SIGNERS random signers.
-        let validator_signers: Vec<ValidatorSigner> = (0..NUM_SIGNERS)
+        let mut validator_signers: Vec<ValidatorSigner> = (0..NUM_SIGNERS)
             .map(|i| ValidatorSigner::random([i; 32]))
             .collect();
+        validator_signers.sort_by(|a, b| a.author().cmp(&b.author()));
         let dummy_struct = TestAptosCrypto("Hello, World".to_string());
 
         // Create a map from authors to public keys with increasing weights (0, 1, 2, 3) and
@@ -579,7 +654,7 @@ mod tests {
         for (i, validator_signer) in validator_signers.iter().enumerate() {
             author_to_public_key_map.insert(
                 validator_signer.author(),
-                ValidatorConsensusInfo::new(validator_signer.public_key(), i as u64),
+                ValidatorConsensusInfo::new(i, validator_signer.public_key(), i as u64),
             );
             author_to_signature_map.insert(
                 validator_signer.author(),
@@ -593,9 +668,11 @@ mod tests {
                 .expect("Incorrect quorum size.");
 
         // Check against all signatures (6 voting power); this will pass.
+        let multi_sig = validator_verifier
+            .aggregate_into_multi_signature(author_to_signature_map.iter())
+            .unwrap();
         assert_eq!(
-            validator_verifier
-                .batch_verify_aggregated_signatures(&dummy_struct, &author_to_signature_map),
+            validator_verifier.verify_multi_signature(&dummy_struct, &multi_sig),
             Ok(())
         );
 
@@ -605,12 +682,8 @@ mod tests {
         author_to_signature_map
             .insert(unknown_validator_signer.author(), unknown_signature.clone());
         assert_eq!(
-            validator_verifier
-                .batch_verify_aggregated_signatures(&dummy_struct, &author_to_signature_map),
-            Err(VerifyError::TooManySignatures {
-                num_of_signatures: 5,
-                num_of_authors: 4
-            })
+            validator_verifier.aggregate_into_multi_signature(author_to_signature_map.iter()),
+            Err(VerifyError::UnknownAuthor)
         );
 
         // Add 5 voting power signers only (quorum threshold is met) with (2, 3) ; this will pass.
@@ -618,9 +691,11 @@ mod tests {
         for validator in validator_signers.iter().skip(2) {
             author_to_signature_map.insert(validator.author(), validator.sign(&dummy_struct));
         }
+        let multi_sig = validator_verifier
+            .aggregate_into_multi_signature(author_to_signature_map.iter())
+            .unwrap();
         assert_eq!(
-            validator_verifier
-                .batch_verify_aggregated_signatures(&dummy_struct, &author_to_signature_map),
+            validator_verifier.verify_multi_signature(&dummy_struct, &multi_sig),
             Ok(())
         );
 
@@ -629,8 +704,7 @@ mod tests {
         author_to_signature_map
             .insert(unknown_validator_signer.author(), unknown_signature.clone());
         assert_eq!(
-            validator_verifier
-                .batch_verify_aggregated_signatures(&dummy_struct, &author_to_signature_map),
+            validator_verifier.aggregate_into_multi_signature(author_to_signature_map.iter()),
             Err(VerifyError::UnknownAuthor)
         );
 
@@ -639,9 +713,11 @@ mod tests {
         for validator in validator_signers.iter().take(3) {
             author_to_signature_map.insert(validator.author(), validator.sign(&dummy_struct));
         }
+        let multi_sig = validator_verifier
+            .aggregate_into_multi_signature(author_to_signature_map.iter())
+            .unwrap();
         assert_eq!(
-            validator_verifier
-                .batch_verify_aggregated_signatures(&dummy_struct, &author_to_signature_map),
+            validator_verifier.verify_multi_signature(&dummy_struct, &multi_sig),
             Err(VerifyError::TooLittleVotingPower {
                 voting_power: 3,
                 quorum_voting_power: 5
@@ -651,8 +727,7 @@ mod tests {
         // Add an unknown signer, we have 5 signers, but one of them is invalid; this will fail.
         author_to_signature_map.insert(unknown_validator_signer.author(), unknown_signature);
         assert_eq!(
-            validator_verifier
-                .batch_verify_aggregated_signatures(&dummy_struct, &author_to_signature_map),
+            validator_verifier.aggregate_into_multi_signature(author_to_signature_map.iter()),
             Err(VerifyError::UnknownAuthor)
         );
     }

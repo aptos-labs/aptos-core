@@ -9,7 +9,7 @@ use crate::{
     transaction::Version,
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
-use aptos_crypto::{ed25519::Ed25519Signature, hash::HashValue};
+use aptos_crypto::{bls12381, hash::HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -137,7 +137,7 @@ impl LedgerInfo {
 /// Wrapper around LedgerInfoWithScheme to support future upgrades, this is the data being persisted.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum LedgerInfoWithSignatures {
-    V0(LedgerInfoWithV0),
+    V0(LedgerInfoV0),
 }
 
 impl Display for LedgerInfoWithSignatures {
@@ -148,17 +148,16 @@ impl Display for LedgerInfoWithSignatures {
     }
 }
 
-// proxy to create LedgerInfoWithEd25519
 impl LedgerInfoWithSignatures {
     pub fn new(
         ledger_info: LedgerInfo,
-        signatures: BTreeMap<AccountAddress, Ed25519Signature>,
+        signatures: BTreeMap<AccountAddress, bls12381::Signature>,
     ) -> Self {
-        LedgerInfoWithSignatures::V0(LedgerInfoWithV0::new(ledger_info, signatures))
+        LedgerInfoWithSignatures::V0(LedgerInfoV0::new(ledger_info, signatures))
     }
 
     pub fn genesis(genesis_state_root_hash: HashValue, validator_set: ValidatorSet) -> Self {
-        LedgerInfoWithSignatures::V0(LedgerInfoWithV0::genesis(
+        LedgerInfoWithSignatures::V0(LedgerInfoV0::genesis(
             genesis_state_root_hash,
             validator_set,
         ))
@@ -168,9 +167,9 @@ impl LedgerInfoWithSignatures {
 // Temporary hack to avoid massive changes, it won't work when new variant comes and needs proper
 // dispatch at that time.
 impl Deref for LedgerInfoWithSignatures {
-    type Target = LedgerInfoWithV0;
+    type Target = LedgerInfoV0;
 
-    fn deref(&self) -> &LedgerInfoWithV0 {
+    fn deref(&self) -> &LedgerInfoV0 {
         match &self {
             LedgerInfoWithSignatures::V0(ledger) => ledger,
         }
@@ -178,7 +177,7 @@ impl Deref for LedgerInfoWithSignatures {
 }
 
 impl DerefMut for LedgerInfoWithSignatures {
-    fn deref_mut(&mut self) -> &mut LedgerInfoWithV0 {
+    fn deref_mut(&mut self) -> &mut LedgerInfoV0 {
         match self {
             LedgerInfoWithSignatures::V0(ref mut ledger) => ledger,
         }
@@ -191,25 +190,25 @@ impl DerefMut for LedgerInfoWithSignatures {
 /// again when the client performs a query, those are only there for the client
 /// to be able to verify the state
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct LedgerInfoWithV0 {
+pub struct LedgerInfoV0 {
     ledger_info: LedgerInfo,
     /// The validator is identified by its account address: in order to verify a signature
     /// one needs to retrieve the public key of the validator for the given epoch.
-    signatures: BTreeMap<AccountAddress, Ed25519Signature>,
+    signatures: BTreeMap<AccountAddress, bls12381::Signature>,
 }
 
-impl Display for LedgerInfoWithV0 {
+impl Display for LedgerInfoV0 {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{}", self.ledger_info)
     }
 }
 
-impl LedgerInfoWithV0 {
+impl LedgerInfoV0 {
     pub fn new(
         ledger_info: LedgerInfo,
-        signatures: BTreeMap<AccountAddress, Ed25519Signature>,
+        signatures: BTreeMap<AccountAddress, bls12381::Signature>,
     ) -> Self {
-        LedgerInfoWithV0 {
+        LedgerInfoV0 {
             ledger_info,
             signatures,
         }
@@ -237,7 +236,7 @@ impl LedgerInfoWithV0 {
         self.ledger_info.commit_info()
     }
 
-    pub fn add_signature(&mut self, validator: AccountAddress, signature: Ed25519Signature) {
+    pub fn add_signature(&mut self, validator: AccountAddress, signature: bls12381::Signature) {
         self.signatures.entry(validator).or_insert(signature);
     }
 
@@ -245,7 +244,7 @@ impl LedgerInfoWithV0 {
         self.signatures.remove(&validator);
     }
 
-    pub fn signatures(&self) -> &BTreeMap<AccountAddress, Ed25519Signature> {
+    pub fn signatures(&self) -> &BTreeMap<AccountAddress, bls12381::Signature> {
         &self.signatures
     }
 
@@ -272,12 +271,12 @@ impl LedgerInfoWithV0 {
 use ::proptest::prelude::*;
 
 #[cfg(any(test, feature = "fuzzing"))]
-impl Arbitrary for LedgerInfoWithV0 {
+impl Arbitrary for LedgerInfoV0 {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        let dummy_signature = Ed25519Signature::dummy_signature();
+        let dummy_signature = bls12381::Signature::dummy_signature();
         (
             proptest::arbitrary::any::<LedgerInfo>(),
             proptest::collection::vec(proptest::arbitrary::any::<AccountAddress>(), 0..100),
@@ -317,7 +316,7 @@ mod tests {
         }
 
         let ledger_info_with_signatures =
-            LedgerInfoWithV0::new(ledger_info.clone(), author_to_signature_map);
+            LedgerInfoV0::new(ledger_info.clone(), author_to_signature_map);
 
         // Add the signatures in reverse order and ensure the serialization matches
         let mut author_to_signature_map = BTreeMap::new();
@@ -326,7 +325,7 @@ mod tests {
         }
 
         let ledger_info_with_signatures_reversed =
-            LedgerInfoWithV0::new(ledger_info, author_to_signature_map);
+            LedgerInfoV0::new(ledger_info, author_to_signature_map);
 
         let ledger_info_with_signatures_bytes =
             bcs::to_bytes(&ledger_info_with_signatures).expect("block serialization failed");

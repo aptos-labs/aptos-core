@@ -371,7 +371,7 @@ pub mod tests {
         assert_eq!(local_config_tx, uploaded_config_tx);
 
         // Verify the transaction sender is the operator account address
-        let operator_account = account_address::from_public_key(&operator_key);
+        let operator_account = account_address::from_ed25519_public_key(&operator_key);
         let uploaded_user_transaction = uploaded_config_tx.as_signed_user_txn().unwrap();
         assert_eq!(operator_account, uploaded_user_transaction.sender());
 

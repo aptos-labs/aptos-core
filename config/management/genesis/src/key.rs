@@ -49,7 +49,7 @@ impl Key {
             let key = validator_storage.ed25519_public_from_private(key_name)?;
 
             if let Some(account_name) = account_name {
-                let peer_id = aptos_types::account_address::from_public_key(&key);
+                let peer_id = aptos_types::account_address::from_ed25519_public_key(&key);
                 validator_storage.set(account_name, peer_id)?;
             }
             key

@@ -71,7 +71,7 @@ impl Account {
     /// Like with [`Account::new`], the account returned by this constructor is a purely logical
     /// entity.
     pub fn with_keypair(privkey: Ed25519PrivateKey, pubkey: Ed25519PublicKey) -> Self {
-        let addr = aptos_types::account_address::from_public_key(&pubkey);
+        let addr = aptos_types::account_address::from_ed25519_public_key(&pubkey);
         Account {
             addr,
             privkey,

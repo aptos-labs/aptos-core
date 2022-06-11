@@ -5,12 +5,13 @@
 
 use crate::command::Command;
 use aptos_crypto::{
+    bls12381,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     Uniform,
 };
 use aptos_global_constants::{
-    APTOS_ROOT_KEY, CONSENSUS_KEY, EXECUTION_KEY, FULLNODE_NETWORK_KEY, OPERATOR_KEY, OWNER_KEY,
-    SAFETY_DATA, VALIDATOR_NETWORK_KEY, WAYPOINT,
+    APTOS_ROOT_KEY, CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OPERATOR_KEY, OWNER_KEY, SAFETY_DATA,
+    VALIDATOR_NETWORK_KEY, WAYPOINT,
 };
 use aptos_management::{error::Error, secure_backend::DISK};
 use aptos_secure_storage::{CryptoStorage, KVStorage, Namespaced, OnDiskStorage, Storage};
@@ -60,10 +61,7 @@ impl StorageHelper {
             .import_private_key(APTOS_ROOT_KEY, Ed25519PrivateKey::generate(&mut rng))
             .unwrap();
         storage
-            .import_private_key(CONSENSUS_KEY, Ed25519PrivateKey::generate(&mut rng))
-            .unwrap();
-        storage
-            .import_private_key(EXECUTION_KEY, Ed25519PrivateKey::generate(&mut rng))
+            .set(CONSENSUS_KEY, bls12381::PrivateKey::generate(&mut rng))
             .unwrap();
         storage
             .import_private_key(FULLNODE_NETWORK_KEY, Ed25519PrivateKey::generate(&mut rng))

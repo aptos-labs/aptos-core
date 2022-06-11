@@ -68,7 +68,7 @@ pub fn verify_genesis(
     writeln!(buffer, "Keys").unwrap();
     write_break(&mut buffer);
 
-    write_ed25519_key(&validator_storage, &mut buffer, CONSENSUS_KEY);
+    write_bls12381_key(&validator_storage, &mut buffer, CONSENSUS_KEY);
     write_x25519_key(&validator_storage, &mut buffer, FULLNODE_NETWORK_KEY);
     write_ed25519_key(&validator_storage, &mut buffer, OWNER_KEY);
     write_ed25519_key(&validator_storage, &mut buffer, OPERATOR_KEY);
@@ -103,6 +103,14 @@ fn write_break(buffer: &mut String) {
         "====================================================================================",
     )
     .unwrap();
+}
+
+fn write_bls12381_key(storage: &Storage, buffer: &mut String, key: &'static str) {
+    let value = storage
+        .bls12381_public_from_private(key)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|e| e.to_string());
+    writeln!(buffer, "{} - {}", key, value).unwrap();
 }
 
 fn write_ed25519_key(storage: &Storage, buffer: &mut String, key: &'static str) {
@@ -167,7 +175,7 @@ fn compare_genesis(
     let validator_account = storage.account_address(OWNER_ACCOUNT)?;
     let validator_config = validator_config(validator_account, db_rw.reader.clone())?;
 
-    let actual_consensus_key = storage.ed25519_public_from_private(CONSENSUS_KEY)?;
+    let actual_consensus_key = storage.bls12381_public_from_private(CONSENSUS_KEY)?;
     let expected_consensus_key = &validator_config.consensus_public_key;
     write_assert(
         buffer,

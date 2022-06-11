@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(dead_code)]
+
 // Defines Forge Tests
 pub mod aptos;
 pub mod fullnode;
@@ -15,13 +17,9 @@ mod aptos_cli;
 #[cfg(test)]
 mod client;
 #[cfg(test)]
-mod consensus;
-#[cfg(test)]
 mod full_nodes;
 #[cfg(test)]
 mod network;
-#[cfg(test)]
-mod operational_tooling;
 #[cfg(test)]
 mod rosetta;
 #[cfg(test)]

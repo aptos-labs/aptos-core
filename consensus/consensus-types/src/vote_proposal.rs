@@ -3,7 +3,7 @@
 
 use crate::{block::Block, vote_data::VoteData};
 use aptos_crypto::{
-    ed25519::Ed25519Signature,
+    bls12381,
     hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -121,7 +121,7 @@ pub struct MaybeSignedVoteProposal {
 
     /// The signature of this proposal's hash from the Execution Correctness service. It is
     /// an `Option` because the LEC can be configured to not sign the vote hash.
-    pub signature: Option<Ed25519Signature>,
+    pub signature: Option<bls12381::Signature>,
 }
 
 impl Deref for MaybeSignedVoteProposal {

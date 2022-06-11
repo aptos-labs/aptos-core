@@ -6,7 +6,7 @@ use crate::{
     genesis::git::from_yaml,
 };
 use aptos_config::config::HANDSHAKE_VERSION;
-use aptos_crypto::{ed25519::Ed25519PublicKey, x25519};
+use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519};
 use aptos_types::{
     chain_id::ChainId,
     network_address::{DnsName, NetworkAddress, Protocol},
@@ -56,7 +56,7 @@ pub struct ValidatorConfiguration {
     /// Account address
     pub account_address: AccountAddress,
     /// Key used for signing in consensus
-    pub consensus_public_key: Ed25519PublicKey,
+    pub consensus_public_key: bls12381::PublicKey,
     /// Key used for signing transactions with the account
     pub account_public_key: Ed25519PublicKey,
     /// Public key used for validator network identity (same as account address)

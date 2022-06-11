@@ -2113,6 +2113,7 @@ dependencies = [
  "itertools",
  "mirai-annotations",
  "proptest",
+ "rand 0.7.3",
  "serde 1.0.137",
  "serde_json",
  "short-hex-str",

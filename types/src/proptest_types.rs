@@ -28,7 +28,8 @@ use crate::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptos_crypto::{
-    ed25519::{self, Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
+    bls12381, ed25519,
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
     traits::*,
     HashValue,
@@ -146,18 +147,24 @@ struct AccountInfo {
     address: AccountAddress,
     private_key: Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
+    consensus_private_key: bls12381::PrivateKey,
     sequence_number: u64,
     sent_event_handle: EventHandle,
     received_event_handle: EventHandle,
 }
 
 impl AccountInfo {
-    pub fn new(private_key: Ed25519PrivateKey, public_key: Ed25519PublicKey) -> Self {
-        let address = account_address::from_public_key(&public_key);
+    pub fn new(
+        private_key: Ed25519PrivateKey,
+        public_key: Ed25519PublicKey,
+        consensus_private_key: bls12381::PrivateKey,
+    ) -> Self {
+        let address = account_address::from_ed25519_public_key(&public_key);
         Self {
             address,
             private_key,
             public_key,
+            consensus_private_key,
             sequence_number: 0,
             sent_event_handle: EventHandle::new_from_address(&address, 0),
             received_event_handle: EventHandle::new_from_address(&address, 1),
@@ -177,14 +184,18 @@ pub struct AccountInfoUniverse {
 impl AccountInfoUniverse {
     fn new(
         keypairs: Vec<(Ed25519PrivateKey, Ed25519PublicKey)>,
+        consensus_keypairs: Vec<(bls12381::PrivateKey, bls12381::PublicKey)>,
         epoch: u64,
         round: Round,
         next_version: Version,
     ) -> Self {
-        let mut accounts = keypairs
+        let mut accounts: Vec<_> = keypairs
             .into_iter()
-            .map(|(private_key, public_key)| AccountInfo::new(private_key, public_key))
-            .collect::<Vec<_>>();
+            .zip(consensus_keypairs.into_iter())
+            .map(|((private_key, public_key), (consensus_private_key, _))| {
+                AccountInfo::new(private_key, public_key, consensus_private_key)
+            })
+            .collect();
         accounts.sort_by(|a, b| a.address.cmp(&b.address));
         let validator_set_by_epoch = vec![(0, Vec::new())].into_iter().collect();
 
@@ -248,17 +259,29 @@ impl AccountInfoUniverse {
 impl Arbitrary for AccountInfoUniverse {
     type Parameters = usize;
     fn arbitrary_with(num_accounts: Self::Parameters) -> Self::Strategy {
-        vec(ed25519::keypair_strategy(), num_accounts)
-            .prop_map(|kps| {
-                let kps: Vec<_> = kps
-                    .into_iter()
-                    .map(|k| (k.private_key, k.public_key))
-                    .collect();
-                AccountInfoUniverse::new(
-                    kps, /* epoch = */ 0, /* round = */ 0, /* next_version = */ 0,
-                )
-            })
-            .boxed()
+        vec(
+            (
+                ed25519::keypair_strategy(),
+                bls12381::bls12381_keys::keypair_strategy(),
+            ),
+            num_accounts,
+        )
+        .prop_map(|kps| {
+            let mut ed25519_vec = vec![];
+            let mut bls12381_vec = vec![];
+            for (kp1, kp2) in kps {
+                ed25519_vec.push((kp1.private_key, kp1.public_key));
+                bls12381_vec.push((kp2.private_key, kp2.public_key));
+            }
+            AccountInfoUniverse::new(
+                ed25519_vec,
+                bls12381_vec,
+                /* epoch = */ 0,
+                /* round = */ 0,
+                /* next_version = */ 0,
+            )
+        })
+        .boxed()
     }
 
     fn arbitrary() -> Self::Strategy {
@@ -427,7 +450,7 @@ impl SignatureCheckedTransaction {
     ) -> impl Strategy<Value = Self> {
         (keypair_strategy, payload_strategy)
             .prop_flat_map(|(keypair, payload)| {
-                let address = account_address::from_public_key(&keypair.public_key);
+                let address = account_address::from_ed25519_public_key(&keypair.public_key);
                 (
                     Just(keypair),
                     RawTransaction::strategy_impl(Just(address), Just(payload)),
@@ -523,7 +546,7 @@ prop_compose! {
 
 prop_compose! {
     fn arb_pubkey()(keypair in ed25519::keypair_strategy()) -> AccountAddress {
-            account_address::from_public_key(&keypair.public_key)
+            account_address::from_ed25519_public_key(&keypair.public_key)
     }
 }
 
@@ -584,10 +607,10 @@ impl Arbitrary for Module {
 prop_compose! {
     fn arb_validator_signature_for_ledger_info(ledger_info: LedgerInfo)(
         ledger_info in Just(ledger_info),
-        keypair in ed25519::keypair_strategy(),
-    ) -> (AccountAddress, Ed25519Signature) {
+        keypair in bls12381::bls12381_keys::keypair_strategy(),
+    ) -> (AccountAddress, bls12381::Signature) {
         let signature = keypair.private_key.sign(&ledger_info);
-        (account_address::from_public_key(&keypair.public_key), signature)
+        (account_address::from_bls12381_public_key(&keypair.public_key), signature)
     }
 }
 
@@ -932,7 +955,9 @@ impl ValidatorSetGen {
         universe
             .get_account_infos_dedup(&self.validators)
             .iter()
-            .map(|account| ValidatorSigner::new(account.address, account.private_key.clone()))
+            .map(|account| {
+                ValidatorSigner::new(account.address, account.consensus_private_key.clone())
+            })
             .collect()
     }
 }

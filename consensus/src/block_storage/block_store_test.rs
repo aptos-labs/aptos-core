@@ -115,7 +115,7 @@ proptest! {
             // recursion depth
             50)
     ){
-        let authors: HashSet<Author> = private_keys.iter().map(|private_key| aptos_types::account_address::from_public_key(&private_key.public_key())).collect();
+        let authors: HashSet<Author> = private_keys.iter().map(|private_key| aptos_types::account_address::from_bls12381_public_key(&private_key.public_key())).collect();
         let mut runtime = consensus_runtime();
         let block_store = build_empty_tree();
         for block in blocks {

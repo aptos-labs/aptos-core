@@ -3,7 +3,7 @@
 
 use crate::serializer::SafetyRulesInput;
 use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    bls12381,
     hash::{HashValue, TransactionAccumulatorHasher},
     test_utils::TEST_SEED,
     traits::{SigningKey, Uniform},
@@ -65,7 +65,7 @@ prop_compose! {
     ) -> Block {
         let signature = if include_signature {
             let mut rng = StdRng::from_seed(TEST_SEED);
-            let private_key = Ed25519PrivateKey::generate(&mut rng);
+            let private_key = bls12381::PrivateKey::generate(&mut rng);
             let signature = private_key.sign(&block_data);
             Some(signature)
         } else {
@@ -115,7 +115,7 @@ prop_compose! {
         let vote_proposal = VoteProposal::new(accumulator_extension_proof, block, next_epoch_state, false);
         let signature = if include_signature {
             let mut rng = StdRng::from_seed(TEST_SEED);
-            let private_key = Ed25519PrivateKey::generate(&mut rng);
+            let private_key = bls12381::PrivateKey::generate(&mut rng);
             let signature = private_key.sign(&vote_proposal);
             Some(signature)
         } else {
@@ -218,7 +218,7 @@ prop_compose! {
 prop_compose! {
     pub fn arb_validator_consensus_info(
     )(
-        public_key in any::<Ed25519PublicKey>(),
+        public_key in any::<bls12381::PublicKey>(),
         voting_power in any::<u64>(),
     ) -> ValidatorConsensusInfo {
         ValidatorConsensusInfo::new(public_key, voting_power)
@@ -252,7 +252,7 @@ pub fn arb_safety_rules_input() -> impl Strategy<Value = SafetyRulesInput> {
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod fuzzing {
     use crate::{error::Error, serializer::SafetyRulesInput, test_utils, TSafetyRules};
-    use aptos_crypto::ed25519::Ed25519Signature;
+    use aptos_crypto::bls12381;
     use aptos_types::epoch_change::EpochChangeProof;
     use consensus_types::{
         block_data::BlockData, timeout_2chain::TwoChainTimeout, vote::Vote,
@@ -285,12 +285,14 @@ pub mod fuzzing {
         }
     }
 
-    pub fn fuzz_sign_proposal(block_data: &BlockData) -> Result<Ed25519Signature, Error> {
+    pub fn fuzz_sign_proposal(block_data: &BlockData) -> Result<bls12381::Signature, Error> {
         let mut safety_rules = test_utils::test_safety_rules();
         safety_rules.sign_proposal(block_data)
     }
 
-    pub fn fuzz_sign_timeout_with_qc(timeout: TwoChainTimeout) -> Result<Ed25519Signature, Error> {
+    pub fn fuzz_sign_timeout_with_qc(
+        timeout: TwoChainTimeout,
+    ) -> Result<bls12381::Signature, Error> {
         let mut safety_rules = test_utils::test_safety_rules();
         safety_rules.sign_timeout_with_qc(&timeout, None)
     }

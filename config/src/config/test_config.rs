@@ -17,7 +17,6 @@ pub struct TestConfig {
     pub auth_key: Option<AuthenticationKey>,
     pub operator_key: Option<ConfigKey<Ed25519PrivateKey>>,
     pub owner_key: Option<ConfigKey<Ed25519PrivateKey>>,
-    pub execution_key: Option<ConfigKey<Ed25519PrivateKey>>,
     // Used only to prevent a potentially temporary data_dir from being deleted. This should
     // eventually be moved to be owned by something outside the config.
     #[serde(skip)]
@@ -32,7 +31,6 @@ impl Clone for TestConfig {
             auth_key: self.auth_key,
             operator_key: self.operator_key.clone(),
             owner_key: self.owner_key.clone(),
-            execution_key: self.execution_key.clone(),
             temp_dir: None,
             publishing_option: self.publishing_option.clone(),
         }
@@ -44,7 +42,6 @@ impl PartialEq for TestConfig {
         self.operator_key == other.operator_key
             && self.owner_key == other.owner_key
             && self.auth_key == other.auth_key
-            && self.execution_key == other.execution_key
     }
 }
 
@@ -54,7 +51,6 @@ impl TestConfig {
             auth_key: None,
             operator_key: None,
             owner_key: None,
-            execution_key: None,
             temp_dir: None,
             publishing_option: Some(VMPublishingOption::open()),
         }
@@ -70,14 +66,9 @@ impl TestConfig {
             auth_key: None,
             operator_key: None,
             owner_key: None,
-            execution_key: None,
             temp_dir: Some(temp_dir),
             publishing_option: None,
         }
-    }
-
-    pub fn execution_key(&mut self, key: Ed25519PrivateKey) {
-        self.execution_key = Some(ConfigKey::new(key))
     }
 
     pub fn operator_key(&mut self, key: Ed25519PrivateKey) {
@@ -97,11 +88,6 @@ impl TestConfig {
         self.owner_key = Some(ConfigKey::new(privkey));
     }
 
-    pub fn random_execution_key(&mut self, rng: &mut StdRng) {
-        let privkey = Ed25519PrivateKey::generate(rng);
-        self.execution_key = Some(ConfigKey::new(privkey));
-    }
-
     pub fn temp_dir(&self) -> Option<&Path> {
         self.temp_dir.as_ref().map(|temp_dir| temp_dir.path())
     }
@@ -118,7 +104,6 @@ mod test {
         let mut test_config = TestConfig::new_with_temp_dir(None);
         assert_eq!(test_config.operator_key, None);
         assert_eq!(test_config.owner_key, None);
-        assert_eq!(test_config.execution_key, None);
 
         // Clone the config and verify equality
         let mut clone_test_config = test_config.clone();
@@ -127,14 +112,12 @@ mod test {
         // Generate keys for original test config
         let mut rng = StdRng::from_seed([0u8; 32]);
         test_config.random_account_key(&mut rng);
-        test_config.random_execution_key(&mut rng);
 
         // Verify that configs differ
         assert_ne!(clone_test_config, test_config);
 
         // Copy keys across configs
         clone_test_config.auth_key = test_config.auth_key;
-        clone_test_config.execution_key = test_config.execution_key.clone();
         clone_test_config.operator_key = test_config.operator_key.clone();
         clone_test_config.owner_key = test_config.owner_key.clone();
 

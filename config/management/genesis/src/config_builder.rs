@@ -31,11 +31,6 @@ pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
         .backend;
     let storage: Storage = std::convert::TryFrom::try_from(backend).unwrap();
     let mut test = aptos_config::config::TestConfig::new_with_temp_dir(Some(path));
-    test.execution_key(
-        storage
-            .export_private_key(aptos_global_constants::EXECUTION_KEY)
-            .unwrap(),
-    );
     test.operator_key(
         storage
             .export_private_key(aptos_global_constants::OPERATOR_KEY)
@@ -55,13 +50,9 @@ pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
     let mut sr_test = aptos_config::config::SafetyRulesTestConfig::new(owner_account);
     sr_test.consensus_key(
         storage
-            .export_private_key(aptos_global_constants::CONSENSUS_KEY)
-            .unwrap(),
-    );
-    sr_test.execution_key(
-        storage
-            .export_private_key(aptos_global_constants::EXECUTION_KEY)
-            .unwrap(),
+            .get(aptos_global_constants::CONSENSUS_KEY)
+            .unwrap()
+            .value,
     );
     config.consensus.safety_rules.test = Some(sr_test);
 

@@ -29,18 +29,12 @@ pub fn storage(config: &SafetyRulesConfig) -> PersistentSafetyStorage {
             .as_ref()
             .expect("Missing consensus key in test config")
             .private_key();
-        let execution_private_key = test_config
-            .execution_key
-            .as_ref()
-            .expect("Missing execution key in test config")
-            .private_key();
         let waypoint = test_config.waypoint.expect("No waypoint in config");
 
         PersistentSafetyStorage::initialize(
             internal_storage,
             author,
             consensus_private_key,
-            execution_private_key,
             waypoint,
             config.enable_cached_safety_data,
         )
@@ -68,9 +62,6 @@ pub fn storage(config: &SafetyRulesConfig) -> PersistentSafetyStorage {
                 identity_blob
                     .consensus_private_key
                     .expect("Consensus key needed for safety rules"),
-                identity_blob
-                    .account_private_key
-                    .expect("Account key needed for safety rules"),
                 waypoint,
                 config.enable_cached_safety_data,
             )

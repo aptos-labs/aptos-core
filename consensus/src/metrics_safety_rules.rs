@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::persistent_liveness_storage::PersistentLivenessStorage;
-use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_crypto::bls12381;
 use aptos_logger::prelude::info;
 use aptos_metrics_core::monitor;
 use aptos_types::{
@@ -89,7 +89,7 @@ impl TSafetyRules for MetricsSafetyRules {
         monitor!("safety_rules", self.inner.initialize(proof))
     }
 
-    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<Ed25519Signature, Error> {
+    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<bls12381::Signature, Error> {
         self.retry(|inner| monitor!("safety_rules", inner.sign_proposal(block_data)))
     }
 
@@ -97,7 +97,7 @@ impl TSafetyRules for MetricsSafetyRules {
         &mut self,
         timeout: &TwoChainTimeout,
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
-    ) -> Result<Ed25519Signature, Error> {
+    ) -> Result<bls12381::Signature, Error> {
         self.retry(|inner| {
             monitor!(
                 "safety_rules",
@@ -123,7 +123,7 @@ impl TSafetyRules for MetricsSafetyRules {
         &mut self,
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
-    ) -> Result<Ed25519Signature, Error> {
+    ) -> Result<bls12381::Signature, Error> {
         self.retry(|inner| {
             monitor!(
                 "safety_rules",
@@ -136,7 +136,7 @@ impl TSafetyRules for MetricsSafetyRules {
 #[cfg(test)]
 mod tests {
     use crate::{metrics_safety_rules::MetricsSafetyRules, test_utils::EmptyStorage};
-    use aptos_crypto::ed25519::Ed25519Signature;
+    use aptos_crypto::bls12381;
     use aptos_types::{
         epoch_change::EpochChangeProof,
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -193,7 +193,7 @@ mod tests {
             self.last_init_result.clone()
         }
 
-        fn sign_proposal(&mut self, _: &BlockData) -> Result<Ed25519Signature, Error> {
+        fn sign_proposal(&mut self, _: &BlockData) -> Result<bls12381::Signature, Error> {
             unimplemented!()
         }
 
@@ -201,7 +201,7 @@ mod tests {
             &mut self,
             _: &TwoChainTimeout,
             _: Option<&TwoChainTimeoutCertificate>,
-        ) -> Result<Ed25519Signature, Error> {
+        ) -> Result<bls12381::Signature, Error> {
             unimplemented!()
         }
 
@@ -217,7 +217,7 @@ mod tests {
             &mut self,
             _: LedgerInfoWithSignatures,
             _: LedgerInfo,
-        ) -> Result<Ed25519Signature, Error> {
+        ) -> Result<bls12381::Signature, Error> {
             unimplemented!()
         }
     }

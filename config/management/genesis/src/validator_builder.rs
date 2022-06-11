@@ -14,12 +14,13 @@ use aptos_config::{
     network_id::NetworkId,
 };
 use aptos_crypto::{
+    bls12381,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     Uniform,
 };
 use aptos_global_constants::{
-    CONSENSUS_KEY, EXECUTION_KEY, FULLNODE_NETWORK_KEY, GENESIS_WAYPOINT, OPERATOR_ACCOUNT,
-    OPERATOR_KEY, OWNER_ACCOUNT, OWNER_KEY, SAFETY_DATA, VALIDATOR_NETWORK_KEY, WAYPOINT,
+    CONSENSUS_KEY, FULLNODE_NETWORK_KEY, GENESIS_WAYPOINT, OPERATOR_ACCOUNT, OPERATOR_KEY,
+    OWNER_ACCOUNT, OWNER_KEY, SAFETY_DATA, VALIDATOR_NETWORK_KEY, WAYPOINT,
 };
 use aptos_management::{
     storage::StorageWrapper, validator_config::build_validator_config_transaction,
@@ -32,7 +33,6 @@ use aptos_types::{
 };
 use consensus_types::safety_data::SafetyData;
 use std::{
-    convert::TryFrom,
     fs::File,
     io::Write,
     num::NonZeroUsize,
@@ -132,8 +132,7 @@ impl RootKeys {
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
-        let key = Ed25519PrivateKey::generate(&mut rng).to_bytes();
-        let root_key = Ed25519PrivateKey::try_from(key.as_ref()).unwrap();
+        let root_key = Ed25519PrivateKey::generate(&mut rng);
 
         Self { root_key }
     }
@@ -343,8 +342,7 @@ impl ValidatorBuilder {
         storage.set(OPERATOR_ACCOUNT, operator_address)?;
         storage.import_private_key(OPERATOR_KEY, operator_key)?;
 
-        storage.import_private_key(CONSENSUS_KEY, Ed25519PrivateKey::generate(&mut rng))?;
-        storage.import_private_key(EXECUTION_KEY, Ed25519PrivateKey::generate(&mut rng))?;
+        storage.set(CONSENSUS_KEY, bls12381::PrivateKey::generate(&mut rng))?;
         storage.import_private_key(FULLNODE_NETWORK_KEY, Ed25519PrivateKey::generate(&mut rng))?;
         storage.import_private_key(VALIDATOR_NETWORK_KEY, Ed25519PrivateKey::generate(&mut rng))?;
 

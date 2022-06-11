@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error::Error, safety_rules::next_round, SafetyRules};
-use aptos_crypto::{ed25519::Ed25519Signature, hash::CryptoHash, HashValue};
+use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
 use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfo};
 use consensus_types::{
     block::Block,
@@ -18,7 +18,7 @@ impl SafetyRules {
         &mut self,
         timeout: &TwoChainTimeout,
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
-    ) -> Result<Ed25519Signature, Error> {
+    ) -> Result<bls12381::Signature, Error> {
         self.signer()?;
         let mut safety_data = self.persistent_storage.safety_data()?;
         self.verify_epoch(timeout.epoch(), &safety_data)?;

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{counters, logging::LogEntry, ConsensusState, Error, SafetyRules, TSafetyRules};
-use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_crypto::bls12381;
 use aptos_infallible::RwLock;
 use aptos_types::{
     epoch_change::EpochChangeProof,
@@ -109,7 +109,7 @@ impl TSafetyRules for SerializerClient {
         serde_json::from_slice(&response)?
     }
 
-    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<Ed25519Signature, Error> {
+    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<bls12381::Signature, Error> {
         let _timer = counters::start_timer("external", LogEntry::SignProposal.as_str());
         let response =
             self.request(SafetyRulesInput::SignProposal(Box::new(block_data.clone())))?;
@@ -120,7 +120,7 @@ impl TSafetyRules for SerializerClient {
         &mut self,
         timeout: &TwoChainTimeout,
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
-    ) -> Result<Ed25519Signature, Error> {
+    ) -> Result<bls12381::Signature, Error> {
         let _timer = counters::start_timer("external", LogEntry::SignTimeoutWithQC.as_str());
         let response = self.request(SafetyRulesInput::SignTimeoutWithQC(
             Box::new(timeout.clone()),
@@ -147,7 +147,7 @@ impl TSafetyRules for SerializerClient {
         &mut self,
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
-    ) -> Result<Ed25519Signature, Error> {
+    ) -> Result<bls12381::Signature, Error> {
         let _timer = counters::start_timer("external", LogEntry::SignCommitVote.as_str());
         let response = self.request(SafetyRulesInput::SignCommitVote(
             Box::new(ledger_info),

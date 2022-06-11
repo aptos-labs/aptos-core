@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{test_utils, tests::suite, SafetyRules};
-use aptos_crypto::{ed25519::Ed25519PrivateKey, Uniform};
 use aptos_types::validator_signer::ValidatorSigner;
 
 #[test]
@@ -30,14 +29,6 @@ fn safety_rules(
             verify_vote_proposal_signature,
             export_consensus_key,
         ));
-        (
-            safety_rules,
-            signer,
-            if verify_vote_proposal_signature {
-                Some(Ed25519PrivateKey::generate_for_testing())
-            } else {
-                None
-            },
-        )
+        (safety_rules, signer)
     })
 }

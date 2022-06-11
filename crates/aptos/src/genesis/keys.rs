@@ -14,7 +14,7 @@ use crate::{
     CliCommand,
 };
 use aptos_config::{config::IdentityBlob, keys::ConfigKey};
-use aptos_crypto::{ed25519::Ed25519PrivateKey, x25519, PrivateKey};
+use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey};
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use async_trait::async_trait;
 use clap::Parser;
@@ -51,7 +51,7 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
         check_if_file_exists(vfn_file.as_path(), self.prompt_options)?;
 
         let account_key = ConfigKey::new(key::GenerateKey::generate_ed25519_in_memory());
-        let consensus_key = ConfigKey::new(key::GenerateKey::generate_ed25519_in_memory());
+        let consensus_key = ConfigKey::new(key::GenerateKey::generate_bls12381_in_memory());
         let validator_network_key = ConfigKey::new(key::GenerateKey::generate_x25519_in_memory()?);
         let full_node_network_key = ConfigKey::new(key::GenerateKey::generate_x25519_in_memory()?);
 
@@ -106,7 +106,7 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
 pub struct PrivateIdentity {
     account_address: AccountAddress,
     account_private_key: Ed25519PrivateKey,
-    consensus_private_key: Ed25519PrivateKey,
+    consensus_private_key: bls12381::PrivateKey,
     full_node_network_private_key: x25519::PrivateKey,
     validator_network_private_key: x25519::PrivateKey,
 }

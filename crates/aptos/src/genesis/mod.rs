@@ -19,7 +19,7 @@ use crate::{
     CliCommand, CliResult,
 };
 use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
-use aptos_crypto::{ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
+use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
 use aptos_temppath::TempPath;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId, transaction::Transaction};
 use aptos_vm::AptosVM;
@@ -173,7 +173,7 @@ fn get_config(client: &Client, user: &str) -> CliTypedResult<Validator> {
         .map_err(|_| CliError::UnexpectedError("account_address invalid".to_string()))?;
     let account_key = Ed25519PublicKey::from_encoded_string(&config.account_public_key)
         .map_err(|_| CliError::UnexpectedError("account_key invalid".to_string()))?;
-    let consensus_key = Ed25519PublicKey::from_encoded_string(&config.consensus_public_key)
+    let consensus_key = bls12381::PublicKey::from_encoded_string(&config.consensus_public_key)
         .map_err(|_| CliError::UnexpectedError("consensus_key invalid".to_string()))?;
     let validator_network_key =
         x25519::PublicKey::from_encoded_string(&config.validator_network_public_key)
