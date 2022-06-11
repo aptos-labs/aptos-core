@@ -37,6 +37,7 @@ aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 aptosdb = { path = "../../storage/aptosdb" }
 executor = { path = "../executor" }
 executor-types = { path = "../executor-types" }
+scratchpad = { path = "../../storage/scratchpad" }
 schemadb = { path = "../../storage/schemadb" }
 storage-client = { path = "../../storage/storage-client" }
 storage-interface = { path = "../../storage/storage-interface" }

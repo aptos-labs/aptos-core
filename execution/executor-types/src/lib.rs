@@ -86,7 +86,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
 pub struct StateSnapshotDelta {
     pub version: Version,
     pub smt: SparseMerkleTree<StateValue>,
-    pub value_sets: Vec<Vec<(HashValue, (HashValue, StateKey))>>,
+    pub jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
 }
 
 pub trait BlockExecutorTrait: Send + Sync {
@@ -112,11 +112,24 @@ pub trait BlockExecutorTrait: Send + Sync {
     /// and only `C` and `E` have signatures, we will send `A`, `B` and `C` in the first batch,
     /// then `D` and `E` later in the another batch.
     /// Commits a block and all its ancestors in a batch manner.
+    fn commit_blocks_ext(
+        &self,
+        block_ids: Vec<HashValue>,
+        ledger_info_with_sigs: LedgerInfoWithSignatures,
+        save_state_snapshots: bool,
+    ) -> Result<Option<StateSnapshotDelta>, Error>;
+
     fn commit_blocks(
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-    ) -> Result<Option<StateSnapshotDelta>, Error>;
+    ) -> Result<Option<StateSnapshotDelta>, Error> {
+        self.commit_blocks_ext(
+            block_ids,
+            ledger_info_with_sigs,
+            true, /* save_state_snapshots */
+        )
+    }
 }
 
 pub trait TransactionReplayer: Send {

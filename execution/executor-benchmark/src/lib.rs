@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod db_generator;
+pub mod state_committer;
 pub mod transaction_committer;
 pub mod transaction_executor;
 pub mod transaction_generator;
@@ -13,6 +14,7 @@ use crate::{
 use aptos_config::config::{NodeConfig, RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_logger::prelude::*;
 
+use crate::state_committer::StateCommitter;
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use executor::block_executor::BlockExecutor;
@@ -22,10 +24,10 @@ use std::{
     path::Path,
     sync::{mpsc, Arc},
 };
-use storage_interface::{DbReader, DbReaderWriter};
+use storage_interface::DbReaderWriter;
 
-pub fn init_db_and_executor(config: &NodeConfig) -> (Arc<dyn DbReader>, BlockExecutor<AptosVM>) {
-    let (db, dbrw) = DbReaderWriter::wrap(
+pub fn init_db_and_executor(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<AptosVM>) {
+    let db = DbReaderWriter::new(
         AptosDB::open(
             &config.storage.dir(),
             false,                       /* readonly */
@@ -35,7 +37,7 @@ pub fn init_db_and_executor(config: &NodeConfig) -> (Arc<dyn DbReader>, BlockExe
         .expect("DB should open."),
     );
 
-    let executor = BlockExecutor::new(dbrw);
+    let executor = BlockExecutor::new(db.clone());
 
     (db, executor)
 }
@@ -68,13 +70,15 @@ pub fn run_benchmark(
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
 
     let (db, executor) = init_db_and_executor(&config);
-    let start_version = db.get_latest_version().unwrap();
+    let start_version = db.reader.get_latest_version().unwrap();
     let parent_block_id = executor.committed_block_id();
+    let base_smt = executor.root_smt();
     let executor_1 = Arc::new(executor);
     let executor_2 = executor_1.clone();
 
     let (block_sender, block_receiver) = mpsc::sync_channel(50 /* bound */);
     let (commit_sender, commit_receiver) = mpsc::sync_channel(3 /* bound */);
+    let (state_commit_sender, state_commit_receiver) = mpsc::sync_channel(100 /* bound */);
 
     let mut generator = TransactionGenerator::new_with_existing_db(
         genesis_key,
@@ -110,8 +114,20 @@ pub fn run_benchmark(
     let commit_thread = std::thread::Builder::new()
         .name("txn_committer".to_string())
         .spawn(move || {
-            let mut committer =
-                TransactionCommitter::new(executor_2, start_version, commit_receiver);
+            let mut committer = TransactionCommitter::new(
+                executor_2,
+                start_version,
+                commit_receiver,
+                state_commit_sender,
+            );
+            committer.run();
+        })
+        .expect("Failed to spawn transaction committer thread.");
+    let db_writer = db.writer.clone();
+    let state_commit_thread = std::thread::Builder::new()
+        .name("state_committer".to_string())
+        .spawn(|| {
+            let committer = StateCommitter::new(state_commit_receiver, db_writer, base_smt);
             committer.run();
         })
         .expect("Failed to spawn transaction committer thread.");
@@ -122,10 +138,11 @@ pub fn run_benchmark(
     // Wait until all transactions are committed.
     exe_thread.join().unwrap();
     commit_thread.join().unwrap();
+    state_commit_thread.join().unwrap();
 
     // Do a sanity check on the sequence number to make sure all transactions are committed.
     if verify_sequence_numbers {
-        generator.verify_sequence_numbers(db.clone());
+        generator.verify_sequence_numbers(db.reader);
     }
 }
 

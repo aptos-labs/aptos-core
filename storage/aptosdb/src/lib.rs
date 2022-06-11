@@ -94,8 +94,8 @@ use std::{
     time::{Duration, Instant},
 };
 use storage_interface::{
-    jmt_update_ref_sets, jmt_update_sets, DbReader, DbWriter, Order, StartupInfo,
-    StateSnapshotReceiver, TreeState,
+    jmt_update_refs, jmt_updates, DbReader, DbWriter, Order, StartupInfo, StateSnapshotReceiver,
+    TreeState,
 };
 
 pub const LEDGER_DB_NAME: &str = "ledger_db";
@@ -1244,14 +1244,11 @@ impl DbWriter for AptosDB {
         version: Version,
     ) -> Result<()> {
         gauged_api("save_state_snapshot", || {
-            let jmt_updates = vec![jmt_updates];
-            let jmt_updates_ref = jmt_update_ref_sets(&jmt_updates);
-
             let mut cs = ChangeSet::new();
             let root_hash = *self
                 .state_store
                 .merklize_value_sets(
-                    jmt_updates_ref,
+                    vec![jmt_update_refs(&jmt_updates)],
                     node_hashes.map(|hashes| vec![hashes]),
                     version,
                     &mut cs,
@@ -1268,11 +1265,12 @@ impl DbWriter for AptosDB {
     /// it carries is generated after the `txns_to_commit` are applied.
     /// Note that even if `txns_to_commit` is empty, `frist_version` is checked to be
     /// `ledger_info_with_sigs.ledger_info.version + 1` if `ledger_info_with_sigs` is not `None`.
-    fn save_transactions(
+    fn save_transactions_ext(
         &self,
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        save_state_snapshots: bool,
     ) -> Result<()> {
         gauged_api("save_transactions", || {
             let num_txns = txns_to_commit.len() as u64;
@@ -1300,26 +1298,26 @@ impl DbWriter for AptosDB {
             let new_root_hash =
                 self.save_transactions_impl(txns_to_commit, first_version, &mut cs)?;
 
-            // find all the checkpoint versions
-            for (idx, value_set, jf_node_hashes) in txns_to_commit
-                .iter()
-                .enumerate()
-                .filter(|(_idx, txn_to_commit)| !txn_to_commit.state_updates().is_empty())
-                .map(|(idx, txn_to_commit)| {
-                    (
-                        idx,
-                        jmt_update_sets(vec![txn_to_commit.state_updates()].as_slice())
-                            .pop()
-                            .unwrap(),
-                        txn_to_commit.jf_node_hashes(),
-                    )
-                })
-            {
-                self.save_state_snapshot(
-                    value_set,
-                    jf_node_hashes,
-                    first_version + idx as LeafCount,
-                )?;
+            if save_state_snapshots {
+                // find all the checkpoint versions
+                for (idx, jmt_updates, jf_node_hashes) in txns_to_commit
+                    .iter()
+                    .enumerate()
+                    .filter(|(_idx, txn_to_commit)| !txn_to_commit.state_updates().is_empty())
+                    .map(|(idx, txn_to_commit)| {
+                        (
+                            idx,
+                            jmt_updates(txn_to_commit.state_updates()),
+                            txn_to_commit.jf_node_hashes(),
+                        )
+                    })
+                {
+                    self.save_state_snapshot(
+                        jmt_updates,
+                        jf_node_hashes,
+                        first_version + idx as LeafCount,
+                    )?;
+                }
             }
 
             // If expected ledger info is provided, verify result root hash and save the ledger info.

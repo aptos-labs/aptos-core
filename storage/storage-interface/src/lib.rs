@@ -655,13 +655,28 @@ pub trait DbWriter: Send + Sync {
     /// See [`AptosDB::save_transactions`].
     ///
     /// [`AptosDB::save_transactions`]: ../aptosdb/struct.AptosDB.html#method.save_transactions
+    fn save_transactions_ext(
+        &self,
+        txns_to_commit: &[TransactionToCommit],
+        first_version: Version,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        save_state_snapshots: bool,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
     fn save_transactions(
         &self,
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
-        unimplemented!()
+        self.save_transactions_ext(
+            txns_to_commit,
+            first_version,
+            ledger_info_with_sigs,
+            true, /* save_state_snapshots */
+        )
     }
 
     /// Persists merklized states as authenticated state checkpoint.
@@ -759,25 +774,17 @@ impl SaveTransactionsRequest {
     }
 }
 
-pub fn jmt_update_sets(
-    state_update_sets: &[&HashMap<StateKey, StateValue>],
-) -> Vec<Vec<(HashValue, (HashValue, StateKey))>> {
-    state_update_sets
+pub fn jmt_updates(
+    state_updates: &HashMap<StateKey, StateValue>,
+) -> Vec<(HashValue, (HashValue, StateKey))> {
+    state_updates
         .iter()
-        .map(|updates| {
-            updates
-                .iter()
-                .map(|(k, v)| (k.hash(), (v.hash(), k.clone())))
-                .collect()
-        })
+        .map(|(k, v)| (k.hash(), (v.hash(), k.clone())))
         .collect()
 }
 
-pub fn jmt_update_ref_sets(
-    jmt_update_sets: &[Vec<(HashValue, (HashValue, StateKey))>],
-) -> Vec<Vec<(HashValue, &(HashValue, StateKey))>> {
-    jmt_update_sets
-        .iter()
-        .map(|vec| vec.iter().map(|(x, y)| (*x, y)).collect())
-        .collect()
+pub fn jmt_update_refs(
+    jmt_updates: &[(HashValue, (HashValue, StateKey))],
+) -> Vec<(HashValue, &(HashValue, StateKey))> {
+    jmt_updates.iter().map(|(x, y)| (*x, y)).collect()
 }

@@ -2994,6 +2994,7 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "schemadb",
+ "scratchpad",
  "serde 1.0.137",
  "storage-client",
  "storage-interface",
