@@ -151,7 +151,7 @@ impl NetworkConfig {
             }
             Identity::FromFile(config) => {
                 let identity_blob: IdentityBlob = IdentityBlob::from_file(&config.path).unwrap();
-                Some(identity_blob.network_key)
+                Some(identity_blob.network_private_key)
             }
             Identity::None => None,
         };
@@ -225,7 +225,7 @@ impl NetworkConfig {
                     Some(address)
                 } else {
                     Some(from_identity_public_key(
-                        identity_blob.network_key.public_key(),
+                        identity_blob.network_private_key.public_key(),
                     ))
                 }
             }

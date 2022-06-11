@@ -56,16 +56,16 @@ pub struct ValidatorConfiguration {
     /// Account address
     pub account_address: AccountAddress,
     /// Key used for signing in consensus
-    pub consensus_key: Ed25519PublicKey,
+    pub consensus_public_key: Ed25519PublicKey,
     /// Key used for signing transactions with the account
-    pub account_key: Ed25519PublicKey,
+    pub account_public_key: Ed25519PublicKey,
     /// Public key used for validator network identity (same as account address)
-    pub validator_network_key: x25519::PublicKey,
+    pub validator_network_public_key: x25519::PublicKey,
     /// Host for validator which can be an IP or a DNS name
     pub validator_host: HostAndPort,
     /// Public key used for full node network identity (same as account address)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub full_node_network_key: Option<x25519::PublicKey>,
+    pub full_node_network_public_key: Option<x25519::PublicKey>,
     /// Host for full node which can be an IP or a DNS name and is optional
     #[serde(skip_serializing_if = "Option::is_none")]
     pub full_node_host: Option<HostAndPort>,
@@ -79,15 +79,15 @@ pub struct StringValidatorConfiguration {
     /// Account address
     pub account_address: String,
     /// Key used for signing in consensus
-    pub consensus_key: String,
+    pub consensus_public_key: String,
     /// Key used for signing transactions with the account
-    pub account_key: String,
+    pub account_public_key: String,
     /// Public key used for validator network identity (same as account address)
-    pub validator_network_key: String,
+    pub validator_network_public_key: String,
     /// Host for validator which can be an IP or a DNS name
     pub validator_host: HostAndPort,
     /// Public key used for full node network identity (same as account address)
-    pub full_node_network_key: Option<String>,
+    pub full_node_network_public_key: Option<String>,
     /// Host for full node which can be an IP or a DNS name and is optional
     pub full_node_host: Option<HostAndPort>,
     /// Stake amount for consensus
@@ -98,13 +98,13 @@ impl TryFrom<ValidatorConfiguration> for Validator {
     type Error = CliError;
 
     fn try_from(config: ValidatorConfiguration) -> Result<Self, CliError> {
-        let auth_key = AuthenticationKey::ed25519(&config.account_key);
+        let auth_key = AuthenticationKey::ed25519(&config.account_public_key);
         let validator_addresses = vec![config
             .validator_host
-            .as_network_address(config.validator_network_key)
+            .as_network_address(config.validator_network_public_key)
             .unwrap()];
         let full_node_addresses = if let Some(full_node_host) = config.full_node_host {
-            if let Some(full_node_network_key) = config.full_node_network_key {
+            if let Some(full_node_network_key) = config.full_node_network_public_key {
                 vec![full_node_host
                     .as_network_address(full_node_network_key)
                     .unwrap()]
@@ -126,7 +126,7 @@ impl TryFrom<ValidatorConfiguration> for Validator {
         }
         Ok(Validator {
             address: derived_address,
-            consensus_pubkey: config.consensus_key.to_bytes().to_vec(),
+            consensus_pubkey: config.consensus_public_key.to_bytes().to_vec(),
             operator_address: auth_key.derived_address(),
             network_address: bcs::to_bytes(&validator_addresses).unwrap(),
             full_node_network_address: bcs::to_bytes(&full_node_addresses).unwrap(),

@@ -170,12 +170,12 @@ pub struct IdentityBlob {
     pub account_address: Option<AccountAddress>,
     /// Optional account key.  Only used for validators
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub account_key: Option<Ed25519PrivateKey>,
+    pub account_private_key: Option<Ed25519PrivateKey>,
     /// Optional consensus key.  Only used for validators
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub consensus_key: Option<Ed25519PrivateKey>,
+    pub consensus_private_key: Option<Ed25519PrivateKey>,
     /// Network private key.  Peer id is derived from this if account address is not present
-    pub network_key: x25519::PrivateKey,
+    pub network_private_key: x25519::PrivateKey,
 }
 
 impl IdentityBlob {
