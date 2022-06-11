@@ -204,11 +204,13 @@ impl NetworkBuilder {
             config.outbound_rate_limit_config,
         );
 
+        /*
         network_builder.add_connection_monitoring(
             config.ping_interval_ms,
             config.ping_timeout_ms,
             config.ping_failures_tolerated,
         );
+        */
 
         // Always add a connectivity manager to keep track of known peers
         let seeds = merge_seeds(config);
