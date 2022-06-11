@@ -57,10 +57,8 @@ jobs:
       - build-os-x-binary
     runs-on: ubuntu-latest
     permissions:
-      id-token: "write"
       contents: "write"
-      packages: "write"
-      pull-requests: "read" 
+      pull-requests: "read"
     steps:
       - name: Download prebuilt binaries
         uses: actions/download-artifact@v3
