@@ -56,12 +56,16 @@ jobs:
       - build-linux-binary
       - build-os-x-binary
     runs-on: ubuntu-latest
+    permissions:
+      id-token: "write"
+      contents: "write"
+      packages: "write"
+      pull-requests: "read" 
     steps:
       - name: Download prebuilt binaries
         uses: actions/download-artifact@v3
         with:
           name: cli-builds
-
       - name: Create GitHub Release
         uses: "marvinpinto/action-automatic-releases@v1.2.1"
         with:
