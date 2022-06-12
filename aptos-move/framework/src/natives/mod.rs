@@ -12,6 +12,7 @@ use move_deps::{
 };
 
 pub mod cost {
+    pub const APTOS_CREATE_ADDRESS: u64 = 5;
     pub const APTOS_LIB_TYPE_OF: u64 = 10;
     pub const APTOS_SIP_HASH: u64 = 10;
 }
@@ -19,10 +20,13 @@ pub mod cost {
 pub mod status {
     // Failure in parsing a struct type tag
     pub const NFE_EXPECTED_STRUCT_TYPE_TAG: u64 = 0x1;
+    // Failure in address parsing (likely no correct length)
+    pub const NFE_UNABLE_TO_PARSE_ADDRESS: u64 = 0x2;
 }
 
 pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
     const NATIVES: &[(&str, &str, NativeFunction)] = &[
+        ("Account", "create_address", account::native_create_address),
         ("Account", "create_signer", account::native_create_signer),
         (
             "Signature",

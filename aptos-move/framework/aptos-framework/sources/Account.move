@@ -1,6 +1,7 @@
 module AptosFramework::Account {
     use Std::BCS;
     use Std::Errors;
+    use Std::GUID;
     use Std::Hash;
     use Std::Signer;
     use Std::Vector;
@@ -70,6 +71,7 @@ module AptosFramework::Account {
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1011;
     const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1012;
 
+    native fun create_address(bytes: vector<u8>): address;
     native fun create_signer(addr: address): signer;
 
     public fun initialize(account: &signer,
@@ -339,7 +341,7 @@ module AptosFramework::Account {
     }
 
     ///////////////////////////////////////////////////////////////////////////
-    /// Basic account creation method.
+    /// Basic account creation methods.
     ///////////////////////////////////////////////////////////////////////////
 
     public(script) fun create_account(auth_key: address) {
@@ -347,9 +349,28 @@ module AptosFramework::Account {
         Coin::register<TestCoin>(&signer);
     }
 
+    public fun create_module_account(source: &signer): signer {
+        let guid = GUID::create(source);
+        let bytes = BCS::to_bytes(&guid);
+        Vector::append(&mut bytes, BCS::to_bytes(&Timestamp::now_microseconds()));
+        let addr = create_address(Hash::sha3_256(bytes));
+        create_account_internal(addr)
+    }
+
     /// Create the account for @AptosFramework to help module upgrades on testnet.
     public(friend) fun create_core_framework_account(): signer {
         Timestamp::assert_genesis();
         create_account_unchecked(@AptosFramework)
+    }
+
+    #[test(core_resources = @CoreResources, user = @0x1)]
+    public(script) fun test_create_module_account(
+        core_resources: signer,
+        user: signer,
+    ) {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        let module_account = create_module_account(&user);
+        assert!(Signer::address_of(&module_account) != Signer::address_of(&user), 0);
+        Coin::register<TestCoin>(&module_account);
     }
 }
