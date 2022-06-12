@@ -4,23 +4,27 @@ on:
 
 jobs:
   coverage:
-    runs-on: ubuntu-latest
-    env:
-      CARGO_TERM_COLOR: always
+    runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
+      - uses: ./.github/actions/rust-setup
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
           override: true
-          components: llvm-tools-preview
-      - uses: taiki-e/install-action@cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      # There's an issue with argument forwarding in `llvm-cov` that requires us to place `nextest` at the end.
-      - run: cargo llvm-cov nextest
+      - uses: actions-rs/cargo@v1
+        with:
+          command: nextest
+          args: --nextest-profile ci --partition hash:1/1 --unit --exclude backup-cli --build-jobs 4
         env:
+          CARGO_INCREMENTAL: '0'
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+          RUSTFLAGS: '-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off'
+          RUSTDOCFLAGS: '-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off'
+      - uses: actions-rs/grcov@v0.1
+        id: coverage
       - uses: codecov/codecov-action@v3
         with:
-          files: lcov.info
+          file: ${{ steps.coverage.outputs.report }}
           fail_ci_if_error: false
