@@ -116,12 +116,14 @@ pub fn run(
 
     // Wait for generator to finish.
     let mut generator = gen_thread.join().unwrap();
+    println!("Finishing up...");
     generator.drop_sender();
     // Wait until all transactions are committed.
     exe_thread.join().unwrap();
     commit_thread.join().unwrap();
     state_commit_thread.join().unwrap();
     if verify_sequence_numbers {
+        println!("Verifying sequence numbers...");
         // Do a sanity check on the sequence number to make sure all transactions are committed.
         generator.verify_sequence_numbers(db.clone());
     }

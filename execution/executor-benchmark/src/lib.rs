@@ -11,7 +11,9 @@ use crate::{
     transaction_committer::TransactionCommitter, transaction_executor::TransactionExecutor,
     transaction_generator::TransactionGenerator,
 };
-use aptos_config::config::{NodeConfig, RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
+use aptos_config::config::{
+    NodeConfig, RocksdbConfig, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG,
+};
 use aptos_logger::prelude::*;
 
 use crate::state_committer::StateCommitter;
@@ -49,6 +51,7 @@ pub fn run_benchmark(
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
     verify_sequence_numbers: bool,
+    pruner_config: StoragePrunerConfig,
 ) {
     // Create rocksdb checkpoint.
     if checkpoint_dir.as_ref().exists() {
@@ -68,6 +71,7 @@ pub fn run_benchmark(
 
     let (mut config, genesis_key) = aptos_genesis_tool::test_config();
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
+    config.storage.storage_pruner_config = pruner_config;
 
     let (db, executor) = init_db_and_executor(&config);
     let start_version = db.reader.get_latest_version().unwrap();
@@ -171,6 +175,7 @@ mod tests {
             storage_dir.as_ref(),
             checkpoint_dir,
             true,
+            NO_OP_STORAGE_PRUNER_CONFIG,
         );
     }
 }
