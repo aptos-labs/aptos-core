@@ -22,6 +22,7 @@ module AptosFramework::Stake {
     use Std::Signer;
     use Std::Vector;
     use AptosFramework::Coin::{Self, Coin, MintCapability};
+    use AptosFramework::Comparator;
     use AptosFramework::SystemAddresses;
     use AptosFramework::Timestamp;
     use AptosFramework::TestCoin::TestCoin;
@@ -456,7 +457,31 @@ module AptosFramework::Stake {
             };
             i = i + 1;
         };
+
+        sort_validators(&mut active_validators);
         validator_set.active_validators = active_validators;
+    }
+
+    fun sort_validators(validators: &mut vector<ValidatorInfo>) {
+        let length = Vector::length(validators);
+        if (length == 0) {
+            return
+        };
+
+        let ordered = false;
+        while (!ordered) {
+            ordered = true;
+            let idx = 0;
+            while (idx < length - 1) {
+                let left = Vector::borrow(validators, idx);
+                let right = Vector::borrow(validators, idx + 1);
+                if (Comparator::is_greater_than(&Comparator::compare(left, right))) {
+                    ordered = false;
+                    Vector::swap(validators, idx, idx + 1);
+                };
+                idx = idx + 1;
+            }
+        }
     }
 
     /// Update individual validator's stake pool
@@ -520,32 +545,24 @@ module AptosFramework::Stake {
         assert!(current_time + MINIMUM_LOCK_PERIOD < locked_until_secs, Errors::invalid_argument(ELOCK_TIME_TOO_SHORT));
     }
 
+    #[test_only]
+    use AptosFramework::TestCoin;
+
     #[test(core_framework = @0x1, core_resources = @CoreResources, validator = @0x123)]
     public(script) fun test_basic_staking(
         core_framework: signer,
         core_resources: signer,
         validator: signer,
     ) acquires OwnerCapability, StakePool, TestCoinCapabilities, ValidatorConfig, ValidatorSet {
-        use AptosFramework::TestCoin;
-
         Timestamp::set_time_has_started_for_testing(&core_resources);
 
         initialize_validator_set(&core_resources, 100, 10000);
 
         let validator_address = Signer::address_of(&validator);
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
-        Coin::register<TestCoin>(&validator);
-        Coin::deposit<TestCoin>(validator_address, Coin::mint<TestCoin>(1000, &mint_cap));
+        register_mint_stake(&validator, &mint_cap);
         store_test_coin_mint_cap(&core_resources, mint_cap);
         Coin::destroy_burn_cap<TestCoin>(burn_cap);
-
-        register_validator_candidate(&validator, Vector::empty(), Vector::empty(), Vector::empty());
-
-        // Add stake when the validator is not yet activated.
-        add_stake(&validator, 100);
-        increase_lockup(&validator, 100000);
-        assert!(Coin::balance<TestCoin>(validator_address) == 900, 0);
-        assert_stake_pool(validator_address, 100, 0, 0, 0);
 
         // Join the validator set with enough stake.
         join_validator_set(&validator, validator_address);
@@ -580,8 +597,6 @@ module AptosFramework::Stake {
         core_resources: signer,
         validator: signer,
     ) acquires OwnerCapability, StakePool, TestCoinCapabilities, ValidatorConfig, ValidatorSet {
-        use AptosFramework::TestCoin;
-
         Timestamp::set_time_has_started_for_testing(&core_resources);
 
         initialize_validator_set(&core_resources, 100, 10000);
@@ -632,8 +647,6 @@ module AptosFramework::Stake {
         validator_2: signer,
         validator_3: signer
     ) acquires OwnerCapability, StakePool, TestCoinCapabilities, ValidatorConfig, ValidatorSet {
-        use AptosFramework::TestCoin;
-
         Timestamp::set_time_has_started_for_testing(&core_resources);
         let validator_1_address = Signer::address_of(&validator_1);
         let validator_2_address = Signer::address_of(&validator_2);
@@ -642,28 +655,11 @@ module AptosFramework::Stake {
         initialize_validator_set(&core_resources, 100, 10000);
 
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
-        Coin::register<TestCoin>(&validator_1);
-        Coin::register<TestCoin>(&validator_2);
-        Coin::register<TestCoin>(&validator_3);
-        Coin::deposit<TestCoin>(validator_1_address, Coin::mint<TestCoin>(1000, &mint_cap));
-        Coin::deposit<TestCoin>(validator_2_address, Coin::mint<TestCoin>(1000, &mint_cap));
-        Coin::deposit<TestCoin>(validator_3_address, Coin::mint<TestCoin>(1000, &mint_cap));
+        register_mint_stake(&validator_1, &mint_cap);
+        register_mint_stake(&validator_2, &mint_cap);
+        register_mint_stake(&validator_3, &mint_cap);
         store_test_coin_mint_cap(&core_resources, mint_cap);
         Coin::destroy_burn_cap<TestCoin>(burn_cap);
-
-        // Register and add stake for all 3 validators.
-        register_validator_candidate(&validator_1, Vector::empty(), Vector::empty(), Vector::empty());
-        register_validator_candidate(&validator_2, Vector::empty(), Vector::empty(), Vector::empty());
-        register_validator_candidate(&validator_3, Vector::empty(), Vector::empty(), Vector::empty());
-        add_stake(&validator_1, 100);
-        increase_lockup(&validator_1, 100000);
-        add_stake(&validator_2, 100);
-        increase_lockup(&validator_2, 100000);
-        add_stake(&validator_3, 100);
-        increase_lockup(&validator_3, 100000);
-        assert_stake_pool(validator_1_address, 100, 0, 0, 0);
-        assert_stake_pool(validator_2_address, 100, 0, 0, 0);
-        assert_stake_pool(validator_3_address, 100, 0, 0, 0);
 
         // Validator 1 and 2 join the validator set.
         join_validator_set(&validator_1, validator_1_address);
@@ -694,6 +690,93 @@ module AptosFramework::Stake {
         unlock(&validator_1, 50);
         on_new_epoch();
         assert!(!is_current_validator(validator_1_address), 6);
+    }
+
+    #[test(
+        core_framework = @0x1,
+        core_resources = @CoreResources,
+        validator_1 = @0x1,
+        validator_2 = @0x2,
+        validator_3 = @0x3,
+        validator_4 = @0x4,
+        validator_5 = @0x5
+    )]
+    public(script) fun test_validator_order(
+        core_framework: signer,
+        core_resources: signer,
+        validator_1: signer,
+        validator_2: signer,
+        validator_3: signer,
+        validator_4: signer,
+        validator_5: signer,
+    ) acquires OwnerCapability, StakePool, TestCoinCapabilities, ValidatorConfig, ValidatorSet {
+        let v1_addr = Signer::address_of(&validator_1);
+        let v2_addr = Signer::address_of(&validator_2);
+        let v3_addr = Signer::address_of(&validator_3);
+        let v4_addr = Signer::address_of(&validator_4);
+        let v5_addr = Signer::address_of(&validator_5);
+
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        initialize_validator_set(&core_resources, 100, 10000);
+
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator_1, &mint_cap);
+        register_mint_stake(&validator_2, &mint_cap);
+        register_mint_stake(&validator_3, &mint_cap);
+        register_mint_stake(&validator_4, &mint_cap);
+        register_mint_stake(&validator_5, &mint_cap);
+
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+
+        join_validator_set(&validator_3, v3_addr);
+        on_new_epoch();
+        assert!(validator_index(v3_addr) == 0, 0);
+
+        join_validator_set(&validator_4, v4_addr);
+        on_new_epoch();
+        assert!(validator_index(v3_addr) == 0, 1);
+        assert!(validator_index(v4_addr) == 1, 2);
+
+        join_validator_set(&validator_1, v1_addr);
+        on_new_epoch();
+        assert!(validator_index(v1_addr) == 0, 3);
+        assert!(validator_index(v3_addr) == 1, 4);
+        assert!(validator_index(v4_addr) == 2, 5);
+
+        join_validator_set(&validator_2, v2_addr);
+        on_new_epoch();
+        assert!(validator_index(v1_addr) == 0, 6);
+        assert!(validator_index(v2_addr) == 1, 7);
+        assert!(validator_index(v3_addr) == 2, 8);
+        assert!(validator_index(v4_addr) == 3, 9);
+
+        join_validator_set(&validator_5, v5_addr);
+        on_new_epoch();
+        assert!(validator_index(v1_addr) == 0, 10);
+        assert!(validator_index(v2_addr) == 1, 11);
+        assert!(validator_index(v3_addr) == 2, 12);
+        assert!(validator_index(v4_addr) == 3, 13);
+        assert!(validator_index(v5_addr) == 4, 14);
+    }
+
+    #[test_only]
+    public(script) fun register_mint_stake(
+        account: &signer,
+        mint_cap: &MintCapability<TestCoin>,
+    ) acquires OwnerCapability, StakePool, ValidatorSet {
+        Coin::register<TestCoin>(account);
+        Coin::deposit<TestCoin>(Signer::address_of(account), Coin::mint<TestCoin>(1000, mint_cap));
+        register_validator_candidate(account, Vector::empty(), Vector::empty(), Vector::empty());
+        add_stake(account, 100);
+        increase_lockup(account, 100000);
+        assert_stake_pool(Signer::address_of(account), 100, 0, 0, 0);
+    }
+
+    #[test_only]
+    fun validator_index(addr: address): u64 acquires ValidatorSet {
+        let validator_set = borrow_global<ValidatorSet>(@CoreResources);
+        Option::extract(&mut find_validator(&validator_set.active_validators, addr))
     }
 
     #[test_only]

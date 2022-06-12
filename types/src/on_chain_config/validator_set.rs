@@ -45,6 +45,9 @@ impl fmt::Display for ValidatorSet {
 impl ValidatorSet {
     /// Constructs a ValidatorSet resource.
     pub fn new(payload: Vec<ValidatorInfo>) -> Self {
+        // This is an invariant that should be maintained by the Aptos Framework
+        debug_assert!(Self::ordered_validators(&payload));
+
         Self {
             scheme: ConsensusScheme::Ed25519,
             minimum_stake: 0,
@@ -63,6 +66,22 @@ impl ValidatorSet {
 
     pub fn empty() -> Self {
         ValidatorSet::new(Vec::new())
+    }
+
+    fn ordered_validators(payload: &[ValidatorInfo]) -> bool {
+        if payload.is_empty() {
+            return true;
+        }
+        let mut left = payload[0].account_address();
+        for current in payload.iter().skip(1) {
+            let right = current.account_address();
+            if right < left {
+                return false;
+            }
+            left = right;
+        }
+
+        true
     }
 }
 

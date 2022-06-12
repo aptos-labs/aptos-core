@@ -50,6 +50,12 @@ pub fn validator_swarm(
         network.seeds = seeds.clone();
     }
 
+    nodes.sort_by(|a, b| {
+        let a_addr = a.consensus.safety_rules.test.as_ref().unwrap().author;
+        let b_addr = b.consensus.safety_rules.test.as_ref().unwrap().author;
+        a_addr.cmp(&b_addr)
+    });
+
     ValidatorSwarm { nodes }
 }
 
