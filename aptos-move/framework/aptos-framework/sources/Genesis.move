@@ -122,7 +122,7 @@ module AptosFramework::Genesis {
 
     /// Sets up the initial validator set for the network.
     /// The validator "owner" accounts, and their authentication
-    /// keys are encoded in the `owners` and `owner_auth_key` vectors.
+    /// Addresses (and keys) are encoded in the `owners`
     /// Each validator signs consensus messages with the private key corresponding to the Ed25519
     /// public key in `consensus_pubkeys`.
     /// Finally, each validator must specify the network address
@@ -130,17 +130,13 @@ module AptosFramework::Genesis {
     public(script) fun create_initialize_validators(
         core_resource_account: signer,
         owners: vector<address>,
-        owner_auth_keys: vector<vector<u8>>,
         consensus_pubkeys: vector<vector<u8>>,
         validator_network_addresses: vector<vector<u8>>,
         full_node_network_addresses: vector<vector<u8>>,
         staking_distribution: vector<u64>,
     ) {
         let num_owners = Vector::length(&owners);
-        let num_owner_keys = Vector::length(&owner_auth_keys);
-        assert!(num_owners == num_owner_keys, 0);
         let num_validator_network_addresses = Vector::length(&validator_network_addresses);
-        assert!(num_owner_keys == num_validator_network_addresses, 0);
         let num_full_node_network_addresses = Vector::length(&full_node_network_addresses);
         assert!(num_validator_network_addresses == num_full_node_network_addresses, 0);
         let num_staking = Vector::length(&staking_distribution);
@@ -150,10 +146,7 @@ module AptosFramework::Genesis {
         while (i < num_owners) {
             let owner = Vector::borrow(&owners, i);
             // create each validator account and rotate its auth key to the correct value
-            let (owner_account, _) = Account::create_account_internal(*owner);
-
-            let owner_auth_key = *Vector::borrow(&owner_auth_keys, i);
-            Account::rotate_authentication_key_internal(&owner_account, owner_auth_key);
+            let owner_account = Account::create_account_internal(*owner);
 
             // use the operator account set up the validator config
             let validator_network_address = *Vector::borrow(&validator_network_addresses, i);

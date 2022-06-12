@@ -130,8 +130,6 @@ impl TryFrom<ValidatorConfiguration> for Validator {
             operator_address: auth_key.derived_address(),
             network_address: bcs::to_bytes(&validator_addresses).unwrap(),
             full_node_network_address: bcs::to_bytes(&full_node_addresses).unwrap(),
-            operator_auth_key: auth_key,
-            auth_key,
             stake_amount: config.stake_amount,
         })
     }

@@ -229,7 +229,6 @@ fn create_and_initialize_validators(
 ) {
     let aptos_root_address = account_config::aptos_root_address();
     let mut owners = vec![];
-    let mut owner_auth_keys = vec![];
     let mut consensus_pubkeys = vec![];
     let mut validator_network_addresses = vec![];
     let mut full_node_network_addresses = vec![];
@@ -237,7 +236,6 @@ fn create_and_initialize_validators(
 
     for v in validators {
         owners.push(MoveValue::Address(v.address));
-        owner_auth_keys.push(MoveValue::vector_u8(v.auth_key.to_vec()));
         consensus_pubkeys.push(MoveValue::vector_u8(v.consensus_pubkey.clone()));
         validator_network_addresses.push(MoveValue::vector_u8(v.network_address.clone()));
         full_node_network_addresses.push(MoveValue::vector_u8(v.full_node_network_address.clone()));
@@ -251,7 +249,6 @@ fn create_and_initialize_validators(
         serialize_values(&vec![
             MoveValue::Signer(aptos_root_address),
             MoveValue::Vector(owners),
-            MoveValue::Vector(owner_auth_keys),
             MoveValue::Vector(consensus_pubkeys),
             MoveValue::Vector(validator_network_addresses),
             MoveValue::Vector(full_node_network_addresses),
@@ -352,15 +349,11 @@ pub fn test_genesis_change_set_and_validators(
 pub struct Validator {
     /// The Aptos account address of the validator
     pub address: AccountAddress,
-    /// Authentication key for the validator
-    pub auth_key: AuthenticationKey,
     /// Ed25519 public key used to sign consensus messages
     pub consensus_pubkey: Vec<u8>,
     /// The Aptos account address of the validator's operator (same as `address` if the validator is
     /// its own operator)
     pub operator_address: AccountAddress,
-    /// Authentication key for the operator
-    pub operator_auth_key: AuthenticationKey,
     /// `NetworkAddress` for the validator
     pub network_address: Vec<u8>,
     /// `NetworkAddress` for the validator's full node
@@ -378,27 +371,22 @@ impl TestValidator {
     pub fn new_test_set(count: Option<usize>) -> Vec<TestValidator> {
         let mut rng: rand::rngs::StdRng = rand::SeedableRng::from_seed([1u8; 32]);
         (0..count.unwrap_or(10))
-            .map(|idx| TestValidator::gen(idx, &mut rng))
+            .map(|_| TestValidator::gen(&mut rng))
             .collect()
     }
 
-    fn gen(index: usize, rng: &mut rand::rngs::StdRng) -> TestValidator {
-        let name = index.to_string().as_bytes().to_vec();
-        let address = aptos_config::utils::validator_owner_account_from_name(&name);
+    fn gen(rng: &mut rand::rngs::StdRng) -> TestValidator {
         let key = Ed25519PrivateKey::generate(rng);
         let auth_key = AuthenticationKey::ed25519(&key.public_key());
+        let address = auth_key.derived_address();
         let consensus_pubkey = key.public_key().to_bytes().to_vec();
-        let operator_auth_key = auth_key;
-        let operator_address = operator_auth_key.derived_address();
         let network_address = [0u8; 0].to_vec();
         let full_node_network_address = [0u8; 0].to_vec();
 
         let data = Validator {
             address,
-            auth_key,
             consensus_pubkey,
-            operator_address,
-            operator_auth_key,
+            operator_address: address,
             network_address,
             full_node_network_address,
             stake_amount: 1,

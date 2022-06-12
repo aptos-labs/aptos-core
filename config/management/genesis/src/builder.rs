@@ -112,14 +112,12 @@ impl<S: KVStorage> GenesisBuilder<S> {
         let layout = self.layout()?;
         let mut validators = Vec::new();
         for owner in &layout.owners {
-            let name = owner.as_bytes().to_vec();
-            let address = aptos_config::utils::default_validator_owner_auth_key_from_name(&name)
-                .derived_address();
             let auth_key = self
                 .owner_key(owner)
                 .map_or(AuthenticationKey::zero(), |k| {
                     AuthenticationKey::ed25519(&k)
                 });
+            let address = auth_key.derived_address();
             let operator = self.operator(owner)?;
             let operator_auth_key = AuthenticationKey::ed25519(&self.operator_key(&operator)?);
             let operator_address = operator_auth_key.derived_address();
@@ -129,10 +127,8 @@ impl<S: KVStorage> GenesisBuilder<S> {
             let full_node_network_address = bcs::from_bytes(&validator_config.args()[3])?;
             validators.push(Validator {
                 address,
-                auth_key,
                 consensus_pubkey,
                 operator_address,
-                operator_auth_key,
                 network_address,
                 full_node_network_address,
                 stake_amount: 1,

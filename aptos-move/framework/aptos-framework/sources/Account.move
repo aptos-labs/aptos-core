@@ -110,14 +110,10 @@ module AptosFramework::Account {
         authentication_key
     }
 
-    /// Publishes a new `Account` resource under `new_address`.
-    /// A signer representing `new_address` is returned. This way, the caller of this function
-    /// can publish additional resources under `new_address`.
-    /// The `_witness` guarantees that owner the registered caller of this function can call it.
-    /// authentication key returned is `auth_key_prefix` | `fresh_address`.
-    public(friend) fun create_account_internal(
-        new_address: address,
-    ): (signer, vector<u8>) {
+    /// Publishes a new `Account` resource under `new_address`. A signer representing `new_address`
+    /// is returned. This way, the caller of this function can publish additional resources under
+    /// `new_address`.
+    public(friend) fun create_account_internal(new_address: address): signer {
         // there cannot be an Account resource under new_addr already.
         assert!(!exists<Account>(new_address), Errors::already_published(EACCOUNT));
         assert!(
@@ -132,7 +128,7 @@ module AptosFramework::Account {
         create_account_unchecked(new_address)
     }
 
-    fun create_account_unchecked(new_address: address): (signer, vector<u8>) {
+    fun create_account_unchecked(new_address: address): signer {
         let new_account = create_signer(new_address);
         let authentication_key = BCS::to_bytes(&new_address);
         assert!(
@@ -142,13 +138,13 @@ module AptosFramework::Account {
         move_to(
             &new_account,
             Account {
-                authentication_key: copy authentication_key,
+                authentication_key,
                 sequence_number: 0,
                 self_address: new_address,
             }
         );
 
-        (new_account, authentication_key)
+        new_account
     }
 
     public fun exists_at(addr: address): bool {
@@ -347,14 +343,13 @@ module AptosFramework::Account {
     ///////////////////////////////////////////////////////////////////////////
 
     public(script) fun create_account(auth_key: address) {
-        let (signer, _) = create_account_internal(auth_key);
+        let signer = create_account_internal(auth_key);
         Coin::register<TestCoin>(&signer);
     }
 
     /// Create the account for @AptosFramework to help module upgrades on testnet.
     public(friend) fun create_core_framework_account(): signer {
         Timestamp::assert_genesis();
-        let (signer, _) = create_account_unchecked(@AptosFramework);
-        signer
+        create_account_unchecked(@AptosFramework)
     }
 }

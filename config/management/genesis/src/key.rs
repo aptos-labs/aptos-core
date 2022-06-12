@@ -98,7 +98,10 @@ pub struct OwnerKey {
 
 impl OwnerKey {
     pub fn execute(self) -> Result<Ed25519PublicKey, Error> {
-        self.key.submit_key(aptos_global_constants::OWNER_KEY, None)
+        self.key.submit_key(
+            aptos_global_constants::OWNER_KEY,
+            Some(aptos_global_constants::OWNER_ACCOUNT),
+        )
     }
 }
 

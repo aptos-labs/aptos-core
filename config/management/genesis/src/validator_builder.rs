@@ -331,10 +331,11 @@ impl ValidatorBuilder {
         let mut storage = validator.storage();
 
         // Set owner key and account address
-        storage.import_private_key(OWNER_KEY, Ed25519PrivateKey::generate(&mut rng))?;
+        let owner_key = Ed25519PrivateKey::generate(&mut rng);
         let owner_address =
-            aptos_config::utils::validator_owner_account_from_name(validator.owner().as_bytes());
+            AuthenticationKey::ed25519(&Ed25519PublicKey::from(&owner_key)).derived_address();
         storage.set(OWNER_ACCOUNT, owner_address)?;
+        storage.import_private_key(OWNER_KEY, owner_key)?;
 
         // Set operator key and account address
         let operator_key = Ed25519PrivateKey::generate(&mut rng);
