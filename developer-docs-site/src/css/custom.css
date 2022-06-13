@@ -153,8 +153,8 @@ b.navbar__title{
 .card-header {
   padding: 0.5rem 1rem;
   margin-bottom: 0;
-  background-color: rgb(29,233,182);
-  border-bottom: 1pxsolidrgba(0,0,0,.125);
+  background-color: rgb(29,233,182 / 9%);
+  border-bottom: 1px solid rgb(29,233,182);
 }
 .btn-primary {
   color: #fff;
