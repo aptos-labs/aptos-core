@@ -1,7 +1,6 @@
 ---
 title: "Creating a Signed Transaction"
 slug: "creating-a-signed-transaction"
-sidebar_position: 1
 ---
 
 import Tabs from '@theme/Tabs';

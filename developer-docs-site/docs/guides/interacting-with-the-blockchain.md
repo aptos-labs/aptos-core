@@ -75,7 +75,7 @@ This instructs the VM to publish the module bytecode under the sender's account.
 
 It is important to note that the Move bytecode must specify the same address as the sender's account, otherwise the transaction will be rejected. For example, assuming account address `0xe110`, the Move module would need to be updated as such `module 0xe110::Message`, `module 0xbar::Message` would be rejected. Alternatively an aliased address could be used, such as `module HelloBlockchain::Message` but the `HelloBlockchain` alias would need to updated to `0xe110` in the `Move.toml` file. We are working with the Move team and planning on incorporating a compiler into our REST interface to mitigate this issue.
 
-[accounts]: /basics/basics-accounts
+[accounts]: /concepts/basics-accounts
 [your-first-coin]: /tutorials/your-first-coin
 [your-first-move-module]: /tutorials/your-first-move-module
 [your-first-transaction]: /tutorials/your-first-transaction
