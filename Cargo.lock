@@ -2989,6 +2989,7 @@ dependencies = [
  "executor",
  "executor-types",
  "indicatif",
+ "itertools",
  "jemallocator",
  "num_cpus",
  "rand 0.7.3",

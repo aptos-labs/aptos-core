@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+mod account_generator;
 pub mod db_generator;
 pub mod state_committer;
 pub mod transaction_committer;
@@ -69,7 +70,7 @@ pub fn run_benchmark(
     .create_checkpoint(checkpoint_dir.as_ref())
     .expect("db checkpoint creation fails.");
 
-    let (mut config, genesis_key) = aptos_genesis_tool::test_config();
+    let (mut config, _genesis_key) = aptos_genesis_tool::test_config();
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
 
@@ -84,12 +85,8 @@ pub fn run_benchmark(
     let (commit_sender, commit_receiver) = mpsc::sync_channel(3 /* bound */);
     let (state_commit_sender, state_commit_receiver) = mpsc::sync_channel(100 /* bound */);
 
-    let mut generator = TransactionGenerator::new_with_existing_db(
-        genesis_key,
-        block_sender,
-        source_dir,
-        start_version,
-    );
+    let mut generator =
+        TransactionGenerator::new_with_existing_db(block_sender, source_dir, start_version);
     let start_version = generator.version();
 
     // Spawn two threads to run transaction generator and executor separately.

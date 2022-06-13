@@ -27,17 +27,12 @@ fn executor_benchmark<M: Measurement + 'static>(c: &mut Criterion<M>) {
     let parent_block_id = executor.committed_block_id();
     let executor = Arc::new(executor);
 
-    let mut generator = TransactionGenerator::new(genesis_key, NUM_ACCOUNTS, NUM_SEED_ACCOUNTS);
+    let mut generator = TransactionGenerator::new(genesis_key, NUM_ACCOUNTS);
     let (commit_tx, _commit_rx) = std::sync::mpsc::sync_channel(50 /* bound */);
 
     let mut executor = TransactionExecutor::new(executor, parent_block_id, 0, Some(commit_tx));
 
-    let txns = generator.create_seed_accounts(SMALL_BLOCK_SIZE);
-    for txn_block in txns {
-        executor.execute_block(txn_block);
-    }
-
-    let txns = generator.mint_seed_accounts(INITIAL_BALANCE * 10_000, SMALL_BLOCK_SIZE);
+    let txns = generator.create_seed_accounts(SMALL_BLOCK_SIZE, INITIAL_BALANCE * 10_000);
     for txn_block in txns {
         executor.execute_block(txn_block);
     }

@@ -13,6 +13,7 @@ edition = "2018"
 chrono = "0.4.19"
 criterion = "0.3.5"
 indicatif = "0.15.0"
+itertools = "0.10.3"
 jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
 num_cpus = "1.13.1"
 rand = "0.7.3"
@@ -37,8 +38,8 @@ aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 aptosdb = { path = "../../storage/aptosdb" }
 executor = { path = "../executor" }
 executor-types = { path = "../executor-types" }
-scratchpad = { path = "../../storage/scratchpad" }
 schemadb = { path = "../../storage/schemadb" }
+scratchpad = { path = "../../storage/scratchpad" }
 storage-client = { path = "../../storage/storage-client" }
 storage-interface = { path = "../../storage/storage-interface" }
 

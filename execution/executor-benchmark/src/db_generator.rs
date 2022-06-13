@@ -72,13 +72,8 @@ pub fn run(
     let gen_thread = std::thread::Builder::new()
         .name("txn_generator".to_string())
         .spawn(move || {
-            let seed_accounts = (num_accounts / 1000).max(1);
-            let mut generator = TransactionGenerator::new_with_sender(
-                genesis_key,
-                num_accounts,
-                seed_accounts,
-                block_sender,
-            );
+            let mut generator =
+                TransactionGenerator::new_with_sender(genesis_key, num_accounts, block_sender);
             generator.run_mint(init_account_balance, block_size);
             generator
         })
@@ -116,12 +111,16 @@ pub fn run(
 
     // Wait for generator to finish.
     let mut generator = gen_thread.join().unwrap();
+
     println!("Finishing up...");
+
     generator.drop_sender();
     // Wait until all transactions are committed.
     exe_thread.join().unwrap();
     commit_thread.join().unwrap();
+    aptos_logger::Logger::new().init(); // see final logs on screen
     state_commit_thread.join().unwrap();
+
     if verify_sequence_numbers {
         println!("Verifying sequence numbers...");
         // Do a sanity check on the sequence number to make sure all transactions are committed.
