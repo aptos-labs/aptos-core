@@ -7,10 +7,10 @@ use crate::{
         bls12381_keys::{PrivateKey, PublicKey},
         ProofOfPossession,
     },
-    test_utils::{KeyPair, TestAptosCrypto},
+    test_utils::{random_subset, KeyPair, TestAptosCrypto},
     Signature, SigningKey, Uniform,
 };
-use rand::{distributions::Alphanumeric, prelude::IteratorRandom, Rng};
+use rand::{distributions::Alphanumeric, Rng};
 use rand_core::OsRng;
 use std::iter::zip;
 
@@ -170,18 +170,6 @@ fn bls12381_multisig_wrong_messages_aggregated() {
     // i.e., it is not an aggregate signature on a single message
     assert!(multisig.verify(&message, &aggpk).is_err());
     assert!(multisig.verify(&message_wrong, &aggpk).is_err());
-}
-
-/// Returns `subset_size` numbers picked uniformly at random from 0 to `max_set_size - 1` (inclusive).
-pub fn random_subset(mut rng: &mut OsRng, max_set_size: usize, subset_size: usize) -> Vec<usize> {
-    let mut vec = (0..max_set_size)
-        .choose_multiple(&mut rng, subset_size)
-        .into_iter()
-        .collect::<Vec<usize>>();
-
-    vec.sort_unstable();
-
-    vec
 }
 
 /// Returns two different sets of signer IDs (i.e., numbers in 0..num_signers)

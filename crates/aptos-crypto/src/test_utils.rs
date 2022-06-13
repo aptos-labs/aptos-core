@@ -76,8 +76,10 @@ where
     }
 }
 
+use crate::traits;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;
+use rand::prelude::IteratorRandom;
 #[cfg(any(test, feature = "fuzzing"))]
 use rand::{rngs::StdRng, SeedableRng};
 
@@ -120,6 +122,38 @@ where
             KeyPair::<Priv, Pub>::generate(&mut rng)
         })
         .no_shrink()
+}
+
+/// Returns `subset_size` numbers picked uniformly at random from 0 to `max_set_size - 1` (inclusive).
+pub fn random_subset<R>(mut rng: &mut R, max_set_size: usize, subset_size: usize) -> Vec<usize>
+where
+    R: ::rand::Rng + ?Sized,
+{
+    let mut vec = (0..max_set_size)
+        .choose_multiple(&mut rng, subset_size)
+        .into_iter()
+        .collect::<Vec<usize>>();
+
+    vec.sort_unstable();
+
+    vec
+}
+
+/// Generates `num_signers` random key-pairs.
+pub fn random_keypairs<R, PrivKey, PubKey>(
+    mut rng: &mut R,
+    num_signers: usize,
+) -> Vec<KeyPair<PrivKey, PubKey>>
+where
+    R: ::rand::RngCore + ::rand::CryptoRng,
+    PubKey: for<'a> std::convert::From<&'a PrivKey>,
+    PrivKey: traits::Uniform,
+{
+    let mut key_pairs = vec![];
+    for _ in 0..num_signers {
+        key_pairs.push(KeyPair::<PrivKey, PubKey>::generate(&mut rng));
+    }
+    key_pairs
 }
 
 /// This struct provides a means of testing signing and verification through
