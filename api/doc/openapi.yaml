@@ -1669,7 +1669,7 @@ components:
       title: Ed25519 Signature
       type: object
       description: |
-        Please refer to https://github.com/aptos-labs/aptos-core/tree/main/specifications/crypto#signature-and-verification for
+        Please refer to https://github.com/aptos-labs/aptos-core/tree/main/documentation/specifications/crypto#signature-and-verification for
         more details.
       required:
         - type
@@ -1687,7 +1687,7 @@ components:
       title: Multi-ed25519 Signature
       type: object
       description: |
-        Multi ed25519 signature, please refer to https://github.com/aptos-labs/aptos-core/tree/main/specifications/crypto#multi-signatures for more details.
+        Multi ed25519 signature, please refer to https://github.com/aptos-labs/aptos-core/tree/main/documentation/specifications/crypto#multi-signatures for more details.
       required:
         - type
         - public_keys
