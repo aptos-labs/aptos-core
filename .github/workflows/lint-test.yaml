@@ -92,7 +92,7 @@ jobs:
         env:
           RUST_BACKTRACE: full
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
-      - name: 'Upload smoke test logs for failures'
+      - name: Upload smoke test logs for failures
         uses: actions/upload-artifact@v3
         if: failure()
         with:

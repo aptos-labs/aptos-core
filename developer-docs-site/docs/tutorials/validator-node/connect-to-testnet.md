@@ -19,13 +19,13 @@ Only do this if you got confirmation email from Aptos team for your eligibility.
 
 - Stop your node and remove the data volumes, `docker-compose down --volumes`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- Update your docker image to use tag `testnet_317f80bb`. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslab/validator/testnet_317f80bb/images/sha256-5184f637f15a9c071475c5bfb3050777c04aa410e9d43c7ff5e7c4a99a55a252?context=explore)
+- Update your docker image to use tag `testnet_317f80bb`. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_317f80bb/images/sha256-5184f637f15a9c071475c5bfb3050777c04aa410e9d43c7ff5e7c4a99a55a252?context=explore)
 - Restarting the node: `docker-compose up`
 
 ## Using Terraform
 
 - Increase `era` number in your Terraform config, this will wipe the data once applied.
-- Update your docker image to use tag `testnet_317f80bb` in the Terraform config. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslab/validator/testnet_317f80bb/images/sha256-5184f637f15a9c071475c5bfb3050777c04aa410e9d43c7ff5e7c4a99a55a252?context=explore)
+- Update your docker image to use tag `testnet_317f80bb` in the Terraform config. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_317f80bb/images/sha256-5184f637f15a9c071475c5bfb3050777c04aa410e9d43c7ff5e7c4a99a55a252?context=explore)
 - Apply Terraform: `terraform apply`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
 - Recreate the secrets, make sure the secret name matches your `era` number, e.g. if you have `era = 3`, you should replace the secret name to be `${WORKSPACE}-aptos-node-genesis-e3`

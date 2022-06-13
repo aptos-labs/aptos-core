@@ -5,7 +5,7 @@ indexTokenData: false
 
 indexer:
   image:
-    repo: aptoslab/indexer
+    repo: aptoslabs/indexer
     tag: devnet
     pullPolicy: IfNotPresent
 

@@ -51,4 +51,4 @@ Deployment
 
 [REST API]: https://github.com/aptos-labs/aptos-core/blob/main/api/doc/openapi.yaml
 [values.yaml]: values.yaml
-[Aptos dockerhub]: https://hub.docker.com/r/aptoslab/validator/tags?page=1&ordering=last_updated
+[Aptos dockerhub]: https://hub.docker.com/r/aptoslabs/validator/tags?page=1&ordering=last_updated

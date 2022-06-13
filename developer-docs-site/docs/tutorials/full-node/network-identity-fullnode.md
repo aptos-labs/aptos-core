@@ -59,7 +59,7 @@ Follow the below detailed steps:
 
     ```
     $ cd ~/my-full-node
-    $ docker run -it aptoslab/tools:devnet /bin/bash
+    $ docker run -it aptoslabs/tools:devnet /bin/bash
     ```
 
 2. Run the [Aptos CLI](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md) `aptos` to produce a hex encoded static x25519 private key. This will be the private key for your network identity.
@@ -87,7 +87,7 @@ Follow the below detailed steps:
 
   **Using Docker**
 
-  Run this step from inside the `aptoslab/tools` Docker container. Open a new terminal and `cd` into the directory where you started the Docker container for your FullNode. Making sure to provide the full path to where you want the private key TXT file to be stored, run the command as below:
+  Run this step from inside the `aptoslabs/tools` Docker container. Open a new terminal and `cd` into the directory where you started the Docker container for your FullNode. Making sure to provide the full path to where you want the private key TXT file to be stored, run the command as below:
 
   ```
   aptos-operational-tool generate-key \
@@ -107,7 +107,7 @@ Follow the below detailed steps:
 
     **Using Docker**
 
-    From inside the `aptoslab/tools` Docker container:
+    From inside the `aptoslabs/tools` Docker container:
 
     ```
     $ aptos-operational-tool extract-peer-from-file \
