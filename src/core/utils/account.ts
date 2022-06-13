@@ -8,6 +8,8 @@ import {
   AptosAccountState, LocalStorageState, Result, err, ok,
 } from 'core/types';
 
+import Browser from 'core/utils/browser';
+
 export function loginAccount(key: string): Result<AptosAccount, Error> {
   if (key.length === KEY_LENGTH) {
     try {
@@ -49,11 +51,12 @@ export function getAptosAccountState(): AptosAccountState {
 }
 
 export function getBackgroundAptosAccountState(): Promise<AptosAccountState> {
-  return new Promise((resolve, reject) => {
-    chrome.storage.local.get([WALLET_STATE_LOCAL_STORAGE_KEY], function (result) {
+  return new Promise((resolve) => {
+    Browser.storage()?.get([WALLET_STATE_LOCAL_STORAGE_KEY], (result: any) => {
       const aptosAccountObject: AptosAccountObject = result[WALLET_STATE_LOCAL_STORAGE_KEY];
-      resolve(aptosAccountObject ? AptosAccount.fromAptosAccountObject(aptosAccountObject) : undefined);
+      resolve(aptosAccountObject
+        ? AptosAccount.fromAptosAccountObject(aptosAccountObject)
+        : undefined);
     });
-  })
-  
+  });
 }
