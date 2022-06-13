@@ -17,8 +17,13 @@ const secondaryHeaderBgColor = {
 };
 
 const secondaryIconColor = {
-  dark: 'white',
-  light: 'gray.800',
+  dark: 'whiteAlpha.500',
+  light: 'blackAlpha.500',
+};
+
+const secondaryIconUnpressedColor = {
+  dark: 'blue.400',
+  light: 'blue.400',
 };
 
 export default function WalletFooter() {
@@ -36,7 +41,9 @@ export default function WalletFooter() {
         <Center width="100%">
           <ChakraLink to="/wallet">
             <IconButton
-              color={(pathname.includes('/wallet')) ? 'blue.400' : secondaryIconColor[colorMode]}
+              color={(pathname.includes('/wallet'))
+                ? secondaryIconUnpressedColor[colorMode]
+                : secondaryIconColor[colorMode]}
               variant="unstyled"
               size="md"
               aria-label="Wallet"
@@ -49,7 +56,9 @@ export default function WalletFooter() {
         <Center width="100%">
           <ChakraLink to="/gallery">
             <IconButton
-              color={(pathname.includes('/gallery')) ? 'blue.400' : secondaryIconColor[colorMode]}
+              color={(pathname.includes('/gallery'))
+                ? secondaryIconUnpressedColor[colorMode]
+                : secondaryIconColor[colorMode]}
               variant="unstyled"
               size="md"
               aria-label="Gallery"
@@ -62,7 +71,9 @@ export default function WalletFooter() {
         <Center width="100%">
           <ChakraLink to="/settings">
             <IconButton
-              color={(pathname.includes('/settings')) ? 'blue.400' : secondaryIconColor[colorMode]}
+              color={(pathname.includes('/settings'))
+                ? secondaryIconUnpressedColor[colorMode]
+                : secondaryIconColor[colorMode]}
               variant="unstyled"
               size="md"
               aria-label="Account"
