@@ -623,6 +623,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         let runtime = Builder::new_multi_thread()
             .thread_name(format!("network-{}", network_config.network_id))
             .enable_all()
+            .worker_threads(64)
             .build()
             .expect("Failed to start runtime. Won't be able to start networking.");
 
