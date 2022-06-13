@@ -1,17 +1,14 @@
 <%= content_tag :header, **@rest do %>
-  <a class="flex items-center gap-2 md:gap-4" href="/" title="Aptos - Building the safest and most scalable Layer 1 blockchain">
+  <a class="flex flex-nowrap items-center gap-2 md:gap-4 h-16" href="/" title="Aptos - Building the safest and most scalable Layer 1 blockchain">
     <%= render IconComponent.new(:aptos_word, class: 'w-24 md:w-32') %>
     <span class="font-display font-light text-neutral-200 text-xs md:text-base">Community</span>
   </a>
-  <div class="flex gap-10 font-mono uppercase text-sm md:text-base">
-     <a class="hover:text-neutral-300" href="/it1" title="AIT1 Validator Status">
-      Validator Status
-    </a>
-    <a class="hidden sm:block" href="https://aptos.dev" title="Aptos Docs" target="_blank">
-      Docs
-    </a>
-    <a class="hidden sm:block" href="https://explorer.devnet.aptos.dev/" title="Aptos Explorer" target="_blank">
-      Explorer
-    </a>
-  </div>
+  <button class="md:hidden flex-nowrap hover:text-neutral-300" aria-label="Toggle navigation" data-action="click->header#toggleNav">
+    <%= render IconComponent.new(:hamburger, size: :medium) %>
+  </button>
+  <nav class="hidden open:flex md:flex flex-wrap flex-auto flex-col md:flex-row w-full md:w-auto border-neutral-800 border-b md:border-none mt-2 mb-4 md:m-0 justify-end md:gap-10 font-mono uppercase text-sm md:text-base" data-header-target="nav">
+    <% nav_items.each do |item| %>
+      <%= content_tag :a, href: item.url, title: item.title, class: 'border-neutral-800 py-2 border-t md:border-none hover:text-neutral-300', target: item.url.starts_with?('http') ? '_blank' : '' do item.name end %>
+    <% end %>
+  </nav>
 <% end %>

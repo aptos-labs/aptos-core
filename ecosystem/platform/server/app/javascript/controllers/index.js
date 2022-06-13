@@ -10,6 +10,9 @@ application.register("dialog", DialogController)
 import NftController from "./nft_controller.ts"
 application.register("nft", NftController)
 
+import HeaderController from "./header_controller.ts"
+application.register("header", HeaderController)
+
 import RecaptchaController from "./recaptcha_controller.ts"
 application.register("recaptcha", RecaptchaController)
 
