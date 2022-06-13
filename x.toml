@@ -259,7 +259,7 @@ mark-changed = "all"
 
 # Core devtools files.
 [[determinator.path-rule]]
-globs = [".config/nextest.toml", "scripts/dev_setup.sh", "x.toml", ".node-version", ".prettierrc"]
+globs = [".config/nextest.toml", "scripts/dev_setup.sh", "x.toml", ".node-version", ".prettierrc", ".cirrus.yml"]
 mark-changed = "all"
 
 [[determinator.path-rule]]
