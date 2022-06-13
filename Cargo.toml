@@ -69,6 +69,7 @@ members = [
     "devtools/x-core",
     "devtools/x-lint",
     "ecosystem/indexer",
+    "ecosystem/node-checker",
     "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",
@@ -145,6 +146,7 @@ default-members = [
     "execution/db-bootstrapper",
     "storage/backup/backup-cli",
     "ecosystem/indexer",
+    "ecosystem/node-checker",
 ]
 
 [profile.release]

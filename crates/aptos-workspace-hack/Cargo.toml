@@ -21,7 +21,7 @@ crossbeam-queue = { version = "0.3.5", features = ["alloc", "std"] }
 crossbeam-utils = { version = "0.8.8", features = ["lazy_static", "std"] }
 crypto-common = { version = "0.1.3", default-features = false, features = ["std"] }
 diesel = { version = "1.4.8", features = ["32-column-tables", "bigdecimal", "bitflags", "chrono", "num-bigint", "num-integer", "num-traits", "numeric", "postgres", "pq-sys", "r2d2", "serde_json", "with-deprecated"] }
-digest = { version = "0.10.3", features = ["alloc", "block-buffer", "core-api", "std"] }
+digest = { version = "0.10.3", features = ["alloc", "block-buffer", "core-api", "mac", "std", "subtle"] }
 either = { version = "1.6.1", features = ["use_std"] }
 futures-channel = { version = "0.3.21", features = ["alloc", "futures-sink", "sink", "std"] }
 futures-core = { version = "0.3.21", features = ["alloc", "std"] }
@@ -48,8 +48,9 @@ rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
 serde = { version = "1.0.137", features = ["alloc", "derive", "rc", "serde_derive", "std"] }
 serde_json = { version = "1.0.81", features = ["indexmap", "preserve_order", "std"] }
 sha-1 = { version = "0.10.0", features = ["std"] }
+subtle = { version = "2.4.1", features = ["i128", "std"] }
 tokio = { version = "1.18.2", features = ["bytes", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "socket2", "sync", "test-util", "time", "tokio-macros"] }
-tokio-util-ca01ad9e24f5d932 = { package = "tokio-util", version = "0.7.2", features = ["codec", "compat", "futures-io", "tracing"] }
+tokio-util-ca01ad9e24f5d932 = { package = "tokio-util", version = "0.7.2", features = ["codec", "compat", "futures-io", "io", "tracing"] }
 toml = { version = "0.5.9" }
 tracing = { version = "0.1.34", features = ["attributes", "log", "std", "tracing-attributes"] }
 tracing-core = { version = "0.1.26", features = ["lazy_static", "std"] }
@@ -67,7 +68,7 @@ crossbeam-queue = { version = "0.3.5", features = ["alloc", "std"] }
 crossbeam-utils = { version = "0.8.8", features = ["lazy_static", "std"] }
 crypto-common = { version = "0.1.3", default-features = false, features = ["std"] }
 diesel = { version = "1.4.8", features = ["32-column-tables", "bigdecimal", "bitflags", "chrono", "num-bigint", "num-integer", "num-traits", "numeric", "postgres", "pq-sys", "r2d2", "serde_json", "with-deprecated"] }
-digest = { version = "0.10.3", features = ["alloc", "block-buffer", "core-api", "std"] }
+digest = { version = "0.10.3", features = ["alloc", "block-buffer", "core-api", "mac", "std", "subtle"] }
 either = { version = "1.6.1", features = ["use_std"] }
 futures-channel = { version = "0.3.21", features = ["alloc", "futures-sink", "sink", "std"] }
 futures-core = { version = "0.3.21", features = ["alloc", "std"] }
@@ -94,9 +95,10 @@ rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
 serde = { version = "1.0.137", features = ["alloc", "derive", "rc", "serde_derive", "std"] }
 serde_json = { version = "1.0.81", features = ["indexmap", "preserve_order", "std"] }
 sha-1 = { version = "0.10.0", features = ["std"] }
+subtle = { version = "2.4.1", features = ["i128", "std"] }
 syn = { version = "1.0.95", features = ["clone-impls", "derive", "extra-traits", "fold", "full", "parsing", "printing", "proc-macro", "quote", "visit", "visit-mut"] }
 tokio = { version = "1.18.2", features = ["bytes", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "socket2", "sync", "test-util", "time", "tokio-macros"] }
-tokio-util-ca01ad9e24f5d932 = { package = "tokio-util", version = "0.7.2", features = ["codec", "compat", "futures-io", "tracing"] }
+tokio-util-ca01ad9e24f5d932 = { package = "tokio-util", version = "0.7.2", features = ["codec", "compat", "futures-io", "io", "tracing"] }
 toml = { version = "0.5.9" }
 tracing = { version = "0.1.34", features = ["attributes", "log", "std", "tracing-attributes"] }
 tracing-core = { version = "0.1.26", features = ["lazy_static", "std"] }

@@ -67,6 +67,15 @@ RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcp
 RUN mkdir -p /opt/aptos/bin
 COPY --from=builder /aptos/target/release/aptos-indexer /usr/local/bin/
 
+### Node Checker Image ###
+
+FROM debian-base AS node-checker
+
+RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcpdump iproute2 netcat libpq-dev \
+&& apt-get clean && rm -r /var/lib/apt/lists/*
+
+RUN mkdir -p /opt/aptos/bin
+COPY --from=builder /aptos/target/release/aptos-node-checker /usr/local/bin/
 
 ### Safety Rules Image ###
 

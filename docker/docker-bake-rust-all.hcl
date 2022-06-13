@@ -37,6 +37,7 @@ group "release" {
   targets = [
     "validator",
     "indexer",
+    "node-checker",
     "safety-rules",
     "tools",
     "init",
@@ -59,6 +60,7 @@ target "_common" {
     // need to repeat all images here until https://github.com/docker/buildx/issues/934 is resolved
     generate_cache_from("validator"),
     generate_cache_from("indexer"),
+    generate_cache_from("node-checker"),
     generate_cache_from("validator_tcb"),
     generate_cache_from("tools"),
     generate_cache_from("init"),
@@ -88,6 +90,13 @@ target "indexer" {
   target   = "indexer"
   cache-to = generate_cache_to("indexer")
   tags     = generate_tags("indexer")
+}
+
+target "node-checker" {
+  inherits = ["_common"]
+  target   = "node-checker"
+  cache-to = generate_cache_to("node-checker")
+  tags     = generate_tags("node-checker")
 }
 
 target "safety-rules" {

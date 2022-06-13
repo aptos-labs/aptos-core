@@ -14,7 +14,7 @@ jobs:
   copy-images:
     strategy:
       matrix:
-        IMAGE_NAME: [validator, forge, init, validator_tcb, tools, faucet, txn-emitter, indexer]
+        IMAGE_NAME: [validator, forge, init, validator_tcb, tools, faucet, txn-emitter, indexer, node-checker]
 
     runs-on: ubuntu-latest
     steps:

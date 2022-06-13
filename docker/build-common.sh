@@ -4,7 +4,7 @@
 set -e
 
 # This is a common compilation scripts across different docker file
-# It unifies RUSFLAGS, compilation flags (like --release) and set of binary crates to compile in common docker layer
+# It unifies RUSTFLAGS, compilation flags (like --release) and set of binary crates to compile in common docker layer
 
 export RUSTFLAGS="-Ctarget-cpu=skylake -Ctarget-feature=+aes,+sse2,+sse4.1,+ssse3"
 
@@ -35,6 +35,7 @@ if [ "$IMAGE_TARGET" = "release" ]; then
           -p aptos-writeset-generator \
           -p transaction-emitter \
           -p aptos-indexer \
+          -p aptos-node-checker \
           -p aptos \
           "$@"
 
@@ -52,7 +53,17 @@ if [ "$IMAGE_TARGET" = "test" ]; then
           "$@"
 fi
 
-rm -rf target/release/{build,deps,incremental}
+if [[ -z "${KEEP_BUILD_ARTIFACTS}" ]]; then
+  rm -rf target/release/{build,deps,incremental}
+fi
 
+# TODO: Consider just making this `./target`
 STRIP_DIR=${STRIP_DIR:-/aptos/target}
-find "$STRIP_DIR/release" -maxdepth 1 -executable -type f | grep -Ev 'aptos-node|safety-rules' | xargs strip
+
+if [ -d "$STRIP_DIR" ]
+then
+  echo "Stripping binaries in $STRIP_DIR"
+  find "$STRIP_DIR/release" -maxdepth 1 -executable -type f | grep -Ev 'aptos-node|safety-rules' | xargs strip
+else
+  echo "STRIP_DIR does not exist: $STRIP_DIR"
+fi

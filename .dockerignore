@@ -15,6 +15,7 @@ docker/
 documentation/
 ecosystem/
 !ecosystem/indexer/
+!ecosystem/node-checker/
 scripts/
 target/
 terraform/
