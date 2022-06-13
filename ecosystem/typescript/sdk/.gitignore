@@ -12,3 +12,6 @@ dist/
 .nyc_output/
 build/
 yarn.lock
+
+# Doc generation output
+docs/
