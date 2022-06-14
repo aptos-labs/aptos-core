@@ -2,49 +2,29 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::types::{Data, Batch, PersistedValue};
+use crate::quorum_store::types::{Batch, Data, PersistedValue};
 use crate::{
     network::NetworkSender,
     quorum_store::{
         batch_reader::{BatchReader, BatchReaderCommand},
         quorum_store_db::QuorumStoreDB,
-        types::SignedDigest,
     },
 };
 use aptos_crypto::HashValue;
 use aptos_types::{
-    validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
+    PeerId, validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier,
 };
-use consensus_types::common::{Round};
+use consensus_types::common::Round;
 use serde::{Deserialize, Serialize};
 use std::sync::{
-    mpsc::{Receiver as SyncReceiver, SyncSender},
     Arc,
+    mpsc::{Receiver as SyncReceiver, SyncSender},
 };
 use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
 };
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Deserialize, Serialize)]
-pub struct LogicalTime {
-    epoch: u64,
-    round: Round,
-}
-
-impl LogicalTime {
-    pub fn new(epoch: u64, round: Round) -> Self {
-        Self { epoch, round }
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.epoch
-    }
-
-    pub fn round(&self) -> Round {
-        self.round
-    }
-}
+use consensus_types::proof_of_store::{LogicalTime, SignedDigest};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PersistRequest {

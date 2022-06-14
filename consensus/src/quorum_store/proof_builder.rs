@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::quorum_store::{ProofReturnChannel, QuorumStoreError};
-use crate::quorum_store::{
-    types::{ProofOfStore, SignedDigest, SignedDigestError},
-    utils::DigestTimeouts,
-};
+use crate::quorum_store::utils::DigestTimeouts;
 use aptos_crypto::HashValue;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use std::collections::HashMap;
 use tokio::sync::mpsc::Receiver;
+use consensus_types::proof_of_store::{ProofOfStore, SignedDigest, SignedDigestError};
 
 #[derive(Debug)]
 #[allow(dead_code)]

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::proof_of_store::ProofOfStore;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -120,10 +121,4 @@ impl fmt::Display for PayloadFilter {
             PayloadFilter::InQuorumStore(_poavs) => todo!(),
         }
     }
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ProofOfStore {
-    // TODO: This is currently just a placeholder for a real ProofOfStore implementation.
-    placeholder: u64,
 }

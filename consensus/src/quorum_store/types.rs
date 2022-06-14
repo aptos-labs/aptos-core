@@ -1,17 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::batch_store::LogicalTime;
+use consensus_types::proof_of_store::LogicalTime;
 use anyhow::bail;
-use aptos_crypto::hash::{DefaultHasher};
+use aptos_crypto::hash::DefaultHasher;
 use aptos_crypto::{ed25519::Ed25519Signature, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::validator_signer::ValidatorSigner;
-use aptos_types::{validator_verifier::ValidatorVerifier, PeerId};
+use aptos_types::{PeerId, validator_verifier::ValidatorVerifier};
 use bcs::to_bytes;
-use rand::{seq::SliceRandom, thread_rng};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use std::sync::Arc;
 use aptos_types::transaction::SignedTransaction;
 
@@ -230,114 +228,5 @@ impl Batch {
     pub fn get_payload(self) -> Data {
         assert!(self.maybe_payload.is_some());
         self.maybe_payload.unwrap()
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash)]
-pub struct SignedDigestInfo {
-    pub(crate) digest: HashValue,
-    pub(crate) expiration: LogicalTime,
-}
-
-impl SignedDigestInfo {
-    pub fn new(digest: HashValue, expiration: LogicalTime) -> Self {
-        Self { digest, expiration }
-    }
-}
-
-// TODO: implement properly (and proper place) w.o. public fields.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SignedDigest {
-    epoch: u64,
-    pub(crate) peer_id: PeerId,
-    pub(crate) info: SignedDigestInfo,
-    pub(crate) signature: Ed25519Signature,
-}
-
-impl SignedDigest {
-    pub fn new(
-        epoch: u64,
-        peer_id: PeerId,
-        digest: HashValue,
-        expiration: LogicalTime,
-        validator_signer: Arc<ValidatorSigner>,
-    ) -> Self {
-        let info = SignedDigestInfo::new(digest, expiration);
-        let signature = validator_signer.sign(&info);
-
-        Self {
-            epoch,
-            peer_id,
-            info,
-            signature,
-        }
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.epoch
-    }
-
-    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
-        Ok(validator.verify(self.peer_id, &self.info, &self.signature)?)
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub enum SignedDigestError {
-    WrongDigest,
-    DuplicatedSignature,
-}
-
-//TODO: sign hashValue and expiration - make ProofOfStoreInfo and sign it
-#[derive(Debug)]
-#[allow(dead_code)]
-pub struct ProofOfStore {
-    info: SignedDigestInfo,
-    aggregated_signature: BTreeMap<PeerId, Ed25519Signature>,
-    // TODO: should we add sender + signature(digest + sender)?
-}
-
-#[allow(dead_code)]
-impl ProofOfStore {
-    pub fn new(info: SignedDigestInfo) -> Self {
-        Self {
-            info,
-            aggregated_signature: BTreeMap::new(),
-        }
-    }
-
-    pub fn digest(&self) -> &HashValue {
-        &self.info.digest
-    }
-
-    pub fn ready(&self, validator_verifier: &ValidatorVerifier) -> bool {
-        validator_verifier
-            .check_voting_power(self.aggregated_signature.keys())
-            .is_ok()
-    }
-
-    pub fn verify(&self, validator_verifier: &ValidatorVerifier) -> bool {
-        validator_verifier
-            .verify_aggregated_struct_signature(&self.info, &self.aggregated_signature)
-            .is_ok()
-    }
-
-    pub fn shuffled_signers(&self) -> Vec<PeerId> {
-        let mut ret: Vec<PeerId> = self.aggregated_signature.keys().cloned().collect();
-        ret.shuffle(&mut thread_rng());
-        ret
-    }
-
-    pub fn add_signature(
-        &mut self,
-        signer_id: PeerId,
-        signature: Ed25519Signature,
-    ) -> Result<(), SignedDigestError> {
-        if self.aggregated_signature.contains_key(&signer_id) {
-            return Err(SignedDigestError::DuplicatedSignature);
-        }
-
-        self.aggregated_signature.insert(signer_id, signature);
-        return Ok(());
     }
 }
