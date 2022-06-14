@@ -40,7 +40,6 @@ pub struct ExecutionProxy {
     txn_notifier: Arc<dyn TxnNotifier>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     async_state_sync_notifier: channel::Sender<NotificationType>,
-    commit_notifier: Arc<dyn CommitNotifier>,
     async_commit_notifier: channel::Sender<CommitType>,
     validators: Mutex<Vec<AccountAddress>>,
 }
@@ -85,7 +84,6 @@ impl ExecutionProxy {
             txn_notifier,
             state_sync_notifier,
             async_state_sync_notifier: tx,
-            commit_notifier,
             async_commit_notifier: commit_tx,
             validators: Mutex::new(vec![]),
         }

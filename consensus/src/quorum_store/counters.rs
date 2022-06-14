@@ -15,10 +15,6 @@ pub const REQUEST_SUCCESS_LABEL: &str = "success";
 pub const CALLBACK_FAIL_LABEL: &str = "callback_fail";
 pub const CALLBACK_SUCCESS_LABEL: &str = "callback_success";
 
-/// Monitor counters, used by monitor! macro
-pub static OP_COUNTERS: Lazy<aptos_metrics_core::op_counters::OpMetrics> =
-    Lazy::new(|| aptos_metrics_core::op_counters::OpMetrics::new_and_registered("quorum_store"));
-
 /// Counter for tracking latency of quorum store processing requests from consensus
 /// A 'fail' result means the quorum store's callback response to consensus failed.
 static QUORUM_STORE_SERVICE_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
