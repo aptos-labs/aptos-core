@@ -1,21 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use consensus_types::proof_of_store::LogicalTime;
 use anyhow::bail;
 use aptos_crypto::hash::DefaultHasher;
 use aptos_crypto::{ed25519::Ed25519Signature, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::validator_signer::ValidatorSigner;
-use aptos_types::{PeerId, validator_verifier::ValidatorVerifier};
+use aptos_types::{validator_verifier::ValidatorVerifier, PeerId};
 use bcs::to_bytes;
+use consensus_types::proof_of_store::LogicalTime;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use aptos_types::transaction::SignedTransaction;
 
 pub(crate) type BatchId = u64;
 pub type Data = Vec<SignedTransaction>;
-
 
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
 pub(crate) struct PersistedValue {

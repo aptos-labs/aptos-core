@@ -4,12 +4,14 @@
 //! Interface between Consensus and Network layers.
 
 use crate::counters;
+use crate::quorum_store::types::{Batch, Fragment};
 use anyhow::anyhow;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_logger::prelude::*;
 use aptos_types::{epoch_change::EpochChangeProof, PeerId};
 use async_trait::async_trait;
 use channel::{aptos_channel, message_queues::QueueStyle};
+use consensus_types::proof_of_store::SignedDigest;
 use consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
@@ -23,7 +25,6 @@ use network::{
     constants::NETWORK_CHANNEL_SIZE,
     error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
-    ProtocolId,
     protocols::{
         network::{
             AppConfig, ApplicationNetworkSender, NetworkEvents, NetworkSender, NewNetworkSender,
@@ -31,11 +32,10 @@ use network::{
         rpc::error::RpcError,
         wire::handshake::v1::ProtocolIdSet,
     },
+    ProtocolId,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use consensus_types::proof_of_store::SignedDigest;
-use crate::quorum_store::types::{Batch, Fragment};
 
 /// Network type for consensus
 #[derive(Clone, Debug, Deserialize, Serialize)]

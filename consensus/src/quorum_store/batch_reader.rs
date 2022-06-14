@@ -5,14 +5,12 @@ use crate::network_interface::ConsensusMsg;
 use crate::quorum_store::types::{Batch, Data, PersistedValue};
 use crate::{
     network::NetworkSender,
-    quorum_store::{
-        batch_requester::BatchRequester,
-        batch_store::BatchStoreCommand,
-    },
+    quorum_store::{batch_requester::BatchRequester, batch_store::BatchStoreCommand},
 };
 use aptos_crypto::HashValue;
-use aptos_types::{PeerId, validator_signer::ValidatorSigner};
+use aptos_types::{validator_signer::ValidatorSigner, PeerId};
 use consensus_types::common::Round;
+use consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
 use dashmap::DashMap;
 use once_cell::sync::OnceCell;
 use std::collections::HashMap;
@@ -20,15 +18,13 @@ use std::{
     cmp::Reverse,
     collections::BinaryHeap,
     sync::{
-        Arc,
         atomic::{AtomicU64, Ordering},
-        mpsc::{Receiver as SyncReceiver, RecvTimeoutError, SyncSender}, Mutex,
+        mpsc::{Receiver as SyncReceiver, RecvTimeoutError, SyncSender},
+        Arc, Mutex,
     },
     time::Duration,
 };
 use tokio::sync::{mpsc::Sender, oneshot};
-use consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
-
 
 // Make configuration parameter (passed to QuorumStore).
 /// Maximum number of rounds in the future from local prospective to hold batches for.

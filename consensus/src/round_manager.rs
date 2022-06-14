@@ -1,10 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::quorum_store::types::{Batch, Fragment};
 use crate::{
     block_storage::{
-        BlockReader,
-        BlockRetriever, BlockStore, tracing::{BlockStage, observe_block},
+        tracing::{observe_block, BlockStage},
+        BlockReader, BlockRetriever, BlockStore,
     },
     counters,
     error::{error_kind, VerifyError},
@@ -20,7 +21,7 @@ use crate::{
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
 };
-use anyhow::{bail, Context, ensure, Result};
+use anyhow::{bail, ensure, Context, Result};
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::monitor;
@@ -29,6 +30,7 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use channel::aptos_channel;
+use consensus_types::proof_of_store::SignedDigest;
 use consensus_types::{
     block::Block,
     block_retrieval::{BlockRetrievalResponse, BlockRetrievalStatus},
@@ -49,8 +51,6 @@ use safety_rules::TSafetyRules;
 use serde::Serialize;
 use std::{mem::Discriminant, sync::Arc, time::Duration};
 use termion::color::*;
-use consensus_types::proof_of_store::SignedDigest;
-use crate::quorum_store::types::{Batch, Fragment};
 
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {

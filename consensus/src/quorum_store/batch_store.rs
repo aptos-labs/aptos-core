@@ -12,19 +12,19 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_types::{
-    PeerId, validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier,
+    validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
 use consensus_types::common::Round;
+use consensus_types::proof_of_store::{LogicalTime, SignedDigest};
 use serde::{Deserialize, Serialize};
 use std::sync::{
-    Arc,
     mpsc::{Receiver as SyncReceiver, SyncSender},
+    Arc,
 };
 use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
 };
-use consensus_types::proof_of_store::{LogicalTime, SignedDigest};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PersistRequest {
@@ -187,11 +187,14 @@ impl BatchStore {
                     }
                 }
                 BatchStoreCommand::BatchRequest(digest, peer_id, maybe_tx) => {
-                    match self.db.get_batch(digest){
+                    match self.db.get_batch(digest) {
                         Ok(maybe_persisted_value) => {
-                            if self.my_peer_id == peer_id{
+                            if self.my_peer_id == peer_id {
                                 //ok to unwrap because value is guaranteed to be in the db and have actual payload
-                                maybe_tx.unwrap().send(maybe_persisted_value.unwrap().maybe_payload.unwrap()).expect("Failed to send PersistedValue");
+                                maybe_tx
+                                    .unwrap()
+                                    .send(maybe_persisted_value.unwrap().maybe_payload.unwrap())
+                                    .expect("Failed to send PersistedValue");
                             } else {
                                 let batch = Batch::new(
                                     self.epoch,

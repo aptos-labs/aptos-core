@@ -11,13 +11,12 @@ use crate::{
     },
     round_manager::VerifiedEvent,
 };
-use aptos_types::{PeerId};
+use aptos_types::PeerId;
 use channel::aptos_channel;
 use futures::StreamExt;
 use std::collections::HashMap;
 use std::sync::mpsc::SyncSender;
 use tokio::sync::mpsc::Sender;
-
 
 pub(crate) struct NetworkListener {
     epoch: u64,

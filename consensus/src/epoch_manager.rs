@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::quorum_store::quorum_store::{QuorumStore, QuorumStoreCommand, QuorumStoreConfig};
+use crate::quorum_store::quorum_store_db::QuorumStoreDB;
 use crate::{
     block_storage::BlockStore,
     commit_notifier::CommitNotifier,
@@ -30,13 +32,15 @@ use crate::{
     state_replication::StateComputer,
     util::time_service::TimeService,
 };
-use aptos_global_constants::CONSENSUS_KEY;
 use anyhow::{bail, ensure, Context};
 use aptos_config::config::{ConsensusConfig, ConsensusProposerType, NodeConfig};
+use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_metrics_core::monitor;
+use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
+use aptos_types::validator_signer::ValidatorSigner;
 use aptos_types::{
     account_address::AccountAddress,
     epoch_change::EpochChangeProof,
@@ -44,7 +48,6 @@ use aptos_types::{
     on_chain_config::{OnChainConfigPayload, OnChainConsensusConfig, ValidatorSet},
     validator_verifier::ValidatorVerifier,
 };
-use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
 use channel::{aptos_channel, message_queues::QueueStyle};
 use consensus_types::{
     common::{Author, Round},
@@ -62,18 +65,13 @@ use futures::{
 };
 use network::protocols::network::{ApplicationNetworkSender, Event};
 use safety_rules::SafetyRulesManager;
+use std::convert::TryInto;
 use std::{
     cmp::Ordering,
     mem::{discriminant, Discriminant},
     sync::Arc,
     time::Duration,
 };
-use std::convert::TryInto;
-use aptos_types::validator_signer::ValidatorSigner;
-use crate::quorum_store::quorum_store::{QuorumStore, QuorumStoreCommand, QuorumStoreConfig};
-use crate::quorum_store::quorum_store_db::QuorumStoreDB;
-
-
 
 #[allow(clippy::large_enum_variant)]
 pub enum LivenessStorageData {
@@ -670,7 +668,7 @@ impl EpochManager {
             | ConsensusMsg::CommitDecisionMsg(_)
             | ConsensusMsg::SignedDigestMsg(_)
             | ConsensusMsg::FragmentMsg(_)
-            | ConsensusMsg::BatchMsg(_) =>{
+            | ConsensusMsg::BatchMsg(_) => {
                 let event: UnverifiedEvent = msg.into();
                 if event.epoch() == self.epoch() {
                     return Ok(Some(event));

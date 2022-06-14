@@ -5,7 +5,6 @@ use crate::quorum_store::types::{BatchId, Data};
 use aptos_crypto::{hash::DefaultHasher, HashValue};
 use bcs::to_bytes;
 
-
 struct IncrementalBatchState {
     txn_fragments: Vec<Data>,
     hasher: DefaultHasher,

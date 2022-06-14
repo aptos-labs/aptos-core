@@ -16,21 +16,21 @@ use crate::quorum_store::{
 use crate::round_manager::VerifiedEvent;
 use aptos_crypto::HashValue;
 use aptos_types::{
-    PeerId, validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier,
+    validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
 use channel::aptos_channel;
 use consensus_types::common::Round;
+use consensus_types::proof_of_store::{LogicalTime, ProofOfStore, SignedDigest};
 use futures::{
     future::BoxFuture,
     stream::{futures_unordered::FuturesUnordered, StreamExt as _},
 };
 use std::collections::HashMap;
-use std::sync::{Arc, mpsc::sync_channel};
+use std::sync::{mpsc::sync_channel, Arc};
 use tokio::sync::{
     mpsc::{channel, Receiver, Sender},
     oneshot,
 };
-use consensus_types::proof_of_store::{LogicalTime, ProofOfStore, SignedDigest};
 
 pub type ProofReturnChannel = oneshot::Sender<Result<ProofOfStore, QuorumStoreError>>;
 
