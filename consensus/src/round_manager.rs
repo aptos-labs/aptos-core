@@ -3,8 +3,8 @@
 
 use crate::{
     block_storage::{
-        tracing::{observe_block, BlockStage},
-        BlockReader, BlockRetriever, BlockStore,
+        BlockReader,
+        BlockRetriever, BlockStore, tracing::{BlockStage, observe_block},
     },
     counters,
     error::{error_kind, VerifyError},
@@ -20,7 +20,7 @@ use crate::{
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
 };
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{bail, Context, ensure, Result};
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::monitor;
@@ -49,7 +49,8 @@ use safety_rules::TSafetyRules;
 use serde::Serialize;
 use std::{mem::Discriminant, sync::Arc, time::Duration};
 use termion::color::*;
-use crate::quorum_store::types::{Batch, Fragment, SignedDigest};
+use consensus_types::proof_of_store::SignedDigest;
+use crate::quorum_store::types::{Batch, Fragment};
 
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {

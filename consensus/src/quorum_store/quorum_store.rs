@@ -3,33 +3,34 @@
 
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::types::{Fragment, Data};
+use crate::quorum_store::types::{Data, Fragment};
 use crate::quorum_store::{
     batch_aggregator::{AggregationMode, BatchAggregator},
     batch_reader::BatchReader,
-    batch_store::{BatchStore, BatchStoreCommand, LogicalTime, PersistRequest},
+    batch_store::{BatchStore, BatchStoreCommand, PersistRequest},
     network_listener::NetworkListener,
     proof_builder::{ProofBuilder, ProofBuilderCommand},
     quorum_store_db::QuorumStoreDB,
-    types::{BatchId, ProofOfStore, SignedDigest},
+    types::BatchId,
 };
 use crate::round_manager::VerifiedEvent;
 use aptos_crypto::HashValue;
 use aptos_types::{
-    validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
+    PeerId, validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier,
 };
 use channel::aptos_channel;
-use consensus_types::common::{Round};
+use consensus_types::common::Round;
 use futures::{
     future::BoxFuture,
     stream::{futures_unordered::FuturesUnordered, StreamExt as _},
 };
 use std::collections::HashMap;
-use std::sync::{mpsc::sync_channel, Arc};
+use std::sync::{Arc, mpsc::sync_channel};
 use tokio::sync::{
     mpsc::{channel, Receiver, Sender},
     oneshot,
 };
+use consensus_types::proof_of_store::{LogicalTime, ProofOfStore, SignedDigest};
 
 pub type ProofReturnChannel = oneshot::Sender<Result<ProofOfStore, QuorumStoreError>>;
 

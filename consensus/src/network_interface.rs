@@ -23,6 +23,7 @@ use network::{
     constants::NETWORK_CHANNEL_SIZE,
     error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
+    ProtocolId,
     protocols::{
         network::{
             AppConfig, ApplicationNetworkSender, NetworkEvents, NetworkSender, NewNetworkSender,
@@ -30,11 +31,11 @@ use network::{
         rpc::error::RpcError,
         wire::handshake::v1::ProtocolIdSet,
     },
-    ProtocolId,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use crate::quorum_store::types::{Batch, Fragment, SignedDigest};
+use consensus_types::proof_of_store::SignedDigest;
+use crate::quorum_store::types::{Batch, Fragment};
 
 /// Network type for consensus
 #[derive(Clone, Debug, Deserialize, Serialize)]
