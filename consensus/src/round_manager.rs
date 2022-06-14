@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::monitor;
+use crate::quorum_store::types::{Batch, Fragment};
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
@@ -27,9 +28,10 @@ use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
-    validator_verifier::ValidatorVerifier,
+    validator_verifier::ValidatorVerifier, PeerId,
 };
 use channel::aptos_channel;
+use consensus_types::proof_of_store::{ProofOfStore, SignedDigest};
 use consensus_types::{
     block::Block,
     common::{Author, Round},
@@ -57,11 +59,20 @@ pub enum UnverifiedEvent {
     SyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
+    SignedDigest(Box<SignedDigest>),
+    Fragment(Box<Fragment>),
+    Batch(Box<Batch>),
+    ProofOfStoreBroadcast(Box<ProofOfStore>),
 }
 
 impl UnverifiedEvent {
-    pub fn verify(self, validator: &ValidatorVerifier) -> Result<VerifiedEvent, VerifyError> {
+    pub fn verify(
+        self,
+        peer_id: PeerId,
+        validator: &ValidatorVerifier,
+    ) -> Result<VerifiedEvent, VerifyError> {
         Ok(match self {
+            //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
                 p.verify(validator)?;
                 VerifiedEvent::ProposalMsg(p)
@@ -80,6 +91,22 @@ impl UnverifiedEvent {
                 cd.verify(validator)?;
                 VerifiedEvent::CommitDecision(cd)
             }
+            UnverifiedEvent::SignedDigest(sd) => {
+                sd.verify(validator)?;
+                VerifiedEvent::SignedDigest(sd)
+            }
+            UnverifiedEvent::Fragment(f) => {
+                f.verify(peer_id)?;
+                VerifiedEvent::Fragment(f)
+            }
+            UnverifiedEvent::Batch(b) => {
+                b.verify(peer_id)?;
+                VerifiedEvent::Batch(b)
+            }
+            UnverifiedEvent::ProofOfStoreBroadcast(p) => {
+                p.verify(validator)?;
+                VerifiedEvent::ProofOfStoreBroadcast(p)
+            }
         })
     }
 
@@ -90,6 +117,10 @@ impl UnverifiedEvent {
             UnverifiedEvent::SyncInfo(s) => s.epoch(),
             UnverifiedEvent::CommitVote(cv) => cv.epoch(),
             UnverifiedEvent::CommitDecision(cd) => cd.epoch(),
+            UnverifiedEvent::SignedDigest(sd) => sd.epoch(),
+            UnverifiedEvent::Fragment(f) => f.epoch(),
+            UnverifiedEvent::Batch(b) => b.epoch(),
+            UnverifiedEvent::ProofOfStoreBroadcast(p) => p.epoch(),
         }
     }
 }
@@ -102,6 +133,10 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
             ConsensusMsg::CommitVoteMsg(m) => UnverifiedEvent::CommitVote(m),
             ConsensusMsg::CommitDecisionMsg(m) => UnverifiedEvent::CommitDecision(m),
+            ConsensusMsg::SignedDigestMsg(sd) => UnverifiedEvent::SignedDigest(sd),
+            ConsensusMsg::FragmentMsg(f) => UnverifiedEvent::Fragment(f),
+            ConsensusMsg::BatchMsg(b) => UnverifiedEvent::Batch(b),
+            ConsensusMsg::ProofOfStoreBroadcastMsg(p) => UnverifiedEvent::ProofOfStoreBroadcast(p),
             _ => unreachable!("Unexpected conversion"),
         }
     }
@@ -115,6 +150,10 @@ pub enum VerifiedEvent {
     UnverifiedSyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
+    SignedDigest(Box<SignedDigest>),
+    Fragment(Box<Fragment>),
+    Batch(Box<Batch>),
+    ProofOfStoreBroadcast(Box<ProofOfStore>),
     // local messages
     LocalTimeout(Round),
     Shutdown(oneshot::Sender<()>),

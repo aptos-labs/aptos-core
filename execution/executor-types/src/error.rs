@@ -33,6 +33,9 @@ pub enum Error {
 
     #[error("Received Empty Blocks")]
     EmptyBlocks,
+
+    #[error("request timeout")]
+    CouldNotGetData,
 }
 
 impl From<anyhow::Error> for Error {
