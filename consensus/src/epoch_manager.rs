@@ -30,6 +30,7 @@ use crate::{
     state_replication::StateComputer,
     util::time_service::TimeService,
 };
+use aptos_global_constants::CONSENSUS_KEY;
 use anyhow::{bail, ensure, Context};
 use aptos_config::config::{ConsensusConfig, ConsensusProposerType, NodeConfig};
 use aptos_infallible::{duration_since_epoch, Mutex};
@@ -43,6 +44,7 @@ use aptos_types::{
     on_chain_config::{OnChainConfigPayload, OnChainConsensusConfig, ValidatorSet},
     validator_verifier::ValidatorVerifier,
 };
+use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
 use channel::{aptos_channel, message_queues::QueueStyle};
 use consensus_types::{
     common::{Author, Round},
@@ -66,6 +68,12 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use std::convert::TryInto;
+use aptos_types::validator_signer::ValidatorSigner;
+use crate::quorum_store::quorum_store::{QuorumStore, QuorumStoreCommand, QuorumStoreConfig};
+use crate::quorum_store::quorum_store_db::QuorumStoreDB;
+
+
 
 #[allow(clippy::large_enum_variant)]
 pub enum LivenessStorageData {
@@ -105,6 +113,8 @@ pub struct EpochManager {
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     >,
     epoch_state: Option<EpochState>,
+    quorum_store_storage: Arc<QuorumStoreDB>,
+    quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
 }
 
 impl EpochManager {
@@ -122,6 +132,7 @@ impl EpochManager {
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
+        let path = node_config.storage.dir();
         let sr_config = &node_config.consensus.safety_rules;
         let safety_rules_manager = SafetyRulesManager::new(sr_config);
         Self {
@@ -141,6 +152,8 @@ impl EpochManager {
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
             epoch_state: None,
+            quorum_store_storage: Arc::new(QuorumStoreDB::new(path)),
+            quorum_store_msg_tx: None,
         }
     }
 
@@ -309,16 +322,98 @@ impl EpochManager {
         Ok(())
     }
 
+    ///this function spawns QuorumStore
     fn spawn_quorum_store(
+        &mut self,
+        verifier: ValidatorVerifier,
+        wrapper_command_rx: tokio::sync::mpsc::Receiver<QuorumStoreCommand>,
+    ) {
+        let network_sender = NetworkSender::new(
+            self.author,
+            self.network_sender.clone(),
+            self.self_sender.clone(),
+            verifier.clone(),
+        );
+
+        let backend = &self.config.safety_rules.backend;
+        let storage: Storage = backend.try_into().expect("Unable to initialize storage");
+        if let Err(error) = storage.available() {
+            panic!("Storage is not available: {:?}", error);
+        }
+        let private_key = storage
+            .export_private_key(CONSENSUS_KEY)
+            .expect("Unable to get private key");
+        let signer = ValidatorSigner::new(self.author, private_key);
+
+        let (quorum_store_msg_tx, quorum_store_msg_rx) =
+            aptos_channel::new::<AccountAddress, VerifiedEvent>(
+                QueueStyle::FIFO,
+                self.config.channel_size,
+                None,
+            );
+        // TODO: channel for reset
+
+        let reader_db = self.storage.aptos_db();
+        let latest_ledger_info_with_sigs = reader_db
+            .get_latest_ledger_info()
+            .expect("could not get latest ledger info");
+        let last_committed_round = if latest_ledger_info_with_sigs
+            .ledger_info()
+            .commit_info()
+            .epoch()
+            == self.epoch()
+        {
+            latest_ledger_info_with_sigs
+                .ledger_info()
+                .commit_info()
+                .round()
+        } else {
+            0
+        };
+
+        self.quorum_store_msg_tx = Some(quorum_store_msg_tx);
+        // TODO: grab config.
+        //TODO: think about these numbers
+        let config = QuorumStoreConfig {
+            channel_size: 100,
+            proof_timeout_ms: 1000,
+            batch_request_num_peers: 3,
+            batch_request_timeout_ms: 1000,
+            max_execution_round_lag: 20,
+            max_batch_size: 10000,
+            memory_quota: 100000000,
+            db_quota: 10000000000,
+        };
+
+        let (quorum_store, _batch_reader) = QuorumStore::new(
+            self.epoch(),
+            last_committed_round,
+            self.author,
+            self.quorum_store_storage.clone(),
+            quorum_store_msg_rx,
+            network_sender,
+            config,
+            verifier,
+            signer,
+            wrapper_command_rx,
+        );
+
+        tokio::spawn(quorum_store.start());
+
+        //TODO: how do we drop these tokio spawns?
+        //TODO: return (quorum_store_msg_tx, batch_reader)
+    }
+
+    fn spawn_quorum_wrapper(
         &mut self,
         consensus_to_quorum_store_receiver: Receiver<ConsensusRequest>,
     ) {
-        let quorum_store = DirectMempoolQuorumStore::new(
+        let quorum_store_wrapper = DirectMempoolQuorumStore::new(
             consensus_to_quorum_store_receiver,
             self.quorum_store_to_mempool_sender.clone(),
             self.config.mempool_txn_pull_timeout_ms,
         );
-        tokio::spawn(quorum_store.start());
+        tokio::spawn(quorum_store_wrapper.start());
     }
 
     /// this function spawns the phases and a buffer manager
@@ -440,9 +535,15 @@ impl EpochManager {
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
+        //TODO: create channels between quorum_store, execution, and wrapper and pass around.
+        let (_wrapper_quorum_store_tx, wrapper_quorum_store_rx) = tokio::sync::mpsc::channel(100);
+
+        //Start QuorumStore
+        self.spawn_quorum_store(epoch_state.verifier.clone(), wrapper_quorum_store_rx);
+
         let (consensus_to_quorum_store_sender, consensus_to_quorum_store_receiver) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
-        self.spawn_quorum_store(consensus_to_quorum_store_receiver);
+        self.spawn_quorum_wrapper(consensus_to_quorum_store_receiver);
         let payload_manager = QuorumStoreClient::new(
             consensus_to_quorum_store_sender.clone(),
             self.config.quorum_store_poll_count,
