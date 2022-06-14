@@ -22,6 +22,7 @@ module AptosFramework::Stake {
     use Std::Option::{Self, Option};
     use Std::Signer;
     use Std::Vector;
+    use AptosFramework::GovernanceProposal::GovernanceProposal;
     use AptosFramework::Coin::{Self, Coin, MintCapability};
     use AptosFramework::Comparator;
     use AptosFramework::Signature;
@@ -44,7 +45,7 @@ module AptosFramework::Stake {
     /// Too much stake to join validator set.
     const ESTAKE_TOO_HIGH: u64 = 5;
     /// Account is already a validator or pending validator.
-    const EALREADY_VALIDATOR: u64 = 6;
+    const EALREADY_ACTIVE_VALIDATOR: u64 = 6;
     /// Account is not a validator.
     const ENOT_VALIDATOR: u64 = 7;
     /// Can't remove last validator.
@@ -96,7 +97,12 @@ module AptosFramework::Stake {
         // Track the current operator of the validator node.
         // This allows the operator to be different from the original account and allow for separation of
         // the validator operations and ownership.
+        // Only the account holding OwnerCapability of the staking pool can update this.
         operator_address: address,
+
+        // Track the current vote delegator of the staking pool.
+        // Only the account holding OwnerCapability of the staking pool can update this.
+        delegated_voter: address,
     }
 
     /// Validator info stored in validator address.
@@ -230,6 +236,65 @@ module AptosFramework::Stake {
         pool_address: address,
     }
 
+    /// Return the lockup expiration of the stake pool at `pool_address`.
+    /// This will throw an error if there's no stake pool at `pool_address`.
+    public fun get_lockup_secs(pool_address: address): u64 acquires StakePool {
+        borrow_global<StakePool>(pool_address).locked_until_secs
+    }
+
+    /// Return the active staked balance of the stake pool at `pool_address`. Any pending_inactive and pending_active
+    /// are not considered.
+    ///
+    /// If the stake pool is not yet active, the voting power will be 0.
+    public fun get_active_staked_balance(pool_address: address): u64 acquires StakePool, ValidatorSet {
+        if (is_validator_active(pool_address)) {
+            Coin::value<TestCoin>(&borrow_global<StakePool>(pool_address).active)
+        } else {
+            0
+        }
+    }
+
+    /// Return true if `voter_address` is the delegated voter for the stake pool at `pool_address`.
+    public fun is_delegated_voter(pool_address: address, voter_address: address): bool acquires StakePool {
+        borrow_global<StakePool>(pool_address).delegated_voter == voter_address
+    }
+
+    /// Update the min and max stake amounts.
+    /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+    public fun update_required_stake(
+        _gov_proposal: GovernanceProposal,
+        minimum_stake: u64,
+        maximum_stake: u64,
+    ) acquires ValidatorSetConfiguration {
+        let validator_set_config = borrow_global_mut<ValidatorSetConfiguration>(@CoreResources);
+        validator_set_config.minimum_stake = minimum_stake;
+        validator_set_config.maximum_stake = maximum_stake;
+    }
+
+    /// Update the min and max lockup duration.
+    /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+    public fun update_required_lockup(
+        _gov_proposal: GovernanceProposal,
+        min_lockup_duration_secs: u64,
+        max_lockup_duration_secs: u64,
+    ) acquires ValidatorSetConfiguration {
+        let validator_set_config = borrow_global_mut<ValidatorSetConfiguration>(@CoreResources);
+        validator_set_config.min_lockup_duration_secs = min_lockup_duration_secs;
+        validator_set_config.max_lockup_duration_secs = max_lockup_duration_secs;
+    }
+
+    /// Update the rewards rate.
+    /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+    public fun update_rewards_rate(
+        _gov_proposal: GovernanceProposal,
+        new_rewards_rate: u64,
+        new_rewards_rate_denominator: u64,
+    ) acquires ValidatorSetConfiguration {
+        let validator_set_config = borrow_global_mut<ValidatorSetConfiguration>(@CoreResources);
+        validator_set_config.rewards_rate = new_rewards_rate;
+        validator_set_config.rewards_rate_denominator = new_rewards_rate_denominator;
+    }
+
     /// Initialize validator set to the core resource account.
     public fun initialize_validator_set(
         core_resources: &signer,
@@ -288,6 +353,7 @@ module AptosFramework::Stake {
             inactive: Coin::zero<TestCoin>(),
             locked_until_secs: 0,
             operator_address: account_address,
+            delegated_voter: account_address,
         });
         move_to(account, StakePoolEvents {
             register_validator_candidate_events: Event::new_event_handle<RegisterValidatorCandidateEvent>(account),
@@ -354,6 +420,28 @@ module AptosFramework::Stake {
                 new_operator,
             },
         );
+    }
+
+    /// Allows an owner to change the delegated voter of the stake pool.
+    public(script) fun set_delegated_voter(
+        account: &signer,
+        new_delegated_voter: address,
+    ) acquires OwnerCapability, StakePool {
+        let account_addr = Signer::address_of(account);
+        let ownership_cap = borrow_global<OwnerCapability>(account_addr);
+        set_delegated_voter_with_cap(account_addr, ownership_cap, new_delegated_voter);
+    }
+
+    /// Allows an owner to change the delegated voter of the stake pool.
+    public(script) fun set_delegated_voter_with_cap(
+        pool_address: address,
+        owner_cap: &OwnerCapability,
+        new_delegated_voter: address,
+    ) acquires StakePool {
+        assert!(owner_cap.pool_address == pool_address, Errors::invalid_argument(ENOT_OWNER));
+
+        let stake_pool = borrow_global_mut<StakePool>(pool_address);
+        stake_pool.delegated_voter = new_delegated_voter;
     }
 
     /// Add `amount` of coins from the `account` owning the StakePool.
@@ -493,12 +581,8 @@ module AptosFramework::Stake {
         let validator_set_config = borrow_global<ValidatorSetConfiguration>(@CoreResources);
         validate_lockup_time(stake_pool.locked_until_secs, validator_set_config);
 
-        let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
-        // Validate that the validator is not already in the validator set.
-        let exist =  Option::is_some(&find_validator(&validator_set.active_validators, pool_address)) ||
-                     Option::is_some(&find_validator(&validator_set.pending_inactive, pool_address)) ||
-                     Option::is_some(&find_validator(&validator_set.pending_active, pool_address));
-        assert!(!exist, Errors::invalid_argument(EALREADY_VALIDATOR));
+        // Throw an error is the validator is already active.
+        assert!(!is_validator_active(pool_address), Errors::invalid_argument(EALREADY_ACTIVE_VALIDATOR));
 
         // The validator is not yet activated so all added stake should be in active.
         let voting_power = Coin::value<TestCoin>(&stake_pool.active);
@@ -507,6 +591,7 @@ module AptosFramework::Stake {
 
         // Add validator to pending_active, to be activated in the next epoch.
         let validator_config = borrow_global_mut<ValidatorConfig>(pool_address);
+        let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
         Vector::push_back(&mut validator_set.pending_active, generate_validator_info(pool_address, *validator_config));
 
         let stake_pool_events = borrow_global_mut<StakePoolEvents>(pool_address);
@@ -859,6 +944,14 @@ module AptosFramework::Stake {
         );
     }
 
+    public fun is_validator_active(pool_address: address): bool acquires ValidatorSet {
+        let validator_set = borrow_global<ValidatorSet>(@CoreResources);
+        // Validate that the validator is not already in the validator set.
+        Option::is_some(&find_validator(&validator_set.active_validators, pool_address)) ||
+            Option::is_some(&find_validator(&validator_set.pending_inactive, pool_address)) ||
+            Option::is_some(&find_validator(&validator_set.pending_active, pool_address))
+    }
+
     #[test_only]
     use AptosFramework::TestCoin;
 
@@ -1108,6 +1201,24 @@ module AptosFramework::Stake {
         assert!(validator_index(v5_addr) == 4, 14);
     }
 
+    #[test(core_resources = @CoreResources)]
+    public(script) fun test_change_validator_set_configs(core_resources: signer) acquires ValidatorSetConfiguration {
+        use AptosFramework::GovernanceProposal;
+
+        initialize_validator_set(&core_resources, 0, 1, 0, 0, false, 0, 1);
+
+        update_required_stake(GovernanceProposal::create_test_proposal(), 100, 1000);
+        update_required_lockup(GovernanceProposal::create_test_proposal(), 1000, 10000);
+        update_rewards_rate(GovernanceProposal::create_test_proposal(), 10, 100);
+        let config = borrow_global<ValidatorSetConfiguration>(@CoreResources);
+        assert!(config.minimum_stake == 100, 0);
+        assert!(config.maximum_stake == 1000, 1);
+        assert!(config.min_lockup_duration_secs == 1000, 2);
+        assert!(config.max_lockup_duration_secs == 10000, 3);
+        assert!(config.rewards_rate == 10, 4);
+        assert!(config.rewards_rate_denominator == 100, 4);
+    }
+
     #[test_only]
     public(script) fun register_mint_stake(
         account: &signer,
@@ -1148,5 +1259,59 @@ module AptosFramework::Stake {
         assert!(actual_pending_inactive_stake == pending_inactive_stake, actual_pending_inactive_stake);
         let validator_config = borrow_global<ValidatorConfig>(pool_address);
         assert!(validator_config.validator_index == validator_index, validator_config.validator_index);
+    }
+
+    #[test_only]
+    public fun create_validator_set(
+        core_resources: &signer,
+        active_validator_addresses: vector<address>
+    ) {
+        let active_validators = Vector::empty<ValidatorInfo>();
+        let i = 0;
+        while (i < Vector::length(&active_validator_addresses)) {
+            let validator_address = Vector::borrow(&active_validator_addresses, i);
+            Vector::push_back(&mut active_validators, ValidatorInfo {
+                addr: *validator_address,
+                voting_power: 0,
+                config: ValidatorConfig {
+                    consensus_pubkey: CONSENSUS_KEY_1,
+                    network_addresses: b"",
+                    fullnode_addresses: b"",
+                    validator_index: 0,
+                }
+            });
+            i = i + 1;
+        };
+
+        move_to(core_resources, ValidatorSet {
+            consensus_scheme: 0,
+            // active validators for the current epoch
+            active_validators,
+            // pending validators to leave in next epoch (still active)
+            pending_inactive: Vector::empty<ValidatorInfo>(),
+            // pending validators to join in next epoch
+            pending_active: Vector::empty<ValidatorInfo>(),
+        });
+    }
+
+    #[test_only]
+    public fun create_stake_pool(
+        account: &signer,
+        active: Coin<TestCoin>,
+        locked_until_secs: u64,
+    ) {
+        let address = Signer::address_of(account);
+        move_to(account, StakePool {
+            active,
+            inactive: Coin::zero<TestCoin>(),
+            pending_active: Coin::zero<TestCoin>(),
+            pending_inactive: Coin::zero<TestCoin>(),
+            locked_until_secs,
+            operator_address: address,
+            delegated_voter: address,
+        });
+        move_to(account, OwnerCapability {
+            pool_address: address,
+        });
     }
 }
