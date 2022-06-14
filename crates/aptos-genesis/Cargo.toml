@@ -1,0 +1,44 @@
+[package]
+name = "aptos-genesis"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "A tool to manage genesis"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.57"
+bcs = "0.1.3"
+rand = "0.7.3"
+serde = { version = "1.0.137", features = ["rc"], default-features = false }
+serde_yaml = "0.8.24"
+structopt = "0.3.21"
+toml = { version = "0.5.9", default-features = false }
+
+aptos-config = { path = "../../config" }
+aptos-crypto = { path = "../aptos-crypto" }
+aptos-global-constants = { path = "../../config/global-constants" }
+aptos-keygen = { path = "../aptos-keygen" }
+aptos-management = { path = "../../config/management" }
+aptos-secure-storage = { path = "../../secure/storage" }
+aptos-state-view =  { path = "../../storage/state-view" }
+aptos-temppath = { path = "../aptos-temppath" }
+aptos-types = { path = "../../types" }
+aptos-vm = { path = "../../aptos-move/aptos-vm" }
+aptos-workspace-hack = { path = "../aptos-workspace-hack" }
+aptosdb = { path = "../../storage/aptosdb" }
+cached-framework-packages = { path = "../../aptos-move/framework/cached-packages" }
+consensus-types = { path = "../../consensus/consensus-types" }
+executor = { path = "../../execution/executor" }
+storage-interface = { path = "../../storage/storage-interface" }
+vm-genesis = { path = "../../aptos-move/vm-genesis" }
+
+[dev-dependencies]
+aptos-config = { path = "../../config", features = ["fuzzing"] }
+
+[features]
+testing = []
+fuzzing = ["aptos-config/fuzzing"]

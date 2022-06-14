@@ -5,20 +5,14 @@
 
 pub mod builder;
 pub mod command;
-pub mod fullnode_builder;
 mod genesis;
 mod key;
 pub mod layout;
 mod move_modules;
-pub mod validator_builder;
 mod validator_operator;
 mod verify;
 mod waypoint;
 
 #[cfg(any(test, feature = "testing"))]
-pub mod config_builder;
 #[cfg(test)]
 mod storage_helper;
-
-#[cfg(any(test, feature = "testing"))]
-pub use crate::config_builder::test_config;

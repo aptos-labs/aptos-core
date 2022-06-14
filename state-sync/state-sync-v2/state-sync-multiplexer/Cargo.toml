@@ -29,7 +29,7 @@ storage-interface = { path = "../../../storage/storage-interface" }
 
 [dev-dependencies]
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
-aptos-genesis-tool = { path = "../../../config/management/genesis", features = ["testing"] }
+aptos-genesis = { path = "../../../crates/aptos-genesis", features = ["testing"] }
 aptos-infallible = { path = "../../../crates/aptos-infallible" }
 aptos-temppath = { path = "../../../crates/aptos-temppath" }
 aptos-time-service = { path = "../../../crates/aptos-time-service", features = ["async", "testing"] }

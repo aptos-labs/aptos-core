@@ -24,7 +24,7 @@ toml = "0.5.9"
 
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
-aptos-genesis-tool = { path = "../../config/management/genesis", features = ["testing"] }
+aptos-genesis = { path = "../../crates/aptos-genesis", features = ["testing"] }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-jellyfish-merkle = { path = "../../storage/jellyfish-merkle" }
 aptos-logger = { path = "../../crates/aptos-logger" }

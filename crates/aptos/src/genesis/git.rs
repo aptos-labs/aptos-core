@@ -6,10 +6,10 @@ use crate::{
         types::{CliError, CliTypedResult},
         utils::write_to_file,
     },
-    genesis::config::Layout,
     CliCommand,
 };
 use aptos_config::config::Token;
+use aptos_genesis::config::Layout;
 use aptos_github_client::Client as GithubClient;
 use async_trait::async_trait;
 use clap::Parser;

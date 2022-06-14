@@ -70,7 +70,7 @@ pub fn run_benchmark(
     .create_checkpoint(checkpoint_dir.as_ref())
     .expect("db checkpoint creation fails.");
 
-    let (mut config, _genesis_key) = aptos_genesis_tool::test_config();
+    let (mut config, _genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
 

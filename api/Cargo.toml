@@ -45,7 +45,7 @@ regex = "1.5.5"
 reqwest = { version = "0.11.10", features = ["blocking", "json"], default_features = false }
 
 aptos-crypto = { path = "../crates/aptos-crypto" }
-aptos-genesis-tool = { path = "../config/management/genesis", features = ["testing"] }
+aptos-genesis = { path = "../crates/aptos-genesis", features = ["testing"] }
 aptos-global-constants = { path = "../config/global-constants" }
 aptos-mempool = { path = "../mempool", features = ["fuzzing"] }
 aptos-proptest-helpers = { path = "../crates/aptos-proptest-helpers" }

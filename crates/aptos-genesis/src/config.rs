@@ -1,25 +1,22 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    common::types::{CliError, CliTypedResult},
-    genesis::git::from_yaml,
-};
 use aptos_config::config::HANDSHAKE_VERSION;
 use aptos_crypto::{ed25519::Ed25519PublicKey, x25519};
 use aptos_types::{
+    account_address::AccountAddress,
     chain_id::ChainId,
     network_address::{DnsName, NetworkAddress, Protocol},
     transaction::authenticator::AuthenticationKey,
 };
-use move_deps::move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     convert::TryFrom,
     fs::File,
     io::Read,
-    net::{Ipv4Addr, Ipv6Addr},
-    path::PathBuf,
+    net::{Ipv4Addr, Ipv6Addr, ToSocketAddrs},
+    path::Path,
     str::FromStr,
 };
 use vm_genesis::Validator;
@@ -35,17 +32,29 @@ pub struct Layout {
     pub users: Vec<String>,
     /// ChainId for the target network
     pub chain_id: ChainId,
+    /// Whether to allow validators to join post genesis
+    #[serde(default)]
+    pub allow_new_validators: bool,
+    /// Initial lockup period for genesis validators
+    #[serde(default)]
+    pub initial_lockup_period_duration_secs: u64,
+    /// Initial balances for the target network
+    #[serde(default)]
+    pub initial_balances: HashMap<AccountAddress, u64>,
 }
 
 impl Layout {
     /// Read the layout from a YAML file on disk
-    pub fn from_disk(path: &PathBuf) -> CliTypedResult<Self> {
-        let mut file =
-            File::open(&path).map_err(|e| CliError::IO(path.display().to_string(), e))?;
+    pub fn from_disk(path: &Path) -> anyhow::Result<Self> {
+        let mut file = File::open(&path).map_err(|e| {
+            anyhow::Error::msg(format!("Failed to open file {}, {}", path.display(), e))
+        })?;
         let mut contents = String::new();
-        file.read_to_string(&mut contents)
-            .map_err(|e| CliError::IO(path.display().to_string(), e))?;
-        from_yaml(&contents)
+        file.read_to_string(&mut contents).map_err(|e| {
+            anyhow::Error::msg(format!("Failed to read file {}, {}", path.display(), e))
+        })?;
+
+        Ok(serde_yaml::from_str(&contents)?)
     }
 }
 
@@ -95,9 +104,9 @@ pub struct StringValidatorConfiguration {
 }
 
 impl TryFrom<ValidatorConfiguration> for Validator {
-    type Error = CliError;
+    type Error = anyhow::Error;
 
-    fn try_from(config: ValidatorConfiguration) -> Result<Self, CliError> {
+    fn try_from(config: ValidatorConfiguration) -> Result<Self, Self::Error> {
         let auth_key = AuthenticationKey::ed25519(&config.account_public_key);
         let validator_addresses = vec![config
             .validator_host
@@ -109,8 +118,8 @@ impl TryFrom<ValidatorConfiguration> for Validator {
                     .as_network_address(full_node_network_key)
                     .unwrap()]
             } else {
-                return Err(CliError::CommandArgumentError(
-                    "Full node host specified, but not full node network key".to_string(),
+                return Err(anyhow::Error::msg(
+                    "Full node host specified, but not full node network key",
                 ));
             }
         } else {
@@ -119,7 +128,7 @@ impl TryFrom<ValidatorConfiguration> for Validator {
 
         let derived_address = auth_key.derived_address();
         if config.account_address != derived_address {
-            return Err(CliError::CommandArgumentError(format!(
+            return Err(anyhow::Error::msg(format!(
                 "AccountAddress {} does not match account key derived one {}",
                 config.account_address, derived_address
             )));
@@ -143,7 +152,7 @@ pub struct HostAndPort {
 }
 
 impl HostAndPort {
-    pub fn as_network_address(&self, key: x25519::PublicKey) -> CliTypedResult<NetworkAddress> {
+    pub fn as_network_address(&self, key: x25519::PublicKey) -> anyhow::Result<NetworkAddress> {
         let host = self.host.to_string();
 
         // Since DnsName supports IPs as well, let's properly fix what the type is
@@ -158,31 +167,36 @@ impl HostAndPort {
         let noise_protocol = Protocol::NoiseIK(key);
         let handshake_protocol = Protocol::Handshake(HANDSHAKE_VERSION);
 
-        NetworkAddress::try_from(vec![
+        Ok(NetworkAddress::try_from(vec![
             host_protocol,
             port_protocol,
             noise_protocol,
             handshake_protocol,
-        ])
-        .map_err(|e| CliError::UnexpectedError(e.to_string()))
+        ])?)
+    }
+}
+
+impl TryFrom<&NetworkAddress> for HostAndPort {
+    type Error = anyhow::Error;
+
+    fn try_from(address: &NetworkAddress) -> Result<Self, Self::Error> {
+        let socket_addr = address.to_socket_addrs()?.next().unwrap();
+        HostAndPort::from_str(&socket_addr.to_string())
     }
 }
 
 impl FromStr for HostAndPort {
-    type Err = CliError;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<_> = s.split(':').collect();
         if parts.len() != 2 {
-            Err(CliError::CommandArgumentError(
-                "Invalid host and port, must be of the form 'host:port` e.g. '127.0.0.1:6180'"
-                    .to_string(),
+            Err(anyhow::Error::msg(
+                "Invalid host and port, must be of the form 'host:port` e.g. '127.0.0.1:6180'",
             ))
         } else {
-            let host = DnsName::from_str(*parts.get(0).unwrap())
-                .map_err(|e| CliError::CommandArgumentError(e.to_string()))?;
-            let port = u16::from_str(parts.get(1).unwrap())
-                .map_err(|e| CliError::CommandArgumentError(e.to_string()))?;
+            let host = DnsName::from_str(*parts.get(0).unwrap())?;
+            let port = u16::from_str(parts.get(1).unwrap())?;
             Ok(HostAndPort { host, port })
         }
     }

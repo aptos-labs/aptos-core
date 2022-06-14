@@ -54,7 +54,7 @@ claim = "0.5.0"
 proptest = "1.0.0"
 
 aptos-crypto = { path = "../../crates/aptos-crypto" }
-aptos-genesis-tool = { path = "../../config/management/genesis", features = ["testing"] }
+aptos-genesis = { path = "../../crates/aptos-genesis", features = ["testing"] }
 aptos-mempool = { path = "../../mempool", features = ["fuzzing"] }
 aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers" }
 aptos-time-service = { path = "../../crates/aptos-time-service", features = ["testing"] }

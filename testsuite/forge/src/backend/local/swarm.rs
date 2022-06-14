@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
-use aptos_genesis_tool::{fullnode_builder::FullnodeConfig, validator_builder::ValidatorBuilder};
+use aptos_genesis::builder::FullnodeNodeConfig;
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{
@@ -146,15 +146,16 @@ impl LocalSwarmBuilder {
             self.template.consensus.quorum_store_poll_count = 30;
         }
 
-        let (root_keys, genesis, genesis_waypoint, validators) = ValidatorBuilder::new(
-            &dir,
-            self.genesis_modules
-                .unwrap_or_else(|| cached_framework_packages::module_blobs().to_vec()),
-        )
-        .num_validators(self.number_of_validators)
-        .template(self.template)
-        .min_price_per_gas_unit(self.min_price_per_gas_unit)
-        .build(rng)?;
+        let (root_key, genesis, genesis_waypoint, validators) =
+            aptos_genesis::builder::Builder::new(
+                &dir,
+                self.genesis_modules
+                    .unwrap_or_else(|| cached_framework_packages::module_blobs().to_vec()),
+            )?
+            .with_num_validators(self.number_of_validators)
+            .with_template(self.template)
+            .with_min_price_per_gas_unit(self.min_price_per_gas_unit)
+            .build(rng)?;
 
         // Get the initial version to start the nodes with, either the one provided or fallback to
         // using the the latest version
@@ -172,11 +173,11 @@ impl LocalSwarmBuilder {
         let validators = validators
             .into_iter()
             .map(|v| {
-                let node = LocalNode::new(version.to_owned(), v.name, v.directory)?;
+                let node = LocalNode::new(version.to_owned(), v.name, v.dir)?;
                 Ok((node.peer_id(), node))
             })
             .collect::<Result<HashMap<_, _>>>()?;
-        let root_key = ConfigKey::new(root_keys.root_key);
+        let root_key = ConfigKey::new(root_key);
         let root_account = LocalAccount::new(
             aptos_sdk::types::account_config::aptos_root_address(),
             AccountKey::from_private_key(root_key.private_key()),
@@ -295,7 +296,7 @@ impl LocalSwarm {
         let mut validator_config = validator.config().clone();
         let name = self.node_name_counter.to_string();
         self.node_name_counter += 1;
-        let fullnode_config = FullnodeConfig::validator_fullnode(
+        let fullnode_config = FullnodeNodeConfig::validator_fullnode(
             name,
             self.dir.as_ref(),
             template,
@@ -313,7 +314,7 @@ impl LocalSwarm {
         let mut fullnode = LocalNode::new(
             version.to_owned(),
             fullnode_config.name,
-            fullnode_config.directory,
+            fullnode_config.dir,
         )?;
 
         let peer_id = fullnode.peer_id();
@@ -328,7 +329,7 @@ impl LocalSwarm {
     fn add_fullnode(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
         let name = self.node_name_counter.to_string();
         self.node_name_counter += 1;
-        let fullnode_config = FullnodeConfig::public_fullnode(
+        let fullnode_config = FullnodeNodeConfig::public_fullnode(
             name,
             self.dir.as_ref(),
             template,
@@ -340,7 +341,7 @@ impl LocalSwarm {
         let mut fullnode = LocalNode::new(
             version.to_owned(),
             fullnode_config.name,
-            fullnode_config.directory,
+            fullnode_config.dir,
         )?;
 
         let peer_id = fullnode.peer_id();

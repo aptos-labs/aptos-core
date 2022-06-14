@@ -170,7 +170,7 @@ mod tests {
     };
     use aptos_crypto::HashValue;
     use aptos_data_client::aptosnet::AptosNetDataClient;
-    use aptos_genesis_tool::test_config;
+    use aptos_genesis::test_utils::test_config;
     use aptos_infallible::RwLock;
     use aptos_temppath::TempPath;
     use aptos_time_service::TimeService;

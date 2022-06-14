@@ -66,6 +66,13 @@ pub enum InitialSafetyRulesConfig {
 }
 
 impl InitialSafetyRulesConfig {
+    pub fn from_file(identity_blob_path: PathBuf, waypoint: WaypointConfig) -> Self {
+        Self::FromFile {
+            identity_blob_path,
+            waypoint,
+        }
+    }
+
     pub fn waypoint(&self) -> Waypoint {
         match self {
             InitialSafetyRulesConfig::FromFile { waypoint, .. } => waypoint.waypoint(),

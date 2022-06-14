@@ -6,19 +6,16 @@ use crate::{
         types::{CliError, CliTypedResult, PromptOptions, RngArgs},
         utils::{check_if_file_exists, read_from_file, write_to_user_only_file},
     },
-    genesis::{
-        config::{HostAndPort, ValidatorConfiguration},
-        git::{from_yaml, to_yaml, GitOptions},
-    },
+    genesis::git::{from_yaml, to_yaml, GitOptions},
     CliCommand,
 };
-use aptos_config::{config::IdentityBlob, keys::ConfigKey};
-use aptos_crypto::{ed25519::Ed25519PrivateKey, x25519, PrivateKey};
-use aptos_types::transaction::authenticator::AuthenticationKey;
+use aptos_crypto::PrivateKey;
+use aptos_genesis::{
+    config::{HostAndPort, ValidatorConfiguration},
+    keys::{generate_key_objects, PrivateIdentity},
+};
 use async_trait::async_trait;
 use clap::Parser;
-use move_deps::move_core_types::account_address::AccountAddress;
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 const PRIVATE_KEYS_FILE: &str = "private-keys.yaml";
@@ -51,36 +48,9 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
         check_if_file_exists(validator_file.as_path(), self.prompt_options)?;
         check_if_file_exists(vfn_file.as_path(), self.prompt_options)?;
 
-        let mut keygen = self.rng_args.key_generator()?;
-        let account_key = ConfigKey::new(keygen.generate_ed25519_private_key());
-        let consensus_key = ConfigKey::new(keygen.generate_ed25519_private_key());
-        let validator_network_key = ConfigKey::new(keygen.generate_x25519_private_key()?);
-        let full_node_network_key = ConfigKey::new(keygen.generate_x25519_private_key()?);
-
-        let account_address =
-            AuthenticationKey::ed25519(&account_key.public_key()).derived_address();
-
-        // Build these for use later as node identity
-        let validator_blob = IdentityBlob {
-            account_address: Some(account_address),
-            account_private_key: Some(account_key.private_key()),
-            consensus_private_key: Some(consensus_key.private_key()),
-            network_private_key: validator_network_key.private_key(),
-        };
-        let vfn_blob = IdentityBlob {
-            account_address: Some(account_address),
-            account_private_key: None,
-            consensus_private_key: None,
-            network_private_key: full_node_network_key.private_key(),
-        };
-
-        let config = PrivateIdentity {
-            account_address,
-            account_private_key: account_key.private_key(),
-            consensus_private_key: consensus_key.private_key(),
-            full_node_network_private_key: full_node_network_key.private_key(),
-            validator_network_private_key: validator_network_key.private_key(),
-        };
+        let mut key_generator = self.rng_args.key_generator()?;
+        let (validator_blob, vfn_blob, private_identity) =
+            generate_key_objects(&mut key_generator)?;
 
         // Create the directory if it doesn't exist
         if !self.output_dir.exists() || !self.output_dir.is_dir() {
@@ -91,7 +61,7 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
         write_to_user_only_file(
             keys_file.as_path(),
             PRIVATE_KEYS_FILE,
-            to_yaml(&config)?.as_bytes(),
+            to_yaml(&private_identity)?.as_bytes(),
         )?;
         write_to_user_only_file(
             validator_file.as_path(),
@@ -101,16 +71,6 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
         write_to_user_only_file(vfn_file.as_path(), VFN_FILE, to_yaml(&vfn_blob)?.as_bytes())?;
         Ok(vec![keys_file, validator_file, vfn_file])
     }
-}
-
-/// Type for serializing private keys file
-#[derive(Deserialize, Serialize)]
-pub struct PrivateIdentity {
-    account_address: AccountAddress,
-    account_private_key: Ed25519PrivateKey,
-    consensus_private_key: Ed25519PrivateKey,
-    full_node_network_private_key: x25519::PrivateKey,
-    validator_network_private_key: x25519::PrivateKey,
 }
 
 /// Set ValidatorConfiguration for a single validator in the git repository

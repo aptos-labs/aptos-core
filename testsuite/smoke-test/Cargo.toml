@@ -44,7 +44,7 @@ rand = "0.7.3"
 regex = "1.5.5"
 serde_yaml = "0.8.24"
 
-aptos-genesis-tool = { path = "../../config/management/genesis", features = ["testing"] }
+aptos-genesis = { path = "../../crates/aptos-genesis", features = ["testing"] }
 aptos-global-constants = { path = "../../config/global-constants" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-logger = { path = "../../crates/aptos-logger" }

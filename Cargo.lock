@@ -134,6 +134,7 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
+ "aptos-genesis",
  "aptos-github-client",
  "aptos-keygen",
  "aptos-logger",
@@ -182,7 +183,7 @@ dependencies = [
  "aptos-api-types",
  "aptos-config",
  "aptos-crypto",
- "aptos-genesis-tool",
+ "aptos-genesis",
  "aptos-global-constants",
  "aptos-logger",
  "aptos-mempool",
@@ -437,6 +438,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-genesis"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-global-constants",
+ "aptos-keygen",
+ "aptos-management",
+ "aptos-secure-storage",
+ "aptos-state-view",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptosdb",
+ "bcs",
+ "cached-framework-packages",
+ "consensus-types",
+ "executor",
+ "rand 0.7.3",
+ "serde 1.0.137",
+ "serde_yaml",
+ "storage-interface",
+ "structopt",
+ "toml",
+ "vm-genesis",
+]
+
+[[package]]
 name = "aptos-genesis-tool"
 version = "0.1.0"
 dependencies = [
@@ -687,7 +718,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-data-client",
- "aptos-genesis-tool",
+ "aptos-genesis",
  "aptos-infallible",
  "aptos-logger",
  "aptos-mempool",
@@ -2949,7 +2980,7 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
- "aptos-genesis-tool",
+ "aptos-genesis",
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
@@ -2984,7 +3015,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-config",
  "aptos-crypto",
- "aptos-genesis-tool",
+ "aptos-genesis",
  "aptos-infallible",
  "aptos-jellyfish-merkle",
  "aptos-logger",
@@ -3023,7 +3054,7 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
- "aptos-genesis-tool",
+ "aptos-genesis",
  "aptos-sdk",
  "aptos-state-view",
  "aptos-temppath",
@@ -3159,7 +3190,7 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-faucet",
- "aptos-genesis-tool",
+ "aptos-genesis",
  "aptos-logger",
  "aptos-rest-client",
  "aptos-retrier",
@@ -7549,7 +7580,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-faucet",
- "aptos-genesis-tool",
+ "aptos-genesis",
  "aptos-global-constants",
  "aptos-indexer",
  "aptos-infallible",
@@ -7669,7 +7700,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-data-client",
- "aptos-genesis-tool",
+ "aptos-genesis",
  "aptos-infallible",
  "aptos-temppath",
  "aptos-time-service",
@@ -7699,7 +7730,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-config",
  "aptos-crypto",
- "aptos-genesis-tool",
+ "aptos-genesis",
  "aptos-infallible",
  "aptos-logger",
  "aptos-mempool",

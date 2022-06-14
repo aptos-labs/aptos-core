@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod config;
 pub mod git;
 pub mod keys;
 #[cfg(test)]
@@ -12,23 +11,19 @@ use crate::{
         types::{CliError, CliTypedResult, PromptOptions},
         utils::{check_if_file_exists, write_to_file},
     },
-    genesis::{
-        config::{Layout, StringValidatorConfiguration, ValidatorConfiguration},
-        git::{Client, GitOptions, LAYOUT_NAME},
-    },
+    genesis::git::{Client, GitOptions, LAYOUT_NAME},
     CliCommand, CliResult,
 };
-use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_crypto::{ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
-use aptos_temppath::TempPath;
-use aptos_types::{account_address::AccountAddress, chain_id::ChainId, transaction::Transaction};
-use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
+use aptos_genesis::{
+    config::{HostAndPort, Layout, ValidatorConfiguration},
+    GenesisInfo,
+};
+use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
-use std::{convert::TryInto, path::PathBuf, str::FromStr};
-use storage_interface::DbReaderWriter;
-use vm_genesis::Validator;
+use serde::{Deserialize, Serialize};
+use std::{path::PathBuf, str::FromStr};
 
 const MIN_PRICE_PER_GAS_UNIT: u64 = 1;
 const WAYPOINT_FILE: &str = "waypoint.txt";
@@ -66,20 +61,6 @@ pub struct GenerateGenesis {
     output_dir: PathBuf,
 }
 
-impl GenerateGenesis {
-    fn generate_genesis_txn(git_options: GitOptions) -> CliTypedResult<Transaction> {
-        let genesis_info = fetch_genesis_info(git_options)?;
-
-        Ok(vm_genesis::encode_genesis_transaction(
-            genesis_info.root_key.clone(),
-            &genesis_info.validators,
-            &genesis_info.modules,
-            genesis_info.chain_id,
-            MIN_PRICE_PER_GAS_UNIT,
-        ))
-    }
-}
-
 #[async_trait]
 impl CliCommand<Vec<PathBuf>> for GenerateGenesis {
     fn command_name(&self) -> &'static str {
@@ -93,25 +74,16 @@ impl CliCommand<Vec<PathBuf>> for GenerateGenesis {
         check_if_file_exists(waypoint_file.as_path(), self.prompt_options)?;
 
         // Generate genesis file
-        let genesis = Self::generate_genesis_txn(self.git_options)?;
+        let mut genesis_info = fetch_genesis_info(self.git_options)?;
+        let genesis = genesis_info.get_genesis();
         write_to_file(
             genesis_file.as_path(),
             GENESIS_FILE,
-            &bcs::to_bytes(&genesis).map_err(|e| CliError::BCS(GENESIS_FILE, e))?,
+            &bcs::to_bytes(genesis).map_err(|e| CliError::BCS(GENESIS_FILE, e))?,
         )?;
 
         // Generate waypoint file
-        let path = TempPath::new();
-        let aptosdb = AptosDB::open(
-            &path,
-            false,
-            NO_OP_STORAGE_PRUNER_CONFIG,
-            RocksdbConfig::default(),
-        )
-        .map_err(|e| CliError::UnexpectedError(e.to_string()))?;
-        let db_rw = DbReaderWriter::new(aptosdb);
-        let waypoint = executor::db_bootstrapper::generate_waypoint::<AptosVM>(&db_rw, &genesis)
-            .map_err(|e| CliError::UnexpectedError(e.to_string()))?;
+        let waypoint = genesis_info.generate_waypoint()?;
         write_to_file(
             waypoint_file.as_path(),
             WAYPOINT_FILE,
@@ -156,16 +128,17 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
 
     let modules = client.get_modules("framework")?;
 
-    Ok(GenesisInfo {
-        chain_id: layout.chain_id,
-        root_key: layout.root_key,
+    Ok(GenesisInfo::new(
+        layout.chain_id,
+        layout.root_key,
         validators,
         modules,
-    })
+        MIN_PRICE_PER_GAS_UNIT,
+    )?)
 }
 
 /// Do proper parsing so more information is known about failures
-fn get_config(client: &Client, user: &str) -> CliTypedResult<Validator> {
+fn get_config(client: &Client, user: &str) -> CliTypedResult<ValidatorConfiguration> {
     let config = client.get::<StringValidatorConfiguration>(user)?;
 
     // Convert each individually
@@ -191,7 +164,7 @@ fn get_config(client: &Client, user: &str) -> CliTypedResult<Validator> {
         };
     let full_node_host = config.full_node_host;
 
-    let config = ValidatorConfiguration {
+    Ok(ValidatorConfiguration {
         account_address,
         consensus_public_key: consensus_key,
         account_public_key: account_key,
@@ -200,15 +173,26 @@ fn get_config(client: &Client, user: &str) -> CliTypedResult<Validator> {
         full_node_network_public_key: full_node_network_key,
         full_node_host,
         stake_amount: config.stake_amount,
-    };
-    config.try_into()
+    })
 }
 
-/// Holder object for all pieces needed to generate a genesis transaction
-#[derive(Clone)]
-pub struct GenesisInfo {
-    chain_id: ChainId,
-    root_key: Ed25519PublicKey,
-    validators: Vec<Validator>,
-    modules: Vec<Vec<u8>>,
+/// For better parsing error messages
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StringValidatorConfiguration {
+    /// Account address
+    pub account_address: String,
+    /// Key used for signing in consensus
+    pub consensus_public_key: String,
+    /// Key used for signing transactions with the account
+    pub account_public_key: String,
+    /// Public key used for validator network identity (same as account address)
+    pub validator_network_public_key: String,
+    /// Host for validator which can be an IP or a DNS name
+    pub validator_host: HostAndPort,
+    /// Public key used for full node network identity (same as account address)
+    pub full_node_network_public_key: Option<String>,
+    /// Host for full node which can be an IP or a DNS name and is optional
+    pub full_node_host: Option<HostAndPort>,
+    /// Stake amount for consensus
+    pub stake_amount: u64,
 }

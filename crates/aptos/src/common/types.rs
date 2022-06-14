@@ -132,6 +132,12 @@ impl From<hex::FromHexError> for CliError {
     }
 }
 
+impl From<anyhow::Error> for CliError {
+    fn from(e: anyhow::Error) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
 /// Config saved to `.aptos/config.yaml`
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {

@@ -37,7 +37,7 @@ impl CliTestFramework {
             endpoint,
             faucet_endpoint,
         };
-        let mut keygen = KeyGen::from_seed([0; 32]);
+        let mut keygen = KeyGen::from_seed([9; 32]);
 
         // TODO: Make this allow a passed in random seed
         for i in 0..num_accounts {

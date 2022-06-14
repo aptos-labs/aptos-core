@@ -7,7 +7,6 @@ use crate::{
         utils::write_to_file,
     },
     genesis::{
-        config::{HostAndPort, Layout},
         git::{GitOptions, SetupGit},
         keys::{GenerateKeys, SetValidatorConfiguration},
         GenerateGenesis,
@@ -18,11 +17,13 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey,
 };
+use aptos_genesis::config::{HostAndPort, Layout};
 use aptos_keygen::KeyGen;
 use aptos_temppath::TempPath;
 use aptos_types::chain_id::ChainId;
 use move_deps::move_binary_format::access::ModuleAccess;
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -30,26 +31,31 @@ use std::{
 /// Test the E2E genesis flow since it doesn't require a node to run
 #[tokio::test]
 async fn test_genesis_e2e_flow() {
-    let user_a = "user_a".to_string();
-    let user_b = "user_b".to_string();
+    const NUM_USERS: u8 = 2;
     let chain_id = ChainId::test();
+    let mut users: HashMap<String, PathBuf> = HashMap::new();
+    let dir = TempPath::new();
+    dir.create_as_dir().unwrap();
 
-    let mut keygen = KeyGen::from_seed([0; 32]);
+    // Create users
+    for i in 0..NUM_USERS {
+        let name = format!("user-{}", i);
+        let dir = generate_keys(dir.path(), i).await;
+        users.insert(name, dir);
+    }
+
+    let names: Vec<_> = users.keys().map(|key| key.to_string()).collect();
+
+    let mut keygen = KeyGen::from_seed([NUM_USERS.saturating_add(1); 32]);
 
     // First step is setup the local git repo
     let root_private_key = keygen.generate_ed25519_private_key();
-    let git_options = setup_git_dir(
-        &root_private_key,
-        vec![user_a.clone(), user_b.clone()],
-        chain_id,
-    )
-    .await;
+    let git_options = setup_git_dir(&root_private_key, names, chain_id).await;
 
-    // Now create the two users
-    let user_a_dir = generate_keys().await;
-    add_public_keys(user_a, git_options.clone(), user_a_dir.path()).await;
-    let user_b_dir = generate_keys().await;
-    add_public_keys(user_b, git_options.clone(), user_b_dir.path()).await;
+    // Add keys
+    for (name, user_dir) in users.iter() {
+        add_public_keys(name.to_string(), git_options.clone(), user_dir.as_path()).await;
+    }
 
     // Now generate genesis
     let output_dir = TempPath::new();
@@ -128,6 +134,9 @@ fn create_layout_file(
         root_key: root_public_key,
         users,
         chain_id,
+        allow_new_validators: false,
+        initial_lockup_period_duration_secs: 0,
+        initial_balances: Default::default(),
     };
     let file = TempPath::new();
     file.create_as_file().unwrap();
@@ -142,18 +151,16 @@ fn create_layout_file(
 }
 
 /// Generate keys for a "user"
-async fn generate_keys() -> TempPath {
-    let dir = TempPath::new();
-    dir.create_as_dir().unwrap();
-    let output_dir = PathBuf::from(dir.path());
+async fn generate_keys(dir: &Path, index: u8) -> PathBuf {
+    let output_dir = dir.join(index.to_string());
     let command = GenerateKeys {
-        rng_args: RngArgs::from_seed([0; 32]),
+        rng_args: RngArgs::from_seed([index; 32]),
         prompt_options: PromptOptions::yes(),
-        output_dir,
+        output_dir: output_dir.clone(),
     };
     let _ = command.execute().await.unwrap();
 
-    dir
+    output_dir
 }
 
 /// Set validator configuration for a user

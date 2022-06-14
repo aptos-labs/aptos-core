@@ -16,7 +16,7 @@
       "data": {
         "type": "0x1::Account::Account",
         "data": {
-          "authentication_key": "0x8e0d19280063fa870fe4dbb85cc724091a398451c5c11e1e76e64cdc7b588510",
+          "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
           "self_address": "0xa550c18",
           "sequence_number": "1"
         }
@@ -78,8 +78,8 @@
   },
   "signature": {
     "type": "ed25519_signature",
-    "public_key": "0x20fdbac9b10b7587bba7b5bc163bce69e796d71e4ed44c10fcb4488689f7a144",
-    "signature": "0x3bb42944c317eaad297496b9d5a8236d4022bde7d5005734cc6bc2e7d9f5a8b381635f2c18d9b5b25bec5079c3892b68fb0de51af5326d1c1a84391f742ebe0e"
+    "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
+    "signature": "0xd0b0b837563711ca969084dd5cd37aacd41bb11a95caf2ae631b1f7cdb8ebe65f26b78e2a654b4e98bf81ef315e2097207df74a048dcba0e760cfc814c0efc0b"
   },
   "events": [],
   "timestamp": "1"

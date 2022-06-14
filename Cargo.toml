@@ -37,6 +37,7 @@ members = [
     "crates/aptos-crypto",
     "crates/aptos-crypto-derive",
     "crates/aptos-faucet",
+    "crates/aptos-genesis",
     "crates/aptos-id-generator",
     "crates/aptos-infallible",
     "crates/aptos-keygen",

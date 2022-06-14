@@ -8,8 +8,6 @@ use aptos_api_types::{
 };
 use aptos_config::config::ApiConfig;
 use aptos_crypto::{hash::HashValue, SigningKey};
-use aptos_genesis_tool::validator_builder::{RootKeys, ValidatorBuilder};
-use aptos_global_constants::OWNER_ACCOUNT;
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
@@ -18,7 +16,6 @@ use aptos_sdk::{
         LocalAccount,
     },
 };
-use aptos_secure_storage::KVStorage;
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::AccountAddress,
@@ -38,6 +35,8 @@ use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
 
 use crate::tests::golden_output::GoldenOutputs;
+use aptos_config::keys::ConfigKey;
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use executor::block_executor::BlockExecutor;
 use rand::SeedableRng;
 use serde_json::{json, Value};
@@ -51,13 +50,17 @@ pub fn new_test_context(test_name: &'static str) -> TestContext {
     tmp_dir.create_as_dir().unwrap();
 
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
-    let builder =
-        ValidatorBuilder::new(&tmp_dir, cached_framework_packages::module_blobs().to_vec())
-            .min_price_per_gas_unit(0)
-            .randomize_first_validator_ports(false);
+    let builder = aptos_genesis::builder::Builder::new(
+        tmp_dir.path(),
+        cached_framework_packages::module_blobs().to_vec(),
+    )
+    .unwrap()
+    .with_min_price_per_gas_unit(0)
+    .with_randomize_first_validator_ports(false);
 
-    let (root_keys, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();
-    let validator_owner = validators[0].storage().get(OWNER_ACCOUNT).unwrap().value;
+    let (root_key, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();
+    let (validator_identity, _, _) = validators[0].get_key_objects(None).unwrap();
+    let validator_owner = validator_identity.account_address.unwrap();
 
     let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(&tmp_dir));
     let ret =
@@ -74,7 +77,7 @@ pub fn new_test_context(test_name: &'static str) -> TestContext {
             ApiConfig::default(),
         ),
         rng,
-        root_keys,
+        root_key,
         validator_owner,
         Box::new(BlockExecutor::<AptosVM>::new(db_rw)),
         mempool,
@@ -90,7 +93,7 @@ pub struct TestContext {
     pub mempool: Arc<MockSharedMempool>,
     pub db: Arc<AptosDB>,
     rng: rand::rngs::StdRng,
-    root_keys: Arc<RootKeys>,
+    root_key: ConfigKey<Ed25519PrivateKey>,
     executor: Arc<dyn BlockExecutorTrait>,
     expect_status_code: u16,
     test_name: &'static str,
@@ -102,7 +105,7 @@ impl TestContext {
     pub fn new(
         context: Context,
         rng: rand::rngs::StdRng,
-        root_keys: RootKeys,
+        root_key: Ed25519PrivateKey,
         validator_owner: AccountAddress,
         executor: Box<dyn BlockExecutorTrait>,
         mempool: MockSharedMempool,
@@ -112,7 +115,7 @@ impl TestContext {
         Self {
             context,
             rng,
-            root_keys: Arc::new(root_keys),
+            root_key: ConfigKey::new(root_key),
             validator_owner,
             executor: executor.into(),
             mempool: Arc::new(mempool),
@@ -145,7 +148,7 @@ impl TestContext {
     }
 
     pub fn root_account(&self) -> LocalAccount {
-        LocalAccount::new(aptos_root_address(), self.root_keys.root_key.clone(), 0)
+        LocalAccount::new(aptos_root_address(), self.root_key.private_key(), 0)
     }
 
     pub fn latest_state_view(&self) -> DbStateView {

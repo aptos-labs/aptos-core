@@ -39,7 +39,7 @@ pub fn bootstrap_genesis<V: VMExecutor>(
 }
 
 pub fn start_storage_service() -> (NodeConfig, JoinHandle<()>, DbReaderWriter) {
-    let (mut config, _genesis_key) = aptos_genesis_tool::test_config();
+    let (mut config, _genesis_key) = aptos_genesis::test_utils::test_config();
     let server_port = utils::get_available_port();
     config.storage.address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), server_port);
     let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(&config.storage.dir()));

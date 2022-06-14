@@ -163,16 +163,14 @@ pub fn load_test_environment<R>(
             template.consensus.quorum_store_poll_count = u64::MAX;
         }
 
-        let builder = aptos_genesis_tool::validator_builder::ValidatorBuilder::new(
-            &config_path,
-            genesis_modules,
-        )
-        .template(template)
-        .randomize_first_validator_ports(random_ports);
+        let builder = aptos_genesis::builder::Builder::new(&config_path, genesis_modules)
+            .unwrap()
+            .with_template(template)
+            .with_randomize_first_validator_ports(random_ports);
 
-        let (root_keys, _genesis, genesis_waypoint, validators) = builder.build(rng).unwrap();
+        let (root_key, _genesis, genesis_waypoint, validators) = builder.build(rng).unwrap();
 
-        let serialized_keys = bcs::to_bytes(&root_keys.root_key).unwrap();
+        let serialized_keys = bcs::to_bytes(&root_key).unwrap();
         let mut key_file = std::fs::File::create(&aptos_root_key_path).unwrap();
         key_file.write_all(&serialized_keys).unwrap();
 
