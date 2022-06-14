@@ -87,7 +87,7 @@ impl QuorumStore {
         config: QuorumStoreConfig,
         validator_verifier: ValidatorVerifier, //TODO: pass the epoch config
         signer: ValidatorSigner,
-        wrapper_command_rx: Receiver<QuorumStoreCommand>,
+        wrapper_command_rx: tokio::sync::mpsc::Receiver<QuorumStoreCommand>,
     ) -> (Self, Arc<BatchReader>) {
         let validator_signer = Arc::new(signer);
         //prepare the channels for communication among the working thread.

@@ -2037,6 +2037,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-crypto-derive",
+ "aptos-global-constants",
  "aptos-infallible",
  "aptos-logger",
  "aptos-mempool",
