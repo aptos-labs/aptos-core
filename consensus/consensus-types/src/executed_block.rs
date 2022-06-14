@@ -8,6 +8,7 @@ use crate::{
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::hash::HashValue;
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -104,13 +105,13 @@ impl ExecutedBlock {
         )
     }
 
+
     pub fn transactions_to_commit(
         &self,
         validators: &[AccountAddress],
         txns: Vec<SignedTransaction>,
     ) -> Vec<Transaction> {
         // reconfiguration suffix don't execute
-
         if self.is_reconfiguration_suffix() {
             return vec![];
         }

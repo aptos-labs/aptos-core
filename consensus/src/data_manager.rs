@@ -182,7 +182,7 @@ impl DataManager for QuorumStoreDataManager {
                         proofs.clone(),
                         LogicalTime::new(block.epoch(), block.round()),
                     )
-                    .await
+                        .await
                 };
                 let mut vec_ret = Vec::new();
                 debug!("QSE: waiting for data on {} receivers", receivers.len());

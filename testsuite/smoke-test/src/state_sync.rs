@@ -189,7 +189,7 @@ async fn test_full_node_sync(vfn_peer_id: PeerId, mut swarm: LocalSwarm, epoch_c
         &account_1,
         epoch_changes,
     )
-    .await;
+        .await;
 
     // Restart the fullnode and verify it can sync
     swarm
@@ -208,7 +208,7 @@ async fn test_full_node_sync(vfn_peer_id: PeerId, mut swarm: LocalSwarm, epoch_c
         &account_0,
         epoch_changes,
     )
-    .await;
+        .await;
 }
 
 #[tokio::test]
@@ -240,7 +240,8 @@ async fn test_validator_bootstrap_transactions() {
             config.state_sync.state_sync_driver.continuous_syncing_mode =
                 ContinuousSyncingMode::ExecuteTransactions;
         }))
-        .build().await;
+        .build()
+        .await;
 
     // Test the ability of the validators to sync
     test_validator_sync(swarm).await;
@@ -282,7 +283,7 @@ async fn test_validator_sync(mut swarm: LocalSwarm) {
         &account_1,
         true,
     )
-    .await;
+        .await;
 
     // Stop validator 1 and delete the storage
     let validator_1 = validator_peer_ids[1];
@@ -296,7 +297,7 @@ async fn test_validator_sync(mut swarm: LocalSwarm) {
         &account_0,
         true,
     )
-    .await;
+        .await;
 
     // Restart validator 1 and wait for all nodes to catchup
     swarm.validator_mut(validator_1).unwrap().start().unwrap();
@@ -310,7 +311,7 @@ async fn test_validator_sync(mut swarm: LocalSwarm) {
         &account_1,
         true,
     )
-    .await;
+        .await;
 }
 
 #[tokio::test]
@@ -366,7 +367,7 @@ async fn test_all_validator_failures(mut swarm: LocalSwarm) {
         &account_1,
         true,
     )
-    .await;
+        .await;
 
     // Go through each validator, stop the node, delete the storage and wait for it to come back
     for validator in validator_peer_ids.clone() {
@@ -383,7 +384,7 @@ async fn test_all_validator_failures(mut swarm: LocalSwarm) {
         &account_0,
         false,
     )
-    .await;
+        .await;
 
     // Go through each validator, stop the node, delete the storage and wait for it to come back
     for validator in validator_peer_ids.clone() {
@@ -404,7 +405,7 @@ async fn test_all_validator_failures(mut swarm: LocalSwarm) {
         &account_0,
         true,
     )
-    .await;
+        .await;
 }
 
 #[tokio::test]
@@ -424,7 +425,7 @@ async fn test_single_validator_failure() {
         &account_1,
         true,
     )
-    .await;
+        .await;
 
     // Restart the validator
     let validator = swarm.validators_mut().next().unwrap();
@@ -440,7 +441,7 @@ async fn test_single_validator_failure() {
         &account_0,
         true,
     )
-    .await;
+        .await;
 }
 
 /// Executes transactions using the given transaction factory, client and
@@ -465,7 +466,7 @@ async fn execute_transactions(
             receiver,
             num_transfers,
         )
-        .await;
+            .await;
     } else {
         for _ in 0..num_transfers {
             // Execute simple transfer transactions

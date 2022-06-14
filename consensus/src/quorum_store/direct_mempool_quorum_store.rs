@@ -6,8 +6,6 @@ use crate::quorum_store::counters;
 use crate::quorum_store::utils::MempoolProxy;
 use anyhow::Result;
 use aptos_logger::prelude::*;
-// use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
-// use aptos_types::transaction::SignedTransaction;
 use aptos_mempool::QuorumStoreRequest;
 use consensus_types::{
     common::{Payload, PayloadFilter},

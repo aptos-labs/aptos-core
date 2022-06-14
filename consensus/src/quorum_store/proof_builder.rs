@@ -19,7 +19,7 @@ pub(crate) enum ProofBuilderCommand {
 }
 
 pub(crate) type ProofReturnChannel =
-    oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
+oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
 
 pub(crate) struct ProofBuilder {
     // peer_id: PeerId,
