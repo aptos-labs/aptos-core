@@ -8,6 +8,7 @@ use crate::{
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::hash::HashValue;
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -103,13 +104,22 @@ impl ExecutedBlock {
         )
     }
 
-    pub fn transactions_to_commit(&self, validators: &[AccountAddress]) -> Vec<Transaction> {
+    pub fn get_payload(&self) -> Payload {
+        self.block.get_payload()
+    }
+
+    pub fn transactions_to_commit(
+        &self,
+        validators: &[AccountAddress],
+        txn: Vec<SignedTransaction>,
+    ) -> Vec<Transaction> {
         // reconfiguration suffix don't execute
+
         if self.is_reconfiguration_suffix() {
             return vec![];
         }
         itertools::zip_eq(
-            self.block.transactions_to_execute(validators),
+            self.block.transactions_to_execute(validators, txn),
             self.state_compute_result.compute_status(),
         )
         .filter_map(|(txn, status)| match status {

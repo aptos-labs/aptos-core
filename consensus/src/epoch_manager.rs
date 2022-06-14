@@ -1,10 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::quorum_store::batch_reader::BatchReader;
+use crate::quorum_store::quorum_store::{QuorumStore, QuorumStoreCommand, QuorumStoreConfig};
+use crate::quorum_store::quorum_store_db::QuorumStoreDB;
+use crate::quorum_store::quorum_store_wrapper::QuorumStoreWrapper;
 use crate::{
     block_storage::BlockStore,
-    commit_notifier::CommitNotifier,
     counters,
+    data_manager::DataManager,
     error::{error_kind, DbError},
     experimental::{
         buffer_manager::{OrderedBlocks, ResetRequest},
@@ -36,10 +40,13 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context};
 use aptos_config::config::{ConsensusConfig, NodeConfig};
+use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_metrics_core::monitor;
+use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
+use aptos_types::validator_signer::ValidatorSigner;
 use aptos_types::{
     account_address::AccountAddress,
     epoch_change::EpochChangeProof,
@@ -54,7 +61,7 @@ use channel::{aptos_channel, message_queues::QueueStyle};
 use consensus_types::{
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,
-    request_response::ConsensusRequest,
+    request_response::WrapperCommand,
 };
 use event_notifications::ReconfigNotificationListener;
 use futures::{
@@ -67,6 +74,7 @@ use futures::{
 };
 use network::protocols::network::{ApplicationNetworkSender, Event};
 use safety_rules::SafetyRulesManager;
+use std::convert::TryInto;
 use std::{
     cmp::Ordering,
     mem::{discriminant, Discriminant},
@@ -105,12 +113,12 @@ pub struct EpochManager {
     self_sender: channel::Sender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkSender,
     timeout_sender: channel::Sender<Round>,
-    quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
+    quorum_store_to_mempool_tx: Sender<QuorumStoreRequest>,
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
     reconfig_events: ReconfigNotificationListener,
-    commit_notifier: Arc<dyn CommitNotifier>,
+    data_manager: Arc<dyn DataManager>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     buffer_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
@@ -120,6 +128,9 @@ pub struct EpochManager {
     >,
     epoch_state: Option<EpochState>,
     block_store: Option<Arc<BlockStore>>,
+    quorum_store_storage: Arc<QuorumStoreDB>,
+    quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+    wrapper_quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
 }
 
 impl EpochManager {
@@ -129,14 +140,15 @@ impl EpochManager {
         self_sender: channel::Sender<Event<ConsensusMsg>>,
         network_sender: ConsensusNetworkSender,
         timeout_sender: channel::Sender<Round>,
-        quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
+        quorum_store_to_mempool_tx: Sender<QuorumStoreRequest>,
         commit_state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn PersistentLivenessStorage>,
         reconfig_events: ReconfigNotificationListener,
-        commit_notifier: Arc<dyn CommitNotifier>,
+        data_manager: Arc<dyn DataManager>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
+        let path = node_config.storage.dir();
         let sr_config = &node_config.consensus.safety_rules;
         let safety_rules_manager = SafetyRulesManager::new(sr_config);
         Self {
@@ -146,17 +158,20 @@ impl EpochManager {
             self_sender,
             network_sender,
             timeout_sender,
-            quorum_store_to_mempool_sender,
+            quorum_store_to_mempool_tx,
             commit_state_computer,
             storage,
             safety_rules_manager,
             reconfig_events,
-            commit_notifier,
+            data_manager,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
             epoch_state: None,
             block_store: None,
+            quorum_store_storage: Arc::new(QuorumStoreDB::new(path)),
+            quorum_store_msg_tx: None,
+            wrapper_quorum_store_msg_tx: None,
         }
     }
 
@@ -364,16 +379,117 @@ impl EpochManager {
         Ok(())
     }
 
-    fn spawn_quorum_store(
+    fn spawn_direct_mempool_quorum_store(
         &mut self,
-        consensus_to_quorum_store_receiver: Receiver<ConsensusRequest>,
+        consensus_to_quorum_store_rx: Receiver<WrapperCommand>,
     ) {
         let quorum_store = DirectMempoolQuorumStore::new(
-            consensus_to_quorum_store_receiver,
-            self.quorum_store_to_mempool_sender.clone(),
+            self.quorum_store_to_mempool_tx.clone(),
             self.config.mempool_txn_pull_timeout_ms,
         );
+        // TODO: do we need to destroy the async thread with explicit shutdown?
+        tokio::spawn(quorum_store.start(consensus_to_quorum_store_rx));
+    }
+
+    ///this function spawns QuorumStore
+    fn spawn_quorum_store(
+        &mut self,
+        config: QuorumStoreConfig,
+        network_sender: NetworkSender,
+        verifier: ValidatorVerifier,
+        wrapper_command_rx: tokio::sync::mpsc::Receiver<QuorumStoreCommand>,
+    ) -> Arc<BatchReader> {
+        let backend = &self.config.safety_rules.backend;
+        let storage: Storage = backend.try_into().expect("Unable to initialize storage");
+        if let Err(error) = storage.available() {
+            panic!("Storage is not available: {:?}", error);
+        }
+        let private_key = storage
+            .get(CONSENSUS_KEY)
+            .map(|v| v.value)
+            .expect("Unable to get private key");
+        let signer = ValidatorSigner::new(self.author, private_key);
+
+        let (quorum_store_msg_tx, quorum_store_msg_rx) =
+            aptos_channel::new::<AccountAddress, VerifiedEvent>(
+                QueueStyle::FIFO,
+                self.config.channel_size,
+                None,
+            );
+
+        let reader_db = self.storage.aptos_db();
+        let latest_ledger_info_with_sigs = reader_db
+            .get_latest_ledger_info()
+            .expect("could not get latest ledger info");
+        let last_committed_round = if latest_ledger_info_with_sigs
+            .ledger_info()
+            .commit_info()
+            .epoch()
+            == self.epoch()
+        {
+            latest_ledger_info_with_sigs
+                .ledger_info()
+                .commit_info()
+                .round()
+        } else {
+            0
+        };
+
+        self.quorum_store_msg_tx = Some(quorum_store_msg_tx);
+
+        let (quorum_store, batch_reader) = QuorumStore::new(
+            self.epoch(),
+            last_committed_round,
+            self.author,
+            self.quorum_store_storage.clone(),
+            quorum_store_msg_rx,
+            network_sender,
+            config,
+            verifier,
+            signer,
+            wrapper_command_rx,
+        );
+
+        // TODO: do we need to destroy the async thread with explicit shutdown?
         tokio::spawn(quorum_store.start());
+        batch_reader
+    }
+
+    fn spawn_quorum_wrapper(
+        &mut self,
+        network_sender: NetworkSender,
+        consensus_to_quorum_store_rx: Receiver<WrapperCommand>,
+        wrapper_to_quorum_store_tx: tokio::sync::mpsc::Sender<QuorumStoreCommand>,
+    ) {
+        // TODO: make this not use a ConsensusRequest
+        let (wrapper_quorum_store_msg_tx, wrapper_quorum_store_msg_rx) =
+            aptos_channel::new::<AccountAddress, VerifiedEvent>(
+                QueueStyle::FIFO,
+                self.config.channel_size,
+                None,
+            );
+
+        self.wrapper_quorum_store_msg_tx = Some(wrapper_quorum_store_msg_tx);
+
+        // TODO: need to bring shutdown_tx out of this function and use it in shutdown_current_processor
+        let (_shutdown_tx, shutdown_rx) = mpsc::channel(0);
+
+        let quorum_store_wrapper = QuorumStoreWrapper::new(
+            self.epoch(),
+            self.quorum_store_storage.clone(),
+            self.quorum_store_to_mempool_tx.clone(),
+            wrapper_to_quorum_store_tx,
+            self.config.mempool_txn_pull_timeout_ms,
+            // TODO
+            100,
+            1000000,
+        );
+        tokio::spawn(quorum_store_wrapper.start(
+            network_sender,
+            consensus_to_quorum_store_rx,
+            shutdown_rx,
+            wrapper_quorum_store_msg_rx,
+        ));
     }
 
     /// this function spawns the phases and a buffer manager
@@ -495,16 +611,51 @@ impl EpochManager {
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
-        let (consensus_to_quorum_store_sender, consensus_to_quorum_store_receiver) =
+        //Start QuorumStore
+        let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
-        self.spawn_quorum_store(consensus_to_quorum_store_receiver);
+        if self.config.use_quorum_store {
+            //TODO: create channels between quorum_store, execution, and wrapper and pass around.
+
+            // TODO: grab config.
+            // TODO: think about these numbers
+            let config = QuorumStoreConfig {
+                channel_size: 100,
+                proof_timeout_ms: 1000,
+                batch_request_num_peers: 3,
+                batch_request_timeout_ms: 1000,
+                max_execution_round_lag: 20,
+                max_batch_size: 200000,
+                memory_quota: 100000000,
+                db_quota: 10000000000,
+            };
+
+            let (wrapper_quorum_store_tx, wrapper_quorum_store_rx) =
+                tokio::sync::mpsc::channel(100);
+            let data_reader = self.spawn_quorum_store(
+                config.clone(),
+                network_sender.clone(),
+                epoch_state.verifier.clone(),
+                wrapper_quorum_store_rx,
+            );
+
+            self.data_manager
+                .new_epoch(data_reader.clone(), consensus_to_quorum_store_tx.clone());
+
+            self.spawn_quorum_wrapper(
+                network_sender.clone(),
+                consensus_to_quorum_store_rx,
+                wrapper_quorum_store_tx,
+            );
+        } else {
+            self.spawn_direct_mempool_quorum_store(consensus_to_quorum_store_rx);
+        }
+
         let payload_manager = QuorumStoreClient::new(
-            consensus_to_quorum_store_sender.clone(),
+            consensus_to_quorum_store_tx,
             self.config.quorum_store_poll_count,
             self.config.quorum_store_pull_timeout_ms,
         );
-        self.commit_notifier
-            .new_epoch(consensus_to_quorum_store_sender);
 
         self.commit_state_computer.new_epoch(&epoch_state);
         let state_computer = if onchain_config.decoupled_execution() {
@@ -602,7 +753,7 @@ impl EpochManager {
             // same epoch -> run well-formedness + signature check
             let verified_event = unverified_event
                 .clone()
-                .verify(&self.epoch_state().verifier)
+                .verify(peer_id, &self.epoch_state().verifier)
                 .context("[EpochManager] Verify event")
                 .map_err(|err| {
                     error!(
@@ -630,7 +781,11 @@ impl EpochManager {
             | ConsensusMsg::SyncInfo(_)
             | ConsensusMsg::VoteMsg(_)
             | ConsensusMsg::CommitVoteMsg(_)
-            | ConsensusMsg::CommitDecisionMsg(_) => {
+            | ConsensusMsg::CommitDecisionMsg(_)
+            | ConsensusMsg::SignedDigestMsg(_)
+            | ConsensusMsg::FragmentMsg(_)
+            | ConsensusMsg::BatchMsg(_)
+            | ConsensusMsg::ProofOfStoreBroadcastMsg(_) => {
                 let event: UnverifiedEvent = msg.into();
                 if event.epoch() == self.epoch() {
                     return Ok(Some(event));
@@ -682,6 +837,22 @@ impl EpochManager {
         event: VerifiedEvent,
     ) -> anyhow::Result<()> {
         match event {
+            wrapper_quorum_store_event @ VerifiedEvent::ProofOfStoreBroadcast(_) => {
+                if let Some(sender) = &mut self.wrapper_quorum_store_msg_tx {
+                    sender.push(peer_id, wrapper_quorum_store_event)?;
+                } else {
+                    bail!("QuorumStore wrapper not started but received QuorumStore Message");
+                }
+            }
+            quorum_store_event @ (VerifiedEvent::SignedDigest(_)
+            | VerifiedEvent::Fragment(_)
+            | VerifiedEvent::Batch(_)) => {
+                if let Some(sender) = &mut self.quorum_store_msg_tx {
+                    sender.push(peer_id, quorum_store_event)?;
+                } else {
+                    bail!("QuorumStore not started but received QuorumStore Message");
+                }
+            }
             buffer_manager_event @ (VerifiedEvent::CommitVote(_)
             | VerifiedEvent::CommitDecision(_)) => {
                 if let Some(sender) = &mut self.buffer_manager_msg_tx {
@@ -737,6 +908,7 @@ impl EpochManager {
         mut round_timeout_sender_rx: channel::Receiver<Round>,
         mut network_receivers: NetworkReceivers,
     ) {
+        debug!("QS: Initial start");
         // initial start of the processor
         self.await_reconfig_notification().await;
         loop {

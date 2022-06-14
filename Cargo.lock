@@ -2016,6 +2016,8 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-global-constants",
  "aptos-infallible",
  "aptos-logger",
  "aptos-mempool",
@@ -2024,14 +2026,17 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "arc-swap",
  "async-trait",
  "bcs",
  "byteorder",
  "bytes",
  "channel",
+ "chrono",
  "claim",
  "consensus-notifications",
  "consensus-types",
+ "dashmap 4.0.2",
  "event-notifications",
  "executor",
  "executor-test-helpers",
@@ -2091,6 +2096,7 @@ dependencies = [
  "itertools",
  "mirai-annotations",
  "proptest",
+ "rand 0.7.3",
  "serde 1.0.137",
  "serde_json",
  "short-hex-str",
@@ -2525,6 +2531,16 @@ dependencies = [
  "darling_core",
  "quote 1.0.18",
  "syn 1.0.95",
+]
+
+[[package]]
+name = "dashmap"
+version = "4.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e77a43b28d0668df09411cb0bc9a8c2adc40f9a048afe863e05fd43251e8e39c"
+dependencies = [
+ "cfg-if 1.0.0",
+ "num_cpus",
 ]
 
 [[package]]
@@ -4062,7 +4078,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ab388864246d58a276e60e7569a833d9cc4cd75c66e5ca77c177dad38e59996"
 dependencies = [
  "ahash",
- "dashmap",
+ "dashmap 5.2.0",
  "hashbrown 0.12.1",
  "once_cell",
  "parking_lot 0.12.0",
@@ -5373,7 +5389,7 @@ name = "mvhashmap"
 version = "0.1.0"
 dependencies = [
  "crossbeam",
- "dashmap",
+ "dashmap 5.2.0",
  "proptest",
  "proptest-derive",
  "rayon",

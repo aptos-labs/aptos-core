@@ -90,7 +90,6 @@ async fn test_basic_state_synchronization() {
 
     // Test multiple chunk sync
     swarm.validator_mut(node_to_restart).unwrap().stop();
-
     for _ in 0..10 {
         transfer_coins(
             &client_1,
