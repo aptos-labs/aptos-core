@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::types::{Payload, Batch, PersistedValue, ProofOfStore};
+use crate::quorum_store::types::{Data, Batch, PersistedValue, ProofOfStore};
 use crate::{
     network::NetworkSender,
     quorum_store::{
@@ -36,8 +36,8 @@ const MAX_BATCH_EXPIRY_ROUND_GAP: Round = 20;
 #[allow(dead_code)]
 pub(crate) enum BatchReaderCommand {
     GetBatchForPeer(HashValue, PeerId),
-    GetBatchForSelf(ProofOfStore, oneshot::Sender<Payload>),
-    BatchResponse(HashValue, Payload),
+    GetBatchForSelf(ProofOfStore, oneshot::Sender<Data>),
+    BatchResponse(HashValue, Data),
 }
 
 pub(crate) enum StoreType {
@@ -267,7 +267,7 @@ impl BatchReader {
 
     // TODO: maybe check the epoch to stop communicating on epoch change.
     #[allow(dead_code)]
-    pub async fn get_batch(&self, proof: ProofOfStore, ret_tx: oneshot::Sender<Payload>) {
+    pub async fn get_batch(&self, proof: ProofOfStore, ret_tx: oneshot::Sender<Data>) {
         if let Some(value) = self.db_cache.get(&proof.digest()) {
             if value.maybe_payload.is_some() {
                 ret_tx

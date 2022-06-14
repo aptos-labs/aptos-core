@@ -1,6 +1,6 @@
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::types::{Batch, Payload};
+use crate::quorum_store::types::{Batch, Data};
 use crate::quorum_store::utils::DigestTimeouts;
 use aptos_crypto::HashValue;
 use aptos_types::{validator_signer::ValidatorSigner, PeerId};
@@ -10,11 +10,11 @@ use tokio::sync::oneshot;
 struct BatchRequesterState {
     signers: Vec<PeerId>,
     next_index: usize,
-    ret_tx: oneshot::Sender<Payload>,
+    ret_tx: oneshot::Sender<Data>,
 }
 
 impl BatchRequesterState {
-    fn new(signers: Vec<PeerId>, ret_tx: oneshot::Sender<Payload>) -> Self {
+    fn new(signers: Vec<PeerId>, ret_tx: oneshot::Sender<Data>) -> Self {
         Self {
             signers,
             next_index: 0,
@@ -35,7 +35,7 @@ impl BatchRequesterState {
         ret
     }
 
-    fn serve_request(self, payload: Payload) {
+    fn serve_request(self, payload: Data) {
         self.ret_tx
             .send(payload)
             .expect("Receiver of requested batch not available");
@@ -90,7 +90,7 @@ impl BatchRequester {
         &mut self,
         digest: HashValue,
         signers: Vec<PeerId>,
-        ret_tx: oneshot::Sender<Payload>,
+        ret_tx: oneshot::Sender<Data>,
         self_signer: Arc<ValidatorSigner>,
     ) {
         let mut request_state = BatchRequesterState::new(signers, ret_tx);
@@ -113,7 +113,7 @@ impl BatchRequester {
     }
 
     // TODO, Rati, how is sending here is not a side effect? Who is it different from the handle messages we had in Quorum_store?
-    pub(crate) fn serve_request(&mut self, digest: HashValue, payload: Payload) {
+    pub(crate) fn serve_request(&mut self, digest: HashValue, payload: Data) {
         if self.digest_to_state.contains_key(&digest) {
             let state = self.digest_to_state.remove(&digest).unwrap();
             state.serve_request(payload);

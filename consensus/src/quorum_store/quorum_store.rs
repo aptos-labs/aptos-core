@@ -3,7 +3,7 @@
 
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::types::{Fragment,Payload};
+use crate::quorum_store::types::{Fragment, Data};
 use crate::quorum_store::{
     batch_aggregator::{AggregationMode, BatchAggregator},
     batch_reader::BatchReader,
@@ -35,8 +35,8 @@ pub type ProofReturnChannel = oneshot::Sender<Result<ProofOfStore, QuorumStoreEr
 
 #[allow(dead_code)]
 pub enum QuorumStoreCommand {
-    AppendToBatch(Payload),
-    EndBatch(Payload, LogicalTime, ProofReturnChannel),
+    AppendToBatch(Data),
+    EndBatch(Data, LogicalTime, ProofReturnChannel),
 }
 
 #[derive(Debug)]
@@ -143,7 +143,7 @@ impl QuorumStore {
     }
 
     /// Aggregate & compute rolling digest, synchronously by worker.
-    fn handle_append_to_batch(&mut self, fragment_payload: Payload) -> Option<ConsensusMsg> {
+    fn handle_append_to_batch(&mut self, fragment_payload: Data) -> Option<ConsensusMsg> {
         if self.batch_aggregator.append_transactions(
             self.batch_id,
             self.fragment_id,
@@ -168,7 +168,7 @@ impl QuorumStore {
     /// Finalize the batch & digest, synchronously by worker.
     fn handle_end_batch(
         &mut self,
-        fragment_payload: Payload,
+        fragment_payload: Data,
         expiration: LogicalTime,
         proof_tx: ProofReturnChannel,
     ) -> Option<(BatchStoreCommand, oneshot::Receiver<SignedDigest>)> {

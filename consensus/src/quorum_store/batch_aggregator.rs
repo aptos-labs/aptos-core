@@ -1,20 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::types::{BatchId, Payload};
+use crate::quorum_store::types::{BatchId, Data};
 use aptos_crypto::{hash::DefaultHasher, HashValue};
 use bcs::to_bytes;
 
 
 struct IncrementalBatchState {
-    txn_fragments: Vec<Payload>,
+    txn_fragments: Vec<Data>,
     hasher: DefaultHasher,
     num_bytes: usize,
     max_bytes: usize,
 }
 
 impl IncrementalBatchState {
-    pub fn from_initial_transactions(transactions: Payload, max_bytes: usize) -> Self {
+    pub fn from_initial_transactions(transactions: Data, max_bytes: usize) -> Self {
         let mut ret = Self {
             txn_fragments: Vec::new(),
             hasher: DefaultHasher::new(b"QuorumStoreBatch"),
@@ -30,7 +30,7 @@ impl IncrementalBatchState {
         self.num_bytes
     }
 
-    pub fn append_transactions(&mut self, transactions: Payload) {
+    pub fn append_transactions(&mut self, transactions: Data) {
         // optimization to save computation when we overflow max size
         if self.num_bytes < self.max_bytes {
             let serialized: Vec<u8> = transactions
@@ -49,7 +49,7 @@ impl IncrementalBatchState {
         self.txn_fragments.len()
     }
 
-    pub fn finalize_batch(self) -> (usize, Payload, HashValue) {
+    pub fn finalize_batch(self) -> (usize, Data, HashValue) {
         (
             self.num_bytes(),
             self.txn_fragments.into_iter().flatten().collect(),
@@ -103,7 +103,7 @@ impl BatchAggregator {
         &mut self,
         batch_id: BatchId,
         fragment_id: usize,
-        transactions: Payload,
+        transactions: Data,
         mode: AggregationMode, //TODO: why is this not part of the struct?
     ) -> bool {
         let missed_fragment = self.missed_fragment(batch_id, fragment_id);
@@ -147,9 +147,9 @@ impl BatchAggregator {
         &mut self,
         batch_id: BatchId,
         fragment_id: usize,
-        transactions: Payload,
+        transactions: Data,
         mode: AggregationMode,
-    ) -> Option<(usize, Payload, HashValue)> {
+    ) -> Option<(usize, Data, HashValue)> {
         if self.append_transactions(batch_id, fragment_id, transactions, mode) {
             Some(self.batch_state.take().unwrap().finalize_batch())
         } else {

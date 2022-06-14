@@ -16,12 +16,12 @@ use std::sync::Arc;
 use aptos_types::transaction::SignedTransaction;
 
 pub(crate) type BatchId = u64;
-pub type Payload = Vec<SignedTransaction>;
+pub type Data = Vec<SignedTransaction>;
 
 
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
 pub(crate) struct PersistedValue {
-    pub(crate) maybe_payload: Option<Payload>,
+    pub(crate) maybe_payload: Option<Data>,
     pub(crate) expiration: LogicalTime,
     pub(crate) author: PeerId,
     pub(crate) num_bytes: usize,
@@ -29,7 +29,7 @@ pub(crate) struct PersistedValue {
 
 impl PersistedValue {
     pub(crate) fn new(
-        maybe_payload: Option<Payload>,
+        maybe_payload: Option<Data>,
         expiration: LogicalTime,
         author: PeerId,
         num_bytes: usize,
@@ -52,7 +52,7 @@ pub struct FragmentInfo {
     epoch: u64,
     batch_id: u64,
     fragment_id: usize,
-    payload: Payload,
+    payload: Data,
     maybe_expiration: Option<LogicalTime>,
 }
 
@@ -62,7 +62,7 @@ impl FragmentInfo {
         epoch: u64,
         batch_id: u64,
         fragment_id: usize,
-        fragment_payload: Payload,
+        fragment_payload: Data,
         maybe_expiration: Option<LogicalTime>,
     ) -> Self {
         Self {
@@ -74,7 +74,7 @@ impl FragmentInfo {
         }
     }
 
-    pub(crate) fn take_transactions(self) -> Payload {
+    pub(crate) fn take_transactions(self) -> Data {
         self.payload
     }
 
@@ -104,7 +104,7 @@ impl Fragment {
         epoch: u64,
         batch_id: u64,
         fragment_id: usize,
-        fragment_payload: Payload,
+        fragment_payload: Data,
         maybe_expiration: Option<LogicalTime>,
         peer_id: PeerId,
         validator_signer: Arc<ValidatorSigner>,
@@ -138,7 +138,7 @@ impl Fragment {
         self.fragment_info.epoch
     }
 
-    pub(crate) fn take_transactions(self) -> Payload {
+    pub(crate) fn take_transactions(self) -> Data {
         self.fragment_info.take_transactions()
     }
 
@@ -165,7 +165,7 @@ pub struct BatchInfo {
 pub struct Batch {
     pub(crate) source: PeerId,
     // None is a request, Some(payload) is a response.
-    pub(crate) maybe_payload: Option<Payload>,
+    pub(crate) maybe_payload: Option<Data>,
     pub(crate) batch_info: BatchInfo,
     pub(crate) maybe_signature: Option<Ed25519Signature>,
 }
@@ -176,7 +176,7 @@ impl Batch {
         epoch: u64,
         source: PeerId,
         digest_hash: HashValue,
-        maybe_payload: Option<Payload>,
+        maybe_payload: Option<Data>,
         signer: Arc<ValidatorSigner>,
     ) -> Self {
         let batch_info = BatchInfo {
@@ -227,7 +227,7 @@ impl Batch {
         }
     }
 
-    pub fn get_payload(self) -> Payload {
+    pub fn get_payload(self) -> Data {
         assert!(self.maybe_payload.is_some());
         self.maybe_payload.unwrap()
     }

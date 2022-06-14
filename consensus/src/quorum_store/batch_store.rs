@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::types::{Payload, Batch, PersistedValue};
+use crate::quorum_store::types::{Data, Batch, PersistedValue};
 use crate::{
     network::NetworkSender,
     quorum_store::{
@@ -55,7 +55,7 @@ pub struct PersistRequest {
 impl PersistRequest {
     pub fn new(
         author: PeerId,
-        payload: Payload,
+        payload: Data,
         digest_hash: HashValue,
         num_bytes: usize,
         expiration: LogicalTime,
@@ -70,7 +70,7 @@ impl PersistRequest {
 #[derive(Debug)]
 pub(crate) enum BatchStoreCommand {
     Persist(PersistRequest, Option<oneshot::Sender<SignedDigest>>),
-    BatchRequest(HashValue, PeerId, Option<oneshot::Sender<Payload>>),
+    BatchRequest(HashValue, PeerId, Option<oneshot::Sender<Data>>),
     Clean(Vec<HashValue>),
 }
 
