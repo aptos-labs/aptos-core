@@ -135,8 +135,8 @@ spec:
         securityContext:
           {{- if $.Values.enablePrivilegedMode }}
           privileged: true
+          runAsUser: 0
           {{- else }}
-	  runAsUser: 0
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
           capabilities:
