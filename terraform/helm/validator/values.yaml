@@ -356,4 +356,4 @@ loggingCentralHost:
 exposeValidatorRestApi: false
 # Used for testing purposes only!
 # Gives certain serviceaccounts access to privileged role. Useful for profiling and performance bencharmking
-enablePrivilegedMode: false
+enablePrivilegedMode: true
