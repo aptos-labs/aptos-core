@@ -389,6 +389,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-faucet-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-faucet",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-rest-client",
+ "aptos-sdk",
+ "aptos-workspace-hack",
+ "bcs",
+ "bytes",
+ "clap 3.1.18",
+ "futures",
+ "hex",
+ "rand 0.7.3",
+ "reqwest",
+ "serde 1.0.137",
+ "serde_json",
+ "serde_yaml",
+ "tempfile",
+ "tokio",
+ "url",
+ "warp",
+]
+
+[[package]]
 name = "aptos-fuzz"
 version = "0.1.0"
 dependencies = [

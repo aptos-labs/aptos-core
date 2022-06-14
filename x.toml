@@ -173,6 +173,7 @@ members = [
     # Please keep this list in alphabetical order!
 
     "testcases",
+    "aptos-faucet-cli",
     "aptos-fuzz",
     "aptos-fuzzer",
     "aptos-proptest-helpers",

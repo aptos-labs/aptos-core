@@ -147,7 +147,7 @@ impl FaucetArgs {
 
 pub struct Service {
     pub faucet_account: Mutex<LocalAccount>,
-    transaction_factory: TransactionFactory,
+    pub transaction_factory: TransactionFactory,
     client: Client,
     endpoint: String,
     maximum_amount: Option<u64>,
