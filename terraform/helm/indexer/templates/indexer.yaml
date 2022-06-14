@@ -54,3 +54,20 @@ spec:
         runAsUser: 6180
         runAsGroup: 6180
       serviceAccountName: {{ include "aptos-indexer.serviceAccountName" . }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "aptos-indexer.fullname" . }}
+  labels:
+    {{- include "aptos-indexer.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: indexer
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: NodePort
+  externalTrafficPolicy: Local
