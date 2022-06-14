@@ -73,6 +73,7 @@ resource "aws_eks_node_group" "nodes" {
 
   lifecycle {
     ignore_changes = [
+      # ignore changes to the desired size that may occur due to cluster autoscaler
       scaling_config[0].desired_size
     ]
   }
@@ -89,7 +90,8 @@ resource "aws_eks_node_group" "nodes" {
   }
 
   update_config {
-    max_unavailable = var.max_node_pool_surge > 1 ? lookup(var.node_pool_sizes, each.key, each.value.size) * (var.max_node_pool_surge - 1) : 1
+    # the maximum unavailable nodes is a functino of the desired size multiplied by how much the nodegroup is allowed to surge
+    max_unavailable = var.max_node_pool_surge > 1 ? lookup(var.node_pool_sizes, each.key, each.value.size) * (var.max_node_pool_surge - 1) : lookup(var.node_pool_sizes, each.key, each.value.size)
   }
 
   depends_on = [
