@@ -18,7 +18,7 @@ use aptos_types::{
 };
 use aptosdb::AptosDB;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
-use proptest::prelude::Rng;
+use rand::Rng;
 use storage_interface::DbReaderWriter;
 
 pub struct TestExecutor {

@@ -7,6 +7,7 @@ import { TransactionBuilderEd25519 } from './index';
 import {
   AccountAddress,
   ChainId,
+  Ed25519Signature,
   Module,
   ModuleBundle,
   RawTransaction,
@@ -43,7 +44,7 @@ function sign(rawTxn: RawTransaction): Bytes {
   const { publicKey } = signingKey;
 
   const txnBuilder = new TransactionBuilderEd25519(
-    (signingMessage) => Nacl.sign(signingMessage, signingKey.secretKey).slice(0, 64),
+    (signingMessage) => new Ed25519Signature(Nacl.sign(signingMessage, signingKey.secretKey).slice(0, 64)),
     publicKey,
   );
 

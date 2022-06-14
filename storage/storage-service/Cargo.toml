@@ -12,12 +12,12 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.57"
 bcs = "0.1.3"
-rand = { version = "0.8.5", optional = true }
+rand = { version = "0.7.3", optional = true }
 
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-metrics = { path = "../../crates/aptos-metrics" }
+aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 aptos-secure-net = { path = "../../secure/net" }
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }

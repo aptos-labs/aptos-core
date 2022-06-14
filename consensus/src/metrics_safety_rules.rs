@@ -4,7 +4,7 @@
 use crate::persistent_liveness_storage::PersistentLivenessStorage;
 use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_logger::prelude::info;
-use aptos_metrics::monitor;
+use aptos_metrics_core::monitor;
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},

@@ -8,10 +8,14 @@ use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Transaction};
+use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures, state_store::state_value::StateValue,
+    transaction::Transaction,
+};
 use aptos_vm::VMExecutor;
 use executor_types::{BlockExecutorTrait, Error, StateComputeResult, StateSnapshotDelta};
 use fail::fail_point;
+use scratchpad::SparseMerkleTree;
 use std::marker::PhantomData;
 
 use crate::{
@@ -22,7 +26,7 @@ use crate::{
         APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
-use storage_interface::{jmt_update_sets, DbReaderWriter};
+use storage_interface::{jmt_updates, DbReaderWriter};
 
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
@@ -41,6 +45,16 @@ where
             block_tree,
             phantom: PhantomData,
         }
+    }
+
+    pub fn root_smt(&self) -> SparseMerkleTree<StateValue> {
+        self.block_tree
+            .root_block()
+            .output
+            .result_view
+            .state()
+            .current
+            .clone()
     }
 }
 
@@ -119,10 +133,11 @@ where
         Ok(block.output.as_state_compute_result(parent_accumulator))
     }
 
-    fn commit_blocks(
+    fn commit_blocks_ext(
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
+        save_state_snapshots: bool,
     ) -> Result<Option<StateSnapshotDelta>, Error> {
         let _timer = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
         let committed_block = self.block_tree.root_block();
@@ -169,10 +184,11 @@ where
             fail_point!("executor::commit_blocks", |_| {
                 Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
             });
-            self.db.writer.save_transactions(
+            self.db.writer.save_transactions_ext(
                 &txns_to_commit,
                 first_version,
                 Some(&ledger_info_with_sigs),
+                save_state_snapshots,
             )?;
             self.block_tree
                 .prune(ledger_info_with_sigs.ledger_info())
@@ -180,12 +196,12 @@ where
         };
         let jmt_updates = txns_to_commit
             .iter()
-            .flat_map(|t| jmt_update_sets(&[t.state_updates()]))
+            .flat_map(|t| jmt_updates(t.state_updates()))
             .collect();
         Ok(Some(StateSnapshotDelta {
             version: ledger_info_with_sigs.ledger_info().version(),
             smt: committed_smt,
-            value_sets: jmt_updates,
+            jmt_updates,
         }))
     }
 }

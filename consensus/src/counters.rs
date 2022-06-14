@@ -1,10 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_metrics::{
-    register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
-    register_int_gauge, DurationHistogram, Histogram, HistogramVec, IntCounter, IntCounterVec,
-    IntGauge,
+use aptos_metrics_core::{
+    op_counters::DurationHistogram, register_histogram, register_histogram_vec,
+    register_int_counter, register_int_counter_vec, register_int_gauge, Histogram, HistogramVec,
+    IntCounter, IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
 
@@ -13,8 +13,8 @@ use once_cell::sync::Lazy;
 //////////////////////
 
 /// Monitor counters, used by monitor! macro
-pub static OP_COUNTERS: Lazy<aptos_metrics::OpMetrics> =
-    Lazy::new(|| aptos_metrics::OpMetrics::new_and_registered("consensus"));
+pub static OP_COUNTERS: Lazy<aptos_metrics_core::op_counters::OpMetrics> =
+    Lazy::new(|| aptos_metrics_core::op_counters::OpMetrics::new_and_registered("consensus"));
 
 pub static ERROR_COUNT: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
@@ -267,6 +267,15 @@ pub static PENDING_STATE_SYNC_NOTIFICATION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_consensus_pending_state_sync_notification",
         "Count of the pending state sync notification"
+    )
+    .unwrap()
+});
+
+/// Count of the pending quorum store commit notification.
+pub static PENDING_QUORUM_STORE_COMMIT_NOTIFICATION: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_pending_quorum_store_commit_notification",
+        "Count of the pending quorum store commit notification"
     )
     .unwrap()
 });

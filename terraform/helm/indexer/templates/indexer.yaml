@@ -37,7 +37,12 @@ spec:
           - sh
           - -c
           - |
-            aptos-indexer --pg-uri=$DATABASE_URI --node-url={{ .Values.nodeUrl }}
+            aptos-indexer --pg-uri=$DATABASE_URI --node-url={{ .Values.nodeUrl }} \
+              {{- if .Values.indexTokenData }}
+              --index-token-data \
+              {{- end }}
+              --emit-every {{ .Values.emitEvery }} \
+              --batch-size {{ .Values.batchSize }}
         securityContext:
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false

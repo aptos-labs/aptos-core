@@ -12,7 +12,7 @@ use crate::{
         tasks::process_committed_transactions,
         types::{notify_subscribers, ScheduledBroadcast, SharedMempool, SharedMempoolNotification},
     },
-    ConsensusRequest, MempoolEventsReceiver, TransactionSummary,
+    MempoolEventsReceiver, QuorumStoreRequest,
 };
 use ::network::protocols::network::Event;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
@@ -20,6 +20,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::on_chain_config::OnChainConfigPayload;
 use bounded_executor::BoundedExecutor;
+use consensus_types::common::TransactionSummary;
 use event_notifications::ReconfigNotificationListener;
 use futures::{
     channel::mpsc,
@@ -43,7 +44,7 @@ pub(crate) async fn coordinator<V>(
     executor: Handle,
     network_events: Vec<(NetworkId, MempoolNetworkEvents)>,
     mut client_events: MempoolEventsReceiver,
-    mut consensus_requests: mpsc::Receiver<ConsensusRequest>,
+    mut quorum_store_requests: mpsc::Receiver<QuorumStoreRequest>,
     mut mempool_listener: MempoolNotificationListener,
     mut mempool_reconfig_events: ReconfigNotificationListener,
 ) where
@@ -72,8 +73,8 @@ pub(crate) async fn coordinator<V>(
             msg = client_events.select_next_some() => {
                 handle_client_request(&mut smp, &bounded_executor, msg).await;
             },
-            msg = consensus_requests.select_next_some() => {
-                tasks::process_consensus_request(&smp, msg);
+            msg = quorum_store_requests.select_next_some() => {
+                tasks::process_quorum_store_request(&smp, msg);
             },
             msg = mempool_listener.select_next_some() => {
                 handle_commit_notification(&mut smp, msg, &mut mempool_listener);
@@ -271,7 +272,10 @@ async fn handle_network_event<V>(
                 } => {
                     let smp_clone = smp.clone();
                     let peer = PeerNetworkId::new(network_id, peer_id);
-                    let timeline_state = match smp.network_interface.is_upstream_peer(&peer, None) {
+                    let timeline_state = match (smp.validator_broadcast()
+                        && smp.network_interface.is_validator())
+                        || smp.network_interface.is_upstream_peer(&peer, None)
+                    {
                         true => TimelineState::NonQualified,
                         false => TimelineState::NotReady,
                     };

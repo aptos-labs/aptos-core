@@ -20,7 +20,7 @@ tokio = { version = "1.8.1", features = ["rt", "macros"], default-features = fal
 
 aptos-config = { path = "../../../config" }
 aptos-logger = { path = "../../../crates/aptos-logger" }
-aptos-metrics = { path = "../../../crates/aptos-metrics" }
+aptos-metrics-core = { path = "../../../crates/aptos-metrics-core" }
 aptos-types = { path = "../../../types" }
 aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
 bounded-executor = { path = "../../../crates/bounded-executor" }

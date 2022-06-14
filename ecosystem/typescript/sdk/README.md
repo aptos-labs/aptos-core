@@ -4,8 +4,11 @@
 [![NPM Package Version][npm-image-version]][npm-url]
 [![NPM Package Downloads][npm-image-downloads]][npm-url]
 
-You need to connect to an [Aptos](https:/github.com/aptos-labs/aptos-core/) node to use this library, or run one
+You need to connect to an [Aptos][repo] node to use this library, or run one
 yourself locally.
+
+## API Docs
+Docs can be found [here](API.md)
 
 ## Usage
 

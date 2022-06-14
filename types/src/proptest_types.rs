@@ -181,10 +181,11 @@ impl AccountInfoUniverse {
         round: Round,
         next_version: Version,
     ) -> Self {
-        let accounts = keypairs
+        let mut accounts = keypairs
             .into_iter()
             .map(|(private_key, public_key)| AccountInfo::new(private_key, public_key))
-            .collect();
+            .collect::<Vec<_>>();
+        accounts.sort_by(|a, b| a.address.cmp(&b.address));
         let validator_set_by_epoch = vec![(0, Vec::new())].into_iter().collect();
 
         Self {

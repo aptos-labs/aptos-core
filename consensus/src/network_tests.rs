@@ -483,8 +483,9 @@ mod tests {
     use aptos_crypto::HashValue;
     use aptos_types::validator_verifier::random_validator_verifier;
     use bytes::Bytes;
-    use consensus_types::block_retrieval::{
-        BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus,
+    use consensus_types::{
+        block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus},
+        common::Payload,
     };
     use futures::{channel::oneshot, future};
     use network::{
@@ -613,7 +614,7 @@ mod tests {
         );
         let previous_qc = certificate_for_genesis();
         let proposal = ProposalMsg::new(
-            Block::new_proposal(vec![], 1, 1, previous_qc.clone(), &signers[0]),
+            Block::new_proposal(Payload::new_empty(), 1, 1, previous_qc.clone(), &signers[0]),
             SyncInfo::new(previous_qc.clone(), previous_qc, None),
         );
         timed_block_on(&mut runtime, async {

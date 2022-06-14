@@ -10,7 +10,6 @@ sidebar_position: 13
 
       ```
       git clone https://github.com/aptos-labs/aptos-core.git
-
       ```
 
 2. `cd` into `aptos-core` directory.

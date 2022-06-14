@@ -5,3 +5,4 @@ export * from './aptos_client';
 export * from './faucet_client';
 export * from './token_client';
 export * from './types';
+export * from './transaction_builder';

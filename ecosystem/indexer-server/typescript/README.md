@@ -16,6 +16,7 @@ This will make sure you have the following setup on your local:
 1. Ensure you have `npm`, `yarn`, and `node` installed via homebrew (recommended through a node package manager like [`nvm`](https://formulae.brew.sh/formula/nvm))
 2. `yarn install`
 3. create a `.env` file at the base of `indexer > typescript`
+4. Add the `Prisma` VSCode extension (the most popular one) for syntax highlighting and formatting
 
 `.env` file contents should look something like this
 ```bash
@@ -23,8 +24,9 @@ This will make sure you have the following setup on your local:
 DATABASE_URL=postgresql://postgres@localhost/postgres
 ```
 4. Ensure your postgres server is up and running
-5. `npx prisma generate`
+5. `yarn run generate`
 6. `yarn run dev`
+7. Go to [http://localhost:4000/api-routes](http://localhost:4000/api-routes) for swagger
 
 ## Using Prisma
 We are using the Rust -> Diesel models as a source of truth for the database schema.
@@ -36,7 +38,7 @@ When updating the schema please do the following one way loop:
 1. Make your changes to the data models in `indexer > rust > models`
 2. Run a db migration
 3. Pull db migration changes into prisma via `npx prisma db pull`
-4. Run `npx prisma generate`
+4. Run `yarn run generate:prisma`
 
 You should never have to modify the `schema.prisma` file manually.
 

@@ -22,15 +22,11 @@ The rest of this document describes:
 
 ## Using the Aptos-core source code
 
-1. Fork and clone the Aptos repo.
-
-  - Fork the Aptos Core repo by clicking on the **Fork** on the top right of this repo page: https://github.com/aptos-labs/aptos-core.
-  - Clone your fork.
+1. Clone the Aptos repo.
 
     ```
-    git clone https://github.com/<YOUR-GITHUB-USERID>/aptos-core
+    git clone https://github.com/aptos-labs/aptos-core.git
     ```
-
 
 2. `cd` into `aptos-core` directory.
 

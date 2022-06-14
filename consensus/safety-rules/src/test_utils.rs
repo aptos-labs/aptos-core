@@ -85,7 +85,14 @@ pub fn make_proposal_with_qc(
     validator_signer: &ValidatorSigner,
     exec_key: Option<&Ed25519PrivateKey>,
 ) -> MaybeSignedVoteProposal {
-    make_proposal_with_qc_and_proof(vec![], round, empty_proof(), qc, validator_signer, exec_key)
+    make_proposal_with_qc_and_proof(
+        Payload::new_empty(),
+        round,
+        empty_proof(),
+        qc,
+        validator_signer,
+        exec_key,
+    )
 }
 
 pub fn make_proposal_with_parent_and_overrides(

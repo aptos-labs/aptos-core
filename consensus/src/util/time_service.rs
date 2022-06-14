@@ -38,12 +38,6 @@ pub trait TimeService: Send + Sync {
     fn wait_until(&self, t: Duration) {
         while let Some(mut wait_duration) = t.checked_sub(self.get_current_timestamp()) {
             wait_duration += Duration::from_millis(1);
-            if wait_duration > Duration::from_secs(10) {
-                error!(
-                    "[TimeService] long wait time {} seconds required",
-                    wait_duration.as_secs()
-                );
-            }
             counters::WAIT_DURATION_S.observe_duration(wait_duration);
             self.sleep(wait_duration);
         }

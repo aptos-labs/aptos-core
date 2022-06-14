@@ -20,7 +20,7 @@ use consensus_types::{
         },
         Block,
     },
-    common::Author,
+    common::{Author, Payload},
     vote::Vote,
     vote_data::VoteData,
 };
@@ -344,7 +344,7 @@ async fn test_illegal_timestamp() {
     let block_store = build_empty_tree();
     let genesis = block_store.ordered_root();
     let block_with_illegal_timestamp = Block::new_proposal(
-        vec![],
+        Payload::new_empty(),
         0,
         // This timestamp is illegal, it is the same as genesis
         genesis.timestamp_usecs(),

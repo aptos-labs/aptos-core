@@ -18,7 +18,7 @@ use aptos_types::{
 };
 use consensus_types::{
     block::block_test_utils::random_payload,
-    common::Round,
+    common::{Payload, Round},
     quorum_cert::QuorumCert,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote_proposal::MaybeSignedVoteProposal,
@@ -34,7 +34,14 @@ fn make_proposal_with_qc_and_proof(
     signer: &ValidatorSigner,
     exec_key: Option<&Ed25519PrivateKey>,
 ) -> MaybeSignedVoteProposal {
-    test_utils::make_proposal_with_qc_and_proof(vec![], round, proof, qc, signer, exec_key)
+    test_utils::make_proposal_with_qc_and_proof(
+        Payload::new_empty(),
+        round,
+        proof,
+        qc,
+        signer,
+        exec_key,
+    )
 }
 
 fn make_proposal_with_parent(
@@ -44,7 +51,14 @@ fn make_proposal_with_parent(
     signer: &ValidatorSigner,
     exec_key: Option<&Ed25519PrivateKey>,
 ) -> MaybeSignedVoteProposal {
-    test_utils::make_proposal_with_parent(vec![], round, parent, committed, signer, exec_key)
+    test_utils::make_proposal_with_parent(
+        Payload::new_empty(),
+        round,
+        parent,
+        committed,
+        signer,
+        exec_key,
+    )
 }
 
 pub type Callback = Box<
@@ -222,7 +236,7 @@ fn test_voting_bad_epoch(safety_rules: &Callback) {
 
     let a1 = test_utils::make_proposal_with_qc(round + 1, genesis_qc, &signer, key.as_ref());
     let a2 = test_utils::make_proposal_with_parent_and_overrides(
-        vec![],
+        Payload::new_empty(),
         round + 3,
         &a1,
         None,
@@ -397,7 +411,7 @@ fn test_validator_not_in_set(safety_rules: &Callback) {
     next_epoch_state.verifier =
         ValidatorVerifier::new_single(rand_signer.author(), rand_signer.public_key());
     let a2 = test_utils::make_proposal_with_parent_and_overrides(
-        vec![],
+        Payload::new_empty(),
         round + 2,
         &a1,
         Some(&a1),
@@ -446,7 +460,7 @@ fn test_reconcile_key(_safety_rules: &Callback) {
     next_epoch_state.epoch = 2;
     next_epoch_state.verifier = ValidatorVerifier::new_single(signer.author(), new_pub_key);
     let a2 = test_utils::make_proposal_with_parent_and_overrides(
-        vec![],
+        Payload::new_empty(),
         round + 2,
         &a1,
         Some(&a1),
@@ -463,7 +477,7 @@ fn test_reconcile_key(_safety_rules: &Callback) {
     // Verification fails for proposal signed by the outdated key
     let outdated_signer = &signer;
     let a3 = test_utils::make_proposal_with_parent_and_overrides(
-        vec![],
+        Payload::new_empty(),
         round + 3,
         &a2,
         Some(&a2),
@@ -499,7 +513,7 @@ fn test_key_not_in_store(safety_rules: &Callback) {
     next_epoch_state.verifier =
         ValidatorVerifier::new_single(signer.author(), rand_signer.public_key());
     let a2 = test_utils::make_proposal_with_parent_and_overrides(
-        vec![],
+        Payload::new_empty(),
         round + 2,
         &a1,
         Some(&a1),

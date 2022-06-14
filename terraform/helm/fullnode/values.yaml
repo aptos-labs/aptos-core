@@ -18,7 +18,7 @@ enable_state_sync_v2: true
 rust_log: info
 
 image:
-  repo: aptoslab/validator
+  repo: aptoslabs/validator
   tag: devnet
   pullPolicy: IfNotPresent
 
@@ -59,7 +59,7 @@ logging:
 
 backup:
   image:
-    repo: aptoslab/tools
+    repo: aptoslabs/tools
     tag: devnet
     pullPolicy: IfNotPresent
   resources:
@@ -101,7 +101,7 @@ backup_verify:
 
 restore:
   image:
-    repo: aptoslab/tools
+    repo: aptoslabs/tools
     tag: devnet
     pullPolicy: IfNotPresent
   resources:

@@ -17,9 +17,7 @@ use crate::{
     },
     schema,
     schema::{
-        ownerships::dsl::{
-            amount as ownership_amount, owner as ownership_owner, token_id as ownership_token_id,
-        },
+        ownerships::{dsl::amount as ownership_amount, ownership_id},
         tokens::dsl::{last_minted_at, supply, tokens},
     },
 };
@@ -101,18 +99,18 @@ fn update_token_ownership(
     txn: &UserTransaction,
     amount_update: i64,
 ) {
-    let ownership = Ownership {
+    let ownership = Ownership::new(
         token_id,
-        owner: txn.sender.clone(),
-        amount: amount_update,
-        updated_at: txn.timestamp,
-        inserted_at: chrono::Utc::now().naive_utc(),
-    };
+        txn.sender.clone(),
+        amount_update,
+        txn.timestamp,
+        chrono::Utc::now().naive_utc(),
+    );
     execute_with_better_error(
         conn,
         diesel::insert_into(schema::ownerships::table)
             .values(&ownership)
-            .on_conflict((ownership_token_id, ownership_owner))
+            .on_conflict(ownership_id)
             .do_update()
             .set(ownership_amount.eq(ownership_amount + ownership.amount)),
     )
@@ -124,15 +122,15 @@ fn insert_collection(
     event_data: CreateCollectionEventType,
     txn: &UserTransaction,
 ) {
-    let collection = Collection {
-        creator: event_data.creator,
-        name: event_data.collection_name,
-        description: event_data.description,
-        max_amount: event_data.maximum.value,
-        uri: event_data.uri,
-        created_at: txn.timestamp,
-        inserted_at: chrono::Utc::now().naive_utc(),
-    };
+    let collection = Collection::new(
+        event_data.creator,
+        event_data.collection_name,
+        event_data.description,
+        event_data.maximum.value,
+        event_data.uri,
+        txn.timestamp,
+        chrono::Utc::now().naive_utc(),
+    );
     execute_with_better_error(
         conn,
         diesel::insert_into(schema::collections::table)

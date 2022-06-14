@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-/* eslint-disable max-classes-per-file */
-import { Serializer, Deserializer, Bytes, Seq, deserializeVector, serializeVector } from '../bcs';
+import { Serializer, Deserializer, Seq, deserializeVector, serializeVector } from '../bcs';
 import { AccountAddress } from './account_address';
+import { Ed25519PublicKey, Ed25519Signature } from './ed25519';
+import { MultiEd25519PublicKey, MultiEd25519Signature } from './multi_ed25519';
 
 export abstract class TransactionAuthenticator {
   abstract serialize(serializer: Serializer): void;
@@ -51,34 +52,9 @@ export class TransactionAuthenticatorMultiEd25519 extends TransactionAuthenticat
   /**
    * An authenticator for multiple signatures.
    *
-   * @param public_key BCS bytes for a list of public keys.
+   * @param public_key
+   * @param signature
    *
-   * @example
-   * Developers must manually construct the input to get the BCS bytes.
-   * See below code example for the BCS input.
-   * ```ts
-   * interface  MultiEd25519PublicKey {
-   *   // A list of public keys
-   *   public_keys: Uint8Array[],
-   *   // At least `threshold` signatures must be valid
-   *   threshold: Uint8,
-   * }
-   * ```
-   * @param signature BCS bytes of multiple signatures.
-   *
-   * @example
-   * Developers must manually construct the input to get the BCS bytes.
-   * See below code example for the BCS input.
-   * ```ts
-   * interface  MultiEd25519Signature {
-   *   // A list of signatures
-   *   signatures: Uint8Array[],
-   *   // 4 bytes, at most 32 signatures are supported.
-   *   // If Nth bit value is `1`, the Nth signature should be provided in `signatures`.
-   *   // Bits are read from left to right.
-   *   bitmap: Uint8Array,
-   * }
-   * ```
    */
   constructor(public readonly public_key: MultiEd25519PublicKey, public readonly signature: MultiEd25519Signature) {
     super();
@@ -170,57 +146,5 @@ export class AccountAuthenticatorMultiEd25519 extends AccountAuthenticator {
     const public_key = MultiEd25519PublicKey.deserialize(deserializer);
     const signature = MultiEd25519Signature.deserialize(deserializer);
     return new AccountAuthenticatorMultiEd25519(public_key, signature);
-  }
-}
-
-export class Ed25519PublicKey {
-  constructor(public readonly value: Bytes) {}
-
-  serialize(serializer: Serializer): void {
-    serializer.serializeBytes(this.value);
-  }
-
-  static deserialize(deserializer: Deserializer): Ed25519PublicKey {
-    const value = deserializer.deserializeBytes();
-    return new Ed25519PublicKey(value);
-  }
-}
-
-export class Ed25519Signature {
-  constructor(public readonly value: Bytes) {}
-
-  serialize(serializer: Serializer): void {
-    serializer.serializeBytes(this.value);
-  }
-
-  static deserialize(deserializer: Deserializer): Ed25519Signature {
-    const value = deserializer.deserializeBytes();
-    return new Ed25519Signature(value);
-  }
-}
-
-export class MultiEd25519PublicKey {
-  constructor(public readonly value: Bytes) {}
-
-  serialize(serializer: Serializer): void {
-    serializer.serializeBytes(this.value);
-  }
-
-  static deserialize(deserializer: Deserializer): MultiEd25519PublicKey {
-    const value = deserializer.deserializeBytes();
-    return new MultiEd25519PublicKey(value);
-  }
-}
-
-export class MultiEd25519Signature {
-  constructor(public readonly value: Bytes) {}
-
-  serialize(serializer: Serializer): void {
-    serializer.serializeBytes(this.value);
-  }
-
-  static deserialize(deserializer: Deserializer): MultiEd25519Signature {
-    const value = deserializer.deserializeBytes();
-    return new MultiEd25519Signature(value);
   }
 }

@@ -79,6 +79,7 @@ const sidebars = {
             "tutorials/full-node/troubleshooting-fullnode",
           ],
         },
+        "tutorials/run-a-fullnode-on-gcp",
       ],
     },
     "tutorials/local-testnet-devnet-incentivized-testnet",

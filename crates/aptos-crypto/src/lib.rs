@@ -5,6 +5,7 @@
 #![deny(missing_docs)]
 
 //! A library supplying various cryptographic primitives
+pub mod bls12381;
 pub mod compat;
 pub mod ed25519;
 pub mod error;

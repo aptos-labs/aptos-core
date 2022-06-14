@@ -66,10 +66,10 @@ pub fn storage(config: &SafetyRulesConfig) -> PersistentSafetyStorage {
                     .account_address
                     .expect("AccountAddress needed for safety rules"),
                 identity_blob
-                    .consensus_key
+                    .consensus_private_key
                     .expect("Consensus key needed for safety rules"),
                 identity_blob
-                    .account_key
+                    .account_private_key
                     .expect("Account key needed for safety rules"),
                 waypoint,
                 config.enable_cached_safety_data,

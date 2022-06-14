@@ -1,6 +1,6 @@
 import { Deserializer } from './deserializer';
 import { Serializer } from './serializer';
-import { Bytes, Seq } from './types';
+import { AnyNumber, Bytes, Seq } from './types';
 
 interface Serializable {
   serialize(serializer: Serializer): void;
@@ -34,7 +34,7 @@ export function bcsToBytes<T extends Serializable>(value: T): Bytes {
   return serializer.getBytes();
 }
 
-export function bcsSerializeUint64(value: bigint | number): Bytes {
+export function bcsSerializeUint64(value: AnyNumber): Bytes {
   const serializer = new Serializer();
   serializer.serializeU64(value);
   return serializer.getBytes();

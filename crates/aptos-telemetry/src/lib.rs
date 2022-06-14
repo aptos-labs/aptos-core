@@ -7,7 +7,7 @@
 pub mod constants;
 
 use aptos_logger::prelude::*;
-use aptos_metrics::{json_metrics::get_git_rev, register_int_counter_vec, IntCounterVec};
+use aptos_metrics_core::{register_int_counter_vec, IntCounterVec};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -88,7 +88,6 @@ pub async fn send_env_data(
     // attempt to get IP address
     let ip_origin = get_ip_origin().await;
     new_event_params.insert(constants::IP_ADDR_METRIC.to_string(), ip_origin);
-    new_event_params.insert(constants::GIT_REV_METRIC.to_string(), get_git_rev());
     send_data(event_name, user_id, new_event_params).await;
 }
 

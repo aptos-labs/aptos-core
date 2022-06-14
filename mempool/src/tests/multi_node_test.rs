@@ -356,7 +356,7 @@ impl TestHarness {
                             let block = self
                                 .node(sender_id)
                                 .mempool()
-                                .get_block(100, HashSet::new());
+                                .get_batch(100, HashSet::new());
                             for txn in transactions.iter() {
                                 assert!(block.contains(txn));
                             }

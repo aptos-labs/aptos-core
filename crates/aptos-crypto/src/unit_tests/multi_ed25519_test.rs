@@ -204,7 +204,7 @@ fn test_multi_ed25519_signature_serialization() {
 
     // We can construct signatures from 32 single signatures.
     let sigs_32 = vec![single_signature.clone(); 32];
-    let indices: Vec<u8> = (0..32).collect();
+    let indices = 0..32;
     let sig32_tuple = sigs_32.into_iter().zip(indices.into_iter()).collect();
 
     let multi_sig32 = MultiEd25519Signature::new(sig32_tuple);
@@ -222,7 +222,7 @@ fn test_multi_ed25519_signature_serialization() {
 
     // Fail to construct a MultiEd25519Signature object from 33 or more single signatures.
     let sigs_33 = vec![single_signature.clone(); 33];
-    let indices: Vec<u8> = (0..33).collect();
+    let indices = 0..33;
     let sig33_tuple = sigs_33.into_iter().zip(indices.into_iter()).collect();
 
     let multi_sig33 = MultiEd25519Signature::new(sig33_tuple);
@@ -450,6 +450,42 @@ fn test_multi_ed25519_signature_verification() {
         &[0b0100_0000, 0u8, 0u8, 0u8]
     );
     assert!(signed_by_2nd_key_unwrapped
+        .verify(message(), &multi_public_key_2of3)
+        .is_err());
+}
+
+#[test]
+fn test_invalid_multi_ed25519_signature_bitmap() {
+    let priv_keys_3 = generate_keys(3);
+
+    let multi_private_key_2of3 = MultiEd25519PrivateKey::new(priv_keys_3, 2).unwrap();
+    let multi_public_key_2of3 = MultiEd25519PublicKey::from(&multi_private_key_2of3);
+
+    let multi_signature_2of3 = multi_private_key_2of3.sign(message());
+
+    assert_eq!(multi_signature_2of3.bitmap(), &[0b1100_0000, 0u8, 0u8, 0u8]);
+
+    assert!(multi_signature_2of3
+        .verify(message(), &multi_public_key_2of3)
+        .is_ok());
+
+    let multi_signature_2of3_invalid_bitmap = MultiEd25519Signature::new_with_signatures_and_bitmap(
+        multi_signature_2of3.signatures().to_vec(),
+        [0b0000_1000, 0u8, 0u8, 0u8],
+    );
+
+    // Fails due to bitmap is set with a bit that's invalid
+    assert!(multi_signature_2of3_invalid_bitmap
+        .verify(message(), &multi_public_key_2of3)
+        .is_err());
+
+    let multi_signature_1of3 = MultiEd25519Signature::new_with_signatures_and_bitmap(
+        multi_signature_2of3.signatures().to_vec(),
+        [0b1000_0000, 0u8, 0u8, 0u8],
+    );
+
+    // Bitmap is valid, but fails due to threshold is not met
+    assert!(multi_signature_1of3
         .verify(message(), &multi_public_key_2of3)
         .is_err());
 }

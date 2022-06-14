@@ -14,9 +14,9 @@ use aptos_config::{
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
-    account_address::AccountAddress, mempool_status::MempoolStatus, transaction::SignedTransaction,
-    vm_status::DiscardedVMStatus,
+    mempool_status::MempoolStatus, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
 };
+use consensus_types::common::TransactionSummary;
 use futures::{
     channel::{mpsc, mpsc::UnboundedSender, oneshot},
     future::Future,
@@ -75,6 +75,10 @@ impl<V: TransactionValidation + 'static> SharedMempool<V> {
             validator,
             subscribers,
         }
+    }
+
+    pub fn validator_broadcast(&self) -> bool {
+        self.config.shared_mempool_validator_broadcast
     }
 }
 
@@ -145,40 +149,39 @@ impl Future for ScheduledBroadcast {
     }
 }
 
-/// Message sent from consensus to mempool.
-pub enum ConsensusRequest {
-    /// Request to pull block to submit to consensus.
-    GetBlockRequest(
-        // max block size
+/// Message sent from QuorumStore to Mempool.
+pub enum QuorumStoreRequest {
+    GetBatchRequest(
+        // max batch size
         u64,
-        // transactions to exclude from the requested block
+        // transactions to exclude from the requested batch
         Vec<TransactionSummary>,
         // callback to respond to
-        oneshot::Sender<Result<ConsensusResponse>>,
+        oneshot::Sender<Result<QuorumStoreResponse>>,
     ),
     /// Notifications about *rejected* committed txns.
     RejectNotification(
         // rejected transactions from consensus
         Vec<TransactionSummary>,
         // callback to respond to
-        oneshot::Sender<Result<ConsensusResponse>>,
+        oneshot::Sender<Result<QuorumStoreResponse>>,
     ),
 }
 
-impl fmt::Display for ConsensusRequest {
+impl fmt::Display for QuorumStoreRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let payload = match self {
-            ConsensusRequest::GetBlockRequest(block_size, excluded_txns, _) => {
+            QuorumStoreRequest::GetBatchRequest(batch_size, excluded_txns, _) => {
                 let mut txns_str = "".to_string();
                 for tx in excluded_txns.iter() {
                     txns_str += &format!("{} ", tx);
                 }
                 format!(
-                    "GetBlockRequest [block_size: {}, excluded_txns: {}]",
-                    block_size, txns_str
+                    "GetBatchRequest [batch_size: {}, excluded_txns: {}]",
+                    batch_size, txns_str
                 )
             }
-            ConsensusRequest::RejectNotification(rejected_txns, _) => {
+            QuorumStoreRequest::RejectNotification(rejected_txns, _) => {
                 let mut txns_str = "".to_string();
                 for tx in rejected_txns.iter() {
                     txns_str += &format!("{} ", tx);
@@ -191,22 +194,11 @@ impl fmt::Display for ConsensusRequest {
 }
 
 /// Response sent from mempool to consensus.
-pub enum ConsensusResponse {
+#[derive(Debug)]
+pub enum QuorumStoreResponse {
     /// Block to submit to consensus
-    GetBlockResponse(Vec<SignedTransaction>),
+    GetBatchResponse(Vec<SignedTransaction>),
     CommitResponse(),
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TransactionSummary {
-    pub sender: AccountAddress,
-    pub sequence_number: u64,
-}
-
-impl fmt::Display for TransactionSummary {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.sender, self.sequence_number,)
-    }
 }
 
 pub type SubmissionStatus = (MempoolStatus, Option<DiscardedVMStatus>);

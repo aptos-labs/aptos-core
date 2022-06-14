@@ -69,15 +69,11 @@ This document describes how to configure your public FullNode using both the met
 
 ### Using Aptos-core source code
 
-1. Fork and clone the Aptos repo.
+1. Clone the Aptos repo.
 
-    - Fork the Aptos Core repo by clicking on the **Fork** on the top right of this repo page: https://github.com/aptos-labs/aptos-core.
-    - Clone your fork.
-
-      ```
-      git clone https://github.com/<YOUR-GITHUB-USERID>/aptos-core
-
-      ```
+    ```
+    git clone https://github.com/aptos-labs/aptos-core.git
+    ```
 
 2. `cd` into `aptos-core` directory.
 

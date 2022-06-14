@@ -11,11 +11,11 @@ impl BlockStage {
     pub const SIGNED: &'static str = "signed";
     pub const RECEIVED: &'static str = "received";
     pub const SYNCED: &'static str = "synced";
-    pub const EXECUTED: &'static str = "executed";
     pub const VOTED: &'static str = "voted";
     pub const QC_AGGREGATED: &'static str = "qc_aggregated";
     pub const QC_ADDED: &'static str = "qc_added";
     pub const ORDERED: &'static str = "ordered";
+    pub const EXECUTED: &'static str = "executed";
     pub const COMMITTED: &'static str = "committed";
 }
 

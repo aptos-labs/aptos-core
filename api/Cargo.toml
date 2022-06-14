@@ -29,7 +29,7 @@ aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-logger = { path = "../crates/aptos-logger" }
 aptos-mempool = { path = "../mempool" }
-aptos-metrics = { path = "../crates/aptos-metrics" }
+aptos-metrics-core = { path = "../crates/aptos-metrics-core" }
 aptos-state-view = { path = "../storage/state-view" }
 aptos-types = { path = "../types" }
 aptos-vm = { path = "../aptos-move/aptos-vm" }
@@ -39,7 +39,7 @@ storage-interface = { path = "../storage/storage-interface" }
 
 [dev-dependencies]
 goldenfile = "1.1.0"
-rand = "0.8.5"
+rand = "0.7.3"
 regex = "1.5.5"
 reqwest = { version = "0.11.10", features = ["blocking", "json"], default_features = false }
 

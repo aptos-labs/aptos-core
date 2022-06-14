@@ -368,5 +368,5 @@ This likely means that the state of the install is out of sync with the saved te
 
 ### Fullnode "NoAvailablePeers" Error message
 
-If your node cannot state sync, and the logs are showing "NoAvailablePeers", it's likely due to network congestion. You can try add some extra upstream peers for your fullnode to state sync from. See the guide [Add upstream seed peers](#add-upstream-seed-peers)
+If your node cannot state sync, and the logs are showing "NoAvailablePeers", it's likely due to network congestion. You can try add some extra upstream peers for your fullnode to state sync from. See the guide [Add upstream seed peers](#add-upstream-seed-peers).
 

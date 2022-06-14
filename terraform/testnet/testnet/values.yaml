@@ -13,7 +13,7 @@ genesis:
   vaultRoleId:
   vaultSecretId:
   image:
-    repo: aptoslab/init
+    repo: aptoslabs/init
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -61,7 +61,7 @@ serviceAccount:
 faucet:
   enabled: true
   image:
-    repo: aptoslab/faucet
+    repo: aptoslabs/faucet
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -160,7 +160,7 @@ monitoring:
 load_test:
   enabled: false
   image:
-    repo: aptoslab/txn-emitter
+    repo: aptoslabs/txn-emitter
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -210,7 +210,3 @@ aws:
 # (Since the testnet sym links to the same alert.yml file the validator uses.)
 backup:
   enable: false
-
-### Used for testing purposes only!
-# Use a local vault backend rather than dedicated vault server for each validator
-localVaultBackend: false

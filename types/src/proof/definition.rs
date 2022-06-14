@@ -516,7 +516,7 @@ where
 
             // Next we take two children at a time and compute their parents.
             let mut children_iter = children_iter.as_slice().chunks_exact(2);
-            while let Some(chunk) = children_iter.next() {
+            for chunk in children_iter.by_ref() {
                 let left_hash = chunk[0];
                 let right_hash = chunk[1];
                 parent_hashes.push(MerkleTreeInternalNode::<H>::new(left_hash, right_hash).hash());

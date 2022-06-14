@@ -6,6 +6,7 @@ use crate::{
         block_test_utils::{certificate_for_genesis, *},
         Block,
     },
+    common::Payload,
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
@@ -51,7 +52,6 @@ fn test_nil_block() {
     assert!(nil_block.verify_well_formed().is_ok());
 
     let signer = ValidatorSigner::random(None);
-    let payload = vec![];
     let parent_block_info = nil_block.quorum_cert().certified_block();
     let nil_block_qc = gen_test_certificate(
         vec![&signer],
@@ -69,7 +69,7 @@ fn test_nil_block() {
         nil_block_qc.certified_block().id()
     );
     let nil_block_child = Block::new_proposal(
-        payload,
+        Payload::new_empty(),
         2,
         aptos_infallible::duration_since_epoch().as_micros() as u64,
         nil_block_qc,
@@ -86,7 +86,7 @@ fn test_block_relation() {
     // Test genesis and the next block
     let genesis_block = Block::make_genesis_block();
     let quorum_cert = certificate_for_genesis();
-    let payload = vec![];
+    let payload = Payload::new_empty();
     let next_block = Block::new_proposal(
         payload.clone(),
         1,
@@ -113,7 +113,7 @@ fn test_same_qc_different_authors() {
     let signer = ValidatorSigner::random(None);
     let genesis_qc = certificate_for_genesis();
     let round = 1;
-    let payload = vec![];
+    let payload = Payload::new_empty();
     let current_timestamp = aptos_infallible::duration_since_epoch().as_micros() as u64;
     let block_round_1 = Block::new_proposal(
         payload.clone(),
@@ -156,7 +156,7 @@ fn test_block_metadata_bitmaps() {
         &ledger_info,
         Block::make_genesis_block_from_ledger_info(&ledger_info).id(),
     );
-    let payload = vec![];
+    let payload = Payload::new_empty();
     let start_round = 1;
     let start_timestamp = aptos_infallible::duration_since_epoch().as_micros() as u64;
 

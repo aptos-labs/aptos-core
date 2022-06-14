@@ -1669,7 +1669,7 @@ components:
       title: Ed25519 Signature
       type: object
       description: |
-        Please refer to https://github.com/aptos-labs/aptos-core/tree/main/specifications/crypto#signature-and-verification for
+        Please refer to https://github.com/aptos-labs/aptos-core/tree/main/documentation/specifications/crypto#signature-and-verification for
         more details.
       required:
         - type
@@ -1687,7 +1687,7 @@ components:
       title: Multi-ed25519 Signature
       type: object
       description: |
-        Multi ed25519 signature, please refer to https://github.com/aptos-labs/aptos-core/tree/main/specifications/crypto#multi-signatures for more details.
+        Multi ed25519 signature, please refer to https://github.com/aptos-labs/aptos-core/tree/main/documentation/specifications/crypto#multi-signatures for more details.
       required:
         - type
         - public_keys
@@ -1761,3 +1761,58 @@ components:
           $ref: '#/components/schemas/MoveTypeId'
         key:
           $ref: '#/components/schemas/MoveValue'
+    TokenData:
+      title: Token Data
+      type: object
+      required:
+        - collection
+        - description
+        - name
+        - supply
+        - uri
+      properties:
+        collection:
+          type: string
+          description: Unique name within this creator's account for this Token's collection
+        description:
+          type: string
+          description: Description of Token
+        name:
+          type: string
+          description: Name of Token
+        maximum:
+          type: integer
+          description: Optional maximum number of this Token
+        supply:
+          type: integer
+          description: Total number of this type of Token
+        uri:
+          type: string
+          description: URL for additional information / media
+    TokenId:
+      type: object
+      required:
+        - creator
+        - collection
+        - name
+      properties:
+        creator:
+          type: string
+          description: Token creator address
+        collection:
+          type: string
+          description: Unique name within this creator's account for this Token's collection
+        name:
+          type: string
+          description: Name of Token
+    Token:
+      type: object
+      required:
+        - id
+        - value
+      properties:
+        id:
+          $ref: '#/components/schemas/TokenId'
+        value:
+          type: integer
+      

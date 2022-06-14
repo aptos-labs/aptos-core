@@ -9,22 +9,23 @@ use crate::{
     network::{BroadcastError, MempoolSyncMsg},
     shared_mempool::types::{
         notify_subscribers, ScheduledBroadcast, SharedMempool, SharedMempoolNotification,
-        SubmissionStatusBundle, TransactionSummary,
+        SubmissionStatusBundle,
     },
-    ConsensusRequest, ConsensusResponse, SubmissionStatus,
+    QuorumStoreRequest, QuorumStoreResponse, SubmissionStatus,
 };
 use anyhow::Result;
 use aptos_config::network_id::PeerNetworkId;
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
-use aptos_metrics::HistogramTimer;
+use aptos_metrics_core::HistogramTimer;
 use aptos_types::{
     mempool_status::{MempoolStatus, MempoolStatusCode},
     on_chain_config::OnChainConfigPayload,
     transaction::SignedTransaction,
     vm_status::DiscardedVMStatus,
 };
+use consensus_types::common::TransactionSummary;
 use futures::{channel::oneshot, stream::FuturesUnordered};
 use network::application::interface::NetworkInterface;
 use rayon::prelude::*;
@@ -361,48 +362,46 @@ fn log_txn_process_results(results: &[SubmissionStatusBundle], sender: Option<Pe
 
 /// Only applies to Validators. Either provides transactions to consensus [`GetBlockRequest`] or
 /// handles rejecting transactions [`RejectNotification`]
-pub(crate) fn process_consensus_request<V: TransactionValidation>(
+pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
     smp: &SharedMempool<V>,
-    req: ConsensusRequest,
+    req: QuorumStoreRequest,
 ) {
     // Start latency timer
     let start_time = Instant::now();
-    debug!(LogSchema::event_log(LogEntry::Consensus, LogEvent::Received).consensus_msg(&req));
+    debug!(LogSchema::event_log(LogEntry::QuorumStore, LogEvent::Received).quorum_store_msg(&req));
 
     let (resp, callback, counter_label) = match req {
-        ConsensusRequest::GetBlockRequest(max_block_size, transactions, callback) => {
+        QuorumStoreRequest::GetBatchRequest(max_batch_size, transactions, callback) => {
             let exclude_transactions: HashSet<TxnPointer> = transactions
                 .iter()
                 .map(|txn| (txn.sender, txn.sequence_number))
                 .collect();
-            let mut txns;
+            let txns;
             {
                 let mut mempool = smp.mempool.lock();
                 // gc before pulling block as extra protection against txns that may expire in consensus
                 // Note: this gc operation relies on the fact that consensus uses the system time to determine block timestamp
                 let curr_time = aptos_infallible::duration_since_epoch();
                 mempool.gc_by_expiration_time(curr_time);
-                let block_size = cmp::max(max_block_size, 1);
-                txns = mempool.get_block(block_size, exclude_transactions);
+                let batch_size = cmp::max(max_batch_size, 1);
+                txns = mempool.get_batch(batch_size, exclude_transactions);
             }
             counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, txns.len());
-            txns.len();
-            let pulled_block = txns.drain(..).map(SignedTransaction::into).collect();
 
             (
-                ConsensusResponse::GetBlockResponse(pulled_block),
+                QuorumStoreResponse::GetBatchResponse(txns),
                 callback,
                 counters::GET_BLOCK_LABEL,
             )
         }
-        ConsensusRequest::RejectNotification(transactions, callback) => {
+        QuorumStoreRequest::RejectNotification(transactions, callback) => {
             counters::mempool_service_transactions(
                 counters::COMMIT_CONSENSUS_LABEL,
                 transactions.len(),
             );
             process_committed_transactions(&smp.mempool, transactions, 0, true);
             (
-                ConsensusResponse::CommitResponse(),
+                QuorumStoreResponse::CommitResponse(),
                 callback,
                 counters::COMMIT_CONSENSUS_LABEL,
             )
@@ -411,7 +410,7 @@ pub(crate) fn process_consensus_request<V: TransactionValidation>(
     // Send back to callback
     let result = if callback.send(Ok(resp)).is_err() {
         error!(LogSchema::event_log(
-            LogEntry::Consensus,
+            LogEntry::QuorumStore,
             LogEvent::CallbackFail
         ));
         counters::REQUEST_FAIL_LABEL

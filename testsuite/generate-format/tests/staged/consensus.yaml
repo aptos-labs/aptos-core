@@ -96,8 +96,7 @@ BlockType:
       Proposal:
         STRUCT:
           - payload:
-              SEQ:
-                TYPENAME: SignedTransaction
+              TYPENAME: Payload
           - author:
               TYPENAME: AccountAddress
     1:
@@ -242,6 +241,21 @@ MultiEd25519PublicKey:
   NEWTYPESTRUCT: BYTES
 MultiEd25519Signature:
   NEWTYPESTRUCT: BYTES
+Payload:
+  ENUM:
+    0:
+      DirectMempool:
+        NEWTYPE:
+          SEQ:
+            TYPENAME: SignedTransaction
+    1:
+      InQuorumStore:
+        NEWTYPE:
+          SEQ:
+            TYPENAME: ProofOfStore
+ProofOfStore:
+  STRUCT:
+    - placeholder: U64
 ProposalMsg:
   STRUCT:
     - proposal:
