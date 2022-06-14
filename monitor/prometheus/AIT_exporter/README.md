@@ -1,7 +1,9 @@
 # Prometheus exporter for Aptos Incentivized Testnet
+* Data source from https://community.aptoslabs.com/it1
+* Data is update every two minutes 
 
-### public exporter
-ait-exporter.aptos.ipfsforce.com:9116/metrics
+### public AIT exporter service
+http://ait-exporter.aptos.ipfsforce.com:9116/metrics
 
 ### metrics
 * aptos_validator_liveness
@@ -27,12 +29,12 @@ pip3 install -r requirements.txt
 ./stop.sh
 ```
 
-### Add job to prometheus.yml
+### Add job to prometheus.yml (replace Ip / DNS address)
 ```yaml
   - job_name: "ait_exporter"
     static_configs:
       - targets:
-        - 'localhost:9116'
+        - '<IP / DNS address>:9116'
 ```
 
 ### Add alert rules (replace peer_id)
