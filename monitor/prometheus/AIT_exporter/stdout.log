@@ -1,0 +1,5 @@
+Tue, 14 Jun 2022 15:27:02 ait_exporter.py[line:76] INFO started
+Tue, 14 Jun 2022 15:27:02 ait_exporter.py[line:79] INFO starting times 1
+Tue, 14 Jun 2022 15:27:02 connectionpool.py[line:939] DEBUG Starting new HTTPS connection (1): community.aptoslabs.com:443
+Tue, 14 Jun 2022 15:27:03 connectionpool.py[line:433] DEBUG https://community.aptoslabs.com:443 "GET /it1 HTTP/1.1" 200 None
+Tue, 14 Jun 2022 15:27:05 ait_exporter.py[line:70] INFO update metrics successful
