@@ -9,6 +9,13 @@ indexer:
     tag: devnet
     pullPolicy: IfNotPresent
 
+indexer_server:
+  enabled: false
+  image:
+    repo: aptoslabs/indexer-server
+    tag: devnet
+    pullPolicy: IfNotPresent
+
 nginx:
   enabled: false
   upstream:
@@ -17,14 +24,6 @@ nginx:
     repo: nginx
     tag: latest
     pullPolicy: IfNotPresent
-
-resources:
-  limits:
-    cpu: 2
-    memory: 4Gi
-  requests:
-    cpu: 2
-    memory: 4Gi
 
 nodeSelector: {}
 tolerations: []
@@ -36,4 +35,11 @@ serviceAccount:
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
   name:
+  annotations: {}
+
+service:
+  # Change this to LoadBalancer to expose the indexer server endpoint externally
+  type: ClusterIP
+  externalTrafficPolicy:
+  loadBalancerSourceRanges: []
   annotations: {}
