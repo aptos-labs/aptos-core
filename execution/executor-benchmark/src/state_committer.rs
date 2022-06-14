@@ -11,12 +11,13 @@ use executor_types::StateSnapshotDelta;
 use scratchpad::SparseMerkleTree;
 use std::{
     collections::VecDeque,
-    sync::{mpsc, Arc},
+    sync::{mpsc, mpsc::TryRecvError, Arc},
+    time,
 };
 use storage_interface::DbWriter;
 
 const NUM_COMMITTED_SMTS_TO_CACHE: usize = 5;
-const NUM_COMMITS_TO_BATCH: usize = 20;
+const NUM_MIN_COMMITS_TO_BATCH: usize = 20;
 
 pub struct StateCommitter {
     commit_receiver: mpsc::Receiver<StateSnapshotDelta>,
@@ -54,27 +55,41 @@ impl StateCommitter {
     }
 
     pub fn run(mut self) {
-        while let Ok(StateSnapshotDelta {
-            version,
-            smt,
-            jmt_updates,
-        }) = self.commit_receiver.recv()
-        {
-            self.version = version;
-            self.smt = smt;
-            self.updates.extend(jmt_updates.into_iter());
-            self.num_pending_commits += 1;
-
-            if self.num_pending_commits >= NUM_COMMITS_TO_BATCH {
-                self.commit();
+        loop {
+            match self.commit_receiver.try_recv() {
+                Ok(StateSnapshotDelta {
+                    version,
+                    smt,
+                    jmt_updates,
+                }) => {
+                    self.version = version;
+                    self.smt = smt;
+                    self.updates.extend(jmt_updates.into_iter());
+                    self.num_pending_commits += 1;
+                }
+                Err(TryRecvError::Empty) => {
+                    if self.num_pending_commits < NUM_MIN_COMMITS_TO_BATCH {
+                        std::thread::sleep(time::Duration::from_secs(1));
+                    } else {
+                        self.commit();
+                    }
+                }
+                Err(TryRecvError::Disconnected) => {
+                    println!("Final state commit...");
+                    self.commit();
+                    return;
+                }
             }
         }
-        println!("Final state commit...");
-        self.commit();
     }
 
     fn commit(&mut self) {
         // commit
+        info!(
+            num_pending_commits = self.num_pending_commits,
+            version = self.version,
+            "Committing state.",
+        );
         let mut to_commit = Vec::new();
         std::mem::swap(&mut to_commit, &mut self.updates);
         let node_hashes = self
@@ -85,7 +100,7 @@ impl StateCommitter {
         self.db
             .save_state_snapshot(to_commit, Some(&node_hashes), self.version)
             .unwrap();
-        info!(version = self.version, "State snapshot saved.");
+        info!("Committing state. Saved.");
 
         // reset pending updates
         self.num_pending_commits = 0;
