@@ -34,6 +34,7 @@ uuid = { version = "1.0.0", features = ["v4", "serde"] }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto", features = [] }
 aptos-github-client = { path = "../../secure/storage/github" }
+aptos-keygen = { path = "../aptos-keygen" }
 aptos-logger = { path = "../aptos-logger" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }

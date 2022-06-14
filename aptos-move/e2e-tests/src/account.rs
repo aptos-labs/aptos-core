@@ -56,13 +56,13 @@ impl Account {
     /// [`FakeExecutor::add_account_data`][crate::executor::FakeExecutor::add_account_data].
     /// This function returns distinct values upon every call.
     pub fn new() -> Self {
-        let (privkey, pubkey) = KeyGen::from_os_rng().generate_keypair();
+        let (privkey, pubkey) = KeyGen::from_os_rng().generate_ed25519_keypair();
         Self::with_keypair(privkey, pubkey)
     }
 
     /// Creates a new account in memory given a random seed.
     pub fn new_from_seed(seed: &mut KeyGen) -> Self {
-        let (privkey, pubkey) = seed.generate_keypair();
+        let (privkey, pubkey) = seed.generate_ed25519_keypair();
         Self::with_keypair(privkey, pubkey)
     }
 

@@ -87,8 +87,8 @@ fn rotate_ed25519_multisig_key() {
         // create a 1-of-2 multisig policy
         let mut keygen = KeyGen::from_seed([9u8; 32]);
 
-        let (privkey1, pubkey1) = keygen.generate_keypair();
-        let (privkey2, pubkey2) = keygen.generate_keypair();
+        let (privkey1, pubkey1) = keygen.generate_ed25519_keypair();
+        let (privkey2, pubkey2) = keygen.generate_ed25519_keypair();
         let threshold = 1;
         let multi_ed_public_key =
             MultiEd25519PublicKey::new(vec![pubkey1, pubkey2], threshold).unwrap();

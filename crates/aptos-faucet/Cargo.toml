@@ -27,6 +27,7 @@ warp = "0.3.2"
 aptos = { path = "../aptos" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }
+aptos-keygen = { path = "../aptos-keygen" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }

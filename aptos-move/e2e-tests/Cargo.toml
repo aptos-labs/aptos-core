@@ -23,7 +23,7 @@ serde = { version = "1.0.137", default-features = false }
 
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
-aptos-keygen = { path = "../aptos-keygen" }
+aptos-keygen = { path = "../../crates/aptos-keygen" }
 aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers" }
 aptos-state-view = { path = "../../storage/state-view" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }

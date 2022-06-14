@@ -118,6 +118,11 @@ impl From<std::string::FromUtf8Error> for CliError {
     }
 }
 
+impl From<aptos_crypto::CryptoMaterialError> for CliError {
+    fn from(e: aptos_crypto::CryptoMaterialError) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
 /// Config saved to `.aptos/config.yaml`
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {

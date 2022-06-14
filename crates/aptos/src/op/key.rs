@@ -12,11 +12,11 @@ use crate::{
     CliCommand, CliResult,
 };
 use aptos_config::config::{Peer, PeerRole};
-use aptos_crypto::{ed25519, x25519, PrivateKey, Uniform, ValidCryptoMaterial};
+use aptos_crypto::{ed25519, x25519, PrivateKey, ValidCryptoMaterial};
+use aptos_keygen::KeyGen;
 use aptos_types::account_address::{from_identity_public_key, AccountAddress};
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
-use rand::SeedableRng;
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
@@ -115,19 +115,22 @@ impl CliCommand<HashMap<&'static str, PathBuf>> for GenerateKey {
 
     async fn execute(self) -> CliTypedResult<HashMap<&'static str, PathBuf>> {
         self.save_params.check_key_file()?;
+        let mut keygen = KeyGen::from_os_rng();
 
-        // Generate a ed25519 key
-        let ed25519_key = Self::generate_ed25519_in_memory();
-
-        // Convert it to the appropriate type and save it
         match self.key_type {
             KeyType::X25519 => {
-                let private_key =
-                    x25519::PrivateKey::from_ed25519_private_bytes(&ed25519_key.to_bytes())
-                        .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+                let private_key = keygen.generate_x25519_private_key().map_err(|err| {
+                    CliError::UnexpectedError(format!(
+                        "Failed to convert ed25519 to x25519 {:?}",
+                        err
+                    ))
+                })?;
                 self.save_params.save_key(&private_key, "x25519")
             }
-            KeyType::Ed25519 => self.save_params.save_key(&ed25519_key, "ed25519"),
+            KeyType::Ed25519 => {
+                let private_key = keygen.generate_ed25519_private_key();
+                self.save_params.save_key(&private_key, "ed25519")
+            }
         }
     }
 }
@@ -175,19 +178,6 @@ impl GenerateKey {
                 &append_file_extension(key_file, PUBLIC_KEY_EXTENSION)?,
             )?,
         ))
-    }
-
-    /// Generates an `Ed25519PrivateKey` without saving it to disk
-    pub fn generate_ed25519_in_memory() -> ed25519::Ed25519PrivateKey {
-        let mut rng = rand::rngs::StdRng::from_entropy();
-        ed25519::Ed25519PrivateKey::generate(&mut rng)
-    }
-
-    pub fn generate_x25519_in_memory() -> CliTypedResult<x25519::PrivateKey> {
-        let key = Self::generate_ed25519_in_memory();
-        x25519::PrivateKey::from_ed25519_private_bytes(&key.to_bytes()).map_err(|err| {
-            CliError::UnexpectedError(format!("Failed to convert ed25519 to x25519 {:?}", err))
-        })
     }
 }
 

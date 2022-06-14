@@ -15,10 +15,10 @@ use crate::{
             PromptOptions, RestOptions, WriteTransactionOptions,
         },
     },
-    op::key::GenerateKey,
     CliCommand,
 };
 use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_keygen::KeyGen;
 use aptos_sdk::move_types::account_address::AccountAddress;
 use reqwest::Url;
 use serde_json::Value;
@@ -37,10 +37,11 @@ impl CliTestFramework {
             endpoint,
             faucet_endpoint,
         };
+        let mut keygen = KeyGen::from_seed([0; 32]);
 
         // TODO: Make this allow a passed in random seed
         for i in 0..num_accounts {
-            let private_key = GenerateKey::generate_ed25519_in_memory();
+            let private_key = keygen.generate_ed25519_private_key();
 
             // For now use, the config files to handle accounts
             framework

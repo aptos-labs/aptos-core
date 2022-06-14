@@ -9,13 +9,13 @@ use crate::{
         keys::{GenerateKeys, SetValidatorConfiguration},
         GenerateGenesis,
     },
-    op::key::GenerateKey,
     CliCommand,
 };
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey,
 };
+use aptos_keygen::KeyGen;
 use aptos_temppath::TempPath;
 use aptos_types::chain_id::ChainId;
 use move_deps::move_binary_format::access::ModuleAccess;
@@ -31,8 +31,10 @@ async fn test_genesis_e2e_flow() {
     let user_b = "user_b".to_string();
     let chain_id = ChainId::test();
 
+    let mut keygen = KeyGen::from_os_rng();
+
     // First step is setup the local git repo
-    let root_private_key = GenerateKey::generate_ed25519_in_memory();
+    let root_private_key = keygen.generate_ed25519_private_key();
     let git_options = setup_git_dir(
         &root_private_key,
         vec![user_a.clone(), user_b.clone()],

@@ -1,17 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    common::{
-        types::{
-            account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
-            EncodingOptions, PrivateKeyInputOptions, ProfileConfig, ProfileOptions, PromptOptions,
-        },
-        utils::{fund_account, prompt_yes_with_override, read_line},
+use crate::common::{
+    types::{
+        account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
+        EncodingOptions, PrivateKeyInputOptions, ProfileConfig, ProfileOptions, PromptOptions,
     },
-    op::key::GenerateKey,
+    utils::{fund_account, prompt_yes_with_override, read_line},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
+use aptos_keygen::KeyGen;
 use async_trait::async_trait;
 use clap::Parser;
 use reqwest::Url;
@@ -136,7 +134,8 @@ impl CliCommand<()> for InitTool {
                     private_key
                 } else {
                     eprintln!("No key given, generating key...");
-                    GenerateKey::generate_ed25519_in_memory()
+                    let mut keygen = KeyGen::from_os_rng();
+                    keygen.generate_ed25519_private_key()
                 }
             } else {
                 Ed25519PrivateKey::from_encoded_string(input)

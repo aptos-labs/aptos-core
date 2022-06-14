@@ -175,7 +175,6 @@ members = [
     "testcases",
     "aptos-fuzz",
     "aptos-fuzzer",
-    "aptos-keygen",
     "aptos-proptest-helpers",
     "aptos-retrier",
     "aptos-rosetta-cli",

@@ -13,6 +13,6 @@ edition = "2018"
 hex = "0.4.3"
 rand = "0.7.3"
 
-aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-crypto = { path = "../aptos-crypto" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../aptos-workspace-hack" }

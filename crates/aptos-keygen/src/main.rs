@@ -7,7 +7,7 @@ use aptos_types::transaction::authenticator::AuthenticationKey;
 
 fn main() {
     let mut keygen = KeyGen::from_os_rng();
-    let (privkey, pubkey) = keygen.generate_keypair();
+    let (privkey, pubkey) = keygen.generate_ed25519_keypair();
 
     println!("Private Key:");
     println!("{}", privkey.to_encoded_string().unwrap());

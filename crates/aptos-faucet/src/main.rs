@@ -13,10 +13,10 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
-    use aptos::op::key::GenerateKey;
-    use aptos_crypto::{ed25519::Ed25519PublicKey, hash::HashValue, PrivateKey};
+    use aptos_crypto::{ed25519::Ed25519PublicKey, hash::HashValue};
     use aptos_faucet::{routes, Service};
     use aptos_infallible::RwLock;
+    use aptos_keygen::KeyGen;
     use aptos_rest_client::{
         aptos_api_types::{
             AccountData, DirectWriteSet, LedgerInfo, PendingTransaction, Response,
@@ -70,10 +70,11 @@ mod tests {
     }
 
     fn setup(maximum_amount: Option<u64>) -> (AccountStates, Arc<Service>) {
-        let key = GenerateKey::generate_ed25519_in_memory();
-        let account_address = AuthenticationKey::ed25519(&key.public_key()).derived_address();
+        let mut keygen = KeyGen::from_os_rng();
+        let (private_key, public_key) = keygen.generate_ed25519_keypair();
+        let account_address = AuthenticationKey::ed25519(&public_key).derived_address();
 
-        let faucet_account = LocalAccount::new(account_address, key, 0);
+        let faucet_account = LocalAccount::new(account_address, private_key, 0);
 
         let chain_id = ChainId::test();
 

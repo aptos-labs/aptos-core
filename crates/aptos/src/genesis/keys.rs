@@ -10,11 +10,11 @@ use crate::{
         config::{HostAndPort, ValidatorConfiguration},
         git::{from_yaml, to_yaml, GitOptions},
     },
-    op::key,
     CliCommand,
 };
 use aptos_config::{config::IdentityBlob, keys::ConfigKey};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, x25519, PrivateKey};
+use aptos_keygen::KeyGen;
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use async_trait::async_trait;
 use clap::Parser;
@@ -50,10 +50,11 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
         check_if_file_exists(validator_file.as_path(), self.prompt_options)?;
         check_if_file_exists(vfn_file.as_path(), self.prompt_options)?;
 
-        let account_key = ConfigKey::new(key::GenerateKey::generate_ed25519_in_memory());
-        let consensus_key = ConfigKey::new(key::GenerateKey::generate_ed25519_in_memory());
-        let validator_network_key = ConfigKey::new(key::GenerateKey::generate_x25519_in_memory()?);
-        let full_node_network_key = ConfigKey::new(key::GenerateKey::generate_x25519_in_memory()?);
+        let mut keygen = KeyGen::from_os_rng();
+        let account_key = ConfigKey::new(keygen.generate_ed25519_private_key());
+        let consensus_key = ConfigKey::new(keygen.generate_ed25519_private_key());
+        let validator_network_key = ConfigKey::new(keygen.generate_x25519_private_key()?);
+        let full_node_network_key = ConfigKey::new(keygen.generate_x25519_private_key()?);
 
         let account_address =
             AuthenticationKey::ed25519(&account_key.public_key()).derived_address();

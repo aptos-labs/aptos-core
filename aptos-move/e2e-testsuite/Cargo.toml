@@ -13,7 +13,7 @@ publish = false
 proptest = "1.0.0"
 
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
-aptos-keygen = { path = "../aptos-keygen" }
+aptos-keygen = { path = "../../crates/aptos-keygen" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-parallel-executor = { path = "../parallel-executor" }
 aptos-state-view = { path = "../../storage/state-view" }
