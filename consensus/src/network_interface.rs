@@ -34,6 +34,7 @@ use network::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc, time::Duration};
+use crate::quorum_store::types::{Batch, Fragment, SignedDigest};
 
 /// Network type for consensus
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -62,6 +63,12 @@ pub enum ConsensusMsg {
     /// than 2f + 1 signatures on the commit proposal. This part is not on the critical path, but
     /// it can save slow machines to quickly confirm the execution result.
     CommitDecisionMsg(Box<CommitDecision>),
+    /// TODO
+    SignedDigestMsg(Box<SignedDigest>),
+    /// TODO
+    BatchMsg(Box<Batch>), //TODO: add to the networking flow - note that it translates into two events
+    /// TODO
+    FragmentMsg(Box<Fragment>),
 }
 
 /// The interface from Network to Consensus layer.

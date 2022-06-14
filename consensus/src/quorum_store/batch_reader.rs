@@ -2,17 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::types::{Batch, PersistedValue, ProofOfStore};
+use crate::quorum_store::types::{Payload, Batch, PersistedValue, ProofOfStore};
 use crate::{
     network::NetworkSender,
-    quorom_store::{
+    quorum_store::{
         batch_requester::BatchRequester,
         batch_store::{BatchStoreCommand, LogicalTime},
     },
 };
 use aptos_crypto::HashValue;
 use aptos_types::{validator_signer::ValidatorSigner, PeerId};
-use consensus_types::common::{Payload, Round};
+use consensus_types::common::{Round};
 use dashmap::DashMap;
 use once_cell::sync::OnceCell;
 use std::collections::HashMap;

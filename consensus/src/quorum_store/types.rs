@@ -3,19 +3,21 @@
 
 use crate::quorum_store::batch_store::LogicalTime;
 use anyhow::bail;
-use aptos_crypto::hash::{DefaultHasher, CryptoHasher};
+use aptos_crypto::hash::{DefaultHasher};
 use aptos_crypto::{ed25519::Ed25519Signature, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::validator_signer::ValidatorSigner;
 use aptos_types::{validator_verifier::ValidatorVerifier, PeerId};
 use bcs::to_bytes;
-use consensus_types::common::Payload;
 use rand::{seq::SliceRandom, thread_rng};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use aptos_types::transaction::SignedTransaction;
 
 pub(crate) type BatchId = u64;
+pub type Payload = Vec<SignedTransaction>;
+
 
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
 pub(crate) struct PersistedValue {

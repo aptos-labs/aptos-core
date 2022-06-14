@@ -1,10 +1,9 @@
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::types::Batch;
+use crate::quorum_store::types::{Batch, Payload};
 use crate::quorum_store::utils::DigestTimeouts;
 use aptos_crypto::HashValue;
 use aptos_types::{validator_signer::ValidatorSigner, PeerId};
-use consensus_types::common::Payload;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::oneshot;
 

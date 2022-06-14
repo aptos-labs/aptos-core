@@ -3,7 +3,7 @@
 
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::types::Fragment;
+use crate::quorum_store::types::{Fragment,Payload};
 use crate::quorum_store::{
     batch_aggregator::{AggregationMode, BatchAggregator},
     batch_reader::BatchReader,
@@ -19,7 +19,7 @@ use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
 use channel::aptos_channel;
-use consensus_types::common::{Payload, Round};
+use consensus_types::common::{Round};
 use futures::{
     future::BoxFuture,
     stream::{futures_unordered::FuturesUnordered, StreamExt as _},

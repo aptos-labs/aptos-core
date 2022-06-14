@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::types::{Batch, PersistedValue};
+use crate::quorum_store::types::{Payload, Batch, PersistedValue};
 use crate::{
     network::NetworkSender,
     quorum_store::{
@@ -15,7 +15,7 @@ use aptos_crypto::HashValue;
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
-use consensus_types::common::{Payload, Round};
+use consensus_types::common::{Round};
 use serde::{Deserialize, Serialize};
 use std::sync::{
     mpsc::{Receiver as SyncReceiver, SyncSender},

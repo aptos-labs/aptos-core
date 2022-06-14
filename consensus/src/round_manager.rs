@@ -49,6 +49,7 @@ use safety_rules::TSafetyRules;
 use serde::Serialize;
 use std::{mem::Discriminant, sync::Arc, time::Duration};
 use termion::color::*;
+use crate::quorum_store::types::{Batch, Fragment, SignedDigest};
 
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {
@@ -57,6 +58,9 @@ pub enum UnverifiedEvent {
     SyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
+    SignedDigest(Box<SignedDigest>),
+    Fragment(Box<Fragment>),
+    Batch(Box<Batch>),
 }
 
 impl UnverifiedEvent {
@@ -80,6 +84,18 @@ impl UnverifiedEvent {
                 cd.verify(validator)?;
                 VerifiedEvent::CommitDecision(cd)
             }
+            UnverifiedEvent::SignedDigest(sd) => {
+                sd.verify(validator)?;
+                VerifiedEvent::SignedDigest(sd)
+            }
+            UnverifiedEvent::Fragment(f) => {
+                f.verify(validator)?;
+                VerifiedEvent::Fragment(f)
+            }
+            UnverifiedEvent::Batch(b) => {
+                b.verify(validator)?;
+                VerifiedEvent::Batch(b)
+            }
         })
     }
 
@@ -90,6 +106,9 @@ impl UnverifiedEvent {
             UnverifiedEvent::SyncInfo(s) => s.epoch(),
             UnverifiedEvent::CommitVote(cv) => cv.epoch(),
             UnverifiedEvent::CommitDecision(cd) => cd.epoch(),
+            UnverifiedEvent::SignedDigest(sd) => sd.epoch(),
+            UnverifiedEvent::Fragment(f) => f.epoch(),
+            UnverifiedEvent::Batch(f) => f.epoch(),
         }
     }
 }
@@ -102,6 +121,9 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
             ConsensusMsg::CommitVoteMsg(m) => UnverifiedEvent::CommitVote(m),
             ConsensusMsg::CommitDecisionMsg(m) => UnverifiedEvent::CommitDecision(m),
+            ConsensusMsg::SignedDigestMsg(sd) => UnverifiedEvent::SignedDigest(sd),
+            ConsensusMsg::FragmentMsg(f) => UnverifiedEvent::Fragment(f),
+            ConsensusMsg::BatchMsg(b) => UnverifiedEvent::Batch(b),
             _ => unreachable!("Unexpected conversion"),
         }
     }
@@ -119,6 +141,9 @@ pub enum VerifiedEvent {
     // local messages
     LocalTimeout(Round),
     Shutdown(oneshot::Sender<()>),
+    SignedDigest(Box<SignedDigest>),
+    Fragment(Box<Fragment>),
+    Batch(Box<Batch>),
 }
 
 #[cfg(test)]

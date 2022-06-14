@@ -1,10 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::types::BatchId;
+use crate::quorum_store::types::{BatchId, Payload};
 use aptos_crypto::{hash::DefaultHasher, HashValue};
 use bcs::to_bytes;
-use consensus_types::common::Payload;
+
 
 struct IncrementalBatchState {
     txn_fragments: Vec<Payload>,
