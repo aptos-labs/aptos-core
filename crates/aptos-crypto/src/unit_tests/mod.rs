@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod bcs_test;
+mod bls12381_test;
 mod compat_test;
 mod cross_test;
 mod cryptohasher;

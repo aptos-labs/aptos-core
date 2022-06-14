@@ -9,4 +9,10 @@ export default class extends Controller<HTMLDialogElement> {
   connect() {
     dialogPolyfill.registerDialog(this.element);
   }
+
+  handleClick(e: Event) {
+    if (e.target === this.element) {
+      this.element.close();
+    }
+  }
 }

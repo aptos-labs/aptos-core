@@ -10,10 +10,12 @@ import WalletHeader from 'core/components/WalletHeader';
 import { secondaryBgColor } from 'core/constants';
 
 interface WalletLayoutProps {
-  children: React.ReactNode
+  backPage?: string;
+  children: React.ReactNode;
 }
 
 export default function WalletLayout({
+  backPage,
   children,
 }: WalletLayoutProps) {
   const { colorMode } = useColorMode();
@@ -21,10 +23,8 @@ export default function WalletLayout({
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if (!aptosAccount) {
-        navigate('/');
-      }
+    if (!aptosAccount) {
+      navigate('/');
     }
   }, []);
 
@@ -36,7 +36,7 @@ export default function WalletLayout({
       templateRows="30px 1fr 50px"
       bgColor={secondaryBgColor[colorMode]}
     >
-      <WalletHeader />
+      <WalletHeader backPage={backPage} />
       <Box maxH="100%" overflowY="auto" pb={4}>
         {children}
       </Box>

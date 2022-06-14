@@ -1,5 +1,0 @@
-<script type="text/javascript">
-(function(P,W,C,c){
-var t={kitId: '<%= ENV.fetch('TYPEKIT_CSS_ID') %>',scriptTimeout: 3000},
-y=P.documentElement,p=P.createElement(W),e=false,k=P.getElementsByTagName(W)[0],i,T=setTimeout(function(){y[C]=y[C].replace(/bwf-loadingb/g,"")+c+"inactive"},t.scriptTimeout);y[C]+=c+"loading";p.src='//use.typekit.net/'+t.kitId+'.js';p.onload=p.onreadystatechange=function(){i=this.readyState;if(e||i&&i!="complete"&&i!="loaded")return;e=true;clearTimeout(T);try{Typekit.load(t)}catch(x){}};k.parentNode.insertBefore(p,k)})(document,'script','className',' wf-');
-</script>

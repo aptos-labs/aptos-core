@@ -85,13 +85,13 @@ Ideally, routine key rotations are automated and don't require operator interven
 Imagine a validator starts with a single advertised network address containing its network identity public key `<pubkey1>`:
 
 ```
-addrs = ["/ip4/1.2.3.4/tcp/6180/ln-noise-ik/<pubkey1>/ln-handshake/0"]
+addrs = ["/ip4/1.2.3.4/tcp/6180/noise-ik/<pubkey1>/handshake/0"]
 ```
 
 The validator initiates a key rotation to a new network identity public key `<pubkey2>` by sending a transaction to set its addresses to a new list:
 
 ```
-tx: set_validator_network_addresses(["/ip4/1.2.3.4/tcp/6180/ln-noise-ik/<pubkey2>/ln-handshake/0"])
+tx: set_validator_network_addresses(["/ip4/1.2.3.4/tcp/6180/noise-ik/<pubkey2>/handshake/0"])
 ```
 
 <!-- TODO(philiphayes): link to actual tx? -->

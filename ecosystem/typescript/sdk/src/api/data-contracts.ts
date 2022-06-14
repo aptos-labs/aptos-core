@@ -396,7 +396,7 @@ export interface MoveStructField {
 export interface MoveFunction {
   /** Move function name */
   name: string;
-  visibility: "public" | "script" | "friend";
+  visibility: 'public' | 'script' | 'friend';
   generic_type_params: { constraints: MoveAbility[] }[];
   params: MoveTypeId[];
   return: MoveTypeId[];
@@ -409,10 +409,10 @@ See [doc](https://diem.github.io/move/abilities.html) for more details.
 * @example key
 */
 export enum MoveAbility {
-  Copy = "copy",
-  Drop = "drop",
-  Store = "store",
-  Key = "key",
+  Copy = 'copy',
+  Drop = 'drop',
+  Store = 'store',
+  Key = 'key',
 }
 
 /**
@@ -449,7 +449,7 @@ export interface UserTransactionRequest {
   gas_unit_price: Uint64;
 
   /** @example XDX */
-  gas_currency_code: string;
+  gas_currency_code?: string;
 
   /**
    * Timestamp in seconds, e.g. transaction expiration timestamp.
@@ -459,6 +459,8 @@ export interface UserTransactionRequest {
   payload: TransactionPayload;
 }
 
+export type UserCreateSigningMessageRequest = UserTransactionRequest & { secondary_signers?: Address[] };
+
 /**
  * This schema is used for appending `signature` field to another schema.
  */
@@ -466,14 +468,23 @@ export interface UserTransactionSignature {
   signature: TransactionSignature;
 }
 
-export type Transaction = PendingTransaction | GenesisTransaction | UserTransaction | BlockMetadataTransaction;
+export type Transaction =
+  | PendingTransaction
+  | GenesisTransaction
+  | UserTransaction
+  | BlockMetadataTransaction
+  | StateCheckpointTransaction;
 
 export type SubmitTransactionRequest = UserTransactionRequest & UserTransactionSignature;
 
 export type PendingTransaction = { type: string; hash: HexEncodedBytes } & UserTransactionRequest &
   UserTransactionSignature;
 
-export type OnChainTransaction = GenesisTransaction | UserTransaction | BlockMetadataTransaction;
+export type OnChainTransaction =
+  | GenesisTransaction
+  | UserTransaction
+  | BlockMetadataTransaction
+  | StateCheckpointTransaction;
 
 export interface OnChainTransactionInfo {
   /** Unsigned int64 type value */
@@ -543,6 +554,8 @@ export type BlockMetadataTransaction = {
 } & OnChainTransactionInfo;
 
 export type GenesisTransaction = { type: string; events: Event[]; payload: WriteSetPayload } & OnChainTransactionInfo;
+
+export type StateCheckpointTransaction = { type: string; timestamp: TimestampUsec } & OnChainTransactionInfo;
 
 export type TransactionPayload = ScriptFunctionPayload | ScriptPayload | ModuleBundlePayload | WriteSetPayload;
 
@@ -787,8 +800,29 @@ export interface WriteTableItem {
    */
   state_key_hash: HexEncodedBytes;
 
-  /** Table item write */
-  data: { handle: HexEncodedBytes; key: HexEncodedBytes; value: HexEncodedBytes };
+  /**
+   * All bytes data are represented as hex-encoded string prefixed with `0x` and fulfilled with
+   * two hex digits per byte.
+   *
+   * Different with `Address` type, hex-encoded bytes should not trim any zeros.
+   */
+  handle: HexEncodedBytes;
+
+  /**
+   * All bytes data are represented as hex-encoded string prefixed with `0x` and fulfilled with
+   * two hex digits per byte.
+   *
+   * Different with `Address` type, hex-encoded bytes should not trim any zeros.
+   */
+  key: HexEncodedBytes;
+
+  /**
+   * All bytes data are represented as hex-encoded string prefixed with `0x` and fulfilled with
+   * two hex digits per byte.
+   *
+   * Different with `Address` type, hex-encoded bytes should not trim any zeros.
+   */
+  value: HexEncodedBytes;
 }
 
 export interface Script {
@@ -967,8 +1001,6 @@ export interface Ed25519Signature {
 export interface MultiEd25519Signature {
   /** @example multi_ed25519_signature */
   type: string;
-
-  /** all public keys of the sender account */
   public_keys: HexEncodedBytes[];
 
   /** signatures created based on the `threshold` */
@@ -1137,4 +1169,40 @@ export interface TableItemRequest {
    * * [0x1::ASCII::String](https://github.com/aptos-labs/aptos-core/blob/main/language/move-stdlib/docs/ASCII.md) is serialized into `string`. For example, struct value `0x1::ASCII::String{bytes: b"hello world"}` is serialized as `"hello world"` in JSON.
    */
   key: MoveValue;
+}
+
+export interface TokenData {
+  /** Unique name within this creator's account for this Token's collection */
+  collection: string;
+
+  /** Description of Token */
+  description: string;
+
+  /** Name of Token */
+  name: string;
+
+  /** Optional maximum number of this Token */
+  maximum?: number;
+
+  /** Total number of this type of Token */
+  supply: number;
+
+  /** URL for additional information / media */
+  uri: string;
+}
+
+export interface TokenId {
+  /** Token creator address */
+  creator: string;
+
+  /** Unique name within this creator's account for this Token's collection */
+  collection: string;
+
+  /** Name of Token */
+  name: string;
+}
+
+export interface Token {
+  id: TokenId;
+  value: number;
 }

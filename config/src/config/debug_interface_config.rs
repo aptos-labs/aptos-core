@@ -10,7 +10,6 @@ pub struct DebugInterfaceConfig {
     pub admission_control_node_debug_port: u16,
     pub address: String,
     pub metrics_server_port: u16,
-    pub public_metrics_server_port: u16,
 }
 
 impl Default for DebugInterfaceConfig {
@@ -19,7 +18,6 @@ impl Default for DebugInterfaceConfig {
             admission_control_node_debug_port: 6191,
             address: "0.0.0.0".to_string(),
             metrics_server_port: 9101,
-            public_metrics_server_port: 9102,
         }
     }
 }
@@ -28,6 +26,5 @@ impl DebugInterfaceConfig {
     pub fn randomize_ports(&mut self) {
         self.admission_control_node_debug_port = utils::get_available_port();
         self.metrics_server_port = utils::get_available_port();
-        self.public_metrics_server_port = utils::get_available_port();
     }
 }

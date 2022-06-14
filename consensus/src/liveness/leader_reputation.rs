@@ -55,10 +55,10 @@ impl AptosDBBackend {
             self.window_size as u64 + self.seek_len,
         )?;
         let mut result = vec![];
-        for (v, e) in events {
-            let e = bcs::from_bytes::<NewBlockEvent>(e.event_data())?;
+        for event in events {
+            let e = bcs::from_bytes::<NewBlockEvent>(event.event.event_data())?;
             if e.round() <= target_round && result.len() < self.window_size {
-                result.push((v, e));
+                result.push((event.transaction_version, e));
             }
         }
         *self.window.lock() = result;

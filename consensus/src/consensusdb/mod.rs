@@ -18,7 +18,7 @@ use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use consensus_types::{block::Block, quorum_cert::QuorumCert};
 use schema::{BLOCK_CF_NAME, QC_CF_NAME, SINGLE_ENTRY_CF_NAME};
-use schemadb::{Options, ReadOptions, SchemaBatch, DB, DEFAULT_CF_NAME};
+use schemadb::{Options, ReadOptions, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME};
 use std::{collections::HashMap, iter::Iterator, path::Path, time::Instant};
 
 pub struct ConsensusDB {
@@ -28,7 +28,7 @@ pub struct ConsensusDB {
 impl ConsensusDB {
     pub fn new<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
         let column_families = vec![
-            /* UNUSED CF = */ DEFAULT_CF_NAME,
+            /* UNUSED CF = */ DEFAULT_COLUMN_FAMILY_NAME,
             BLOCK_CF_NAME,
             QC_CF_NAME,
             SINGLE_ENTRY_CF_NAME,

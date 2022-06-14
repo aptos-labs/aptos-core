@@ -148,25 +148,6 @@ if not args.tag:
         parsed_pr = json.loads(output)
         TAG = print(parsed_pr['head']['sha'])
 
-        # Delete all the aws codebuild stuff after https://github.com/aptos-labs/aptos-core/pull/741 is found to be stable enough
-
-        ret = subprocess.call(
-            ["aws", "codebuild", "list-projects"], stdout=subprocess.DEVNULL
-        )
-        if ret != 0:
-            print(f"{FAIL}Failed to access codebuild. Try aws-mfa?{RESTORE}")
-            sys.exit(1)
-        ret = subprocess.call(
-            ["./docker/build-aws.sh", "--build-forge",
-                "--version", f"pull/{args.pr}"]
-        )
-        if ret != 0:
-            print(f"{FAIL}Failed to build forge.")
-            sys.exit(1)
-        TAG = f"dev_{USER}_pull_{args.pr}"
-        print(
-            f"**TIP Use ./scripts/fgi/run -T {TAG} <...> to restart this run with the same tag without rebuilding it"
-        )
 if not args.base_image_tag:
     BASE_TAG = "devnet"
 # ================ Test setup ================

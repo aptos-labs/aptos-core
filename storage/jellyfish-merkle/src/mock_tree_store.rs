@@ -110,15 +110,15 @@ where
         Ok(())
     }
 
-    pub fn purge_stale_nodes(&self, least_readable_version: Version) -> Result<()> {
+    pub fn purge_stale_nodes(&self, min_readable_version: Version) -> Result<()> {
         let mut wlocked = self.data.write();
 
-        // Only records retired before or at `least_readable_version` can be purged in order
+        // Only records retired before or at `min_readable_version` can be purged in order
         // to keep that version still readable.
         let to_prune = wlocked
             .1
             .iter()
-            .take_while(|log| log.stale_since_version <= least_readable_version)
+            .take_while(|log| log.stale_since_version <= min_readable_version)
             .cloned()
             .collect::<Vec<_>>();
 

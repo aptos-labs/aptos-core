@@ -61,23 +61,23 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
         // Build these for use later as node identity
         let validator_blob = IdentityBlob {
             account_address: Some(account_address),
-            account_key: Some(account_key.private_key()),
-            consensus_key: Some(consensus_key.private_key()),
-            network_key: validator_network_key.private_key(),
+            account_private_key: Some(account_key.private_key()),
+            consensus_private_key: Some(consensus_key.private_key()),
+            network_private_key: validator_network_key.private_key(),
         };
         let vfn_blob = IdentityBlob {
             account_address: Some(account_address),
-            account_key: None,
-            consensus_key: None,
-            network_key: full_node_network_key.private_key(),
+            account_private_key: None,
+            consensus_private_key: None,
+            network_private_key: full_node_network_key.private_key(),
         };
 
         let config = PrivateIdentity {
             account_address,
-            account_key: account_key.private_key(),
-            consensus_key: consensus_key.private_key(),
-            full_node_network_key: full_node_network_key.private_key(),
-            validator_network_key: validator_network_key.private_key(),
+            account_private_key: account_key.private_key(),
+            consensus_private_key: consensus_key.private_key(),
+            full_node_network_private_key: full_node_network_key.private_key(),
+            validator_network_private_key: validator_network_key.private_key(),
         };
 
         // Create the directory if it doesn't exist
@@ -105,10 +105,10 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
 #[derive(Deserialize, Serialize)]
 pub struct PrivateIdentity {
     account_address: AccountAddress,
-    account_key: Ed25519PrivateKey,
-    consensus_key: Ed25519PrivateKey,
-    full_node_network_key: x25519::PrivateKey,
-    validator_network_key: x25519::PrivateKey,
+    account_private_key: Ed25519PrivateKey,
+    consensus_private_key: Ed25519PrivateKey,
+    full_node_network_private_key: x25519::PrivateKey,
+    validator_network_private_key: x25519::PrivateKey,
 }
 
 /// Set ValidatorConfiguration for a single validator in the git repository
@@ -129,7 +129,7 @@ pub struct SetValidatorConfiguration {
     #[clap(long)]
     pub(crate) full_node_host: Option<HostAndPort>,
     /// Stake amount for stake distribution
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value_t = 1)]
     pub(crate) stake_amount: u64,
 }
 
@@ -145,23 +145,23 @@ impl CliCommand<()> for SetValidatorConfiguration {
         let key_files: PrivateIdentity =
             from_yaml(&String::from_utf8(bytes).map_err(CliError::from)?)?;
         let account_address = key_files.account_address;
-        let account_key = key_files.account_key.public_key();
-        let consensus_key = key_files.consensus_key.public_key();
-        let validator_network_key = key_files.validator_network_key.public_key();
+        let account_key = key_files.account_private_key.public_key();
+        let consensus_key = key_files.consensus_private_key.public_key();
+        let validator_network_key = key_files.validator_network_private_key.public_key();
 
         let full_node_network_key = if self.full_node_host.is_some() {
-            Some(key_files.full_node_network_key.public_key())
+            Some(key_files.full_node_network_private_key.public_key())
         } else {
             None
         };
 
         let credentials = ValidatorConfiguration {
             account_address,
-            consensus_key,
-            account_key,
-            validator_network_key,
+            consensus_public_key: consensus_key,
+            account_public_key: account_key,
+            validator_network_public_key: validator_network_key,
             validator_host: self.validator_host,
-            full_node_network_key,
+            full_node_network_public_key: full_node_network_key,
             full_node_host: self.full_node_host,
             stake_amount: self.stake_amount,
         };

@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@chakra-ui/icons": "^2.0.0",
-    "@chakra-ui/react": "^2.0.0",
+    "@chakra-ui/icons": "^2.0.1",
+    "@chakra-ui/react": "^2.1.2",
     "@emotion/react": "^11",
     "@emotion/styled": "^11",
     "@types/jest": "^27.4.1",
@@ -31,10 +31,13 @@
     "start": "react-scripts start",
     "lint": "eslint ./src",
     "lint:fix": "eslint ./src --fix",
+    "tauri": "tauri",
     "prebuild": "rimraf build",
-    "build": "npm run lint:fix && npm-run-all build:*",
+    "build": "yarn run lint:fix && yarn run build:app && yarn run build:bg && yarn run build:inpage",
+    "build:tauri": "yarn tauri build --target aarch64-apple-darwin",
     "build:app": "INLINE_RUNTIME_CHUNK=false react-scripts build",
-    "build:bg": "webpack --mode production ./src/background.js --output-path ./build --output-filename background.js",
+    "build:bg": "webpack --mode production ./src/scripts/background.js --output-path ./build --output-filename background.js",
+    "build:inpage": "webpack --mode production ./src/scripts/inpage.js --output-path ./build --output-filename inpage.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -57,6 +60,7 @@
     ]
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^1.0.0-rc.13",
     "@types/chrome": "^0.0.183",
     "@types/react": "^18.0.6",
     "@types/webextension-polyfill": "^0.8.3",

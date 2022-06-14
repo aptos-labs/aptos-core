@@ -72,10 +72,6 @@ spec:
           FILE_BACKEND="backend=disk;path=/tmp/genesis.json"
           export VAULT_ADDR="{{ .Values.vault.server.address }}"
           export VAULT_CACERT="{{ .Values.vault.server.ca_cert }}"
-          {{- if .Values.localVaultBackend }}
-          # the local vault pod token
-          echo "root" > /tmp/vault.token
-          {{- end }}
           # the vault server token
           export VAULT_TOKEN=$(vault write -field=token auth/approle/login role_id="{{ .Values.genesis.vaultRoleId }}" secret_id="{{ .Values.genesis.vaultSecretId }}")
 
@@ -92,11 +88,6 @@ spec:
           sleep 60
           {{- end }}
           for N in $(seq 0 $(({{ .Values.genesis.numValidators}}-1))); do
-            {{- if .Values.localVaultBackend }}
-            export VAULT_ADDR="http://val${N}-aptos-validator-vault:8200"
-            export VAULT_TOKEN="root"
-            VAULT_BACKEND="backend=vault;server=$VAULT_ADDR;token=/tmp/vault.token"
-            {{- end }}
             # XXX: disables key rotation at re-genesis to keep from hitting managed backend key size limits
             # vault write -f "/transit/keys/val${N}__validator_network/rotate"
             aptos-genesis-tool owner-key --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N"
@@ -115,11 +106,6 @@ spec:
           aptos-genesis-tool create-waypoint --shared-backend "$FILE_BACKEND" --chain-id "{{ .Values.genesis.chain_id | default .Values.genesis.era }}" | grep -oE "[0-9]:[0-9a-zA-Z]+" | tee /tmp/waypoint.txt
 
           for N in $(seq 0 $(({{ .Values.genesis.numValidators}}-1))); do
-            {{- if .Values.localVaultBackend }}
-            export VAULT_ADDR="http://val${N}-aptos-validator-vault:8200"
-            export VAULT_TOKEN="root"
-            VAULT_BACKEND="backend=vault;server=$VAULT_ADDR;token=/tmp/vault.token"
-            {{- end }}
             aptos-genesis-tool insert-waypoint --set-genesis --validator-backend "$VAULT_BACKEND;namespace=val$N" --waypoint "$(cat /tmp/waypoint.txt)"
             kubectl create configmap val$N-aptos-validator-genesis-e{{ .Values.genesis.era }} --from-file=genesis.blob=/tmp/genesis.blob
             echo '{"safety_data": {"epoch": 0, "last_voted_round": 0, "preferred_round": 0, "last_vote": null}}' | vault kv put /secret/val$N/safety_data -

@@ -42,10 +42,10 @@ To create a static identity for your FullNode:
 
 Follow the below detailed steps:
 
-1. Fork and clone the [aptos-labs/aptos-core](https://github.com/aptos-labs/aptos-core) repo. For example:
+1. Clone the [aptos-labs/aptos-core](https://github.com/aptos-labs/aptos-core) repo. For example:
 
     ```
-    $ git clone https://github.com/<YOUR-GITHUB-USERID>/aptos-core.git
+    $ git clone https://github.com/aptos-labs/aptos-core.git
     $ cd aptos-core
     $ ./scripts/dev_setup.sh
     $ source ~/.cargo/env
@@ -59,7 +59,7 @@ Follow the below detailed steps:
 
     ```
     $ cd ~/my-full-node
-    $ docker run -it aptoslab/tools:devnet /bin/bash
+    $ docker run -it aptoslabs/tools:devnet /bin/bash
     ```
 
 2. Run the [Aptos CLI](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md) `aptos` to produce a hex encoded static x25519 private key. This will be the private key for your network identity.
@@ -87,7 +87,7 @@ Follow the below detailed steps:
 
   **Using Docker**
 
-  Run this step from inside the `aptoslab/tools` Docker container. Open a new terminal and `cd` into the directory where you started the Docker container for your FullNode. Making sure to provide the full path to where you want the private key TXT file to be stored, run the command as below:
+  Run this step from inside the `aptoslabs/tools` Docker container. Open a new terminal and `cd` into the directory where you started the Docker container for your FullNode. Making sure to provide the full path to where you want the private key TXT file to be stored, run the command as below:
 
   ```
   aptos-operational-tool generate-key \
@@ -107,7 +107,7 @@ Follow the below detailed steps:
 
     **Using Docker**
 
-    From inside the `aptoslab/tools` Docker container:
+    From inside the `aptoslabs/tools` Docker container:
 
     ```
     $ aptos-operational-tool extract-peer-from-file \
@@ -179,12 +179,12 @@ Share your FullNode static network identity in the following format in the Disco
   <Peer_ID>:
     addresses:
     # with DNS
-    - "/dns4/<DNS_Name>/tcp/<Port_Number>/ln-noise-ik/<Public_Key>/ln-handshake/0"
+    - "/dns4/<DNS_Name>/tcp/<Port_Number>/noise-ik/<Public_Key>/handshake/0"
     role: Upstream
   <Peer_ID>:
     addresses:
     # with IP
-    - "/ip4/<IP_Address>/tcp/<Port_Number>/ln-noise-ik/<Public_Key>/ln-handshake/0"
+    - "/ip4/<IP_Address>/tcp/<Port_Number>/noise-ik/<Public_Key>/handshake/0"
     role: Upstream
   ```
 
@@ -193,11 +193,11 @@ Share your FullNode static network identity in the following format in the Disco
   ```
   B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813:
     addresses:
-    - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813/ln-handshake/0"
+    - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/noise-ik/B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813/handshake/0"
     role: "Upstream"
   B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813:
     addresses:
-    - "/ip4/100.20.221.187/tcp/6182/ln-noise-ik/B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813/ln-handshake/0"
+    - "/ip4/100.20.221.187/tcp/6182/noise-ik/B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813/handshake/0"
     role: "Upstream"
   ```
 

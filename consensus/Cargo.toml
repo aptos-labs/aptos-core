@@ -22,7 +22,7 @@ mirai-annotations = { version = "1.12.0", default-features = false }
 num-derive = { version = "0.3.3", default-features = false }
 num-traits = { version = "0.2.15", default-features = false }
 once_cell = "1.10.0"
-rand = { version = "0.8.5", default-features = false }
+rand = { version = "0.7.3", default-features = false }
 serde = { version = "1.0.137", default-features = false }
 serde_json = "1.0.81"
 termion = { version = "1.5.6", default-features = false }
@@ -34,7 +34,7 @@ aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-infallible = { path = "../crates/aptos-infallible" }
 aptos-logger = { path = "../crates/aptos-logger" }
 aptos-mempool = { path = "../mempool" }
-aptos-metrics = { path = "../crates/aptos-metrics" }
+aptos-metrics-core = { path = "../crates/aptos-metrics-core" }
 aptos-secure-storage = { path = "../secure/storage" }
 aptos-temppath = { path = "../crates/aptos-temppath" }
 aptos-types = { path = "../types" }

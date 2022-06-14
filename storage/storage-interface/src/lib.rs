@@ -2,17 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, format_err, Result};
-use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_crypto::{
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    HashValue,
+};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::aptos_root_address,
-    contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
+    contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     move_resource::MoveStorage,
+    nibble::nibble_path::NibblePath,
     on_chain_config::{access_path_for_config, ConfigID},
     proof::{
         definition::LeafCount, AccumulatorConsistencyProof, SparseMerkleProof,
@@ -303,19 +307,7 @@ pub trait DbReader: Send + Sync {
         start: u64,
         order: Order,
         limit: u64,
-    ) -> Result<Vec<(u64, ContractEvent)>> {
-        unimplemented!()
-    }
-
-    /// Returns events by given event key
-    fn get_events_with_proofs(
-        &self,
-        event_key: &EventKey,
-        start: u64,
-        order: Order,
-        limit: u64,
-        known_version: Option<u64>,
-    ) -> Result<Vec<EventWithProof>> {
+    ) -> Result<Vec<EventWithVersion>> {
         unimplemented!()
     }
 
@@ -324,17 +316,6 @@ pub trait DbReader: Send + Sync {
     /// [AptosDB::get_block_timestamp]:
     /// ../aptosdb/struct.AptosDB.html#method.get_block_timestamp
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
-        unimplemented!()
-    }
-
-    /// Returns the [`aptos_types::account_config::events::new_block::NewBlockEvent`] for the block
-    /// containing the requested `version` and proof that the block actually contains the `version`.
-    fn get_event_by_version_with_proof(
-        &self,
-        event_key: &EventKey,
-        event_version: u64,
-        proof_version: u64,
-    ) -> Result<EventByVersionWithProof> {
         unimplemented!()
     }
 
@@ -674,11 +655,39 @@ pub trait DbWriter: Send + Sync {
     /// See [`AptosDB::save_transactions`].
     ///
     /// [`AptosDB::save_transactions`]: ../aptosdb/struct.AptosDB.html#method.save_transactions
+    fn save_transactions_ext(
+        &self,
+        txns_to_commit: &[TransactionToCommit],
+        first_version: Version,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        save_state_snapshots: bool,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
     fn save_transactions(
         &self,
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+    ) -> Result<()> {
+        self.save_transactions_ext(
+            txns_to_commit,
+            first_version,
+            ledger_info_with_sigs,
+            true, /* save_state_snapshots */
+        )
+    }
+
+    /// Persists merklized states as authenticated state checkpoint.
+    /// See [`AptosDB::save_state_snapshot`].
+    ///
+    /// [`AptosDB::save_state_snapshot`]: ../aptosdb/struct.AptosDB.html#method.save_state_snapshot
+    fn save_state_snapshot(
+        &self,
+        jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
+        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
+        version: Version,
     ) -> Result<()> {
         unimplemented!()
     }
@@ -763,4 +772,19 @@ impl SaveTransactionsRequest {
             ledger_info_with_signatures,
         }
     }
+}
+
+pub fn jmt_updates(
+    state_updates: &HashMap<StateKey, StateValue>,
+) -> Vec<(HashValue, (HashValue, StateKey))> {
+    state_updates
+        .iter()
+        .map(|(k, v)| (k.hash(), (v.hash(), k.clone())))
+        .collect()
+}
+
+pub fn jmt_update_refs(
+    jmt_updates: &[(HashValue, (HashValue, StateKey))],
+) -> Vec<(HashValue, &(HashValue, StateKey))> {
+    jmt_updates.iter().map(|(x, y)| (*x, y)).collect()
 }

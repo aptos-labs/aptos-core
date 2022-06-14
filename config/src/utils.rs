@@ -67,7 +67,7 @@ pub fn get_available_port_in_multiaddr(is_ipv4: bool) -> NetworkAddress {
     } else {
         Protocol::Ip6("::1".parse().unwrap())
     };
-    NetworkAddress::from(ip_proto).push(Protocol::Tcp(get_available_port()))
+    NetworkAddress::from_protocols(vec![ip_proto, Protocol::Tcp(get_available_port())]).unwrap()
 }
 
 pub fn get_genesis_txn(config: &NodeConfig) -> Option<&Transaction> {

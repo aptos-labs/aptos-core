@@ -116,7 +116,7 @@ mod tests {
 
         // Try with a peer
         let mut peers = PeerSet::new();
-        let addr = NetworkAddress::from_str("/ip4/1.2.3.4/tcp/6180/ln-noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/ln-handshake/0").unwrap();
+        let addr = NetworkAddress::from_str("/ip4/1.2.3.4/tcp/6180/noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/handshake/0").unwrap();
         let key = addr.find_noise_proto().unwrap();
         let addrs = vec![addr];
         let mut keys = HashSet::new();

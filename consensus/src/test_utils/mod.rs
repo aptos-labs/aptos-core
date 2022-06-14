@@ -15,19 +15,19 @@ use consensus_types::{
 use std::{future::Future, sync::Arc, time::Duration};
 use tokio::{runtime, time::timeout};
 
+#[cfg(any(test, feature = "fuzzing"))]
+mod mock_payload_manager;
 mod mock_state_computer;
 mod mock_storage;
-#[cfg(any(test, feature = "fuzzing"))]
-mod mock_txn_manager;
 
 use crate::util::mock_time_service::SimulatedTimeService;
 use aptos_types::block_info::BlockInfo;
 use consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
+pub use mock_payload_manager::MockPayloadManager;
 pub use mock_state_computer::{
     EmptyStateComputer, MockStateComputer, RandomComputeResultStateComputer,
 };
 pub use mock_storage::{EmptyStorage, MockSharedStorage, MockStorage};
-pub use mock_txn_manager::MockTransactionManager;
 
 pub const TEST_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -135,7 +135,7 @@ impl TreeInserter {
                 parent_qc,
                 parent.timestamp_usecs() + 1,
                 round,
-                vec![],
+                Payload::new_empty(),
             ))
             .await
             .unwrap()

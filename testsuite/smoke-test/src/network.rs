@@ -296,7 +296,7 @@ fn network_address(node_config: &NodeConfig, network_id: &NetworkId) -> NetworkA
         .unwrap();
     let key = network.identity_key().public_key();
     NetworkAddress::from_str(&format!(
-        "/ip4/127.0.0.1/tcp/{}/ln-noise-ik/{}/ln-handshake/0",
+        "/ip4/127.0.0.1/tcp/{}/noise-ik/{}/handshake/0",
         port, key
     ))
     .unwrap()

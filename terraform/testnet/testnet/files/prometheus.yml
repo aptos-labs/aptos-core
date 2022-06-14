@@ -114,7 +114,7 @@ scrape_configs:
 
 - job_name: "vault"
 
-  scheme: {{ ternary "http" "https" .Values.localVaultBackend }}
+  scheme: "https"
 
   tls_config:
     insecure_skip_verify: true
@@ -123,13 +123,6 @@ scrape_configs:
     format: ["prometheus"]
 
   static_configs:
-  {{- if .Values.localVaultBackend }}
-  {{- range $i, $e := .Values.genesis.numValidators | int | until }}
-  - targets: {{ printf "val%d-aptos-validator-vault:8200" $i | quote | list }}
-    labels:
-      owner: {{ printf "val%d" $i | quote }}
-  {{- end }}
-  {{- end }}
   - targets: ['{{ .Values.vault.prometheusTarget }}']
 
 {{ if .Values.monitoring.prometheus.remote_write.enabled }}

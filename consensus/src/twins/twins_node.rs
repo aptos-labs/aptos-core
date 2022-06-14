@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    commit_notifier::QuorumStoreCommitNotifier,
     counters,
     epoch_manager::EpochManager,
     network::NetworkTask,
     network_interface::{ConsensusNetworkEvents, ConsensusNetworkSender},
     network_tests::{NetworkPlayground, TwinId},
-    test_utils::{MockStateComputer, MockStorage, MockTransactionManager},
+    test_utils::{MockStateComputer, MockStorage},
     util::time_service::ClockTimeService,
 };
 use aptos_config::{
@@ -22,11 +23,12 @@ use aptos_mempool::mocks::MockSharedMempool;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{OnChainConfig, OnChainConfigPayload, ValidatorSet},
+    transaction::SignedTransaction,
     validator_info::ValidatorInfo,
     waypoint::Waypoint,
 };
 use channel::{self, aptos_channel, message_queues::QueueStyle};
-use consensus_types::common::{Author, Payload, Round};
+use consensus_types::common::{Author, Round};
 use event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use futures::channel::mpsc;
 use network::{
@@ -48,7 +50,7 @@ pub struct SMRNode {
     pub commit_cb_receiver: mpsc::UnboundedReceiver<LedgerInfoWithSignatures>,
     _runtime: Runtime,
     _shared_mempool: MockSharedMempool,
-    _state_sync: mpsc::UnboundedReceiver<Payload>,
+    _state_sync: mpsc::UnboundedReceiver<Vec<SignedTransaction>>,
 }
 
 fn author_from_config(config: &NodeConfig) -> Author {
@@ -79,19 +81,17 @@ impl SMRNode {
         let (state_sync_client, state_sync) = mpsc::unbounded();
         let (commit_cb_sender, commit_cb_receiver) = mpsc::unbounded::<LedgerInfoWithSignatures>();
         let shared_mempool = MockSharedMempool::new();
-        let consensus_to_mempool_sender = shared_mempool.consensus_sender.clone();
+        let (quorum_store_to_mempool_sender, _) = mpsc::channel(1_024);
         let state_computer = Arc::new(MockStateComputer::new(
             state_sync_client,
             commit_cb_sender,
             Arc::clone(&storage),
         ));
-        let txn_manager = Arc::new(MockTransactionManager::new(Some(
-            consensus_to_mempool_sender,
-        )));
         let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
         let reconfig_listener = ReconfigNotificationListener {
             notification_receiver: reconfig_events,
         };
+        let commit_notifier = Arc::new(QuorumStoreCommitNotifier::new(1_000));
         let mut configs = HashMap::new();
         configs.insert(
             ValidatorSet::CONFIG_ID,
@@ -130,10 +130,11 @@ impl SMRNode {
             self_sender,
             network_sender,
             timeout_sender,
-            txn_manager,
+            quorum_store_to_mempool_sender,
             state_computer,
             storage.clone(),
             reconfig_listener,
+            commit_notifier,
         );
         let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);
 

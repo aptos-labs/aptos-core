@@ -1,0 +1,10 @@
+[build]
+# Ignore the build when nothing in the docs directory has changed.
+# This is a workaround/override for netlify's default ignore behaviour which 
+# only checks whether are any changes between the last builds (on the same branch)
+# which leads it to skipping the deploy preview on some commits as observed by @rajkaramchedu in the past.
+# What we really want is to check whether there are any changes in the current branch compared to main
+# and this command achieves that.
+# More details can be found here https://docs.netlify.com/configure-builds/ignore-builds/ 
+# and here https://answers.netlify.com/t/builds-cancelled-for-a-new-branch-due-to-no-content-change/17169/4
+ignore = "if [ \"$PULL_REQUEST\" == \"true\" ]; then git diff --quiet main $COMMIT_REF . ; else git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF; fi"

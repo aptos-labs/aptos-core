@@ -232,6 +232,7 @@ mod tests {
         );
         let (aptos_data_client, _) = AptosNetDataClient::new(
             node_config.state_sync.aptos_data_client,
+            node_config.base.clone(),
             node_config.state_sync.storage_service,
             TimeService::mock(),
             network_client,

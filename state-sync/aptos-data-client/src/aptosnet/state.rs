@@ -6,10 +6,12 @@ use crate::{
     AdvertisedData, GlobalDataSummary, OptimalChunkSizes, ResponseError,
 };
 use aptos_config::{
-    config::{PeerRole, StorageServiceConfig},
-    network_id::PeerNetworkId,
+    config::{BaseConfig, StorageServiceConfig},
+    network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_logger::debug;
+use aptos_logger::prelude::*;
+use itertools::Itertools;
+use netcore::transport::ConnectionOrigin;
 use network::application::storage::PeerMetadataStorage;
 use std::{
     cmp::min,
@@ -104,7 +106,8 @@ impl PeerState {
 // TODO(philiphayes): this map needs to be garbage collected
 #[derive(Debug)]
 pub(crate) struct PeerStates {
-    config: StorageServiceConfig,
+    base_config: BaseConfig,
+    storage_service_config: StorageServiceConfig,
     peer_to_state: HashMap<PeerNetworkId, PeerState>,
     in_flight_priority_polls: HashSet<PeerNetworkId>, // The priority peers with in-flight polls
     in_flight_regular_polls: HashSet<PeerNetworkId>,  // The regular peers with in-flight polls
@@ -113,11 +116,13 @@ pub(crate) struct PeerStates {
 
 impl PeerStates {
     pub fn new(
-        config: StorageServiceConfig,
+        base_config: BaseConfig,
+        storage_service_config: StorageServiceConfig,
         peer_metadata_storage: Arc<PeerMetadataStorage>,
     ) -> Self {
         Self {
-            config,
+            base_config,
+            storage_service_config,
             peer_to_state: HashMap::new(),
             in_flight_priority_polls: HashSet::new(),
             in_flight_regular_polls: HashSet::new(),
@@ -160,7 +165,7 @@ impl PeerStates {
             .update_score_success();
         let new_score = self.peer_to_state.entry(peer).or_default().score;
         if old_score <= IGNORE_PEER_THRESHOLD && new_score > IGNORE_PEER_THRESHOLD {
-            debug!(
+            info!(
                 (LogSchema::new(LogEntry::PeerStates)
                     .event(LogEvent::PeerNoLongerIgnored)
                     .message("Peer will no longer be ignored")
@@ -178,7 +183,7 @@ impl PeerStates {
             .update_score_error(error);
         let new_score = self.peer_to_state.entry(peer).or_default().score;
         if old_score > IGNORE_PEER_THRESHOLD && new_score <= IGNORE_PEER_THRESHOLD {
-            debug!(
+            info!(
                 (LogSchema::new(LogEntry::PeerStates)
                     .event(LogEvent::PeerIgnored)
                     .message("Peer will be ignored")
@@ -199,52 +204,72 @@ impl PeerStates {
 
     /// Returns true iff there is an existing in-flight request
     pub fn existing_in_flight_request(&self, peer: &PeerNetworkId) -> bool {
-        if self.is_priority_peer(peer) {
-            self.in_flight_priority_polls.contains(peer)
-        } else {
-            self.in_flight_regular_polls.contains(peer)
-        }
+        self.in_flight_priority_polls.contains(peer) || self.in_flight_regular_polls.contains(peer)
     }
 
-    /// Creates a new pending in-flight request for the specified peer
+    /// Marks an in-flight request as started for the specified peer
     pub fn new_in_flight_request(&mut self, peer: &PeerNetworkId) {
-        if self.is_priority_peer(peer) {
-            let _ = self.in_flight_priority_polls.insert(*peer);
+        // Get the current in-flight polls
+        let is_priority_peer = self.is_priority_peer(peer);
+        let in_flight_polls = if is_priority_peer {
+            &mut self.in_flight_priority_polls
         } else {
-            let _ = self.in_flight_regular_polls.insert(*peer);
+            &mut self.in_flight_regular_polls
         };
+
+        // Insert the new peer
+        if !in_flight_polls.insert(*peer) {
+            error!(
+                (LogSchema::new(LogEntry::PeerStates)
+                    .event(LogEvent::PriorityAndRegularPeers)
+                    .message(&format!(
+                        "Peer already found with an in-flight poll! Priority: {:?}",
+                        is_priority_peer
+                    ))
+                    .peer(peer))
+            );
+        }
     }
 
     /// Marks the pending in-flight request as complete for the specified peer
     pub fn mark_in_flight_request_complete(&mut self, peer: &PeerNetworkId) {
-        if self.is_priority_peer(peer) {
-            let _ = self.in_flight_priority_polls.remove(peer);
-        } else {
-            let _ = self.in_flight_regular_polls.remove(peer);
-        };
+        // The priority of the peer might have changed since we
+        // last polled it, so we attempt to remove it from both
+        // the regular and priority in-flight requests.
+        if !self.in_flight_priority_polls.remove(peer) && !self.in_flight_regular_polls.remove(peer)
+        {
+            error!(
+                (LogSchema::new(LogEntry::PeerStates)
+                    .event(LogEvent::PriorityAndRegularPeers)
+                    .message("Peer not found with an in-flight poll!")
+                    .peer(peer))
+            );
+        }
     }
 
     /// Returns true iff the given peer is high-priority.
     ///
     /// TODO(joshlind): make this less hacky using network topological awareness.
     pub fn is_priority_peer(&self, peer: &PeerNetworkId) -> bool {
-        if peer.network_id().is_validator_network() {
-            return true;
+        // Validators should only prioritize other validators
+        let peer_network_id = peer.network_id();
+        if self.base_config.role.is_validator() {
+            return peer_network_id.is_validator_network();
         }
 
-        let peer_role = self
+        // VFNs should only prioritize validators
+        if self
             .peer_metadata_storage
-            .read(*peer)
-            .map(|peer| peer.active_connection.role);
-        if let Some(peer_role) = peer_role {
-            if peer.network_id().is_vfn_network() {
-                match peer_role {
-                    PeerRole::Validator
-                    | PeerRole::ValidatorFullNode
-                    | PeerRole::PreferredUpstream
-                    | PeerRole::Upstream => return true,
-                    _ => return false,
-                }
+            .networks()
+            .contains(&NetworkId::Vfn)
+        {
+            return peer_network_id.is_vfn_network();
+        }
+
+        // PFNs should only prioritize outbound connections (this targets seed peers and VFNs)
+        if let Some(peer_info) = self.peer_metadata_storage.read(*peer) {
+            if peer_info.active_connection.origin == ConnectionOrigin::Outbound {
+                return true;
             }
         }
 
@@ -316,7 +341,7 @@ impl PeerStates {
 
         // Calculate optimal chunk sizes based on the advertised data
         let optimal_chunk_sizes = calculate_optimal_chunk_sizes(
-            &self.config,
+            &self.storage_service_config,
             max_account_states_chunk_sizes,
             max_epoch_chunk_sizes,
             max_transaction_chunk_sizes,

@@ -1,8 +1,11 @@
-nodeUrl:
+nodeUrl: https://fullnode.devnet.aptoslabs.com
+emitEvery: 1000
+batchSize: 10
+indexTokenData: false
 
 indexer:
   image:
-    repo: aptoslab/indexer
+    repo: aptoslabs/indexer
     tag: devnet
     pullPolicy: IfNotPresent
 

@@ -45,6 +45,7 @@ gem 'kaminari'
 gem 'omniauth'
 gem 'omniauth-discord'
 gem 'omniauth-github'
+gem 'omniauth-google-oauth2'
 gem 'omniauth-rails_csrf_protection'
 
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin AJAX possible
@@ -66,6 +67,12 @@ gem 'tzinfo-data', platforms: %i[mingw mswin x64_mingw jruby]
 gem 'bootsnap', require: false
 
 gem 'httparty'
+
+# Address deriviation (sha_256)
+gem 'sha3'
+
+# Zip files
+gem 'rubyzip'
 
 # IP -> GEO via MaxMind
 gem 'maxmind-geoip2'

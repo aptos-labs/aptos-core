@@ -1,123 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos::common::types::EncodingType;
-use aptos_config::keys::ConfigKey;
-use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_logger::info;
-use aptos_sdk::types::{
-    account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
-    LocalAccount,
-};
-use std::{path::Path, sync::Arc};
+use aptos_faucet::FaucetArgs;
 use structopt::StructOpt;
-
-#[derive(Debug, StructOpt)]
-#[structopt(
-    name = "Aptos Faucet",
-    author = "Aptos",
-    about = "Aptos Testnet utility service for creating test accounts and minting test coins"
-)]
-struct Args {
-    /// Faucet service listen address
-    #[structopt(short = "a", long, default_value = "127.0.0.1")]
-    pub address: String,
-    /// Faucet service listen port
-    #[structopt(short = "p", long, default_value = "80")]
-    pub port: u16,
-    /// Aptos fullnode/validator server URL
-    #[structopt(short = "s", long, default_value = "https://testnet.aptoslabs.com/")]
-    pub server_url: String,
-    /// Path to the private key for creating test account and minting coins.
-    /// To keep Testnet simple, we used one private key for aptos root account
-    /// To manually generate a keypair, use generate-key:
-    /// `cargo run -p generate-keypair -- -o <output_file_path>`
-    #[structopt(short = "m", long, default_value = "/opt/aptos/etc/mint.key")]
-    pub mint_key_file_path: String,
-    /// Ed25519PrivateKey for minting coins
-    #[structopt(long, parse(try_from_str = ConfigKey::from_encoded_string))]
-    pub mint_key: Option<ConfigKey<Ed25519PrivateKey>>,
-    /// Address of the account to send transactions from.
-    /// On Testnet, for example, this is a550c18.
-    /// If not present, the mint key's address is used
-    #[structopt(short = "t", long, parse(try_from_str = AccountAddress::from_hex_literal))]
-    pub mint_account_address: Option<AccountAddress>,
-    /// Chain ID of the network this client is connecting to.
-    /// For mainnet: "MAINNET" or 1, testnet: "TESTNET" or 2, devnet: "DEVNET" or 3,
-    /// local swarm: "TESTING" or 4
-    /// Note: Chain ID of 0 is not allowed; Use number if chain id is not predefined.
-    #[structopt(short = "c", long, default_value = "2")]
-    pub chain_id: ChainId,
-    /// Maximum amount of coins to mint.
-    #[structopt(long)]
-    pub maximum_amount: Option<u64>,
-    #[structopt(long)]
-    pub do_not_delegate: bool,
-}
 
 #[tokio::main]
 async fn main() {
-    let args: Args = Args::from_args();
     aptos_logger::Logger::new().init();
-
-    let address: std::net::SocketAddr = format!("{}:{}", args.address, args.port)
-        .parse()
-        .expect("invalid address or port number");
-
-    info!(
-        "[faucet]: chain id: {}, server url: {} . Limit: {:?}",
-        args.chain_id,
-        args.server_url.as_str(),
-        args.maximum_amount,
-    );
-
-    let key = if let Some(key) = args.mint_key {
-        key.private_key()
-    } else {
-        EncodingType::BCS
-            .load_key::<Ed25519PrivateKey>("mint key", Path::new(&args.mint_key_file_path))
-            .unwrap()
-    };
-
-    let faucet_address: AccountAddress =
-        args.mint_account_address.unwrap_or_else(aptos_root_address);
-    let faucet_account = LocalAccount::new(faucet_address, key, 0);
-
-    // Do not use maximum amount on delegation, this allows the new delegated faucet to
-    // mint a lot for themselves!
-    let maximum_amount = if args.do_not_delegate {
-        args.maximum_amount
-    } else {
-        None
-    };
-
-    let service = Arc::new(aptos_faucet::Service::new(
-        args.server_url.clone(),
-        args.chain_id,
-        faucet_account,
-        maximum_amount,
-    ));
-
-    let actual_service = if args.do_not_delegate {
-        service
-    } else {
-        aptos_faucet::delegate_mint_account(
-            service,
-            args.server_url,
-            args.chain_id,
-            args.maximum_amount,
-        )
-        .await
-    };
-
-    info!(
-        "[faucet]: running on: {}. Minting from {}",
-        address,
-        actual_service.faucet_account.lock().await.address()
-    );
-    warp::serve(aptos_faucet::routes(actual_service))
-        .run(address)
-        .await;
+    let args: FaucetArgs = FaucetArgs::from_args();
+    args.run().await
 }
 
 #[cfg(test)]
@@ -148,11 +39,17 @@ mod tests {
     use serde::Serialize;
     use std::{
         collections::HashMap,
-        convert::{TryFrom, TryInto},
+        convert::{Infallible, TryFrom, TryInto},
         sync::{Arc, Mutex},
     };
     use tokio::task::yield_now;
-    use warp::{Filter, Rejection, Reply};
+    use warp::{
+        body::BodyDeserializeError,
+        cors::CorsForbidden,
+        http::{header, HeaderValue, StatusCode},
+        reject::{LengthRequired, MethodNotAllowed, PayloadTooLarge, UnsupportedMediaType},
+        reply, Filter, Rejection, Reply,
+    };
 
     type AccountStates = Arc<RwLock<HashMap<AccountAddress, AccountState>>>;
     #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -201,7 +98,14 @@ mod tests {
                 .and(warp::post())
                 .and(warp::body::bytes())
                 .and(warp::any().map(move || (accounts_cloned_1.clone(), last_txn.clone())))
-                .and_then(handle_submit_transaction));
+                .and_then(handle_submit_transaction))
+            .with(
+                warp::cors()
+                    .allow_any_origin()
+                    .allow_methods(vec!["POST", "GET"])
+                    .allow_headers(vec![header::CONTENT_TYPE]),
+            )
+            .recover(handle_rejection);
         let (address, future) = warp::serve(stub).bind_ephemeral(([127, 0, 0, 1], 0));
         tokio::task::spawn(async move { future.await });
 
@@ -332,6 +236,63 @@ mod tests {
                 events: Vec::new(),
             }),
         })
+    }
+
+    #[derive(Clone, Debug, Serialize, PartialEq)]
+    pub struct Error {
+        pub code: u16,
+        pub message: String,
+    }
+
+    impl Error {
+        fn new(code: StatusCode, message: String) -> Error {
+            Error {
+                code: code.as_u16(),
+                message,
+            }
+        }
+
+        fn status_code(&self) -> StatusCode {
+            StatusCode::from_u16(self.code).unwrap()
+        }
+    }
+
+    async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
+        let code;
+        let body;
+
+        if err.is_not_found() {
+            code = StatusCode::NOT_FOUND;
+            body = reply::json(&Error::new(code, "Not Found".to_owned()));
+        } else if let Some(error) = err.find::<Error>() {
+            code = error.status_code();
+            body = reply::json(error);
+        } else if let Some(cause) = err.find::<CorsForbidden>() {
+            code = StatusCode::FORBIDDEN;
+            body = reply::json(&Error::new(code, cause.to_string()));
+        } else if let Some(cause) = err.find::<BodyDeserializeError>() {
+            code = StatusCode::BAD_REQUEST;
+            body = reply::json(&Error::new(code, cause.to_string()));
+        } else if let Some(cause) = err.find::<LengthRequired>() {
+            code = StatusCode::LENGTH_REQUIRED;
+            body = reply::json(&Error::new(code, cause.to_string()));
+        } else if let Some(cause) = err.find::<PayloadTooLarge>() {
+            code = StatusCode::PAYLOAD_TOO_LARGE;
+            body = reply::json(&Error::new(code, cause.to_string()));
+        } else if let Some(cause) = err.find::<UnsupportedMediaType>() {
+            code = StatusCode::UNSUPPORTED_MEDIA_TYPE;
+            body = reply::json(&Error::new(code, cause.to_string()));
+        } else if let Some(cause) = err.find::<MethodNotAllowed>() {
+            code = StatusCode::METHOD_NOT_ALLOWED;
+            body = reply::json(&Error::new(code, cause.to_string()));
+        } else {
+            code = StatusCode::INTERNAL_SERVER_ERROR;
+            body = reply::json(&Error::new(code, format!("unexpected error: {:?}", err)));
+        }
+        let mut rep = reply::with_status(body, code).into_response();
+        rep.headers_mut()
+            .insert("access-control-allow-origin", HeaderValue::from_static("*"));
+        Ok(rep)
     }
 
     #[tokio::test]

@@ -10,7 +10,7 @@
 use crate::message_queues::{PerKeyQueue, QueueStyle};
 use anyhow::{ensure, Result};
 use aptos_infallible::{Mutex, NonZeroUsize};
-use aptos_metrics::IntCounterVec;
+use aptos_metrics_core::IntCounterVec;
 use futures::{
     channel::oneshot,
     stream::{FusedStream, Stream},

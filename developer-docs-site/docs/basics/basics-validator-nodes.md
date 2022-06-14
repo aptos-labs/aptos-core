@@ -1,5 +1,5 @@
 ---
-title: "Validator nodes"
+title: "Validator Nodes"
 slug: "basics-validator-nodes"
 ---
 import BlockQuote from "@site/src/components/BlockQuote";

@@ -22,7 +22,7 @@ tokio = { version = "1.18.2", features = ["rt", "macros"], default-features = fa
 aptos-config = { path = "../../../config" }
 aptos-infallible = { path = "../../../crates/aptos-infallible" }
 aptos-logger = { path = "../../../crates/aptos-logger" }
-aptos-metrics = { path = "../../../crates/aptos-metrics" }
+aptos-metrics-core = { path = "../../../crates/aptos-metrics-core" }
 aptos-time-service = { path = "../../../crates/aptos-time-service", features = ["async"] }
 aptos-types = { path = "../../../types" }
 aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }

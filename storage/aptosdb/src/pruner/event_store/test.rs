@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{pruner::*, AptosDB, ChangeSet};
+use crate::{pruner::*, AptosDB, ChangeSet, EventStore};
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -39,15 +39,13 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
     let mut cs = ChangeSet::new();
     let num_versions = events.len();
     let pruner = Pruner::new(
-        Arc::clone(&aptos_db.db),
+        Arc::clone(&aptos_db.ledger_db),
+        Arc::clone(&aptos_db.state_merkle_db),
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
             ledger_prune_window: Some(0),
             pruning_batch_size: 1,
         },
-        Arc::clone(&aptos_db.transaction_store),
-        Arc::clone(&aptos_db.ledger_store),
-        Arc::clone(&aptos_db.event_store),
     );
 
     // Write events to DB
@@ -56,7 +54,7 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
             .put_events(version as u64, events_for_version, &mut cs)
             .unwrap();
     }
-    aptos_db.db.write_schemas(cs.batch).unwrap();
+    aptos_db.ledger_db.write_schemas(cs.batch).unwrap();
 
     // start pruning events batches of size 2 and verify transactions have been pruned from DB
     for i in (0..=num_versions).step_by(2) {

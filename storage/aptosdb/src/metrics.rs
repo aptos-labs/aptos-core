@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_metrics::{
+use aptos_metrics_core::{
     register_histogram_vec, register_int_counter, register_int_gauge, register_int_gauge_vec,
     HistogramVec, IntCounter, IntGauge, IntGaugeVec,
 };
@@ -75,7 +75,7 @@ pub static PRUNER_WINDOW: Lazy<IntGaugeVec> = Lazy::new(|| {
 pub static PRUNER_LEAST_READABLE_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         // metric name
-        "aptos_pruner_least_readable_version",
+        "aptos_pruner_min_readable_version",
         // metric description
         "Aptos pruner least readable state version",
         // metric labels (dimensions)

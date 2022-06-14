@@ -53,9 +53,12 @@ struct IndexerArgs {
     /// Set to 0 to disable.
     #[clap(long, default_value_t = 1000)]
     emit_every: usize,
-}
 
-const INTERNAL_TESTING_TOKEN_PROCESSOR: bool = true;
+    /// Turn on the indexer to collect token, ownership, collection and metadata and store them
+    /// in the postgres DB tables.
+    #[clap(long)]
+    index_token_data: bool,
+}
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -75,7 +78,7 @@ async fn main() -> std::io::Result<()> {
 
     let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
     tailer.add_processor(Arc::new(pg_transaction_processor));
-    if !INTERNAL_TESTING_TOKEN_PROCESSOR {
+    if args.index_token_data {
         let token_transaction_processor = TokenTransactionProcessor::new(conn_pool.clone());
         tailer.add_processor(Arc::new(token_transaction_processor));
     }

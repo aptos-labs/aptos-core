@@ -20,7 +20,7 @@ aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
 proptest = "1.0.0"
-rand = "0.8.5"
+rand = "0.7.3"
 
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
 

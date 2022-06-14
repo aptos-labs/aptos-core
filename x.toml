@@ -130,6 +130,8 @@ whitespace-exceptions = [
     "**/*.errmap",
     "**/*.abi",
     "terraform/**/*",
+    "**/*.yaml",
+    "**/*.yml",
 ]
 
 license-exceptions = [
@@ -176,6 +178,7 @@ members = [
     "aptos-keygen",
     "aptos-proptest-helpers",
     "aptos-retrier",
+    "aptos-rosetta-cli",
     "aptos-transaction-benchmarks",
     "aptos-writeset-generator",
     "executor-benchmark",
@@ -187,6 +190,9 @@ members = [
     "language-e2e-testsuite",
     "memsocket",
     "move-examples",
+    "peer-monitoring-service-client", # This will be removed once the peer monitoring service is plugged in
+    "peer-monitoring-service-server", # This will be removed once the peer monitoring service is plugged in
+    "peer-monitoring-service-types", # This will be removed once the peer monitoring service is plugged in
     "smoke-test",
     "storage-client",
     "transaction-emitter",
@@ -253,17 +259,17 @@ mark-changed = "all"
 
 # Core devtools files.
 [[determinator.path-rule]]
-globs = [".config/nextest.toml", "scripts/dev_setup.sh", "x.toml"]
+globs = [".config/nextest.toml", "scripts/dev_setup.sh", "x.toml", ".node-version", ".prettierrc"]
 mark-changed = "all"
 
 [[determinator.path-rule]]
 # Ignore website and other ancillary files, and scripts not listed above.
-globs = ["dashboards/**", "developer-docs-site/**/*", "documentation/**/*", "docker/**/*", "language/documentation/**/*", "specifications/**/*", "scripts/**/*", "terraform/**/*"]
+globs = ["CODEOWNERS","dashboards/**", "developer-docs-site/**/*", "documentation/**/*", "docker/**/*", "language/documentation/**/*", "specifications/**/*", "scripts/**/*", "terraform/**/*"]
 mark-changed = []
 
 [[determinator.path-rule]]
 # Ignore ecosytem typescript
-globs = ["ecosystem/typescript/**/*", "ecosystem/web-wallet/**/*", "ecosystem/platform/**/*", "ecosystem/indexer-server/typescript/**/*", "ecosystem/indexer-server/doc/*"]
+globs = ["ecosystem/typescript/**/*", "ecosystem/python/**/*", "ecosystem/web-wallet/**/*", "ecosystem/platform/**/*", "ecosystem/indexer-server/*"]
 mark-changed = []
 
 [[determinator.path-rule]]

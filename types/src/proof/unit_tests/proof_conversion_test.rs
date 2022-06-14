@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::proof::{
-    definition::{EventProof, TransactionInfoListWithProof, TransactionInfoWithProof},
+    definition::{TransactionInfoListWithProof, TransactionInfoWithProof},
     AccumulatorConsistencyProof, SparseMerkleRangeProof, TestAccumulatorProof,
     TestAccumulatorRangeProof,
 };
@@ -52,11 +52,6 @@ proptest! {
 
     #[test]
     fn test_transaction_proof_bcs_roundtrip(proof in any::<TransactionInfoWithProof>()) {
-        assert_canonical_encode_decode(proof);
-    }
-
-    #[test]
-    fn test_event_proof_bcs_roundtrip(proof in any::<EventProof>()) {
         assert_canonical_encode_decode(proof);
     }
 

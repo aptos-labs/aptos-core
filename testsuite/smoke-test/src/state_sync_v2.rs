@@ -383,6 +383,7 @@ async fn test_all_validator_failures(mut swarm: LocalSwarm) {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_single_validator_failure() {
     // Create a swarm of 1 validator
     let mut swarm = new_local_swarm_with_aptos(1).await;
@@ -491,7 +492,7 @@ fn stop_validator_and_delete_storage(swarm: &mut LocalSwarm, validator: AccountA
 
     // Delete the validator storage
     let node_config = swarm.validator_mut(validator).unwrap().config().clone();
-    let state_db_path = node_config.storage.dir().join("aptosdb");
+    let state_db_path = node_config.storage.dir();
     info!(
         "Deleting state db path {:?} for validator {:?}",
         state_db_path.as_path(),

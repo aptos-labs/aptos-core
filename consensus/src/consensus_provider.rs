@@ -2,18 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    commit_notifier::QuorumStoreCommitNotifier,
     counters,
     epoch_manager::EpochManager,
     network::NetworkTask,
     network_interface::{ConsensusNetworkEvents, ConsensusNetworkSender},
     persistent_liveness_storage::StorageWriteProxy,
     state_computer::ExecutionProxy,
-    txn_manager::MempoolProxy,
+    txn_notifier::MempoolNotifier,
     util::time_service::ClockTimeService,
 };
 use aptos_config::config::NodeConfig;
 use aptos_logger::prelude::*;
-use aptos_mempool::ConsensusRequest;
+use aptos_mempool::QuorumStoreRequest;
 use aptos_vm::AptosVM;
 use consensus_notifications::ConsensusNotificationSender;
 use event_notifications::ReconfigNotificationListener;
@@ -30,7 +31,7 @@ pub fn start_consensus(
     mut network_sender: ConsensusNetworkSender,
     network_events: ConsensusNetworkEvents,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
-    consensus_to_mempool_sender: mpsc::Sender<ConsensusRequest>,
+    consensus_to_mempool_sender: mpsc::Sender<QuorumStoreRequest>,
     aptos_db: DbReaderWriter,
     reconfig_events: ReconfigNotificationListener,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
@@ -41,17 +42,19 @@ pub fn start_consensus(
         .build()
         .expect("Failed to create Tokio runtime!");
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
-    let txn_manager = Arc::new(MempoolProxy::new(
-        consensus_to_mempool_sender,
-        node_config.consensus.mempool_poll_count,
-        node_config.consensus.mempool_txn_pull_timeout_ms,
+    let txn_notifier = Arc::new(MempoolNotifier::new(
+        consensus_to_mempool_sender.clone(),
         node_config.consensus.mempool_executed_txn_timeout_ms,
+    ));
+    let commit_notifier = Arc::new(QuorumStoreCommitNotifier::new(
+        node_config.consensus.quorum_store_pull_timeout_ms,
     ));
 
     let state_computer = Arc::new(ExecutionProxy::new(
         Box::new(BlockExecutor::<AptosVM>::new(aptos_db)),
-        txn_manager.clone(),
+        txn_notifier,
         state_sync_notifier,
+        commit_notifier.clone(),
         runtime.handle(),
     ));
 
@@ -67,10 +70,11 @@ pub fn start_consensus(
         self_sender,
         network_sender,
         timeout_sender,
-        txn_manager,
+        consensus_to_mempool_sender,
         state_computer,
         storage,
         reconfig_events,
+        commit_notifier,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);

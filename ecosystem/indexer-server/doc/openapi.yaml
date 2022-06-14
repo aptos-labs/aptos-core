@@ -129,7 +129,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Token"
+                $ref: "#/components/schemas/TokenMetaData"
         '404':
           $ref: '#/components/responses/404'
         '400':
@@ -159,7 +159,7 @@ paths:
           $ref: "#/components/responses/500"
   /metadata/byIds:
     post:
-      description: "Returns Token MetaData by Ids"
+      description: "Returns Token MetaData by tokenIds"
       operationId: getTokenMetaDataByIds
       requestBody:
         content:
@@ -181,7 +181,7 @@ paths:
           $ref: '#/components/responses/500'
   /tokens/byIds:
     post:
-      description: "Returns Tokens by Ids"
+      description: "Returns Tokens by tokenIds"
       operationId: getTokenByIds
       requestBody:
         content:
@@ -234,7 +234,7 @@ paths:
           $ref: "#/components/responses/500"
   /ownerships/{ownershipId}:
     get:
-      description: "Returns ownership by Id"
+      description: "Returns ownership by ownershipId"
       operationId: getOwnershipById
       parameters:
         - name: "ownershipId"
@@ -292,13 +292,13 @@ paths:
           $ref: "#/components/responses/500"
   /ownerships/byIds:
     post:
-      description: "Returns Ownerships by Ids"
+      description: "Returns Ownerships by ownershipIds"
       operationId: getOwnershipsByIds
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/Ownerships"
+              $ref: "#/components/schemas/OwnershipIds"
         required: true
       responses:
         "200":
@@ -306,22 +306,22 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Ownership"
+                $ref: "#/components/schemas/Ownerships"
         '404':
           $ref: "#/components/responses/404"
         '400':
           $ref: "#/components/responses/400"
         '500':
           $ref: "#/components/responses/500"
-  /collections/{CollectionId}:
+  /collections/{collectionId}:
     get:
       description: "Returns collection by collection id"
       operationId: getCollectionById
       parameters:
-        - name: "CollectionId"
+        - name: "collectionId"
           in: path
           required: true
-          description: "Id of the collection"
+          description: "Id of the collection. collectionId has the format of “${ownerAddress}::${collectionName}"
           schema:
             $ref: "#/components/schemas/CollectionId"
       responses:
@@ -1644,7 +1644,7 @@ components:
     TokenIds:
       type: object
       properties:
-        ids:
+        tokenIds:
           type: array
           description: "List of token Ids "
           items:
@@ -1748,8 +1748,16 @@ components:
             $ref: "#/components/schemas/Collection"
     OwnershipId:
       type: string
-      description: Ownership Id has the format of "${tokenID}::${ownerAddress}"
+      description: Ownership Id has the format of "${tokenID}::${ownerAddress}". ${tokenID}::${ownerAddress}, fully destructured, becomes ${creator_address}::${collection_name}::${token_name}::${ownerAddress}
       example:
+    OwnershipIds:
+      type: object
+      properties:
+        ownershipIds:
+          type: array
+          description: "List of Ownership Ids"
+          items:
+            $ref: "#/components/schemas/OwnershipId"
     OwnershipSource:
       type: string
       enum:

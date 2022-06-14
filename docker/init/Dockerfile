@@ -37,6 +37,7 @@ RUN mkdir -p /aptos-framework/move/build
 RUN mkdir -p /aptos-framework/move/modules
 COPY --from=builder /aptos/aptos-framework/releases/artifacts/current/build /aptos-framework/move/build
 RUN mv /aptos-framework/move/build/**/bytecode_modules/*.mv /aptos-framework/move/modules
+RUN mv /aptos-framework/move/build/**/bytecode_modules/dependencies/**/*.mv /aptos-framework/move/modules
 RUN rm -rf /aptos-framework/move/build
 
 FROM pre-prod as testing

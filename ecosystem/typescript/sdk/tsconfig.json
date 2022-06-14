@@ -1,8 +1,9 @@
 {
   "compilerOptions": {
+    "experimentalDecorators": true,
     "outDir": "./dist",
     "allowJs": true,
-    "target": "es6",
+    "target": "es2020",
     "declaration": true,
     "declarationMap": true,
     "esModuleInterop": true,
@@ -10,7 +11,7 @@
     "module": "commonjs",
     "pretty": true,
     "noImplicitAny": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
   },
   "include": [
     "src"

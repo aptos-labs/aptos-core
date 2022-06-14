@@ -48,6 +48,7 @@ dialog.fixed {
   position: fixed;
   top: 50%;
   transform: translate(0, -50%);
+  margin: 0 auto;
 }
 
 dialog::backdrop {

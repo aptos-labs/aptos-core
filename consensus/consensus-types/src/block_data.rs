@@ -232,7 +232,12 @@ fn test_reconfiguration_suffix() {
             BTreeMap::new(),
         ),
     );
-    let reconfig_suffix_block =
-        BlockData::new_proposal(vec![], AccountAddress::random(), 2, 2, quorum_cert);
+    let reconfig_suffix_block = BlockData::new_proposal(
+        Payload::new_empty(),
+        AccountAddress::random(),
+        2,
+        2,
+        quorum_cert,
+    );
     assert!(reconfig_suffix_block.is_reconfiguration_suffix());
 }

@@ -12,7 +12,7 @@
     "lint": "eslint \"**/*.ts\"",
     "push": "yarn publish --non-interactive --new-version",
     "test": "jest",
-    "_fmt": "prettier --config .prettierrc 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts'",
+    "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts'",
     "fmt": "yarn _fmt --write",
     "fmt:check": "yarn _fmt --check",
     "cov:clean": "rm -rf coverage"
@@ -38,6 +38,7 @@
     "@typescript-eslint/parser": "^5.17.0",
     "eslint": "^7.32.0",
     "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-config-airbnb-typescript": "^17.0.0",
     "eslint-plugin-import": "^2.25.4",
     "jest": "^27.5.1",
     "prettier": "^2.6.2",
@@ -53,5 +54,5 @@
     "tweetnacl": "^1.0.3",
     "yarn": "^1.22.18"
   },
-  "version": "0.0.20"
+  "version": "1.1.0"
 }

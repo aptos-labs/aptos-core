@@ -24,7 +24,7 @@ pub struct LedgerPruner {
     db: Arc<DB>,
     /// Keeps track of the target version that the pruner needs to achieve.
     target_version: AtomicVersion,
-    least_readable_version: AtomicVersion,
+    min_readable_version: AtomicVersion,
     transaction_store_pruner: Arc<dyn DBSubPruner + Send + Sync>,
     event_store_pruner: Arc<dyn DBSubPruner + Send + Sync>,
     write_set_pruner: Arc<dyn DBSubPruner + Send + Sync>,
@@ -38,42 +38,39 @@ impl DBPruner for LedgerPruner {
 
     fn prune(&self, db_batch: &mut SchemaBatch, max_versions: u64) -> anyhow::Result<Version> {
         if !self.is_pruning_pending() {
-            return Ok(self.least_readable_version());
+            return Ok(self.min_readable_version());
         }
-        let least_readable_version = self.least_readable_version();
+        let min_readable_version = self.min_readable_version();
         // Current target version might be less than the target version to ensure we don't prune
         // more than max_version in one go.
         let current_target_version = self.get_currrent_batch_target(max_versions);
 
         self.transaction_store_pruner.prune(
             db_batch,
-            least_readable_version,
+            min_readable_version,
             current_target_version,
         )?;
         self.write_set_pruner
-            .prune(db_batch, least_readable_version, current_target_version)?;
-        self.ledger_counter_pruner.prune(
-            db_batch,
-            least_readable_version,
-            current_target_version,
-        )?;
+            .prune(db_batch, min_readable_version, current_target_version)?;
+        self.ledger_counter_pruner
+            .prune(db_batch, min_readable_version, current_target_version)?;
 
         self.event_store_pruner
-            .prune(db_batch, least_readable_version, current_target_version)?;
+            .prune(db_batch, min_readable_version, current_target_version)?;
 
         self.record_progress(current_target_version);
         Ok(current_target_version)
     }
 
-    fn initialize_least_readable_version(&self) -> anyhow::Result<Version> {
+    fn initialize_min_readable_version(&self) -> anyhow::Result<Version> {
         let mut iter = self.db.iter::<TransactionSchema>(ReadOptions::default())?;
         iter.seek_to_first();
         let version = iter.next().transpose()?.map_or(0, |(version, _)| version);
         Ok(version)
     }
 
-    fn least_readable_version(&self) -> Version {
-        self.least_readable_version.load(Ordering::Relaxed)
+    fn min_readable_version(&self) -> Version {
+        self.min_readable_version.load(Ordering::Relaxed)
     }
 
     fn set_target_version(&self, target_version: Version) {
@@ -84,12 +81,12 @@ impl DBPruner for LedgerPruner {
         self.target_version.load(Ordering::Relaxed)
     }
 
-    fn record_progress(&self, least_readable_version: Version) {
-        self.least_readable_version
-            .store(least_readable_version, Ordering::Relaxed);
+    fn record_progress(&self, min_readable_version: Version) {
+        self.min_readable_version
+            .store(min_readable_version, Ordering::Relaxed);
         PRUNER_LEAST_READABLE_VERSION
             .with_label_values(&["ledger_pruner"])
-            .set(least_readable_version as i64);
+            .set(min_readable_version as i64);
     }
 }
 
@@ -103,7 +100,7 @@ impl LedgerPruner {
         let pruner = LedgerPruner {
             db,
             target_version: AtomicVersion::new(0),
-            least_readable_version: AtomicVersion::new(0),
+            min_readable_version: AtomicVersion::new(0),
             ledger_counter_pruner: Arc::new(LedgerCounterPruner::new(ledger_store)),
             transaction_store_pruner: Arc::new(TransactionStorePruner::new(
                 transaction_store.clone(),

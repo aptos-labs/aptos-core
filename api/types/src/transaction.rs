@@ -329,6 +329,14 @@ pub struct UserTransactionRequest {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct UserCreateSigningMessageRequest {
+    #[serde(flatten)]
+    pub transaction: UserTransactionRequest,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secondary_signers: Option<Vec<Address>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GenesisTransaction {
     #[serde(flatten)]
     pub info: TransactionInfo,

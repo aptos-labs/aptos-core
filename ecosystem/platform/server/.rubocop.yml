@@ -24,7 +24,11 @@ Metrics/AbcSize:
 Style/Copyright:
   Enabled: true
   Notice: '^# Copyright \(c\) Aptos'
-  AutocorrectNotice: "# Copyright (c) Aptos\n# SPDX-License-Identifier: Apache-2.0"
+  AutocorrectNotice: "# Copyright (c) Aptos\n# SPDX-License-Identifier: Apache-2.0\n"
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  SafeAutoCorrect: true # it is safe to add frozen_string_literal: true
 
 Lint/MissingSuper:
   Exclude:

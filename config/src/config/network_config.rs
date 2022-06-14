@@ -151,7 +151,7 @@ impl NetworkConfig {
             }
             Identity::FromFile(config) => {
                 let identity_blob: IdentityBlob = IdentityBlob::from_file(&config.path).unwrap();
-                Some(identity_blob.network_key)
+                Some(identity_blob.network_private_key)
             }
             Identity::None => None,
         };
@@ -225,7 +225,7 @@ impl NetworkConfig {
                     Some(address)
                 } else {
                     Some(from_identity_public_key(
-                        identity_blob.network_key.public_key(),
+                        identity_blob.network_private_key.public_key(),
                     ))
                 }
             }
@@ -302,6 +302,22 @@ impl NetworkConfig {
             )?;
         }
         Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct PeerMonitoringServiceConfig {
+    pub max_concurrent_requests: u64, // Max num of concurrent server tasks
+    pub max_network_channel_size: u64, // Max num of pending network messages
+}
+
+impl Default for PeerMonitoringServiceConfig {
+    fn default() -> Self {
+        Self {
+            max_concurrent_requests: 1000,
+            max_network_channel_size: 1000,
+        }
     }
 }
 

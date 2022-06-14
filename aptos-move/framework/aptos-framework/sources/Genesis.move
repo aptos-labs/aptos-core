@@ -3,6 +3,7 @@ module AptosFramework::Genesis {
     use Std::Event;
     use Std::Vector;
     use AptosFramework::Account;
+    use AptosFramework::Coin;
     use AptosFramework::ConsensusConfig;
     use AptosFramework::TransactionPublishingOption;
     use AptosFramework::Version;
@@ -10,7 +11,7 @@ module AptosFramework::Genesis {
     use AptosFramework::ChainId;
     use AptosFramework::Reconfiguration;
     use AptosFramework::Stake;
-    use AptosFramework::TestCoin;
+    use AptosFramework::TestCoin::{Self, TestCoin};
     use AptosFramework::Timestamp;
     use AptosFramework::TransactionFee;
     use AptosFramework::VMConfig;
@@ -98,7 +99,10 @@ module AptosFramework::Genesis {
 
         // This is testnet-specific configuration and can be skipped for mainnet.
         // Mainnet can call Coin::initialize<MainnetCoin> directly and give mint capability to the Staking module.
-        let burn_cap = TestCoin::initialize(&core_framework_account, core_resource_account);
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework_account, core_resource_account);
+
+        // Give Stake MintCapability<TestCoin> so it can mint rewards.
+        Stake::store_test_coin_mint_cap(core_resource_account, mint_cap);
 
         // Give TransactionFee BurnCapability<TestCoin> so it can burn gas.
         TransactionFee::store_test_coin_burn_cap(&core_framework_account, burn_cap);
@@ -159,11 +163,16 @@ module AptosFramework::Genesis {
                 &owner_account,
                 consensus_pubkey,
                 validator_network_address,
-                full_node_network_address
+                full_node_network_address,
             );
+            Stake::increase_lockup(&owner_account, 100000);
             let amount = *Vector::borrow(&staking_distribution, i);
-            Stake::delegate_stake(&core_resource_account, *owner, amount, 100000);
-            Stake::join_validator_set(&owner_account);
+            // Transfer coins from the root account to the validator, so they can stake and have non-zero voting power
+            // and can complete consensus on the genesis block.
+            Coin::register<TestCoin>(&owner_account);
+            Coin::transfer<TestCoin>(&core_resource_account, *owner, amount);
+            Stake::add_stake(&owner_account, amount);
+            Stake::join_validator_set(&owner_account, *owner);
 
             i = i + 1;
         };

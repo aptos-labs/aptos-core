@@ -2810,7 +2810,7 @@
               "refId": "C"
             },
             {
-              "expr": "aptos_storage_pruner_least_readable_state_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
+              "expr": "aptos_storage_pruner_min_readable_state_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}} pruned-till",
               "refId": "B"

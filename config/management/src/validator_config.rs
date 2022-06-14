@@ -117,7 +117,7 @@ pub fn build_validator_config_transaction<S: KVStorage + CryptoStorage>(
         .and_then(to_x25519)?;
 
     // Build Validator address including protocols and encryption
-    // Append ln-noise-ik and ln-handshake protocols to base network addresses
+    // Append noise-ik and handshake protocols to base network addresses
     // and encrypt the validator address.
     let validator_address =
         validator_address.append_prod_protos(validator_network_key, HANDSHAKE_VERSION);
@@ -226,18 +226,18 @@ mod tests {
     #[test]
     fn test_invalid_inputs() {
         let no_port = NetworkAddress::from_str("/ip4/127.0.0.1").unwrap();
-        let no_ip = NetworkAddress::from_str("/tcp/1234").unwrap();
+        let _no_ip = NetworkAddress::from_str("/tcp/1234").unwrap_err();
         let ipv6 = NetworkAddress::from_str("/dns6/localhost").unwrap();
         let ipv4_and_ipv6 = NetworkAddress::from_str("/dns/localhost").unwrap();
-        let bad_protocol = NetworkAddress::from_str("/ln-handshake/0").unwrap();
+        let _bad_protocol = NetworkAddress::from_str("/handshake/0").unwrap_err();
         let ip_in_dns = NetworkAddress::from_str("/dns4/127.0.0.1/tcp/1234").unwrap();
 
+        //The Network layer is the first in the stack -- address cration allows empty next layers
         validate_address("no_port", &no_port).expect_err("Failed to check for port");
-        validate_address("no_ip", &no_ip).expect_err("Failed to check for no IP");
+        //Currently NetworkAddress doesnt disallow ipv6
         validate_address("ipv6", &ipv6).expect_err("Failed to check for ipv6");
         validate_address("ipv4_and_ipv6", &ipv4_and_ipv6).expect_err("Failed to check for ipv6");
-        validate_address("bad_protocol", &bad_protocol)
-            .expect_err("Failed to check for bad protocol");
+        //TODO: Add this check in NetworkAddress Creation
         validate_address("ip_in_dns", &ip_in_dns).expect_err("Failed to check for ip in DNS");
     }
 

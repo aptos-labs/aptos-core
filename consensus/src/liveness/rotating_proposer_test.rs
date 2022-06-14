@@ -5,7 +5,10 @@ use crate::liveness::{
     proposer_election::ProposerElection, rotating_proposer_election::RotatingProposer,
 };
 use aptos_types::validator_signer::ValidatorSigner;
-use consensus_types::block::{block_test_utils::certificate_for_genesis, Block};
+use consensus_types::{
+    block::{block_test_utils::certificate_for_genesis, Block},
+    common::Payload,
+};
 
 #[test]
 fn test_rotating_proposer() {
@@ -22,12 +25,27 @@ fn test_rotating_proposer() {
     // Test genesis and the next block
     let quorum_cert = certificate_for_genesis();
 
-    let good_proposal =
-        Block::new_proposal(vec![], 1, 1, quorum_cert.clone(), &another_validator_signer);
-    let bad_proposal =
-        Block::new_proposal(vec![], 1, 2, quorum_cert.clone(), &chosen_validator_signer);
-    let next_good_proposal =
-        Block::new_proposal(vec![], 2, 3, quorum_cert, &chosen_validator_signer);
+    let good_proposal = Block::new_proposal(
+        Payload::new_empty(),
+        1,
+        1,
+        quorum_cert.clone(),
+        &another_validator_signer,
+    );
+    let bad_proposal = Block::new_proposal(
+        Payload::new_empty(),
+        1,
+        2,
+        quorum_cert.clone(),
+        &chosen_validator_signer,
+    );
+    let next_good_proposal = Block::new_proposal(
+        Payload::new_empty(),
+        2,
+        3,
+        quorum_cert,
+        &chosen_validator_signer,
+    );
     assert!(pe.is_valid_proposal(&good_proposal));
     assert!(!pe.is_valid_proposal(&bad_proposal));
     assert!(pe.is_valid_proposal(&next_good_proposal),);
@@ -54,12 +72,27 @@ fn test_rotating_proposer_with_three_contiguous_rounds() {
     // Test genesis and the next block
     let quorum_cert = certificate_for_genesis();
 
-    let good_proposal =
-        Block::new_proposal(vec![], 1, 1, quorum_cert.clone(), &chosen_validator_signer);
-    let bad_proposal =
-        Block::new_proposal(vec![], 1, 2, quorum_cert.clone(), &another_validator_signer);
-    let next_good_proposal =
-        Block::new_proposal(vec![], 2, 3, quorum_cert, &chosen_validator_signer);
+    let good_proposal = Block::new_proposal(
+        Payload::new_empty(),
+        1,
+        1,
+        quorum_cert.clone(),
+        &chosen_validator_signer,
+    );
+    let bad_proposal = Block::new_proposal(
+        Payload::new_empty(),
+        1,
+        2,
+        quorum_cert.clone(),
+        &another_validator_signer,
+    );
+    let next_good_proposal = Block::new_proposal(
+        Payload::new_empty(),
+        2,
+        3,
+        quorum_cert,
+        &chosen_validator_signer,
+    );
     assert!(pe.is_valid_proposal(&good_proposal),);
     assert!(!pe.is_valid_proposal(&bad_proposal));
     assert!(pe.is_valid_proposal(&next_good_proposal),);
@@ -85,12 +118,27 @@ fn test_fixed_proposer() {
     // Test genesis and the next block
     let quorum_cert = certificate_for_genesis();
 
-    let good_proposal =
-        Block::new_proposal(vec![], 1, 1, quorum_cert.clone(), &chosen_validator_signer);
-    let bad_proposal =
-        Block::new_proposal(vec![], 1, 2, quorum_cert.clone(), &another_validator_signer);
-    let next_good_proposal =
-        Block::new_proposal(vec![], 2, 3, quorum_cert, &chosen_validator_signer);
+    let good_proposal = Block::new_proposal(
+        Payload::new_empty(),
+        1,
+        1,
+        quorum_cert.clone(),
+        &chosen_validator_signer,
+    );
+    let bad_proposal = Block::new_proposal(
+        Payload::new_empty(),
+        1,
+        2,
+        quorum_cert.clone(),
+        &another_validator_signer,
+    );
+    let next_good_proposal = Block::new_proposal(
+        Payload::new_empty(),
+        2,
+        3,
+        quorum_cert,
+        &chosen_validator_signer,
+    );
     assert!(pe.is_valid_proposal(&good_proposal));
     assert!(!pe.is_valid_proposal(&bad_proposal));
     assert!(pe.is_valid_proposal(&next_good_proposal));

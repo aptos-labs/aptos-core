@@ -3,6 +3,7 @@
 
 pub mod collection;
 pub mod events;
+pub mod metadata;
 pub mod ownership;
 pub mod processor_statuses;
 pub mod token;

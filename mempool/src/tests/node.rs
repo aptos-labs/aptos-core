@@ -571,7 +571,7 @@ fn start_node_mempool(
     let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
     let (sender, subscriber) = unbounded();
     let (_ac_endpoint_sender, ac_endpoint_receiver) = mpsc::channel(1_024);
-    let (_consensus_sender, consensus_events) = mpsc::channel(1_024);
+    let (_quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
     let (_mempool_notifier, mempool_listener) =
         mempool_notifications::new_mempool_notifier_listener_pair();
     let mut event_subscriber = EventSubscriptionService::new(
@@ -590,7 +590,7 @@ fn start_node_mempool(
         Arc::clone(&mempool),
         network_handles,
         ac_endpoint_receiver,
-        consensus_events,
+        quorum_store_receiver,
         mempool_listener,
         reconfig_event_subscriber,
         Arc::new(MockDbReaderWriter),

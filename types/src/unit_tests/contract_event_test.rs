@@ -1,10 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
-    event::EventKey,
-};
+use crate::{contract_event::ContractEvent, event::EventKey};
 use bcs::test_helpers::assert_canonical_encode_decode;
 use move_deps::move_core_types::language_storage::TypeTag;
 use proptest::prelude::*;
@@ -13,18 +10,6 @@ proptest! {
     #[test]
     fn event_bcs_roundtrip(event in any::<ContractEvent>()) {
         assert_canonical_encode_decode(event);
-    }
-
-    #[test]
-    fn event_with_proof_bcs_roundtrip(event_with_proof in any::<EventWithProof>()) {
-        assert_canonical_encode_decode(event_with_proof);
-    }
-
-    #[test]
-    fn event_by_version_with_proof_bcs_roundtrip(
-        event_by_version_with_proof in any::<EventByVersionWithProof>()
-    ) {
-        assert_canonical_encode_decode(event_by_version_with_proof);
     }
 }
 

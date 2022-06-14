@@ -11,6 +11,36 @@ use structopt::StructOpt;
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[derive(Debug, StructOpt)]
+struct PrunerOpt {
+    #[structopt(long, default_value = "100000", help = "Set to -1 to disable.")]
+    state_prune_window: i64,
+
+    #[structopt(long, default_value = "100000", help = "Set to -1 to disable.")]
+    ledger_prune_window: i64,
+
+    #[structopt(long, default_value = "500")]
+    pruning_batch_size: usize,
+}
+
+impl PrunerOpt {
+    fn pruner_config(&self) -> StoragePrunerConfig {
+        StoragePrunerConfig {
+            state_store_prune_window: if self.state_prune_window == -1 {
+                None
+            } else {
+                Some(self.state_prune_window as u64)
+            },
+            ledger_prune_window: if self.ledger_prune_window == -1 {
+                None
+            } else {
+                Some(self.ledger_prune_window as u64)
+            },
+            pruning_batch_size: self.pruning_batch_size,
+        }
+    }
+}
+
+#[derive(Debug, StructOpt)]
 struct Opt {
     #[structopt(long, default_value = "500")]
     block_size: usize,
@@ -18,8 +48,17 @@ struct Opt {
     #[structopt(long)]
     concurrency_level: Option<usize>,
 
+    #[structopt(flatten)]
+    pruner_opt: PrunerOpt,
+
     #[structopt(subcommand)]
     cmd: Command,
+
+    #[structopt(
+        long,
+        about = "Verify sequence number of all the accounts after execution finishes"
+    )]
+    verify_sequence_numbers: bool,
 }
 
 impl Opt {
@@ -49,12 +88,6 @@ enum Command {
 
         #[structopt(long, default_value = "1000000")]
         init_account_balance: u64,
-
-        #[structopt(long)]
-        state_store_prune_window: Option<u64>,
-
-        #[structopt(long)]
-        default_store_prune_window: Option<u64>,
     },
     RunExecutor {
         #[structopt(
@@ -69,12 +102,6 @@ enum Command {
 
         #[structopt(long, parse(from_os_str))]
         checkpoint_dir: PathBuf,
-
-        #[structopt(
-            long,
-            about = "Verify sequence number of all the accounts after execution finishes"
-        )]
-        verify: bool,
     },
 }
 
@@ -93,26 +120,20 @@ fn main() {
             data_dir,
             num_accounts,
             init_account_balance,
-            state_store_prune_window,
-            default_store_prune_window,
         } => {
             executor_benchmark::db_generator::run(
                 num_accounts,
                 init_account_balance,
                 opt.block_size,
                 data_dir,
-                StoragePrunerConfig::new(
-                    Some(state_store_prune_window.unwrap_or(1_000_000)),
-                    Some(default_store_prune_window.unwrap_or(10_000_000)),
-                    10_000,
-                ),
+                opt.pruner_opt.pruner_config(),
+                opt.verify_sequence_numbers,
             );
         }
         Command::RunExecutor {
             blocks,
             data_dir,
             checkpoint_dir,
-            verify,
         } => {
             aptos_logger::Logger::new().init();
             executor_benchmark::run_benchmark(
@@ -120,7 +141,8 @@ fn main() {
                 blocks,
                 data_dir,
                 checkpoint_dir,
-                verify,
+                opt.verify_sequence_numbers,
+                opt.pruner_opt.pruner_config(),
             );
         }
     }

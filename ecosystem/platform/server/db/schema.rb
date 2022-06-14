@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2022_05_20_193550) do
+ActiveRecord::Schema[7.0].define(version: 2022_06_07_180333) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -99,6 +99,8 @@ ActiveRecord::Schema[7.0].define(version: 2022_05_20_193550) do
     t.boolean "terms_accepted", default: false
     t.string "fullnode_network_key"
     t.boolean "selected", default: false, null: false, comment: "Whether this node is selected for participation in IT1."
+    t.boolean "validator_verified_final"
+    t.jsonb "metrics_data"
     t.index ["user_id"], name: "index_it1_profiles_on_user_id"
   end
 
@@ -153,6 +155,24 @@ ActiveRecord::Schema[7.0].define(version: 2022_05_20_193550) do
     t.index ["item_type", "item_id"], name: "index_locations_on_item"
   end
 
+  create_table "nft_offers", force: :cascade do |t|
+    t.string "name", null: false
+    t.datetime "valid_from"
+    t.datetime "valid_until"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_nft_offers_on_name", unique: true
+  end
+
+  create_table "nfts", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "nft_offer_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["nft_offer_id"], name: "index_nfts_on_nft_offer_id"
+    t.index ["user_id"], name: "index_nfts_on_user_id"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "username"
     t.string "email"
@@ -180,10 +200,15 @@ ActiveRecord::Schema[7.0].define(version: 2022_05_20_193550) do
     t.boolean "kyc_exempt", default: false
     t.string "completed_persona_inquiry_id"
     t.index ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true
+    t.index ["current_sign_in_ip"], name: "index_users_on_current_sign_in_ip"
     t.index ["email"], name: "index_users_on_email", unique: true
+    t.index ["external_id"], name: "index_users_on_external_id"
+    t.index ["last_sign_in_ip"], name: "index_users_on_last_sign_in_ip"
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["username"], name: "index_users_on_username", unique: true
   end
 
   add_foreign_key "it1_profiles", "users"
+  add_foreign_key "nfts", "nft_offers"
+  add_foreign_key "nfts", "users"
 end

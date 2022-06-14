@@ -3,10 +3,7 @@
 use aptos_types::transaction::Version;
 use schemadb::{SchemaBatch, DB};
 
-use crate::{
-    pruner::{db_pruner::DBPruner, utils},
-    EventStore, LedgerStore, TransactionStore,
-};
+use crate::pruner::{db_pruner::DBPruner, utils};
 use aptos_infallible::Mutex;
 use itertools::zip_eq;
 use std::sync::{mpsc::Receiver, Arc};
@@ -14,14 +11,14 @@ use std::sync::{mpsc::Receiver, Arc};
 /// Maintains all the DBPruners and periodically calls the db_pruner's prune method to prune the DB.
 /// This also exposes API to report the progress to the parent thread.
 pub struct Worker {
-    db: Arc<DB>,
+    ledger_db: Arc<DB>,
     command_receiver: Receiver<Command>,
     /// Keeps tracks of all the DB pruners
     db_pruners: Vec<Mutex<Arc<dyn DBPruner + Send + Sync>>>,
     /// Keeps a record of the pruning progress. If this equals to version `V`, we know versions
     /// smaller than `V` are no longer readable.
     /// This being an atomic value is to communicate the info with the Pruner thread (for tests).
-    least_readable_versions: Arc<Mutex<Vec<Version>>>,
+    min_readable_versions: Arc<Mutex<Vec<Version>>>,
     /// Indicates if there's NOT any pending work to do currently, to hint
     /// `Self::receive_commands()` to `recv()` blocking-ly.
     blocking_recv: bool,
@@ -30,21 +27,18 @@ pub struct Worker {
 
 impl Worker {
     pub(crate) fn new(
-        db: Arc<DB>,
-        transaction_store: Arc<TransactionStore>,
-        ledger_store: Arc<LedgerStore>,
-        event_store: Arc<EventStore>,
+        ledger_db: Arc<DB>,
+        state_merkle_db: Arc<DB>,
         command_receiver: Receiver<Command>,
-        least_readable_versions: Arc<Mutex<Vec<Version>>>,
+        min_readable_versions: Arc<Mutex<Vec<Version>>>,
         max_version_to_prune_per_batch: u64,
     ) -> Self {
-        let db_pruners =
-            utils::create_db_pruners(db.clone(), transaction_store, ledger_store, event_store);
+        let db_pruners = utils::create_db_pruners(ledger_db.clone(), state_merkle_db);
         Self {
-            db: Arc::clone(&db),
+            ledger_db: Arc::clone(&ledger_db),
             db_pruners,
             command_receiver,
-            least_readable_versions,
+            min_readable_versions,
             blocking_recv: true,
             max_version_to_prune_per_batch,
         }
@@ -55,16 +49,18 @@ impl Worker {
             // Process a reasonably small batch of work before trying to receive commands again,
             // in case `Command::Quit` is received (that's when we should quit.)
             let mut error_in_pruning = false;
-            let mut db_batch = SchemaBatch::new();
+            let mut ledger_db_batch = SchemaBatch::new();
             for db_pruner in &self.db_pruners {
                 let result = db_pruner
                     .lock()
-                    .prune(&mut db_batch, self.max_version_to_prune_per_batch);
+                    .prune(&mut ledger_db_batch, self.max_version_to_prune_per_batch);
                 result.map_err(|_| error_in_pruning = true).ok();
             }
             // Commit all the changes to DB atomically
-            let result = self.db.write_schemas(db_batch);
-            result.map_err(|_| error_in_pruning = true).ok();
+            self.ledger_db
+                .write_schemas(ledger_db_batch)
+                .map_err(|_| error_in_pruning = true)
+                .ok();
             let mut pruning_pending = false;
             for db_pruner in &self.db_pruners {
                 // if any of the pruner has pending pruning, then we don't block on receive
@@ -82,11 +78,11 @@ impl Worker {
     }
 
     fn record_progress(&mut self) {
-        let mut updated_least_readable_versions: Vec<Version> = Vec::new();
+        let mut updated_min_readable_versions: Vec<Version> = Vec::new();
         for x in &self.db_pruners {
-            updated_least_readable_versions.push(x.lock().least_readable_version())
+            updated_min_readable_versions.push(x.lock().min_readable_version())
         }
-        *self.least_readable_versions.lock() = updated_least_readable_versions;
+        *self.min_readable_versions.lock() = updated_min_readable_versions;
     }
 
     /// Tries to receive all pending commands, blocking waits for the next command if no work needs

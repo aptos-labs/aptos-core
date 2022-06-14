@@ -171,16 +171,16 @@ fn get_config(client: &Client, user: &str) -> CliTypedResult<Validator> {
     // Convert each individually
     let account_address = AccountAddress::from_str(&config.account_address)
         .map_err(|_| CliError::UnexpectedError("account_address invalid".to_string()))?;
-    let account_key = Ed25519PublicKey::from_encoded_string(&config.account_key)
+    let account_key = Ed25519PublicKey::from_encoded_string(&config.account_public_key)
         .map_err(|_| CliError::UnexpectedError("account_key invalid".to_string()))?;
-    let consensus_key = Ed25519PublicKey::from_encoded_string(&config.consensus_key)
+    let consensus_key = Ed25519PublicKey::from_encoded_string(&config.consensus_public_key)
         .map_err(|_| CliError::UnexpectedError("consensus_key invalid".to_string()))?;
     let validator_network_key =
-        x25519::PublicKey::from_encoded_string(&config.validator_network_key)
+        x25519::PublicKey::from_encoded_string(&config.validator_network_public_key)
             .map_err(|_| CliError::UnexpectedError("validator_network_key invalid".to_string()))?;
     let validator_host = config.validator_host.clone();
     let full_node_network_key =
-        if let Some(ref full_node_network_key) = config.full_node_network_key {
+        if let Some(ref full_node_network_key) = config.full_node_network_public_key {
             Some(
                 x25519::PublicKey::from_encoded_string(full_node_network_key).map_err(|_| {
                     CliError::UnexpectedError("full_node_network_key invalid".to_string())
@@ -193,11 +193,11 @@ fn get_config(client: &Client, user: &str) -> CliTypedResult<Validator> {
 
     let config = ValidatorConfiguration {
         account_address,
-        consensus_key,
-        account_key,
-        validator_network_key,
+        consensus_public_key: consensus_key,
+        account_public_key: account_key,
+        validator_network_public_key: validator_network_key,
         validator_host,
-        full_node_network_key,
+        full_node_network_public_key: full_node_network_key,
         full_node_host,
         stake_amount: 0,
     };

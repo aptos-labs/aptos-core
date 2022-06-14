@@ -16,7 +16,7 @@ use crate::{
     persistent_liveness_storage::RecoveryData,
     round_manager::RoundManager,
     test_utils::{
-        consensus_runtime, timed_block_on, MockStateComputer, MockStorage, MockTransactionManager,
+        consensus_runtime, timed_block_on, MockPayloadManager, MockStateComputer, MockStorage,
         TreeInserter,
     },
     util::time_service::{ClockTimeService, TimeService},
@@ -29,6 +29,7 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::OnChainConsensusConfig,
+    transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
     validator_verifier::random_validator_verifier,
     waypoint::Waypoint,
@@ -75,7 +76,7 @@ pub struct NodeSetup {
     safety_rules_manager: SafetyRulesManager,
     all_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
     commit_cb_receiver: mpsc::UnboundedReceiver<LedgerInfoWithSignatures>,
-    _state_sync_receiver: mpsc::UnboundedReceiver<Payload>,
+    _state_sync_receiver: mpsc::UnboundedReceiver<Vec<SignedTransaction>>,
     id: usize,
 }
 
@@ -200,7 +201,7 @@ impl NodeSetup {
         let proposal_generator = ProposalGenerator::new(
             author,
             block_store.clone(),
-            Arc::new(MockTransactionManager::new(None)),
+            Arc::new(MockPayloadManager::new(None)),
             time_service.clone(),
             1,
         );
@@ -342,7 +343,8 @@ fn vote_on_successful_proposal() {
         // Start round 1 and clear the message queue
         node.next_proposal().await;
 
-        let proposal = Block::new_proposal(vec![], 1, 1, genesis_qc.clone(), &node.signer);
+        let proposal =
+            Block::new_proposal(Payload::new_empty(), 1, 1, genesis_qc.clone(), &node.signer);
         let proposal_id = proposal.id();
         node.round_manager.process_proposal(proposal).await.unwrap();
         let vote_msg = node.next_vote().await;
@@ -367,9 +369,10 @@ fn no_vote_on_old_proposal() {
     let mut nodes = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 1);
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
-    let new_block = Block::new_proposal(vec![], 1, 1, genesis_qc.clone(), &node.signer);
+    let new_block =
+        Block::new_proposal(Payload::new_empty(), 1, 1, genesis_qc.clone(), &node.signer);
     let new_block_id = new_block.id();
-    let old_block = Block::new_proposal(vec![], 1, 2, genesis_qc, &node.signer);
+    let old_block = Block::new_proposal(Payload::new_empty(), 1, 2, genesis_qc, &node.signer);
     let old_block_id = old_block.id();
     timed_block_on(&mut runtime, async {
         // clear the message queue
@@ -403,8 +406,10 @@ fn no_vote_on_mismatch_round() {
         .pop()
         .unwrap();
     let genesis_qc = certificate_for_genesis();
-    let correct_block = Block::new_proposal(vec![], 1, 1, genesis_qc.clone(), &node.signer);
-    let block_skip_round = Block::new_proposal(vec![], 2, 2, genesis_qc.clone(), &node.signer);
+    let correct_block =
+        Block::new_proposal(Payload::new_empty(), 1, 1, genesis_qc.clone(), &node.signer);
+    let block_skip_round =
+        Block::new_proposal(Payload::new_empty(), 2, 2, genesis_qc.clone(), &node.signer);
     timed_block_on(&mut runtime, async {
         let bad_proposal = ProposalMsg::new(
             block_skip_round,
@@ -491,9 +496,15 @@ fn no_vote_on_invalid_proposer() {
     let incorrect_proposer = nodes.pop().unwrap();
     let mut node = nodes.pop().unwrap();
     let genesis_qc = certificate_for_genesis();
-    let correct_block = Block::new_proposal(vec![], 1, 1, genesis_qc.clone(), &node.signer);
-    let block_incorrect_proposer =
-        Block::new_proposal(vec![], 1, 1, genesis_qc.clone(), &incorrect_proposer.signer);
+    let correct_block =
+        Block::new_proposal(Payload::new_empty(), 1, 1, genesis_qc.clone(), &node.signer);
+    let block_incorrect_proposer = Block::new_proposal(
+        Payload::new_empty(),
+        1,
+        1,
+        genesis_qc.clone(),
+        &incorrect_proposer.signer,
+    );
     timed_block_on(&mut runtime, async {
         let bad_proposal = ProposalMsg::new(
             block_incorrect_proposer,
@@ -527,8 +538,10 @@ fn new_round_on_timeout_certificate() {
         .pop()
         .unwrap();
     let genesis_qc = certificate_for_genesis();
-    let correct_block = Block::new_proposal(vec![], 1, 1, genesis_qc.clone(), &node.signer);
-    let block_skip_round = Block::new_proposal(vec![], 2, 2, genesis_qc.clone(), &node.signer);
+    let correct_block =
+        Block::new_proposal(Payload::new_empty(), 1, 1, genesis_qc.clone(), &node.signer);
+    let block_skip_round =
+        Block::new_proposal(Payload::new_empty(), 2, 2, genesis_qc.clone(), &node.signer);
     let timeout = TwoChainTimeout::new(1, 1, genesis_qc.clone());
     let timeout_signature = timeout.sign(&node.signer);
 
@@ -565,7 +578,7 @@ fn response_on_block_retrieval() {
         .unwrap();
 
     let genesis_qc = certificate_for_genesis();
-    let block = Block::new_proposal(vec![], 1, 1, genesis_qc.clone(), &node.signer);
+    let block = Block::new_proposal(Payload::new_empty(), 1, 1, genesis_qc.clone(), &node.signer);
     let block_id = block.id();
     let proposal = ProposalMsg::new(block, SyncInfo::new(genesis_qc.clone(), genesis_qc, None));
 
@@ -666,7 +679,8 @@ fn recover_on_restart() {
     let num_proposals = 100;
     // insert a few successful proposals
     for i in 1..=num_proposals {
-        let proposal = inserter.create_block_with_qc(genesis_qc.clone(), i, i, vec![]);
+        let proposal =
+            inserter.create_block_with_qc(genesis_qc.clone(), i, i, Payload::new_empty());
         let timeout = TwoChainTimeout::new(1, i - 1, genesis_qc.clone());
         let mut tc = TwoChainTimeoutCertificate::new(timeout.clone());
         tc.add(
@@ -779,7 +793,7 @@ fn sync_info_sent_on_stale_sync_info() {
     let mut nodes = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 2);
     runtime.spawn(playground.start());
     let genesis_qc = certificate_for_genesis();
-    let block_0 = Block::new_proposal(vec![], 1, 1, genesis_qc, &nodes[0].signer);
+    let block_0 = Block::new_proposal(Payload::new_empty(), 1, 1, genesis_qc, &nodes[0].signer);
     let parent_block_info = block_0.quorum_cert().certified_block();
     let block_0_quorum_cert = gen_test_certificate(
         vec![&nodes[0].signer, &nodes[1].signer],

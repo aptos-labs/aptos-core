@@ -28,7 +28,7 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use scratchpad::ProofRead;
+use scratchpad::{ProofRead, SparseMerkleTree};
 use serde::{Deserialize, Serialize};
 use std::{cmp::max, collections::HashMap, sync::Arc};
 use storage_interface::DbReader;
@@ -83,6 +83,12 @@ pub trait ChunkExecutorTrait: Send + Sync {
     fn reset(&self) -> Result<()>;
 }
 
+pub struct StateSnapshotDelta {
+    pub version: Version,
+    pub smt: SparseMerkleTree<StateValue>,
+    pub jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
+}
+
 pub trait BlockExecutorTrait: Send + Sync {
     /// Get the latest committed block id
     fn committed_block_id(&self) -> HashValue;
@@ -106,11 +112,24 @@ pub trait BlockExecutorTrait: Send + Sync {
     /// and only `C` and `E` have signatures, we will send `A`, `B` and `C` in the first batch,
     /// then `D` and `E` later in the another batch.
     /// Commits a block and all its ancestors in a batch manner.
+    fn commit_blocks_ext(
+        &self,
+        block_ids: Vec<HashValue>,
+        ledger_info_with_sigs: LedgerInfoWithSignatures,
+        save_state_snapshots: bool,
+    ) -> Result<Option<StateSnapshotDelta>, Error>;
+
     fn commit_blocks(
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-    ) -> Result<(), Error>;
+    ) -> Result<Option<StateSnapshotDelta>, Error> {
+        self.commit_blocks_ext(
+            block_ids,
+            ledger_info_with_sigs,
+            true, /* save_state_snapshots */
+        )
+    }
 }
 
 pub trait TransactionReplayer: Send {

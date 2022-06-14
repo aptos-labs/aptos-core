@@ -1,5 +1,5 @@
 ---
-title: "Gas and transaction fees"
+title: "Gas and Transaction Fees"
 slug: "basics-gas-txn-fee"
 ---
 import BlockQuote from "@site/src/components/BlockQuote";

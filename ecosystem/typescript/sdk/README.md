@@ -4,8 +4,11 @@
 [![NPM Package Version][npm-image-version]][npm-url]
 [![NPM Package Downloads][npm-image-downloads]][npm-url]
 
-You need to connect to an [Aptos](https:/github.com/aptos-labs/aptos-core/) node to use this library, or run one
+You need to connect to an [Aptos][repo] node to use this library, or run one
 yourself locally.
+
+## API Docs
+Docs can be found [here](API.md)
 
 ## Usage
 
@@ -41,7 +44,7 @@ sudo apt-get install nodejs yarn
 Originally created with this:
 
 ```bash
-$  npx swagger-typescript-api -p ../../../api/doc/openapi.yaml -o ./src/api --modular --axios --single-http-client
+$  npx swagger-typescript-api@latest -p ../../../api/doc/openapi.yaml -o ./src/api --modular --axios --single-http-client
 ```
 
 #### Changes to make after generation:

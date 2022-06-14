@@ -28,7 +28,7 @@ import React, { useMemo, useRef } from 'react';
 import { IoIosSend } from 'react-icons/io';
 import useWalletState from 'core/hooks/useWalletState';
 import {
-  accountExists,
+  getAccountExists,
   getAccountResources,
   getTestCoinTokenBalanceFromAccountResources,
   getToAddressAccountExists,
@@ -38,7 +38,6 @@ import { useMutation, useQuery, useQueryClient } from 'react-query';
 import { getUserTransaction } from 'core/queries/transaction';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import {
-  NODE_URL,
   secondaryErrorMessageColor, STATIC_GAS_AMOUNT,
 } from 'core/constants';
 import numeral from 'numeral';
@@ -52,7 +51,7 @@ export const secondaryDividerColor = {
 
 function TransferDrawer() {
   const { colorMode } = useColorMode();
-  const { aptosAccount } = useWalletState();
+  const { aptosAccount, aptosNetwork } = useWalletState();
   const toast = useToast();
   const queryClient = useQueryClient();
   const {
@@ -69,7 +68,7 @@ function TransferDrawer() {
         return;
       }
       queryClient.invalidateQueries('getAccountResources');
-      const txn = await getUserTransaction({ txnHashOrVersion: txnHash });
+      const txn = await getUserTransaction({ nodeUrl: aptosNetwork, txnHashOrVersion: txnHash });
       const amount = (txn?.payload)
         ? (txn.payload as { arguments: string[] }).arguments[1]
         : undefined;
@@ -95,21 +94,21 @@ function TransferDrawer() {
   const toAddress: string | undefined | null = watch('toAddress');
   const explorerAddress = `https://explorer.devnet.aptos.dev/account/${toAddress}`;
   const { data: toAddressAccountExists } = useQuery(
-    ['getToAddressAccountExists', { aptosAccount, toAddress }],
+    ['getToAddressAccountExists', { aptosAccount, nodeUrl: aptosNetwork, toAddress }],
     getToAddressAccountExists,
   );
 
   const onSubmit: SubmitHandler<Record<string, any>> = async (data, event) => {
     event?.preventDefault();
     if (toAddress && aptosAccount && transferAmount) {
-      const toAccountExists = await accountExists({ address: toAddress });
+      const toAccountExists = await getAccountExists({ address: toAddress, nodeUrl: aptosNetwork });
       if (!toAccountExists) {
         setError('toAddress', { message: 'Invalid account address', type: 'custom' });
         return;
       }
       const fromAccountResources = await getAccountResources({
         address: aptosAccount.address().hex(),
-        nodeUrl: NODE_URL,
+        nodeUrl: aptosNetwork,
       });
       const tokenBalance = getTestCoinTokenBalanceFromAccountResources({
         accountResources: fromAccountResources,
@@ -121,6 +120,7 @@ function TransferDrawer() {
       await submitSendTransaction({
         amount: transferAmount,
         fromAccount: aptosAccount,
+        nodeUrl: aptosNetwork,
         onClose,
         toAddress,
       });
@@ -155,7 +155,7 @@ function TransferDrawer() {
         <DrawerOverlay />
         <form onSubmit={handleSubmit(onSubmit)}>
           <DrawerContent>
-            <DrawerHeader borderBottomWidth="1px">
+            <DrawerHeader borderBottomWidth="1px" px={4}>
               <Grid templateColumns="32px 1fr" gap={4} maxW="100%">
                 <Box pt={1}>
                   <Box width="32px">
@@ -225,7 +225,7 @@ function TransferDrawer() {
                   borderTopWidth="1px"
                   borderTopColor={secondaryDividerColor[colorMode]}
                   pt={4}
-                  px={6}
+                  px={4}
                   width="100%"
                 >
                   <InputGroup>
@@ -269,7 +269,7 @@ function TransferDrawer() {
                 </VStack>
               </VStack>
             </DrawerBody>
-            <DrawerFooter borderTopColor={secondaryDividerColor[colorMode]} borderTopWidth="1px">
+            <DrawerFooter borderTopColor={secondaryDividerColor[colorMode]} borderTopWidth="1px" px={4}>
               <SimpleGrid spacing={4} width="100%" columns={2}>
                 <Button colorScheme="teal" isLoading={isTransferLoading} isDisabled={isTransferLoading} type="submit">
                   Submit

@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
+use storage_interface::{jmt_update_refs, jmt_updates};
 
 use crate::{change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB};
 
@@ -20,9 +21,10 @@ fn put_value_set(
         .iter()
         .map(|(key, value)| (key.clone(), value.clone()))
         .collect();
+    let jmt_updates = jmt_updates(&value_set);
 
     let root = state_store
-        .merklize_value_sets(vec![&value_set], None, version, &mut cs)
+        .merklize_value_sets(vec![jmt_update_refs(&jmt_updates)], None, version, &mut cs)
         .unwrap()[0];
     state_store
         .put_value_sets(vec![&value_set], version, &mut cs)
@@ -54,19 +56,18 @@ fn test_state_store_pruner() {
     let num_versions = 25;
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
-    let db = aptos_db.db;
-    let state_store = &StateStore::new(Arc::clone(&db));
-    let transaction_store = &aptos_db.transaction_store;
+    let state_store = &StateStore::new(
+        Arc::clone(&aptos_db.ledger_db),
+        Arc::clone(&aptos_db.state_merkle_db),
+    );
     let pruner = Pruner::new(
-        Arc::clone(&db),
+        Arc::clone(&aptos_db.ledger_db),
+        Arc::clone(&aptos_db.state_merkle_db),
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
             ledger_prune_window: Some(0),
             pruning_batch_size: prune_batch_size,
         },
-        Arc::clone(transaction_store),
-        Arc::clone(&aptos_db.ledger_store),
-        Arc::clone(&aptos_db.event_store),
     );
 
     let mut root_hashes = vec![];
@@ -74,7 +75,7 @@ fn test_state_store_pruner() {
     for i in 0..num_versions {
         let value = StateValue::from(vec![i as u8]);
         root_hashes.push(put_value_set(
-            &db,
+            &aptos_db.ledger_db,
             state_store,
             vec![(key.clone(), value.clone())],
             i as u64, /* version */
@@ -143,8 +144,8 @@ fn test_worker_quit_eagerly() {
 
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
-    let db = aptos_db.db;
-    let state_store = &StateStore::new(Arc::clone(&db));
+    let db = aptos_db.ledger_db;
+    let state_store = &StateStore::new(Arc::clone(&db), Arc::clone(&aptos_db.state_merkle_db));
 
     let _root0 = put_value_set(
         &db,
@@ -169,9 +170,7 @@ fn test_worker_quit_eagerly() {
         let (command_sender, command_receiver) = channel();
         let worker = Worker::new(
             Arc::clone(&db),
-            Arc::clone(&aptos_db.transaction_store),
-            Arc::clone(&aptos_db.ledger_store),
-            Arc::clone(&aptos_db.event_store),
+            Arc::clone(&aptos_db.state_merkle_db),
             command_receiver,
             Arc::new(Mutex::new(vec![0, 0])), /* progress */
             100,

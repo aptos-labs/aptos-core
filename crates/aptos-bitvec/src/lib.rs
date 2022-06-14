@@ -63,7 +63,7 @@ const MAX_BUCKETS: usize = 32;
 /// assert!(intersection.is_set(2));
 /// assert_eq!(false, intersection.is_set(3));
 /// ```
-#[derive(Clone, Default, Debug, PartialEq, Serialize)]
+#[derive(Clone, Default, Debug, Eq, PartialEq, Serialize)]
 pub struct BitVec {
     #[serde(with = "serde_bytes")]
     inner: Vec<u8>,

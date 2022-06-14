@@ -143,6 +143,8 @@ ProtocolId:
       StorageServiceRpc: UNIT
     9:
       MempoolRpc: UNIT
+    10:
+      PeerMonitoringServiceRpc: UNIT
 ProtocolIdSet:
   NEWTYPESTRUCT: BYTES
 PublicKey:

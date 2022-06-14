@@ -9,13 +9,27 @@ use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
 use serde_json::json;
-use std::str::FromStr;
+use std::{
+    fmt::{Display, Formatter},
+    str::FromStr,
+};
 
 #[derive(ArgEnum, Clone, Copy, Debug)]
-enum ListQuery {
+pub enum ListQuery {
     Balance,
     Modules,
     Resources,
+}
+
+impl Display for ListQuery {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            ListQuery::Balance => "balance",
+            ListQuery::Modules => "modules",
+            ListQuery::Resources => "resources",
+        };
+        write!(f, "{}", str)
+    }
 }
 
 impl FromStr for ListQuery {
@@ -36,19 +50,19 @@ impl FromStr for ListQuery {
 #[derive(Debug, Parser)]
 pub struct ListAccount {
     #[clap(flatten)]
-    rest_options: RestOptions,
+    pub(crate) rest_options: RestOptions,
 
     #[clap(flatten)]
-    profile_options: ProfileOptions,
+    pub(crate) profile_options: ProfileOptions,
 
     /// Address of account you want to list resources/modules for
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
-    account: Option<AccountAddress>,
+    pub(crate) account: Option<AccountAddress>,
 
     /// Type of items to list: resources, modules. (Defaults to 'resources').
     /// TODO: add options like --tokens --nfts etc
-    #[clap(long, default_value = "resources")]
-    query: ListQuery,
+    #[clap(long, default_value_t = ListQuery::Resources)]
+    pub(crate) query: ListQuery,
 }
 
 #[async_trait]

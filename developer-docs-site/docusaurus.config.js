@@ -10,7 +10,7 @@ const codeInjector = require("./src/remark/code-injector");
 const config = {
   title: "Aptos Labs",
   tagline: "Developer Documentation",
-  url: "https://docs.aptoslabs.com",
+  url: "https://aptos.dev",
   baseUrl: "/",
   onBrokenLinks: "warn",
   onBrokenMarkdownLinks: "warn",
@@ -42,14 +42,14 @@ const config = {
   ],
 
   themeConfig:
-  /** @type {import("@docusaurus/preset-classic").ThemeConfig} */
+    /** @type {import("@docusaurus/preset-classic").ThemeConfig} */
     ({
       navbar: {
         title: "| Developer Network",
         logo: {
           alt: "Aptos Labs Logo",
           src: "img/aptos_word.svg",
-          srcDark: "/img/aptos_word.svg",
+          srcDark: "img/aptos_word_dark.svg",
         },
         items: [
           {
@@ -70,7 +70,7 @@ const config = {
                   <a class="social-link" href="https://aptoslabs.com" target="_blank" rel="noopener noreferrer" title="Git">
                      <img class="logo" src="/img/aptos_word.svg" alt="Git Icon" />
                   </a>
-                `
+                `,
               },
             ],
           },
@@ -128,21 +128,21 @@ const config = {
         additionalLanguages: ["rust"],
       },
       algolia: {
-        appId: 'HM7UY0NMLG',
-        apiKey: '63c5819714b74e64977337e61a1e3ae6',
-        indexName: 'aptos',
+        appId: "HM7UY0NMLG",
+        apiKey: "63c5819714b74e64977337e61a1e3ae6",
+        indexName: "aptos",
         contextualSearch: true,
         debug: false,
       },
     }),
   plugins: [
     [
-      '@docusaurus/plugin-client-redirects',
+      "@docusaurus/plugin-client-redirects",
       {
         redirects: [
           {
-            to: '/tutorials/full-node/run-a-fullnode',
-            from: '/tutorials/run-a-fullnode',
+            to: "/tutorials/full-node/run-a-fullnode",
+            from: "/tutorials/run-a-fullnode",
           },
         ],
       },

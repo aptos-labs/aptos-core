@@ -1,0 +1,26 @@
+name: Google Artifact Registry Login
+
+inputs:
+  GCP_WORKLOAD_IDENTITY_PROVIDER:
+    required: true
+  GCP_SERVICE_ACCOUNT_EMAIL:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - id: auth
+      name: "Authenticate to Google Cloud"
+      uses: "google-github-actions/auth@v0"
+      with:
+        create_credentials_file: false
+        token_format: "access_token"
+        workload_identity_provider: ${{ inputs.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ inputs.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+    - name: Login to Google Artifact Registry
+      uses: docker/login-action@v2
+      with:
+        registry: us-west1-docker.pkg.dev
+        username: oauth2accesstoken
+        password: ${{ steps.auth.outputs.access_token }}

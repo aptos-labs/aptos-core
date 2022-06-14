@@ -5,7 +5,8 @@ use crate::{
     aptosnet::{
         logging::{LogEntry, LogEvent, LogSchema},
         metrics::{
-            increment_counter, set_gauge, start_timer, DataType, PRIORITIZED_PEER, REGULAR_PEER,
+            increment_request_counter, set_gauge, start_request_timer, DataType, PRIORITIZED_PEER,
+            REGULAR_PEER,
         },
         state::{ErrorType, PeerStates},
     },
@@ -13,7 +14,7 @@ use crate::{
     ResponseError, ResponseId, Result,
 };
 use aptos_config::{
-    config::{AptosDataClientConfig, StorageServiceConfig},
+    config::{AptosDataClientConfig, BaseConfig, StorageServiceConfig},
     network_id::PeerNetworkId,
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
@@ -56,6 +57,7 @@ mod tests;
 const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 5;
 const GLOBAL_DATA_METRIC_FREQ_SECS: u64 = 1;
 const IN_FLIGHT_METRICS_SAMPLE_FREQ: u64 = 5;
+const PEER_LOG_FREQ_SECS: u64 = 10;
 const POLLER_LOG_FREQ_SECS: u64 = 1;
 const REGULAR_PEER_SAMPLE_FREQ: u64 = 3;
 
@@ -94,6 +96,7 @@ pub struct AptosNetDataClient {
 impl AptosNetDataClient {
     pub fn new(
         data_client_config: AptosDataClientConfig,
+        base_config: BaseConfig,
         storage_service_config: StorageServiceConfig,
         time_service: TimeService,
         network_client: StorageServiceClient,
@@ -103,6 +106,7 @@ impl AptosNetDataClient {
             data_client_config,
             network_client: network_client.clone(),
             peer_states: Arc::new(RwLock::new(PeerStates::new(
+                base_config,
                 storage_service_config,
                 network_client.get_peer_metadata_storage(),
             ))),
@@ -140,22 +144,15 @@ impl AptosNetDataClient {
         &self,
         request: &StorageServiceRequest,
     ) -> Result<PeerNetworkId, Error> {
-        // Identify the peers that can service the request
-        let serviceable_peers =
-            if request.is_get_storage_server_summary() || request.is_data_subscription_request() {
-                // Storage summary and data subscription requests should be sent to prioritized peers.
-                // If none can handle the request, fall back to the regular peers.
-                let (priority_peers, regular_peers) = self.get_priority_and_regular_peers()?;
-                let priority_serviceable = self.identify_serviceable(priority_peers, request);
-                if !priority_serviceable.is_empty() {
-                    priority_serviceable
-                } else {
-                    self.identify_serviceable(regular_peers, request)
-                }
-            } else {
-                let all_connected_peers = self.get_all_connected_peers()?;
-                self.identify_serviceable(all_connected_peers, request)
-            };
+        // All requests should be sent to prioritized peers (if possible).
+        // If none can handle the request, fall back to the regular peers.
+        let (priority_peers, regular_peers) = self.get_priority_and_regular_peers()?;
+        let priority_serviceable = self.identify_serviceable(priority_peers, request);
+        let serviceable_peers = if !priority_serviceable.is_empty() {
+            priority_serviceable
+        } else {
+            self.identify_serviceable(regular_peers, request)
+        };
 
         // Randomly select a peer to handle the request
         serviceable_peers
@@ -280,6 +277,19 @@ impl AptosNetDataClient {
             }
         }
 
+        // Log the peers, periodically.
+        sample!(
+            SampleRate::Duration(Duration::from_secs(PEER_LOG_FREQ_SECS)),
+            info!(
+                (LogSchema::new(LogEntry::PeerStates)
+                    .event(LogEvent::PriorityAndRegularPeers)
+                    .message(&format!(
+                        "Current priority peers: {:?} and regular peers: {:?}",
+                        priority_peers, regular_peers,
+                    )))
+            );
+        );
+
         Ok((priority_peers, regular_peers))
     }
 
@@ -301,7 +311,7 @@ impl AptosNetDataClient {
             );
             error
         })?;
-        let _timer = start_timer(&metrics::REQUEST_LATENCIES, request.get_label().into());
+        let _timer = start_request_timer(&metrics::REQUEST_LATENCIES, request.get_label(), peer);
         self.send_request_to_peer_and_decode(peer, request).await
     }
 
@@ -349,7 +359,7 @@ impl AptosNetDataClient {
                 .request_data(&request))
         );
 
-        increment_counter(&metrics::SENT_REQUESTS, request.get_label().into());
+        increment_request_counter(&metrics::SENT_REQUESTS, request.get_label(), peer);
 
         let result = self
             .network_client
@@ -370,7 +380,7 @@ impl AptosNetDataClient {
                         .peer(&peer))
                 );
 
-                increment_counter(&metrics::SUCCESS_RESPONSES, request.get_label().into());
+                increment_request_counter(&metrics::SUCCESS_RESPONSES, request.get_label(), peer);
 
                 // For now, record all responses that at least pass the data
                 // client layer successfully. An alternative might also have the
@@ -394,11 +404,11 @@ impl AptosNetDataClient {
                 };
                 Ok(Response::new(context, response))
             }
-            Err(err) => {
+            Err(error) => {
                 // Convert network error and storage service error types into
                 // data client errors. Also categorize the error type for scoring
                 // purposes.
-                let client_err = match err {
+                let client_error = match error {
                     storage_service_client::Error::RpcError(err) => match err {
                         RpcError::NotConnected(_) => Error::DataIsUnavailable(err.to_string()),
                         RpcError::TimedOut => Error::TimeoutWaitingForResponse(err.to_string()),
@@ -415,13 +425,17 @@ impl AptosNetDataClient {
                         .request_type(request.get_label())
                         .request_id(id)
                         .peer(&peer)
-                        .error(&client_err))
+                        .error(&client_error))
                 );
 
-                increment_counter(&metrics::ERROR_RESPONSES, request.get_label().into());
+                increment_request_counter(
+                    &metrics::ERROR_RESPONSES,
+                    client_error.get_label(),
+                    peer,
+                );
 
                 self.notify_bad_response(id, peer, &request, ErrorType::NotUseful);
-                Err(client_err)
+                Err(client_error)
             }
         }
     }
@@ -700,17 +714,17 @@ pub(crate) fn poll_peer(
     peer: PeerNetworkId,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
+    // Mark the in-flight poll as started. We do this here to prevent
+    // the main polling loop from selecting the same peer concurrently.
+    data_client.in_flight_request_started(&peer);
+
     // Create the poller for the peer
     let poller = async move {
-        // Mark the in-flight poll as started
-        data_client.in_flight_request_started(&peer);
-
         // Start the peer polling timer
-        let timer = start_timer(
+        let timer = start_request_timer(
             &metrics::REQUEST_LATENCIES,
-            StorageServiceRequest::GetStorageServerSummary
-                .get_label()
-                .into(),
+            StorageServiceRequest::GetStorageServerSummary.get_label(),
+            peer,
         );
 
         // Fetch the storage summary for the peer and stop the timer

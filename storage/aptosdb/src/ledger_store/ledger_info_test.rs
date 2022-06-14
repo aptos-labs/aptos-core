@@ -133,5 +133,5 @@ fn put_transaction_infos(db: &AptosDB, txn_infos: &[TransactionInfo]) {
     db.ledger_store
         .put_transaction_infos(0, txn_infos, &mut cs)
         .unwrap();
-    db.db.write_schemas(cs.batch).unwrap()
+    db.ledger_db.write_schemas(cs.batch).unwrap()
 }

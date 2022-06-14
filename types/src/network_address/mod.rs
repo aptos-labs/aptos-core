@@ -6,7 +6,7 @@ use aptos_crypto::{
     x25519,
 };
 #[cfg(any(test, feature = "fuzzing"))]
-use proptest::{collection::vec, prelude::*};
+use proptest::prelude::*;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
@@ -31,7 +31,7 @@ const MAX_DNS_NAME_SIZE: usize = 255;
 ///
 /// Most validators will advertise a network address like:
 ///
-/// `/dns/example.com/tcp/6180/ln-noise-ik/<x25519-pubkey>/ln-handshake/1`
+/// `/dns/example.com/tcp/6180/noise-ik/<x25519-pubkey>/handshake/1`
 ///
 /// Unpacking, the above effectively means:
 ///
@@ -183,6 +183,23 @@ pub enum ParseError {
 
     #[error("bcs error: {0}")]
     BCSError(#[from] bcs::Error),
+
+    #[error("NetworkAddress must start with one of Protocol::Ip4/Ip6/Dns/Dns4/Dns6")]
+    NetworkLayerMissing,
+
+    #[error(
+        "NetworkAddress must start with one of Protocol::Ip4/Ip6/Dns/Dns4/Dns6 followed by TCP"
+    )]
+    TransportLayerMissing,
+
+    #[error("NetworkAddress must have a NoiseIK protocol following the TCP protocol")]
+    SessionLayerMissing,
+
+    #[error("NetworkAddress must have a Handshake protocol following the NoiseIK protocol")]
+    HandshakeLayerMissing,
+
+    #[error("NetworkAddress must not have duplicate layer protocols")]
+    RedundantLayer,
 }
 
 #[derive(Error, Debug)]
@@ -192,23 +209,106 @@ pub struct EmptyError;
 ////////////////////
 // NetworkAddress //
 ////////////////////
+// Network
+// Transport
+// Session - Noise
+// Presentation - Handshake
+
+fn is_network_layer(p: Option<&Protocol>) -> bool {
+    use Protocol::*;
+
+    matches!(
+        p,
+        Some(Ip4(_))
+            | Some(Ip6(_))
+            | Some(Dns(_))
+            | Some(Dns4(_))
+            | Some(Dns6(_))
+            /* cfg!(test) is the correct value rather than true, but this doesnt propagate properly from external tests */
+            | Some(Memory(_))
+    )
+}
+
+fn is_transport_layer(p: Option<&Protocol>) -> bool {
+    use Protocol::*;
+
+    matches!(p, Some(Tcp(_)))
+}
+
+fn is_session_layer(p: Option<&Protocol>, allow_empty: bool) -> bool {
+    use Protocol::*;
+    match p {
+        None => allow_empty,
+        Some(NoiseIK(_)) => true,
+        _ => false,
+    }
+}
+
+fn is_handshake_layer(p: Option<&Protocol>, allow_empty: bool) -> bool {
+    use Protocol::*;
+    match p {
+        None => allow_empty,
+        Some(Handshake(_)) => true,
+        _ => false,
+    }
+}
 
 impl NetworkAddress {
-    fn new(protocols: Vec<Protocol>) -> Self {
-        Self(protocols)
+    pub fn from_protocols(protocols: Vec<Protocol>) -> Result<Self, ParseError> {
+        use Protocol::*;
+
+        let mut iter = protocols.iter();
+
+        let mut p = iter.next();
+
+        if p == None {
+            return Ok(Self(protocols));
+        }
+
+        if !is_network_layer(p) {
+            return Err(ParseError::NetworkLayerMissing);
+        }
+
+        if !matches!(p, Some(Memory(_))) {
+            p = iter.next();
+            if p == None {
+                return Ok(Self(protocols));
+            }
+            if !is_transport_layer(p) {
+                return Err(ParseError::TransportLayerMissing);
+            }
+        }
+
+        p = iter.next();
+        if p == None {
+            return Ok(Self(protocols));
+        }
+        if !is_session_layer(p, true) {
+            return Err(ParseError::SessionLayerMissing);
+        }
+
+        p = iter.next();
+        if p == None {
+            return Ok(Self(protocols));
+        }
+        if !is_handshake_layer(p, true) {
+            return Err(ParseError::HandshakeLayerMissing);
+        }
+
+        p = iter.next();
+        if p == None {
+            Ok(Self(protocols))
+        } else {
+            Err(ParseError::RedundantLayer)
+        }
     }
 
     pub fn as_slice(&self) -> &[Protocol] {
         self.0.as_slice()
     }
 
-    pub fn push(mut self, proto: Protocol) -> Self {
+    fn push(mut self, proto: Protocol) -> Self {
         self.0.push(proto);
-        self
-    }
-
-    pub fn extend_from_slice(mut self, protos: &[Protocol]) -> Self {
-        self.0.extend_from_slice(protos);
         self
     }
 
@@ -228,7 +328,7 @@ impl NetworkAddress {
     /// let addr = addr.append_prod_protos(pubkey, 0);
     /// assert_eq!(
     ///     addr.to_string(),
-    ///     "/dns/example.com/tcp/6180/ln-noise-ik/0x080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/ln-handshake/0",
+    ///     "/dns/example.com/tcp/6180/noise-ik/0x080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/handshake/0",
     /// );
     /// ```
     // TODO(philiphayes): use handshake version enum
@@ -255,7 +355,7 @@ impl NetworkAddress {
     ///
     /// followed by transport upgrade handshake protocols:
     ///
-    /// `"/ln-noise-ik/<pubkey>/ln-handshake/<version>"`
+    /// `"/noise-ik/<pubkey>/handshake/<version>"`
     ///
     /// ### Example
     ///
@@ -263,7 +363,7 @@ impl NetworkAddress {
     /// use aptos_types::network_address::NetworkAddress;
     /// use std::str::FromStr;
     ///
-    /// let addr_str = "/ip4/1.2.3.4/tcp/6180/ln-noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/ln-handshake/0";
+    /// let addr_str = "/ip4/1.2.3.4/tcp/6180/noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/handshake/0";
     /// let addr = NetworkAddress::from_str(addr_str).unwrap();
     /// assert!(addr.is_aptosnet_addr());
     /// ```
@@ -280,7 +380,7 @@ impl NetworkAddress {
         })
     }
 
-    /// A temporary, hacky function to parse out the first `/ln-noise-ik/<pubkey>` from
+    /// A temporary, hacky function to parse out the first `/noise-ik/<pubkey>` from
     /// a `NetworkAddress`. We can remove this soon, when we move to the interim
     /// "monolithic" transport model.
     pub fn find_noise_proto(&self) -> Option<x25519::PublicKey> {
@@ -308,7 +408,7 @@ impl NetworkAddress {
 
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn mock() -> Self {
-        NetworkAddress::new(vec![Protocol::Memory(1234)])
+        NetworkAddress::from_protocols(vec![Protocol::Memory(1234)]).unwrap()
     }
 }
 
@@ -339,10 +439,17 @@ impl FromStr for NetworkAddress {
 
         // parse all `Protocol`s
         while let Some(protocol_type) = parts_iter.next() {
+            // Allow for trailing or duplicate '/'
+            if protocol_type.is_empty() {
+                continue;
+            }
             protocols.push(Protocol::parse(protocol_type, &mut parts_iter)?);
         }
-
-        Ok(NetworkAddress::new(protocols))
+        if protocols.is_empty() {
+            Err(ParseError::EmptyProtocolString)
+        } else {
+            NetworkAddress::from_protocols(protocols)
+        }
     }
 }
 
@@ -365,20 +472,20 @@ impl ToSocketAddrs for NetworkAddress {
 }
 
 impl TryFrom<Vec<Protocol>> for NetworkAddress {
-    type Error = EmptyError;
+    type Error = ParseError;
 
     fn try_from(value: Vec<Protocol>) -> Result<Self, Self::Error> {
         if value.is_empty() {
-            Err(EmptyError)
+            anyhow::private::Err(ParseError::EmptyProtocolString)
         } else {
-            Ok(NetworkAddress::new(value))
+            NetworkAddress::from_protocols(value)
         }
     }
 }
 
 impl From<Protocol> for NetworkAddress {
     fn from(proto: Protocol) -> NetworkAddress {
-        NetworkAddress::new(vec![proto])
+        NetworkAddress::from_protocols(vec![proto]).unwrap()
     }
 }
 
@@ -386,7 +493,7 @@ impl From<SocketAddr> for NetworkAddress {
     fn from(sockaddr: SocketAddr) -> NetworkAddress {
         let ip_proto = Protocol::from(sockaddr.ip());
         let tcp_proto = Protocol::Tcp(sockaddr.port());
-        NetworkAddress::new(vec![ip_proto, tcp_proto])
+        NetworkAddress::from_protocols(vec![ip_proto, tcp_proto]).unwrap()
     }
 }
 
@@ -445,18 +552,6 @@ impl<'de> Deserialize<'de> for NetworkAddress {
 }
 
 #[cfg(any(test, feature = "fuzzing"))]
-impl Arbitrary for NetworkAddress {
-    type Parameters = ();
-    type Strategy = BoxedStrategy<Self>;
-
-    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        vec(any::<Protocol>(), 1..10)
-            .prop_map(NetworkAddress::new)
-            .boxed()
-    }
-}
-
-#[cfg(any(test, feature = "fuzzing"))]
 pub fn arb_aptosnet_addr() -> impl Strategy<Value = NetworkAddress> {
     let arb_transport_protos = prop_oneof![
         any::<u16>().prop_map(|port| vec![Protocol::Memory(port)]),
@@ -477,7 +572,7 @@ pub fn arb_aptosnet_addr() -> impl Strategy<Value = NetworkAddress> {
     (arb_transport_protos, arb_aptosnet_protos).prop_map(
         |(mut transport_protos, mut aptosnet_protos)| {
             transport_protos.append(&mut aptosnet_protos);
-            NetworkAddress::new(transport_protos)
+            NetworkAddress::from_protocols(transport_protos).unwrap()
         },
     )
 }
@@ -499,12 +594,12 @@ impl fmt::Display for Protocol {
             Memory(port) => write!(f, "/memory/{}", port),
             NoiseIK(pubkey) => write!(
                 f,
-                "/ln-noise-ik/{}",
+                "/noise-ik/{}",
                 pubkey
                     .to_encoded_string()
                     .expect("ValidCryptoMaterialStringExt::to_encoded_string is infallible")
             ),
-            Handshake(version) => write!(f, "/ln-handshake/{}", version),
+            Handshake(version) => write!(f, "/handshake/{}", version),
         }
     }
 }
@@ -531,10 +626,10 @@ impl Protocol {
             "dns6" => Protocol::Dns6(parse_one(args)?),
             "tcp" => Protocol::Tcp(parse_one(args)?),
             "memory" => Protocol::Memory(parse_one(args)?),
-            "ln-noise-ik" => Protocol::NoiseIK(x25519::PublicKey::from_encoded_string(
+            "noise-ik" => Protocol::NoiseIK(x25519::PublicKey::from_encoded_string(
                 args.next().ok_or(ParseError::UnexpectedEnd)?,
             )?),
-            "ln-handshake" => Protocol::Handshake(parse_one(args)?),
+            "handshake" => Protocol::Handshake(parse_one(args)?),
             unknown => return Err(ParseError::UnknownProtocolType(unknown.to_string())),
         };
         Ok(protocol)
@@ -727,7 +822,7 @@ pub fn parse_tcp(protos: &[Protocol]) -> Option<((String, u16), &[Protocol])> {
     }
 }
 
-/// parse the `&[Protocol]` into the `"/ln-noise-ik/<pubkey>"` prefix and
+/// parse the `&[Protocol]` into the `"/noise-ik/<pubkey>"` prefix and
 /// unparsed `&[Protocol]` suffix.
 pub fn parse_noise_ik(protos: &[Protocol]) -> Option<(&x25519::PublicKey, &[Protocol])> {
     match protos.split_first() {
@@ -736,11 +831,11 @@ pub fn parse_noise_ik(protos: &[Protocol]) -> Option<(&x25519::PublicKey, &[Prot
     }
 }
 
-/// parse the `&[Protocol]` into the `"/ln-handshake/<version>"` prefix and
+/// parse the `&[Protocol]` into the `"/handshake/<version>"` prefix and
 /// unparsed `&[Protocol]` suffix.
-pub fn parse_handshake(protos: &[Protocol]) -> Option<(u8, &[Protocol])> {
-    match protos.split_first() {
-        Some((Protocol::Handshake(version), suffix)) => Some((*version, suffix)),
+pub fn parse_handshake(protos: &[Protocol]) -> Option<u8> {
+    match protos.last() {
+        Some(Protocol::Handshake(version)) => Some(*version),
         _ => None,
     }
 }
@@ -774,15 +869,10 @@ fn parse_aptosnet_protos(protos: &[Protocol]) -> Option<&[Protocol]> {
 
     // parse handshake layer
 
-    let handshake_suffix = parse_handshake(auth_suffix).map(|x| x.1)?;
+    // also ensures there are no trailing protos after handshake
+    parse_handshake(auth_suffix)?;
 
-    // ensure no trailing protos after handshake
-
-    if handshake_suffix.is_empty() {
-        Some(protos)
-    } else {
-        None
-    }
+    Some(protos)
 }
 
 ///////////
@@ -798,8 +888,22 @@ mod test {
     #[test]
     fn test_network_address_display() {
         use super::Protocol::*;
-        let addr = NetworkAddress::new(vec![Memory(1234), Handshake(0)]);
-        assert_eq!("/memory/1234/ln-handshake/0", addr.to_string());
+        let pubkey_str = "080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120";
+        let pubkey = x25519::PublicKey::from_encoded_string(pubkey_str).unwrap();
+        let protocols = vec![
+            Dns(DnsName("example.com".to_owned())),
+            Tcp(1234),
+            NoiseIK(pubkey),
+            Handshake(0),
+        ];
+
+        let addr = NetworkAddress::from_protocols(protocols).unwrap();
+
+        let noise_addr_str = format!(
+            "/dns/example.com/tcp/1234/noise-ik/0x{}/handshake/0",
+            pubkey_str
+        );
+        assert_eq!(noise_addr_str, addr.to_string());
     }
 
     #[test]
@@ -809,20 +913,21 @@ mod test {
         let pubkey_str = "080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120";
         let pubkey = x25519::PublicKey::from_encoded_string(pubkey_str).unwrap();
         let noise_addr_str = format!(
-            "/dns/example.com/tcp/1234/ln-noise-ik/{}/ln-handshake/5",
+            "/dns/example.com/tcp/1234/noise-ik/{}/handshake/5",
             pubkey_str
         );
 
         let test_cases = [
+            ("/memory/1234", vec![Memory(1234)]),
             (
-                "/memory/1234/ln-handshake/0",
-                vec![Memory(1234), Handshake(0)],
-            ),
-            (
-                "/ip4/12.34.56.78/tcp/1234/ln-handshake/123",
+                &(format!(
+                    "/ip4/12.34.56.78/tcp/1234/noise-ik/{}/handshake/123",
+                    pubkey_str
+                )),
                 vec![
                     Ip4(Ipv4Addr::new(12, 34, 56, 78)),
                     Tcp(1234),
+                    NoiseIK(pubkey),
                     Handshake(123),
                 ],
             ),
@@ -856,7 +961,8 @@ mod test {
             let actual_address = NetworkAddress::from_str(addr_str)
                 .map_err(|err| format_err!("failed to parse: input: '{}', err: {}", addr_str, err))
                 .unwrap();
-            let expected_address = NetworkAddress::new(expected_address.clone());
+            let expected_address =
+                NetworkAddress::from_protocols(expected_address.clone()).unwrap();
             assert_eq!(actual_address, expected_address);
         }
     }
@@ -896,16 +1002,6 @@ mod test {
             parse_memory(addr.as_slice()).unwrap(),
             (123, expected_suffix)
         );
-
-        let addr = NetworkAddress::from_str("/memory/123/tcp/999").unwrap();
-        let expected_suffix: &[Protocol] = &[Protocol::Tcp(999)];
-        assert_eq!(
-            parse_memory(addr.as_slice()).unwrap(),
-            (123, expected_suffix)
-        );
-
-        let addr = NetworkAddress::from_str("/tcp/999/memory/123").unwrap();
-        assert_eq!(None, parse_memory(addr.as_slice()));
     }
 
     #[test]
@@ -923,16 +1019,6 @@ mod test {
             parse_ip_tcp(addr.as_slice()).unwrap(),
             ((IpAddr::from_str("::1").unwrap(), 123), expected_suffix)
         );
-
-        let addr = NetworkAddress::from_str("/ip6/::1/tcp/123/memory/999").unwrap();
-        let expected_suffix: &[Protocol] = &[Protocol::Memory(999)];
-        assert_eq!(
-            parse_ip_tcp(addr.as_slice()).unwrap(),
-            ((IpAddr::from_str("::1").unwrap(), 123), expected_suffix)
-        );
-
-        let addr = NetworkAddress::from_str("/tcp/999/memory/123").unwrap();
-        assert_eq!(None, parse_ip_tcp(addr.as_slice()));
     }
 
     #[test]
@@ -958,69 +1044,55 @@ mod test {
             parse_dns_tcp(addr.as_slice()).unwrap(),
             ((IpFilter::OnlyIp6, &dns_name, 123), expected_suffix)
         );
-
-        let addr = NetworkAddress::from_str("/dns/example.com/tcp/123/memory/44").unwrap();
-        let expected_suffix: &[Protocol] = &[Protocol::Memory(44)];
-        assert_eq!(
-            parse_dns_tcp(addr.as_slice()).unwrap(),
-            ((IpFilter::Any, &dns_name, 123), expected_suffix)
-        );
-
-        let addr = NetworkAddress::from_str("/tcp/999/memory/123").unwrap();
-        assert_eq!(None, parse_dns_tcp(addr.as_slice()));
     }
 
     #[test]
-    fn test_parse_noise_ik() {
+    fn test_find_noise_proto() {
         let pubkey_str = "080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120";
         let pubkey = x25519::PublicKey::from_encoded_string(pubkey_str).unwrap();
-        let addr = NetworkAddress::from_str(&format!("/ln-noise-ik/{}", pubkey_str)).unwrap();
-        let expected_suffix: &[Protocol] = &[];
-        assert_eq!(
-            parse_noise_ik(addr.as_slice()).unwrap(),
-            (&pubkey, expected_suffix)
-        );
+        let addr = NetworkAddress::from_str(&format!(
+            "/dns4/example.com/tcp/1024/noise-ik/{}/handshake/0",
+            pubkey_str
+        ))
+        .unwrap();
 
-        let addr =
-            NetworkAddress::from_str(&format!("/ln-noise-ik/{}/tcp/999", pubkey_str)).unwrap();
-        let expected_suffix: &[Protocol] = &[Protocol::Tcp(999)];
-        assert_eq!(
-            parse_noise_ik(addr.as_slice()).unwrap(),
-            (&pubkey, expected_suffix)
-        );
+        assert_eq!(addr.find_noise_proto().unwrap(), pubkey);
 
-        let addr = NetworkAddress::from_str("/tcp/999/memory/123").unwrap();
-        assert_eq!(None, parse_noise_ik(addr.as_slice()));
+        let addr = NetworkAddress::from_str(&format!(
+            "/dns4/example.com/tcp/999/noise-ik/{}/handshake/0",
+            pubkey_str
+        ))
+        .unwrap();
+        assert_eq!(addr.find_noise_proto().unwrap(), pubkey);
     }
 
     #[test]
     fn test_parse_handshake() {
-        let addr = NetworkAddress::from_str("/ln-handshake/0").unwrap();
-        let expected_suffix: &[Protocol] = &[];
-        assert_eq!(
-            parse_handshake(addr.as_slice()).unwrap(),
-            (0, expected_suffix),
-        );
+        let pubkey_str = "080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120";
+        let addr = NetworkAddress::from_str(&format!(
+            "/dns4/example.com/tcp/999/noise-ik/{}/handshake/0",
+            pubkey_str
+        ))
+        .unwrap();
 
-        let addr = NetworkAddress::from_str("/ln-handshake/0/tcp/999").unwrap();
-        let expected_suffix: &[Protocol] = &[Protocol::Tcp(999)];
-        assert_eq!(
-            parse_handshake(addr.as_slice()).unwrap(),
-            (0, expected_suffix),
-        );
+        assert_eq!(parse_handshake(addr.as_slice()).unwrap(), 0);
 
-        let addr = NetworkAddress::from_str("/tcp/999/memory/123").unwrap();
-        assert_eq!(None, parse_handshake(addr.as_slice()));
+        let addr = NetworkAddress::from_str(&format!(
+            "/ip4/127.0.0.1/tcp/999/noise-ik/{}/handshake/0/",
+            pubkey_str
+        ))
+        .unwrap();
+        assert_eq!(parse_handshake(addr.as_slice()).unwrap(), 0);
     }
 
     proptest! {
         #[test]
-        fn test_network_address_canonical_serialization(addr in any::<NetworkAddress>()) {
+        fn test_network_address_canonical_serialization(addr in arb_aptosnet_addr()) {
             assert_canonical_encode_decode(addr);
         }
 
         #[test]
-        fn test_network_address_display_roundtrip(addr in any::<NetworkAddress>()) {
+        fn test_network_address_display_roundtrip(addr in arb_aptosnet_addr()) {
             let addr_str = addr.to_string();
             let addr_parsed = NetworkAddress::from_str(&addr_str).unwrap();
             assert_eq!(addr, addr_parsed);
@@ -1029,16 +1101,6 @@ mod test {
         #[test]
         fn test_is_aptosnet_addr(addr in arb_aptosnet_addr()) {
             assert!(addr.is_aptosnet_addr(), "addr.is_aptosnet_addr() = false; addr: '{}'", addr);
-        }
-
-        #[test]
-        fn test_is_not_aptosnet_addr_with_trailing(
-            addr in arb_aptosnet_addr(),
-            addr_suffix in any::<NetworkAddress>(),
-        ) {
-            // A valid AptosNet addr w/ unexpected trailing protocols should not parse.
-            let addr = addr.extend_from_slice(addr_suffix.as_slice());
-            assert!(!addr.is_aptosnet_addr(), "addr.is_aptosnet_addr() = true; addr: '{}'", addr);
         }
     }
 }

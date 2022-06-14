@@ -22,10 +22,14 @@ pub struct ConsensusConfig {
     // Only sync committed transactions but not vote for any pending blocks. This is useful when
     // validators coordinate on the latest version to apply a manual transaction.
     pub sync_only: bool,
+    pub channel_size: usize,
+    // When false, use the Direct Mempool Quorum Store
+    pub use_quorum_store: bool,
+    pub quorum_store_pull_timeout_ms: u64,
     // Decides how long the leader waits before proposing empty block if there's no txns in mempool
     // the period = (poll_count - 1) * 30ms
-    pub mempool_poll_count: u64,
-    pub channel_size: usize,
+    pub quorum_store_poll_count: u64,
+    pub intra_consensus_channel_buffer_size: usize,
 }
 
 impl Default for ConsensusConfig {
@@ -34,8 +38,8 @@ impl Default for ConsensusConfig {
             contiguous_rounds: 2,
             max_block_size: 3000,
             max_pruned_blocks_in_mem: 100,
-            mempool_txn_pull_timeout_ms: 1000,
             mempool_executed_txn_timeout_ms: 1000,
+            mempool_txn_pull_timeout_ms: 1000,
             round_initial_timeout_ms: 1000,
             proposer_type: ConsensusProposerType::LeaderReputation(LeaderReputationConfig {
                 active_weights: 99,
@@ -43,8 +47,11 @@ impl Default for ConsensusConfig {
             }),
             safety_rules: SafetyRulesConfig::default(),
             sync_only: false,
-            mempool_poll_count: 20,
             channel_size: 30, // hard-coded
+            use_quorum_store: false,
+            quorum_store_pull_timeout_ms: 1000,
+            quorum_store_poll_count: 20,
+            intra_consensus_channel_buffer_size: 10,
         }
     }
 }

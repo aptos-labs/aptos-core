@@ -1,5 +1,5 @@
 ---
-title: "Your first NFT"
+title: "Your First NFT"
 slug: "your-first-nft"
 sidebar_position: 3
 ---

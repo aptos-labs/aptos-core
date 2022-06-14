@@ -36,6 +36,8 @@ module PersonaHelper
 
   class PersonaClient
     include HTTParty
+    # debug_output $stdout
+
     base_uri 'https://withpersona.com/api/v1/'
     headers({ 'Authorization' => "Bearer #{ENV.fetch('PERSONA_API_KEY', 'test')}", 'Persona-Version' => '2021-05-14',
               'Key-Inflection' => 'snake_case' })
@@ -54,17 +56,31 @@ module PersonaHelper
       end
     end
 
+    # Declined = watchlist failed, Approved = watchlist passed!. Nil = neither! (no watchlist run)
+    # @param [User] user
+    # @return [TrueClass, FalseClass, nil]
+    def user_watchlist_checks_passed(user)
+      inquiries = get_inquiries(reference_id: user.external_id)
+      inquiries['data']&.each do |inquiry|
+        case inquiry['attributes']['status']
+        when 'declined'
+          return false
+        when 'approved'
+          return true
+        end
+      end
+      nil
+    end
+
     # https://docs.withpersona.com/reference/list-all-inquiries
     # @param [Integer] after
     # @param [String] account_id
     # @param [String] reference_id
     def get_inquiries(after: nil, account_id: nil, reference_id: nil)
-      query = {
-        'page[after]' => after,
-        'filter[account-id]' => account_id,
-        'filter[reference-id]' => reference_id,
-        'page[size]' => 50
-      }
+      query = { 'page[size]' => 50 }
+      query['page[after]'] = after if after.present?
+      query['filter[account-id]'] = account_id if account_id.present?
+      query['filter[reference-id]'] = reference_id if reference_id.present?
       self.class.get('/inquiries', { query: })
     end
 

@@ -17,7 +17,7 @@ use executor::{
         APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
-use executor_types::BlockExecutorTrait;
+use executor_types::{BlockExecutorTrait, StateSnapshotDelta};
 use std::{
     collections::BTreeMap,
     sync::{mpsc, Arc},
@@ -47,6 +47,7 @@ pub struct TransactionCommitter {
     executor: Arc<BlockExecutor<AptosVM>>,
     version: Version,
     block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
+    state_commit_sender: mpsc::SyncSender<StateSnapshotDelta>,
 }
 
 impl TransactionCommitter {
@@ -54,11 +55,13 @@ impl TransactionCommitter {
         executor: Arc<BlockExecutor<AptosVM>>,
         version: Version,
         block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
+        state_commit_sender: mpsc::SyncSender<StateSnapshotDelta>,
     ) -> Self {
         Self {
             version,
             executor,
             block_receiver,
+            state_commit_sender,
         }
     }
 
@@ -78,8 +81,10 @@ impl TransactionCommitter {
             self.version += num_txns as u64;
             let commit_start = std::time::Instant::now();
             let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, self.version);
-            self.executor
-                .commit_blocks(vec![block_id], ledger_info_with_sigs)
+            let snapshot_delta = self
+                .executor
+                .commit_blocks_ext(vec![block_id], ledger_info_with_sigs, false)
+                .unwrap()
                 .unwrap();
 
             report_block(
@@ -91,6 +96,7 @@ impl TransactionCommitter {
                 Instant::now().duration_since(commit_start),
                 num_txns,
             );
+            self.state_commit_sender.send(snapshot_delta).unwrap();
         }
     }
 }

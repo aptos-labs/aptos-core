@@ -12,7 +12,7 @@ This specification documents how we make use of Noise to encrypt communications 
 The Noise protocol is "pre-negotiated" in peers' advertised or configured [`NetworkAddress`](network-address.md)es. Canonical AptosNet addresses will include the following `Protocol` after the base transport `Protocol`s:
 
 ```
-human-readable format: "/ln-noise-ik/<x25519-public-key>"
+human-readable format: "/noise-ik/<x25519-public-key>"
 ```
 
 where `<x25519-public-key>` is the advertising peer's remote static public key in Noise terminology.

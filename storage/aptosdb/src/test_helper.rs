@@ -10,6 +10,7 @@ use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumula
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 use aptos_temppath::TempPath;
 use aptos_types::{
+    contract_event::ContractEvent,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::accumulator::InMemoryAccumulator,
     proptest_types::{AccountInfoUniverse, BlockGen},
@@ -180,11 +181,6 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
         // check getting all events by version for all committed transactions
         // up to this point using the current ledger info
         all_committed_txns.extend_from_slice(txns_to_commit);
-        verify_get_event_by_version(
-            &db,
-            &all_committed_txns,
-            ledger_info_with_sigs.ledger_info(),
-        );
 
         cur_ver += txns_to_commit.len() as u64;
     }
@@ -234,15 +230,10 @@ fn get_events_by_event_key(
 
     let mut ret = Vec::new();
     loop {
-        let events_with_proof = db.get_events_with_proof_by_event_key(
-            event_key,
-            cursor,
-            order,
-            LIMIT,
-            ledger_info.version(),
-        )?;
+        let events =
+            db.get_events_by_event_key(event_key, cursor, order, LIMIT, ledger_info.version())?;
 
-        let num_events = events_with_proof.len() as u64;
+        let num_events = events.len() as u64;
         if cursor == u64::max_value() {
             cursor = last_seq_num;
         }
@@ -252,18 +243,8 @@ fn get_events_by_event_key(
             (cursor + 1 - num_events..=cursor).rev().collect()
         };
 
-        let events: Vec<_> = itertools::zip_eq(events_with_proof, expected_seq_nums)
-            .map(|(e, seq_num)| {
-                e.verify(
-                    ledger_info,
-                    event_key,
-                    seq_num,
-                    e.transaction_version,
-                    e.event_index,
-                )
-                .unwrap();
-                (e.transaction_version, e.event)
-            })
+        let events: Vec<_> = itertools::zip_eq(events, expected_seq_nums)
+            .map(|(e, _)| (e.transaction_version, e.event))
             .collect();
 
         let num_results = events.len() as u64;
@@ -370,58 +351,6 @@ fn group_events_by_event_key(
         }
     }
     event_key_to_events.into_iter().collect()
-}
-
-fn verify_get_event_by_version(
-    db: &AptosDB,
-    committed_txns: &[TransactionToCommit],
-    ledger_info: &LedgerInfo,
-) {
-    let events = group_events_by_event_key(0, committed_txns);
-
-    // just exhaustively check all versions for each set of events
-    for (event_key, events) in events {
-        for event_version in 0..=ledger_info.version() {
-            // find the latest event at or below event_version, or None if
-            // event_version < first event.
-            let maybe_event_idx = events
-                .partition_point(|(txn_version, _event)| *txn_version <= event_version)
-                .checked_sub(1);
-            let actual = maybe_event_idx.map(|idx| (events[idx].0, &events[idx].1));
-
-            // do the same but via the verifiable DB API
-            let event_count = events.len() as u64;
-            let event_by_version = db
-                .get_event_by_version_with_proof(&event_key, event_version, ledger_info.version())
-                .unwrap();
-            event_by_version
-                .verify(ledger_info, &event_key, Some(event_count), event_version)
-                .unwrap();
-            // omitting the event count should always pass if we already passed
-            // with the actual event count
-            event_by_version
-                .verify(ledger_info, &event_key, None, event_version)
-                .unwrap();
-            let expected = event_by_version
-                .lower_bound_incl
-                .as_ref()
-                .map(|proof| (proof.transaction_version, &proof.event));
-
-            // results should be the same
-            assert_eq!(actual, expected);
-
-            // quickly check that perturbing a correct proof makes the verification fail
-            // TODO(philiphayes): more robust fuzzing?
-            let mut bad1 = event_by_version.clone();
-            let good = event_by_version;
-
-            std::mem::swap(&mut bad1.lower_bound_incl, &mut bad1.upper_bound_excl);
-            if good != bad1 {
-                bad1.verify(ledger_info, &event_key, Some(event_count), event_version)
-                    .unwrap_err();
-            }
-        }
-    }
 }
 
 fn verify_account_txns(
@@ -613,15 +542,15 @@ pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &Transacti
     db.ledger_store
         .put_transaction_infos(version, &[txn_info.clone()], &mut cs)
         .unwrap();
-    db.db.write_schemas(cs.batch).unwrap();
+    db.ledger_db.write_schemas(cs.batch).unwrap();
 }
 
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
     let leaf_node = Node::new_leaf(key.hash(), value.hash(), (key.clone(), version));
-    db.db
+    db.state_merkle_db
         .put::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version), &leaf_node)
         .unwrap();
-    db.db
+    db.ledger_db
         .put::<StateValueSchema>(&(key, version), &value)
         .unwrap();
     db.state_store

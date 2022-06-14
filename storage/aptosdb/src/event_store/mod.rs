@@ -22,13 +22,9 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_types::{
-    account_address::AccountAddress,
-    account_config::NewBlockEvent,
-    block_metadata::new_block_event_key,
-    contract_event::ContractEvent,
-    event::EventKey,
-    proof::{position::Position, EventAccumulatorProof, EventProof},
-    transaction::Version,
+    account_address::AccountAddress, account_config::NewBlockEvent,
+    block_metadata::new_block_event_key, contract_event::ContractEvent, event::EventKey,
+    proof::position::Position, transaction::Version,
 };
 use schemadb::{schema::ValueCodec, ReadOptions, SchemaBatch, SchemaIterator, DB};
 use std::{
@@ -84,7 +80,7 @@ impl EventStore {
         })
     }
 
-    fn get_event_by_version_and_index(
+    pub fn get_event_by_version_and_index(
         &self,
         version: Version,
         index: u64,
@@ -94,30 +90,6 @@ impl EventStore {
             .ok_or_else(|| {
                 AptosDbError::NotFound(format!("Event {} of Txn {}", index, version)).into()
             })
-    }
-
-    /// Get the event raw data given transaction version and the index of the event queried.
-    pub fn get_event_with_proof_by_version_and_index(
-        &self,
-        version: Version,
-        index: u64,
-    ) -> Result<(ContractEvent, EventAccumulatorProof)> {
-        // Get event content.
-        let event = self.get_event_by_version_and_index(version, index)?;
-
-        // Get the number of events in total for the transaction at `version`.
-        let mut iter = self.db.iter::<EventSchema>(ReadOptions::default())?;
-        iter.seek_for_prev(&(version + 1))?;
-        let num_events = match iter.next().transpose()? {
-            Some(((ver, index), _)) if ver == version => (index + 1),
-            _ => unreachable!(), // since we've already got at least one event above
-        };
-
-        // Get proof.
-        let proof =
-            Accumulator::get_proof(&EventHashReader::new(self, version), num_events, index)?;
-
-        Ok((event, proof))
     }
 
     pub fn get_txn_ver_by_seq_num(&self, event_key: &EventKey, seq_num: u64) -> Result<u64> {

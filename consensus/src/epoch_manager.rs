@@ -3,6 +3,7 @@
 
 use crate::{
     block_storage::BlockStore,
+    commit_notifier::CommitNotifier,
     counters,
     error::{error_kind, DbError},
     experimental::{
@@ -22,16 +23,19 @@ use crate::{
     metrics_safety_rules::MetricsSafetyRules,
     network::{IncomingBlockRetrievalRequest, NetworkReceivers, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkSender},
+    payload_manager::QuorumStoreClient,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
+    quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
-    state_replication::{StateComputer, TxnManager},
+    state_replication::StateComputer,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, Context};
 use aptos_config::config::{ConsensusConfig, ConsensusProposerType, NodeConfig};
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
-use aptos_metrics::monitor;
+use aptos_mempool::QuorumStoreRequest;
+use aptos_metrics_core::monitor;
 use aptos_types::{
     account_address::AccountAddress,
     epoch_change::EpochChangeProof,
@@ -43,11 +47,13 @@ use channel::{aptos_channel, message_queues::QueueStyle};
 use consensus_types::{
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,
+    request_response::ConsensusRequest,
 };
 use event_notifications::ReconfigNotificationListener;
 use futures::{
     channel::{
-        mpsc::{unbounded, UnboundedSender},
+        mpsc,
+        mpsc::{unbounded, Receiver, Sender, UnboundedSender},
         oneshot,
     },
     SinkExt, StreamExt,
@@ -85,11 +91,12 @@ pub struct EpochManager {
     self_sender: channel::Sender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkSender,
     timeout_sender: channel::Sender<Round>,
-    txn_manager: Arc<dyn TxnManager>,
+    quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
     reconfig_events: ReconfigNotificationListener,
+    commit_notifier: Arc<dyn CommitNotifier>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     buffer_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
@@ -107,10 +114,11 @@ impl EpochManager {
         self_sender: channel::Sender<Event<ConsensusMsg>>,
         network_sender: ConsensusNetworkSender,
         timeout_sender: channel::Sender<Round>,
-        txn_manager: Arc<dyn TxnManager>,
+        quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
         commit_state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn PersistentLivenessStorage>,
         reconfig_events: ReconfigNotificationListener,
+        commit_notifier: Arc<dyn CommitNotifier>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -123,11 +131,12 @@ impl EpochManager {
             self_sender,
             network_sender,
             timeout_sender,
-            txn_manager,
+            quorum_store_to_mempool_sender,
             commit_state_computer,
             storage,
             safety_rules_manager,
             reconfig_events,
+            commit_notifier,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
@@ -300,6 +309,18 @@ impl EpochManager {
         Ok(())
     }
 
+    fn spawn_quorum_store(
+        &mut self,
+        consensus_to_quorum_store_receiver: Receiver<ConsensusRequest>,
+    ) {
+        let quorum_store = DirectMempoolQuorumStore::new(
+            consensus_to_quorum_store_receiver,
+            self.quorum_store_to_mempool_sender.clone(),
+            self.config.mempool_txn_pull_timeout_ms,
+        );
+        tokio::spawn(quorum_store.start());
+    }
+
     /// this function spawns the phases and a buffer manager
     /// it sets `self.commit_msg_tx` to a new aptos_channel::Sender and returns an OrderingStateComputer
     fn spawn_decoupled_execution(
@@ -419,6 +440,17 @@ impl EpochManager {
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
+        let (consensus_to_quorum_store_sender, consensus_to_quorum_store_receiver) =
+            mpsc::channel(self.config.intra_consensus_channel_buffer_size);
+        self.spawn_quorum_store(consensus_to_quorum_store_receiver);
+        let payload_manager = QuorumStoreClient::new(
+            consensus_to_quorum_store_sender.clone(),
+            self.config.quorum_store_poll_count,
+            self.config.quorum_store_pull_timeout_ms,
+        );
+        self.commit_notifier
+            .new_epoch(consensus_to_quorum_store_sender);
+
         self.commit_state_computer.new_epoch(&epoch_state);
         let state_computer = if onchain_config.decoupled_execution() {
             Arc::new(self.spawn_decoupled_execution(
@@ -445,7 +477,7 @@ impl EpochManager {
         let proposal_generator = ProposalGenerator::new(
             self.author,
             block_store.clone(),
-            self.txn_manager.clone(),
+            Arc::new(payload_manager),
             self.time_service.clone(),
             self.config.max_block_size,
         );

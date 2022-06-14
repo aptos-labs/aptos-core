@@ -1,5 +1,5 @@
 ---
-title: "Your first Move Module"
+title: "Your First Move Module"
 slug: "your-first-move-module"
 sidebar_position: 2
 ---
@@ -7,7 +7,7 @@ sidebar_position: 2
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Your first Move Module
+# Your First Move Module
 
 This tutorial details how to write, compile, test, publish and interact with Move Modules on the Aptos Blockchain. The steps are:
 

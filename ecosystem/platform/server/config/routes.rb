@@ -37,6 +37,11 @@ Rails.application.routes.draw do
   resources :overview, only: %i[index]
   resources :it1_profiles, except: %i[index destroy]
 
+  resources :nfts, only: %i[show]
+  resources :nft_offers, only: %i[show update]
+
+  get 'nft-nyc', to: 'nft_nyc#show'
+
   get 'leaderboard/it1', to: redirect('/it1')
 
   get 'it1', to: 'leaderboard#it1'
