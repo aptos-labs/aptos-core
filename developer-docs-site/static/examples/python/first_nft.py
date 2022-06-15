@@ -53,6 +53,7 @@ class TokenClient(RestClient):
                 True,
                 str(supply),
                 uri.encode("utf-8").hex(),
+                str(0),
             ]
         }
         self.submit_transaction_helper(account, payload)

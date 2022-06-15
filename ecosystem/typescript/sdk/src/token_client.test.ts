@@ -34,6 +34,7 @@ test(
       "Alice's simple token",
       1,
       'https://aptos.dev/img/nyan.jpeg',
+      0,
     );
 
     // Transfer Token from Alice's Account to Bob's Account

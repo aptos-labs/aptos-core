@@ -292,6 +292,7 @@ class RestClient:
         description: str,
         supply: int,
         uri: str,
+        royalty_points_per_million: int,
     ) -> str:
         transaction_arguments = [
             TransactionArgument(collection_name, Serializer.str),
@@ -300,6 +301,7 @@ class RestClient:
             TransactionArgument(True, Serializer.bool),
             TransactionArgument(supply, Serializer.u64),
             TransactionArgument(uri, Serializer.str),
+            TransactionArgument(royalty_points_per_million, Serializer.u64),
         ]
 
         payload = ScriptFunction.natural(
@@ -549,6 +551,7 @@ def token_transfer():
         "Alice's simple token",
         1,
         "https://aptos.dev/img/nyan.jpeg",
+        0,
     )
     rest_client.wait_for_transaction(txn_hash)
 

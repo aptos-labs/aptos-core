@@ -7,6 +7,7 @@ module AptosFramework::Token {
     use Std::Signer;
 
     use AptosFramework::Table::{Self, Table};
+    const ROYALTY_POINTS_DENOMINATOR: u64 = 1000000;
 
     const EALREADY_HAS_BALANCE: u64 = 0;
     const EBALANCE_NOT_PUBLISHED: u64 = 1;
@@ -33,6 +34,7 @@ module AptosFramework::Token {
         id: TokenId,
         value: u64,
     }
+
 
     /// Represents a unique identity for the token
     struct TokenId has copy, drop, store {
@@ -114,6 +116,16 @@ module AptosFramework::Token {
         maximum: Option<u64>,
     }
 
+    /// The royalty of a token
+    struct Royalty has copy, drop, store {
+        // The basis point and denominator is ROYAL_BASIS_POINT_DENOMINATOR (1,000,000)
+        royalty_points_per_million: u64,
+        // if the token is jointly owned by multiple creators,
+        // the group of creators should create a shared account.
+        // the creator_account will be the shared account address.
+        creator_account: address,
+    }
+
     /// The data associated with the Tokens
     struct TokenData has copy, drop, store {
         // Unique name within this creators account for this Token's collection
@@ -126,8 +138,10 @@ module AptosFramework::Token {
         maximum: Option<u64>,
         // Total number of this type of Token
         supply: Option<u64>,
-        /// URL for additional information / media
+        // URL for additional information / media
         uri: ASCII::String,
+        // the royalty of the token
+        royalty: Royalty,
     }
 
     /// Capability required to mint tokens.
@@ -184,6 +198,7 @@ module AptosFramework::Token {
         initial_balance: u64,
         maximum: u64,
         uri: vector<u8>,
+        royalty_points_per_million: u64
     ) acquires Collections, TokenStore {
         create_token(
             creator,
@@ -194,6 +209,7 @@ module AptosFramework::Token {
             initial_balance,
             Option::some(maximum),
             ASCII::string(uri),
+            royalty_points_per_million
         );
     }
 
@@ -205,6 +221,7 @@ module AptosFramework::Token {
         monitor_supply: bool,
         initial_balance: u64,
         uri: vector<u8>,
+        royalty_points_per_million: u64
     ) acquires Collections, TokenStore {
         create_token(
             creator,
@@ -215,6 +232,7 @@ module AptosFramework::Token {
             initial_balance,
             Option::none(),
             ASCII::string(uri),
+            royalty_points_per_million,
         );
     }
 
@@ -489,6 +507,7 @@ module AptosFramework::Token {
         initial_balance: u64,
         maximum: Option<u64>,
         uri: ASCII::String,
+        royalty_points_per_million: u64
     ): TokenId acquires Collections, TokenStore {
         let account_addr = Signer::address_of(account);
         assert!(
@@ -526,6 +545,10 @@ module AptosFramework::Token {
             maximum,
             supply,
             uri,
+            royalty: Royalty {
+                royalty_points_per_million,
+                creator_account: Signer::address_of(account)
+            }
         };
         Table::add(&mut collections.token_data, token_id, token_data);
         Table::add(
@@ -678,6 +701,7 @@ module AptosFramework::Token {
             2,
             Option::some(100),
             ASCII::string(b"https://aptos.dev"),
+            0,
         );
 
     }
@@ -719,6 +743,7 @@ module AptosFramework::Token {
             amount,
             Option::some(token_max),
             ASCII::string(b"https://aptos.dev"),
+           0,
         )
     }
 

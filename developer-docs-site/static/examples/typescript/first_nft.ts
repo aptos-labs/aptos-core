@@ -57,6 +57,7 @@ export class TokenClient {
         true,
         supply.toString(),
         Buffer.from(uri).toString("hex"),
+        "0",
       ],
     };
     await this.submitTransactionHelper(account, payload);

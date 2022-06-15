@@ -49,6 +49,7 @@ impl AptosTest for NFTTransaction {
                 true,
                 1,
                 "uri".to_owned().into_bytes(),
+                0,
             ),
         );
 

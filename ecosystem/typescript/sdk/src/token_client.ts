@@ -69,6 +69,7 @@ export class TokenClient {
    * @param description Token description
    * @param supply Token supply
    * @param uri URL to additional info about token
+   * @param royalty_points_per_million the royal points to be provided to creator
    * @returns A hash of transaction
    */
   async createToken(
@@ -78,6 +79,7 @@ export class TokenClient {
     description: string,
     supply: number,
     uri: string,
+    royalty_points_per_million: number,
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
       type: 'script_function_payload',
@@ -90,6 +92,7 @@ export class TokenClient {
         true,
         supply.toString(),
         Buffer.from(uri).toString('hex'),
+        royalty_points_per_million.toString(),
       ],
     };
     const transactionHash = await this.submitTransactionHelper(account, payload);
