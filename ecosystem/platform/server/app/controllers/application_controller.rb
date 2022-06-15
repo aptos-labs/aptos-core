@@ -30,7 +30,7 @@ class ApplicationController < ActionController::Base
     if user.email.nil?
       onboarding_email_path
     else
-      it1_path
+      it2_path
     end
   end
 

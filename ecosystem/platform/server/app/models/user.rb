@@ -19,7 +19,7 @@ class User < ApplicationRecord
   validates :terms_accepted, acceptance: true
 
   has_many :authorizations, dependent: :destroy
-  has_one :it1_profile
+  has_one :it2_profile
   has_many :nfts
 
   def self.from_omniauth(auth, current_user = nil)
@@ -61,12 +61,12 @@ class User < ApplicationRecord
   #   end
   # end
 
-  def maybe_send_ait1_registration_complete_email
-    SendRegistrationCompleteEmailJob.perform_now({ user_id: id }) if ait1_registration_complete?
+  def maybe_send_ait2_registration_complete_email
+    SendRegistrationCompleteEmailJob.perform_now({ user_id: id }) if ait2_registration_complete?
   end
 
-  def ait1_registration_complete?
-    kyc_complete? && it1_profile&.validator_verified?
+  def ait2_registration_complete?
+    kyc_complete? && it2_profile&.validator_verified?
   end
 
   def kyc_complete?

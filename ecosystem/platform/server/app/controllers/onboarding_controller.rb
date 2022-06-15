@@ -7,20 +7,20 @@ class OnboardingController < ApplicationController
   before_action :authenticate_user!, except: %i[kyc_callback]
   before_action :ensure_discord!, only: %i[kyc_redirect]
   before_action :ensure_confirmed!, only: %i[kyc_redirect]
-  before_action :ensure_it1_registration_open!, only: %i[kyc_callback kyc_redirect]
+  before_action :ensure_it2_registration_open!, only: %i[kyc_callback kyc_redirect]
   before_action :set_oauth_data, except: %i[kyc_callback]
   protect_from_forgery except: :kyc_callback
 
-  layout 'it1'
+  layout 'it2'
 
   def email
-    redirect_to it1_path if current_user.confirmed?
+    redirect_to it2_path if current_user.confirmed?
   end
 
   def email_success; end
 
   def email_update
-    redirect_to it1_path and return if current_user.confirmed?
+    redirect_to it2_path and return if current_user.confirmed?
 
     recaptcha_v3_success = verify_recaptcha(action: 'onboarding/email', minimum_score: 0.5,
                                             secret_key: ENV.fetch('RECAPTCHA_V3_SECRET_KEY', nil), model: current_user)
@@ -46,16 +46,16 @@ class OnboardingController < ApplicationController
 
   def kyc_redirect
     if current_user.kyc_exempt?
-      redirect_to it1_path,
+      redirect_to it2_path,
                   notice: 'You are not required to complete Identity Verification' and return
     end
     if current_user.kyc_complete?
-      redirect_to it1_path,
+      redirect_to it2_path,
                   notice: 'You have already completed Identity Verification' and return
     end
 
-    unless current_user.it1_profile&.validator_verified?
-      path = current_user.it1_profile.present? ? edit_it1_profile_path(current_user.it1_profile) : new_it1_profile_path
+    unless current_user.it2_profile&.validator_verified?
+      path = current_user.it2_profile.present? ? edit_it2_profile_path(current_user.it2_profile) : new_it2_profile_path
       redirect_to path, error: 'Must register and validate node first' and return
     end
 
@@ -83,10 +83,10 @@ class OnboardingController < ApplicationController
     inquiry_id = kyc_params.require(:'inquiry-id')
     begin
       KYCCompleteJob.perform_now({ user_id: current_user&.id, inquiry_id:, external_id: reference_id })
-      redirect_to it1_path, notice: 'Identity Verification completed successfully!'
+      redirect_to it2_path, notice: 'Identity Verification completed successfully!'
     rescue KYCCompleteJobError => e
       Sentry.capture_exception(e)
-      redirect_to it1_path, error: 'Error; If you completed Identity Verification,'\
+      redirect_to it2_path, error: 'Error; If you completed Identity Verification,'\
                                    " it may take some time to reflect. Error: #{e}"
     end
   end
@@ -98,7 +98,7 @@ class OnboardingController < ApplicationController
     @oauth_email = current_user.authorizations.pluck(:email).first
   end
 
-  def ensure_it1_registration_open!
-    redirect_to root_url if Flipper.enabled?(:it1_registration_closed, current_user)
+  def ensure_it2_registration_open!
+    redirect_to root_url if Flipper.enabled?(:it2_registration_closed, current_user)
   end
 end

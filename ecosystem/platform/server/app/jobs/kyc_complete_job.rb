@@ -34,6 +34,6 @@ class KYCCompleteJob < ApplicationJob
     raise KYCCompleteJobError, "Inquiry was not complete! Status: '#{status}'" unless VALID_STATUSES.include? status
 
     user.update(completed_persona_inquiry_id: inquiry_id, kyc_status: 'completed')
-    user.maybe_send_ait1_registration_complete_email
+    user.maybe_send_ait2_registration_complete_email
   end
 end

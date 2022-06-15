@@ -8,12 +8,13 @@ ActiveAdmin.register User do
   actions :all, except: %i[destroy new]
 
   permit_params :email, :is_root, :kyc_exempt
-  includes :authorizations, :it1_profile
+  includes :authorizations, :it1_profile, :it2_profile
 
   index do
     selectable_column
     id_column
     column :it1_profile
+    column :it2_profile
     column :authorizations
     column 'External ID', :external_id
     column :email
@@ -40,6 +41,7 @@ ActiveAdmin.register User do
     default_main_content do
       row :authorizations
       row :it1_profile
+      row :it2_profile
     end
   end
 
