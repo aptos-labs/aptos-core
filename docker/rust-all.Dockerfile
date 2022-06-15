@@ -33,7 +33,7 @@ FROM debian-base AS validator
 RUN apt-get update && apt-get install -y libssl1.1 ca-certificates && apt-get clean && rm -r /var/lib/apt/lists/*
 
 ### Needed to run debugging tools like perf
-RUN apt-get update && apt-get install -y linux-tools-4.19 sudo procps
+RUN apt-get update && apt-get install -y linux-tools-$(uname -r) sudo procps
 
 RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-create-home --uid 6180 aptos
 
