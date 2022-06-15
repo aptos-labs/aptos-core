@@ -97,49 +97,6 @@ pub struct RunnerArgs {
     pub blocking_runner_args: BlockingRunnerArgs,
 }
 
-/*
-/// The URL of the baseline node, e.g. http://fullnode.devnet.aptoslabs.com
-/// We assume this is just the base and will add ports and paths to this.
-#[clap(long)]
-pub baseline_node_url: Url,
-
-/// The metrics port for the baseline node.
-#[clap(long, default_value = &DEFAULT_METRICS_PORT_STR)]
-pub baseline_metrics_port: u16,
-
-/// The API port for the baseline node.
-#[clap(long, default_value = &DEFAULT_API_PORT_STR)]
-pub baseline_api_port: u16,
-
-/// The port over which validator nodes can talk to the baseline node.
-#[clap(long, default_value = &DEFAULT_NOISE_PORT_STR)]
-pub baseline_noise_port: u16,
-
-/// If this is given, the user will be able to call the check_preconfigured_node
-/// endpoint, which takes no target, instead using this as the target. If
-/// allow_test_node_only is set, only the todo endpoint will work,
-/// the node will not respond to health check requests for other nodes.
-#[clap(long)]
-pub target_node_url: Option<Url>,
-
-// The following 3 arguments are only relevant if the user sets test_node_url.
-/// The metrics port for the target node.
-#[clap(long, default_value = &DEFAULT_METRICS_PORT_STR)]
-pub target_metrics_port: u16,
-
-/// The API port for the target node.
-#[clap(long, default_value = &DEFAULT_API_PORT_STR)]
-pub target_api_port: u16,
-
-/// The port over which validator nodes can talk to the target node.
-#[clap(long, default_value = &DEFAULT_NOISE_PORT_STR)]
-pub target_noise_port: u16,
-
-/// See the help message of target_node_url.
-#[clap(long)]
-pub allow_preconfigured_test_node_only: bool,
-*/
-
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
 #[oai(example)]
 pub struct NodeAddress {
@@ -151,16 +108,19 @@ pub struct NodeAddress {
     /// Metrics port.
     #[clap(long, default_value = &DEFAULT_METRICS_PORT_STR)]
     #[oai(default = "Self::default_metrics_port")]
+    #[serde(default = "NodeAddress::default_metrics_port")]
     pub metrics_port: u16,
 
     /// API port.
     #[clap(long, default_value = &DEFAULT_API_PORT_STR)]
     #[oai(default = "Self::default_api_port")]
+    #[serde(default = "NodeAddress::default_api_port")]
     pub api_port: u16,
 
     /// Validator communication port.
     #[clap(long, default_value = &DEFAULT_NOISE_PORT_STR)]
     #[oai(default = "Self::default_noise_port")]
+    #[serde(default = "NodeAddress::default_noise_port")]
     pub noise_port: u16,
 }
 

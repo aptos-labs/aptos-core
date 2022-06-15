@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::{Parser, ArgEnum};
+use clap::{ArgEnum, Parser};
 
 use super::NodeConfiguration;
 

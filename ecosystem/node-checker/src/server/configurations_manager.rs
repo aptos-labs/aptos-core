@@ -74,7 +74,8 @@ pub async fn build_server_with_blocking_runner_and_reqwest_metric_collector(
 ) -> Result<ConfigurationsManager<ReqwestMetricCollector, BlockingRunner<ReqwestMetricCollector>>> {
     let mut configurations = HashMap::new();
     for path in baseline_node_config_paths.iter() {
-        let mut cfg = read_configuration_from_file(path.to_path_buf()).with_context(|| format!("Failed to read configuration from {}", path.display()))?;
+        let mut cfg = read_configuration_from_file(path.to_path_buf())
+            .with_context(|| format!("Failed to read configuration from {}", path.display()))?;
         let name = cfg.configuration_name.clone();
 
         cfg.fetch_additional_configuration()
