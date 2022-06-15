@@ -34,6 +34,7 @@ RUN apt-get update && apt-get install -y libssl1.1 ca-certificates && apt-get cl
 
 ### Needed to run debugging tools like perf
 RUN apt-get update && apt-get install -y linux-tools-4.19 sudo procps
+RUN echo root:root | chpasswd
 
 RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-create-home --uid 6180 aptos
 
