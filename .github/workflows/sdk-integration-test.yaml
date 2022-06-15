@@ -38,4 +38,7 @@ jobs:
       # Run package install, test, build
       - run: cd ./ecosystem/typescript/sdk && yarn install
       - run: cd ./ecosystem/typescript/sdk && yarn test
+        env:
+          APTOS_NODE_URL: http://localhost:8080
+          APTOS_FAUCET_URL: http://localhost:8000
       - run: cd ./ecosystem/typescript/sdk && yarn build
