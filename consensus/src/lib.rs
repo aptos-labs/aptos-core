@@ -15,7 +15,6 @@
 mod block_storage;
 mod commit_notifier;
 mod consensusdb;
-mod counters;
 mod epoch_manager;
 mod error;
 mod experimental;
@@ -41,6 +40,8 @@ mod util;
 
 /// AptosBFT implementation
 pub mod consensus_provider;
+/// Required by the telemetry service
+pub mod counters;
 /// AptosNet interface.
 pub mod network_interface;
 

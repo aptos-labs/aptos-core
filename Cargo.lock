@@ -652,9 +652,9 @@ dependencies = [
 name = "aptos-metrics"
 version = "0.1.0"
 dependencies = [
- "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-telemetry",
  "aptos-workspace-hack",
  "assert_approx_eq",
  "futures",
@@ -663,7 +663,6 @@ dependencies = [
  "prometheus",
  "rusty-fork",
  "serde_json",
- "shadow-rs",
  "sysinfo",
  "tokio",
 ]
@@ -986,15 +985,26 @@ dependencies = [
 name = "aptos-telemetry"
 version = "0.1.0"
 dependencies = [
+ "aptos-config",
+ "aptos-infallible",
  "aptos-logger",
+ "aptos-mempool",
  "aptos-metrics-core",
  "aptos-workspace-hack",
+ "aptosdb",
+ "consensus",
+ "futures",
+ "network",
  "once_cell",
+ "prometheus",
  "reqwest",
  "serde 1.0.137",
  "serde_json",
+ "shadow-rs",
+ "state-sync-driver",
  "sysinfo",
  "tokio",
+ "tokio-stream",
  "uuid",
 ]
 
@@ -1183,10 +1193,8 @@ dependencies = [
  "futures-core",
  "futures-io",
  "futures-sink",
- "futures-task",
  "futures-util",
  "generic-array 0.14.5",
- "getrandom 0.2.6",
  "hashbrown 0.11.2",
  "hyper",
  "include_dir 0.7.2",
@@ -5332,7 +5340,6 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-proptest-helpers",
  "aptos-rate-limiter",
- "aptos-telemetry",
  "aptos-time-service",
  "aptos-types",
  "aptos-workspace-hack",

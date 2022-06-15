@@ -13,20 +13,12 @@ use aptos_config::{
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, Logger};
-use aptos_metrics::{metric_server, system_information};
+use aptos_metrics::metric_server;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
-use aptos_telemetry::{
-    constants::{
-        APTOS_NODE_BUILD_INFORMATION, APTOS_NODE_PUSH_METRICS, APTOS_NODE_SYSTEM_INFORMATION,
-        CHAIN_ID_METRIC, NODE_PUSH_METRICS_FREQ_SECS, NODE_SYS_INFO_FREQ_SECS, PEER_ID_METRIC,
-        SYNCED_VERSION_METRIC,
-    },
-    send_env_data,
-};
 use aptos_time_service::TimeService;
 use aptos_types::{
     account_config::aptos_root_address, account_view::AccountView, chain_id::ChainId,
-    move_resource::MoveStorage, on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
+    on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
@@ -50,7 +42,7 @@ use state_sync_multiplexer::{
 use state_sync_v1::network::{StateSyncEvents, StateSyncSender};
 use std::{
     boxed::Box,
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     io::Write,
     net::ToSocketAddrs,
     path::PathBuf,
@@ -82,7 +74,7 @@ pub struct AptosHandle {
     _mempool: Runtime,
     _network_runtimes: Vec<Runtime>,
     _state_sync_runtimes: StateSyncRuntimes,
-    _telemetry_runtime: Runtime,
+    _telemetry_runtime: Option<Runtime>,
 }
 
 pub fn start(config: &NodeConfig, log_file: Option<PathBuf>) {
@@ -393,101 +385,6 @@ fn setup_state_sync_storage_service(
     storage_service_runtime
 }
 
-// TODO(joshlind): clean me up and make everything configurable!
-async fn periodic_telemetry_dump(node_config: NodeConfig, db: DbReaderWriter) {
-    // Grab the peer id and chain id
-    let peer_id = match node_config.peer_id() {
-        Some(p) => p.to_string(),
-        None => String::new(),
-    };
-    let chain_id = fetch_chain_id(&db).id().to_string(); // Get the chain_id as u8 for schema consistency
-
-    // Send build information once, only on startup.
-    send_build_information(peer_id.clone()).await;
-
-    // Send system information every 5 minutes
-    let mut system_information_interval = IntervalStream::new(tokio::time::interval(
-        std::time::Duration::from_secs(NODE_SYS_INFO_FREQ_SECS),
-    ))
-    .fuse();
-
-    // Send node metrics every 30 seconds
-    let mut node_metrics_interval = IntervalStream::new(tokio::time::interval(
-        std::time::Duration::from_secs(NODE_PUSH_METRICS_FREQ_SECS),
-    ))
-    .fuse();
-
-    info!("periodic_telemetry_dump task started");
-    loop {
-        futures::select! {
-            _ = system_information_interval.select_next_some() => {
-                send_system_information(peer_id.clone()).await;
-            }
-            _ = node_metrics_interval.select_next_some() => {
-                send_node_metrics(peer_id.clone(), chain_id.clone(), db.clone()).await;
-            }
-        }
-    }
-}
-
-async fn send_build_information(peer_id: String) {
-    tokio::spawn(async move {
-        // Collect the build information
-        let build_information = system_information::get_build_information();
-        let build_information = convert_btree_to_hashmap(build_information);
-
-        // Send the build information
-        send_env_data(
-            APTOS_NODE_BUILD_INFORMATION.to_string(),
-            peer_id.to_string(),
-            build_information,
-        )
-        .await;
-    });
-}
-
-async fn send_system_information(peer_id: String) {
-    tokio::spawn(async move {
-        // Collect the system information
-        let system_information = system_information::get_system_information();
-        let system_information = convert_btree_to_hashmap(system_information);
-
-        // Send the system information
-        send_env_data(
-            APTOS_NODE_SYSTEM_INFORMATION.to_string(),
-            peer_id.to_string(),
-            system_information,
-        )
-        .await;
-    });
-}
-
-async fn send_node_metrics(peer_id: String, chain_id: String, db: DbReaderWriter) {
-    tokio::spawn(async move {
-        // Fetch the synced version
-        let synced_version = (&*db.reader).fetch_synced_version().unwrap_or(0);
-
-        // Send the node metrics
-        let mut node_metrics: HashMap<String, String> = HashMap::new();
-        node_metrics.insert(
-            SYNCED_VERSION_METRIC.to_string(),
-            synced_version.to_string(),
-        );
-        node_metrics.insert(CHAIN_ID_METRIC.to_string(), chain_id);
-        node_metrics.insert(PEER_ID_METRIC.to_string(), peer_id.clone());
-        send_env_data(APTOS_NODE_PUSH_METRICS.to_string(), peer_id, node_metrics).await;
-    });
-}
-
-// TODO(joshlind): avoid the need to convert!
-fn convert_btree_to_hashmap(btree: BTreeMap<String, String>) -> HashMap<String, String> {
-    let mut hashmap = HashMap::new();
-    for (key, value) in btree {
-        hashmap.insert(key, value);
-    }
-    hashmap
-}
-
 async fn periodic_state_dump(node_config: NodeConfig, db: DbReaderWriter) {
     let args: Vec<String> = ::std::env::args().collect();
 
@@ -776,20 +673,13 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     debug_if
         .runtime()
         .handle()
-        .spawn(periodic_state_dump(node_config.to_owned(), db_rw.clone()));
+        .spawn(periodic_state_dump(node_config.to_owned(), db_rw));
 
-    let telemery_runtime = Builder::new_multi_thread()
-        .thread_name("aptos-telemetry")
-        .enable_all()
-        .build()
-        .expect("Failed to create aptos telemetry runtime!");
-
-    // TODO(joshlind): clean this up!
-    if !aptos_telemetry::is_disabled() {
-        telemery_runtime
-            .handle()
-            .spawn(periodic_telemetry_dump(node_config.to_owned(), db_rw));
-    }
+    // Create the telemetry service
+    let telemetry_runtime = aptos_telemetry::service::start_telemetry_service(
+        node_config.clone(),
+        chain_id.to_string(),
+    );
 
     AptosHandle {
         _api: api_runtime,
@@ -799,6 +689,6 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         _mempool: mempool,
         _network_runtimes: network_runtimes,
         _state_sync_runtimes: state_sync_runtimes,
-        _telemetry_runtime: telemery_runtime,
+        _telemetry_runtime: telemetry_runtime,
     }
 }

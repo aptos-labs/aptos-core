@@ -5,7 +5,7 @@
 
 use aptos_config::config::NodeConfig;
 use aptos_logger::{info, Filter, Logger};
-use aptos_metrics::{metric_server, system_information::get_git_rev};
+use aptos_metrics::metric_server;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::runtime::{Builder, Runtime};
@@ -20,8 +20,6 @@ pub struct NodeDebugService {
 struct NodeInfo {
     #[serde(default)]
     node_config: NodeConfig,
-    #[serde(default)]
-    git_revision: String,
 }
 
 impl NodeDebugService {
@@ -73,9 +71,8 @@ impl NodeDebugService {
             .and(warp::path("log"))
             .and(local_filter.or(remote_filter));
 
-        // Get /node-info (git revision the node was built at and the node config being used)
+        // Get /node-info (the node config being used)
         let node_info = NodeInfo {
-            git_revision: get_git_rev(),
             node_config: node_config.clone(),
         };
         let node_info_route = warp::path("node-info").map(move || warp::reply::json(&node_info));

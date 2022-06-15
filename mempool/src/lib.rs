@@ -68,6 +68,6 @@ pub use shared_mempool::{
 pub use tests::{fuzzing, mocks};
 
 mod core_mempool;
-mod counters;
+pub mod counters;
 mod logging;
 mod shared_mempool;

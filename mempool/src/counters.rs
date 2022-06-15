@@ -77,7 +77,7 @@ pub const INVALID_REQUEST_ID: &str = "invalid_req_id";
 pub const UNKNOWN_PEER: &str = "unknown_peer";
 
 /// Counter tracking size of various indices in core mempool
-static CORE_MEMPOOL_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static CORE_MEMPOOL_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "core_mempool_index_size",
         "Size of a core mempool index",

@@ -16,6 +16,7 @@ use once_cell::sync::Lazy;
 pub static OP_COUNTERS: Lazy<aptos_metrics_core::op_counters::OpMetrics> =
     Lazy::new(|| aptos_metrics_core::op_counters::OpMetrics::new_and_registered("consensus"));
 
+/// Counts the total number of errors
 pub static ERROR_COUNT: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_consensus_error_count",
@@ -216,6 +217,7 @@ pub static NUM_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Traces block movement throughout the node
 pub static BLOCK_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_consensus_block_tracing",
@@ -280,6 +282,7 @@ pub static PENDING_QUORUM_STORE_COMMIT_NOTIFICATION: Lazy<IntGauge> = Lazy::new(
     .unwrap()
 });
 
+/// Counters related to pending commit votes
 pub static BUFFER_MANAGER_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_buffer_manager_msgs_count",

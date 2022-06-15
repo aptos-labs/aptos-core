@@ -48,8 +48,6 @@
 
 mod json_encoder;
 pub mod metric_server;
-pub mod system_information;
-pub mod system_metrics;
 
 pub use aptos_metrics_core::op_counters::{DurationHistogram, OpMetrics};
 

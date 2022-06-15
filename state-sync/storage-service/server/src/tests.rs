@@ -61,7 +61,7 @@ use storage_service_types::{
 use tokio::time::timeout;
 
 /// Various test constants for storage
-const MAX_RESPONSE_TIMEOUT_SECS: u64 = 10;
+const MAX_RESPONSE_TIMEOUT_SECS: u64 = 30;
 const PROTOCOL_VERSION: u64 = 1;
 
 #[tokio::test]

@@ -40,7 +40,6 @@ aptos-logger = { path = "../crates/aptos-logger" }
 aptos-metrics-core = { path = "../crates/aptos-metrics-core" }
 aptos-proptest-helpers = { path = "../crates/aptos-proptest-helpers", optional = true }
 aptos-rate-limiter = { path = "../crates/aptos-rate-limiter" }
-aptos-telemetry = { path = "../crates/aptos-telemetry" }
 aptos-time-service = { path = "../crates/aptos-time-service", features = ["async"] }
 aptos-types = { path = "../types" }
 aptos-workspace-hack = { path = "../crates/aptos-workspace-hack" }
