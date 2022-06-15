@@ -1,4 +1,5 @@
 {
+  "extends": "@tsconfig/docusaurus/tsconfig.json",
   "compilerOptions": {
     "experimentalDecorators": true,
     "outDir": "./dist",
