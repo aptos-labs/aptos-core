@@ -161,7 +161,7 @@ impl VerifiedEpochStates {
         &mut self,
         epoch_ending_ledger_info: LedgerInfoWithSignatures,
     ) {
-        debug!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+        info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
             "Adding a new epoch to the epoch ending ledger infos: {}",
             &epoch_ending_ledger_info
         )));
@@ -419,6 +419,9 @@ impl<
         &mut self,
         global_data_summary: &GlobalDataSummary,
     ) -> Result<(), Error> {
+        // Reset the chunk executor to flush any invalid state currently held in-memory
+        self.storage_synchronizer.reset_chunk_executor()?;
+
         // Always fetch the new epoch ending ledger infos first
         if self.should_fetch_epoch_ending_ledger_infos() {
             return self

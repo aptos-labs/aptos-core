@@ -65,6 +65,7 @@ async fn test_critical_timeout() {
     let mut continuous_syncer = create_continuous_syncer(
         driver_configuration,
         mock_streaming_client,
+        true,
         current_synced_version,
         current_synced_epoch,
     );
@@ -149,6 +150,7 @@ async fn test_data_stream_transactions_with_target() {
     let mut continuous_syncer = create_continuous_syncer(
         driver_configuration,
         mock_streaming_client,
+        true,
         current_synced_version,
         current_synced_epoch,
     );
@@ -228,6 +230,7 @@ async fn test_data_stream_transaction_outputs() {
     let mut continuous_syncer = create_continuous_syncer(
         driver_configuration,
         mock_streaming_client,
+        true,
         current_synced_version,
         current_synced_epoch,
     );
@@ -270,6 +273,7 @@ async fn test_data_stream_transaction_outputs() {
 fn create_continuous_syncer(
     driver_configuration: DriverConfiguration,
     mock_streaming_client: MockStreamingClient,
+    expect_reset_executor: bool,
     synced_version: Version,
     current_epoch: Epoch,
 ) -> ContinuousSyncer<MockStorageSynchronizer, MockStreamingClient> {
@@ -277,7 +281,7 @@ fn create_continuous_syncer(
     aptos_logger::Logger::init_for_testing();
 
     // Create the mock storage synchronizer
-    let mock_storage_synchronizer = create_ready_storage_synchronizer();
+    let mock_storage_synchronizer = create_ready_storage_synchronizer(expect_reset_executor);
 
     // Create the mock db reader with the given synced version
     let mut mock_database_reader = create_mock_db_reader();

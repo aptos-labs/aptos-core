@@ -96,14 +96,16 @@ pub fn create_mock_storage_synchronizer() -> MockStorageSynchronizer {
 
 /// Creates a mock storage synchronizer that is not currently handling
 /// any pending storage data.
-pub fn create_ready_storage_synchronizer() -> MockStorageSynchronizer {
+pub fn create_ready_storage_synchronizer(expect_reset_executor: bool) -> MockStorageSynchronizer {
     let mut mock_storage_synchronizer = create_mock_storage_synchronizer();
     mock_storage_synchronizer
         .expect_pending_storage_data()
         .return_const(false);
-    mock_storage_synchronizer
-        .expect_reset_chunk_executor()
-        .return_const(Ok(()));
+    if expect_reset_executor {
+        mock_storage_synchronizer
+            .expect_reset_chunk_executor()
+            .return_const(Ok(()));
+    }
 
     mock_storage_synchronizer
 }

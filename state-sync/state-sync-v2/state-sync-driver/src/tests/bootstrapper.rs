@@ -42,7 +42,7 @@ async fn test_bootstrap_genesis_waypoint() {
     let mock_streaming_client = create_mock_streaming_client();
 
     // Create the bootstrapper and verify it's not yet bootstrapped
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client);
+    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
     assert!(!bootstrapper.is_bootstrapped());
 
     // Subscribe to a bootstrapped notification
@@ -77,7 +77,7 @@ async fn test_bootstrap_immediate_notification() {
     let mock_streaming_client = create_mock_streaming_client();
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client);
+    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
 
     // Create a global data summary where only epoch 0 has ended
     let global_data_summary = create_global_summary(0);
@@ -110,7 +110,7 @@ async fn test_bootstrap_no_notification() {
         .return_once(move |_| Ok(data_stream_listener));
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client);
+    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
 
     // Create a global data summary where epoch 0 and 1 have ended
     let global_data_summary = create_global_summary(1);
@@ -151,7 +151,7 @@ async fn test_critical_timeout() {
     }
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client);
+    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
 
     // Create a global data summary where epoch 0 and 1 have ended
     let global_data_summary = create_global_summary(1);
@@ -224,7 +224,7 @@ async fn test_data_stream_accounts() {
         .return_const(Ok(()));
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client);
+    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
 
     // Insert an epoch ending ledger info into the verified states of the bootstrapper
     manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
@@ -291,7 +291,7 @@ async fn test_data_stream_transactions() {
         .return_const(Ok(()));
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client);
+    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
 
     // Insert an epoch ending ledger info into the verified states of the bootstrapper
     manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
@@ -358,7 +358,7 @@ async fn test_data_stream_transaction_outputs() {
         .return_const(Ok(()));
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client);
+    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
 
     // Insert an epoch ending ledger info into the verified states of the bootstrapper
     manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
@@ -408,7 +408,7 @@ async fn test_fetch_epoch_ending_ledger_infos() {
         .return_once(move |_| Ok(data_stream_listener));
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client);
+    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
 
     // Set the waypoint as already having been verified (but no fetched ledger infos)
     manipulate_verified_epoch_states(&mut bootstrapper, false, true, None);
@@ -457,7 +457,7 @@ async fn test_waypoint_mismatch() {
         .return_const(Ok(()));
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client);
+    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
 
     // Create a global data summary up to the waypoint
     let mut global_data_summary = create_global_summary(waypoint_epoch);
@@ -501,7 +501,7 @@ async fn test_waypoint_must_be_verified() {
         .return_once(move |_| Ok(data_stream_listener));
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client);
+    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
 
     // Set fetched ledger infos to true but the waypoint is still not verified
     manipulate_verified_epoch_states(&mut bootstrapper, true, false, None);
@@ -533,7 +533,7 @@ async fn test_waypoint_satisfiable() {
     let mock_streaming_client = create_mock_streaming_client();
 
     // Create the bootstrapper
-    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client);
+    let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
 
     // Create an empty global data summary
     let mut global_data_summary = GlobalDataSummary::empty();
@@ -559,12 +559,13 @@ async fn test_waypoint_satisfiable() {
 fn create_bootstrapper(
     driver_configuration: DriverConfiguration,
     mock_streaming_client: MockStreamingClient,
+    expect_reset_executor: bool,
 ) -> Bootstrapper<MockStorageSynchronizer, MockStreamingClient> {
     // Initialize the logger for tests
     aptos_logger::Logger::init_for_testing();
 
     // Create the mock storage synchronizer
-    let mock_storage_synchronizer = create_ready_storage_synchronizer();
+    let mock_storage_synchronizer = create_ready_storage_synchronizer(expect_reset_executor);
 
     // Create the mock db reader with only genesis loaded
     let mut mock_database_reader = create_mock_db_reader();

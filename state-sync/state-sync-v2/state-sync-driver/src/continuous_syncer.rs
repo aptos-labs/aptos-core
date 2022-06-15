@@ -94,6 +94,9 @@ impl<
         &mut self,
         consensus_sync_request: Arc<Mutex<Option<ConsensusSyncRequest>>>,
     ) -> Result<(), Error> {
+        // Reset the chunk executor to flush any invalid state currently held in-memory
+        self.storage_synchronizer.reset_chunk_executor()?;
+
         // Fetch the highest synced version and epoch (in storage)
         let (highest_synced_version, highest_synced_epoch) =
             self.get_highest_synced_version_and_epoch()?;
@@ -106,11 +109,6 @@ impl<
             .lock()
             .as_ref()
             .map(|sync_request| sync_request.get_sync_target());
-        if sync_request_target.is_some() {
-            // Reset the chunk executor to ensure we're up-to-date
-            // with where consensus stopped.
-            self.storage_synchronizer.reset_chunk_executor()?;
-        }
 
         // Initialize a new active data stream
         let active_data_stream = match self.driver_configuration.config.continuous_syncing_mode {
