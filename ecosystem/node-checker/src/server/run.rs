@@ -29,7 +29,7 @@ use super::{
 #[derive(Clone, Debug, Parser)]
 pub struct Run {
     /// What address to listen on.
-    #[clap(long, default_value = "0.0.0.0")]
+    #[clap(long, default_value = "http://0.0.0.0")]
     pub listen_address: Url,
 
     /// What port to listen on.
@@ -37,7 +37,7 @@ pub struct Run {
     pub listen_port: u16,
 
     /// File paths leading to baseline node configurations.
-    #[structopt(long, parse(from_os_str))]
+    #[structopt(long, parse(from_os_str), required = true, min_values = 1)]
     pub baseline_node_config_paths: Vec<PathBuf>,
 
     /// If this is given, the user will be able to call the check_preconfigured_node

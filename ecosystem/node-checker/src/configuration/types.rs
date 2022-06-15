@@ -39,16 +39,18 @@ pub struct NodeConfiguration {
     /// The chain ID we expect to find when we speak to the node.
     /// If not given, we will just assume the value we find is correct.
     /// If given, we will check that the value is correct, exiting if not.
+    #[clap(long)]
     chain_id: Option<u16>,
 
     /// The role type we expect to find when we speak to the node.
     /// If not given, we will just assume the value we find is correct.
     /// If given, we will check that the value is correct, exiting if not.
     /// e.g. "full_node", "validator_node", etc.
+    #[clap(long)]
     role_type: Option<String>,
 
     /// The (metric) evaluators to use, e.g. state_sync, api, etc.
-    #[clap(long, min_values = 1, use_value_delimiter = true)]
+    #[clap(long, required = true, min_values = 1, use_value_delimiter = true)]
     pub evaluators: Vec<String>,
 
     #[clap(flatten)]
@@ -143,17 +145,21 @@ pub allow_preconfigured_test_node_only: bool,
 pub struct NodeAddress {
     /// Target URL. This should include a scheme (e.g. http://). If there is
     /// no scheme, we will prepend http://.
+    #[clap(long)]
     pub url: Url,
 
     /// Metrics port.
+    #[clap(long, default_value = &DEFAULT_METRICS_PORT_STR)]
     #[oai(default = "Self::default_metrics_port")]
     pub metrics_port: u16,
 
     /// API port.
+    #[clap(long, default_value = &DEFAULT_API_PORT_STR)]
     #[oai(default = "Self::default_api_port")]
     pub api_port: u16,
 
     /// Validator communication port.
+    #[clap(long, default_value = &DEFAULT_NOISE_PORT_STR)]
     #[oai(default = "Self::default_noise_port")]
     pub noise_port: u16,
 }
