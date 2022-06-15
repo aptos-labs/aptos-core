@@ -9,6 +9,9 @@ on:
       - auto
       - canary
 
+env:
+  HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
+
 jobs:
   scripts-lint:
     runs-on: ubuntu-latest
@@ -80,6 +83,18 @@ jobs:
       - run: cargo nextest --nextest-profile ci --partition hash:1/1 --unit --exclude backup-cli --changed-since "origin/main"
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+
+      - name: Upload test results to BuildPulse for flaky test detection
+        # Only run this step for branches where where we have access to secrets.
+        # Run this step even when the tests fail. Skip if the workflow is cancelled.
+        if: env.HAS_BUILDPULSE_SECRETS == 'true' && !cancelled()
+        uses: Workshop64/buildpulse-action@main
+        with:
+          account: 99841612
+          repository: 462597790
+          path: target/nextest/ci/junit.xml
+          key: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
+          secret: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
 
   rust-e2e-test:
     runs-on: high-perf-docker
