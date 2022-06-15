@@ -234,17 +234,17 @@ Generic type parameter value example, the following is `0x1::TransactionFee::Tra
             {"constraints": [], "is_phantom": true}
         ],
         "fields": [
-            { "name": "balance", "type": "0x1::Aptos::Aptos<T0>" },
-            { "name": "preburn", "type": "0x1::Aptos::Preburn<T0>" }
+            { "name": "balance", "type": "0x1::Aptos::Aptos<T0 />" },
+            { "name": "preburn", "type": "0x1::Aptos::Preburn<T0 />" }
         ]
     }
 
 It's Move source code:
 
     module AptosFramework::TransactionFee {
-        struct TransactionFee<phantom CoinType> has key {
-            balance: Aptos<CoinType>,
-            preburn: Preburn<CoinType>,
+        struct TransactionFee<phantom CoinType /> has key {
+            balance: Aptos<CoinType />,
+            preburn: Preburn<CoinType />,
         }
     }
 
@@ -268,7 +268,7 @@ It is a combination of:
 
 Examples:
   * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
-  * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
+  * `0x1::Abc::Abc<vector<u8>, vector<u64> />`
   * `0x1::AptosAccount::AccountOperationsCapability`
 
 Note:
@@ -277,7 +277,7 @@ Note:
 
 See [doc](https://diem.github.io/move/structs-and-resources.html) for more details.
 * @format move_type
-* @pattern ^0x[0-9a-zA-Z:_<>]+$
+* @pattern ^0x[0-9a-zA-Z:_< />]+$
 * @example 0x1::AptosAccount::Balance<0x1::XUS::XUS>
 */
 export type MoveStructTagId = string;
@@ -318,7 +318,7 @@ export interface MoveModuleABI {
 }
 
 /**
- * @example {"name":"Balance","is_native":false,"abilities":["key"],"generic_type_params":[{"constraints":[],"is_phantom":true}],"fields":[{"name":"coin","type":"0x1::Aptos::Aptos<T0>"}]}
+ * @example {"name":"Balance","is_native":false,"abilities":["key"],"generic_type_params":[{"constraints":[],"is_phantom":true}],"fields":[{"name":"coin","type":"0x1::Aptos::Aptos<T0 />"}]}
  */
 export interface MoveStruct {
   name: string;
@@ -371,15 +371,15 @@ export interface MoveStructField {
    *             {"constraints": [], "is_phantom": true}
    *         ],
    *         "fields": [
-   *             { "name": "balance", "type": "0x1::Aptos::Aptos<T0>" },
-   *             { "name": "preburn", "type": "0x1::Aptos::Preburn<T0>" }
+   *             { "name": "balance", "type": "0x1::Aptos::Aptos<T0 />" },
+   *             { "name": "preburn", "type": "0x1::Aptos::Preburn<T0 />" }
    *         ]
    *     }
    * It's Move source code:
    *     module AptosFramework::TransactionFee {
-   *         struct TransactionFee<phantom CoinType> has key {
-   *             balance: Aptos<CoinType>,
-   *             preburn: Preburn<CoinType>,
+   *         struct TransactionFee<phantom CoinType /> has key {
+   *             balance: Aptos<CoinType />,
+   *             preburn: Preburn<CoinType />,
    *         }
    * The `T0` in the above JSON representation is the generic type place holder for
    * the `CoinType` in the Move source code.
@@ -391,7 +391,7 @@ export interface MoveStructField {
 }
 
 /**
- * @example {"name":"peer_to_peer_with_metadata","visibility":"script","generic_type_params":[{"constraints":[]}],"params":["signer","address","u64","vector<u8>","vector<u8>"],"return":[]}
+ * @example {"name":"peer_to_peer_with_metadata","visibility":"script","generic_type_params":[{"constraints":[]}],"params":["signer","address","u64","vector<u8 />","vector<u8 />"],"return":[]}
  */
 export interface MoveFunction {
   /** Move function name */
@@ -1069,15 +1069,15 @@ export interface TableItemRequest {
    *             {"constraints": [], "is_phantom": true}
    *         ],
    *         "fields": [
-   *             { "name": "balance", "type": "0x1::Aptos::Aptos<T0>" },
-   *             { "name": "preburn", "type": "0x1::Aptos::Preburn<T0>" }
+   *             { "name": "balance", "type": "0x1::Aptos::Aptos<T0 />" },
+   *             { "name": "preburn", "type": "0x1::Aptos::Preburn<T0 />" }
    *         ]
    *     }
    * It's Move source code:
    *     module AptosFramework::TransactionFee {
-   *         struct TransactionFee<phantom CoinType> has key {
-   *             balance: Aptos<CoinType>,
-   *             preburn: Preburn<CoinType>,
+   *         struct TransactionFee<phantom CoinType /> has key {
+   *             balance: Aptos<CoinType />,
+   *             preburn: Preburn<CoinType />,
    *         }
    * The `T0` in the above JSON representation is the generic type place holder for
    * the `CoinType` in the Move source code.
@@ -1124,15 +1124,15 @@ export interface TableItemRequest {
    *             {"constraints": [], "is_phantom": true}
    *         ],
    *         "fields": [
-   *             { "name": "balance", "type": "0x1::Aptos::Aptos<T0>" },
-   *             { "name": "preburn", "type": "0x1::Aptos::Preburn<T0>" }
+   *             { "name": "balance", "type": "0x1::Aptos::Aptos<T0 />" },
+   *             { "name": "preburn", "type": "0x1::Aptos::Preburn<T0 />" }
    *         ]
    *     }
    * It's Move source code:
    *     module AptosFramework::TransactionFee {
-   *         struct TransactionFee<phantom CoinType> has key {
-   *             balance: Aptos<CoinType>,
-   *             preburn: Preburn<CoinType>,
+   *         struct TransactionFee<phantom CoinType /> has key {
+   *             balance: Aptos<CoinType />,
+   *             preburn: Preburn<CoinType />,
    *         }
    * The `T0` in the above JSON representation is the generic type place holder for
    * the `CoinType` in the Move source code.

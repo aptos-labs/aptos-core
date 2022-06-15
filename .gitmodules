@@ -1,0 +1,3 @@
+[submodule "ecosystem/typescript/sdk/docs"]
+	path = ecosystem/typescript/sdk/docs
+	url = https://github.com/aptos-labs/ts-sdk-doc.git

@@ -219,6 +219,14 @@ const config = {
         ],
       },
     ],
+    [
+      "docusaurus-plugin-typedoc",
+      // Plugin / TypeDoc options
+      {
+        entryPoints: ['../ecosystem/typescript/sdk/src/index.ts'],
+        tsconfig: '../ecosystem/typescript/sdk/tsconfig.json',
+      },
+    ],
   ],
 };
 
