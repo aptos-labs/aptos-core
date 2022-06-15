@@ -1,13 +1,15 @@
+{{- range $i, $e := until (int .Values.numValidators) }}
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "aptos-validator.fullname" . }}-validator
+  name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-validator
   labels:
-    {{- include "aptos-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" $ | nindent 4 }}
 spec:
   selector:
-    {{- include "aptos-validator.selectorLabels" . | nindent 4 }}
-    app.kubernetes.io/name: validator
+    {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/name: validator-{{$i}}
   ports:
   - name: validator
     port: 6180
@@ -15,7 +17,7 @@ spec:
     port: 6181
   - name: metrics
     port: 9101
-  {{- if .Values.validator.exposeRestApi }}
+  {{- if $.Values.validator.exposeRestApi }}
   - name: api
     port: 8080
   {{- end }}
@@ -25,48 +27,48 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "aptos-validator.fullname" . }}-validator-e{{ .Values.chain.era }}
+  name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-validator-e{{ $.Values.chain.era }}
   labels:
-    {{- include "aptos-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" $ | nindent 4 }}
 spec:
   accessModes:
   - ReadWriteOnce
-  storageClassName: {{ .Values.validator.storage.class }}
+  storageClassName: {{ $.Values.validator.storage.class }}
   resources:
     requests:
-      storage: {{ .Values.validator.storage.size }}
+      storage: {{ $.Values.validator.storage.size }}
 
 ---
 
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "aptos-validator.fullname" . }}-validator
+  name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-validator
   labels:
-    {{- include "aptos-validator.labels" . | nindent 4 }}
-    app.kubernetes.io/name: validator
+    {{- include "aptos-validator.labels" $ | nindent 4 }}
+    app.kubernetes.io/name: validator-{{$i}}
 spec:
-  serviceName: {{ include "aptos-validator.fullname" . }}-validator
+  serviceName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-validator
   replicas: 1
   podManagementPolicy: Parallel
   selector:
     matchLabels:
-      {{- include "aptos-validator.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/name: validator
+      {{- include "aptos-validator.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/name: validator-{{$i}}
   template:
     metadata:
       labels:
-        {{- include "aptos-validator.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/name: validator
+        {{- include "aptos-validator.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/name: validator-{{$i}}
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
-        checksum/validator.yaml: {{ tpl (.Files.Get "files/configs/validator.yaml") . | sha256sum }}
+        checksum/validator.yaml: {{ tpl ($.Files.Get "files/configs/validator.yaml") $ | sha256sum }}
     spec:
       terminationGracePeriodSeconds: 0
       containers:
       - name: validator
-        image: {{ .Values.validator.image.repo }}:{{ .Values.validator.image.tag | default .Values.imageTag }}
-      {{- with .Values.validator }}
+        image: {{ $.Values.validator.image.repo }}:{{ $.Values.validator.image.tag | default $.Values.imageTag }}
+      {{- with $.Values.validator }}
         imagePullPolicy: {{ .image.pullPolicy }}
         command: ["/opt/aptos/bin/aptos-node", "-f", "/opt/aptos/etc/validator.yaml"]
         resources:
@@ -113,8 +115,8 @@ spec:
             drop:
             - ALL
           {{- end }}
-      {{- with .Values.validator }}
-      {{- with .nodeSelector }}
+      {{- with $.Values.validator }}
+      {{- with $.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -135,85 +137,16 @@ spec:
       volumes:
       - name: aptos-config
         configMap:
-          name: {{ include "aptos-validator.fullname" . }}
+          name: {{ include "aptos-validator.fullname" $ }}-{{$i}}
       - name: genesis-config
         secret:
-          secretName: {{ include "aptos-validator.fullname" . }}-genesis-e{{ .Values.chain.era }}
+          secretName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-genesis-e{{ $.Values.chain.era }}
       - name: aptos-data
         persistentVolumeClaim:
-          claimName: {{ include "aptos-validator.fullname" . }}-validator-e{{ .Values.chain.era }}
-      serviceAccountName: {{ include "aptos-validator.fullname" . }}-validator
-      {{- if .Values.imagePullSecret }}
+          claimName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-validator-e{{ $.Values.chain.era }}
+      serviceAccountName: {{ include "aptos-validator.fullname" $ }}-validator
+      {{- if $.Values.imagePullSecret }}
       imagePullSecrets:
-      - name: {{.Values.imagePullSecret}}
+      - name: {{ $.Values.imagePullSecret }}
       {{- end }}
-
----
-
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: {{ include "aptos-validator.fullname" . }}-validator
-  labels:
-    {{- include "aptos-validator.labels" . | nindent 4 }}
-spec:
-  podSelector:
-    matchLabels:
-      {{- include "aptos-validator.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/name: validator
-  policyTypes:
-  - Ingress
-  - Egress
-  ingress:
-  # AptosNet from HAproxy
-  - from:
-    - podSelector:
-        matchLabels:
-          {{- include "aptos-validator.selectorLabels" . | nindent 10 }}
-          app.kubernetes.io/name: haproxy
-    ports:
-    - protocol: TCP
-      port: 6180
-    - protocol: TCP
-      port: 9101
-  - from:
-    - podSelector:
-        matchLabels:
-          app.kubernetes.io/name: monitoring
-    ports:
-    - protocol: TCP
-      port: 9101
-  {{- if .Values.validator.exposeRestApi }}
-  # REST API from HAproxy
-    - protocol: TCP
-      port: 8080
-  {{- end }}
-  # AptosNet from local full nodes
-  - from:
-    - podSelector:
-        matchLabels:
-          {{- include "aptos-validator.selectorLabels" . | nindent 10 }}
-          app.kubernetes.io/name: fullnode
-    ports:
-    - protocol: TCP
-      port: 6181
-  egress:
-  # AptosNet to other validators
-  - ports:
-    - protocol: TCP
-      port: 6180
-  # DNS
-  - to:
-    - namespaceSelector: {}
-    ports:
-    - protocol: UDP
-      port: 53
-  # Enable HTTPS telemetry
-  - ports:
-    - protocol: TCP
-      port: 443
-  # Logging
-  - ports:
-    - protocol: TCP
-      port: 5044
-
+{{- end }}

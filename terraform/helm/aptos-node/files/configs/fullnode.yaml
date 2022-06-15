@@ -9,9 +9,9 @@ execution:
 storage:
   backup_service_address: "0.0.0.0:6186"
   storage_pruner_config:
-    ledger_prune_window: {{ int .Values.validator.config.ledger_prune_window }}
-    state_store_prune_window: {{ int .Values.validator.config.state_store_prune_window }}
-    pruning_batch_size: {{ int .Values.validator.config.pruning_batch_size }}
+    ledger_prune_window: {{ int $.Values.validator.config.ledger_prune_window }}
+    state_store_prune_window: {{ int $.Values.validator.config.state_store_prune_window }}
+    pruning_batch_size: {{ int $.Values.validator.config.pruning_batch_size }}
 
 full_node_networks:
 - network_id:
@@ -20,7 +20,7 @@ full_node_networks:
   seeds:
     00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237:
       addresses:
-      - "/dns4/{{ include "aptos-validator.fullname" . }}-validator/tcp/6181/noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/handshake/0"
+      - "/dns4/{{ include "aptos-validator.fullname" $ }}-{{$.Values.i}}-validator/tcp/6181/noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/handshake/0"
       role: "Validator"
 
 - network_id: "public"
@@ -29,14 +29,14 @@ full_node_networks:
   identity:
     type: "from_file"
     path: "/opt/aptos/genesis/validator-full-node-identity.yaml"
-  {{- if .Values.haproxy.config.send_proxy_protocol }}
+  {{- if $.Values.haproxy.config.send_proxy_protocol }}
   enable_proxy_protocol: true
   {{- end }}
   max_inbound_connections: 100
-  {{- if .Values.fullnode.identity }}
+  {{- if $.Values.fullnode.identity }}
   {{- end }}
   seeds:
-    {{- .Values.fullnode.config.seeds | default dict | toYaml | nindent 6 }}
+    {{- $.Values.fullnode.config.seeds | default dict | toYaml | nindent 6 }}
 
 api:
   enabled: true

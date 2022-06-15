@@ -16,31 +16,31 @@ consensus:
         waypoint:
           from_file: /opt/aptos/genesis/waypoint.txt
         identity_blob_path: /opt/aptos/genesis/validator-identity.yaml
-  sync_only: {{ .Values.validator.config.sync_only | default false}}
-  {{- if .Values.validator.config.mempool_poll_count }}
-  mempool_poll_count: {{ .Values.validator.config.mempool_poll_count }}
+  sync_only: {{ $.Values.validator.config.sync_only | default false}}
+  {{- if $.Values.validator.config.mempool_poll_count }}
+  mempool_poll_count: {{ $.Values.validator.config.mempool_poll_count }}
   {{- end }}
-  {{- if .Values.validator.config.round_initial_timeout_ms }}
-  round_initial_timeout_ms: {{ .Values.validator.config.round_initial_timeout_ms }}
+  {{- if $.Values.validator.config.round_initial_timeout_ms }}
+  round_initial_timeout_ms: {{ $.Values.validator.config.round_initial_timeout_ms }}
   {{- end }}
-  {{- if .Values.validator.config.max_block_size }}
-  max_block_size: {{ .Values.validator.config.max_block_size}}
+  {{- if $.Values.validator.config.max_block_size }}
+  max_block_size: {{ $.Values.validator.config.max_block_size}}
   {{- end }}
 
 storage:
   storage_pruner_config:
-    ledger_prune_window: {{ int .Values.validator.config.ledger_prune_window }}
-    state_store_prune_window: {{ int .Values.validator.config.state_store_prune_window }}
-    pruning_batch_size: {{ int .Values.validator.config.pruning_batch_size }}
+    ledger_prune_window: {{ int $.Values.validator.config.ledger_prune_window }}
+    state_store_prune_window: {{ int $.Values.validator.config.state_store_prune_window }}
+    pruning_batch_size: {{ int $.Values.validator.config.pruning_batch_size }}
 
 execution:
   genesis_file_location: /opt/aptos/genesis/genesis.blob
-  concurrency_level: {{ int .Values.validator.config.concurrency_level }}
+  concurrency_level: {{ int $.Values.validator.config.concurrency_level }}
 
 validator_network:
   discovery_method: "onchain"
   mutual_authentication: true
-  {{- if .Values.haproxy.config.send_proxy_protocol }}
+  {{- if $.Values.haproxy.config.send_proxy_protocol }}
   enable_proxy_protocol: true
   {{- end }}
   identity:

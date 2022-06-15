@@ -5,6 +5,9 @@ chain:
 
 imageTag: testnet
 
+# Number of validators to deploy
+numValidators: 1
+
 validator:
   name:
   image:

@@ -1,0 +1,6 @@
+Your {{ .Chart.Name }} deployment named {{ .Release.Name }} is now deployed.
+
+To start the nodes, specify either .Values.loadTestGenesis or populate the following configmaps with genesis data:
+{{- range $i, $e := until (int .Values.numValidators) }}
+    - {{ include "aptos-validator.fullname" $ }}-{{$i}}-genesis-e{{ $.Values.chain.era }}
+{{- end }}

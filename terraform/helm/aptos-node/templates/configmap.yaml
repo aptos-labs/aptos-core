@@ -1,29 +1,14 @@
+# TODO(rustielin): make option to specify node config for each validator/fullnode
+{{- range $i, $e := until (int .Values.numValidators) }}
+---
+# make the validator index available in tpl using $.Values.i 
+{{ $_ := set $.Values "i" $i }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "aptos-validator.fullname" . }}
+  name: {{ include "aptos-validator.fullname" $ }}-{{$i}}
   labels:
-    {{- include "aptos-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" $ | nindent 4 }}
 data:
-{{ tpl (.Files.Glob "files/configs/*.yaml").AsConfig . | indent 2 }}
-
-{{- if .Values.loadTestGenesis }}
----
-
-apiVersion: v1
-kind: Secret
-metadata:
-  name: {{ include "aptos-validator.fullname" . }}-genesis-e{{ .Values.chain.era }}
-  labels:
-    {{- include "aptos-validator.labels" . | nindent 4 }}
-data:
-  waypoint.txt: |-
-{{ .Files.Get "files/test-data/waypoint.txt" | indent 4 }}
-  validator-identity.yaml: |-
-{{ .Files.Get "files/test-data/validator-identity.yaml" | indent 4 }}
-  validator-full-node-identity.yaml: |-
-{{ .Files.Get "files/test-data/validator-full-node-identity.yaml" | indent 4 }}
-binaryData:
-  genesis.blob: {{ .Files.Get "files/test-data/genesis.blob" | b64enc }}
-
+{{ tpl ($.Files.Glob "files/configs/*.yaml").AsConfig $ | indent 2 }}
 {{- end }}

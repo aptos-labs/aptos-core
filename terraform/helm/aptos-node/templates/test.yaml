@@ -1,0 +1,20 @@
+
+{{- if .Values.loadTestGenesis }}
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "aptos-validator.fullname" . }}-genesis-e{{ .Values.chain.era }}
+  labels:
+    {{- include "aptos-validator.labels" . | nindent 4 }}
+data:
+  waypoint.txt: |-
+{{ .Files.Get "files/test-data/waypoint.txt" | indent 4 }}
+  validator-identity.yaml: |-
+{{ .Files.Get "files/test-data/validator-identity.yaml" | indent 4 }}
+  validator-full-node-identity.yaml: |-
+{{ .Files.Get "files/test-data/validator-full-node-identity.yaml" | indent 4 }}
+  genesis.blob: {{ .Files.Get "files/test-data/genesis.blob" | b64enc }}
+
+{{- end }}

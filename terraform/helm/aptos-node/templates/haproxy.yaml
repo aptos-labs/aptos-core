@@ -1,21 +1,16 @@
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: {{ include "aptos-validator.fullname" . }}-haproxy
-  labels:
-    {{- include "aptos-validator.labels" . | nindent 4 }}
-
+{{- range $i, $e := until (int .Values.numValidators) }}
 ---
-
+# make the validator index available in tpl using $.Values.i 
+{{ $_ := set $.Values "i" $i }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "aptos-validator.fullname" . }}-haproxy
+  name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-haproxy
   labels:
-    {{- include "aptos-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" $ | nindent 4 }}
 data:
   haproxy.cfg: |-
-{{ (tpl (.Files.Get "files/haproxy.cfg") .) | indent 4 }}
+{{ (tpl ($.Files.Get "files/haproxy.cfg") $) | indent 4 }}
   blocked.ips: ""
 
 ---
@@ -23,42 +18,7 @@ data:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "aptos-validator.fullname" . }}-validator-lb
-  labels:
-    {{- include "aptos-validator.labels" . | nindent 4 }}
-  annotations:
-    service.beta.kubernetes.io/aws-load-balancer-type: nlb
-    service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: All
-spec:
-  selector:
-    {{- include "aptos-validator.selectorLabels" . | nindent 4 }}
-    app.kubernetes.io/name: haproxy
-  ports:
-  - name: validator
-    port: 6180
-  - name: metrics
-    port: 9101
-    targetPort: 9102
-  {{- if .Values.validator.exposeRestApi }}
-  - name: api
-    port: 80
-    targetPort: 8180
-  {{- end }}
-  type: {{ .Values.service.external.type }}
-  externalTrafficPolicy: Local
-  {{- with .Values.service.validator.loadBalancerSourceRanges }}
-  loadBalancerSourceRanges:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-
-{{- range $index, $config := $.Values.fullnode.groups }}
-
----
-
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ include "aptos-validator.fullname" $ }}-{{ $config.name }}-lb
+  name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-validator-lb
   labels:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
   annotations:
@@ -67,7 +27,40 @@ metadata:
 spec:
   selector:
     {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
-    app.kubernetes.io/name: haproxy
+    app.kubernetes.io/name: haproxy-{{$i}}
+  ports:
+  - name: validator
+    port: 6180
+  - name: metrics
+    port: 9101
+    targetPort: 9102
+  {{- if $.Values.validator.exposeRestApi }}
+  - name: api
+    port: 80
+    targetPort: 8180
+  {{- end }}
+  type: {{ $.Values.service.external.type }}
+  externalTrafficPolicy: Local
+  {{- with $.Values.service.validator.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+{{- range $index, $config := $.Values.fullnode.groups }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-{{ $config.name }}-lb
+  labels:
+    {{- include "aptos-validator.labels" $ | nindent 4 }}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: All
+spec:
+  selector:
+    {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/name: haproxy-{{$i}}
   ports:
   - name: aptosnet
     port: 6182
@@ -99,29 +92,29 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "aptos-validator.fullname" . }}-haproxy
+  name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-haproxy
   labels:
-    {{- include "aptos-validator.labels" . | nindent 4 }}
-    app.kubernetes.io/name: haproxy
+    {{- include "aptos-validator.labels" $ | nindent 4 }}
+    app.kubernetes.io/name: haproxy-{{$i}}
 spec:
-  replicas: {{ .Values.haproxy.replicas }}
+  replicas: {{ $.Values.haproxy.replicas }}
   strategy:
     rollingUpdate:
       maxUnavailable: 1
   selector:
     matchLabels:
-      {{- include "aptos-validator.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/name: haproxy
+      {{- include "aptos-validator.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/name: haproxy-{{$i}}
   template:
     metadata:
       labels:
-        {{- include "aptos-validator.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/name: haproxy
+        {{- include "aptos-validator.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/name: haproxy-{{$i}}
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
-        checksum/haproxy.cfg: {{ tpl (.Files.Get "files/haproxy.cfg") . | sha256sum }}
+        checksum/haproxy.cfg: {{ tpl ($.Files.Get "files/haproxy.cfg") $ | sha256sum }}
     spec:
-      {{- with .Values.haproxy }}
+      {{- with $.Values.haproxy }}
       containers:
       - name: haproxy
         image: {{ .image.repo }}:{{ .image.tag }}
@@ -181,14 +174,15 @@ spec:
       volumes:
       - name: haproxy-config
         configMap:
-          name: {{ include "aptos-validator.fullname" . }}-haproxy
-      {{- if .Values.haproxy.tls_secret }}
+          name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-haproxy
+      {{- if $.Values.haproxy.tls_secret }}
       - name: haproxy-tls
         secret:
-          secretName: {{ .Values.haproxy.tls_secret }}
+          secretName: {{ $.Values.haproxy.tls_secret }}
       {{- end }}
-      serviceAccountName: {{ include "aptos-validator.fullname" . }}-haproxy
-      {{- if .Values.imagePullSecret }}
+      serviceAccountName: {{ include "aptos-validator.fullname" $ }}-haproxy
+      {{- if $.Values.imagePullSecret }}
       imagePullSecrets:
-      - name: {{.Values.imagePullSecret}}
+      - name: {{ $.Values.imagePullSecret }}
       {{- end }}
+{{- end }}
