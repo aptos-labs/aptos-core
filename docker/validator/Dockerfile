@@ -14,6 +14,8 @@ WORKDIR /aptos
 COPY rust-toolchain /aptos/rust-toolchain
 RUN rustup install $(cat rust-toolchain)
 
+RUN echo root:root | chpasswd
+
 FROM toolchain AS builder
 
 ARG ENABLE_FAILPOINTS
