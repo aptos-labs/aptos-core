@@ -7,11 +7,12 @@ use crate::liveness::{
     },
     proposer_election::{next, ProposerElection},
 };
-use aptos_types::{block_metadata::NewBlockEvent, validator_signer::ValidatorSigner};
-use consensus_types::{
-    block::{block_test_utils::certificate_for_genesis, Block},
-    common::{Author, Payload, Round},
+
+use aptos_types::{
+    account_address::AccountAddress, block_metadata::NewBlockEvent,
+    validator_signer::ValidatorSigner,
 };
+use consensus_types::common::{Author, Round};
 use itertools::Itertools;
 
 struct MockHistory {
@@ -140,11 +141,8 @@ fn test_epoch_change() {
 fn test_api() {
     let active_weight = 9;
     let inactive_weight = 1;
-    let (proposers, signers): (Vec<_>, Vec<_>) = (0..5)
-        .map(|i| ValidatorSigner::random([i; 32]))
-        .sorted_by(|a, b| Ord::cmp(&a.author(), &b.author()))
-        .map(|signer| (signer.author(), signer))
-        .unzip();
+    let proposers: Vec<AccountAddress> =
+        (0..5).map(|_| AccountAddress::random()).sorted().collect();
     let history = vec![
         create_block(0, proposers[0], vec![false, true, true, false, false]),
         create_block(0, proposers[0], vec![false, false, false, true, false]),
@@ -184,37 +182,8 @@ fn test_api() {
         }
     }
     let unexpected_index = (expected_index + 1) % proposers.len();
-    let proposer_election: Box<dyn ProposerElection> = Box::new(leader_reputation);
-    let output = proposer_election.get_valid_proposer(round);
+    let output = leader_reputation.get_valid_proposer(round);
     assert_eq!(output, proposers[expected_index]);
-    assert!(proposer_election.is_valid_proposer(proposers[expected_index], 42));
-    assert!(!proposer_election.is_valid_proposer(proposers[unexpected_index], 42));
-    let good_proposal = Block::new_proposal(
-        Payload::new_empty(),
-        round,
-        1,
-        certificate_for_genesis(),
-        &signers[expected_index],
-    );
-    assert!(proposer_election.is_valid_proposal(&good_proposal));
-    let bad_proposal = Block::new_proposal(
-        Payload::new_empty(),
-        round,
-        1,
-        certificate_for_genesis(),
-        &signers[unexpected_index],
-    );
-    assert!(!proposer_election.is_valid_proposal(&bad_proposal));
-    let bad_proposal_2 = Block::new_proposal(
-        Payload::new_empty(),
-        round,
-        2,
-        certificate_for_genesis(),
-        &signers[expected_index],
-    );
-    assert_ne!(good_proposal.id(), bad_proposal_2.id());
-    // another proposal from the valid proposer should fail
-    assert!(!proposer_election.is_valid_proposal(&bad_proposal_2));
-    // good proposal still passes
-    assert!(proposer_election.is_valid_proposal(&good_proposal));
+    assert!(leader_reputation.is_valid_proposer(proposers[expected_index], 42));
+    assert!(!leader_reputation.is_valid_proposer(proposers[unexpected_index], 42));
 }

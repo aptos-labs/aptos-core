@@ -7,19 +7,11 @@ use crate::{
     },
     liveness::proposer_election::{next, ProposerElection},
 };
-use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::block_metadata::{new_block_event_key, NewBlockEvent};
-use consensus_types::{
-    block::Block,
-    common::{Author, Round},
-};
-use std::{
-    cmp::Ordering,
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use consensus_types::common::{Author, Round};
+use std::{cmp::Ordering, collections::HashSet, sync::Arc};
 use storage_interface::{DbReader, Order};
 
 /// Interface to query committed BlockMetadata.
@@ -238,7 +230,6 @@ pub struct LeaderReputation {
     proposers: Vec<Author>,
     backend: Box<dyn MetadataBackend>,
     heuristic: Box<dyn ReputationHeuristic>,
-    already_proposed: Mutex<(Round, HashMap<Author, HashValue>)>,
     exclude_round: u64,
 }
 
@@ -262,7 +253,6 @@ impl LeaderReputation {
             proposers,
             backend,
             heuristic,
-            already_proposed: Mutex::new((0, HashMap::new())),
             exclude_round,
         }
     }
@@ -293,44 +283,5 @@ impl ProposerElection for LeaderReputation {
             })
             .unwrap_err();
         self.proposers[chosen_index]
-    }
-
-    /// This function will return true for at most one proposal per valid proposer for a given round.
-    fn is_valid_proposal(&self, block: &Block) -> bool {
-        block.author().map_or(false, |author| {
-            let valid = self.is_valid_proposer(author, block.round());
-            let mut already_proposed = self.already_proposed.lock();
-            if !valid {
-                return false;
-            }
-            // detect if the leader proposes more than once in this round
-            match block.round().cmp(&already_proposed.0) {
-                Ordering::Greater => {
-                    already_proposed.0 = block.round();
-                    already_proposed.1.clear();
-                    already_proposed.1.insert(author, block.id());
-                    true
-                }
-                Ordering::Equal => {
-                    if already_proposed
-                        .1
-                        .get(&author)
-                        .map_or(false, |id| *id != block.id())
-                    {
-                        error!(
-                            SecurityEvent::InvalidConsensusProposal,
-                            "Multiple proposals from {} for round {}",
-                            author,
-                            block.round()
-                        );
-                        false
-                    } else {
-                        already_proposed.1.insert(author, block.id());
-                        true
-                    }
-                }
-                Ordering::Less => false,
-            }
-        })
     }
 }
