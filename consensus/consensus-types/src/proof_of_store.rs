@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::Round;
+use anyhow::Context;
 use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_crypto::HashValue;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -13,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Deserialize, Serialize, Hash)]
 pub struct LogicalTime {
     epoch: u64,
     round: Round,
@@ -33,7 +34,9 @@ impl LogicalTime {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq)]
+#[derive(
+    Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
+)]
 pub struct SignedDigestInfo {
     pub digest: HashValue,
     pub expiration: LogicalTime,
@@ -92,6 +95,7 @@ pub enum SignedDigestError {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 #[allow(dead_code)]
 pub struct ProofOfStore {
+    epoch: u64,
     info: SignedDigestInfo,
     aggregated_signature: BTreeMap<PeerId, Ed25519Signature>,
     // TODO: should we add sender + signature(digest + sender)?
@@ -99,8 +103,9 @@ pub struct ProofOfStore {
 
 #[allow(dead_code)]
 impl ProofOfStore {
-    pub fn new(info: SignedDigestInfo) -> Self {
+    pub fn new(epoch: u64, info: SignedDigestInfo) -> Self {
         Self {
+            epoch,
             info,
             aggregated_signature: BTreeMap::new(),
         }
@@ -116,10 +121,10 @@ impl ProofOfStore {
             .is_ok()
     }
 
-    pub fn verify(&self, validator_verifier: &ValidatorVerifier) -> bool {
-        validator_verifier
+    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        validator
             .verify_aggregated_struct_signature(&self.info, &self.aggregated_signature)
-            .is_ok()
+            .context("Failed to verify ProofOfStore")
     }
 
     pub fn shuffled_signers(&self) -> Vec<PeerId> {
@@ -139,5 +144,9 @@ impl ProofOfStore {
 
         self.aggregated_signature.insert(signer_id, signature);
         return Ok(());
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
     }
 }

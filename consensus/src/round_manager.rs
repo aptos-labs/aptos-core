@@ -30,7 +30,7 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier, PeerId,
 };
 use channel::aptos_channel;
-use consensus_types::proof_of_store::SignedDigest;
+use consensus_types::proof_of_store::{ProofOfStore, SignedDigest};
 use consensus_types::{
     block::Block,
     block_retrieval::{BlockRetrievalResponse, BlockRetrievalStatus},
@@ -62,6 +62,7 @@ pub enum UnverifiedEvent {
     SignedDigest(Box<SignedDigest>),
     Fragment(Box<Fragment>),
     Batch(Box<Batch>),
+    ProofOfStoreBroadcast(Box<ProofOfStore>),
 }
 
 impl UnverifiedEvent {
@@ -102,6 +103,10 @@ impl UnverifiedEvent {
                 b.verify(peer_id)?;
                 VerifiedEvent::Batch(b)
             }
+            UnverifiedEvent::ProofOfStoreBroadcast(p) => {
+                p.verify(validator)?;
+                VerifiedEvent::ProofOfStoreBroadcast(p)
+            }
         })
     }
 
@@ -114,7 +119,8 @@ impl UnverifiedEvent {
             UnverifiedEvent::CommitDecision(cd) => cd.epoch(),
             UnverifiedEvent::SignedDigest(sd) => sd.epoch(),
             UnverifiedEvent::Fragment(f) => f.epoch(),
-            UnverifiedEvent::Batch(f) => f.epoch(),
+            UnverifiedEvent::Batch(b) => b.epoch(),
+            UnverifiedEvent::ProofOfStoreBroadcast(p) => p.epoch(),
         }
     }
 }
@@ -130,6 +136,7 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::SignedDigestMsg(sd) => UnverifiedEvent::SignedDigest(sd),
             ConsensusMsg::FragmentMsg(f) => UnverifiedEvent::Fragment(f),
             ConsensusMsg::BatchMsg(b) => UnverifiedEvent::Batch(b),
+            ConsensusMsg::ProofOfStoreBroadcastMsg(p) => UnverifiedEvent::ProofOfStoreBroadcast(p),
             _ => unreachable!("Unexpected conversion"),
         }
     }
@@ -144,12 +151,13 @@ pub enum VerifiedEvent {
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
     BlockRetrievalRequest(Box<IncomingBlockRetrievalRequest>),
-    // local messages
-    LocalTimeout(Round),
-    Shutdown(oneshot::Sender<()>),
     SignedDigest(Box<SignedDigest>),
     Fragment(Box<Fragment>),
     Batch(Box<Batch>),
+    ProofOfStoreBroadcast(Box<ProofOfStore>),
+    // local messages
+    LocalTimeout(Round),
+    Shutdown(oneshot::Sender<()>),
 }
 
 #[cfg(test)]

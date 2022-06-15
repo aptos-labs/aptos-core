@@ -21,16 +21,14 @@ use aptos_types::{
 use channel::aptos_channel;
 use consensus_types::common::Round;
 use consensus_types::proof_of_store::{LogicalTime, ProofOfStore, SignedDigest};
+use futures::channel::oneshot;
 use futures::{
     future::BoxFuture,
     stream::{futures_unordered::FuturesUnordered, StreamExt as _},
 };
 use std::collections::HashMap;
 use std::sync::{mpsc::sync_channel, Arc};
-use tokio::sync::{
-    mpsc::{channel, Receiver, Sender},
-    oneshot,
-};
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 pub type ProofReturnChannel = oneshot::Sender<Result<ProofOfStore, QuorumStoreError>>;
 
@@ -101,7 +99,7 @@ impl QuorumStore {
             proof_builder_tx.clone(),
             config.max_batch_size,
         );
-        let proof_builder = ProofBuilder::new(config.proof_timeout_ms);
+        let proof_builder = ProofBuilder::new(epoch, config.proof_timeout_ms);
         let (batch_store, batch_reader) = BatchStore::new(
             epoch,
             last_committed_round,

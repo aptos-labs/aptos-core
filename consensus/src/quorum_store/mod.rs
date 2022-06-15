@@ -12,6 +12,7 @@ pub(crate) mod network_listener;
 pub(crate) mod proof_builder;
 pub(crate) mod quorum_store;
 pub(crate) mod quorum_store_db;
+pub(crate) mod quorum_store_wrapper;
 pub(crate) mod types;
 pub(crate) mod utils;
 
