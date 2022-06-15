@@ -124,11 +124,11 @@ ActiveRecord::Schema[7.0].define(version: 2022_06_15_171316) do
     t.jsonb "metrics_data"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["account_key"], name: "index_it2_profiles_on_account_key"
-    t.index ["consensus_key"], name: "index_it2_profiles_on_consensus_key"
-    t.index ["fullnode_network_key"], name: "index_it2_profiles_on_fullnode_network_key"
-    t.index ["network_key"], name: "index_it2_profiles_on_network_key"
-    t.index ["user_id"], name: "index_it2_profiles_on_user_id"
+    t.index ["account_key"], name: "index_it2_profiles_on_account_key", unique: true
+    t.index ["consensus_key"], name: "index_it2_profiles_on_consensus_key", unique: true
+    t.index ["fullnode_network_key"], name: "index_it2_profiles_on_fullnode_network_key", unique: true
+    t.index ["network_key"], name: "index_it2_profiles_on_network_key", unique: true
+    t.index ["user_id"], name: "index_it2_profiles_on_user_id", unique: true
   end
 
   create_table "locations", force: :cascade do |t|
