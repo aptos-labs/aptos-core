@@ -2,7 +2,7 @@
   "compilerOptions": {
     "experimentalDecorators": true,
     "outDir": "./dist",
-    "baseUrl": "src/",
+    "baseUrl": "./",
     "allowJs": true,
     "target": "es2020",
     "declaration": true,
