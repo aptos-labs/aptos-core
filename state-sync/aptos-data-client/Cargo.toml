@@ -13,7 +13,7 @@ edition = "2018"
 async-trait = "0.1.53"
 futures = "0.3.21"
 itertools = "0.10.0"
-rand = "0.8.5"
+rand = "0.7.3"
 serde = { version = "1.0.137", default-features = false }
 thiserror = "1.0.31"
 tokio = { version = "1.18.2", features = ["full"] }
@@ -23,11 +23,13 @@ aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-id-generator = { path = "../../crates/aptos-id-generator" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-metrics = { path = "../../crates/aptos-metrics" }
+aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 aptos-time-service = { path = "../../crates/aptos-time-service", features = ["async"] }
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+netcore = { path = "../../network/netcore" }
 network = { path = "../../network" }
+short-hex-str = { path = "../../crates/short-hex-str" }
 storage-service-client = { path = "../storage-service/client" }
 storage-service-types = { path = "../storage-service/types" }
 

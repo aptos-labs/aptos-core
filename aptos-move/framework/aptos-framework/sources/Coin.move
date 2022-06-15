@@ -205,6 +205,13 @@ module AptosFramework::Coin {
         Coin { value: amount }
     }
 
+    /// Extracts the entire amount from the passed-in `coin`, where the original token is modified in place.
+    public fun extract_all<CoinType>(coin: &mut Coin<CoinType>): Coin<CoinType> {
+        let total_value = coin.value;
+        coin.value = 0;
+        Coin { value: total_value }
+    }
+
     /// Creates a new Coin with given `CoinType` and returns minting/burning capabilities.
     /// The given signer also becomes the account hosting the information
     /// about the coin (name, supply, etc.).
@@ -595,8 +602,7 @@ module AptosFramework::Coin {
     }
 
     #[test_only]
-    public fun mint_for_test<CoinType>(account: &signer, amount: u64) acquires CoinEvents, CoinStore {
-        register_internal<CoinType>(account);
-        deposit<CoinType>(Signer::address_of(account), Coin<CoinType> {value: amount});
+    public fun destroy_burn_cap<CoinType>(burn_cap: BurnCapability<CoinType>) {
+        let BurnCapability<CoinType> { } = burn_cap;
     }
 }

@@ -505,7 +505,7 @@ fn create_non_zero_random_u64(max_value: u64) -> u64 {
 /// Returns a random u64 within the range, [min, max)
 fn create_range_random_u64(min_value: u64, max_value: u64) -> u64 {
     let mut rng = OsRng;
-    rng.gen_range(min_value..max_value)
+    rng.gen_range(min_value, max_value)
 }
 
 /// Initializes the Aptos logger for tests

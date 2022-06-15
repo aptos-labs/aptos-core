@@ -57,6 +57,7 @@ pub enum LogEvent {
     PeerNoLongerIgnored,
     PeerPollingError,
     PeerSelectionError,
+    PriorityAndRegularPeers,
     ResponseError,
     ResponseSuccess,
     SendRequest,

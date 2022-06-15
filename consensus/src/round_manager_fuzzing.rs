@@ -13,7 +13,7 @@ use crate::{
     network_interface::ConsensusNetworkSender,
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
     round_manager::RoundManager,
-    test_utils::{EmptyStateComputer, MockStorage, MockTransactionManager},
+    test_utils::{EmptyStateComputer, MockPayloadManager, MockStorage},
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
 use aptos_infallible::Mutex;
@@ -142,7 +142,7 @@ fn create_node_for_fuzzing() -> RoundManager {
     let proposal_generator = ProposalGenerator::new(
         signer.author(),
         block_store.clone(),
-        Arc::new(MockTransactionManager::new(None)),
+        Arc::new(MockPayloadManager::new(None)),
         time_service,
         1,
     );

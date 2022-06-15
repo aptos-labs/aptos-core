@@ -4,10 +4,11 @@
 use anyhow::Result;
 use byteorder::{LittleEndian, ReadBytesExt};
 use proptest::{collection::vec, prelude::*};
+use rocksdb::DEFAULT_COLUMN_FAMILY_NAME;
 use schemadb::{
     define_schema,
     schema::{KeyCodec, Schema, ValueCodec},
-    ColumnFamilyName, SchemaBatch, DB, DEFAULT_CF_NAME,
+    ColumnFamilyName, SchemaBatch, DB,
 };
 
 // Creating two schemas that share exactly the same structure but are stored in different column
@@ -73,7 +74,7 @@ impl ValueCodec<TestSchema2> for TestField {
 
 fn get_column_families() -> Vec<ColumnFamilyName> {
     vec![
-        DEFAULT_CF_NAME,
+        DEFAULT_COLUMN_FAMILY_NAME,
         TestSchema1::COLUMN_FAMILY_NAME,
         TestSchema2::COLUMN_FAMILY_NAME,
     ]
@@ -87,22 +88,22 @@ fn open_db(dir: &aptos_temppath::TempPath) -> DB {
 }
 
 fn open_db_read_only(dir: &aptos_temppath::TempPath) -> DB {
-    DB::open_readonly(
+    DB::open_cf_readonly(
+        &rocksdb::Options::default(),
         &dir.path(),
         "test",
         get_column_families(),
-        &rocksdb::Options::default(),
     )
     .expect("Failed to open DB.")
 }
 
 fn open_db_as_secondary(dir: &aptos_temppath::TempPath, dir_sec: &aptos_temppath::TempPath) -> DB {
-    DB::open_as_secondary(
+    DB::open_cf_as_secondary(
+        &rocksdb::Options::default(),
         &dir.path(),
         &dir_sec.path(),
         "test",
         get_column_families(),
-        &rocksdb::Options::default(),
     )
     .expect("Failed to open DB.")
 }
@@ -420,7 +421,8 @@ fn test_report_size() {
         db.write_schemas(db_batch).unwrap();
     }
 
-    db.flush_all().unwrap();
+    db.flush_cf("TestCF1").unwrap();
+    db.flush_cf("TestCF2").unwrap();
 
     assert!(
         db.get_property("TestCF1", "rocksdb.estimate-live-data-size")

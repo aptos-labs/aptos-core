@@ -74,8 +74,8 @@ Dns6("example.com") => "/dns6/example.com",
 Tcp(6080) => "/tcp/6080",
 Memory(1234) => "/memory/1234",
 NoiseIK(b"080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120") =>
-    "/ln-noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120",
-Handshake(0) => "/ln-handshake/0",
+    "/noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120",
+Handshake(0) => "/handshake/0",
 ```
 
 A `NetworkAddress` is then just a concatenation of these individually formatted `Protocol` segments:
@@ -86,7 +86,7 @@ NetworkAddress([
     Tcp(6080),
     NoiseIK(b"080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120"),
     Handshake(0),
-]) => "/ip4/127.0.0.1/tcp/6080/ln-noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/ln-handshake/0"
+]) => "/ip4/127.0.0.1/tcp/6080/noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/handshake/0"
 ```
 
 A `NetworkAddress` as a concatenation of `Protocol` segments must have the following characteristics:
@@ -99,7 +99,7 @@ A `NetworkAddress` as a concatenation of `Protocol` segments must have the follo
 Example possible combinations:
 * `/ip4/127.0.0.1/tcp/6080`
 * `/memory/6080`
-* `/dns/novi.com/tcp/80/ln-noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/ln-handshake/0`
+* `/dns/novi.com/tcp/80/noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/handshake/0`
 
 ## Network Protocol Upgradability
 
@@ -108,7 +108,7 @@ backwards-incompatible upgrades allows Aptos to evolve quickly and prevents prot
 
 Each node advertises the full set of protocols needed to speak with a it using
 [onchain discovery](onchain-discovery.md). In other words, a node that sees
-`"/dns6/example.com/tcp/1234/ln-noise-ik/<pubkey>/ln-handshake/0"` knows unambiguously the precise set of protocols it
+`"/dns6/example.com/tcp/1234/noise-ik/<pubkey>/handshake/0"` knows unambiguously the precise set of protocols it
 must speak and in which order for the listening node to understand them.
 
 By allowing several `NetworkAddress`es to be advertised at once, nodes can also facilitate backwards-incompatible
@@ -121,9 +121,9 @@ handshake protocol:
 ```
 addrs := [
     // new protocol
-    "/ip4/1.2.3.4/tcp/6181/ln-noise-ix/<pubkey>/ln-handshake/0",
+    "/ip4/1.2.3.4/tcp/6181/noise-ix/<pubkey>/handshake/0",
     // old protocol
-    "/ip4/1.2.3.4/tcp/6180/ln-noise-ik/<pubkey>/ln-handshake/0",
+    "/ip4/1.2.3.4/tcp/6180/noise-ik/<pubkey>/handshake/0",
 ]
 ```
 
@@ -139,6 +139,6 @@ like:
 ```
 // new protocol only
 addrs := [
-    "/ip4/1.2.3.4/tcp/6181/ln-noise-ix/<pubkey>/ln-handshake/0",
+    "/ip4/1.2.3.4/tcp/6181/noise-ix/<pubkey>/handshake/0",
 ]
 ```

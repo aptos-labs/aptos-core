@@ -4,8 +4,12 @@
 [![NPM Package Version][npm-image-version]][npm-url]
 [![NPM Package Downloads][npm-image-downloads]][npm-url]
 
-You need to connect to an [Aptos](https:/github.com/aptos-labs/aptos-core/) node to use this library, or run one
+You need to connect to an [Aptos][repo] node to use this library, or run one
 yourself locally.
+
+## API Docs
+
+Docs can be found [here][api-doc]
 
 ## Usage
 
@@ -41,7 +45,7 @@ sudo apt-get install nodejs yarn
 Originally created with this:
 
 ```bash
-$  npx swagger-typescript-api -p ../../../api/doc/openapi.yaml -o ./src/api --modular --axios --single-http-client
+$  npx swagger-typescript-api@latest -p ../../../api/doc/openapi.yaml -o ./src/api --modular --axios --single-http-client
 ```
 
 #### Changes to make after generation:
@@ -56,20 +60,15 @@ $  npx swagger-typescript-api -p ../../../api/doc/openapi.yaml -o ./src/api --mo
 yarn test
 ```
 
-[examples]: https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/
-
-[repo]: https://github.com/aptos-labs/aptos-core
-
-[npm-image-version]: https://img.shields.io/npm/v/aptos.svg
-
-[npm-image-downloads]: https://img.shields.io/npm/dm/aptos.svg
-
-[npm-url]: https://npmjs.org/package/aptos
-
-[discord-image]: https://img.shields.io/discord/945856774056083548?label=Discord&logo=discord&style=flat~~~~
-
-[discord-url]:  https://discord.gg/aptoslabs
-
 ## Semantic versioning
 
 This project follows [semver](https://semver.org/) as closely as possible
+
+[examples]: https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/
+[repo]: https://github.com/aptos-labs/aptos-core
+[npm-image-version]: https://img.shields.io/npm/v/aptos.svg
+[npm-image-downloads]: https://img.shields.io/npm/dm/aptos.svg
+[npm-url]: https://npmjs.org/package/aptos
+[discord-image]: https://img.shields.io/discord/945856774056083548?label=Discord&logo=discord&style=flat~~~~
+[discord-url]: https://discord.gg/aptoslabs
+[api-doc]: https://aptos-labs.github.io/ts-sdk-doc/

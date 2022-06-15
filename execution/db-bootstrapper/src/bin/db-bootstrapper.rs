@@ -6,7 +6,7 @@ use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::AptosVM;
-use aptosdb::AptosDB;
+use aptosdb::{AptosDB, LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use executor::db_bootstrapper::calculate_genesis;
 use std::{
     fs::File,
@@ -60,7 +60,8 @@ fn main() -> Result<()> {
         tmpdir = TempPath::new();
         AptosDB::open_as_secondary(
             opt.db_dir.as_path(),
-            tmpdir.path(),
+            &tmpdir.as_ref().to_path_buf().join(LEDGER_DB_NAME),
+            &tmpdir.as_ref().to_path_buf().join(STATE_MERKLE_DB_NAME),
             RocksdbConfig::default(),
         )
     }

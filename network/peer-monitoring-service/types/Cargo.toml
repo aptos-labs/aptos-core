@@ -1,0 +1,18 @@
+[package]
+name = "peer-monitoring-service-types"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Common types offered by the peer monitoring service"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+serde = { version = "1.0.124", default-features = false }
+thiserror = "1.0.24"
+
+aptos-config = { path = "../../../config" }
+aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
+network = { path = "../../../network" }

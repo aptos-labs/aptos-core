@@ -39,6 +39,13 @@ pub struct MempoolError {
 
 #[derive(Debug, Error)]
 #[error(transparent)]
+pub struct QuorumStoreError {
+    #[from]
+    inner: anyhow::Error,
+}
+
+#[derive(Debug, Error)]
+#[error(transparent)]
 pub struct VerifyError {
     #[from]
     inner: anyhow::Error,
@@ -56,6 +63,9 @@ pub fn error_kind(e: &anyhow::Error) -> &'static str {
     }
     if e.downcast_ref::<MempoolError>().is_some() {
         return "Mempool";
+    }
+    if e.downcast_ref::<QuorumStoreError>().is_some() {
+        return "QuorumStore";
     }
     if e.downcast_ref::<DbError>().is_some() {
         return "ConsensusDb";

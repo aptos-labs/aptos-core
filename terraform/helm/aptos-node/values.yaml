@@ -8,7 +8,7 @@ imageTag: testnet
 validator:
   name:
   image:
-    repo: aptoslab/validator
+    repo: aptoslabs/validator
     tag:
     pullPolicy: IfNotPresent
   resources:

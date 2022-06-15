@@ -1,0 +1,50 @@
+{{- if .Values.ingress.enable }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "chaos.fullname" . }}
+  labels:
+    {{- include "chaos.labels" . | nindent 4 }}
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/tags: {{ .Values.ingress.aws_tags | quote }}
+    {{- if .Values.ingress.loadBalancerSourceRanges }}
+    alb.ingress.kubernetes.io/inbound-cidrs: {{ join "," .Values.ingress.loadBalancerSourceRanges }}
+    {{- end }}
+    external-dns.alpha.kubernetes.io/hostname: {{ .Values.ingress.domain }}
+    alb.ingress.kubernetes.io/certificate-arn: {{ .Values.ingress.acm_certificate }}
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/actions.ssl-redirect: >-
+        {
+            "Type": "redirect",
+            "RedirectConfig": {
+                "Protocol": "HTTPS",
+                "Port": "443",
+                "Host": "#{host}",
+                "Path": "/#{path}",
+                "Query": "#{query}",
+                "StatusCode": "HTTP_301"
+            }
+        }
+spec:
+  rules:
+  - host: {{ .Values.ingress.domain }}
+    http:
+      paths:
+      # the first path must be for SSL redirect
+      - path: /*
+        pathType: Prefix
+        backend:
+          service: 
+            name: ssl-redirect
+            port: 
+              name: use-annotation
+      - path: /*
+        pathType: Prefix
+        backend:
+          service:
+            name: chaos-dashboard
+            port: 
+              name: http
+{{- end }}

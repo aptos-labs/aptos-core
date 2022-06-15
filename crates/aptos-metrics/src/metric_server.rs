@@ -2,12 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    gather_metrics,
-    json_encoder::JsonEncoder,
-    json_metrics::get_json_metrics,
-    public_metrics::{PUBLIC_JSON_METRICS, PUBLIC_METRICS},
-    system_metrics::refresh_system_metrics,
-    NUM_METRICS,
+    gather_metrics, json_encoder::JsonEncoder, system_information::get_system_information,
+    system_metrics::update_system_metrics, NUM_METRICS,
 };
 use futures::future;
 use hyper::{
@@ -86,17 +82,6 @@ pub fn get_all_metrics() -> HashMap<String, String> {
     get_metrics(all_metric_families)
 }
 
-pub fn get_public_metrics() -> HashMap<String, String> {
-    let mut metric_families = gather_metrics();
-    metric_families = whitelist_metrics(metric_families, PUBLIC_METRICS);
-    get_metrics(metric_families)
-}
-
-pub fn get_public_json_metrics() -> HashMap<&'static str, String> {
-    let jmet = get_json_metrics();
-    whitelist_json_metrics(jmet, PUBLIC_JSON_METRICS)
-}
-
 // filtering metrics from the prometheus collections
 // only return the whitelisted metrics
 fn whitelist_metrics(
@@ -113,38 +98,20 @@ fn whitelist_metrics(
     whitelist_metrics
 }
 
-// filtering metrics from the Json format metrics
-// only return the whitelisted metrics
-fn whitelist_json_metrics(
-    json_metrics: HashMap<String, String>,
-    whitelist: &'static [&'static str],
-) -> HashMap<&'static str, String> {
-    let mut whitelist_metrics: HashMap<&'static str, String> = HashMap::new();
-    for key in whitelist {
-        if let Some(metric) = json_metrics.get(*key) {
-            whitelist_metrics.insert(key, metric.clone());
-        }
-    }
-    whitelist_metrics
-}
-
 async fn serve_metrics(req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
     let mut resp = Response::new(Body::empty());
     match (req.method(), req.uri().path()) {
-        (&Method::GET, "/-/healthy") => {
-            *resp.body_mut() = Body::from("aptos-node:ok");
-        }
         (&Method::GET, "/metrics") => {
-            //Prometheus server expects metrics to be on host:port/metrics
+            // Prometheus server expects metrics to be on host:port/metrics
             let encoder = TextEncoder::new();
             let buffer = encode_metrics(encoder, &[]);
             *resp.body_mut() = Body::from(buffer);
         }
-        // expose non-numeric metrics to host:port/json_metrics
-        (&Method::GET, "/json_metrics") => {
-            let json_metrics = get_json_metrics();
-            let encoded_metrics = serde_json::to_string(&json_metrics).unwrap();
-            *resp.body_mut() = Body::from(encoded_metrics);
+        // Expose system information to host:port/system_information
+        (&Method::GET, "/system_information") => {
+            let system_information = get_system_information();
+            let encoded_information = serde_json::to_string(&system_information).unwrap();
+            *resp.body_mut() = Body::from(encoded_information);
         }
         (&Method::GET, "/counters") => {
             // Json encoded aptos_metrics;
@@ -160,33 +127,7 @@ async fn serve_metrics(req: Request<Body>) -> Result<Response<Body>, hyper::Erro
     Ok(resp)
 }
 
-async fn serve_public_metrics(req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
-    let mut resp = Response::new(Body::empty());
-    match (req.method(), req.uri().path()) {
-        (&Method::GET, "/metrics") => {
-            let encoder = TextEncoder::new();
-            // encode public metrics defined in common/metrics/src/public_metrics.rs
-            let buffer = encode_metrics(encoder, PUBLIC_METRICS);
-            *resp.body_mut() = Body::from(buffer);
-        }
-        (&Method::GET, "/json_metrics") => {
-            let json_metrics = get_json_metrics();
-            let whitelist_json_metrics = whitelist_json_metrics(json_metrics, PUBLIC_JSON_METRICS);
-            let encoded_metrics = serde_json::to_string(&whitelist_json_metrics).unwrap();
-            *resp.body_mut() = Body::from(encoded_metrics);
-        }
-        _ => {
-            *resp.status_mut() = StatusCode::NOT_FOUND;
-        }
-    };
-
-    Ok(resp)
-}
-
-pub fn start_server(host: String, port: u16, public_metric: bool) {
-    // Collect system metrics
-    refresh_system_metrics();
-
+pub fn start_server(host: String, port: u16) {
     // Only called from places that guarantee that host is parsable, but this must be assumed.
     let addr: SocketAddr = (host.as_str(), port)
         .to_socket_addrs()
@@ -194,36 +135,25 @@ pub fn start_server(host: String, port: u16, public_metric: bool) {
         .next()
         .unwrap();
 
-    if public_metric {
-        thread::spawn(move || {
-            let make_service = make_service_fn(|_| {
-                future::ok::<_, hyper::Error>(service_fn(serve_public_metrics))
-            });
+    // Spawn the metric server
+    thread::spawn(move || {
+        let make_service =
+            make_service_fn(|_| future::ok::<_, hyper::Error>(service_fn(serve_metrics)));
 
-            let rt = runtime::Builder::new_current_thread()
-                .enable_io()
-                .build()
-                .unwrap();
-            rt.block_on(async {
-                let server = Server::bind(&addr).serve(make_service);
-                server.await
-            })
+        let rt = runtime::Builder::new_current_thread()
+            .enable_io()
+            .build()
             .unwrap();
-        });
-    } else {
-        thread::spawn(move || {
-            let make_service =
-                make_service_fn(|_| future::ok::<_, hyper::Error>(service_fn(serve_metrics)));
+        rt.block_on(async {
+            let server = Server::bind(&addr).serve(make_service);
+            server.await
+        })
+        .unwrap();
+    });
 
-            let rt = runtime::Builder::new_current_thread()
-                .enable_io()
-                .build()
-                .unwrap();
-            rt.block_on(async {
-                let server = Server::bind(&addr).serve(make_service);
-                server.await
-            })
-            .unwrap();
-        });
-    }
+    // Update system metrics on startup
+    thread::spawn(move || {
+        // TODO(joshlind): this doesn't need to be done here.
+        update_system_metrics();
+    });
 }

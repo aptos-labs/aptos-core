@@ -40,8 +40,7 @@ Changes to the project are proposed through pull requests. The general pull requ
 2. If you have added code that should be tested, add unit tests.
 3. If you have changed APIs, update the documentation. Make sure the documentation builds.
 4. Ensure all tests and lints pass on each and every commit that is part of your pull request. `cargo x lint && cargo xfmt && cargo xclippy --all-targets`
-5. If you haven't already, complete the Contributor License Agreement (CLA).
-6. Submit your pull request.
+5. Submit your pull request.
 
 ## Authoring Clean Commits
 
@@ -109,10 +108,6 @@ You *should not* update your branch by merging the latest main into your branch.
 ## Bisect-able History
 
 It is important that the project history is bisect-able so that when regressions are identified we can easily use `git bisect` to be able to pin-point the exact commit which introduced the regression. This requires that every commit is able to be built and passes all lints and tests. So if your pull request includes multiple commits be sure that each and every commit is able to be built and passes all checks performed by CI.
-
-## Contributor License Agreement
-
-For pull request to be accepted by any Aptos project, a CLA must be signed. You will only need to do this once to work on any of Aptos Lab's open source projects. Individuals contributing on their own behalf can sign the [Individual CLA](https://github.com/aptos-labs/aptos-core/blob/main/documentation/contributing/individual-cla.pdf).  If you are contributing on behalf of your employer, please ask them to sign the [Corporate CLA](https://github.com/aptos-labs/aptos-core/blob/main/documentation/contributing/corporate-cla.pdf).
 
 # Issues
 

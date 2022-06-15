@@ -36,6 +36,6 @@ pub use transaction::{
     BlockMetadataTransaction, DirectWriteSet, Event, GenesisTransaction, PendingTransaction,
     ScriptFunctionPayload, ScriptPayload, ScriptWriteSet, Transaction, TransactionData,
     TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
-    TransactionSigningMessage, UserTransaction, UserTransactionRequest, WriteSet, WriteSetChange,
-    WriteSetPayload,
+    TransactionSigningMessage, UserCreateSigningMessageRequest, UserTransaction,
+    UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
 };

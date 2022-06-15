@@ -1,6 +1,7 @@
+# frozen_string_literal: true
+
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
-# frozen_string_literal: true
 
 module It1ProfilesHelper
 end

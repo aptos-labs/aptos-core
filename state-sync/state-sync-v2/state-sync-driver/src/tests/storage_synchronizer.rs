@@ -16,7 +16,7 @@ use crate::{
         utils::{
             create_epoch_ending_ledger_info, create_event, create_output_list_with_proof,
             create_startup_info, create_state_value_chunk_with_proof, create_transaction,
-            create_transaction_list_with_proof,
+            create_transaction_list_with_proof, verify_mempool_and_event_notification,
         },
     },
 };
@@ -24,15 +24,14 @@ use anyhow::format_err;
 use aptos_config::config::StateSyncDriverConfig;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
-    contract_event::ContractEvent, ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::ON_CHAIN_CONFIG_REGISTRY, transaction::Transaction,
+    ledger_info::LedgerInfoWithSignatures, on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
 };
 use claim::assert_matches;
 use data_streaming_service::data_notification::NotificationId;
-use event_notifications::{EventNotificationListener, EventSubscriptionService};
+use event_notifications::EventSubscriptionService;
 use executor_types::ChunkCommitNotification;
 use futures::StreamExt;
-use mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
+use mempool_notifications::MempoolNotificationListener;
 use mockall::predicate::{always, eq};
 use std::{sync::Arc, time::Duration};
 use storage_interface::DbReaderWriter;
@@ -42,7 +41,7 @@ use tokio::task::JoinHandle;
 async fn test_apply_transaction_outputs() {
     // Create test data
     let transaction_to_commit = create_transaction();
-    let event_to_commit = create_event();
+    let event_to_commit = create_event(None);
 
     // Setup the mock executor
     let mut chunk_executor = create_mock_executor();
@@ -164,7 +163,7 @@ async fn test_commit_chunk_error() {
 async fn test_execute_transactions() {
     // Create test data
     let transaction_to_commit = create_transaction();
-    let event_to_commit = create_event();
+    let event_to_commit = create_event(None);
 
     // Setup the mock executor
     let mut chunk_executor = create_mock_executor();
@@ -622,36 +621,6 @@ async fn verify_account_commit_notification(
         committed_accounts.committed_transaction,
         expected_committed_transactions
     );
-}
-
-/// Verifies that mempool is notified about the committed transactions and
-/// verifies that the event listener is notified about the committed
-/// events (if it exists).
-async fn verify_mempool_and_event_notification(
-    event_listener: Option<&mut EventNotificationListener>,
-    mempool_notification_listener: &mut MempoolNotificationListener,
-    expected_transactions: Vec<Transaction>,
-    expected_events: Vec<ContractEvent>,
-) {
-    // Verify mempool is notified and ack the notification
-    let mempool_notification = mempool_notification_listener.select_next_some().await;
-    let committed_transactions: Vec<CommittedTransaction> = expected_transactions
-        .into_iter()
-        .map(|txn| CommittedTransaction {
-            sender: txn.as_signed_user_txn().unwrap().sender(),
-            sequence_number: 0,
-        })
-        .collect();
-    assert_eq!(mempool_notification.transactions, committed_transactions);
-    mempool_notification_listener
-        .ack_commit_notification(mempool_notification)
-        .unwrap();
-
-    // Verify the event listener is notified about the specified event
-    if let Some(event_listener) = event_listener {
-        let event_notification = event_listener.select_next_some().await;
-        assert_eq!(event_notification.subscribed_events, expected_events);
-    }
 }
 
 /// Verifies that the expected error notification is received by the listener

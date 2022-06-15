@@ -7,6 +7,9 @@ import { application } from "./application"
 import DialogController from "./dialog_controller.ts"
 application.register("dialog", DialogController)
 
+import NftController from "./nft_controller.ts"
+application.register("nft", NftController)
+
 import RecaptchaController from "./recaptcha_controller.ts"
 application.register("recaptcha", RecaptchaController)
 

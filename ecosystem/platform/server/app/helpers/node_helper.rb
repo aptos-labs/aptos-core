@@ -9,37 +9,71 @@ require 'maxmind/geoip2'
 require 'httparty'
 require 'logging/logs'
 
-module NodeHelper
-  # @param [String] hostname
-  def normalize_hostname!(hostname)
-    hostname.strip!
-    hostname.downcase!
-    hostname.delete_prefix! 'http://'
-    hostname.delete_prefix! 'https://'
-    hostname.delete_suffix! '/'
+VerifyResult = Struct.new(:valid, :message)
+MetricsResult = Struct.new(:ok, :version, :message)
+MetricsJsonResult = Struct.new(:ok, :data, :message)
+LocationResult = Struct.new(:ok, :message, :record)
+IPResult = Struct.new(:ok, :ip, :message)
+
+# @param [String] hostname
+def normalize_hostname!(hostname)
+  hostname.strip!
+  hostname.downcase!
+  hostname.delete_prefix! 'http://'
+  hostname.delete_prefix! 'https://'
+  hostname.delete_suffix! '/'
+end
+
+# @param [String] metrics
+# @return MetricsResult
+def extract_metrics(metrics)
+  return MetricsResult.new(false, nil, 'Metrics result is empty') unless metrics.present?
+
+  metrics.split("\n").each_entry do |metric|
+    next if metric.start_with? '#'
+
+    name, value = metric.split
+    # aptos_consensus_last_committed_version 8299
+    return MetricsResult.new(true, value.to_i, nil) if name == 'aptos_consensus_last_committed_version'
   end
 
-  # @param [String] metrics
-  # @return MetricsResult
-  def extract_metrics(metrics)
-    return MetricsResult.new(false, nil, 'Metrics result is empty') unless metrics.present?
+  MetricsResult.new(false, nil, 'could not find `aptos_consensus_last_committed_version` metric')
+end
 
-    metrics.split("\n").each_entry do |metric|
-      next if metric.start_with? '#'
+# @param [String] metrics
+# @return Array<Tuple<String, Numeric, Hash>>
+def metrics_to_json(metrics)
+  res = metrics.split("\n").map do |metric|
+    next if metric.start_with? '#'
 
-      name, value = metric.split
-      # aptos_consensus_last_committed_version 8299
-      return MetricsResult.new(true, value.to_i, nil) if name == 'aptos_consensus_last_committed_version'
+    metric_line_to_json(metric)
+  end.compact
+  MetricsJsonResult.new(true, res, nil)
+end
+
+# input: "aptos_consensus_block_tracing_bucket{stage=\"committed\",le=\"0.01\"} 0"
+# output: key="aptos_consensus_block_tracing_bucket", value=0, params={"stage"=>"committed", "le"=>"0.01"}
+# @param [String] line
+# @return Tuple<String, Numeric, Hash>
+def metric_line_to_json(line)
+  first_space = line.index ' '
+  first_paren = line.index '{'
+
+  if first_paren.nil?
+    key, value = line.split
+    value = JSON.parse(value)
+    params = {}
+  else
+    key = line[..(first_paren - 1)]
+    value = JSON.parse(line[(first_space + 1)..])
+    params = line[(first_paren + 1)..(first_space - 2)].split(',').to_h do |parm|
+      parm.split('=').tap { |kv| kv[1] = JSON.parse(kv[1]) }
     end
-
-    MetricsResult.new(false, nil, 'could not find `aptos_consensus_last_committed_version` metric')
   end
+  [key, value, params]
+end
 
-  VerifyResult = Struct.new(:valid, :message)
-  MetricsResult = Struct.new(:ok, :version, :message)
-  LocationResult = Struct.new(:ok, :message, :record)
-  IPResult = Struct.new(:ok, :ip, :message)
-
+module NodeHelper
   class NodeVerifier
     include Logging::Logs
 
@@ -86,9 +120,8 @@ module NodeHelper
 
     # @return MetricsResult
     def fetch_metrics
-      res = HTTParty.get("http://#{@hostname}:#{@metrics_port}/metrics", open_timeout: 2, read_timeout: 3,
-                                                                         max_retries: 0)
-      extract_metrics(res.body)
+      yield HTTParty.get("http://#{@hostname}:#{@metrics_port}/metrics", open_timeout: 2, read_timeout: 3,
+                                                                         max_retries: 0).body
     rescue Net::ReadTimeout => e
       MetricsResult.new(false, nil, "Read timeout: #{e}")
     rescue Net::OpenTimeout => e
@@ -100,13 +133,13 @@ module NodeHelper
 
     # @return VerifyResult
     def verify_metrics
-      res1 = fetch_metrics
+      res1 = fetch_metrics { |b| extract_metrics(b) }
       return VerifyResult.new(false, "Could not verify metrics; #{res1.message}") unless res1.ok
 
       # Sleep to allow their node to produce more versions
       sleep 1
 
-      res2 = fetch_metrics
+      res2 = fetch_metrics { |b| extract_metrics(b) }
       return VerifyResult.new(false, "Could not verify metrics; #{res2.message}") unless res2.ok
 
       unless res2.version > res1.version
@@ -115,6 +148,18 @@ module NodeHelper
       end
 
       VerifyResult.new(true, 'Metrics verified successfully!')
+    end
+
+    # @return [MetricsJsonResult]
+    def fetch_json_metrics
+      res = fetch_metrics { |b| metrics_to_json(b) }
+      case res
+      when MetricsResult
+        # Wrap the error
+        MetricsJsonResult.new(false, nil, res.message)
+      when MetricsJsonResult
+        res
+      end
     end
 
     # @return [Array<VerifyResult>]

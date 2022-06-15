@@ -1,5 +1,5 @@
 ---
-title: "Node networks and synchronization"
+title: "Node Networks and Synchronization"
 slug: "basics-node-networks-sync"
 ---
 

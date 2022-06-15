@@ -182,7 +182,7 @@ impl Mempool {
     /// `seen_txns` - transactions that were sent to Consensus but were not committed yet,
     ///  mempool should filter out such transactions.
     #[allow(clippy::explicit_counter_loop)]
-    pub(crate) fn get_block(
+    pub(crate) fn get_batch(
         &self,
         batch_size: u64,
         mut seen: HashSet<TxnPointer>,

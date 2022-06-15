@@ -1,10 +1,28 @@
+/**
+ * Validator lifecycle:
+ * 1. Prepare a validator node set up and call Stake::register_validator_candidate
+ * 2. Once ready to deposit stake (or have funds assigned by a staking service in exchange for ownership capability),
+ * call Stake::add_stake and Stake::increase_lockup (or *_with_cap versions if called from the staking service)
+ * 3. Call Stake::join_validator_set (or _with_cap version) to join the active validator set. Changes are effective in
+ * the next epoch.
+ * 4. Validate and gain rewards.
+ * 5. At any point, if the validator operator wants to switch validator node operator, they can call
+ * Stake::rotate_consensus_key.
+ * 6. When lockup has expired, validator (or the owner of owner capability) can choose to either (1) increase the lockup
+ * to keep validating and receiving rewards, or (2) call Stake::unlock to unlock their stake and Stake::withdraw to
+ * withdraw in the next epoch.
+ * 7. After exiting, the validator can either explicitly leave the validator set by calling Stake::leave_validator_set
+ * or if their stake drops below the min required, they would get removed at the end of the epoch.
+ * 8. Validator can always rejoin the validator set by going through steps 2-3 again.
+ * 9. Owner can always switch operators by calling Stake::set_operator.
+*/
 module AptosFramework::Stake {
     use Std::Errors;
     use Std::Option::{Self, Option};
     use Std::Signer;
     use Std::Vector;
-    use AptosFramework::Coin::{Self, Coin};
-    use AptosFramework::IterableTable::{Self, IterableTable};
+    use AptosFramework::Coin::{Self, Coin, MintCapability};
+    use AptosFramework::Comparator;
     use AptosFramework::SystemAddresses;
     use AptosFramework::Timestamp;
     use AptosFramework::TestCoin::TestCoin;
@@ -12,57 +30,69 @@ module AptosFramework::Stake {
     friend AptosFramework::Reconfiguration;
     friend AptosFramework::Genesis;
 
+    /// TODO: Parameterize these.
+    const REWARDS_RATE_PERCENT: u64 = 1;
     const MINIMUM_LOCK_PERIOD: u64 = 86400;
 
-    /// Delegation not found for the account.
-    const EDELEGATION_NOT_FOUND: u64 = 1;
     /// Lock period is shorter than required.
-    const ELOCK_TIME_TOO_SHORT: u64 = 2;
+    const ELOCK_TIME_TOO_SHORT: u64 = 1;
     /// Withdraw not allowed, the stake is still locked.
-    const EWITHDRAW_NOT_ALLOWED: u64 = 3;
+    const EWITHDRAW_NOT_ALLOWED: u64 = 2;
     /// Validator Config not published.
-    const EVALIDATOR_CONFIG: u64 = 4;
+    const EVALIDATOR_CONFIG: u64 = 3;
     /// Not enough stake to join validator set.
-    const ESTAKE_TOO_LOW: u64 = 5;
+    const ESTAKE_TOO_LOW: u64 = 4;
     /// Too much stake to join validator set.
-    const ESTAKE_TOO_HIGH: u64 = 6;
+    const ESTAKE_TOO_HIGH: u64 = 5;
     /// Account is already a validator or pending validator.
-    const EALREADY_VALIDATOR: u64 = 7;
+    const EALREADY_VALIDATOR: u64 = 6;
     /// Account is not a validator.
-    const ENOT_VALIDATOR: u64 = 8;
+    const ENOT_VALIDATOR: u64 = 7;
     /// Can't remove last validator.
-    const ELAST_VALIDATOR: u64 = 9;
-    /// Delegation from the address already exists in this pool
-    const EDELEGATION_ALREADY_EXIST: u64 = 10;
-    /// Delegation to this stake pool will make it exceed tht maximum stake specified in ValidatorSet.
-    const EDELEGATION_EXCEED_MAX: u64 = 11;
+    const ELAST_VALIDATOR: u64 = 8;
+    /// Total stake exceeds maximum allowed.
+    const ESTAKE_EXCEEDS_MAX: u64 = 9;
+    /// Account is already registered as a validator candidate.
+    const EALREADY_REGISTERED: u64 = 10;
+    /// Account does not have the right ownership capability.
+    const ENOT_OWNER: u64 = 11;
+    /// No coins in inactive state to withdraw from specified pool.
+    const ENO_COINS_TO_WITHDRAW: u64 = 12;
+    /// Account does not have the right operator capability.
+    const ENOT_OPERATOR: u64 = 13;
 
-    /// Basic unit of stake delegation, it's stored in StakePool.
-    struct Delegation has store {
-        coins: Coin<TestCoin>,
-        rewards: Coin<TestCoin>,
-        locked_until_secs: u64,
+    /// Capability that represents ownership and can be used to control the validator and the associated stake pool.
+    /// Having this be separate from the signer for the account that the validator resources are hosted at allows
+    /// modules to have control over a validator.
+    struct OwnerCapability has key, store {
+        pool_address: address,
     }
 
-    /// Aggregation of delegation and represent a validator's voting power, stored in ValidatorInfo.
-    /// Invariants:
-    /// 1. voting_power = sum(active + pending_inactive)
-    /// 2. user interact with pending_active and inactive if it's in the ValidatorSet.
-    /// 3. user interact with active, inactive if it's not in the ValidatorSet.
-    /// 4. pending_active and pending_inactive are empty if it's not in the ValidatorSet.
-    struct StakePool has key, store {
-        // sum of active and pending_inactive stakes, updated on epoch boundary for active validators.
-        voting_power: u64,
-        // sum of active and pending_active stakes, updated when delegate/unlock happens.
-        next_epoch_voting_power: u64,
+    /// Each validator has a separate StakePool resource and can provide a stake.
+    /// Changes in stake for an active validator:
+    /// 1. If a validator calls add_stake, the newly added stake is moved to pending_active.
+    /// 2. If validator calls unlock, their stake is moved to pending_inactive.
+    /// 2. When the next epoch starts, any pending_inactive stake is moved to inactive and can be withdrawn.
+    ///    Any pending_active stake is moved to active and adds to the validator's voting power.
+    ///
+    /// Changes in stake for an inactive validator:
+    /// 1. If a validator calls add_stake, the newly added stake is moved directly to active.
+    /// 2. If validator calls unlock, their stake is moved directly to inactive.
+    /// 3. When the next epoch starts, the validator can be activated if their active stake is more than the minimum.
+    struct StakePool has key {
         // active stake
-        active: IterableTable<address, Delegation>,
+        active: Coin<TestCoin>,
         // inactive stake, can be withdrawn
-        inactive: IterableTable<address,Delegation>,
+        inactive: Coin<TestCoin>,
         // pending activation for next epoch
-        pending_active: IterableTable<address, Delegation>,
+        pending_active: Coin<TestCoin>,
         // pending deactivation for next epoch
-        pending_inactive: IterableTable<address, Delegation>,
+        pending_inactive: Coin<TestCoin>,
+        locked_until_secs: u64,
+        // Track the current operator of the validator node.
+        // This allows the operator to be different from the original account and allow for separation of
+        // the validator operations and ownership.
+        operator_address: address,
     }
 
     /// Validator info stored in validator address.
@@ -98,94 +128,16 @@ module AptosFramework::Stake {
         pending_active: vector<ValidatorInfo>,
     }
 
-    /// Any user can delegate a stake.
-    public(friend) fun delegate_stake(account: &signer, to: address, amount: u64, locked_until_secs: u64) acquires StakePool, ValidatorSet {
-        let coins = Coin::withdraw<TestCoin>(account, amount);
-        let current_time = Timestamp::now_seconds();
-        assert!(current_time + MINIMUM_LOCK_PERIOD < locked_until_secs, Errors::invalid_argument(ELOCK_TIME_TOO_SHORT));
-        let addr = Signer::address_of(account);
-        let stake_pool = borrow_global_mut<StakePool>(to);
-        assert!(!find_delegation_from_pool(stake_pool, addr), Errors::invalid_argument(EDELEGATION_ALREADY_EXIST));
-        let delegation = Delegation {
-            coins,
-            rewards: Coin::zero<TestCoin>(),
-            locked_until_secs,
-        };
-        // add to pending_active if it's a current validator otherwise add to active directly
-        stake_pool.next_epoch_voting_power = stake_pool.next_epoch_voting_power + Coin::value<TestCoin>(&delegation.coins);
-        let maximum_stake = borrow_global<ValidatorSet>(@CoreResources).maximum_stake;
-        assert!(stake_pool.next_epoch_voting_power <= maximum_stake, Errors::invalid_argument(EDELEGATION_EXCEED_MAX));
-        if (!is_current_validator(to)) {
-            IterableTable::add(&mut stake_pool.active, addr, delegation);
-        } else {
-            IterableTable::add(&mut stake_pool.pending_active, addr, delegation);
-        }
-    }
-
-    /// Unlock from active delegation, it's moved to pending_inactive if locked_until_secs < current_time or
-    /// directly inactive if it's not from an active validator.
-    public(script) fun unlock(account: &signer, from: address) acquires StakePool, ValidatorSet {
-        let addr = Signer::address_of(account);
-        let current_time = Timestamp::now_seconds();
-        let stake_pool = borrow_global_mut<StakePool>(from);
-        let delegation = withdraw_internal(&mut stake_pool.active, addr);
-        let is_current_validator = is_current_validator(from);
-        stake_pool.next_epoch_voting_power = stake_pool.next_epoch_voting_power - Coin::value<TestCoin>(&delegation.coins);
-        if (!is_current_validator) {
-            // move to inactive directly if it's not from an active validator
-            IterableTable::add(&mut stake_pool.inactive, addr, delegation);
-        } else if (delegation.locked_until_secs < current_time) {
-            // move to pending_inactive if it can be unlocked
-            IterableTable::add(&mut stake_pool.pending_inactive, addr,  delegation);
-        } else {
-            abort Errors::invalid_argument(EWITHDRAW_NOT_ALLOWED)
-        };
-    }
-
-    /// Withdraw from inactive delegation.
-    public(script) fun withdraw(account: &signer, from: address): Coin<TestCoin> acquires StakePool {
-        let addr = Signer::address_of(account);
-        let stake_pool = borrow_global_mut<StakePool>(from);
-        let delegation = withdraw_internal(&mut stake_pool.inactive, addr);
-        let Delegation {coins, rewards, locked_until_secs: _} = delegation;
-        Coin::merge<TestCoin>(&mut coins, rewards);
-        coins
-    }
-
-    /// Initialize the ValidatorInfo for account.
-    public(script) fun register_validator_candidate(
-        account: &signer,
-        consensus_pubkey: vector<u8>,
-        network_address: vector<u8>,
-        fullnode_address: vector<u8>
-    ) {
-        move_to(account, StakePool {
-            voting_power: 0,
-            next_epoch_voting_power: 0,
-            active: IterableTable::new(),
-            pending_active: IterableTable::new(),
-            pending_inactive: IterableTable::new(),
-            inactive: IterableTable::new(),
-        });
-        move_to(account, ValidatorConfig {
-            consensus_pubkey,
-            network_address,
-            fullnode_address,
-        });
-    }
-
-    /// Rotate the consensus key of the validator, it'll take effect in next epoch.
-    public(script) fun rotate_consensus_key(account: &signer, consensus_pubkey: vector<u8>) acquires ValidatorConfig {
-        let addr = Signer::address_of(account);
-        assert!(exists<ValidatorConfig>(addr), Errors::not_published(EVALIDATOR_CONFIG));
-        let validator_info = borrow_global_mut<ValidatorConfig>(addr);
-        validator_info.consensus_pubkey = consensus_pubkey;
+    /// TestCoin capabilities, set during genesis and stored in @CoreResource account.
+    /// This allows the Stake module to mint rewards to stakers.
+    struct TestCoinCapabilities has key {
+        mint_cap: MintCapability<TestCoin>,
     }
 
     /// Initialize validator set to the core resource account.
-    public fun initialize_validator_set(account: &signer, minimum_stake: u64, maximum_stake: u64) {
-        SystemAddresses::assert_core_resource(account);
-        move_to(account, ValidatorSet {
+    public fun initialize_validator_set(core_resources: &signer, minimum_stake: u64, maximum_stake: u64) {
+        SystemAddresses::assert_core_resource(core_resources);
+        move_to(core_resources, ValidatorSet {
             consensus_scheme: 0,
             minimum_stake,
             maximum_stake,
@@ -195,27 +147,248 @@ module AptosFramework::Stake {
         });
     }
 
-    /// Initiate by the validator info owner
-    public(friend) fun join_validator_set(account: &signer) acquires StakePool, ValidatorConfig, ValidatorSet {
-        let addr = Signer::address_of(account);
-        let stake_pool = borrow_global<StakePool>(addr);
-        let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
-        assert!(stake_pool.next_epoch_voting_power >= validator_set.minimum_stake, Errors::invalid_argument(ESTAKE_TOO_LOW));
-        assert!(stake_pool.next_epoch_voting_power <= validator_set.maximum_stake, Errors::invalid_argument(ESTAKE_TOO_HIGH));
-        let exist =  Option::is_some(&find_validator(&validator_set.active_validators, addr)) ||
-                     Option::is_some(&find_validator(&validator_set.pending_inactive, addr)) ||
-                     Option::is_some(&find_validator(&validator_set.pending_active, addr));
-        assert!(!exist, Errors::invalid_argument(EALREADY_VALIDATOR));
-
-        Vector::push_back(&mut validator_set.pending_active, generate_validator_info(addr));
+    /// This is only called during Genesis, which is where MintCapability<TestCoin> can be created.
+    /// Beyond genesis, no one can create TestCoin mint/burn capabilities.
+    public fun store_test_coin_mint_cap(core_resources: &signer, mint_cap: MintCapability<TestCoin>) {
+        SystemAddresses::assert_core_resource(core_resources);
+        move_to(core_resources, TestCoinCapabilities { mint_cap })
     }
 
-    /// Initiate by the validator info owner.
-    public(friend) fun leave_validator_set(account: &signer) acquires ValidatorSet {
-        let addr = Signer::address_of(account);
-        let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
+    /// Initialize the validator account and give ownership to the signing account.
+    public(script) fun register_validator_candidate(
+        account: &signer,
+        consensus_pubkey: vector<u8>,
+        network_address: vector<u8>,
+        fullnode_address: vector<u8>,
+    ) {
+        let account_address = Signer::address_of(account);
+        assert!(!exists<StakePool>(account_address), Errors::invalid_argument(EALREADY_REGISTERED));
 
-        let maybe_index = find_validator(&validator_set.active_validators, addr);
+        move_to(account, StakePool {
+            active: Coin::zero<TestCoin>(),
+            pending_active: Coin::zero<TestCoin>(),
+            pending_inactive: Coin::zero<TestCoin>(),
+            inactive: Coin::zero<TestCoin>(),
+            locked_until_secs: 0,
+            operator_address: account_address,
+        });
+        move_to(account, ValidatorConfig {
+            consensus_pubkey,
+            network_address,
+            fullnode_address,
+        });
+        move_to(account, OwnerCapability {
+           pool_address: account_address,
+        });
+    }
+
+    /// Extract and return owner capability from the signing account.
+    public fun extract_owner_cap(account: &signer): OwnerCapability acquires OwnerCapability {
+        move_from<OwnerCapability>(Signer::address_of(account))
+    }
+
+    /// Deposit `owner_cap` into `account`. This requires `account` to not already have owernship of another
+    /// staking pool.
+    public fun deposit_owner_cap(account: &signer, owner_cap: OwnerCapability) {
+        move_to(account, owner_cap);
+    }
+
+    /// Allows an owner to change the operator of the stake pool.
+    public(script) fun set_operator(account: &signer, new_operator: address) acquires OwnerCapability, StakePool {
+        let account_addr = Signer::address_of(account);
+        let ownership_cap = borrow_global<OwnerCapability>(account_addr);
+        set_operator_with_cap(account_addr, ownership_cap, new_operator);
+    }
+
+    /// Allows an account with ownership capability to change the operator of the stake pool.
+    public fun set_operator_with_cap(
+        pool_address: address,
+        owner_cap: &OwnerCapability,
+        new_operator: address,
+    ) acquires StakePool {
+        assert!(owner_cap.pool_address == pool_address, Errors::invalid_argument(ENOT_OWNER));
+
+        let stake_pool = borrow_global_mut<StakePool>(pool_address);
+        stake_pool.operator_address = new_operator;
+    }
+
+    /// Add `amount` of coins from the `account` owning the StakePool.
+    public(script) fun add_stake(
+        account: &signer,
+        amount: u64,
+    ) acquires OwnerCapability, StakePool, ValidatorSet {
+        let account_addr = Signer::address_of(account);
+        let ownership_cap = borrow_global<OwnerCapability>(account_addr);
+        add_stake_with_cap(account_addr, ownership_cap, Coin::withdraw<TestCoin>(account, amount));
+    }
+
+    /// Add `coins` into `pool_address`. this requires the corresponding `owner_cap` to be passed in.
+    public fun add_stake_with_cap(
+        pool_address: address,
+        owner_cap: &OwnerCapability,
+        coins: Coin<TestCoin>,
+    ) acquires StakePool, ValidatorSet {
+        assert!(owner_cap.pool_address == pool_address, Errors::invalid_argument(ENOT_OWNER));
+
+        let stake_pool = borrow_global_mut<StakePool>(pool_address);
+        // Add to pending_active if it's a current validator because the stake is not counted until the next epoch.
+        // Otherwise, the delegation can be added to active directly as the validator is also activated in the epoch.
+        if (is_current_validator(pool_address)) {
+            Coin::merge<TestCoin>(&mut stake_pool.pending_active, coins);
+        } else {
+            Coin::merge<TestCoin>(&mut stake_pool.active, coins);
+        };
+
+        let maximum_stake = borrow_global<ValidatorSet>(@CoreResources).maximum_stake;
+        let total_stake = Coin::value<TestCoin>(&stake_pool.active) +
+                          Coin::value<TestCoin>(&stake_pool.pending_active);
+        assert!(total_stake <= maximum_stake, Errors::invalid_argument(ESTAKE_EXCEEDS_MAX));
+    }
+
+    /// Rotate the consensus key of the validator, it'll take effect in next epoch.
+    public(script) fun rotate_consensus_key(
+        account: &signer,
+        pool_address: address,
+        consensus_pubkey: vector<u8>,
+    ) acquires StakePool, ValidatorConfig {
+        let stake_pool = borrow_global<StakePool>(pool_address);
+        assert!(Signer::address_of(account) == stake_pool.operator_address, Errors::invalid_argument(ENOT_OPERATOR));
+
+        assert!(exists<ValidatorConfig>(pool_address), Errors::not_published(EVALIDATOR_CONFIG));
+        let validator_info = borrow_global_mut<ValidatorConfig>(pool_address);
+        validator_info.consensus_pubkey = consensus_pubkey;
+    }
+
+    /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
+    public(script) fun increase_lockup(
+        account: &signer,
+        new_locked_until_secs: u64,
+    ) acquires OwnerCapability, StakePool {
+        let account_addr = Signer::address_of(account);
+        let ownership_cap = borrow_global<OwnerCapability>(account_addr);
+        increase_lockup_with_cap(account_addr, ownership_cap, new_locked_until_secs);
+    }
+
+    /// Unlock from active delegation, it's moved to pending_inactive if locked_until_secs < current_time or
+    /// directly inactive if it's not from an active validator.
+    public fun increase_lockup_with_cap(
+        pool_address: address,
+        owner_cap: &OwnerCapability,
+        new_locked_until_secs: u64,
+    ) acquires StakePool {
+        assert!(owner_cap.pool_address == pool_address, Errors::invalid_argument(ENOT_OWNER));
+        validate_lockup_time(new_locked_until_secs);
+
+        let stake_pool = borrow_global_mut<StakePool>(pool_address);
+        assert!(new_locked_until_secs > stake_pool.locked_until_secs, Errors::invalid_argument(ELOCK_TIME_TOO_SHORT));
+        stake_pool.locked_until_secs = new_locked_until_secs;
+    }
+
+    /// Request to have `pool_address` join the validator set. Can only be called after calling `register_validator_candidate`.
+    /// If the validator has the required stake (more than minimum and less than maximum allowed), they will be
+    /// added to the pending_active queue. All validators in this queue will be added to the active set when the next
+    /// epoch starts (eligibility will be rechecked).
+    ///
+    /// This can only called by the operator of the validator/staking pool.
+    public(friend) fun join_validator_set(
+        account: &signer,
+        pool_address: address,
+    ) acquires StakePool, ValidatorConfig, ValidatorSet {
+        let stake_pool = borrow_global<StakePool>(pool_address);
+        // Account has to be the operator.
+        assert!(Signer::address_of(account) == stake_pool.operator_address, Errors::invalid_argument(ENOT_OPERATOR));
+
+        // Requires the validator to have a lockup more than the minimum.
+        validate_lockup_time(stake_pool.locked_until_secs);
+
+        let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
+        let exist =  Option::is_some(&find_validator(&validator_set.active_validators, pool_address)) ||
+                     Option::is_some(&find_validator(&validator_set.pending_inactive, pool_address)) ||
+                     Option::is_some(&find_validator(&validator_set.pending_active, pool_address));
+        assert!(!exist, Errors::invalid_argument(EALREADY_VALIDATOR));
+
+        // The validator is not yet activated so all added stake should be in active.
+        let voting_power = Coin::value<TestCoin>(&stake_pool.active);
+        assert!(voting_power >= validator_set.minimum_stake, Errors::invalid_argument(ESTAKE_TOO_LOW));
+        assert!(voting_power <= validator_set.maximum_stake, Errors::invalid_argument(ESTAKE_TOO_HIGH));
+
+        // Add validator to pending_active, to be activated in the next epoch.
+        Vector::push_back(&mut validator_set.pending_active, generate_validator_info(pool_address));
+    }
+
+    /// Similar to unlock_with_cap but will use ownership capability from the signing account.
+    public(script) fun unlock(account: &signer, amount: u64) acquires OwnerCapability, StakePool, ValidatorSet {
+        let account_addr = Signer::address_of(account);
+        let ownership_cap = borrow_global<OwnerCapability>(account_addr);
+        unlock_with_cap(account_addr, amount, ownership_cap);
+    }
+
+    /// Unlock `amount` from the active stake. Only possible if the lockup has expired.
+    public fun unlock_with_cap(
+        pool_address: address,
+        amount: u64,
+        owner_cap: &OwnerCapability,
+    ) acquires StakePool, ValidatorSet {
+        assert!(owner_cap.pool_address == pool_address, Errors::invalid_argument(ENOT_OWNER));
+
+        let stake_pool = borrow_global_mut<StakePool>(pool_address);
+        let unlocked_stake = Coin::extract<TestCoin>(&mut stake_pool.active, amount);
+
+        // Withdrawal is not allowed if lockup has not expired.
+        // This is also enforced even if the validator is not active in order to prevent a validator from intentionally
+        // leave the set early to be able to unlock.
+        let current_time = Timestamp::now_seconds();
+        if (stake_pool.locked_until_secs > current_time) {
+            abort Errors::invalid_argument(EWITHDRAW_NOT_ALLOWED)
+        };
+
+        // Move requested amount to pending_inactive if the validator is already active.
+        // Otherwise, we can move directly to inactive.
+        if (is_current_validator(pool_address)) {
+            Coin::merge<TestCoin>(&mut stake_pool.pending_inactive, unlocked_stake);
+        } else {
+            Coin::merge<TestCoin>(&mut stake_pool.inactive, unlocked_stake);
+        };
+    }
+
+    /// Withdraw from `account`'s inactive stake.
+    public(script) fun withdraw(account: &signer) acquires OwnerCapability, StakePool {
+        let account_addr = Signer::address_of(account);
+        let ownership_cap = borrow_global<OwnerCapability>(account_addr);
+        let coins = withdraw_with_cap(account_addr, ownership_cap);
+        Coin::deposit<TestCoin>(account_addr, coins);
+    }
+
+    /// Withdraw from `pool_address`'s inactive stake with the corresponding `owner_cap`.
+    public fun withdraw_with_cap(
+        pool_address: address,
+        owner_cap: &OwnerCapability,
+    ): Coin<TestCoin> acquires StakePool {
+        assert!(owner_cap.pool_address == pool_address, Errors::invalid_argument(ENOT_OWNER));
+
+        let stake_pool = borrow_global_mut<StakePool>(pool_address);
+        let withdraw_amount = Coin::value<TestCoin>(&stake_pool.inactive);
+        assert!(withdraw_amount > 0, Errors::invalid_argument(ENO_COINS_TO_WITHDRAW));
+
+        Coin::extract<TestCoin>(&mut stake_pool.inactive, withdraw_amount)
+    }
+
+    /// Request to have `pool_address` leave the validator set. The validator is only actually removed from the set when
+    /// the next epoch starts.
+    /// The last validator in the set cannot leave. This is an edge case that should never happen as long as the network
+    /// is still operational.
+    ///
+    /// Can only be called by the operator of the validator/staking pool.
+    public(friend) fun leave_validator_set(
+        account: &signer,
+        pool_address: address,
+    ) acquires StakePool, ValidatorSet {
+        let stake_pool = borrow_global<StakePool>(pool_address);
+        // Account has to be the operator.
+        assert!(Signer::address_of(account) == stake_pool.operator_address, Errors::invalid_argument(ENOT_OPERATOR));
+
+        let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
+        let maybe_index = find_validator(&validator_set.active_validators, pool_address);
         assert!(Option::is_some(&maybe_index), Errors::invalid_argument(ENOT_VALIDATOR));
         let index = Option::extract(&mut maybe_index);
 
@@ -224,20 +397,28 @@ module AptosFramework::Stake {
         Vector::push_back(&mut validator_set.pending_inactive, validator_info);
     }
 
+    /// Returns if the current validator is still active (can still vote) in the current epoch.
+    /// This includes validators that requested to leave but are still in the pending_inactive queue and will be removed
+    /// when the epoch starts.
     public fun is_current_validator(addr: address): bool acquires ValidatorSet{
         let validator_set = borrow_global<ValidatorSet>(@CoreResources);
         Option::is_some(&find_validator(&validator_set.active_validators, addr)) ||
         Option::is_some(&find_validator(&validator_set.pending_inactive, addr))
     }
 
-    /// Triggers at epoch boundary.
-    /// 1. distribute rewards to stake pool of active and pending inactive validators
-    /// 2. purge pending queues
-    /// 3. update the validator info from owners' address
-    /// This function shouldn't abort.
-    public(friend) fun on_new_epoch() acquires StakePool, ValidatorConfig, ValidatorSet {
+    /// Triggers at epoch boundary. This function shouldn't abort.
+    ///
+    /// 1. Distribute rewards to stake pools of active and pending inactive validators (requested to leave but not yet
+    /// removed).
+    /// 2. Officially move pending active stake to active and move pending inactive stake to inactive.
+    /// The staking pool's voting power in this new epoch will be updated to the total active stake.
+    /// 3. Add pending active validators to the active set if they satisfy requirements so they can vote and remove
+    /// pending inactive validators so they no longer can vote.
+    /// 4. The validator's voting power in the validator set is updated to be the corresponding staking pool's voting
+    /// power.
+    public(friend) fun on_new_epoch() acquires StakePool, TestCoinCapabilities, ValidatorConfig, ValidatorSet {
         let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
-        // distribute reward
+        // Process pending stake and distribute rewards for each currently active validator.
         let i = 0;
         let len = Vector::length(&validator_set.active_validators);
         while (i < len) {
@@ -245,6 +426,9 @@ module AptosFramework::Stake {
             update_stake_pool(addr);
             i = i + 1;
         };
+
+        // Process pending stake and distribute rewards for each currently pending_inactive validator (requested to
+        // leave but not removed yet).
         let i = 0;
         let len = Vector::length(&validator_set.pending_inactive);
         while (i < len) {
@@ -252,17 +436,19 @@ module AptosFramework::Stake {
             update_stake_pool(addr);
             i = i + 1;
         };
-        // purge pending queue
+
+        // Activate currently pending_active validators.
         append(&mut validator_set.active_validators, &mut validator_set.pending_active);
+
+        // Officially deactivate all pending_inactive validators. They will now no longer receive rewards.
         validator_set.pending_inactive = Vector::empty();
-        // update validator info (so network address/public key change takes effect)
+
+        // Update validator info (so network address/public key change takes effect)
         let i = 0;
         let len = Vector::length(&validator_set.active_validators);
         let active_validators = Vector::empty();
         while (i < len) {
             let old_validator_info = Vector::borrow_mut(&mut validator_set.active_validators, i);
-            let stake_pool = borrow_global_mut<StakePool>(old_validator_info.addr);
-            stake_pool.voting_power = stake_pool.next_epoch_voting_power;
             let new_validator_info = generate_validator_info(old_validator_info.addr);
             if (new_validator_info.voting_power >= validator_set.minimum_stake &&
                 new_validator_info.voting_power <= validator_set.maximum_stake
@@ -271,49 +457,61 @@ module AptosFramework::Stake {
             };
             i = i + 1;
         };
+
+        sort_validators(&mut active_validators);
         validator_set.active_validators = active_validators;
+    }
+
+    fun sort_validators(validators: &mut vector<ValidatorInfo>) {
+        let length = Vector::length(validators);
+        if (length == 0) {
+            return
+        };
+
+        let ordered = false;
+        while (!ordered) {
+            ordered = true;
+            let idx = 0;
+            while (idx < length - 1) {
+                let left = Vector::borrow(validators, idx);
+                let right = Vector::borrow(validators, idx + 1);
+                if (Comparator::is_greater_than(&Comparator::compare(left, right))) {
+                    ordered = false;
+                    Vector::swap(validators, idx, idx + 1);
+                };
+                idx = idx + 1;
+            }
+        }
     }
 
     /// Update individual validator's stake pool
     /// 1. distribute rewards to active/pending_inactive delegations
     /// 2. process pending_active, pending_inactive correspondingly
     /// This function shouldn't abort.
-    fun update_stake_pool(addr: address) acquires StakePool {
+    fun update_stake_pool(addr: address) acquires StakePool, TestCoinCapabilities {
         let stake_pool = borrow_global_mut<StakePool>(addr);
         distribute_reward( &mut stake_pool.active);
         distribute_reward( &mut stake_pool.pending_inactive);
+
         // move pending_active to active
-        IterableTable::append(&mut stake_pool.active, &mut stake_pool.pending_active);
-        // move pending_inactive to inactive
-        IterableTable::append(&mut stake_pool.inactive, &mut stake_pool.pending_inactive);
+        Coin::merge<TestCoin>(&mut stake_pool.active, Coin::extract_all<TestCoin>(&mut stake_pool.pending_active));
+        Coin::merge<TestCoin>(&mut stake_pool.inactive, Coin::extract_all<TestCoin>(&mut stake_pool.pending_inactive));
     }
 
-    /// Mint the reward and add to the delegation based on some formula
-    fun distribute_reward(v: &mut IterableTable<address, Delegation>) {
-        let key = IterableTable::head_key(v);
-        while (Option::is_some(&key)) {
-            let (delegation, _, next) = IterableTable::borrow_iter_mut(v, *Option::borrow(&key));
-            let reward = Coin::zero<TestCoin>(); // mint some coins based on delegation, timestamp, maybe also total stakes
-            Coin::merge<TestCoin>(&mut delegation.rewards, reward);
-            key = next;
-        };
+    /// Distribute reward corresponding to `stake`. Rewards is currently simple and just a fixed % of staked coins.
+    fun distribute_reward(stake: &mut Coin<TestCoin>) acquires TestCoinCapabilities {
+        let rewards_amount = Coin::value<TestCoin>(stake) * REWARDS_RATE_PERCENT / 100;
+        if (rewards_amount > 0) {
+            let mint_cap = &borrow_global<TestCoinCapabilities>(@CoreResources).mint_cap;
+            let rewards = Coin::mint<TestCoin>(rewards_amount, mint_cap);
+            Coin::merge<TestCoin>(stake, rewards);
+        }
     }
 
     fun append<T>(v1: &mut vector<T>, v2: &mut vector<T>) {
         while (!Vector::is_empty(v2)) {
             Vector::push_back(v1, Vector::pop_back(v2));
         }
-    }
-
-    fun find_delegation_from_pool(pool: &StakePool, addr: address): bool {
-        find_delegation(&pool.active, addr) ||
-        find_delegation(&pool.pending_active, addr) ||
-        find_delegation(&pool.pending_inactive, addr) ||
-        find_delegation(&pool.inactive, addr)
-    }
-
-    fun find_delegation(v: &IterableTable<address, Delegation>, addr: address): bool {
-        IterableTable::contains(v, addr)
     }
 
     fun find_validator(v: &vector<ValidatorInfo>, addr: address): Option<u64> {
@@ -328,14 +526,12 @@ module AptosFramework::Stake {
         Option::none()
     }
 
-    fun withdraw_internal(v: &mut IterableTable<address, Delegation>, addr: address): Delegation {
-        assert!(find_delegation(v, addr), Errors::invalid_argument(EDELEGATION_NOT_FOUND));
-        IterableTable::remove(v, addr)
-    }
-
     fun generate_validator_info(addr: address): ValidatorInfo acquires StakePool, ValidatorConfig {
         let config = *borrow_global<ValidatorConfig>(addr);
-        let voting_power = borrow_global<StakePool>(addr).voting_power;
+        let stake_pool = borrow_global<StakePool>(addr);
+        // As pending_active validators have all been activated. The new epoch's voting power is just the pool's
+        // total active stake.
+        let voting_power = Coin::value<TestCoin>(&stake_pool.active);
         ValidatorInfo {
             addr,
             voting_power,
@@ -343,100 +539,258 @@ module AptosFramework::Stake {
         }
     }
 
-    #[test(core_resources = @CoreResources, account_1 = @0x123, account_2 = @0x234, account_3 = @0x345)]
-    public(script) fun test_basic_delegation(
-        core_resources: signer,
-        account_1: signer,
-        account_2: signer,
-        account_3: signer,
-    ) acquires StakePool, ValidatorConfig, ValidatorSet {
-        initialize_validator_set(&core_resources, 100, 10000);
-        Timestamp::set_time_has_started_for_testing(&core_resources);
-        Coin::mint_for_test<TestCoin>(&account_1, 10000);
-        Coin::mint_for_test<TestCoin>(&account_2, 10000);
-        Coin::mint_for_test<TestCoin>(&account_3, 10000);
-        register_validator_candidate(&account_1, Vector::empty(), Vector::empty(), Vector::empty());
-        let addr1 = Signer::address_of(&account_1);
-        let addr2 = Signer::address_of(&account_2);
-        let addr3 = Signer::address_of(&account_3);
-        // delegation when the address is not a validator
-        delegate_stake(&account_1, addr1, 100, 100000);
-        assert!(Coin::value<TestCoin>(&IterableTable::borrow(&borrow_global<StakePool>(addr1).active, addr1).coins) == 100, 0);
-        delegate_stake(&account_2, addr1, 101, 100000);
-        assert!(Coin::value<TestCoin>(&IterableTable::borrow(&borrow_global<StakePool>(addr1).active, addr2).coins) == 101, 0);
-        // join the validator set with enough stake
-        join_validator_set(&account_1);
-        on_new_epoch();
-        // delegation when the address is active valdiator
-        assert!(is_current_validator(addr1), 0);
-        delegate_stake(&account_3, addr1, 102, 100000);
-        assert!(borrow_global<StakePool>(addr1).voting_power == 201, 0);
-        assert!(Coin::value<TestCoin>(&IterableTable::borrow(&borrow_global<StakePool>(addr1).active, addr1).coins) == 100, 0);
-        assert!(Coin::value<TestCoin>(&IterableTable::borrow(&borrow_global<StakePool>(addr1).active, addr2).coins) == 101, 0);
-        assert!(Coin::value<TestCoin>(&IterableTable::borrow(&borrow_global<StakePool>(addr1).pending_active, addr3).coins) == 102, 0);
-        // unlock active stakes
-        Timestamp::update_global_time_for_test(100001000000);
-        unlock(&account_1, addr1);
-        assert!(Coin::value<TestCoin>(&IterableTable::borrow(&borrow_global<StakePool>(addr1).pending_inactive, addr1).coins) == 100, 0);
-        // total stake doesn't change until next epoch
-        assert!(borrow_global<StakePool>(addr1).voting_power == 201, 0);
-        // pending delegations are processed on new epoch
-        on_new_epoch();
-        assert!(IterableTable::length(&borrow_global<StakePool>(addr1).pending_active) == 0, 0);
-        assert!(IterableTable::length(&borrow_global<StakePool>(addr1).pending_inactive) == 0, 0);
-        assert!(Coin::value<TestCoin>(&IterableTable::borrow(&borrow_global<StakePool>(addr1).inactive, addr1).coins) == 100, 0);
-        assert!(Coin::value<TestCoin>(&IterableTable::borrow(&borrow_global<StakePool>(addr1).active, addr3).coins) == 102, 0);
-        assert!(borrow_global<StakePool>(addr1).voting_power == 203, 0);
-        // withdraw
-        let coins = withdraw(&account_1, addr1);
-        assert!(Coin::value<TestCoin>(&coins) == 100, 0);
-        Coin::deposit<TestCoin>(addr1, coins);
+    /// Validate that the lockup time is at least more than the minimum required.
+    fun validate_lockup_time(locked_until_secs: u64) {
+        let current_time = Timestamp::now_seconds();
+        assert!(current_time + MINIMUM_LOCK_PERIOD < locked_until_secs, Errors::invalid_argument(ELOCK_TIME_TOO_SHORT));
     }
 
-    #[test(core_resources = @CoreResources, account_1 = @0x123, account_2 = @0x234, account_3 = @0x345)]
-    public(script) fun test_validator_join_leave(
+    #[test_only]
+    use AptosFramework::TestCoin;
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator = @0x123)]
+    public(script) fun test_basic_staking(
+        core_framework: signer,
         core_resources: signer,
-        account_1: signer,
-        account_2: signer,
-        account_3: signer
-    ) acquires StakePool, ValidatorConfig, ValidatorSet {
-        initialize_validator_set(&core_resources, 100, 10000);
+        validator: signer,
+    ) acquires OwnerCapability, StakePool, TestCoinCapabilities, ValidatorConfig, ValidatorSet {
         Timestamp::set_time_has_started_for_testing(&core_resources);
-        Coin::mint_for_test<TestCoin>(&account_1, 10000);
-        let addr1 = Signer::address_of(&account_1);
-        let addr2 = Signer::address_of(&account_2);
-        let addr3 = Signer::address_of(&account_3);
-        register_validator_candidate(&account_1, Vector::empty(), Vector::empty(), Vector::empty());
-        register_validator_candidate(&account_2, Vector::empty(), Vector::empty(), Vector::empty());
-        register_validator_candidate(&account_3, Vector::empty(), Vector::empty(), Vector::empty());
-        delegate_stake(&account_1, addr1, 100, 100000);
-        delegate_stake(&account_1, addr2, 100, 100000);
-        delegate_stake(&account_1, addr3, 100, 100000);
-        join_validator_set(&account_1);
-        join_validator_set(&account_2);
-        assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).pending_active, 0).addr == addr1, 0);
-        assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).pending_active, 1).addr == addr2, 0);
+
+        initialize_validator_set(&core_resources, 100, 10000);
+
+        let validator_address = Signer::address_of(&validator);
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator, &mint_cap);
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+
+        // Join the validator set with enough stake.
+        join_validator_set(&validator, validator_address);
         on_new_epoch();
-        assert!(is_current_validator(addr1), 0);
-        assert!(is_current_validator(addr2), 0);
-        // changes don't take effect until next epoch
-        leave_validator_set(&account_2);
-        join_validator_set(&account_3);
-        rotate_consensus_key(&account_1, x"1234");
-        assert!(is_current_validator(addr2), 0);
-        assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).pending_inactive, 0).addr == addr2, 0);
-        assert!(!is_current_validator(addr3), 0);
-        assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).pending_active, 0).addr == addr3, 0);
+        assert!(is_current_validator(validator_address), 1);
+
+        // Validator adds more stake (validator is already active).
+        add_stake(&validator, 100);
+        assert!(Coin::balance<TestCoin>(validator_address) == 800, 3);
+        assert_stake_pool(validator_address, 100, 0, 100, 0);
+
+        // pending_active and pending_inactive stakes are processed in the new epoch.
+        // Rewards were also distributed.
+        on_new_epoch();
+        assert_stake_pool(validator_address, 201, 0, 0, 0);
+
+        // Unlock the entire stake after lockup expires.
+        Timestamp::update_global_time_for_test(100001000000);
+        unlock(&validator, 100);
+        assert_stake_pool(validator_address, 101, 0, 0, 100);
+        on_new_epoch();
+
+        // Validator withdraws from inactive stake, including rewards on the withdrawn amount.
+        withdraw(&validator);
+        assert!(Coin::balance<TestCoin>(validator_address) == 901, 4);
+        assert_stake_pool(validator_address, 102, 0, 0, 0);
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator = @0x123)]
+    public(script) fun test_delegated_staking_with_owner_cap(
+        core_framework: signer,
+        core_resources: signer,
+        validator: signer,
+    ) acquires OwnerCapability, StakePool, TestCoinCapabilities, ValidatorConfig, ValidatorSet {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+
+        initialize_validator_set(&core_resources, 100, 10000);
+
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        let stake = Coin::mint<TestCoin>(100, &mint_cap);
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+
+        register_validator_candidate(&validator, Vector::empty(), Vector::empty(), Vector::empty());
+        let owner_cap = extract_owner_cap(&validator);
+
+        // Add stake when the validator is not yet activated.
+        let pool_address = Signer::address_of(&validator);
+        add_stake_with_cap(pool_address, &owner_cap, stake);
+        increase_lockup_with_cap(pool_address, &owner_cap, 100000);
+        assert_stake_pool(pool_address, 100, 0, 0, 0);
+
+        // Join the validator set with enough stake.
+        join_validator_set(&validator, pool_address);
+        on_new_epoch();
+        assert!(is_current_validator(pool_address), 0);
+
+        // Unlock the entire stake after lockup expires.
+        Timestamp::update_global_time_for_test(100001000000);
+        unlock_with_cap(pool_address, 100, &owner_cap);
+        assert_stake_pool(pool_address, 0, 0, 0, 100);
+        on_new_epoch();
+
+        // Withdraw stake.
+        let coins = withdraw_with_cap(pool_address, &owner_cap);
+        // Extra rewards added.
+        assert!(Coin::value<TestCoin>(&coins) == 101, 1);
+        assert_stake_pool(pool_address, 0, 0, 0, 0);
+
+        // Operator can separately rotate consensus key.
+        rotate_consensus_key(&validator, pool_address, x"1234");
+
+        let OwnerCapability { pool_address: _ } = owner_cap;
+        Coin::burn(coins, &burn_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator_1 = @0x123, validator_2 = @0x234, validator_3 = @0x345)]
+    public(script) fun test_validator_join_leave(
+        core_framework: signer,
+        core_resources: signer,
+        validator_1: signer,
+        validator_2: signer,
+        validator_3: signer
+    ) acquires OwnerCapability, StakePool, TestCoinCapabilities, ValidatorConfig, ValidatorSet {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        let validator_1_address = Signer::address_of(&validator_1);
+        let validator_2_address = Signer::address_of(&validator_2);
+        let validator_3_address = Signer::address_of(&validator_3);
+
+        initialize_validator_set(&core_resources, 100, 10000);
+
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator_1, &mint_cap);
+        register_mint_stake(&validator_2, &mint_cap);
+        register_mint_stake(&validator_3, &mint_cap);
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+
+        // Validator 1 and 2 join the validator set.
+        join_validator_set(&validator_1, validator_1_address);
+        join_validator_set(&validator_2, validator_2_address);
+        on_new_epoch();
+        assert!(is_current_validator(validator_1_address), 0);
+        assert!(is_current_validator(validator_2_address), 1);
+
+        // Validator 1 rotates consensus key. Validator 2 leaves. Validator 3 joins.
+        rotate_consensus_key(&validator_1, validator_1_address, x"1234");
+        leave_validator_set(&validator_2, validator_2_address);
+        join_validator_set(&validator_3, validator_3_address);
+        // Validator 2 is not effectively removed until next epoch.
+        assert!(is_current_validator(validator_2_address), 2);
+        assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).pending_inactive, 0).addr == validator_2_address, 0);
+        assert!(!is_current_validator(validator_3_address), 3);
+        assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).pending_active, 0).addr == validator_3_address, 0);
         assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).active_validators, 0).config.consensus_pubkey == Vector::empty(), 0);
-        // changes applied after new epoch
+
+        // Changes applied after new epoch
         on_new_epoch();
-        assert!(!is_current_validator(addr2), 0);
-        assert!(is_current_validator(addr3), 0);
+        assert!(!is_current_validator(validator_2_address), 4);
+        assert!(is_current_validator(validator_3_address), 5);
         assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).active_validators, 0).config.consensus_pubkey == x"1234", 0);
+
         // validators without enough stake will be removed
         Timestamp::update_global_time_for_test(100001000000);
-        unlock(&account_1, addr1);
+        unlock(&validator_1, 50);
         on_new_epoch();
-        assert!(!is_current_validator(addr1), 0);
+        assert!(!is_current_validator(validator_1_address), 6);
+    }
+
+    #[test(
+        core_framework = @0x1,
+        core_resources = @CoreResources,
+        validator_1 = @0x1,
+        validator_2 = @0x2,
+        validator_3 = @0x3,
+        validator_4 = @0x4,
+        validator_5 = @0x5
+    )]
+    public(script) fun test_validator_order(
+        core_framework: signer,
+        core_resources: signer,
+        validator_1: signer,
+        validator_2: signer,
+        validator_3: signer,
+        validator_4: signer,
+        validator_5: signer,
+    ) acquires OwnerCapability, StakePool, TestCoinCapabilities, ValidatorConfig, ValidatorSet {
+        let v1_addr = Signer::address_of(&validator_1);
+        let v2_addr = Signer::address_of(&validator_2);
+        let v3_addr = Signer::address_of(&validator_3);
+        let v4_addr = Signer::address_of(&validator_4);
+        let v5_addr = Signer::address_of(&validator_5);
+
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        initialize_validator_set(&core_resources, 100, 10000);
+
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator_1, &mint_cap);
+        register_mint_stake(&validator_2, &mint_cap);
+        register_mint_stake(&validator_3, &mint_cap);
+        register_mint_stake(&validator_4, &mint_cap);
+        register_mint_stake(&validator_5, &mint_cap);
+
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+
+        join_validator_set(&validator_3, v3_addr);
+        on_new_epoch();
+        assert!(validator_index(v3_addr) == 0, 0);
+
+        join_validator_set(&validator_4, v4_addr);
+        on_new_epoch();
+        assert!(validator_index(v3_addr) == 0, 1);
+        assert!(validator_index(v4_addr) == 1, 2);
+
+        join_validator_set(&validator_1, v1_addr);
+        on_new_epoch();
+        assert!(validator_index(v1_addr) == 0, 3);
+        assert!(validator_index(v3_addr) == 1, 4);
+        assert!(validator_index(v4_addr) == 2, 5);
+
+        join_validator_set(&validator_2, v2_addr);
+        on_new_epoch();
+        assert!(validator_index(v1_addr) == 0, 6);
+        assert!(validator_index(v2_addr) == 1, 7);
+        assert!(validator_index(v3_addr) == 2, 8);
+        assert!(validator_index(v4_addr) == 3, 9);
+
+        join_validator_set(&validator_5, v5_addr);
+        on_new_epoch();
+        assert!(validator_index(v1_addr) == 0, 10);
+        assert!(validator_index(v2_addr) == 1, 11);
+        assert!(validator_index(v3_addr) == 2, 12);
+        assert!(validator_index(v4_addr) == 3, 13);
+        assert!(validator_index(v5_addr) == 4, 14);
+    }
+
+    #[test_only]
+    public(script) fun register_mint_stake(
+        account: &signer,
+        mint_cap: &MintCapability<TestCoin>,
+    ) acquires OwnerCapability, StakePool, ValidatorSet {
+        Coin::register<TestCoin>(account);
+        Coin::deposit<TestCoin>(Signer::address_of(account), Coin::mint<TestCoin>(1000, mint_cap));
+        register_validator_candidate(account, Vector::empty(), Vector::empty(), Vector::empty());
+        add_stake(account, 100);
+        increase_lockup(account, 100000);
+        assert_stake_pool(Signer::address_of(account), 100, 0, 0, 0);
+    }
+
+    #[test_only]
+    fun validator_index(addr: address): u64 acquires ValidatorSet {
+        let validator_set = borrow_global<ValidatorSet>(@CoreResources);
+        Option::extract(&mut find_validator(&validator_set.active_validators, addr))
+    }
+
+    #[test_only]
+    fun assert_stake_pool(
+        pool_address: address,
+        active_stake: u64,
+        inactive_stake: u64,
+        pending_active_stake: u64,
+        pending_inactive_stake: u64,
+    ) acquires StakePool {
+        let stake_pool = borrow_global<StakePool>(pool_address);
+        assert!(Coin::value<TestCoin>(&stake_pool.active) == active_stake, 0);
+        assert!(Coin::value<TestCoin>(&stake_pool.inactive) == inactive_stake, 1);
+        assert!(Coin::value<TestCoin>(&stake_pool.pending_active) == pending_active_stake, 2);
+        assert!(Coin::value<TestCoin>(&stake_pool.pending_inactive) == pending_inactive_stake, 3);
     }
 }

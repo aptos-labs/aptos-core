@@ -1,0 +1,21 @@
+[package]
+name = "peer-monitoring-service-client"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "The Aptos peer monitoring service (client-side)"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+async-trait = "0.1.42"
+thiserror = "1.0.24"
+
+aptos-config = { path = "../../../config" }
+aptos-types = { path = "../../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
+channel = { path = "../../../crates/channel" }
+network = { path = "../../../network" }
+peer-monitoring-service-types = { path = "../types" }

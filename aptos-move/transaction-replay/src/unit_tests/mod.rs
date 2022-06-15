@@ -8,7 +8,7 @@ use anyhow::{bail, Result};
 use aptos_types::{
     account_address::AccountAddress,
     account_state::AccountState,
-    contract_event::EventWithProof,
+    contract_event::EventWithVersion,
     event::EventKey,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, Version, WriteSetPayload},
@@ -101,7 +101,7 @@ impl AptosValidatorInterface for TestInterface {
         _key: &EventKey,
         _start_seq: u64,
         _limit: u64,
-    ) -> Result<Vec<EventWithProof>> {
+    ) -> Result<Vec<EventWithVersion>> {
         unimplemented!()
     }
 

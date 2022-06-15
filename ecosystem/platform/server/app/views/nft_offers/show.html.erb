@@ -1,0 +1,25 @@
+<% offer_dependent_logic(@nft_offer) %>
+<div class="bg-neutral-900 text-white h-full">
+  <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 md:px-8 py-12 sm:py-24">
+    <h2 class="text-6xl mb-4 font-display font-light">
+      <%= content_for(:page_title) || 'Claim NFT' %>
+    </h2>
+    <div class="mb-16">
+      <%= render DividerComponent.new(scheme: :primary) %>
+    </div>
+
+    <%= render CardOutlineComponent.new(class: 'w-fit mx-auto') do %>
+      <%= form_with(model: @nft_offer, builder: AptosFormBuilder, method: 'put') do |f| %>
+        <div class="flex flex-col md:flex-row gap-8">
+          <div class="flex flex-col gap-8 lg:w-96 lg:h-96 items-center justify-center">
+            <p class="font-light text-xl">Lorem ipsum dolor sit amet</p>
+            <%= f.submit 'Mint your NFT' %>
+          </div>
+          <div class="flex order-first md:order-last w-64 h-64 lg:w-96 lg:h-96 items-center justify-center rounded-lg bg-neutral-800 text-neutral-900">
+            <%= render IconComponent.new(:aptos, class: 'w-32 h-32') %>
+          </div>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+</div>

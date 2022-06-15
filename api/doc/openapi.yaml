@@ -356,12 +356,12 @@ paths:
       tags:
         - transactions
       requestBody:
-        description: User transaction request
+        description: User create signing message request
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserTransactionRequest'
+              $ref: '#/components/schemas/UserCreateSigningMessageRequest'
       responses:
         "200":
           description: |
@@ -1074,6 +1074,16 @@ components:
           $ref: '#/components/schemas/TimestampSec'
         payload:
           $ref: '#/components/schemas/TransactionPayload'
+    UserCreateSigningMessageRequest:
+      title: User Create Signing Message Request
+      allOf:
+        - $ref: '#/components/schemas/UserTransactionRequest'
+        - type: object
+          properties:
+            secondary_signers:
+              type: array
+              items:
+                $ref: '#/components/schemas/Address'
     UserTransactionSignature:
       title: User Transaction Signature
       type: object
@@ -1090,6 +1100,7 @@ components:
         - $ref: '#/components/schemas/GenesisTransaction'
         - $ref: '#/components/schemas/UserTransaction'
         - $ref: '#/components/schemas/BlockMetadataTransaction'
+        - $ref: '#/components/schemas/StateCheckpointTransaction'
       discriminator:
         propertyName: type
         mapping:
@@ -1097,6 +1108,7 @@ components:
           genesis_transaction: '#/components/schemas/GenesisTransaction'
           user_transaction: '#/components/schemas/UserTransaction'
           block_metadata_transaction: '#/components/schemas/BlockMetadataTransaction'
+          state_checkpoint_transaction: '#/components/schemas/StateCheckpointTransaction'
     SubmitTransactionRequest:
       title: Submit Transaction Request
       type: object
@@ -1124,12 +1136,14 @@ components:
         - $ref: '#/components/schemas/GenesisTransaction'
         - $ref: '#/components/schemas/UserTransaction'
         - $ref: '#/components/schemas/BlockMetadataTransaction'
+        - $ref: '#/components/schemas/StateCheckpointTransaction'
       discriminator:
         propertyName: type
         mapping:
           genesis_transaction: '#/components/schemas/GenesisTransaction'
           user_transaction: '#/components/schemas/UserTransaction'
           block_metadata_transaction: '#/components/schemas/BlockMetadataTransaction'
+          state_checkpoint_transaction: '#/components/schemas/StateCheckpointTransaction'
     OnChainTransactionInfo:
       title: On-chain transaction information
       type: object
@@ -1236,6 +1250,20 @@ components:
                 $ref: '#/components/schemas/Event'
             payload:
               $ref: '#/components/schemas/WriteSetPayload'
+        - $ref: '#/components/schemas/OnChainTransactionInfo'
+    StateCheckpointTransaction:
+      title: State Checkpoint Transaction
+      type: object
+      allOf:
+        - required:
+            - type
+            - timestamp
+          properties:
+            type:
+              type: string
+              example: "state_checkpoint_transaction"
+            timestamp:
+              $ref: '#/components/schemas/TimestampUsec'
         - $ref: '#/components/schemas/OnChainTransactionInfo'
     TransactionPayload:
       title: Transaction Payload
@@ -1510,27 +1538,21 @@ components:
       required:
         - type
         - state_key_hash
-        - data
+        - handle
+        - key
+        - value
       properties:
         type:
           type: string
           example: "write_table_item"
         state_key_hash:
           $ref: '#/components/schemas/HexEncodedBytes'
-        data:
-          title: Table item write
-          type: object
-          required:
-            - handle
-            - key
-            - value
-          properties:
-            handle:
-              $ref: '#/components/schemas/HexEncodedBytes'
-            key:
-              $ref: '#/components/schemas/HexEncodedBytes'
-            value:
-              $ref: '#/components/schemas/HexEncodedBytes'
+        handle:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        key:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        value:
+          $ref: '#/components/schemas/HexEncodedBytes'
     Script:
       title: Script
       type: object
@@ -1647,7 +1669,7 @@ components:
       title: Ed25519 Signature
       type: object
       description: |
-        Please refer to https://github.com/aptos-labs/aptos-core/tree/main/specifications/crypto#signature-and-verification for
+        Please refer to https://github.com/aptos-labs/aptos-core/tree/main/documentation/specifications/crypto#signature-and-verification for
         more details.
       required:
         - type
@@ -1665,7 +1687,7 @@ components:
       title: Multi-ed25519 Signature
       type: object
       description: |
-        Multi ed25519 signature, please refer to https://github.com/aptos-labs/aptos-core/tree/main/specifications/crypto#multi-signatures for more details.
+        Multi ed25519 signature, please refer to https://github.com/aptos-labs/aptos-core/tree/main/documentation/specifications/crypto#multi-signatures for more details.
       required:
         - type
         - public_keys
@@ -1739,3 +1761,58 @@ components:
           $ref: '#/components/schemas/MoveTypeId'
         key:
           $ref: '#/components/schemas/MoveValue'
+    TokenData:
+      title: Token Data
+      type: object
+      required:
+        - collection
+        - description
+        - name
+        - supply
+        - uri
+      properties:
+        collection:
+          type: string
+          description: Unique name within this creator's account for this Token's collection
+        description:
+          type: string
+          description: Description of Token
+        name:
+          type: string
+          description: Name of Token
+        maximum:
+          type: integer
+          description: Optional maximum number of this Token
+        supply:
+          type: integer
+          description: Total number of this type of Token
+        uri:
+          type: string
+          description: URL for additional information / media
+    TokenId:
+      type: object
+      required:
+        - creator
+        - collection
+        - name
+      properties:
+        creator:
+          type: string
+          description: Token creator address
+        collection:
+          type: string
+          description: Unique name within this creator's account for this Token's collection
+        name:
+          type: string
+          description: Name of Token
+    Token:
+      type: object
+      required:
+        - id
+        - value
+      properties:
+        id:
+          $ref: '#/components/schemas/TokenId'
+        value:
+          type: integer
+      

@@ -33,13 +33,13 @@ pub struct InitTool {
     #[clap(long)]
     pub faucet_url: Option<Url>,
     #[clap(flatten)]
-    private_key_options: PrivateKeyInputOptions,
+    pub(crate) private_key_options: PrivateKeyInputOptions,
     #[clap(flatten)]
-    profile_options: ProfileOptions,
+    pub(crate) profile_options: ProfileOptions,
     #[clap(flatten)]
-    prompt_options: PromptOptions,
+    pub(crate) prompt_options: PromptOptions,
     #[clap(flatten)]
-    encoding_options: EncodingOptions,
+    pub(crate) encoding_options: EncodingOptions,
 }
 
 #[async_trait]

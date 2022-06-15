@@ -10,7 +10,9 @@ use anyhow::{format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
+use aptos_types::{
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
+};
 use consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlock};
 use executor_types::{Error, StateComputeResult};
 use futures::channel::mpsc;
@@ -18,7 +20,7 @@ use std::{collections::HashMap, sync::Arc};
 use termion::color::*;
 
 pub struct MockStateComputer {
-    state_sync_client: mpsc::UnboundedSender<Payload>,
+    state_sync_client: mpsc::UnboundedSender<Vec<SignedTransaction>>,
     commit_callback: mpsc::UnboundedSender<LedgerInfoWithSignatures>,
     consensus_db: Arc<MockStorage>,
     block_cache: Mutex<HashMap<HashValue, Payload>>,
@@ -26,7 +28,7 @@ pub struct MockStateComputer {
 
 impl MockStateComputer {
     pub fn new(
-        state_sync_client: mpsc::UnboundedSender<Payload>,
+        state_sync_client: mpsc::UnboundedSender<Vec<SignedTransaction>>,
         commit_callback: mpsc::UnboundedSender<LedgerInfoWithSignatures>,
         consensus_db: Arc<MockStorage>,
     ) -> Self {
@@ -46,9 +48,10 @@ impl StateComputer for MockStateComputer {
         block: &Block,
         _parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error> {
-        self.block_cache
-            .lock()
-            .insert(block.id(), block.payload().unwrap_or(&vec![]).clone());
+        self.block_cache.lock().insert(
+            block.id(),
+            block.payload().unwrap_or(&Payload::new_empty()).clone(),
+        );
         let result = StateComputeResult::new_dummy();
         Ok(result)
     }
@@ -69,7 +72,9 @@ impl StateComputer for MockStateComputer {
                 .block_cache
                 .lock()
                 .remove(&block.id())
-                .ok_or_else(|| format_err!("Cannot find block"))?;
+                .ok_or_else(|| format_err!("Cannot find block"))?
+                .into_iter()
+                .collect();
             txns.append(&mut payload);
         }
         // they may fail during shutdown

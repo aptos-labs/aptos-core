@@ -1,0 +1,16 @@
+name: Copy images to dockerhub nightly
+on:
+  schedule:
+    # mon-fri at 9am PST (16:00 UTC).
+    - cron: "0 16 * * 1-5"
+
+permissions:
+  contents: read
+  id-token: write #required for GCP Workload Identity federation
+
+jobs:
+  copy-images-to-dockerhub:
+    uses: ./.github/workflows/copy-images-to-dockerhub.yaml
+    with:
+      image_tag_prefix: nightly
+    secrets: inherit

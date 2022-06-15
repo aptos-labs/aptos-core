@@ -8,7 +8,7 @@ use crate::{
         coordinator::{coordinator, gc_coordinator, snapshot_job},
         types::{MempoolEventsReceiver, SharedMempool, SharedMempoolNotification},
     },
-    ConsensusRequest,
+    QuorumStoreRequest,
 };
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
 use aptos_infallible::{Mutex, RwLock};
@@ -35,7 +35,7 @@ pub(crate) fn start_shared_mempool<V>(
     // See `NodeConfig::is_upstream_peer` for the definition of network ID.
     mempool_network_handles: Vec<(NetworkId, MempoolNetworkSender, MempoolNetworkEvents)>,
     client_events: MempoolEventsReceiver,
-    consensus_requests: mpsc::Receiver<ConsensusRequest>,
+    quorum_store_requests: mpsc::Receiver<QuorumStoreRequest>,
     mempool_listener: MempoolNotificationListener,
     mempool_reconfig_events: ReconfigNotificationListener,
     db: Arc<dyn DbReader>,
@@ -68,7 +68,7 @@ pub(crate) fn start_shared_mempool<V>(
         executor.clone(),
         all_network_events,
         client_events,
-        consensus_requests,
+        quorum_store_requests,
         mempool_listener,
         mempool_reconfig_events,
     ));
@@ -91,7 +91,7 @@ pub fn bootstrap(
     // See `NodeConfig::is_upstream_peer` for the definition of network ID.
     mempool_network_handles: Vec<(NetworkId, MempoolNetworkSender, MempoolNetworkEvents)>,
     client_events: MempoolEventsReceiver,
-    consensus_requests: Receiver<ConsensusRequest>,
+    quorum_store_requests: Receiver<QuorumStoreRequest>,
     mempool_listener: MempoolNotificationListener,
     mempool_reconfig_events: ReconfigNotificationListener,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
@@ -109,7 +109,7 @@ pub fn bootstrap(
         mempool,
         mempool_network_handles,
         client_events,
-        consensus_requests,
+        quorum_store_requests,
         mempool_listener,
         mempool_reconfig_events,
         db,

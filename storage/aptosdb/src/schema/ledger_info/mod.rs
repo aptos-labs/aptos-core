@@ -12,6 +12,7 @@
 //! `epoch` is serialized in big endian so that records in RocksDB will be in order of their
 //! numeric value.
 
+use super::LEDGER_INFO_CF_NAME;
 use crate::schema::ensure_slice_len_eq;
 use anyhow::Result;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
@@ -19,7 +20,6 @@ use byteorder::{BigEndian, ReadBytesExt};
 use schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
-    DEFAULT_CF_NAME,
 };
 use std::mem::size_of;
 
@@ -27,7 +27,7 @@ define_schema!(
     LedgerInfoSchema,
     u64, /* epoch num */
     LedgerInfoWithSignatures,
-    DEFAULT_CF_NAME
+    LEDGER_INFO_CF_NAME
 );
 
 impl KeyCodec<LedgerInfoSchema> for u64 {

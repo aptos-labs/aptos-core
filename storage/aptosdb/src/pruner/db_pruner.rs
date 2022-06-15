@@ -14,14 +14,14 @@ pub trait DBPruner {
     /// thread start, record the progress and seek from that position afterwards.
     fn initialize(&self) {
         loop {
-            match self.initialize_least_readable_version() {
-                Ok(least_readable_version) => {
+            match self.initialize_min_readable_version() {
+                Ok(min_readable_version) => {
                     info!(
-                        least_readable_version = least_readable_version,
+                        min_readable_version = min_readable_version,
                         "{} initialized.",
                         self.name()
                     );
-                    self.record_progress(least_readable_version);
+                    self.record_progress(min_readable_version);
                     return;
                 }
                 Err(e) => {
@@ -38,13 +38,17 @@ pub trait DBPruner {
 
     /// Performs the actual pruning, a target version is passed, which is the target the pruner
     /// tries to prune.
-    fn prune(&self, db_batch: &mut SchemaBatch, max_versions: u64) -> anyhow::Result<Version>;
+    fn prune(
+        &self,
+        ledger_db_batch: &mut SchemaBatch,
+        max_versions: u64,
+    ) -> anyhow::Result<Version>;
 
     /// Initializes the least readable version stored in underlying DB storage
-    fn initialize_least_readable_version(&self) -> anyhow::Result<Version>;
+    fn initialize_min_readable_version(&self) -> anyhow::Result<Version>;
 
     /// Returns the least readable version stores in the DB pruner
-    fn least_readable_version(&self) -> Version;
+    fn min_readable_version(&self) -> Version;
 
     /// Sets the target version for the pruner
     fn set_target_version(&self, target_version: Version);
@@ -58,15 +62,15 @@ pub trait DBPruner {
         // Current target version  might be less than the target version to ensure we don't prune
         // more than max_version in one go.
         min(
-            self.least_readable_version() + max_versions as u64,
+            self.min_readable_version() + max_versions as u64,
             self.target_version(),
         )
     }
     /// Records the current progress of the pruner by updating the least readable version
-    fn record_progress(&self, least_readable_version: Version);
+    fn record_progress(&self, min_readable_version: Version);
 
     /// True if there is pruning work pending to be done
     fn is_pruning_pending(&self) -> bool {
-        self.target_version() > self.least_readable_version()
+        self.target_version() > self.min_readable_version()
     }
 }

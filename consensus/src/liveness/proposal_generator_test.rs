@@ -4,7 +4,7 @@
 use crate::{
     block_storage::BlockReader,
     liveness::proposal_generator::ProposalGenerator,
-    test_utils::{build_empty_tree, MockTransactionManager, TreeInserter},
+    test_utils::{build_empty_tree, MockPayloadManager, TreeInserter},
     util::mock_time_service::SimulatedTimeService,
 };
 use aptos_types::validator_signer::ValidatorSigner;
@@ -23,7 +23,7 @@ async fn test_proposal_generation_empty_tree() {
     let mut proposal_generator = ProposalGenerator::new(
         signer.author(),
         block_store.clone(),
-        Arc::new(MockTransactionManager::new(None)),
+        Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
         1,
     );
@@ -54,7 +54,7 @@ async fn test_proposal_generation_parent() {
     let mut proposal_generator = ProposalGenerator::new(
         inserter.signer().author(),
         block_store.clone(),
-        Arc::new(MockTransactionManager::new(None)),
+        Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
         1,
     );
@@ -105,7 +105,7 @@ async fn test_old_proposal_generation() {
     let mut proposal_generator = ProposalGenerator::new(
         inserter.signer().author(),
         block_store.clone(),
-        Arc::new(MockTransactionManager::new(None)),
+        Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
         1,
     );

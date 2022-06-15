@@ -3,11 +3,11 @@
 
 use crate::{
     mocks::MockSharedMempool,
-    shared_mempool::types::TransactionSummary,
     tests::common::{batch_add_signed_txn, TestTransaction},
-    ConsensusRequest,
+    QuorumStoreRequest,
 };
 use aptos_types::transaction::Transaction;
+use consensus_types::common::TransactionSummary;
 use futures::{channel::oneshot, executor::block_on, sink::SinkExt};
 use mempool_notifications::MempoolNotificationSender;
 use tokio::runtime::Builder;
@@ -39,8 +39,8 @@ fn test_consensus_events_rejected_txns() {
         sequence_number: committed_txn.sequence_number(),
     }];
     let (callback, callback_rcv) = oneshot::channel();
-    let req = ConsensusRequest::RejectNotification(transactions, callback);
-    let mut consensus_sender = smp.consensus_sender.clone();
+    let req = QuorumStoreRequest::RejectNotification(transactions, callback);
+    let mut consensus_sender = smp.consensus_to_mempool_sender.clone();
     block_on(async {
         assert!(consensus_sender.send(req).await.is_ok());
         assert!(callback_rcv.await.is_ok());

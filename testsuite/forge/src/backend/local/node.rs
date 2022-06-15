@@ -4,7 +4,7 @@
 use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, Version};
 use anyhow::{anyhow, Context, Result};
 use aptos_config::config::NodeConfig;
-use aptos_logger::{debug, warn};
+use aptos_logger::debug;
 use aptos_sdk::types::{account_address::AccountAddress, PeerId};
 use std::{
     env,
@@ -150,8 +150,8 @@ impl LocalNode {
             match p.0.try_wait() {
                 // This would mean the child process has crashed
                 Ok(Some(status)) => {
-                    debug!("Node '{}' crashed with: {}", self.name, status);
-                    return Err(HealthCheckError::NotRunning);
+                    let error = format!("Node '{}' crashed with: {}", self.name, status);
+                    return Err(HealthCheckError::NotRunning(error));
                 }
 
                 // This is the case where the node is still running
@@ -163,8 +163,8 @@ impl LocalNode {
                 }
             }
         } else {
-            warn!("Node '{}' is stopped", self.name);
-            return Err(HealthCheckError::NotRunning);
+            let error = format!("Node '{}' is stopped", self.name);
+            return Err(HealthCheckError::NotRunning(error));
         }
 
         self.debug_client()

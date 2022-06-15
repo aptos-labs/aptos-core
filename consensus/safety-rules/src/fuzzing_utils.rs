@@ -22,6 +22,7 @@ use aptos_types::{
 use consensus_types::block::Block;
 use consensus_types::{
     block_data::{BlockData, BlockType},
+    common::Payload,
     quorum_cert::QuorumCert,
     timeout_2chain::TwoChainTimeout,
     vote_data::VoteData,
@@ -93,10 +94,10 @@ prop_compose! {
     pub fn arb_block_type_proposal(
     )(
         author in any::<AccountAddress>(),
-        payload in prop::collection::vec(any::<SignedTransaction>(), 0..MAX_PROPOSAL_TRANSACTIONS),
+        txns in prop::collection::vec(any::<SignedTransaction>(), 0..MAX_PROPOSAL_TRANSACTIONS),
     ) -> BlockType {
         BlockType::Proposal{
-            payload,
+            payload: Payload::DirectMempool(txns),
             author
         }
     }

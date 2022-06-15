@@ -13,7 +13,7 @@
 
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use futures::{future::Future, stream::Stream};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub mod and_then;
@@ -24,7 +24,7 @@ pub mod proxy_protocol;
 pub mod tcp;
 
 /// Origin of how a Connection was established.
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum ConnectionOrigin {
     /// `Inbound` indicates that we are the listener for this connection.
     Inbound,

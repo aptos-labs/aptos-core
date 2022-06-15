@@ -12,7 +12,7 @@ use aptos_types::{
     account_config,
     account_state::AccountState,
     account_view::AccountView,
-    contract_event::EventWithProof,
+    contract_event::EventWithVersion,
     event::EventKey,
     on_chain_config::ValidatorSet,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -35,8 +35,12 @@ pub trait AptosValidatorInterface: Sync {
         version: Version,
     ) -> Result<Option<StateValue>>;
 
-    fn get_events(&self, key: &EventKey, start_seq: u64, limit: u64)
-        -> Result<Vec<EventWithProof>>;
+    fn get_events(
+        &self,
+        key: &EventKey,
+        start_seq: u64,
+        limit: u64,
+    ) -> Result<Vec<EventWithVersion>>;
 
     fn get_committed_transactions(&self, start: Version, limit: u64) -> Result<Vec<Transaction>>;
 

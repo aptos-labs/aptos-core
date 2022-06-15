@@ -13,7 +13,7 @@ on:
       source_git_ref_override:
         type: string
         required: false
-        description: "GIT_SHA1_OVERRIDE: Use this to override the Git SHA1, branch or tag to build the binaries from. Defaults to the workflow Git REV, but can be different than that:"
+        description: "GIT_SHA_OVERRIDE: Use this to override the Git SHA1, branch or tag to build the binaries from. Defaults to the workflow Git REV, but can be different than that:"
 
 jobs:
   build-linux-binary:

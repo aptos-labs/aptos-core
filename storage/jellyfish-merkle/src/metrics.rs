@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_metrics::{register_int_counter, IntCounter};
+use aptos_metrics_core::{register_int_counter, IntCounter};
 use once_cell::sync::Lazy;
 
 pub static APTOS_JELLYFISH_LEAF_ENCODED_BYTES: Lazy<IntCounter> = Lazy::new(|| {

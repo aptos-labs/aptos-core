@@ -64,6 +64,7 @@ model transactions {
   inserted_at                 DateTime                     @default(now()) @db.Timestamp(6)
   block_metadata_transactions block_metadata_transactions?
   events                      events[]
+  token_activities            token_activities[]
   user_transactions           user_transactions?
   write_set_changes           write_set_changes[]
 }
@@ -97,4 +98,70 @@ model write_set_changes {
 
   @@id([transaction_hash, hash])
   @@index([transaction_hash, address, type], map: "write_set_changes_tx_hash_addr_type_index")
+}
+
+model collections {
+  creator     String   @db.VarChar
+  name        String   @db.VarChar
+  description String   @db.VarChar
+  max_amount  BigInt?
+  uri         String   @db.VarChar
+  created_at  DateTime @db.Timestamp(6)
+  inserted_at DateTime @default(now()) @db.Timestamp(6)
+
+  @@id([creator, name])
+}
+
+model ownerships {
+  token_id    String   @db.VarChar
+  owner       String   @db.VarChar
+  amount      BigInt
+  updated_at  DateTime @db.Timestamp(6)
+  inserted_at DateTime @default(now()) @db.Timestamp(6)
+
+  @@id([token_id, owner])
+}
+
+model token_activities {
+  event_key        String       @db.VarChar
+  sequence_number  BigInt
+  account          String       @db.VarChar
+  token_id         String?      @db.VarChar
+  event_type       String?      @db.VarChar
+  amount           Decimal?     @db.Decimal
+  created_at       DateTime     @db.Timestamp(6)
+  inserted_at      DateTime     @default(now()) @db.Timestamp(6)
+  transaction_hash String       @db.VarChar(255)
+  transactions     transactions @relation(fields: [transaction_hash], references: [hash], onDelete: NoAction, onUpdate: NoAction, map: "fk_transactions")
+
+  @@id([event_key, sequence_number])
+}
+
+model tokens {
+  token_id       String   @id @db.VarChar
+  creator        String   @db.VarChar
+  collection     String   @db.VarChar
+  name           String   @db.VarChar
+  description    String   @db.VarChar
+  max_amount     BigInt?
+  supply         BigInt
+  uri            String   @db.VarChar
+  minted_at      DateTime @db.Timestamp(6)
+  last_minted_at DateTime @db.Timestamp(6)
+  inserted_at    DateTime @default(now()) @db.Timestamp(6)
+}
+
+model metadatas {
+  token_id                String   @id @db.VarChar
+  name                    String?  @db.VarChar
+  symbol                  String?  @db.VarChar
+  seller_fee_basis_points BigInt?
+  description             String?  @db.VarChar
+  image                   String   @db.VarChar
+  external_url            String?  @db.VarChar
+  animation_url           String?  @db.VarChar
+  attributes              Json?
+  properties              Json?
+  last_updated_at         DateTime @db.Timestamp(6)
+  inserted_at             DateTime @default(now()) @db.Timestamp(6)
 }

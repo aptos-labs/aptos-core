@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_metrics::IntCounterVec;
+use aptos_metrics_core::IntCounterVec;
 use std::{
     collections::{HashMap, VecDeque},
     fmt::{Debug, Formatter, Result},

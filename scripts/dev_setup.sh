@@ -9,13 +9,12 @@
 # Assumptions for nix systems:
 # 1 The running user is the user who will execute the builds.
 # 2 .profile will be used to configure the shell
-# 3 ${HOME}/bin/, or ${INSTALL_DIR} is expected to be on the path - hashicorp tools/hadolint/etc.  will be installed there on linux systems.
+# 3 ${HOME}/bin/, or ${INSTALL_DIR} is expected to be on the path - hashicorp tools/etc.  will be installed there on linux systems.
 
 # fast fail.
 set -eo pipefail
 
 SHELLCHECK_VERSION=0.7.1
-HADOLINT_VERSION=1.17.4
 SCCACHE_VERSION=0.2.16-alpha.0
 #If installing sccache from a git repp set url@revision.
 SCCACHE_GIT='https://github.com/diem/sccache.git@ef50d87a58260c30767520045e242ccdbdb965af'
@@ -42,7 +41,7 @@ function usage {
   echo "-b batch mode, no user interactions and miminal output"
   echo "-p update ${HOME}/.profile"
   echo "-t install build tools"
-  echo "-o install operations tooling as well: helm, terraform, hadolint, yamllint, vault, docker, kubectl, python3"
+  echo "-o install operations tooling as well: helm, terraform, yamllint, vault, docker, kubectl, python3"
   echo "-y installs or updates Move prover tools: z3, cvc5, dotnet, boogie"
   echo "-s installs or updates requirements to test code-generation for Move SDKs"
   echo "-a install tools for build and test api"
@@ -152,14 +151,6 @@ function install_rustup {
       PATH="${HOME}/.cargo/bin:${PATH}"
     fi
   fi
-}
-
-function install_hadolint {
-  if ! command -v hadolint &> /dev/null; then
-    export HADOLINT=${INSTALL_DIR}/hadolint
-    curl -sL -o "$HADOLINT" "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-$(uname -s)-$(uname -m)" && chmod 700 "$HADOLINT"
-  fi
-  hadolint -v
 }
 
 function install_vault {
@@ -893,7 +884,6 @@ if [[ "$OPERATIONS" == "true" ]]; then
     install_pkg coreutils "$PACKAGE_MANAGER"
   fi
   install_shellcheck
-  install_hadolint
   install_vault
   install_helm
   install_terraform

@@ -20,7 +20,7 @@ warp = "0.3.2"
 
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
 aptos-logger = { path = "../../../crates/aptos-logger" }
-aptos-metrics = { path = "../../../crates/aptos-metrics" }
+aptos-metrics-core = { path = "../../../crates/aptos-metrics-core" }
 aptos-types = { path = "../../../types" }
 aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
 aptosdb = { path = "../../aptosdb" }

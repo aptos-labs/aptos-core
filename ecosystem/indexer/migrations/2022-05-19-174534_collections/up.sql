@@ -2,6 +2,7 @@
 
 CREATE TABLE collections
 (
+    collection_id VARCHAR NOT NULL,
     creator VARCHAR NOT NULL,
     name VARCHAR NOT NULL,
     description VARCHAR NOT NULL,
@@ -10,5 +11,5 @@ CREATE TABLE collections
     created_at TIMESTAMP NOT NULL,
 
     inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (creator, name)
+    PRIMARY KEY (collection_id)
 );

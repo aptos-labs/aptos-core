@@ -16,7 +16,8 @@ table! {
 }
 
 table! {
-    collections (creator, name) {
+    collections (collection_id) {
+        collection_id -> Varchar,
         creator -> Varchar,
         name -> Varchar,
         description -> Varchar,
@@ -40,9 +41,27 @@ table! {
 }
 
 table! {
-    ownerships (token_id, owner) {
+    metadatas (token_id) {
         token_id -> Varchar,
-        owner -> Varchar,
+        name -> Nullable<Varchar>,
+        symbol -> Nullable<Varchar>,
+        seller_fee_basis_points -> Nullable<Int8>,
+        description -> Nullable<Varchar>,
+        image -> Varchar,
+        external_url -> Nullable<Varchar>,
+        animation_url -> Nullable<Varchar>,
+        attributes -> Nullable<Jsonb>,
+        properties -> Nullable<Jsonb>,
+        last_updated_at -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
+    ownerships (ownership_id) {
+        ownership_id -> Varchar,
+        token_id -> Nullable<Varchar>,
+        owner -> Nullable<Varchar>,
         amount -> Int8,
         updated_at -> Timestamp,
         inserted_at -> Timestamp,
@@ -138,6 +157,7 @@ allow_tables_to_appear_in_same_query!(
     block_metadata_transactions,
     collections,
     events,
+    metadatas,
     ownerships,
     processor_statuses,
     token_activities,

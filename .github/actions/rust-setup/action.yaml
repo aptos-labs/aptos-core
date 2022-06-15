@@ -1,0 +1,12 @@
+runs:
+  using: composite
+  steps:
+    - run: sudo apt-get update && sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config --no-install-recommends --assume-yes
+      shell: bash
+    - uses: actions-rs/toolchain@v1
+      with:
+        override: true
+        components: rustfmt, clippy
+    - uses: bmwill/rust-cache@v1
+      with:
+        path: ~/.cargo/registry/src/**/librocksdb-sys-*

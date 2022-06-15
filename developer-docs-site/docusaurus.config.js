@@ -10,13 +10,13 @@ const codeInjector = require("./src/remark/code-injector");
 const config = {
   title: "Aptos Labs",
   tagline: "Developer Documentation",
-  url: "https://docs.aptoslabs.com",
+  url: "https://aptos.dev",
   baseUrl: "/",
   onBrokenLinks: "warn",
   onBrokenMarkdownLinks: "warn",
   favicon: "img/favicon.ico",
   organizationName: "aptos-labs", // Usually your GitHub org/user name.
-  projectName: "developer-docs", // Usually your repo name.
+  projectName: "aptos-core", // Usually your repo name.
 
   presets: [
     [
@@ -42,20 +42,92 @@ const config = {
   ],
 
   themeConfig:
-  /** @type {import("@docusaurus/preset-classic").ThemeConfig} */
+    /** @type {import("@docusaurus/preset-classic").ThemeConfig} */
     ({
+      docs: {
+        sidebar: {
+          autoCollapseCategories: true,
+          hideable: true,
+        },
+      },
       navbar: {
         title: "| Developer Network",
         logo: {
           alt: "Aptos Labs Logo",
           src: "img/aptos_word.svg",
-          srcDark: "/img/aptos_word.svg",
+          srcDark: "img/aptos_word_dark.svg",
         },
         items: [
           {
             href: "https://github.com/aptos-labs/aptos-core/",
             label: "GitHub",
             position: "right",
+          },
+          {
+            type: "dropdown",
+            label: "Move",
+            position: "left",
+            items: [
+              {
+                label: "Move on Aptos",
+                type: "doc",
+                docId: "guides/move",
+              },
+              {
+                label: "Your First Move Module",
+                type: "doc",
+                docId: "tutorials/first-move-module",
+              },
+            ],
+          },
+          {
+            type: "dropdown",
+            label: "Applications",
+            position: "left",
+            items: [
+              {
+                type: "doc",
+                label: "Your First Transaction",
+                docId: "tutorials/first-transaction",
+              },
+              {
+                type: "doc",
+                label: "Your First DApp",
+                docId: "tutorials/first-dapp",
+              },
+              {
+                type: "doc",
+                label: "Your First NFT",
+                docId: "tutorials/your-first-nft",
+              },
+              {
+                type: "doc",
+                label: "Your First Coin",
+                docId: "tutorials/first-coin",
+              },
+            ],
+          },
+          {
+            type: "dropdown",
+            label: "Nodes",
+            position: "left",
+            items: [
+              {
+                label: "Node Tutorials",
+                type: "doc",
+                docId: "tutorials/run-a-local-testnet",
+              },
+              {
+                label: "Aptos Blockchain Deployments",
+                type: "doc",
+                docId: "tutorials/local-testnet-devnet-incentivized-testnet",
+              },
+              {
+                label: "Incentivized Testnet",
+                type: "doc",
+                docId: "tutorials/validator-node/intro",
+              },
+            ],
           },
         ],
       },
@@ -70,7 +142,7 @@ const config = {
                   <a class="social-link" href="https://aptoslabs.com" target="_blank" rel="noopener noreferrer" title="Git">
                      <img class="logo" src="/img/aptos_word.svg" alt="Git Icon" />
                   </a>
-                `
+                `,
               },
             ],
           },
@@ -128,21 +200,21 @@ const config = {
         additionalLanguages: ["rust"],
       },
       algolia: {
-        appId: 'HM7UY0NMLG',
-        apiKey: '63c5819714b74e64977337e61a1e3ae6',
-        indexName: 'aptos',
+        appId: "HM7UY0NMLG",
+        apiKey: "63c5819714b74e64977337e61a1e3ae6",
+        indexName: "aptos",
         contextualSearch: true,
         debug: false,
       },
     }),
   plugins: [
     [
-      '@docusaurus/plugin-client-redirects',
+      "@docusaurus/plugin-client-redirects",
       {
         redirects: [
           {
-            to: '/tutorials/full-node/run-a-fullnode',
-            from: '/tutorials/run-a-fullnode',
+            to: "/tutorials/full-node/run-a-fullnode",
+            from: "/tutorials/run-a-fullnode",
           },
         ],
       },

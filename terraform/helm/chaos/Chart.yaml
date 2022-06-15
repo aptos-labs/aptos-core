@@ -1,0 +1,9 @@
+apiVersion: v2
+name: chaos
+description: Chaos Mesh for Aptos
+version: 0.1.0
+
+dependencies:
+  - name: chaos-mesh
+    version: 2.2.0
+    repository: "https://charts.chaos-mesh.org"

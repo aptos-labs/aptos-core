@@ -516,7 +516,7 @@ where
 
             // Next we take two children at a time and compute their parents.
             let mut children_iter = children_iter.as_slice().chunks_exact(2);
-            while let Some(chunk) = children_iter.next() {
+            for chunk in children_iter.by_ref() {
                 let left_hash = chunk[0];
                 let right_hash = chunk[1];
                 parent_hashes.push(MerkleTreeInternalNode::<H>::new(left_hash, right_hash).hash());
@@ -705,59 +705,6 @@ impl TransactionInfoWithProof {
             &self.transaction_info,
             &self.ledger_info_to_transaction_info_proof,
         )?;
-        Ok(())
-    }
-}
-
-/// The complete proof used to authenticate a contract event. This structure consists of the
-/// `AccumulatorProof` from `LedgerInfo` to `TransactionInfo`, the `TransactionInfo` object and the
-/// `AccumulatorProof` from event accumulator root to the event.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct EventProof {
-    transaction_info_with_proof: TransactionInfoWithProof,
-
-    /// The accumulator proof from event root to the actual event.
-    transaction_info_to_event_proof: EventAccumulatorProof,
-}
-
-impl EventProof {
-    /// Constructs a new `EventProof` using given `ledger_info_to_transaction_info_proof`,
-    /// `transaction_info` and `transaction_info_to_event_proof`.
-    pub fn new(
-        transaction_info_with_proof: TransactionInfoWithProof,
-        transaction_info_to_event_proof: EventAccumulatorProof,
-    ) -> Self {
-        EventProof {
-            transaction_info_with_proof,
-            transaction_info_to_event_proof,
-        }
-    }
-
-    /// Returns the `transaction_info_with_proof` object in this proof.
-    pub fn transaction_info_with_proof(&self) -> &TransactionInfoWithProof {
-        &self.transaction_info_with_proof
-    }
-
-    /// Verifies that a given event is correct using provided proof.
-    pub fn verify(
-        &self,
-        ledger_info: &LedgerInfo,
-        event_hash: HashValue,
-        transaction_version: Version,
-        event_version_within_transaction: Version,
-    ) -> Result<()> {
-        self.transaction_info_to_event_proof.verify(
-            self.transaction_info_with_proof
-                .transaction_info()
-                .event_root_hash(),
-            event_hash,
-            event_version_within_transaction,
-        )?;
-
-        self.transaction_info_with_proof
-            .verify(ledger_info, transaction_version)?;
-
         Ok(())
     }
 }

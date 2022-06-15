@@ -1,0 +1,104 @@
+name: "Lint+Test"
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - devnet
+      - testnet
+      - auto
+      - canary
+
+jobs:
+  scripts-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: sudo apt-get install shellcheck --assume-yes --no-install-recommends
+      - run: shellcheck scripts/dev_setup.sh
+      - run: shellcheck scripts/dockerhub_prune.sh
+      - run: shellcheck scripts/weekly-dep-report.sh
+
+  ecosystem-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+      # install packages for examples
+      - run: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install
+      - run: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install
+      # Run package build+lint + tests
+      - run: cd ./ecosystem/typescript/sdk && yarn install
+      - run: cd ./ecosystem/typescript/sdk && yarn lint
+      - run: cd ./ecosystem/typescript/sdk && yarn fmt:check
+      # Run typescript indexer server linting
+      - run: cd ./ecosystem/indexer-server/typescript && yarn install
+      - run: cd ./ecosystem/indexer-server/typescript && yarn lint
+
+  docs-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+      - run: yarn lint
+        working-directory: developer-docs-site
+
+  rust-lint:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/rust-setup
+      - run: cargo x lint
+      - run: cargo xclippy --workspace --all-targets
+      - run: cargo xfmt --check
+      - run: cargo install cargo-sort
+      # Temporary workaround for unsorted hakari generated Cargo files (https://github.com/DevinR528/cargo-sort/issues/38).
+      - run: cargo sort --grouped crates/aptos-workspace-hack
+      - run: cargo sort --grouped --check --workspace
+
+  rust-unit-xtest:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+      - uses: ./.github/actions/rust-setup
+      - run: cargo xtest --doc --unit --changed-since "origin/main"
+
+  rust-unit-nextest:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+      - uses: ./.github/actions/rust-setup
+      - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - run: cargo nextest --nextest-profile ci --partition hash:1/1 --unit --exclude backup-cli --changed-since "origin/main"
+        env:
+          INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+
+  rust-e2e-test:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/rust-setup
+      - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      # --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
+      - run: cargo nextest --nextest-profile ci --partition hash:1/1 --package smoke-test --test-threads 6 --retries 3
+        env:
+          RUST_BACKTRACE: full
+          INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+      - name: Upload smoke test logs for failures
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: failed-smoke-test-logs
+          # Retain all smoke test data except for the db (which may be large).
+          path: |
+            /tmp/.tmp*
+            !/tmp/.tmp*/**/db/
+          retention-days: 1

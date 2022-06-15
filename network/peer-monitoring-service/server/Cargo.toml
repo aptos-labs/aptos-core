@@ -1,0 +1,33 @@
+[package]
+name = "peer-monitoring-service-server"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "The peer monitoring service (server-side)"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+bcs = "0.1.2"
+bytes = "1.0.1"
+futures = "0.3.12"
+once_cell = "1.7.2"
+serde = { version = "1.0.124", default-features = false }
+thiserror = "1.0.24"
+tokio = { version = "1.8.1", features = ["rt", "macros"], default-features = false }
+
+aptos-config = { path = "../../../config" }
+aptos-logger = { path = "../../../crates/aptos-logger" }
+aptos-metrics-core = { path = "../../../crates/aptos-metrics-core" }
+aptos-types = { path = "../../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
+bounded-executor = { path = "../../../crates/bounded-executor" }
+channel = { path = "../../../crates/channel" }
+netcore = { path = "../../netcore" }
+network = { path = "../../../network" }
+peer-monitoring-service-types = { path = "../types" }
+
+[dev-dependencies]
+claim = "0.5.0"

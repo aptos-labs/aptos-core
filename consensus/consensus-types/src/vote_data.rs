@@ -71,4 +71,9 @@ impl VoteData {
         );
         Ok(())
     }
+
+    /// Is the vote for a NIL block.
+    pub fn is_for_nil(&self) -> bool {
+        self.proposed().timestamp_usecs() == self.parent().timestamp_usecs()
+    }
 }

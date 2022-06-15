@@ -27,6 +27,7 @@ import useWalletState from 'core/hooks/useWalletState';
 import { secondaryTextColor } from 'pages/Login';
 import { NODE_URL } from 'core/constants';
 import { AptosAccountState } from 'core/types';
+import { AptosNetwork } from 'core/utils/network';
 
 // eslint-disable-next-line global-require
 window.Buffer = window.Buffer || require('buffer').Buffer;
@@ -56,12 +57,13 @@ const raiseForError = ({
 };
 
 interface CreateTokenAndCollectionProps {
-  account: AptosAccountState,
-  collectionName?: string,
-  description?: string,
-  name?: string,
-  supply: number,
-  uri?: string
+  account: AptosAccountState;
+  collectionName?: string;
+  description?: string;
+  name?: string;
+  nodeUrl?: AptosNetwork;
+  supply: number;
+  uri?: string;
 }
 
 const createTokenAndCollection = async ({
@@ -69,13 +71,14 @@ const createTokenAndCollection = async ({
   collectionName,
   description,
   name,
+  nodeUrl = NODE_URL,
   supply,
   uri,
 }: CreateTokenAndCollectionProps): Promise<void> => {
   if (!account || !(collectionName && description && uri && name)) {
     return;
   }
-  const aptosClient = new AptosClient(NODE_URL);
+  const aptosClient = new AptosClient(nodeUrl);
   const tokenClient = new TokenClient(aptosClient);
 
   const collectionTxnHash = await tokenClient.createCollection(
@@ -107,7 +110,7 @@ export default function CreateNFTModal() {
   const { colorMode } = useColorMode();
   const { isOpen, onClose, onOpen } = useDisclosure();
   const { handleSubmit, register, watch } = useForm();
-  const { aptosAccount } = useWalletState();
+  const { aptosAccount, aptosNetwork } = useWalletState();
   const queryClient = useQueryClient();
 
   const collectionName: string | undefined = watch('collectionName');
@@ -127,6 +130,7 @@ export default function CreateNFTModal() {
       collectionName,
       description,
       name: tokenName,
+      nodeUrl: aptosNetwork,
       supply,
       uri,
     })

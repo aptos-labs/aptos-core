@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_metrics::{register_int_counter, register_int_counter_vec, IntCounter, IntCounterVec};
+use aptos_metrics_core::{
+    register_int_counter, register_int_counter_vec, IntCounter, IntCounterVec,
+};
 use once_cell::sync::Lazy;
 
 /// Number of times a given processor has been invoked

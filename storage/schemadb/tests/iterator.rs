@@ -3,10 +3,11 @@
 
 use anyhow::Result;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use rocksdb::DEFAULT_COLUMN_FAMILY_NAME;
 use schemadb::{
     define_schema,
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
-    SchemaIterator, DB, DEFAULT_CF_NAME,
+    SchemaIterator, DB,
 };
 
 define_schema!(TestSchema, TestKey, TestValue, "TestCF");
@@ -78,7 +79,7 @@ struct TestDB {
 impl TestDB {
     fn new() -> Self {
         let tmpdir = aptos_temppath::TempPath::new();
-        let column_families = vec![DEFAULT_CF_NAME, TestSchema::COLUMN_FAMILY_NAME];
+        let column_families = vec![DEFAULT_COLUMN_FAMILY_NAME, TestSchema::COLUMN_FAMILY_NAME];
         let mut db_opts = rocksdb::Options::default();
         db_opts.create_if_missing(true);
         db_opts.create_missing_column_families(true);

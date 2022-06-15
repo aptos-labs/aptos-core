@@ -1,0 +1,13 @@
+name: Setup docker buildx
+
+runs:
+  using: composite
+  steps:
+    - name: setup docker context for buildx
+      id: buildx-context
+      shell: bash
+      run: docker context create builders
+    - name: setup docker buildx
+      uses: docker/setup-buildx-action@v1
+      with:
+        endpoint: builders

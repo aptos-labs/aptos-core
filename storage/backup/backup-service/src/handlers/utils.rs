@@ -3,7 +3,7 @@
 
 use anyhow::Result;
 use aptos_logger::prelude::*;
-use aptos_metrics::{
+use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec,
 };
 use aptosdb::backup::backup_handler::BackupHandler;

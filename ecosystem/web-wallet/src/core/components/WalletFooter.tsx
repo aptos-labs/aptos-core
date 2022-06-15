@@ -4,10 +4,11 @@
 import {
   Center, IconButton, SimpleGrid, useColorMode,
 } from '@chakra-ui/react';
-import { IoIosPerson, IoMdImage } from 'react-icons/io';
+import { IoMdImage } from 'react-icons/io';
 import { RiCopperCoinFill } from 'react-icons/ri';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
+import { SettingsIcon } from '@chakra-ui/icons';
 import ChakraLink from './ChakraLink';
 
 const secondaryHeaderBgColor = {
@@ -35,7 +36,7 @@ export default function WalletFooter() {
         <Center width="100%">
           <ChakraLink to="/wallet">
             <IconButton
-              color={(pathname === '/wallet') ? 'blue.400' : secondaryIconColor[colorMode]}
+              color={(pathname.includes('/wallet')) ? 'blue.400' : secondaryIconColor[colorMode]}
               variant="unstyled"
               size="md"
               aria-label="Wallet"
@@ -48,7 +49,7 @@ export default function WalletFooter() {
         <Center width="100%">
           <ChakraLink to="/gallery">
             <IconButton
-              color={(pathname === '/gallery') ? 'blue.400' : secondaryIconColor[colorMode]}
+              color={(pathname.includes('/gallery')) ? 'blue.400' : secondaryIconColor[colorMode]}
               variant="unstyled"
               size="md"
               aria-label="Gallery"
@@ -59,13 +60,13 @@ export default function WalletFooter() {
           </ChakraLink>
         </Center>
         <Center width="100%">
-          <ChakraLink to="/account">
+          <ChakraLink to="/settings">
             <IconButton
-              color={(pathname === '/account') ? 'blue.400' : secondaryIconColor[colorMode]}
+              color={(pathname.includes('/settings')) ? 'blue.400' : secondaryIconColor[colorMode]}
               variant="unstyled"
               size="md"
               aria-label="Account"
-              icon={<IoIosPerson />}
+              icon={<SettingsIcon />}
               fontSize="xl"
               display="flex"
             />

@@ -13,7 +13,7 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, state_store::state_key::StateKeyTag,
 };
-use storage_interface::StateSnapshotReceiver;
+use storage_interface::{jmt_update_refs, jmt_updates, StateSnapshotReceiver};
 
 use crate::{pruner, AptosDB};
 
@@ -29,28 +29,29 @@ fn put_value_set(
         .iter()
         .map(|(key, value)| (key.clone(), value.clone()))
         .collect();
+    let jmt_updates = jmt_updates(&value_set);
 
     let root = state_store
-        .merklize_value_sets(vec![&value_set], None, version, &mut cs)
+        .merklize_value_sets(vec![jmt_update_refs(&jmt_updates)], None, version, &mut cs)
         .unwrap()[0];
     state_store
         .put_value_sets(vec![&value_set], version, &mut cs)
         .unwrap();
-    state_store.db.write_schemas(cs.batch).unwrap();
+    state_store.ledger_db.write_schemas(cs.batch).unwrap();
     state_store.set_latest_checkpoint(version, root);
     root
 }
 
 fn prune_stale_indices(
     store: &StateStore,
-    least_readable_version: Version,
-    target_least_readable_version: Version,
+    min_readable_version: Version,
+    target_min_readable_version: Version,
     limit: usize,
 ) {
     pruner::state_store::prune_state_store(
-        Arc::clone(&store.db),
-        least_readable_version,
-        target_least_readable_version,
+        &store.state_merkle_db,
+        min_readable_version,
+        target_min_readable_version,
         limit,
     )
     .unwrap();
@@ -278,8 +279,8 @@ fn test_retired_records() {
     // Prune with limit=0, nothing is gone.
     {
         prune_stale_indices(
-            store, 0, /* least_readable_version */
-            1, /* target_least_readable_version */
+            store, 0, /* min_readable_version */
+            1, /* target_min_readable_version */
             0, /* limit */
         );
         verify_value_and_proof(store, key1.clone(), Some(&value1), 0, root0);
@@ -287,8 +288,8 @@ fn test_retired_records() {
     // Prune till version=1.
     {
         prune_stale_indices(
-            store, 0,   /* least_readable_version */
-            1,   /* target_least_readable_version */
+            store, 0,   /* min_readable_version */
+            1,   /* target_min_readable_version */
             100, /* limit */
         );
         // root0 is gone.
@@ -301,8 +302,8 @@ fn test_retired_records() {
     // Prune till version=2.
     {
         prune_stale_indices(
-            store, 1,   /* least_readable_version */
-            2,   /* target_least_readable_version */
+            store, 1,   /* min_readable_version */
+            2,   /* target_min_readable_version */
             100, /* limit */
         );
         // root1 is gone.
@@ -675,15 +676,16 @@ fn update_store(
 ) {
     for (i, (key, value)) in input.enumerate() {
         let mut cs = ChangeSet::new();
-        let value_state_set: HashMap<_, _> = std::iter::once((key, value)).collect();
+        let value_state_set = vec![(key, value)].into_iter().collect();
+        let jmt_updates = jmt_updates(&value_state_set);
         let version = first_version + i as Version;
         let root_hashes = store
-            .merklize_value_sets(vec![&value_state_set], None, version, &mut cs)
+            .merklize_value_sets(vec![jmt_update_refs(&jmt_updates)], None, version, &mut cs)
             .unwrap();
         store
             .put_value_sets(vec![&value_state_set], version, &mut cs)
             .unwrap();
-        store.db.write_schemas(cs.batch).unwrap();
+        store.ledger_db.write_schemas(cs.batch).unwrap();
         store.set_latest_checkpoint(version, root_hashes[0]);
     }
 }

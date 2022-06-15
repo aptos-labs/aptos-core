@@ -27,27 +27,16 @@ use crate::{
     },
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
 };
-use anyhow::{ensure, format_err, Result};
+use anyhow::{format_err, Result};
 use aptos_logger::prelude::*;
-use std::{
-    collections::{HashMap, HashSet},
-    iter::Iterator,
-    marker::PhantomData,
-    path::Path,
-};
+use std::{collections::HashMap, iter::Iterator, marker::PhantomData, path::Path};
 
 /// Type alias to `rocksdb::ReadOptions`. See [`rocksdb doc`](https://github.com/pingcap/rust-rocksdb/blob/master/src/rocksdb_options.rs)
-pub type ReadOptions = rocksdb::ReadOptions;
-
-/// Type alias to `rocksdb::Options`.
-pub type Options = rocksdb::Options;
-
-/// Type alias to improve readability.
+pub use rocksdb::{
+    ColumnFamilyDescriptor, DBCompressionType, Options, ReadOptions, SliceTransform,
+    DEFAULT_COLUMN_FAMILY_NAME,
+};
 pub type ColumnFamilyName = &'static str;
-
-/// Name for the `default` column family that's always open by RocksDB. We use it to store
-/// [`LedgerInfo`](../types/ledger_info/struct.LedgerInfo.html).
-pub const DEFAULT_CF_NAME: ColumnFamilyName = "default";
 
 #[derive(Debug)]
 enum WriteOp {
@@ -227,123 +216,70 @@ where
 pub struct DB {
     name: &'static str, // for logging
     inner: rocksdb::DB,
-    column_families: Vec<ColumnFamilyName>,
 }
 
 impl DB {
-    /// Create db with all the column families provided if it doesn't exist at `path`; Otherwise,
-    /// try to open it with all the column families.
     pub fn open(
         path: impl AsRef<Path>,
         name: &'static str,
         column_families: Vec<ColumnFamilyName>,
         db_opts: &rocksdb::Options,
     ) -> Result<Self> {
-        {
-            let cfs_set: HashSet<_> = column_families.iter().collect();
-            ensure!(
-                cfs_set.contains(&DEFAULT_CF_NAME),
-                "No \"default\" column family name is provided.",
-            );
-            ensure!(
-                cfs_set.len() == column_families.len(),
-                "Duplicate column family name found.",
-            );
-        }
-
-        let db = DB::open_cf(db_opts, path, name, column_families)?;
+        let db = DB::open_cf(
+            db_opts,
+            path,
+            name,
+            column_families
+                .iter()
+                .map(|cf_name| {
+                    let mut cf_opts = rocksdb::Options::default();
+                    cf_opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+                    rocksdb::ColumnFamilyDescriptor::new((*cf_name).to_string(), cf_opts)
+                })
+                .collect(),
+        )?;
         Ok(db)
+    }
+
+    pub fn open_cf(
+        db_opts: &rocksdb::Options,
+        path: impl AsRef<Path>,
+        name: &'static str,
+        cfds: Vec<rocksdb::ColumnFamilyDescriptor>,
+    ) -> Result<DB> {
+        let inner = rocksdb::DB::open_cf_descriptors(db_opts, path, cfds)?;
+        Ok(Self::log_construct(name, inner))
     }
 
     /// Open db in readonly mode
     /// Note that this still assumes there's only one process that opens the same DB.
     /// See `open_as_secondary`
-    pub fn open_readonly(
-        path: impl AsRef<Path>,
-        name: &'static str,
-        column_families: Vec<ColumnFamilyName>,
-        db_opts: &rocksdb::Options,
-    ) -> Result<Self> {
-        DB::open_cf_readonly(db_opts, path, name, column_families)
-    }
-
-    /// Open db as secondary.
-    /// This allows to read the DB in another process while it's already opened for read / write in
-    /// one (e.g. a Node)
-    /// <https://github.com/facebook/rocksdb/blob/493f425e77043cc35ea2d89ee3c4ec0274c700cb/include/rocksdb/db.h#L176-L222>
-    pub fn open_as_secondary<P: AsRef<Path>>(
-        primary_path: P,
-        secondary_path: P,
-        name: &'static str,
-        column_families: Vec<ColumnFamilyName>,
-        db_opts: &rocksdb::Options,
-    ) -> Result<Self> {
-        DB::open_cf_as_secondary(db_opts, primary_path, secondary_path, name, column_families)
-    }
-
-    fn open_cf(
-        db_opts: &rocksdb::Options,
-        path: impl AsRef<Path>,
-        name: &'static str,
-        column_families: Vec<ColumnFamilyName>,
-    ) -> Result<DB> {
-        let inner = rocksdb::DB::open_cf_descriptors(
-            db_opts,
-            path,
-            column_families.iter().map(|cf_name| {
-                let mut cf_opts = rocksdb::Options::default();
-                cf_opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
-                rocksdb::ColumnFamilyDescriptor::new((*cf_name).to_string(), cf_opts)
-            }),
-        )?;
-        Ok(Self::log_construct(name, column_families, inner))
-    }
-
-    fn open_cf_readonly(
+    pub fn open_cf_readonly(
         opts: &rocksdb::Options,
         path: impl AsRef<Path>,
         name: &'static str,
-        column_families: Vec<ColumnFamilyName>,
+        cfs: Vec<ColumnFamilyName>,
     ) -> Result<DB> {
         let error_if_log_file_exists = false;
-        let inner = rocksdb::DB::open_cf_for_read_only(
-            opts,
-            path,
-            &column_families,
-            error_if_log_file_exists,
-        )?;
+        let inner = rocksdb::DB::open_cf_for_read_only(opts, path, &cfs, error_if_log_file_exists)?;
 
-        Ok(Self::log_construct(name, column_families, inner))
+        Ok(Self::log_construct(name, inner))
     }
 
-    fn open_cf_as_secondary<P: AsRef<Path>>(
+    pub fn open_cf_as_secondary<P: AsRef<Path>>(
         opts: &rocksdb::Options,
         primary_path: P,
         secondary_path: P,
         name: &'static str,
-        column_families: Vec<ColumnFamilyName>,
+        cfs: Vec<ColumnFamilyName>,
     ) -> Result<DB> {
-        let inner = rocksdb::DB::open_cf_as_secondary(
-            opts,
-            primary_path,
-            secondary_path,
-            &column_families,
-        )?;
-
-        Ok(Self::log_construct(name, column_families, inner))
+        let inner = rocksdb::DB::open_cf_as_secondary(opts, primary_path, secondary_path, &cfs)?;
+        Ok(Self::log_construct(name, inner))
     }
 
-    fn log_construct(
-        name: &'static str,
-        column_families: Vec<&'static str>,
-        inner: rocksdb::DB,
-    ) -> DB {
+    fn log_construct(name: &'static str, inner: rocksdb::DB) -> DB {
         info!(rocksdb_name = name, "Opened RocksDB.");
-        DB {
-            name,
-            inner,
-            column_families,
-        }
+        DB { name, inner }
     }
 
     /// Reads single record by key.
@@ -482,14 +418,10 @@ impl DB {
         })
     }
 
-    /// Flushes all memtable data. This is only used for testing `get_approximate_sizes_cf` in unit
+    /// Flushes memtable data. This is only used for testing `get_approximate_sizes_cf` in unit
     /// tests.
-    pub fn flush_all(&self) -> Result<()> {
-        for cf_name in &self.column_families {
-            let cf_handle = self.get_cf_handle(cf_name)?;
-            self.inner.flush_cf(cf_handle)?;
-        }
-        Ok(())
+    pub fn flush_cf(&self, cf_name: &str) -> Result<()> {
+        Ok(self.inner.flush_cf(self.get_cf_handle(cf_name)?)?)
     }
 
     pub fn get_property(&self, cf_name: &str, property_name: &str) -> Result<u64> {

@@ -7,7 +7,7 @@ use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_types::{
     account_address::AccountAddress,
     account_state::AccountState,
-    contract_event::EventWithProof,
+    contract_event::EventWithVersion,
     event::EventKey,
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
     transaction::{Transaction, Version},
@@ -58,9 +58,8 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         key: &EventKey,
         start_seq: u64,
         limit: u64,
-    ) -> Result<Vec<EventWithProof>> {
-        self.0
-            .get_events_with_proofs(key, start_seq, Order::Ascending, limit, None)
+    ) -> Result<Vec<EventWithVersion>> {
+        self.0.get_events(key, start_seq, Order::Ascending, limit)
     }
     fn get_committed_transactions(&self, start: Version, limit: u64) -> Result<Vec<Transaction>> {
         Ok(self

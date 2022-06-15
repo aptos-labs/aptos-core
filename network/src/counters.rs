@@ -3,7 +3,7 @@
 
 use crate::protocols::wire::handshake::v1::ProtocolId;
 use aptos_config::network_id::NetworkContext;
-use aptos_metrics::{
+use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
     Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };

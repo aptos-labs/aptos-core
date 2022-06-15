@@ -93,7 +93,7 @@ async fn test_db_restore() {
     insert_waypoint(&mut node0_config, genesis_waypoint);
     node0_config.save(node0_config_path).unwrap();
     let db_dir = node0_config.storage.dir();
-    fs::remove_dir_all(db_dir.join("aptosdb")).unwrap();
+    fs::remove_dir_all(db_dir.clone()).unwrap();
     fs::remove_dir_all(db_dir.join("consensusdb")).unwrap();
 
     // restore db from backup

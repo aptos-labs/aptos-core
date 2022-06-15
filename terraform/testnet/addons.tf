@@ -1,5 +1,5 @@
 resource "helm_release" "metrics-server" {
-  count       = var.enable_k8s_metrics_server ? 1 : 0
+  count       = var.enable_k8s_metrics_server || var.enable_cluster_autoscaler ? 1 : 0
   name        = "metrics-server"
   namespace   = "kube-system"
   chart       = "${path.module}/../helm/k8s-metrics"
@@ -10,7 +10,6 @@ resource "helm_release" "metrics-server" {
     jsonencode({
       coredns = {
         maxReplicas = var.num_validators
-        minReplicas = var.coredns_min_replicas
       }
       autoscaler = {
         enabled     = var.enable_cluster_autoscaler
@@ -101,4 +100,46 @@ resource "aws_iam_role_policy" "cluster-autoscaler" {
   name   = "Helm"
   role   = aws_iam_role.cluster-autoscaler[0].name
   policy = data.aws_iam_policy_document.cluster-autoscaler[0].json
+}
+
+resource "kubernetes_namespace" "chaos-mesh" {
+  count = var.enable_chaos_mesh ? 1 : 0
+
+  metadata {
+    annotations = {
+      name = "chaos-mesh"
+    }
+
+    name = "chaos-mesh"
+  }
+}
+
+resource "helm_release" "chaos-mesh" {
+  count     = var.enable_chaos_mesh ? 1 : 0
+  name      = "chaos-mesh"
+  namespace = kubernetes_namespace.chaos-mesh[0].metadata[0].name
+
+  chart       = "${path.module}/../helm/chaos"
+  max_history = 10
+  wait        = false
+
+  values = [
+    jsonencode({
+      # Only create the ingress if an ACM certificate exists
+      ingress = {
+        enable                   = length(aws_acm_certificate.ingress) > 0 ? true : false
+        domain                   = "chaos.${local.domain}"
+        acm_certificate          = length(aws_acm_certificate.ingress) > 0 ? aws_acm_certificate.ingress[0].arn : null
+        loadBalancerSourceRanges = join(",", var.client_sources_ipv4)
+        aws_tags                 = local.aws_tags
+      }
+      chaos-mesh = {
+        chaosDaemon = {
+          podSecurityPolicy = true
+          # tolerate pod assignment on nodes in the validator nodegroup
+          tolerations = jsondecode(module.validator.helm_values)["validator"]["tolerations"]
+        }
+      }
+    })
+  ]
 }

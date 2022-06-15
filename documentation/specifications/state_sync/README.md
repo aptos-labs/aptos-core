@@ -34,7 +34,7 @@ by re-executing the transactions.
 
 There are three types of supported sync protocols:
 1. [Validator sync](#validator-sync): In general, validators learn about recent
-ledger state through their participation in the [consensus protocol](../specifications/consensus),
+ledger state through their participation in the [consensus protocol](../consensus),
 but it is possible they still fall behind (e.g. node goes offline for a while,
 network partition). In these cases, a lagging validator can rely on state
 synchronization to catch up to the more recent state.

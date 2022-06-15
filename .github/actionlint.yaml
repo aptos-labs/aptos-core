@@ -1,0 +1,4 @@
+self-hosted-runner:
+  # Labels of self-hosted runners in array of string
+  labels:
+    - high-perf-docker

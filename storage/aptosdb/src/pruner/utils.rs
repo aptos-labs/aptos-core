@@ -16,22 +16,20 @@ use std::{sync::Arc, time::Instant};
 
 /// A useful utility function to instantiate all db pruners.
 pub fn create_db_pruners(
-    db: Arc<DB>,
-    transaction_store: Arc<TransactionStore>,
-    ledger_store: Arc<LedgerStore>,
-    event_store: Arc<EventStore>,
+    ledger_db: Arc<DB>,
+    state_merkle_db: Arc<DB>,
 ) -> Vec<Mutex<Arc<dyn DBPruner + Send + Sync>>> {
     vec![
         Mutex::new(Arc::new(StateStorePruner::new(
-            Arc::clone(&db),
+            Arc::clone(&state_merkle_db),
             0,
             Instant::now(),
         ))),
         Mutex::new(Arc::new(LedgerPruner::new(
-            Arc::clone(&db),
-            Arc::clone(&transaction_store),
-            Arc::clone(&event_store),
-            Arc::clone(&ledger_store),
+            Arc::clone(&ledger_db),
+            Arc::new(TransactionStore::new(Arc::clone(&ledger_db))),
+            Arc::new(EventStore::new(Arc::clone(&ledger_db))),
+            Arc::new(LedgerStore::new(Arc::clone(&ledger_db))),
         ))),
     ]
 }

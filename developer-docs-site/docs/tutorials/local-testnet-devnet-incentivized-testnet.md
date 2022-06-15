@@ -1,9 +1,9 @@
 ---
-title: "Local Testnet, Devnet and Incentivized Testnet"
+title: "Aptos Blockchain Deployments"
 slug: "local-testnet-devnet-and-incentivized-testnet"
 ---
 
-# Local Testnet, Devnet and Incentivized Testnet
+# Aptos Blockchain Deployments
 
 You can connect to the Aptos Blockchain in a few ways. See the below table:
 

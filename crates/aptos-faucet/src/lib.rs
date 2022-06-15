@@ -20,19 +20,130 @@
 //! ```
 
 use anyhow::Result;
+use aptos::common::types::EncodingType;
+use aptos_config::keys::ConfigKey;
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
 use aptos_rest_client::Client;
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{chain_id::ChainId, LocalAccount},
+    types::{
+        account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
+        LocalAccount,
+    },
 };
 use futures::lock::Mutex;
 use reqwest::StatusCode;
-use std::{convert::Infallible, fmt, sync::Arc};
+use std::{convert::Infallible, fmt, path::Path, sync::Arc};
+use structopt::StructOpt;
 use url::Url;
 use warp::{http, Filter, Rejection, Reply};
 
 pub mod mint;
+
+#[derive(Debug, StructOpt)]
+#[structopt(
+    name = "Aptos Faucet",
+    author = "Aptos",
+    about = "Aptos Testnet utility service for creating test accounts and minting test coins"
+)]
+pub struct FaucetArgs {
+    /// Faucet service listen address
+    #[structopt(short = "a", long, default_value = "127.0.0.1")]
+    pub address: String,
+    /// Faucet service listen port
+    #[structopt(short = "p", long, default_value = "80")]
+    pub port: u16,
+    /// Aptos fullnode/validator server URL
+    #[structopt(short = "s", long, default_value = "https://testnet.aptoslabs.com/")]
+    pub server_url: String,
+    /// Path to the private key for creating test account and minting coins.
+    /// To keep Testnet simple, we used one private key for aptos root account
+    /// To manually generate a keypair, use generate-key:
+    /// `cargo run -p generate-keypair -- -o <output_file_path>`
+    #[structopt(short = "m", long, default_value = "/opt/aptos/etc/mint.key")]
+    pub mint_key_file_path: String,
+    /// Ed25519PrivateKey for minting coins
+    #[structopt(long, parse(try_from_str = ConfigKey::from_encoded_string))]
+    pub mint_key: Option<ConfigKey<Ed25519PrivateKey>>,
+    /// Address of the account to send transactions from.
+    /// On Testnet, for example, this is a550c18.
+    /// If not present, the mint key's address is used
+    #[structopt(short = "t", long, parse(try_from_str = AccountAddress::from_hex_literal))]
+    pub mint_account_address: Option<AccountAddress>,
+    /// Chain ID of the network this client is connecting to.
+    /// For mainnet: "MAINNET" or 1, testnet: "TESTNET" or 2, devnet: "DEVNET" or 3,
+    /// local swarm: "TESTING" or 4
+    /// Note: Chain ID of 0 is not allowed; Use number if chain id is not predefined.
+    #[structopt(short = "c", long, default_value = "2")]
+    pub chain_id: ChainId,
+    /// Maximum amount of coins to mint.
+    #[structopt(long)]
+    pub maximum_amount: Option<u64>,
+    #[structopt(long)]
+    pub do_not_delegate: bool,
+}
+
+impl FaucetArgs {
+    pub async fn run(self) {
+        let address: std::net::SocketAddr = format!("{}:{}", self.address, self.port)
+            .parse()
+            .expect("invalid address or port number");
+
+        info!(
+            "[faucet]: chain id: {}, server url: {} . Limit: {:?}",
+            self.chain_id,
+            self.server_url.as_str(),
+            self.maximum_amount,
+        );
+
+        let key = if let Some(ref key) = self.mint_key {
+            key.private_key()
+        } else {
+            EncodingType::BCS
+                .load_key::<Ed25519PrivateKey>("mint key", Path::new(&self.mint_key_file_path))
+                .unwrap()
+        };
+
+        let faucet_address: AccountAddress =
+            self.mint_account_address.unwrap_or_else(aptos_root_address);
+        let faucet_account = LocalAccount::new(faucet_address, key, 0);
+
+        // Do not use maximum amount on delegation, this allows the new delegated faucet to
+        // mint a lot for themselves!
+        let maximum_amount = if self.do_not_delegate {
+            self.maximum_amount
+        } else {
+            None
+        };
+
+        let service = Arc::new(Service::new(
+            self.server_url.clone(),
+            self.chain_id,
+            faucet_account,
+            maximum_amount,
+        ));
+
+        let actual_service = if self.do_not_delegate {
+            service
+        } else {
+            delegate_mint_account(
+                service,
+                self.server_url.clone(),
+                self.chain_id,
+                self.maximum_amount,
+            )
+            .await
+        };
+
+        info!(
+            "[faucet]: running on: {}. Minting from {}",
+            address,
+            actual_service.faucet_account.lock().await.address()
+        );
+        warp::serve(routes(actual_service)).run(address).await;
+    }
+}
 
 pub struct Service {
     pub faucet_account: Mutex<LocalAccount>,

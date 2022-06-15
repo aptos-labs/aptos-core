@@ -22,7 +22,7 @@ dependencies = [
  "aptos-workspace-hack",
  "mirai-annotations",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
 ]
 
 [[package]]
@@ -156,7 +156,7 @@ dependencies = [
  "hex",
  "itertools",
  "move-deps",
- "rand 0.8.5",
+ "rand 0.7.3",
  "reqwest",
  "serde 1.0.137",
  "serde_json",
@@ -185,7 +185,7 @@ dependencies = [
  "aptos-global-constants",
  "aptos-logger",
  "aptos-mempool",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-sdk",
  "aptos-secure-storage",
  "aptos-state-view",
@@ -208,7 +208,7 @@ dependencies = [
  "move-deps",
  "once_cell",
  "percent-encoding",
- "rand 0.8.5",
+ "rand 0.7.3",
  "regex",
  "reqwest",
  "serde 1.0.137",
@@ -266,7 +266,7 @@ dependencies = [
  "bcs",
  "get_if_addrs",
  "mirai-annotations",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "serde_yaml",
  "short-hex-str",
@@ -283,6 +283,7 @@ dependencies = [
  "aptos-workspace-hack",
  "bcs",
  "bitvec",
+ "blst",
  "byteorder",
  "bytes",
  "criterion",
@@ -295,8 +296,8 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
- "rand_core 0.6.3",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
  "ripemd160",
  "serde 1.0.137",
  "serde-name",
@@ -331,7 +332,7 @@ dependencies = [
  "aptos-id-generator",
  "aptos-infallible",
  "aptos-logger",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-time-service",
  "aptos-types",
  "aptos-workspace-hack",
@@ -342,9 +343,11 @@ dependencies = [
  "futures",
  "itertools",
  "maplit",
+ "netcore",
  "network",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
+ "short-hex-str",
  "storage-service-client",
  "storage-service-server",
  "storage-service-types",
@@ -369,7 +372,7 @@ dependencies = [
  "bytes",
  "futures",
  "hex",
- "rand 0.8.5",
+ "rand 0.7.3",
  "reqwest",
  "serde 1.0.137",
  "serde_json",
@@ -418,7 +421,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rusty-fork",
  "safety-rules",
  "scratchpad",
@@ -449,7 +452,7 @@ dependencies = [
  "cached-framework-packages",
  "consensus-types",
  "executor",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "storage-interface",
  "structopt",
@@ -487,7 +490,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "aptos-logger",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-rest-client",
  "aptos-workspace-hack",
  "async-trait",
@@ -497,6 +500,9 @@ dependencies = [
  "diesel_migrations",
  "futures",
  "once_cell",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
  "serde 1.0.137",
  "serde_json",
  "tokio",
@@ -518,7 +524,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-infallible",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-types",
  "aptos-workspace-hack",
  "aptosdb",
@@ -531,7 +537,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "storage-interface",
  "thiserror",
@@ -545,7 +551,7 @@ dependencies = [
  "aptos-types",
  "aptos-workspace-hack",
  "hex",
- "rand 0.8.5",
+ "rand 0.7.3",
 ]
 
 [[package]]
@@ -609,7 +615,7 @@ dependencies = [
  "aptos-id-generator",
  "aptos-infallible",
  "aptos-logger",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-proptest-helpers",
  "aptos-types",
  "aptos-workspace-hack",
@@ -617,6 +623,7 @@ dependencies = [
  "bcs",
  "bounded-executor",
  "channel",
+ "consensus-types",
  "enum_dispatch",
  "event-notifications",
  "fail 0.5.0",
@@ -628,7 +635,7 @@ dependencies = [
  "network",
  "once_cell",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
  "serde 1.0.137",
  "serde_json",
@@ -645,6 +652,7 @@ dependencies = [
 name = "aptos-metrics"
 version = "0.1.0"
 dependencies = [
+ "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-workspace-hack",
@@ -655,6 +663,7 @@ dependencies = [
  "prometheus",
  "rusty-fork",
  "serde_json",
+ "shadow-rs",
  "sysinfo",
  "tokio",
 ]
@@ -708,7 +717,7 @@ dependencies = [
  "mempool-notifications",
  "network",
  "network-builder",
- "rand 0.8.5",
+ "rand 0.7.3",
  "state-sync-multiplexer",
  "state-sync-v1",
  "storage-interface",
@@ -744,7 +753,7 @@ dependencies = [
  "move-deps",
  "netcore",
  "network",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "serde_json",
  "serde_yaml",
@@ -771,7 +780,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
 ]
 
@@ -791,7 +800,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-infallible",
  "aptos-logger",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-workspace-hack",
  "futures",
  "pin-project",
@@ -840,6 +849,65 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-rosetta"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-api",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-rest-client",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "async-trait",
+ "bcs",
+ "clap 3.1.18",
+ "framework",
+ "futures",
+ "hex",
+ "move-deps",
+ "reqwest",
+ "serde 1.0.137",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "url",
+ "warp",
+]
+
+[[package]]
+name = "aptos-rosetta-cli"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-api",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-rest-client",
+ "aptos-rosetta",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "async-trait",
+ "bcs",
+ "clap 3.1.18",
+ "framework",
+ "futures",
+ "hex",
+ "move-deps",
+ "reqwest",
+ "serde 1.0.137",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "url",
+ "warp",
+]
+
+[[package]]
 name = "aptos-sdk"
 version = "0.0.3"
 dependencies = [
@@ -849,7 +917,7 @@ dependencies = [
  "aptos-workspace-hack",
  "bcs",
  "move-deps",
- "rand_core 0.6.3",
+ "rand_core 0.5.1",
  "serde 1.0.137",
 ]
 
@@ -893,7 +961,7 @@ dependencies = [
  "bcs",
  "chrono",
  "enum_dispatch",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "serde_json",
  "thiserror",
@@ -908,7 +976,7 @@ dependencies = [
  "aptos-types",
  "aptos-workspace-hack",
  "bcs",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e)",
+ "move-core-types",
  "serde 1.0.137",
  "serde_bytes",
  "serde_json",
@@ -919,7 +987,7 @@ name = "aptos-telemetry"
 version = "0.1.0"
 dependencies = [
  "aptos-logger",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-workspace-hack",
  "once_cell",
  "reqwest",
@@ -936,7 +1004,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-workspace-hack",
  "hex",
- "rand 0.8.5",
+ "rand 0.7.3",
 ]
 
 [[package]]
@@ -1024,7 +1092,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
+ "rand 0.7.3",
  "regex",
  "serde 1.0.137",
  "serde_bytes",
@@ -1074,7 +1142,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-logger",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-parallel-executor",
  "aptos-state-view",
  "aptos-types",
@@ -1115,6 +1183,7 @@ dependencies = [
  "futures-core",
  "futures-io",
  "futures-sink",
+ "futures-task",
  "futures-util",
  "generic-array 0.14.5",
  "getrandom 0.2.6",
@@ -1128,6 +1197,7 @@ dependencies = [
  "num-integer",
  "num-traits 0.2.15",
  "parking_lot 0.12.0",
+ "rand 0.7.3",
  "rand 0.8.5",
  "regex",
  "regex-syntax",
@@ -1180,7 +1250,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-jellyfish-merkle",
  "aptos-logger",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-proptest-helpers",
  "aptos-temppath",
  "aptos-types",
@@ -1197,7 +1267,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
+ "rand 0.7.3",
  "schemadb",
  "scratchpad",
  "serde 1.0.137",
@@ -1340,7 +1410,7 @@ dependencies = [
  "once_cell",
  "pin-project",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "regex",
  "reqwest",
  "serde 1.0.137",
@@ -1362,7 +1432,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-logger",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-temppath",
  "aptos-types",
  "aptos-workspace-hack",
@@ -1554,6 +1624,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d696c370c750c948ada61c69a0ee2cbbb9c50b1019ddb86d9317157a99c2cae"
 
 [[package]]
+name = "blst"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acb8c0939e210397464ae1857265a7492a2957f915803d43cb9832229100636a"
+dependencies = [
+ "cc",
+ "glob",
+ "threadpool",
+ "zeroize",
+ "zeroize_derive",
+]
+
+[[package]]
 name = "bounded-executor"
 version = "0.1.0"
 dependencies = [
@@ -1736,7 +1819,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-infallible",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-types",
  "aptos-workspace-hack",
  "futures",
@@ -1956,7 +2039,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-mempool",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-secure-storage",
  "aptos-temppath",
  "aptos-types",
@@ -1984,7 +2067,7 @@ dependencies = [
  "num-traits 0.2.15",
  "once_cell",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "safety-rules",
  "schemadb",
  "serde 1.0.137",
@@ -2026,6 +2109,7 @@ dependencies = [
  "aptos-workspace-hack",
  "bcs",
  "executor-types",
+ "futures",
  "itertools",
  "mirai-annotations",
  "proptest",
@@ -2427,7 +2511,7 @@ dependencies = [
  "aptos-id-generator",
  "aptos-infallible",
  "aptos-logger",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-types",
  "aptos-workspace-hack",
  "async-trait",
@@ -2437,7 +2521,7 @@ dependencies = [
  "futures",
  "network",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "short-hex-str",
  "storage-service-types",
@@ -2718,11 +2802,12 @@ dependencies = [
 [[package]]
 name = "ed25519-dalek"
 version = "1.0.1"
-source = "git+https://github.com/dalek-cryptography/ed25519-dalek?rev=44488e43b8d61fa8263b146f9a1beba5549f8b0e#44488e43b8d61fa8263b146f9a1beba5549f8b0e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c762bae6dcaf24c4c84667b8579785430908723d5c889f469d76a41d59cc7a9d"
 dependencies = [
  "curve25519-dalek",
  "ed25519",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "serde_bytes",
  "sha2",
@@ -2854,7 +2939,7 @@ dependencies = [
  "aptos-genesis-tool",
  "aptos-infallible",
  "aptos-logger",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-secure-net",
  "aptos-state-view",
  "aptos-temppath",
@@ -2872,7 +2957,7 @@ dependencies = [
  "move-deps",
  "once_cell",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
  "scratchpad",
  "serde 1.0.137",
@@ -2904,11 +2989,13 @@ dependencies = [
  "executor",
  "executor-types",
  "indicatif",
+ "itertools",
  "jemallocator",
  "num_cpus",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
  "schemadb",
+ "scratchpad",
  "serde 1.0.137",
  "storage-client",
  "storage-interface",
@@ -2924,6 +3011,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-genesis-tool",
+ "aptos-sdk",
  "aptos-state-view",
  "aptos-temppath",
  "aptos-transaction-builder",
@@ -2934,7 +3022,7 @@ dependencies = [
  "executor",
  "executor-types",
  "move-deps",
- "rand 0.8.5",
+ "rand 0.7.3",
  "storage-interface",
  "storage-service",
  "vm-genesis",
@@ -3057,6 +3145,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "aptos-config",
+ "aptos-faucet",
  "aptos-genesis-tool",
  "aptos-logger",
  "aptos-rest-client",
@@ -3074,7 +3163,7 @@ dependencies = [
  "hyper-tls",
  "k8s-openapi",
  "kube",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
  "regex",
  "reqwest",
@@ -3271,7 +3360,7 @@ dependencies = [
  "consensus-types",
  "move-deps",
  "network",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection)",
  "serde_yaml",
@@ -4112,7 +4201,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "vm-genesis",
 ]
@@ -4468,7 +4557,7 @@ dependencies = [
  "log",
  "move-bytecode-verifier",
  "move-command-line-common",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-model",
  "serde 1.0.137",
 ]
@@ -4479,7 +4568,7 @@ version = "0.0.3"
 source = "git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7#ece13ae276e3925111bf48cd85b73af4287210e7"
 dependencies = [
  "anyhow",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "once_cell",
  "proptest",
  "proptest-derive",
@@ -4502,7 +4591,7 @@ dependencies = [
  "bcs",
  "move-binary-format",
  "move-command-line-common",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-ir-types",
  "move-symbol-pool",
  "serde 1.0.137",
@@ -4515,7 +4604,7 @@ source = "git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd
 dependencies = [
  "anyhow",
  "move-binary-format",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "petgraph 0.5.1",
  "serde-reflection 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -4528,7 +4617,7 @@ dependencies = [
  "anyhow",
  "move-binary-format",
  "move-borrow-graph",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "petgraph 0.5.1",
 ]
 
@@ -4568,7 +4657,7 @@ dependencies = [
  "move-bytecode-viewer",
  "move-command-line-common",
  "move-compiler",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-coverage",
  "move-disassembler",
  "move-errmapgen",
@@ -4598,7 +4687,7 @@ dependencies = [
  "anyhow",
  "difference",
  "hex",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "num-bigint 0.4.3",
  "serde 1.0.137",
  "sha2",
@@ -4621,7 +4710,7 @@ dependencies = [
  "move-bytecode-source-map",
  "move-bytecode-verifier",
  "move-command-line-common",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-ir-to-bytecode",
  "move-ir-types",
  "move-symbol-pool",
@@ -4632,22 +4721,6 @@ dependencies = [
  "sha3",
  "tempfile",
  "walkdir",
-]
-
-[[package]]
-name = "move-core-types"
-version = "0.0.4"
-source = "git+https://github.com/move-language/move?rev=1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e#1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e"
-dependencies = [
- "anyhow",
- "bcs",
- "hex",
- "mirai-annotations",
- "once_cell",
- "rand 0.8.5",
- "ref-cast",
- "serde 1.0.137",
- "serde_bytes",
 ]
 
 [[package]]
@@ -4680,7 +4753,7 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-source-map",
  "move-command-line-common",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-ir-types",
  "once_cell",
  "petgraph 0.5.1",
@@ -4698,7 +4771,7 @@ dependencies = [
  "move-cli",
  "move-command-line-common",
  "move-compiler",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-docgen",
  "move-errmapgen",
  "move-ir-compiler",
@@ -4731,7 +4804,7 @@ dependencies = [
  "move-bytecode-verifier",
  "move-command-line-common",
  "move-compiler",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-coverage",
  "move-ir-types",
 ]
@@ -4763,7 +4836,7 @@ dependencies = [
  "bcs",
  "log",
  "move-command-line-common",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-model",
  "serde 1.0.137",
 ]
@@ -4792,7 +4865,7 @@ dependencies = [
  "move-bytecode-source-map",
  "move-bytecode-verifier",
  "move-command-line-common",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-ir-to-bytecode",
  "move-ir-types",
  "move-symbol-pool",
@@ -4810,7 +4883,7 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-source-map",
  "move-command-line-common",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-ir-to-bytecode-syntax",
  "move-ir-types",
  "move-symbol-pool",
@@ -4826,7 +4899,7 @@ dependencies = [
  "anyhow",
  "hex",
  "move-command-line-common",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-ir-types",
  "move-symbol-pool",
 ]
@@ -4839,7 +4912,7 @@ dependencies = [
  "anyhow",
  "hex",
  "move-command-line-common",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-symbol-pool",
  "once_cell",
  "serde 1.0.137",
@@ -4861,7 +4934,7 @@ dependencies = [
  "move-bytecode-verifier",
  "move-command-line-common",
  "move-compiler",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-disassembler",
  "move-ir-types",
  "move-symbol-pool",
@@ -4887,7 +4960,7 @@ dependencies = [
  "move-bytecode-utils",
  "move-command-line-common",
  "move-compiler",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-docgen",
  "move-model",
  "move-symbol-pool",
@@ -4923,7 +4996,7 @@ dependencies = [
  "move-binary-format",
  "move-command-line-common",
  "move-compiler",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-docgen",
  "move-errmapgen",
  "move-ir-types",
@@ -4955,7 +5028,7 @@ dependencies = [
  "log",
  "move-binary-format",
  "move-command-line-common",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-model",
  "move-stackless-bytecode",
  "num",
@@ -4976,7 +5049,7 @@ source = "git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd
 dependencies = [
  "anyhow",
  "move-binary-format",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "serde 1.0.137",
 ]
 
@@ -4990,7 +5063,7 @@ dependencies = [
  "hex",
  "move-binary-format",
  "move-bytecode-utils",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "once_cell",
  "serde 1.0.137",
 ]
@@ -5011,7 +5084,7 @@ dependencies = [
  "move-bytecode-verifier",
  "move-command-line-common",
  "move-compiler",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-ir-to-bytecode",
  "move-model",
  "move-read-write-set-types",
@@ -5033,7 +5106,7 @@ dependencies = [
  "codespan-reporting",
  "itertools",
  "move-binary-format",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-model",
  "move-stackless-bytecode",
  "num",
@@ -5049,7 +5122,7 @@ dependencies = [
  "move-binary-format",
  "move-command-line-common",
  "move-compiler",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-docgen",
  "move-errmapgen",
  "move-prover",
@@ -5079,7 +5152,7 @@ dependencies = [
  "bcs",
  "better_any",
  "move-binary-format",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-vm-runtime",
  "move-vm-types",
  "once_cell",
@@ -5101,7 +5174,7 @@ dependencies = [
  "move-bytecode-utils",
  "move-command-line-common",
  "move-compiler",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-ir-types",
  "move-model",
  "move-resource-viewer",
@@ -5126,7 +5199,7 @@ dependencies = [
  "fail 0.4.0",
  "move-binary-format",
  "move-bytecode-verifier",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-vm-types",
  "once_cell",
  "parking_lot 0.11.2",
@@ -5140,7 +5213,7 @@ version = "0.1.0"
 source = "git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7#ece13ae276e3925111bf48cd85b73af4287210e7"
 dependencies = [
  "anyhow",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-table-extension",
 ]
 
@@ -5151,7 +5224,7 @@ source = "git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd
 dependencies = [
  "bcs",
  "move-binary-format",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "once_cell",
  "proptest",
  "serde 1.0.137",
@@ -5256,7 +5329,7 @@ dependencies = [
  "aptos-id-generator",
  "aptos-infallible",
  "aptos-logger",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-proptest-helpers",
  "aptos-rate-limiter",
  "aptos-telemetry",
@@ -5281,8 +5354,8 @@ dependencies = [
  "pin-project",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
- "rand_core 0.6.3",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
  "serde 1.0.137",
  "serde_bytes",
  "serde_json",
@@ -5314,7 +5387,7 @@ dependencies = [
  "netcore",
  "network",
  "network-discovery",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "tokio",
 ]
@@ -5327,7 +5400,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-logger",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-secure-storage",
  "aptos-temppath",
  "aptos-time-service",
@@ -5341,7 +5414,7 @@ dependencies = [
  "netcore",
  "network",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde_yaml",
  "short-hex-str",
  "tokio",
@@ -5810,6 +5883,55 @@ name = "peeking_take_while"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
+
+[[package]]
+name = "peer-monitoring-service-client"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "async-trait",
+ "channel",
+ "network",
+ "peer-monitoring-service-types",
+ "thiserror",
+]
+
+[[package]]
+name = "peer-monitoring-service-server"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "bcs",
+ "bounded-executor",
+ "bytes",
+ "channel",
+ "claim",
+ "futures",
+ "netcore",
+ "network",
+ "once_cell",
+ "peer-monitoring-service-types",
+ "serde 1.0.137",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "peer-monitoring-service-types"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "aptos-workspace-hack",
+ "network",
+ "serde 1.0.137",
+ "thiserror",
+]
 
 [[package]]
 name = "pem"
@@ -6285,6 +6407,7 @@ dependencies = [
  "rand_chacha 0.2.2",
  "rand_core 0.5.1",
  "rand_hc",
+ "rand_pcg",
 ]
 
 [[package]]
@@ -6346,6 +6469,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rand_pcg"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16abd0c1b639e9eb4d7c50c0b8100b0d0f849be2349829c740fe8e6eb4816429"
+dependencies = [
+ "rand_core 0.5.1",
+]
+
+[[package]]
 name = "rand_xorshift"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6395,7 +6527,7 @@ dependencies = [
  "anyhow",
  "move-binary-format",
  "move-bytecode-utils",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-model",
  "move-read-write-set-types",
  "move-stackless-bytecode",
@@ -6410,7 +6542,7 @@ dependencies = [
  "anyhow",
  "move-binary-format",
  "move-bytecode-utils",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "move-read-write-set-types",
 ]
 
@@ -6524,6 +6656,7 @@ dependencies = [
  "lazy_static 1.4.0",
  "log",
  "mime",
+ "mime_guess",
  "native-tls",
  "percent-encoding",
  "pin-project-lite",
@@ -6539,6 +6672,53 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "winreg",
+]
+
+[[package]]
+name = "reqwest-middleware"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69539cea4148dce683bec9dc95be3f0397a9bb2c248a49c8296a9d21659a8cdd"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "http",
+ "reqwest",
+ "serde 1.0.137",
+ "task-local-extensions",
+ "thiserror",
+]
+
+[[package]]
+name = "reqwest-retry"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce246a729eaa6aff5e215aee42845bf5fed9893cc6cd51aeeb712f34e04dd9f3"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "futures",
+ "http",
+ "hyper",
+ "reqwest",
+ "reqwest-middleware",
+ "retry-policies",
+ "task-local-extensions",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "retry-policies"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47f9e19b18c6cdd796cc70aea8a9ea5ee7b813be611c6589e3624fcdbfd05f9d"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -6776,7 +6956,7 @@ dependencies = [
  "criterion",
  "once_cell",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rusty-fork",
  "serde 1.0.137",
  "serde_json",
@@ -6818,7 +6998,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-logger",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-temppath",
  "aptos-workspace-hack",
  "byteorder",
@@ -6845,7 +7025,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-crypto",
  "aptos-infallible",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-types",
  "aptos-workspace-hack",
  "bitvec",
@@ -6853,7 +7033,7 @@ dependencies = [
  "itertools",
  "once_cell",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
  "storage-interface",
  "thiserror",
@@ -6906,7 +7086,7 @@ dependencies = [
  "aptos-workspace-hack",
  "bcs",
  "hex",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde_yaml",
  "structopt",
  "thiserror",
@@ -7356,6 +7536,7 @@ dependencies = [
  "aptos",
  "aptos-config",
  "aptos-crypto",
+ "aptos-faucet",
  "aptos-genesis-tool",
  "aptos-global-constants",
  "aptos-indexer",
@@ -7364,6 +7545,7 @@ dependencies = [
  "aptos-management",
  "aptos-operational-tool",
  "aptos-rest-client",
+ "aptos-rosetta",
  "aptos-sdk",
  "aptos-secure-storage",
  "aptos-temppath",
@@ -7386,7 +7568,7 @@ dependencies = [
  "move-deps",
  "once_cell",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "regex",
  "reqwest",
  "serde_json",
@@ -7435,7 +7617,7 @@ dependencies = [
  "aptos-data-client",
  "aptos-infallible",
  "aptos-logger",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-temppath",
  "aptos-time-service",
  "aptos-types",
@@ -7509,7 +7691,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-mempool",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-proptest-helpers",
  "aptos-temppath",
  "aptos-time-service",
@@ -7539,7 +7721,7 @@ dependencies = [
  "network-builder",
  "once_cell",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "serde 1.0.137",
  "short-hex-str",
  "storage-interface",
@@ -7653,7 +7835,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-logger",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-secure-net",
  "aptos-temppath",
  "aptos-types",
@@ -7662,7 +7844,7 @@ dependencies = [
  "bcs",
  "itertools",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "storage-client",
  "storage-interface",
 ]
@@ -7690,7 +7872,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-infallible",
  "aptos-logger",
- "aptos-metrics",
+ "aptos-metrics-core",
  "aptos-time-service",
  "aptos-types",
  "aptos-workspace-hack",
@@ -7824,9 +8006,9 @@ dependencies = [
 
 [[package]]
 name = "sysinfo"
-version = "0.23.12"
+version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56b1e20ee77901236c389ff74618a899ff5fd34719a7ff0fd1d64f0acca5179a"
+checksum = "9a2809487b962344ca55d9aea565f9ffbcb6929780802217acc82561f6746770"
 dependencies = [
  "cfg-if 1.0.0",
  "core-foundation-sys",
@@ -7869,6 +8051,15 @@ dependencies = [
  "guppy-workspace-hack",
  "serde 1.0.137",
  "target-lexicon",
+]
+
+[[package]]
+name = "task-local-extensions"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36794203e10c86e5998179e260869d156e0674f02d5451b4a3fb9fd86d02aaab"
+dependencies = [
+ "tokio",
 ]
 
 [[package]]
@@ -7955,7 +8146,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-workspace-hack",
  "forge",
- "rand 0.8.5",
+ "rand 0.7.3",
  "tokio",
 ]
 
@@ -8016,6 +8207,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5516c27b78311c50bf42c071425c560ac799b11c30b31f87e3081965fe5e0180"
 dependencies = [
  "once_cell",
+]
+
+[[package]]
+name = "threadpool"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d050e60b33d41c19108b32cea32164033a9013fe3b46cbd4457559bfbf77afaa"
+dependencies = [
+ "num_cpus",
 ]
 
 [[package]]
@@ -8395,8 +8595,8 @@ dependencies = [
  "aptos-workspace-hack",
  "futures",
  "itertools",
- "rand 0.8.5",
- "rand_core 0.6.3",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
  "reqwest",
  "structopt",
  "termion",
@@ -8735,7 +8935,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
+ "rand 0.7.3",
 ]
 
 [[package]]
@@ -8755,7 +8955,7 @@ dependencies = [
  "executor-test-helpers",
  "fail 0.5.0",
  "move-deps",
- "rand 0.8.5",
+ "rand 0.7.3",
  "storage-interface",
  "vm-genesis",
 ]
@@ -9116,12 +9316,12 @@ dependencies = [
 
 [[package]]
 name = "x25519-dalek"
-version = "2.0.0-pre.1"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5da623d8af10a62342bcbbb230e33e58a63255a58012f8653c578e54bab48df"
+checksum = "2392b6b94a576b4e2bf3c5b2757d63f10ada8020a2e4d08ac849ebcf6ea8e077"
 dependencies = [
  "curve25519-dalek",
- "rand_core 0.6.3",
+ "rand_core 0.5.1",
  "zeroize",
 ]
 
@@ -9142,18 +9342,18 @@ dependencies = [
 
 [[package]]
 name = "zeroize"
-version = "1.5.5"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94693807d016b2f2d2e14420eb3bfcca689311ff775dcf113d74ea624b7cdf07"
+checksum = "4756f7db3f7b5574938c3eb1c117038b8e07f95ee6718c0efad4ac21508f1efd"
 dependencies = [
  "zeroize_derive",
 ]
 
 [[package]]
 name = "zeroize_derive"
-version = "1.3.2"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f8f187641dad4f680d25c4bfc4225b418165984179f26ca76ec4fb6441d3a17"
+checksum = "4eb56561c1f8f5441784ea91f52ae8b44268d920f2a59121968fec9297fa7157"
 dependencies = [
  "proc-macro2 1.0.39",
  "quote 1.0.18",

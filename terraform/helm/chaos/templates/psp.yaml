@@ -1,0 +1,89 @@
+# Chaos Mesh manager can edit chaos-mesh API resources and read cluster resources
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ include "chaos.fullname" . }}-manager
+rules:
+  - apiGroups:
+      - chaos-mesh.org
+    resources: ['*']
+    verbs: ['get', 'list', 'watch', 'create', 'delete', 'patch', 'update']
+  - apiGroups: [""]
+    resources: ['*']
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "chaos.fullname" . }}-manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "chaos.fullname" . }}-manager
+subjects:
+- kind: ServiceAccount
+  name: {{ include "chaos.serviceAccountName" . }}-manager
+  namespace: {{ .Release.Namespace }}
+
+---
+# Grant Chaos Mesh daemon cluster admin access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "chaos.fullname" . }}-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: chaos-daemon
+  namespace: {{ .Release.Namespace }}
+
+---
+# Grant some basic permissions to the dashboard and controller manager
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: {{ include "chaos.fullname" . }}
+spec:
+  privileged: false  # Don't allow privileged pods!
+  # The rest fills in some required fields.
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  runAsUser:
+    rule: RunAsAny
+  fsGroup:
+    rule: RunAsAny
+  volumes:
+  - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "chaos.fullname" . }}-psp
+rules:
+- apiGroups: ["policy"]
+  resources: ["podsecuritypolicies"]
+  verbs: ["use"]
+  resourceNames:
+  - {{ include "chaos.fullname" . }}
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "chaos.fullname" . }}-psp
+roleRef:
+  kind: ClusterRole
+  name: {{ include "chaos.fullname" . }}-psp
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  namespace: {{ .Release.Namespace }}
+  name: chaos-controller-manager
+- kind: ServiceAccount
+  namespace: {{ .Release.Namespace }}
+  name: chaos-dashboard

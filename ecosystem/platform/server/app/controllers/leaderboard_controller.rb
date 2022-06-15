@@ -4,16 +4,20 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class LeaderboardController < ApplicationController
-  It1MetricKeys = %i[rank validator liveness participation latest_reported_timestamp].freeze
-  It1Metric = Struct.new(*It1MetricKeys)
+  IT1_METRIC_KEYS = %i[rank validator liveness participation latest_reported_timestamp].freeze
+  IT1_RESULTS = File.read(File.join(Rails.root, 'public/it1_leaderboard_final.json'))
+  It1Metric = Struct.new(*IT1_METRIC_KEYS)
 
   def it1
     expires_in 1.minute, public: true
     default_sort = [[:participation, -1], [:liveness, -1], [:latest_reported_timestamp, -1]]
-    @metrics = Rails.cache.fetch(:it1_leaderboard, expires_in: 1.minute) do
-      response = HTTParty.get(ENV.fetch('LEADERBOARD_IT1_URL'))
-      metrics = JSON.parse(response.body).map do |metric|
-        timestamp = metric['latest_reported_timestamp'] ? DateTime.parse(metric['latest_reported_timestamp']).to_f : nil
+    @metrics, @last_updated = Rails.cache.fetch(:it1_leaderboard, expires_in: 1.minute) do
+      metrics = JSON.parse(IT1_RESULTS).map do |metric|
+        timestamp = if metric['latest_reported_timestamp'].blank?
+                      nil
+                    else
+                      DateTime.parse(metric['latest_reported_timestamp']).to_f
+                    end
         It1Metric.new(
           -1,
           metric['validator'],
@@ -26,7 +30,7 @@ class LeaderboardController < ApplicationController
       metrics.each_with_index do |metric, i|
         metric.rank = i + 1
       end
-      metrics
+      [metrics, Time.now]
     end
 
     @sort_columns = %w[rank liveness participation latest_reported_timestamp]

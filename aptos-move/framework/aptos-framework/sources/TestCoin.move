@@ -31,7 +31,10 @@ module AptosFramework::TestCoin {
         inner: vector<DelegatedMintCapability>,
     }
 
-    public fun initialize(core_framework: &signer, core_resource: &signer): BurnCapability<TestCoin> {
+    public fun initialize(
+        core_framework: &signer,
+        core_resource: &signer,
+    ): (MintCapability<TestCoin>, BurnCapability<TestCoin>) {
         SystemAddresses::assert_core_resource(core_resource);
 
         let (mint_cap, burn_cap) = Coin::initialize<TestCoin>(
@@ -51,16 +54,16 @@ module AptosFramework::TestCoin {
         Coin::deposit<TestCoin>(Signer::address_of(core_resource), coins);
 
         // Save MintCapability so we can give Faucet mint capability when one claims.
-        move_to(core_framework, Capabilities { mint_cap });
+        move_to(core_framework, Capabilities { mint_cap: copy mint_cap });
 
         // Also give Core resources account mint capability so it can mint test coins if needed.
-        move_to(core_resource, Capabilities { mint_cap });
+        move_to(core_resource, Capabilities { mint_cap: copy mint_cap });
 
         // Give Core Resources ability to delegate/create mint capability so it can grant the
         // faucet account mint cap.
         move_to(core_resource, Delegations { inner: Vector::empty() });
 
-        burn_cap
+        (mint_cap, burn_cap)
     }
 
     /// Create new test coins and deposit them into dst_addr's account.

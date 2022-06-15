@@ -9,6 +9,7 @@ pub mod config;
 pub mod genesis;
 pub mod move_tool;
 pub mod op;
+pub mod test;
 
 use crate::common::types::{CliCommand, CliResult};
 use clap::Parser;

@@ -4,7 +4,7 @@
 version: "3.8"
 services:
   fullnode:
-    image: "${VALIDATOR_IMAGE_REPO:-aptoslab/validator}:${IMAGE_TAG:-testnet}"
+    image: "${VALIDATOR_IMAGE_REPO:-aptoslabs/validator}:${IMAGE_TAG:-testnet}"
     networks:
       shared:
     volumes:
@@ -24,6 +24,7 @@ services:
         source: ./validator-full-node-identity.yaml
         target: /opt/aptos/genesis/validator-full-node-identity.yaml
     command: ["/opt/aptos/bin/aptos-node", "-f", "/opt/aptos/etc/fullnode.yaml"]
+    restart: unless-stopped
     ports:
       - "6182:6182"
       - "80:8080"

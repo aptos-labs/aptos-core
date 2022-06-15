@@ -13,27 +13,29 @@ use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
 
+pub const DEFAULT_FUNDED_COINS: u64 = 10000;
+
 /// Command to create a new account on-chain
 ///
 #[derive(Debug, Parser)]
 pub struct CreateAccount {
     #[clap(flatten)]
-    encoding_options: EncodingOptions,
+    pub(crate) encoding_options: EncodingOptions,
     #[clap(flatten)]
-    write_options: WriteTransactionOptions,
+    pub(crate) write_options: WriteTransactionOptions,
     #[clap(flatten)]
-    profile_options: ProfileOptions,
+    pub(crate) profile_options: ProfileOptions,
     /// Address to create account for
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
-    account: AccountAddress,
+    pub(crate) account: AccountAddress,
     /// Flag for using faucet to create the account
     #[clap(long)]
-    use_faucet: bool,
+    pub(crate) use_faucet: bool,
     #[clap(flatten)]
-    faucet_options: FaucetOptions,
+    pub(crate) faucet_options: FaucetOptions,
     /// Initial coins to fund when using the faucet
-    #[clap(long, default_value = "10000")]
-    initial_coins: u64,
+    #[clap(long, default_value_t = DEFAULT_FUNDED_COINS)]
+    pub(crate) initial_coins: u64,
 }
 
 #[async_trait]

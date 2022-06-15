@@ -84,10 +84,9 @@ resource "helm_release" "testnet" {
 
   values = [
     jsonencode({
-      imageTag          = local.image_tag
-      validatorLite     = var.validator_lite_mode
-      chain_name        = "aptos-${terraform.workspace}"
-      localVaultBackend = var.enable_dev_vault # Toggle dev vault mode
+      imageTag      = local.image_tag
+      validatorLite = var.validator_lite_mode
+      chain_name    = "aptos-${terraform.workspace}"
       genesis = {
         numValidators      = var.num_validators
         numPublicFullnodes = var.num_public_fullnodes
@@ -150,7 +149,6 @@ resource "helm_release" "validator" {
     module.validator.helm_values,
     jsonencode({
       exposeValidatorRestApi = var.enable_forge
-      localVaultBackend      = var.enable_dev_vault # Toggle dev vault mode
       validator = {
         name = "val${count.index}"
       }
@@ -182,16 +180,6 @@ resource "helm_release" "validator" {
         }
         nodeSelector = jsondecode(module.validator.helm_values)["validator"]["nodeSelector"]
         tolerations  = jsondecode(module.validator.helm_values)["validator"]["tolerations"]
-        resources = var.enable_dev_vault ? {
-          limits = {
-            cpu    = "0.5"
-            memory = "2Gi"
-          }
-          requests = {
-            cpu    = "0.5"
-            memory = "2Gi"
-          }
-        } : {}
       }
       backup = {
         enable = count.index == 0

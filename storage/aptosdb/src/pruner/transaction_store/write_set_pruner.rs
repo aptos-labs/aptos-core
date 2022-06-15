@@ -12,11 +12,11 @@ impl DBSubPruner for WriteSetPruner {
     fn prune(
         &self,
         db_batch: &mut SchemaBatch,
-        least_readable_version: u64,
+        min_readable_version: u64,
         target_version: u64,
     ) -> anyhow::Result<()> {
         self.transaction_store
-            .prune_write_set(least_readable_version, target_version, db_batch)?;
+            .prune_write_set(min_readable_version, target_version, db_batch)?;
         Ok(())
     }
 }

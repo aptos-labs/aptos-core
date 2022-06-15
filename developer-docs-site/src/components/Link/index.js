@@ -1,14 +1,11 @@
-import React from 'react';
+import React from "react";
 
-import isInternalUrl from '@docusaurus/isInternalUrl';
-import DocusaurusLink from '@docusaurus/Link';
+import isInternalUrl from "@docusaurus/isInternalUrl";
+import DocusaurusLink from "@docusaurus/Link";
 
-const Link = props => {
+const Link = (props) => {
   return (
-    <DocusaurusLink
-      {...props}
-      {...!isInternalUrl(props.href) && props.target == null ? {target: "__blank"} : {}}
-    />
+    <DocusaurusLink {...props} {...(!isInternalUrl(props.href) && props.target == null ? { target: "__blank" } : {})} />
   );
 };
 

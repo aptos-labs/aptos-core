@@ -1,10 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::super::*;
+use crate::metric_server::get_all_metrics;
 use assert_approx_eq::assert_approx_eq;
 use once_cell::sync::Lazy;
-use prometheus::{proto::MetricFamily, Counter, IntCounter, Opts, Registry};
+use prometheus::{proto::MetricFamily, register_int_counter, Counter, IntCounter, Opts, Registry};
 use rusty_fork::rusty_fork_test;
 
 const INT_COUNTER_NAME: &str = "INT_COUNTER";

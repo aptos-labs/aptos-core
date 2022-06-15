@@ -23,8 +23,10 @@ tokio = { version = "1.18.2", features = ["full"] }
 aptos = { path = "../../crates/aptos" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-faucet = { path = "../../crates/aptos-faucet" }
 aptos-indexer = { path = "../../ecosystem/indexer" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
+aptos-rosetta = { path = "../../crates/aptos-rosetta" }
 aptos-sdk = { path = "../../sdk" }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
@@ -38,7 +40,7 @@ move-deps = { path = "../../aptos-move/move-deps" }
 base64 = "0.13.0"
 futures = "0.3.21"
 once_cell = "1.10.0"
-rand = "0.8.5"
+rand = "0.7.3"
 regex = "1.5.5"
 serde_yaml = "0.8.24"
 

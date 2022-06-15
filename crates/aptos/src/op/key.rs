@@ -101,7 +101,7 @@ impl CliCommand<HashMap<AccountAddress, Peer>> for ExtractPeer {
 #[derive(Debug, Parser)]
 pub struct GenerateKey {
     /// Key type: `x25519` or `ed25519`
-    #[clap(long, default_value = "ed25519")]
+    #[clap(long, default_value_t = KeyType::Ed25519)]
     key_type: KeyType,
     #[clap(flatten)]
     save_params: SaveKey,

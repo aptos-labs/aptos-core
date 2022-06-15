@@ -321,10 +321,13 @@ fn add_node_to_seeds(
             .iter()
             .find(|protocol| matches!(protocol, Protocol::Tcp(_)))
             .unwrap();
-        let address = NetworkAddress::from(Protocol::Ip4(Ipv4Addr::new(127, 0, 0, 1)))
-            .push(port_protocol.clone())
-            .push(Protocol::NoiseIK(seed_key))
-            .push(Protocol::Handshake(HANDSHAKE_VERSION));
+        let address = NetworkAddress::from_protocols(vec![
+            Protocol::Ip4(Ipv4Addr::new(127, 0, 0, 1)),
+            port_protocol.clone(),
+            Protocol::NoiseIK(seed_key),
+            Protocol::Handshake(HANDSHAKE_VERSION),
+        ])
+        .unwrap();
 
         Peer::new(vec![address], HashSet::new(), peer_role)
     } else {

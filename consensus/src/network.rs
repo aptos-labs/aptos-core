@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::{anyhow, ensure};
 use aptos_logger::prelude::*;
-use aptos_metrics::monitor;
+use aptos_metrics_core::monitor;
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
