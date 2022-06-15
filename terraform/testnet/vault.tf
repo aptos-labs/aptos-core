@@ -36,7 +36,8 @@ resource "vault_mount" "transit" {
 }
 
 module "vault" {
-  count  = var.num_validators
+  # if we have a maximum number of validators across all chain eras, keep around the vault secrets
+  count  = var.max_num_validators > 0 ? var.max_num_validators : var.num_validators
   source = "../validator/vault-init"
   providers = {
     vault = vault
@@ -44,6 +45,7 @@ module "vault" {
 
   mount_engines     = false
   reset_safety_data = false
+  deletion_allowed  = true
   namespace         = "val${count.index}"
 
   kubernetes_host        = module.validator.kubernetes.kubernetes_host
@@ -108,7 +110,7 @@ resource "vault_policy" "genesis-reset" {
 }
 
 resource "vault_auth_backend" "approle" {
-  type  = "approle"
+  type = "approle"
 }
 
 resource "vault_approle_auth_backend_role" "genesis-reset-role" {

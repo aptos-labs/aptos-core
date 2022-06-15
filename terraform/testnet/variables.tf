@@ -63,6 +63,11 @@ variable "num_validators" {
   default = 4
 }
 
+variable "max_num_validators" {
+  default     = 0
+  description = "Maximum number of validators across all chain eras. AWS limit is < 450"
+}
+
 variable "num_public_fullnodes" {
   default = 1
 }

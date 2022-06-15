@@ -86,12 +86,13 @@ resource "aws_eks_node_group" "nodes" {
   scaling_config {
     desired_size = lookup(var.node_pool_sizes, each.key, each.value.size)
     min_size     = 1
-    max_size     = lookup(var.node_pool_sizes, each.key, each.value.size) * var.max_node_pool_surge
+    # the maximum nodegroup size in AWS is 450
+    max_size = lookup(var.node_pool_sizes, each.key, each.value.size) * var.max_node_pool_surge > 450 ? 450 : lookup(var.node_pool_sizes, each.key, each.value.size) * var.max_node_pool_surge
   }
 
   update_config {
     # the maximum unavailable nodes is a functino of the desired size multiplied by how much the nodegroup is allowed to surge
-    max_unavailable = var.max_node_pool_surge > 1 ? lookup(var.node_pool_sizes, each.key, each.value.size) * (var.max_node_pool_surge - 1) : lookup(var.node_pool_sizes, each.key, each.value.size)
+    max_unavailable_percentage = 50
   }
 
   depends_on = [

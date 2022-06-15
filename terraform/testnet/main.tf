@@ -40,7 +40,9 @@ module "validator" {
   k8s_admins         = var.k8s_admins
   ssh_pub_key        = var.ssh_pub_key
 
-  max_node_pool_surge = var.enable_forge ? 2 : 1
+  # allow all nodegroups to surge to 2x their size, in case of total nodes replacement
+  max_node_pool_surge = 2
+
   node_pool_sizes = var.validator_lite_mode ? {
     utilities  = var.num_utilities_instance > 0 ? var.num_utilities_instance : 3
     validators = var.num_validator_instance > 0 ? var.num_validator_instance : var.num_validators + var.num_public_fullnodes
@@ -79,7 +81,7 @@ provider "kubernetes" {
 resource "helm_release" "testnet" {
   name        = "aptos"
   chart       = "${path.module}/testnet"
-  max_history = var.enable_forge ? 2 : 10
+  max_history = 2
   wait        = false
 
   values = [
@@ -142,7 +144,7 @@ resource "helm_release" "validator" {
   count       = var.num_validators
   name        = "val${count.index}"
   chart       = var.validator_lite_mode ? "${path.module}/../helm/validator-lite" : "${path.module}/../helm/validator"
-  max_history = var.enable_forge ? 2 : 10
+  max_history = 2
   wait        = false
 
   values = [
