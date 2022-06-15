@@ -47,6 +47,7 @@ impl StateSyncMetricsEvaluator {
                 score: 0,
                 explanation: format!("The {} set of metrics from the target node is missing the state sync metric: {}", metrics_round, STATE_SYNC_METRIC),
                 source: self.get_name(),
+                links: vec![],
             }),
         }
     }
@@ -62,10 +63,11 @@ impl StateSyncMetricsEvaluator {
         match target_progress {
             target_progress if (target_progress == 0) => {
                 EvaluationResult {
-                  headline: "State sync version is not progressing".to_string(),
-                  score: 50,
-                  explanation: "Successfully pulled metrics from target node twice, but the metrics aren't progressing.".to_string(),
-                  source: self.get_name(),
+                    headline: "State sync version is not progressing".to_string(),
+                    score: 50,
+                    explanation: "Successfully pulled metrics from target node twice, but the metrics aren't progressing.".to_string(),
+                    source: self.get_name(),
+                    links: vec![],
               }
             }
             target_progress if (target_progress < 0) => {
@@ -74,6 +76,7 @@ impl StateSyncMetricsEvaluator {
                     score: 0,
                     explanation: "Successfully pulled metrics from target node twice, but the second time the state sync version went backwards!".to_string(),
                     source: self.get_name(),
+                    links: vec![],
                 }
             }
             wildcard => {
@@ -90,6 +93,7 @@ impl StateSyncMetricsEvaluator {
                             delta_from_baseline, latest_target_version, latest_baseline_version, self.args.version_delta_tolerance
                         ),
                         source: self.get_name(),
+                        links: vec![],
                     }
                 } else {
                     EvaluationResult {
@@ -105,6 +109,7 @@ impl StateSyncMetricsEvaluator {
                             self.args.version_delta_tolerance
                         ),
                         source: self.get_name(),
+                        links: vec![],
                     }
                 }
             }

@@ -63,6 +63,9 @@ pub struct EvaluationResult {
 
     /// Name of the evaluator where the evaluation came from, e.g. state_sync.
     pub source: String,
+
+    /// Links that might help the user fix a potential problem.
+    pub links: Vec<String>,
 }
 
 #[derive(Clone, Debug, PoemObject)]
