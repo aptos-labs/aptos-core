@@ -57,6 +57,7 @@ impl IntoIterator for Payload {
     type Item = SignedTransaction;
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
+    // TODO: delete
     fn into_iter(self) -> Self::IntoIter {
         match self {
             Payload::DirectMempool(txns) => txns.into_iter(),

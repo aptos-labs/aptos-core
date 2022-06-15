@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    commit_notifier::QuorumStoreCommitNotifier,
     counters,
+    data_manager::QuorumStoreDataManager,
     epoch_manager::EpochManager,
     network::NetworkTask,
     network_interface::{ConsensusNetworkEvents, ConsensusNetworkSender},
@@ -46,15 +46,13 @@ pub fn start_consensus(
         consensus_to_mempool_sender.clone(),
         node_config.consensus.mempool_executed_txn_timeout_ms,
     ));
-    let commit_notifier = Arc::new(QuorumStoreCommitNotifier::new(
-        node_config.consensus.quorum_store_pull_timeout_ms,
-    ));
+    let data_manager = Arc::new(QuorumStoreDataManager::new());
 
     let state_computer = Arc::new(ExecutionProxy::new(
         Box::new(BlockExecutor::<AptosVM>::new(aptos_db)),
         txn_notifier,
         state_sync_notifier,
-        commit_notifier.clone(),
+        data_manager.clone(),
         runtime.handle(),
     ));
 
@@ -74,7 +72,7 @@ pub fn start_consensus(
         state_computer,
         storage,
         reconfig_events,
-        commit_notifier,
+        data_manager,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);

@@ -263,6 +263,7 @@ impl BatchReader {
     }
 
     // TODO: maybe check the epoch to stop communicating on epoch change.
+    // TODO: use timeouts and return an error if cannot get tha batch.
     #[allow(dead_code)]
     pub async fn get_batch(&self, proof: ProofOfStore, ret_tx: oneshot::Sender<Data>) {
         if let Some(value) = self.db_cache.get(&proof.digest()) {

@@ -13,9 +13,9 @@
 #![recursion_limit = "512"]
 
 mod block_storage;
-mod commit_notifier;
 mod consensusdb;
 mod counters;
+mod data_manager;
 mod epoch_manager;
 mod error;
 mod experimental;
