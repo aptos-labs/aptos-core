@@ -10,28 +10,27 @@ variable "GCP_DOCKER_ARTIFACT_REPO" {}
 variable "ecr_base" {
   default = "${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.us-west-2.amazonaws.com/aptos"
 }
-
 variable "normalized_git_branch" {
   default = regex_replace("${GIT_BRANCH}", "[^a-zA-Z0-9]", "-")
 }
 
 group "default" {
   targets = [
-    "community-platform",
+    "indexer-server",
   ]
 }
 
-target "community-platform" {
+target "indexer-server" {
   dockerfile = "Dockerfile"
   context    = "."
   cache-from = [
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/community-platform:cache-main",
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/community-platform:cache-auto",
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/community-platform:cache-${normalized_git_branch}",
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/indexer-server:cache-main",
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/indexer-server:cache-auto",
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/indexer-server:cache-${normalized_git_branch}",
   ]
-  cache-to = ["type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/community-platform:cache-${normalized_git_branch},mode=max"]
+  cache-to = ["type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/indexer-server:cache-${normalized_git_branch},mode=max"]
   tags = [
-    "${ecr_base}/community-platform:${GIT_SHA}",
-    "${GCP_DOCKER_ARTIFACT_REPO}/community-platform:${GIT_SHA}",
+    "${ecr_base}/indexer-server:${GIT_SHA}",
+    "${GCP_DOCKER_ARTIFACT_REPO}/indexer-server:${GIT_SHA}",
   ]
 }

@@ -28,6 +28,10 @@ variable "gh_image_cache" {
   default = "ghcr.io/aptos-labs/aptos-core"
 }
 
+variable "normalized_git_branch" {
+  default = regex_replace("${GIT_BRANCH}", "[^a-zA-Z0-9]", "-")
+}
+
 # images with IMAGE_TARGET=release for rust build
 group "release" {
   targets = [
@@ -139,13 +143,13 @@ function "generate_cache_from" {
   result = [
     "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-main",
     "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-auto",
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${GIT_BRANCH}"
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${normalized_git_branch}"
   ]
 }
 
 function "generate_cache_to" {
   params = [target]
-  result = ["type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${GIT_BRANCH},mode=max"]
+  result = ["type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${normalized_git_branch},mode=max"]
 }
 
 function "generate_tags" {
