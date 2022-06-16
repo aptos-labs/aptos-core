@@ -8,8 +8,7 @@ use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use log::debug;
 use reqwest::{Client as ReqwestClient, Url};
-use std::collections::HashMap;
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 use url::Host;
 
 // TODO Make it possible to reject nodes unless they are a specific type.
