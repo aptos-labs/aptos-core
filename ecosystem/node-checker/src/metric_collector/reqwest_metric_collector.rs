@@ -8,6 +8,7 @@ use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use log::debug;
 use reqwest::{Client as ReqwestClient, Url};
+use std::collections::HashMap;
 use std::time::Duration;
 use url::Host;
 
@@ -53,19 +54,16 @@ impl ReqwestMetricCollector {
         }
     }
 
-    fn get_metrics_endpoint(&self) -> Url {
+    fn get_url(&self, path: &str) -> Url {
         let mut url = self.node_url.clone();
         url.set_port(Some(self.metrics_port)).unwrap();
-        url.set_path("metrics");
+        url.set_path(path);
         url
     }
-}
 
-#[async_trait]
-impl MetricCollector for ReqwestMetricCollector {
-    async fn collect_metrics(&self) -> Result<Vec<String>, MetricCollectorError> {
-        let url = self.get_metrics_endpoint();
-        debug!("Connecting to {} to collect metrics", url);
+    async fn get_data_from_node(&self, path: &str) -> Result<String, MetricCollectorError> {
+        let url = self.get_url(path);
+        debug!("Connecting to {}", url);
         let response = self
             .client
             .get(url.clone())
@@ -79,6 +77,36 @@ impl MetricCollector for ReqwestMetricCollector {
             .await
             .with_context(|| format!("Failed to process response body from {}", url))
             .map_err(|e| MetricCollectorError::ResponseParseError(anyhow!(e)))?;
+        Ok(body)
+    }
+}
+
+#[async_trait]
+impl MetricCollector for ReqwestMetricCollector {
+    async fn collect_metrics(&self) -> Result<Vec<String>, MetricCollectorError> {
+        let body = self.get_data_from_node("metrics").await?;
         Ok(body.lines().map(|line| line.to_owned()).collect())
+    }
+
+    /// We know that this endpoint returns JSON that is actually just HashMap<String, String>.
+    /// Better than this would be to have that endpoint return a serialized struct that we can
+    /// use here to deseralize. TODO for that.
+    async fn collect_system_information(
+        &self,
+    ) -> Result<HashMap<String, String>, MetricCollectorError> {
+        let body = self.get_data_from_node("system_information").await?;
+        let raw_map: HashMap<String, serde_json::Value> = serde_json::from_str(&body)
+            .context("Failed to process response body as JSON")
+            .map_err(|e| MetricCollectorError::ResponseParseError(anyhow!(e)))?;
+        let mut out = HashMap::new();
+        for (key, value) in raw_map.into_iter() {
+            let string_value = value
+                .as_str()
+                .with_context(|| format!("Failed to convert value to String: {}", value))
+                .map_err(|e| MetricCollectorError::ResponseParseError(anyhow!(e)))?
+                .to_owned();
+            out.insert(key, string_value);
+        }
+        Ok(out)
     }
 }
