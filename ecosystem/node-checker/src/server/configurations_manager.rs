@@ -24,11 +24,13 @@ use url::Url;
 
 /// This struct is a wrapper to help with all the different baseline
 /// node configurations.
+#[derive(Debug)]
 pub struct ConfigurationsManager<M: MetricCollector, R: Runner> {
     /// They key here is the configuration_name.
     pub configurations: HashMap<String, NodeConfigurationWrapper<M, R>>,
 }
 
+#[derive(Debug)]
 pub struct NodeConfigurationWrapper<M: MetricCollector, R: Runner> {
     pub node_configuration: NodeConfiguration,
     pub baseline_metric_collector: M,

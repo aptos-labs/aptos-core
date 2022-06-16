@@ -13,7 +13,7 @@ use poem::{
     handler, http::StatusCode, listener::TcpListener, Error as PoemError, Result as PoemResult,
     Route, Server,
 };
-use poem_openapi::{payload::Json, OpenApi, OpenApiService};
+use poem_openapi::{payload::Json, types::Example, Object as PoemObject, OpenApi, OpenApiService};
 use std::{collections::HashMap, marker::PhantomData};
 use url::Url;
 
@@ -36,7 +36,7 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
             None => {
                 return Err(PoemError::from((
                     StatusCode::BAD_REQUEST,
-                    anyhow!("No baseline configuration name provided"),
+                    anyhow!("You must provide a baseline configuration name for now"),
                 )))
             }
         };
@@ -68,8 +68,7 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
     #[oai(path = "/check_node", method = "get")]
     async fn check_node(
         &self,
-        target_node: Json<NodeAddress>,
-        baseline_configuration_name: Option<String>,
+        request: Json<CheckNodeRequest>,
     ) -> PoemResult<Json<EvaluationSummary>> {
         if self.allow_preconfigured_test_node_only {
             return Err(PoemError::from((
@@ -79,7 +78,7 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
             )));
         }
         // todo check if this is necessary now that the type is URL, and if it is, use set_scheme instead.
-        let mut target_url = target_node.url.to_string();
+        let mut target_url = request.target_node.url.to_string();
         if !target_url.starts_with("http") {
             target_url = format!("http://{}", target_url);
         }
@@ -89,10 +88,10 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
         };
 
         let baseline_node_configuration =
-            self.get_baseline_node_configuration(&baseline_configuration_name)?;
+            self.get_baseline_node_configuration(&request.baseline_configuration_name)?;
 
         let target_metric_collector =
-            ReqwestMetricCollector::new(target_url, target_node.metrics_port);
+            ReqwestMetricCollector::new(target_url, request.target_node.metrics_port);
 
         let complete_evaluation_result = baseline_node_configuration
             .runner
@@ -112,7 +111,7 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
     #[oai(path = "/check_preconfigured_node", method = "get")]
     async fn check_preconfigured_node(
         &self,
-        baseline_configuration_name: Option<String>,
+        baseline_configuration_name: Json<Option<String>>,
     ) -> PoemResult<Json<EvaluationSummary>> {
         if self.target_metric_collector.is_none() {
             return Err(PoemError::from((
@@ -142,6 +141,22 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
     }
 }
 
+#[derive(Clone, Debug, PoemObject)]
+#[oai(example)]
+struct CheckNodeRequest {
+    target_node: NodeAddress,
+    baseline_configuration_name: Option<String>,
+}
+
+impl Example for CheckNodeRequest {
+    fn example() -> Self {
+        Self {
+            baseline_configuration_name: Some("Devnet Full Node".to_string()),
+            target_node: NodeAddress::example(),
+        }
+    }
+}
+
 pub fn build_openapi_service<M: MetricCollector, R: Runner>(
     api: Api<M, R>,
     listen_address: Url,
@@ -150,8 +165,16 @@ pub fn build_openapi_service<M: MetricCollector, R: Runner>(
 ) -> OpenApiService<Api<M, R>, ()> {
     let version = std::env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.1.0".to_string());
     // TODO: Ensure we have a scheme on listen address.
+    let host = listen_address
+        .host_str()
+        .expect("Failed to find host in listen address");
     let endpoint = endpoint_override.unwrap_or("api");
-    let api_service = OpenApiService::new(api, "Aptos Node Checker", version)
-        .server(format!("{}:{}/{}", listen_address, listen_port, endpoint));
+    let api_service = OpenApiService::new(api, "Aptos Node Checker", version).server(format!(
+        "{}://{}:{}/{}",
+        listen_address.scheme(),
+        host,
+        listen_port,
+        endpoint
+    ));
     api_service
 }

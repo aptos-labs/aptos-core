@@ -14,6 +14,7 @@ use crate::{
 };
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
+use log::debug;
 use poem::{
     handler, http::StatusCode, listener::TcpListener, Error as PoemError, Result as PoemResult,
     Route, Server,
@@ -72,6 +73,10 @@ pub async fn run(args: Run) -> Result<()> {
     )
     .await
     .context("Failed to build baseline node configurations")?;
+    debug!(
+        "Running with the following configuration: {:#?}",
+        configurations_manager.configurations
+    );
 
     let target_metric_collector = match args.target_node_url {
         Some(ref url) => Some(ReqwestMetricCollector::new(
@@ -93,8 +98,12 @@ pub async fn run(args: Run) -> Result<()> {
     let spec_json = api_service.spec_endpoint();
     let spec_yaml = api_service.spec_endpoint_yaml();
 
+    debug!("Successfully built API");
+
     Server::new(TcpListener::bind((
-        args.listen_address.to_string(),
+        args.listen_address
+            .host_str()
+            .with_context(|| format!("Failed to pull host from {}", args.listen_address))?,
         args.listen_port,
     )))
     .run(
