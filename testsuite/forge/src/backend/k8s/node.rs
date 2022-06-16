@@ -83,7 +83,7 @@ impl Node for K8sNode {
             .expect("Invalid URL.")
     }
 
-    fn debug_endpoint(&self) -> Url {
+    fn inspection_service_endpoint(&self) -> Url {
         Url::parse(&format!("http://{}:{}", self.ip(), self.port())).unwrap()
     }
 

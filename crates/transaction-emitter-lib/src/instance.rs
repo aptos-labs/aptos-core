@@ -14,15 +14,15 @@ use tokio::time;
 pub struct Instance {
     peer_name: String,
     url: Url,
-    debug_interface_port: Option<u32>,
+    inspection_service_port: Option<u32>,
 }
 
 impl Instance {
-    pub fn new(peer_name: String, url: Url, debug_interface_port: Option<u32>) -> Instance {
+    pub fn new(peer_name: String, url: Url, inspection_service_port: Option<u32>) -> Instance {
         Instance {
             peer_name,
             url,
-            debug_interface_port,
+            inspection_service_port,
         }
     }
 
@@ -44,8 +44,8 @@ impl Instance {
         self.url.clone()
     }
 
-    pub fn debug_interface_port(&self) -> Option<u32> {
-        self.debug_interface_port
+    pub fn inspection_service_port(&self) -> Option<u32> {
+        self.inspection_service_port
     }
 
     pub fn rest_client(&self) -> RestClient {

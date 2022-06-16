@@ -12,8 +12,7 @@ use aptos_config::{
 };
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_infallible::RwLock;
-use aptos_logger::{prelude::*, Logger};
-use aptos_metrics::metric_server;
+use aptos_logger::prelude::*;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -29,10 +28,9 @@ use data_streaming_service::{
     streaming_client::{new_streaming_service_client_listener_pair, StreamingServiceClient},
     streaming_service::DataStreamingService,
 };
-use debug_interface::node_debug_service::NodeDebugService;
 use event_notifications::EventSubscriptionService;
 use executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
-use futures::{channel::mpsc::channel, stream::StreamExt};
+use futures::channel::mpsc::channel;
 use mempool_notifications::MempoolNotificationSender;
 use network::application::storage::PeerMetadataStorage;
 use network_builder::builder::NetworkBuilder;
@@ -44,7 +42,6 @@ use std::{
     boxed::Box,
     collections::{HashMap, HashSet},
     io::Write,
-    net::ToSocketAddrs,
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -59,7 +56,6 @@ use storage_service_server::{
     network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer,
 };
 use tokio::runtime::{Builder, Runtime};
-use tokio_stream::wrappers::IntervalStream;
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
@@ -69,14 +65,13 @@ pub struct AptosHandle {
     _api: Runtime,
     _backup: Runtime,
     _consensus_runtime: Option<Runtime>,
-    _debug: NodeDebugService,
     _mempool: Runtime,
     _network_runtimes: Vec<Runtime>,
     _state_sync_runtimes: StateSyncRuntimes,
     _telemetry_runtime: Option<Runtime>,
 }
 
-pub fn start(config: &NodeConfig, log_file: Option<PathBuf>) {
+pub fn start(config: NodeConfig, log_file: Option<PathBuf>) {
     crash_handler::setup_panic_handler();
 
     let mut logger = aptos_logger::Logger::new();
@@ -91,7 +86,7 @@ pub fn start(config: &NodeConfig, log_file: Option<PathBuf>) {
     if let Some(log_file) = log_file {
         logger.printer(Box::new(FileWriter::new(log_file)));
     }
-    let logger = Some(logger.build());
+    let _logger = Some(logger.build());
 
     // Let's now log some important information, since the logger is set up
     info!(config = config, "Loaded AptosNode config");
@@ -107,7 +102,7 @@ pub fn start(config: &NodeConfig, log_file: Option<PathBuf>) {
         warn!("failpoints is set in config, but the binary doesn't compile with this feature");
     }
 
-    let _node_handle = setup_environment(config, logger);
+    let _node_handle = setup_environment(config);
     let term = Arc::new(AtomicBool::new(false));
 
     while !term.load(Ordering::Acquire) {
@@ -212,7 +207,7 @@ pub fn load_test_environment<R>(
 
     println!("\nAptos is running, press ctrl-c to exit\n");
 
-    start(&config, Some(log_file))
+    start(config, Some(log_file))
 }
 
 // Fetch chain ID from on-chain resource
@@ -227,19 +222,6 @@ fn fetch_chain_id(db: &DbReaderWriter) -> ChainId {
         .expect("[aptos-node] failed to get chain ID resource")
         .expect("[aptos-node] missing chain ID resource")
         .chain_id()
-}
-
-fn setup_debug_interface(config: &NodeConfig, logger: Option<Arc<Logger>>) -> NodeDebugService {
-    let addr = format!(
-        "{}:{}",
-        config.debug_interface.address, config.debug_interface.admission_control_node_debug_port,
-    )
-    .to_socket_addrs()
-    .unwrap()
-    .next()
-    .unwrap();
-
-    NodeDebugService::new(addr, logger, config)
 }
 
 fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
@@ -390,55 +372,14 @@ fn setup_state_sync_storage_service(
     storage_service_runtime
 }
 
-async fn periodic_state_dump(node_config: NodeConfig, db: DbReaderWriter) {
-    let args: Vec<String> = ::std::env::args().collect();
+pub fn setup_environment(node_config: NodeConfig) -> AptosHandle {
+    // Start the node inspection service
+    let node_config_clone = node_config.clone();
+    thread::spawn(move || {
+        inspection_service::inspection_service::start_inspection_service(node_config_clone)
+    });
 
-    // Once an hour
-    let mut config_interval = IntervalStream::new(tokio::time::interval(
-        std::time::Duration::from_secs(60 * 60),
-    ))
-    .fuse();
-    // Once a minute
-    let mut version_interval =
-        IntervalStream::new(tokio::time::interval(std::time::Duration::from_secs(60))).fuse();
-
-    info!("periodic_state_dump task started");
-
-    loop {
-        futures::select! {
-            _ = config_interval.select_next_some() => {
-                info!(config = node_config, args = args, "config and command line arguments");
-            }
-            _ = version_interval.select_next_some() => {
-                let chain_id = fetch_chain_id(&db);
-                let ledger_info = if let Ok(ledger_info) = db.reader.get_latest_ledger_info() {
-                    ledger_info
-                } else {
-                    warn!("unable to query latest ledger info");
-                    continue;
-                };
-
-                let latest_ledger_verion = ledger_info.ledger_info().version();
-                let root_hash = ledger_info.ledger_info().transaction_accumulator_hash();
-
-                info!(
-                    chain_id = chain_id,
-                    latest_ledger_verion = latest_ledger_verion,
-                    root_hash = root_hash,
-                    "latest ledger version and its corresponding root hash"
-                );
-            }
-        }
-    }
-}
-
-pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) -> AptosHandle {
-    let debug_if = setup_debug_interface(node_config, logger);
-
-    let metrics_port = node_config.debug_interface.metrics_server_port;
-    let metric_host = node_config.debug_interface.address.clone();
-    thread::spawn(move || metric_server::start_server(metric_host, metrics_port));
-
+    // Open the database
     let mut instant = Instant::now();
     let (aptos_db, db_rw) = DbReaderWriter::wrap(
         AptosDB::open(
@@ -456,7 +397,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
     let genesis_waypoint = node_config.base.waypoint.genesis_waypoint();
     // if there's genesis txn and waypoint, commit it if the result matches.
-    if let Some(genesis) = get_genesis_txn(node_config) {
+    if let Some(genesis) = get_genesis_txn(&node_config) {
         maybe_bootstrap::<AptosVM>(&db_rw, genesis, genesis_waypoint)
             .expect("Db-bootstrapper should not fail.");
     } else {
@@ -607,7 +548,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
     // Create the state sync runtimes
     let state_sync_runtimes = create_state_sync_runtimes(
-        node_config,
+        &node_config,
         storage_service_server_network_handles,
         storage_service_client_network_handles,
         state_sync_network_handles,
@@ -621,7 +562,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
     let (mp_client_sender, mp_client_events) = channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
-    let api_runtime = bootstrap_api(node_config, chain_id, aptos_db, mp_client_sender).unwrap();
+    let api_runtime = bootstrap_api(&node_config, chain_id, aptos_db, mp_client_sender).unwrap();
 
     let mut consensus_runtime = None;
     let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
@@ -629,7 +570,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
     instant = Instant::now();
     let mempool = aptos_mempool::bootstrap(
-        node_config,
+        &node_config,
         Arc::clone(&db_rw.reader),
         mempool_network_handles,
         mp_client_events,
@@ -665,24 +606,18 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         // Initialize and start consensus.
         instant = Instant::now();
         consensus_runtime = Some(start_consensus(
-            node_config,
+            &node_config,
             consensus_network_sender,
             consensus_network_events,
             Arc::new(consensus_notifier),
             consensus_to_mempool_sender,
-            db_rw.clone(),
+            db_rw,
             consensus_reconfig_subscription
                 .expect("Consensus requires a reconfiguration subscription!"),
             peer_metadata_storage,
         ));
         debug!("Consensus started in {} ms", instant.elapsed().as_millis());
     }
-
-    // Spawn a task which will periodically dump some interesting state
-    debug_if
-        .runtime()
-        .handle()
-        .spawn(periodic_state_dump(node_config.to_owned(), db_rw));
 
     // Create the telemetry service
     let telemetry_runtime = aptos_telemetry::service::start_telemetry_service(
@@ -694,7 +629,6 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         _api: api_runtime,
         _backup: backup_service,
         _consensus_runtime: consensus_runtime,
-        _debug: debug_if,
         _mempool: mempool,
         _network_runtimes: network_runtimes,
         _state_sync_runtimes: state_sync_runtimes,

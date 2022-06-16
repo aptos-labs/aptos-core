@@ -28,7 +28,6 @@ aptos-genesis = { path = "../crates/aptos-genesis", features = ["testing"] }
 aptos-infallible = { path = "../crates/aptos-infallible" }
 aptos-logger = { path = "../crates/aptos-logger" }
 aptos-mempool = { path = "../mempool" }
-aptos-metrics = { path = "../crates/aptos-metrics" }
 aptos-secure-storage = { path = "../secure/storage" }
 aptos-state-view = { path = "../storage/state-view" }
 aptos-telemetry = { path = "../crates/aptos-telemetry" }
@@ -44,11 +43,11 @@ consensus = { path = "../consensus" }
 consensus-notifications = { path = "../state-sync/inter-component/consensus-notifications" }
 crash-handler = { path = "../crates/crash-handler" }
 data-streaming-service = { path = "../state-sync/state-sync-v2/data-streaming-service" }
-debug-interface = { path = "../crates/debug-interface" }
 event-notifications = { path = "../state-sync/inter-component/event-notifications" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
 framework = { path = "../aptos-move/framework" }
+inspection-service = { path = "../crates/inspection-service" }
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
 network = { path = "../network" }
 network-builder = { path = "../network/builder" }

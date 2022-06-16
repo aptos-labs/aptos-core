@@ -56,7 +56,6 @@ aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
 aptos-writeset-generator = { path = "../../aptos-move/writeset-transaction-generator" }
 backup-cli = { path = "../../storage/backup/backup-cli" }
-debug-interface = { path = "../../crates/debug-interface" }
 
 [[test]]
 name = "forge"
