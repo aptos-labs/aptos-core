@@ -5,6 +5,7 @@ FROM phusion/passenger-full:2.3.0
 ADD nginx.conf /etc/nginx/sites-enabled/webapp.conf
 
 RUN npm install -g yarn && \
+  rm -f /etc/my_init.d/10_syslog-ng.init && \
   rm -f /etc/service/nginx/down && \
   rm -f /etc/nginx/sites-enabled/default && \
   mkdir /home/app/webapp && \
