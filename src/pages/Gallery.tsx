@@ -39,12 +39,16 @@ function Gallery() {
             <CreateNFTModal />
           </Flex>
         </Grid>
+        <Flex alignItems="flex-start" width="100%">
+          <Heading fontWeight={500} fontSize="md">Created by you</Heading>
+        </Flex>
         <SimpleGrid w="100%" columns={2} spacing={2}>
           {
             (galleryItems && galleryItems.length > 0)
               ? (
                 galleryItems?.map((item) => (
                   <GalleryItem
+                    id={item.id}
                     key={`${item.name}`}
                     imageSrc={item.metadata?.image || 'https://www.publicdomainpictures.net/pictures/280000/nahled/not-found-image-15383864787lu.jpg'}
                   />

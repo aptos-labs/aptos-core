@@ -56,7 +56,7 @@ export default function WalletFooter() {
         <Center width="100%">
           <ChakraLink to="/gallery">
             <IconButton
-              color={(pathname.includes('/gallery'))
+              color={(pathname.includes('/gallery') || pathname.includes('/tokens'))
                 ? secondaryIconUnpressedColor[colorMode]
                 : secondaryIconColor[colorMode]}
               variant="unstyled"

@@ -33,7 +33,7 @@ export default function WalletLayout({
       height="100%"
       width="100%"
       maxW="100%"
-      templateRows="30px 1fr 50px"
+      templateRows="40px 1fr 50px"
       bgColor={secondaryBgColor[colorMode]}
     >
       <WalletHeader backPage={backPage} />

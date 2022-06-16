@@ -18,6 +18,7 @@ import CreateWallet from 'pages/CreateWallet';
 import Gallery from 'pages/Gallery';
 import Credentials from 'pages/Credentials';
 import Network from 'pages/Network';
+import Token from 'pages/Token';
 
 const theme: ThemeConfig = extendTheme({
   initialColorMode: 'dark',
@@ -52,6 +53,7 @@ root.render(
               <Route path="/settings" element={<Settings />} />
               <Route path="/settings/network" element={<Network />} />
               <Route path="/settings/credentials" element={<Credentials />} />
+              <Route path="/tokens/:id" element={<Token />} />
             </Routes>
           </MemoryRouter>
         </WalletStateProvider>

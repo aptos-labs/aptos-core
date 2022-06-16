@@ -1,18 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient, HexString } from 'aptos';
-import axios from 'axios';
+import { AptosClient, HexString, TokenClient } from 'aptos';
+import axios, { AxiosError, AxiosResponse } from 'axios';
 import { useQuery } from 'react-query';
 import { validStorageUris } from 'core/constants';
 import useWalletState from 'core/hooks/useWalletState';
 import { MetadataJson } from 'core/types/TokenMetadata';
 import { AptosAccountState } from 'core/types';
 import { AptosNetwork } from 'core/utils/network';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
+import { getTokenIdDictFromString, TokenId } from 'core/utils/token';
 
 interface TokenAttributes {
   description?: string;
+  id?: TokenId,
   imageUri?: string;
   metadata?: MetadataJson,
   name: string;
@@ -85,6 +87,7 @@ export const getGalleryItems = async ({
         && 'function' in accountTransaction.payload
         && accountTransaction.payload.function === '0x1::Token::create_unlimited_token_script'
       ) {
+        const creator = (accountTransaction as any).sender;
         const collectionName = new HexString(
           accountTransaction.payload.arguments[0],
         ).toBuffer().toString();
@@ -95,6 +98,11 @@ export const getGalleryItems = async ({
           accountTransaction.payload.arguments[5],
         ).toBuffer().toString();
         collectionDict[collectionName].push({
+          id: {
+            collection: collectionName,
+            creator,
+            name,
+          },
           metadata: storageDict[uri],
           name,
           uri,
@@ -109,7 +117,67 @@ export const getGalleryItems = async ({
 
 export const collectiblesQueryKeys = Object.freeze({
   getGalleryItems: 'getGalleryItems',
+  getTokenData: 'getTokenData',
 } as const);
+
+interface GetTokenDataProps {
+  id: TokenId;
+  nodeUrl: string;
+}
+
+export const getTokenData = async ({
+  id,
+  nodeUrl,
+}: GetTokenDataProps) => {
+  const aptosClient = new AptosClient(nodeUrl);
+  const tokenClient = new TokenClient(aptosClient);
+  const data = await tokenClient.getTokenData(id.creator, id.collection, id.name);
+  return data;
+};
+
+interface UseTokenDataProps {
+  tokenId: string;
+}
+
+export interface TokenDataResponse {
+  collection: string;
+  description: string;
+  maximum: {
+    vec: number[]
+  },
+  metadata?: MetadataJson;
+  name: string;
+  supply: {
+    vec: number[]
+  };
+  uri: string;
+}
+
+export const useTokenData = ({
+  tokenId,
+}: UseTokenDataProps) => {
+  const { aptosNetwork } = useWalletState();
+  const tokenIdDict = useMemo(() => getTokenIdDictFromString({ tokenId }), []);
+
+  const getGalleryItemsQuery = useCallback(async () => {
+    const tokenData = await getTokenData({
+      id: tokenIdDict,
+      nodeUrl: aptosNetwork,
+    });
+
+    // Cast as AxiosResponse of type TokenDataResponse
+    const reformattedTokenData = (
+      tokenData as unknown as AxiosResponse<TokenDataResponse, AxiosError>
+    ).data;
+
+    // Get Arweave / IPFS link
+    const tokenMetadata = await axios.get<MetadataJson>(reformattedTokenData.uri);
+    reformattedTokenData.metadata = tokenMetadata.data;
+    return reformattedTokenData;
+  }, [aptosNetwork, tokenIdDict]);
+
+  return useQuery(collectiblesQueryKeys.getTokenData, getGalleryItemsQuery);
+};
 
 export const useGalleryItems = () => {
   const {
