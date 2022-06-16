@@ -38,7 +38,7 @@ To create a static identity for your FullNode:
 
 1. You first create a private key, public key pair for your FullNode.
 2. Next you derive the `peer_id` from the public key.
-3. Finally, you use the `peer_id` in your `public_full_node.yaml` to create a static network identity for your FullNode.
+3. Finally, you use the `peer_id` in your `fullnode.yaml` to create a static network identity for your FullNode.
 
 Follow the below detailed steps:
 
@@ -129,12 +129,12 @@ Follow the below detailed steps:
    role: Upstream
     ```
 
-  In this example, `B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813` is the `peer_id`. Use this in the `peer_id` field of your `public_full_node.yaml` to create a static identity for your FullNode.
+  In this example, `B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813` is the `peer_id`. Use this in the `peer_id` field of your `fullnode.yaml` to create a static identity for your FullNode.
 
 
 ## Start a node with a static network identity
 
-After you generated the public identity key you can startup the FullNode with a static network identity by using the public key in the `peer_id` field of the configuration file `public_full_node.yaml`:
+After you generated the public identity key you can startup the FullNode with a static network identity by using the public key in the `peer_id` field of the configuration file `fullnode.yaml`:
 
 ```
 full_node_networks:
@@ -170,8 +170,8 @@ In the below steps, the port numbers used are for illustration only. You can use
 
 - Make sure you open port `6180` (or `6182`, for example, depending on which port your node is listening to) and that you open your firewall.
 - If you are using Docker, simply add `- "6180:6180"` or `- "6182:6182"` under ports in your ``docker-compose.yaml`` file.
-- Share your FullNode static network identity with others. They can then use it in the `seeds` key of their `public_full_node.yaml` file to connect to your FullNode.
-- Make sure the port number you put in the `addresses` matches the one you have in the FullNode configuration file `public_full_node.yaml` (for example, `6180` or `6182`).
+- Share your FullNode static network identity with others. They can then use it in the `seeds` key of their `fullnode.yaml` file to connect to your FullNode.
+- Make sure the port number you put in the `addresses` matches the one you have in the FullNode configuration file `fullnode.yaml` (for example, `6180` or `6182`).
 
 Share your FullNode static network identity in the following format in the Discord channel `advertise-full-nodes`:
 
