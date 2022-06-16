@@ -4,11 +4,12 @@
 use std::sync::Arc;
 // use futures::channel::{mpsc, mpsc::Sender, oneshot};
 use crate::quorum_store::batch_reader::BatchReader;
-use crate::quorum_store::types::Data;
 use aptos_types::transaction::SignedTransaction;
 use arc_swap::ArcSwapOption;
-use consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
+use consensus_types::common::Payload;
+use consensus_types::proof_of_store::LogicalTime;
 use tokio::sync::oneshot;
+use executor_types::Error;
 
 /// Notification of execution committed logical time for QuorumStore to clean.
 #[async_trait::async_trait]
@@ -18,7 +19,7 @@ pub trait DataManager: Send + Sync {
 
     fn new_epoch(&self, data_reader: Arc<BatchReader>);
 
-    async fn get_data(&self, poss: Vec<ProofOfStore>) -> Vec<SignedTransaction>;
+    async fn get_data(&self, payload: Payload) -> Result<Vec<SignedTransaction>, Error>;
 }
 
 /// Execution -> QuorumStore notification of commits.
@@ -47,24 +48,33 @@ impl DataManager for QuorumStoreDataManager {
     }
 
     // TODO: handle the case that the data was garbage collected and return error
-    async fn get_data(&self, poss: Vec<ProofOfStore>) -> Vec<SignedTransaction> {
-        let mut receivers: Vec<oneshot::Receiver<Data>> = Vec::new();
-        for pos in poss {
-            let (tx_data, rx_data) = oneshot::channel();
-            self.data_reader
-                .load()
-                .as_ref()
-                .unwrap() //TODO: can this be None? Need to make sure we call new_epoch() first.
-                .get_batch(pos, tx_data)
-                .await;
-            receivers.push(rx_data);
+    async fn get_data(&self, payload: Payload) -> Result<Vec<SignedTransaction>, Error> {
+        match payload {
+            Payload::DirectMempool(txns) => Ok(txns),
+            Payload::InQuorumStore(poss) => {
+                let mut receivers = Vec::new();
+                for pos in poss {
+                    let (tx_data, rx_data) = oneshot::channel();
+                    self.data_reader
+                        .load()
+                        .as_ref()
+                        .unwrap() //TODO: can this be None? Need to make sure we call new_epoch() first.
+                        .get_batch(pos, tx_data)
+                        .await;
+                    receivers.push(rx_data);
+                }
+                let mut ret = Vec::new();
+                for rx in receivers {
+                    match rx.await.expect("oneshot was dropped") {
+                        Ok(data) => { ret.push(data) }
+                        Err(_) => {
+                            return Err(Error::CouldNotGetData);
+                        }
+                    }
+                }
+                Ok(ret.into_iter().flatten().collect())
+            }
         }
-        let mut ret = Vec::new();
-        for rx in receivers {
-            ret.push(rx.await.expect("oneshot was dropped"));
-        }
-
-        ret.into_iter().flatten().collect()
     }
 
     fn new_epoch(&self, data_reader: Arc<BatchReader>) {

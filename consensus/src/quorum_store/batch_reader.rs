@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_interface::ConsensusMsg;
+use crate::quorum_store::quorum_store::QuorumStoreError;
 use crate::quorum_store::types::{Batch, Data, PersistedValue};
 use crate::{
     network::NetworkSender,
@@ -33,7 +34,10 @@ const MAX_BATCH_EXPIRY_ROUND_GAP: Round = 20;
 #[allow(dead_code)]
 pub(crate) enum BatchReaderCommand {
     GetBatchForPeer(HashValue, PeerId),
-    GetBatchForSelf(ProofOfStore, oneshot::Sender<Data>),
+    GetBatchForSelf(
+        ProofOfStore,
+        oneshot::Sender<Result<Data, QuorumStoreError>>,
+    ),
     BatchResponse(HashValue, Data),
 }
 
@@ -265,11 +269,11 @@ impl BatchReader {
     // TODO: maybe check the epoch to stop communicating on epoch change.
     // TODO: use timeouts and return an error if cannot get tha batch.
     #[allow(dead_code)]
-    pub async fn get_batch(&self, proof: ProofOfStore, ret_tx: oneshot::Sender<Data>) {
+    pub async fn get_batch(&self, proof: ProofOfStore, ret_tx: oneshot::Sender<Result<Data, QuorumStoreError>>) {
         if let Some(value) = self.db_cache.get(&proof.digest()) {
             if value.maybe_payload.is_some() {
                 ret_tx
-                    .send(value.maybe_payload.clone().unwrap())
+                    .send(Ok(value.maybe_payload.clone().unwrap()))
                     .expect("Receiver of requested batch is not available");
             } else {
                 self.batch_store_tx

@@ -103,7 +103,7 @@ pub struct EpochManager {
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
     reconfig_events: ReconfigNotificationListener,
-    commit_notifier: Arc<dyn DataManager>,
+    data_manager: Arc<dyn DataManager>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     buffer_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
@@ -127,7 +127,7 @@ impl EpochManager {
         commit_state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn PersistentLivenessStorage>,
         reconfig_events: ReconfigNotificationListener,
-        commit_notifier: Arc<dyn DataManager>,
+        data_manager: Arc<dyn DataManager>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -146,7 +146,7 @@ impl EpochManager {
             storage,
             safety_rules_manager,
             reconfig_events,
-            commit_notifier,
+            data_manager,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
@@ -541,7 +541,7 @@ impl EpochManager {
         //Start QuorumStore
         let data_reader =
             self.spawn_quorum_store(epoch_state.verifier.clone(), wrapper_quorum_store_rx);
-        self.commit_notifier.new_epoch(data_reader);
+        self.data_manager.new_epoch(data_reader);
 
         let (consensus_to_quorum_store_sender, consensus_to_quorum_store_receiver) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);

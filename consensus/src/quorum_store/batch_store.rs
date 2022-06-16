@@ -25,6 +25,7 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
 };
+use crate::quorum_store::quorum_store::QuorumStoreError;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PersistRequest {
@@ -50,7 +51,7 @@ impl PersistRequest {
 #[derive(Debug)]
 pub(crate) enum BatchStoreCommand {
     Persist(PersistRequest, Option<oneshot::Sender<SignedDigest>>),
-    BatchRequest(HashValue, PeerId, Option<oneshot::Sender<Data>>),
+    BatchRequest(HashValue, PeerId, Option<oneshot::Sender<Result<Data, QuorumStoreError>>>),
     Clean(Vec<HashValue>),
 }
 
@@ -193,7 +194,7 @@ impl BatchStore {
                                 //ok to unwrap because value is guaranteed to be in the db and have actual payload
                                 maybe_tx
                                     .unwrap()
-                                    .send(maybe_persisted_value.unwrap().maybe_payload.unwrap())
+                                    .send(Ok(maybe_persisted_value.unwrap().maybe_payload.unwrap()))
                                     .expect("Failed to send PersistedValue");
                             } else {
                                 let batch = Batch::new(

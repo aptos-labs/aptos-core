@@ -14,13 +14,11 @@ use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::monitor;
-use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
     account_address::AccountAddress, contract_event::ContractEvent, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
 };
 use consensus_notifications::ConsensusNotificationSender;
-use consensus_types::common::Payload;
 use consensus_types::proof_of_store::LogicalTime;
 use consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
 use executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
@@ -91,13 +89,6 @@ impl ExecutionProxy {
             data_manager,
         }
     }
-
-    async fn get_transactions_from_payload(&self, payload: Payload) -> Vec<SignedTransaction> {
-        match payload {
-            Payload::DirectMempool(txns) => txns,
-            Payload::InQuorumStore(poss) => self.data_manager.get_data(poss).await,
-        }
-    }
 }
 
 // TODO: filter duplicated transaction before executing
@@ -122,7 +113,7 @@ impl StateComputer for ExecutionProxy {
         );
 
         let payload = block.get_payload();
-        let txns = self.get_transactions_from_payload(payload).await;
+        let txns = self.data_manager.get_data(payload).await?;
 
         // TODO: figure out error handling for the prologue txn
         let compute_result = monitor!(
@@ -167,7 +158,7 @@ impl StateComputer for ExecutionProxy {
         for block in blocks {
             block_ids.push(block.id());
             let payload = block.get_payload();
-            let signed_txns = self.get_transactions_from_payload(payload).await;
+            let signed_txns = self.data_manager.get_data(payload).await?;
             txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));
             reconfig_events.extend(block.reconfig_event());
 
