@@ -16,7 +16,11 @@ class It2sController < ApplicationController
       connect_discord_step,
       node_registration_step,
       identity_verification_step
-    ].map { |h| OpenStruct.new(**h) }
+    ].map do |h|
+      # rubocop:disable Style/OpenStructUse
+      OpenStruct.new(**h)
+      # rubocop:enable Style/OpenStructUse
+    end
     first_incomplete = @steps.index { |step| !step.completed }
     @steps[first_incomplete + 1..].each { |step| step.disabled = true } if first_incomplete
     @steps.each { |step| step.disabled = true } if @it2_registration_closed
