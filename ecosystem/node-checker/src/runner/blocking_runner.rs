@@ -70,6 +70,21 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
         &self,
         target_collector: &T,
     ) -> Result<EvaluationSummary, RunnerError> {
+        debug!("Collecting system information from baseline node");
+        let baseline_system_information = self
+            .baseline_metric_collector
+            .collect_system_information()
+            .await
+            .map_err(RunnerError::MetricCollectorError)?;
+        debug!("{:?}", baseline_system_information);
+
+        debug!("Collecting system information from target node");
+        let target_system_information = target_collector
+            .collect_system_information()
+            .await
+            .map_err(RunnerError::MetricCollectorError)?;
+        debug!("{:?}", target_system_information);
+
         debug!("Collecting first round of baseline metrics");
         let first_baseline_metrics = self
             .baseline_metric_collector
