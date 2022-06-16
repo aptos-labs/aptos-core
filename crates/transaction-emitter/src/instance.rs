@@ -16,7 +16,7 @@ pub struct Instance {
     peer_name: String,
     ip: String,
     ac_port: u32,
-    debug_interface_port: Option<u32>,
+    inspection_service_port: Option<u32>,
 }
 
 impl Instance {
@@ -24,13 +24,13 @@ impl Instance {
         peer_name: String,
         ip: String,
         ac_port: u32,
-        debug_interface_port: Option<u32>,
+        inspection_service_port: Option<u32>,
     ) -> Instance {
         Instance {
             peer_name,
             ip,
             ac_port,
-            debug_interface_port,
+            inspection_service_port,
         }
     }
 
@@ -60,8 +60,8 @@ impl Instance {
         Url::from_str(&format!("http://{}:{}", self.ip(), self.ac_port())).expect("Invalid URL.")
     }
 
-    pub fn debug_interface_port(&self) -> Option<u32> {
-        self.debug_interface_port
+    pub fn inspection_service_port(&self) -> Option<u32> {
+        self.inspection_service_port
     }
 
     pub fn rest_client(&self) -> RestClient {

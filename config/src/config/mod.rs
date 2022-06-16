@@ -18,12 +18,12 @@ use thiserror::Error;
 
 mod consensus_config;
 pub use consensus_config::*;
-mod debug_interface_config;
-pub use debug_interface_config::*;
 mod error;
 pub use error::*;
 mod execution_config;
 pub use execution_config::*;
+mod inspection_service_config;
+pub use inspection_service_config::*;
 mod logger_config;
 pub use logger_config::*;
 mod mempool_config;
@@ -61,11 +61,11 @@ pub struct NodeConfig {
     #[serde(default)]
     pub consensus: ConsensusConfig,
     #[serde(default)]
-    pub debug_interface: DebugInterfaceConfig,
-    #[serde(default)]
     pub execution: ExecutionConfig,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub full_node_networks: Vec<NetworkConfig>,
+    #[serde(default)]
+    pub inspection_service: InspectionServiceConfig,
     #[serde(default)]
     pub logger: LoggerConfig,
     #[serde(default)]
@@ -316,8 +316,8 @@ impl NodeConfig {
     }
 
     pub fn randomize_ports(&mut self) {
-        self.debug_interface.randomize_ports();
         self.api.randomize_ports();
+        self.inspection_service.randomize_ports();
         self.storage.randomize_ports();
 
         if let Some(network) = self.validator_network.as_mut() {

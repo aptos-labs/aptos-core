@@ -129,15 +129,15 @@ fn parse_host_port(s: &str) -> Result<(String, u32, Option<u32>)> {
     }
     if v.len() != 2 && v.len() != 3 {
         return Err(format_err!(
-            "Failed to parse {:?} in host:port or host:port:debug_interface_port format",
+            "Failed to parse {:?} in host:port or host:port:inspection_service_port format",
             s
         ));
     }
     let host = v[0].to_string();
     let port = v[1].parse::<u32>()?;
     if v.len() == 3 {
-        let debug_interface_port = v[2].parse::<u32>()?;
-        return Ok((host, port, Some(debug_interface_port)));
+        let inspection_service_port = v[2].parse::<u32>()?;
+        return Ok((host, port, Some(inspection_service_port)));
     }
     Ok((host, port, None))
 }

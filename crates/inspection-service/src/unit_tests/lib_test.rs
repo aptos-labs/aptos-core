@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metric_server::get_all_metrics;
+use crate::inspection_service::get_all_metrics;
 use assert_approx_eq::assert_approx_eq;
 use once_cell::sync::Lazy;
 use prometheus::{proto::MetricFamily, register_int_counter, Counter, IntCounter, Opts, Registry};
