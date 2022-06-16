@@ -7,6 +7,7 @@ mod metric_collector;
 mod metric_evaluator;
 mod runner;
 mod server;
+mod system_information_evaluator;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
