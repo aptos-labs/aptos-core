@@ -1,0 +1,18 @@
+name: Deploy community-platform to staging
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "ecosystem/platform/server/**"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-community-platform.yaml
+    with:
+      aptos_env: staging
+    secrets: inherit
