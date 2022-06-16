@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(dead_code)]
+
 use crate::{metric_evaluator::StateSyncMetricsEvaluatorArgs, runner::BlockingRunnerArgs};
 use anyhow::Result;
 use clap::Parser;

@@ -1,25 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashMap, convert::TryFrom, path::PathBuf};
+use std::path::PathBuf;
 
 use crate::{
-    configuration::{
-        self, read_configuration_from_file, NodeAddress, NodeConfiguration, DEFAULT_API_PORT_STR,
-        DEFAULT_METRICS_PORT_STR, DEFAULT_NOISE_PORT_STR,
-    },
-    metric_collector::{MetricCollector, ReqwestMetricCollector},
-    metric_evaluator::{build_evaluators, MetricsEvaluator},
-    runner::{BlockingRunner, Runner},
+    configuration::{DEFAULT_API_PORT_STR, DEFAULT_METRICS_PORT_STR, DEFAULT_NOISE_PORT_STR},
+    metric_collector::ReqwestMetricCollector,
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use clap::Parser;
 use log::debug;
-use poem::{
-    handler, http::StatusCode, listener::TcpListener, Error as PoemError, Result as PoemResult,
-    Route, Server,
-};
-use poem_openapi::{payload::Json, OpenApi, OpenApiService};
+use poem::{handler, listener::TcpListener, Route, Server};
 use url::Url;
 
 use super::{

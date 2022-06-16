@@ -4,17 +4,12 @@
 use crate::{
     configuration::NodeAddress,
     metric_collector::{MetricCollector, ReqwestMetricCollector},
-    metric_evaluator::{EvaluationSummary, MetricsEvaluator},
-    runner::{BlockingRunner, Runner},
+    metric_evaluator::EvaluationSummary,
+    runner::Runner,
 };
-use anyhow::{anyhow, Context, Result};
-use clap::Parser;
-use poem::{
-    handler, http::StatusCode, listener::TcpListener, Error as PoemError, Result as PoemResult,
-    Route, Server,
-};
+use anyhow::anyhow;
+use poem::{http::StatusCode, Error as PoemError, Result as PoemResult};
 use poem_openapi::{payload::Json, types::Example, Object as PoemObject, OpenApi, OpenApiService};
-use std::{collections::HashMap, marker::PhantomData};
 use url::Url;
 
 use super::configurations_manager::{ConfigurationsManager, NodeConfigurationWrapper};

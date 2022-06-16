@@ -8,7 +8,7 @@ use anyhow::Result;
 use clap::Parser;
 use log::debug;
 use poem_openapi::Object as PoemObject;
-use prometheus_parse::{Scrape as PrometheusScrape, Value as PrometheusValue};
+use prometheus_parse::Scrape as PrometheusScrape;
 use serde::{Deserialize, Serialize};
 
 pub const NAME: &str = "state_sync";
@@ -44,7 +44,7 @@ impl StateSyncMetricsEvaluator {
         metrics_round: &str,
     ) -> Option<EvaluationResult> {
         match version {
-            Some(v) => None,
+            Some(_v) => None,
             None => Some(EvaluationResult {
                 headline: "State sync version metric missing".to_string(),
                 score: 0,
@@ -82,7 +82,7 @@ impl StateSyncMetricsEvaluator {
                     links: vec![],
                 }
             }
-            wildcard => {
+            _wildcard => {
                 // We convert to i64 to avoid potential overflow if the target is ahead of the baseline.
                 let delta_from_baseline = latest_baseline_version as i64 - latest_target_version as i64;
                 if delta_from_baseline > self.args.version_delta_tolerance as i64 {
@@ -125,7 +125,7 @@ impl MetricsEvaluator for StateSyncMetricsEvaluator {
     /// and that we're within tolerance of the baseline node's latest version.
     fn evaluate_metrics(
         &self,
-        previous_baseline_metrics: &PrometheusScrape,
+        _previous_baseline_metrics: &PrometheusScrape,
         previous_target_metrics: &PrometheusScrape,
         latest_baseline_metrics: &PrometheusScrape,
         latest_target_metrics: &PrometheusScrape,

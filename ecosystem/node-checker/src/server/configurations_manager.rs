@@ -1,26 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashMap, convert::TryFrom, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
-    configuration::{
-        self, read_configuration_from_file, NodeAddress, NodeConfiguration, DEFAULT_API_PORT_STR,
-        DEFAULT_METRICS_PORT_STR, DEFAULT_NOISE_PORT_STR,
-    },
+    configuration::{read_configuration_from_file, NodeConfiguration},
     metric_collector::{MetricCollector, ReqwestMetricCollector},
-    metric_evaluator::{build_evaluators, MetricsEvaluator},
+    metric_evaluator::build_evaluators,
     runner::{BlockingRunner, Runner},
 };
-use anyhow::{anyhow, Context, Result};
-use clap::Parser;
-use poem::{
-    handler, http::StatusCode, listener::TcpListener, Error as PoemError, Result as PoemResult,
-    Route, Server,
-};
-use poem_openapi::{payload::Json, OpenApi, OpenApiService};
-use reqwest::blocking;
-use url::Url;
+use anyhow::{Context, Result};
 
 /// This struct is a wrapper to help with all the different baseline
 /// node configurations.

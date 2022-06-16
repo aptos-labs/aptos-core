@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use poem_openapi::{types::Example, Object as PoemObject};
+use poem_openapi::Object as PoemObject;
 
 // TODO: Should I find a way to have typed actual + expected fields?
 #[derive(Clone, Debug, PoemObject)]

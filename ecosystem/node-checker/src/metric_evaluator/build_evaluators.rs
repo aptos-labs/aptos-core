@@ -6,7 +6,7 @@ use crate::{
     metric_evaluator::{MetricsEvaluator, StateSyncMetricsEvaluator, STATE_SYNC_EVALUATOR_NAME},
 };
 use anyhow::{bail, Result};
-use log::{info, warn};
+use log::info;
 use std::collections::HashSet;
 
 pub fn build_evaluators(

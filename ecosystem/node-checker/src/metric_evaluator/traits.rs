@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::types::EvaluationResult;
-use anyhow::{Error, Result};
+use anyhow::Result;
 use prometheus_parse::Scrape as PrometheusScrape;
 use thiserror::Error as ThisError;
-
-// TODO: Consider using thiserror.
 
 #[derive(Debug, ThisError)]
 pub enum MetricsEvaluatorError {
@@ -19,9 +17,6 @@ pub enum MetricsEvaluatorError {
     /// without our node checker configuration, so we return an error here.
     #[error("A baseline metric was missing. Metric name: {0}, Explanation: {1}")]
     MissingBaselineMetric(String, String),
-
-    #[error("An unknown error occured")]
-    UnknownError(Error),
 }
 
 /// todo describe the trait

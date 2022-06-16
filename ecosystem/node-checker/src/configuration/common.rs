@@ -6,7 +6,6 @@ use anyhow::{anyhow, Context, Result};
 use std::{
     convert::{TryFrom, TryInto},
     fs::File,
-    io::Read,
     path::PathBuf,
 };
 
