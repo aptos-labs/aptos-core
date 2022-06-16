@@ -9,7 +9,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use clap::Parser;
-use log::debug;
+use log::info;
 use poem::{handler, listener::TcpListener, Route, Server};
 use url::Url;
 
@@ -64,7 +64,8 @@ pub async fn run(args: Run) -> Result<()> {
     )
     .await
     .context("Failed to build baseline node configurations")?;
-    debug!(
+
+    info!(
         "Running with the following configuration: {:#?}",
         configurations_manager.configurations
     );
@@ -88,8 +89,6 @@ pub async fn run(args: Run) -> Result<()> {
     let ui = api_service.swagger_ui();
     let spec_json = api_service.spec_endpoint();
     let spec_yaml = api_service.spec_endpoint_yaml();
-
-    debug!("Successfully built API");
 
     Server::new(TcpListener::bind((
         args.listen_address
