@@ -8,8 +8,8 @@ use aptos_types::transaction::SignedTransaction;
 use arc_swap::ArcSwapOption;
 use consensus_types::common::Payload;
 use consensus_types::proof_of_store::LogicalTime;
-use tokio::sync::oneshot;
 use executor_types::Error;
+use tokio::sync::oneshot;
 
 /// Notification of execution committed logical time for QuorumStore to clean.
 #[async_trait::async_trait]
@@ -66,7 +66,7 @@ impl DataManager for QuorumStoreDataManager {
                 let mut ret = Vec::new();
                 for rx in receivers {
                     match rx.await.expect("oneshot was dropped") {
-                        Ok(data) => { ret.push(data) }
+                        Ok(data) => ret.push(data),
                         Err(_) => {
                             return Err(Error::CouldNotGetData);
                         }

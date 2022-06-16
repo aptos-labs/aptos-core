@@ -10,13 +10,11 @@ use std::collections::HashMap;
 use tokio::sync::mpsc::Receiver;
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub(crate) enum ProofBuilderCommand {
     InitProof(SignedDigest, ProofReturnChannel),
     AppendSignature(SignedDigest),
 }
 
-#[allow(dead_code)]
 pub(crate) struct ProofBuilder {
     // peer_id: PeerId,
     proof_timeout_ms: usize,
@@ -25,7 +23,6 @@ pub(crate) struct ProofBuilder {
 }
 
 //PoQS builder object - gather signed digest to form PoQS
-#[allow(dead_code)]
 impl ProofBuilder {
     pub fn new(proof_timeout_ms: usize) -> Self {
         Self {

@@ -53,7 +53,6 @@ pub struct FragmentInfo {
     maybe_expiration: Option<LogicalTime>,
 }
 
-#[allow(dead_code)]
 impl FragmentInfo {
     fn new(
         epoch: u64,
@@ -95,7 +94,6 @@ pub struct Fragment {
     pub signature: Ed25519Signature,
 }
 
-#[allow(dead_code)]
 impl Fragment {
     pub fn new(
         epoch: u64,

@@ -31,7 +31,6 @@ use tokio::sync::{mpsc::Sender, oneshot};
 /// Maximum number of rounds in the future from local prospective to hold batches for.
 const MAX_BATCH_EXPIRY_ROUND_GAP: Round = 20;
 
-#[allow(dead_code)]
 pub(crate) enum BatchReaderCommand {
     GetBatchForPeer(HashValue, PeerId),
     GetBatchForSelf(
@@ -246,7 +245,6 @@ impl BatchReader {
     // TODO: maybe check the epoch to stop communicating on epoch change.
     // TODO: make sure state-sync also sends the message.
     // TODO: make sure message is sent execution re-starts (will also clean)
-    #[allow(dead_code)]
     pub async fn update_certified_round(&self, certified_time: LogicalTime) {
         let prev_round = self
             .last_committed_round
@@ -268,8 +266,11 @@ impl BatchReader {
 
     // TODO: maybe check the epoch to stop communicating on epoch change.
     // TODO: use timeouts and return an error if cannot get tha batch.
-    #[allow(dead_code)]
-    pub async fn get_batch(&self, proof: ProofOfStore, ret_tx: oneshot::Sender<Result<Data, QuorumStoreError>>) {
+    pub async fn get_batch(
+        &self,
+        proof: ProofOfStore,
+        ret_tx: oneshot::Sender<Result<Data, QuorumStoreError>>,
+    ) {
         if let Some(value) = self.db_cache.get(&proof.digest()) {
             if value.maybe_payload.is_some() {
                 ret_tx

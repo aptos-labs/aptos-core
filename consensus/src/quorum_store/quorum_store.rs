@@ -46,7 +46,6 @@ pub enum QuorumStoreError {
     BatchSizeLimit,
 }
 
-#[allow(dead_code)]
 pub struct QuorumStore {
     epoch: u64,
     my_peer_id: PeerId,
@@ -74,7 +73,6 @@ pub struct QuorumStoreConfig {
     pub db_quota: usize,
 }
 
-#[allow(dead_code)]
 impl QuorumStore {
     //TODO: pass epoc state
     pub fn new(

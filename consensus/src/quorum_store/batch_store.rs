@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_interface::ConsensusMsg;
+use crate::quorum_store::quorum_store::QuorumStoreError;
 use crate::quorum_store::types::{Batch, Data, PersistedValue};
 use crate::{
     network::NetworkSender,
@@ -25,7 +26,6 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
 };
-use crate::quorum_store::quorum_store::QuorumStoreError;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PersistRequest {
@@ -51,7 +51,11 @@ impl PersistRequest {
 #[derive(Debug)]
 pub(crate) enum BatchStoreCommand {
     Persist(PersistRequest, Option<oneshot::Sender<SignedDigest>>),
-    BatchRequest(HashValue, PeerId, Option<oneshot::Sender<Result<Data, QuorumStoreError>>>),
+    BatchRequest(
+        HashValue,
+        PeerId,
+        Option<oneshot::Sender<Result<Data, QuorumStoreError>>>,
+    ),
     Clean(Vec<HashValue>),
 }
 

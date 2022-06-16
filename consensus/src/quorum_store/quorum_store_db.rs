@@ -46,7 +46,6 @@ pub struct QuorumStoreDB {
     db: DB,
 }
 
-#[allow(dead_code)]
 impl QuorumStoreDB {
     pub(crate) fn new<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
         let column_families = vec![BATCH_CF_NAME];
