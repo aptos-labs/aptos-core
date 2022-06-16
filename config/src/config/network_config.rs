@@ -73,6 +73,7 @@ pub struct NetworkConfig {
     // authentication only occurs for outgoing connections.
     pub mutual_authentication: bool,
     pub network_id: NetworkId,
+    pub runtime_threads: usize,
     // Addresses of initial peers to connect to. In a mutual_authentication network,
     // we will extract the public keys from these addresses to set our initial
     // trusted peers set.  TODO: Replace usage in configs with `seeds` this is for backwards compatibility
@@ -114,6 +115,7 @@ impl NetworkConfig {
             listen_address: "/ip4/0.0.0.0/tcp/6180".parse().unwrap(),
             mutual_authentication: false,
             network_id,
+            runtime_threads: 8,
             seed_addrs: HashMap::new(),
             seeds: PeerSet::default(),
             max_frame_size: MAX_FRAME_SIZE,

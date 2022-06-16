@@ -519,6 +519,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         debug!("Creating runtime for {}", network_config.network_id);
         let runtime = Builder::new_multi_thread()
             .thread_name(format!("network-{}", network_config.network_id))
+            .worker_threads(network_config.runtime_threads)
             .enable_all()
             .build()
             .expect("Failed to start runtime. Won't be able to start networking.");
