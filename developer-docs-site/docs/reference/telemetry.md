@@ -13,22 +13,22 @@ Users can disable telemetry at any point. If telemetry remains enabled, Aptos no
 
 # Disabling telemetry
 
-On macOs and Linux, you can disable telemetry by setting the `APTOS_TELEMETRY_DISABLE` environment variable to any value.
+On macOs and Linux, you can disable telemetry by setting the `APTOS_DISABLE_TELEMETRY` environment variable to any value.
 
 ```
-export APTOS_TELEMETRY_DISABLE=true
+export APTOS_DISABLE_TELEMETRY=true
 ```
 
 The above example only disables telemetry for a single session or terminal. To disable it everywhere, you must do so at shell startup.
 
 ```
-echo "export APTOS_TELEMETRY_DISABLE=true" >> ~/.profile
+echo "export APTOS_DISABLE_TELEMETRY=true" >> ~/.profile
 source ~/.profile
 ```
 
 # Types of information collected
 
-* **Usage information** - Commands and subcommands that are run
-* **System information** - Operating system (Windows, Linux, macOS) and kernel information, CPU and memory utilization
-* **Software information** - Version of the Aptos node binary
-* **Node information** - Public IP address, number of inbound and outbound Aptos node connections
+* **Aptos node information**, e.g., public IP address and core metrics (including node type, synced version and number of network connections).
+* **Aptos tooling usage**, e.g., the commands and subcommands run by the Aptos CLI tool.
+* **Rust build information**, e.g., the rust version, cargo version, build target architecture and build tag.
+* **System information**, e.g., operating system information (including versions), hardware information and resource utilization (including CPU, memory and disk).
