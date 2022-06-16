@@ -120,7 +120,6 @@ impl Fragment {
     }
 
     pub(crate) fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
-        // TODO: check fragment size.
         if let Some(expiration) = &self.fragment_info.maybe_expiration {
             if expiration.epoch() != self.fragment_info.epoch {
                 bail!("Incorrect expiration epoch");
@@ -195,7 +194,8 @@ impl Batch {
         self.batch_info.epoch
     }
 
-    //TODO: maybe we should verify signature anyway
+    //TODO: maybe we should verify signature anyway.
+    //TODO: maybe we dont need to verify signatures at all - network should check the sender
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         if self.maybe_payload.is_some() {
             let mut hasher = DefaultHasher::new(b"QuorumStoreBatch");
