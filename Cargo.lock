@@ -765,6 +765,7 @@ dependencies = [
  "arr_macro",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "byteorder",
+ "clap 3.2.23",
  "dashmap",
  "itertools",
  "lru",
@@ -772,6 +773,7 @@ dependencies = [
  "move-resource-viewer",
  "num-derive",
  "once_cell",
+ "owo-colors",
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
@@ -7475,6 +7477,12 @@ checksum = "628223faebab4e3e40667ee0b2336d34a5b960ff60ea743ddfdbcf7770bcfb66"
 dependencies = [
  "winapi 0.3.9",
 ]
+
+[[package]]
+name = "owo-colors"
+version = "3.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1b04fb49957986fdce4d6ee7a65027d55d4b6d2265e5848bbb507b58ccfdb6f"
 
 [[package]]
 name = "parity-scale-codec"
