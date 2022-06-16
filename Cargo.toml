@@ -137,6 +137,7 @@ default-members = [
     "aptos-move/transaction-builder-generator",
     "execution/db-bootstrapper",
     "storage/backup/backup-cli",
+    "storage/aptosdb",
     "ecosystem/indexer",
 ]
 

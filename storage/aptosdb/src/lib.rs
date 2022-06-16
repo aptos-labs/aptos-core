@@ -30,6 +30,9 @@ mod transaction_store;
 #[cfg(test)]
 mod aptosdb_test;
 
+#[cfg(feature = "db-debugger")]
+pub mod db_debugger;
+
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
     change_set::{ChangeSet, SealedChangeSet},
@@ -222,7 +225,7 @@ pub struct AptosDB {
 }
 
 impl AptosDB {
-    fn column_families() -> Vec<ColumnFamilyName> {
+    pub fn column_families() -> Vec<ColumnFamilyName> {
         vec![
             /* LedgerInfo CF = */ DEFAULT_CF_NAME,
             EPOCH_BY_VERSION_CF_NAME,

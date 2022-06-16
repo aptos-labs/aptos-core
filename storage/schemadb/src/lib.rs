@@ -316,7 +316,7 @@ impl DB {
         Ok(Self::log_construct(name, column_families, inner))
     }
 
-    fn open_cf_as_secondary<P: AsRef<Path>>(
+    pub fn open_cf_as_secondary<P: AsRef<Path>>(
         opts: &rocksdb::Options,
         primary_path: P,
         secondary_path: P,

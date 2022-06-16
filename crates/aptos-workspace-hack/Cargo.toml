@@ -48,6 +48,7 @@ rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
 serde = { version = "1.0.137", features = ["alloc", "derive", "rc", "serde_derive", "std"] }
 serde_json = { version = "1.0.81", features = ["indexmap", "preserve_order", "std"] }
 sha-1 = { version = "0.10.0", features = ["std"] }
+textwrap = { version = "0.15.0", features = ["smawk", "unicode-linebreak", "unicode-width"] }
 tokio = { version = "1.18.2", features = ["bytes", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "socket2", "sync", "test-util", "time", "tokio-macros"] }
 tokio-util-ca01ad9e24f5d932 = { package = "tokio-util", version = "0.7.2", features = ["codec", "compat", "futures-io", "tracing"] }
 toml = { version = "0.5.9" }
@@ -95,6 +96,7 @@ serde = { version = "1.0.137", features = ["alloc", "derive", "rc", "serde_deriv
 serde_json = { version = "1.0.81", features = ["indexmap", "preserve_order", "std"] }
 sha-1 = { version = "0.10.0", features = ["std"] }
 syn = { version = "1.0.95", features = ["clone-impls", "derive", "extra-traits", "fold", "full", "parsing", "printing", "proc-macro", "quote", "visit", "visit-mut"] }
+textwrap = { version = "0.15.0", features = ["smawk", "unicode-linebreak", "unicode-width"] }
 tokio = { version = "1.18.2", features = ["bytes", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "socket2", "sync", "test-util", "time", "tokio-macros"] }
 tokio-util-ca01ad9e24f5d932 = { package = "tokio-util", version = "0.7.2", features = ["codec", "compat", "futures-io", "tracing"] }
 toml = { version = "0.5.9" }
