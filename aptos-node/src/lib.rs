@@ -517,10 +517,14 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     let peer_metadata_storage = PeerMetadataStorage::new(&network_ids);
     for network_config in network_configs.into_iter() {
         debug!("Creating runtime for {}", network_config.network_id);
-        let runtime = Builder::new_multi_thread()
+        let mut runtime_builder = Builder::new_multi_thread();
+        runtime_builder
             .thread_name(format!("network-{}", network_config.network_id))
-            .worker_threads(network_config.runtime_threads)
-            .enable_all()
+            .enable_all();
+        if let Some(runtime_threads) = network_config.runtime_threads {
+            runtime_builder.worker_threads(runtime_threads);
+        }
+        let runtime = runtime_builder
             .build()
             .expect("Failed to start runtime. Won't be able to start networking.");
 
