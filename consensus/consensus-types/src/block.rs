@@ -9,6 +9,7 @@ use crate::{
 use anyhow::{bail, ensure, format_err};
 use aptos_crypto::{ed25519::Ed25519Signature, hash::CryptoHash, HashValue};
 use aptos_infallible::duration_since_epoch;
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -296,17 +297,19 @@ impl Block {
         Ok(())
     }
 
-    pub fn transactions_to_execute(&self, validators: &[AccountAddress]) -> Vec<Transaction> {
+    pub fn get_payload(&self) -> Payload {
+        self.payload().unwrap_or(&Payload::new_empty()).clone()
+    }
+
+    pub fn transactions_to_execute(
+        &self,
+        validators: &[AccountAddress],
+        txns: Vec<SignedTransaction>,
+    ) -> Vec<Transaction> {
         std::iter::once(Transaction::BlockMetadata(
             self.new_block_metadata(validators),
         ))
-        .chain(
-            self.payload()
-                .unwrap_or(&Payload::new_empty())
-                .clone()
-                .into_iter()
-                .map(Transaction::UserTransaction),
-        )
+        .chain(txns.into_iter().map(Transaction::UserTransaction))
         .chain(once(Transaction::StateCheckpoint))
         .collect()
     }

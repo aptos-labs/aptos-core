@@ -1,12 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::quorum_store::batch_reader::BatchReader;
 use crate::quorum_store::quorum_store::{QuorumStore, QuorumStoreCommand, QuorumStoreConfig};
 use crate::quorum_store::quorum_store_db::QuorumStoreDB;
 use crate::{
     block_storage::BlockStore,
-    commit_notifier::CommitNotifier,
     counters,
+    data_manager::DataManager,
     error::{error_kind, DbError},
     experimental::{
         buffer_manager::{OrderedBlocks, ResetRequest},
@@ -102,7 +103,7 @@ pub struct EpochManager {
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
     reconfig_events: ReconfigNotificationListener,
-    commit_notifier: Arc<dyn CommitNotifier>,
+    data_manager: Arc<dyn DataManager>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     buffer_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
@@ -126,7 +127,7 @@ impl EpochManager {
         commit_state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn PersistentLivenessStorage>,
         reconfig_events: ReconfigNotificationListener,
-        commit_notifier: Arc<dyn CommitNotifier>,
+        data_manager: Arc<dyn DataManager>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -145,7 +146,7 @@ impl EpochManager {
             storage,
             safety_rules_manager,
             reconfig_events,
-            commit_notifier,
+            data_manager,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
@@ -325,7 +326,7 @@ impl EpochManager {
         &mut self,
         verifier: ValidatorVerifier,
         wrapper_command_rx: tokio::sync::mpsc::Receiver<QuorumStoreCommand>,
-    ) {
+    ) -> Arc<BatchReader> {
         let network_sender = NetworkSender::new(
             self.author,
             self.network_sender.clone(),
@@ -383,7 +384,7 @@ impl EpochManager {
             db_quota: 10000000000,
         };
 
-        let (quorum_store, _batch_reader) = QuorumStore::new(
+        let (quorum_store, batch_reader) = QuorumStore::new(
             self.epoch(),
             last_committed_round,
             self.author,
@@ -397,6 +398,7 @@ impl EpochManager {
         );
 
         tokio::spawn(quorum_store.start());
+        batch_reader
 
         //TODO: how do we drop these tokio spawns?
         //TODO: return (quorum_store_msg_tx, batch_reader)
@@ -537,7 +539,9 @@ impl EpochManager {
         let (_wrapper_quorum_store_tx, wrapper_quorum_store_rx) = tokio::sync::mpsc::channel(100);
 
         //Start QuorumStore
-        self.spawn_quorum_store(epoch_state.verifier.clone(), wrapper_quorum_store_rx);
+        let data_reader =
+            self.spawn_quorum_store(epoch_state.verifier.clone(), wrapper_quorum_store_rx);
+        self.data_manager.new_epoch(data_reader);
 
         let (consensus_to_quorum_store_sender, consensus_to_quorum_store_receiver) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
@@ -547,8 +551,6 @@ impl EpochManager {
             self.config.quorum_store_poll_count,
             self.config.quorum_store_pull_timeout_ms,
         );
-        self.commit_notifier
-            .new_epoch(consensus_to_quorum_store_sender);
 
         self.commit_state_computer.new_epoch(&epoch_state);
         let state_computer = if onchain_config.decoupled_execution() {

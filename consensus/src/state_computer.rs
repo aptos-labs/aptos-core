@@ -3,8 +3,8 @@
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
-    commit_notifier::CommitNotifier,
     counters,
+    data_manager::DataManager,
     error::StateSyncError,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     txn_notifier::TxnNotifier,
@@ -19,6 +19,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
 };
 use consensus_notifications::ConsensusNotificationSender;
+use consensus_types::proof_of_store::LogicalTime;
 use consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
 use executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
 use fail::fail_point;
@@ -42,6 +43,7 @@ pub struct ExecutionProxy {
     async_state_sync_notifier: channel::Sender<NotificationType>,
     async_commit_notifier: channel::Sender<CommitType>,
     validators: Mutex<Vec<AccountAddress>>,
+    data_manager: Arc<dyn DataManager>,
 }
 
 impl ExecutionProxy {
@@ -49,7 +51,7 @@ impl ExecutionProxy {
         executor: Box<dyn BlockExecutorTrait>,
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
-        commit_notifier: Arc<dyn CommitNotifier>,
+        data_manager: Arc<dyn DataManager>,
         handle: &tokio::runtime::Handle,
     ) -> Self {
         let (tx, mut rx) =
@@ -69,14 +71,12 @@ impl ExecutionProxy {
         });
         let (commit_tx, mut commit_rx) =
             channel::new::<CommitType>(10, &counters::PENDING_QUORUM_STORE_COMMIT_NOTIFICATION);
-        let notifier = commit_notifier.clone();
+        let data_manager_clone = data_manager.clone();
         handle.spawn(async move {
             while let Some((epoch, round)) = commit_rx.next().await {
-                if let Err(e) =
-                    monitor!("notify_commit", notifier.notify_commit(epoch, round).await)
-                {
-                    error!(error = ?e, "Failed to notify commit notifier");
-                }
+                data_manager_clone
+                    .notify_commit(LogicalTime::new(epoch, round))
+                    .await;
             }
         });
         Self {
@@ -86,10 +86,12 @@ impl ExecutionProxy {
             async_state_sync_notifier: tx,
             async_commit_notifier: commit_tx,
             validators: Mutex::new(vec![]),
+            data_manager,
         }
     }
 }
 
+// TODO: filter duplicated transaction before executing
 #[async_trait::async_trait]
 impl StateComputer for ExecutionProxy {
     async fn compute(
@@ -110,13 +112,16 @@ impl StateComputer for ExecutionProxy {
             "Executing block",
         );
 
+        let payload = block.get_payload();
+        let txns = self.data_manager.get_data(payload).await?;
+
         // TODO: figure out error handling for the prologue txn
         let compute_result = monitor!(
             "execute_block",
             self.executor.execute_block(
                 (
                     block.id(),
-                    block.transactions_to_execute(&self.validators.lock())
+                    block.transactions_to_execute(&self.validators.lock(), txns)
                 ),
                 parent_block_id
             )
@@ -152,7 +157,9 @@ impl StateComputer for ExecutionProxy {
 
         for block in blocks {
             block_ids.push(block.id());
-            txns.extend(block.transactions_to_commit(&self.validators.lock()));
+            let payload = block.get_payload();
+            let signed_txns = self.data_manager.get_data(payload).await?;
+            txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));
             reconfig_events.extend(block.reconfig_event());
 
             if block.epoch() > latest_epoch {
@@ -184,6 +191,7 @@ impl StateComputer for ExecutionProxy {
         if skip_clean {
             return Ok(());
         }
+        //TODO: what if do not use QuorumStore?
         self.async_commit_notifier
             .clone()
             .send((latest_epoch, latest_round))

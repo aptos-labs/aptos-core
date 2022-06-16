@@ -1,5 +1,6 @@
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
+use crate::quorum_store::quorum_store::QuorumStoreError;
 use crate::quorum_store::types::{Batch, Data};
 use crate::quorum_store::utils::DigestTimeouts;
 use aptos_crypto::HashValue;
@@ -10,35 +11,51 @@ use tokio::sync::oneshot;
 struct BatchRequesterState {
     signers: Vec<PeerId>,
     next_index: usize,
-    ret_tx: oneshot::Sender<Data>,
+    ret_tx: oneshot::Sender<Result<Data, QuorumStoreError>>,
+    num_retries: usize,
+    max_num_retry: usize,
 }
 
 impl BatchRequesterState {
-    fn new(signers: Vec<PeerId>, ret_tx: oneshot::Sender<Data>) -> Self {
+    fn new(signers: Vec<PeerId>, ret_tx: oneshot::Sender<Result<Data, QuorumStoreError>>) -> Self {
         Self {
             signers,
             next_index: 0,
             ret_tx,
+            num_retries: 0,
+            max_num_retry: 5, // TODO: get it from config.
         }
     }
 
-    fn next_request_peers(&mut self, num_peers: usize) -> Vec<PeerId> {
-        let ret = self
-            .signers
-            .iter()
-            .cycle()
-            .skip(self.next_index)
-            .take(num_peers)
-            .cloned()
-            .collect();
-        self.next_index = (self.next_index + num_peers) % self.signers.len();
-        ret
+    fn next_request_peers(&mut self, num_peers: usize) -> Option<Vec<PeerId>> {
+        if self.num_retries < self.max_num_retry {
+            self.num_retries = self.num_retries + 1;
+            let ret = self
+                .signers
+                .iter()
+                .cycle()
+                .skip(self.next_index)
+                .take(num_peers)
+                .cloned()
+                .collect();
+            self.next_index = (self.next_index + num_peers) % self.signers.len();
+            Some(ret)
+        } else {
+            None
+        }
     }
 
-    fn serve_request(self, payload: Data) {
-        self.ret_tx
-            .send(payload)
-            .expect("Receiver of requested batch not available");
+    //TODO: if None, then return an error to the caller
+    fn serve_request(self, maybe_payload: Option<Data>) {
+        if let Some(payload) = maybe_payload {
+            self.ret_tx
+                .send(Ok(payload))
+                .expect("Receiver of requested batch not available");
+        } else {
+            self.ret_tx
+                .send(Err(QuorumStoreError::Timeout))
+                .expect("Receiver of requested batch not available");
+        }
     }
 }
 
@@ -90,33 +107,39 @@ impl BatchRequester {
         &mut self,
         digest: HashValue,
         signers: Vec<PeerId>,
-        ret_tx: oneshot::Sender<Data>,
+        ret_tx: oneshot::Sender<Result<Data, QuorumStoreError>>,
         self_signer: Arc<ValidatorSigner>,
     ) {
         let mut request_state = BatchRequesterState::new(signers, ret_tx);
 
-        let request_peers = request_state.next_request_peers(self.request_num_peers);
+        let request_peers = request_state
+            .next_request_peers(self.request_num_peers)
+            .unwrap(); //note: this is the first try
         self.send_requests(digest, request_peers, self_signer).await;
         self.digest_to_state.insert(digest, request_state);
         self.timeouts.add_digest(digest, self.request_timeout_ms);
     }
 
     pub(crate) async fn handle_timeouts(&mut self, self_signer: Arc<ValidatorSigner>) {
+        // let mut expired_states = Vec::new();
         for digest in self.timeouts.expire() {
             if let Some(state) = self.digest_to_state.get_mut(&digest) {
-                let request_peers = state.next_request_peers(self.request_num_peers);
-                self.send_requests(digest, request_peers, self_signer.clone())
-                    .await;
-                self.timeouts.add_digest(digest, self.request_timeout_ms);
+                if let Some(request_peers) = state.next_request_peers(self.request_num_peers) {
+                    self.send_requests(digest, request_peers, self_signer.clone())
+                        .await;
+                    self.timeouts.add_digest(digest, self.request_timeout_ms);
+                } else {
+                    let state = self.digest_to_state.remove(&digest).unwrap();
+                    state.serve_request(None);
+                }
             }
         }
     }
 
-    // TODO, Rati, how is sending here is not a side effect? Who is it different from the handle messages we had in Quorum_store?
     pub(crate) fn serve_request(&mut self, digest: HashValue, payload: Data) {
         if self.digest_to_state.contains_key(&digest) {
             let state = self.digest_to_state.remove(&digest).unwrap();
-            state.serve_request(payload);
+            state.serve_request(Some(payload));
         }
     }
 }

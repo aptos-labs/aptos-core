@@ -104,6 +104,7 @@ impl ProofBuilder {
                 }
                 ProofBuilderCommand::AppendSignature(signed_digest) => {
                     if let Err(_) = self.add_signature(signed_digest, &validator_verifier) {
+                        // Can happen if we already garbage collected
                         //TODO: do something
                     }
                 }
