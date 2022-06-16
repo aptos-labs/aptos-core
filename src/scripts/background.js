@@ -5,6 +5,7 @@ import { AptosClient } from 'aptos'
 import { DEVNET_NODE_URL } from '../core/constants'
 import { MessageMethod } from '../core/types'
 import { getBackgroundAptosAccountState } from '../core/utils/account'
+import Permissions from '../core/utils/permissions'
 
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
   try {
@@ -28,7 +29,7 @@ async function handleDappRequest (request, sendResponse) {
       connect(account, sendResponse)
       break
     case MessageMethod.DISCONNECT:
-      disconnect()
+      disconnect(sendResponse)
       break
     case MessageMethod.IS_CONNECTED:
       isConnected(sendResponse)
@@ -47,21 +48,26 @@ async function handleDappRequest (request, sendResponse) {
   }
 }
 
-function connect (account, sendResponse) {
-  // todo: register caller for permission checking purposes
+async function connect (account, sendResponse) {
+  await Permissions.addDomain(await getCurrentDomain())
   getAccountAddress(account, sendResponse)
 }
 
-function disconnect () {
-  // todo: unregister caller
+async function disconnect (sendResponse) {
+  await Permissions.removeDomain(await getCurrentDomain())
+  sendResponse({})
 }
 
-function isConnected (sendResponse) {
-  // todo: send boolean response based on registered caller
-  sendResponse(true)
+async function isConnected (sendResponse) {
+  const isConnected = await Permissions.isDomainAllowed(await getCurrentDomain())
+  sendResponse(isConnected)
 }
 
 function getAccountAddress (account, sendResponse) {
+  if (!checkConnected(sendResponse)) {
+    return
+  }
+
   if (account.address()) {
     sendResponse({ address: account.address().hex() })
   } else {
@@ -70,6 +76,10 @@ function getAccountAddress (account, sendResponse) {
 }
 
 async function signAndSubmitTransaction (client, account, transaction, sendResponse) {
+  if (!checkConnected(sendResponse)) {
+    return
+  }
+
   try {
     const signedTransaction = signTransaction(client, account, transaction)
     const response = await client.submitTransaction(account, signedTransaction)
@@ -80,6 +90,10 @@ async function signAndSubmitTransaction (client, account, transaction, sendRespo
 }
 
 async function signTransactionAndSendResponse (client, account, transaction, sendResponse) {
+  if (!checkConnected(sendResponse)) {
+    return
+  }
+
   try {
     const signedTransaction = signTransaction(client, account, transaction)
     sendResponse({ signedTransaction })
@@ -88,8 +102,25 @@ async function signTransactionAndSendResponse (client, account, transaction, sen
   }
 }
 
+// Utils
+
 async function signTransaction (client, account, transaction) {
   const address = account.address()
   const txn = await client.generateTransaction(address, transaction)
   return await client.signTransaction(account, txn)
+}
+
+async function checkConnected (sendResponse) {
+  if (Permissions.isDomainAllowed(await getCurrentDomain())) {
+    return true;
+  } else {
+    sendResponse({ error: 'App not connected - call aptos.connect()' })    
+    return false;
+  }
+}
+
+async function getCurrentDomain() {
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+  const url = new URL(tabs[0].url)
+  return url.hostname
 }
