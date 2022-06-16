@@ -39,6 +39,23 @@ const config = {
         },
       }),
     ],
+    [
+      "redocusaurus",
+      {
+        // Plugin Options for loading OpenAPI files
+        specs: [
+          {
+            spec: "../api/doc/openapi.yaml",
+            route: "/rest-api/",
+          },
+        ],
+        // Theme Options for modifying how redoc renders them
+        theme: {
+          // Change with your site colors
+          primaryColor: "#1890ff",
+        },
+      },
+    ],
   ],
 
   themeConfig:
@@ -128,6 +145,11 @@ const config = {
                 docId: "tutorials/validator-node/intro",
               },
             ],
+          },
+          {
+            position: "left",
+            href: "/rest-api",
+            label: "REST API",
           },
         ],
       },
