@@ -6,8 +6,9 @@ use async_trait::async_trait;
 use thiserror::Error as ThisError;
 
 use crate::{
+    evaluator::EvaluationSummary,
     metric_collector::{MetricCollector, MetricCollectorError},
-    metric_evaluator::{EvaluationSummary, MetricsEvaluatorError},
+    metric_evaluator::MetricsEvaluatorError,
 };
 
 #[derive(Debug, ThisError)]

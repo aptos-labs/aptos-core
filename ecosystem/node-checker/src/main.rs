@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod configuration;
+mod evaluator;
 mod metric_collector;
 mod metric_evaluator;
 mod runner;
