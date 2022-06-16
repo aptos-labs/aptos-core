@@ -67,27 +67,27 @@ impl TransactionStore {
     }
 
     /// Gets an iterator that yields `(sequence_number, version)` for each
-    /// transaction sent by an account, starting at `start_seq_num`, and returning
-    /// at most `num_versions` results with `version <= ledger_version`.
-    ///
+    /// transaction sent by an account, with minimum sequence number greater
+    /// `min_seq_num`, and returning at most `num_versions` results with
+    /// `version <= ledger_version`.
     /// Guarantees that the returned sequence numbers are sequential, i.e.,
     /// `seq_num_{i} + 1 = seq_num_{i+1}`.
     pub fn get_account_transaction_version_iter(
         &self,
         address: AccountAddress,
-        start_seq_num: u64,
+        min_seq_num: u64,
         num_versions: u64,
         ledger_version: Version,
     ) -> Result<AccountTransactionVersionIter> {
         let mut iter = self
             .db
             .iter::<TransactionByAccountSchema>(ReadOptions::default())?;
-        iter.seek(&(address, start_seq_num))?;
+        iter.seek(&(address, min_seq_num))?;
         Ok(AccountTransactionVersionIter {
             inner: iter,
             address,
-            expected_next_seq_num: start_seq_num,
-            end_seq_num: start_seq_num
+            expected_next_seq_num: None,
+            end_seq_num: min_seq_num
                 .checked_add(num_versions)
                 .ok_or_else(|| format_err!("too many transactions requested"))?,
             prev_version: None,
@@ -383,7 +383,7 @@ impl<'a> Iterator for TransactionIter<'a> {
 pub struct AccountTransactionVersionIter<'a> {
     inner: SchemaIterator<'a, TransactionByAccountSchema>,
     address: AccountAddress,
-    expected_next_seq_num: u64,
+    expected_next_seq_num: Option<u64>,
     end_seq_num: u64,
     prev_version: Option<Version>,
     ledger_version: Version,
@@ -391,25 +391,26 @@ pub struct AccountTransactionVersionIter<'a> {
 
 impl<'a> AccountTransactionVersionIter<'a> {
     fn next_impl(&mut self) -> Result<Option<(u64, Version)>> {
-        if self.expected_next_seq_num >= self.end_seq_num {
-            return Ok(None);
-        }
-
         Ok(match self.inner.next().transpose()? {
             Some(((address, seq_num), version)) => {
                 // No more transactions sent by this account.
                 if address != self.address {
                     return Ok(None);
                 }
+                if seq_num >= self.end_seq_num {
+                    return Ok(None);
+                }
 
                 // Ensure seq_num_{i+1} == seq_num_{i} + 1
-                ensure!(
-                    seq_num == self.expected_next_seq_num,
-                    "DB corruption: account transactions sequence numbers are not contiguous: \
+                if let Some(expected_seq_num) = self.expected_next_seq_num {
+                    ensure!(
+                        seq_num == expected_seq_num,
+                        "DB corruption: account transactions sequence numbers are not contiguous: \
                      actual: {}, expected: {}",
-                    seq_num,
-                    self.expected_next_seq_num,
-                );
+                        seq_num,
+                        expected_seq_num,
+                    );
+                };
 
                 // Ensure version_{i+1} > version_{i}
                 if let Some(prev_version) = self.prev_version {
@@ -427,7 +428,7 @@ impl<'a> AccountTransactionVersionIter<'a> {
                     return Ok(None);
                 }
 
-                self.expected_next_seq_num += 1;
+                self.expected_next_seq_num = Some(seq_num + 1);
                 self.prev_version = Some(version);
                 Some((seq_num, version))
             }
