@@ -12,9 +12,9 @@ pub enum MetricsEvaluatorError {
     ///   - The metric name.
     ///   - Explanation.
     /// When the target node is missing a metric, we return an Evaluation
-    /// indiating that something is wrong with the target node, but if the
+    /// indicating that something is wrong with the target node, but if the
     /// baseline node is missing a metric, it implies that something is wrong
-    /// without our node checker configuration, so we return an error here.
+    /// with our node checker configuration, so we return an error here.
     #[error("A baseline metric was missing. Metric name: {0}, Explanation: {1}")]
     MissingBaselineMetric(String, String),
 }
