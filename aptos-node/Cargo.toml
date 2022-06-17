@@ -55,7 +55,6 @@ network-builder = { path = "../network/builder" }
 state-sync-multiplexer = { path = "../state-sync/state-sync-v2/state-sync-multiplexer" }
 state-sync-v1 = { path = "../state-sync/state-sync-v1" }
 storage-interface = { path = "../storage/storage-interface" }
-storage-service = { path = "../storage/storage-service" }
 storage-service-client = { path = "../state-sync/storage-service/client" }
 storage-service-server = { path = "../state-sync/storage-service/server" }
 

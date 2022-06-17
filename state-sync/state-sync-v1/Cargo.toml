@@ -66,7 +66,6 @@ memsocket = { path = "../../network/memsocket" }
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 network = { path = "../../network", features = ["fuzzing", "testing"] }
 network-builder = { path = "../../network/builder" }
-storage-service = { path = "../../storage/storage-service" }
 vm-genesis = { path = "../../aptos-move/vm-genesis", features = ["fuzzing"] }
 
 [features]

@@ -3,7 +3,7 @@
 
 pub mod integration_test_impl;
 
-use aptos_config::{config::NodeConfig, utils};
+use aptos_config::config::NodeConfig;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     HashValue,
@@ -17,16 +17,10 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
     waypoint::Waypoint,
 };
-use aptos_vm::{AptosVM, VMExecutor};
-use aptosdb::AptosDB;
+use aptos_vm::VMExecutor;
 use executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};
 use executor_types::StateComputeResult;
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    thread::JoinHandle,
-};
 use storage_interface::DbReaderWriter;
-use storage_service::start_storage_service_with_db;
 
 /// Helper function for test to blindly bootstrap without waypoint.
 pub fn bootstrap_genesis<V: VMExecutor>(
@@ -36,16 +30,6 @@ pub fn bootstrap_genesis<V: VMExecutor>(
     let waypoint = generate_waypoint::<V>(db, genesis_txn)?;
     maybe_bootstrap::<V>(db, genesis_txn, waypoint)?;
     Ok(waypoint)
-}
-
-pub fn start_storage_service() -> (NodeConfig, JoinHandle<()>, DbReaderWriter) {
-    let (mut config, _genesis_key) = aptos_genesis::test_utils::test_config();
-    let server_port = utils::get_available_port();
-    config.storage.address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), server_port);
-    let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(&config.storage.dir()));
-    bootstrap_genesis::<AptosVM>(&db_rw, utils::get_genesis_txn(&config).unwrap()).unwrap();
-    let handle = start_storage_service_with_db(&config, db);
-    (config, handle, db_rw)
 }
 
 pub fn gen_block_id(index: u8) -> HashValue {

@@ -44,7 +44,6 @@ netcore = { path = "../network/netcore" }
 network = { path = "../network" }
 short-hex-str = { path = "../crates/short-hex-str" }
 storage-interface = { path = "../storage/storage-interface" }
-storage-service = { path = "../storage/storage-service", optional = true }
 vm-validator = { path = "../vm-validator" }
 
 [dev-dependencies]

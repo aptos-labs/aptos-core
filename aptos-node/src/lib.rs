@@ -54,7 +54,6 @@ use std::{
     time::Instant,
 };
 use storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
-use storage_service::start_storage_service_with_db;
 use storage_service_client::{StorageServiceClient, StorageServiceMultiSender};
 use storage_service_server::{
     network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer,
@@ -442,7 +441,6 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         )
         .expect("DB should open."),
     );
-    let _simple_storage_service = start_storage_service_with_db(node_config, Arc::clone(&aptos_db));
     let backup_service = start_backup_service(
         node_config.storage.backup_service_address,
         Arc::clone(&aptos_db),

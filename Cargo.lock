@@ -676,7 +676,6 @@ dependencies = [
  "serde_json",
  "short-hex-str",
  "storage-interface",
- "storage-service",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -755,7 +754,6 @@ dependencies = [
  "state-sync-multiplexer",
  "state-sync-v1",
  "storage-interface",
- "storage-service",
  "storage-service-client",
  "storage-service-server",
  "structopt",
@@ -3041,7 +3039,6 @@ dependencies = [
  "schemadb",
  "scratchpad",
  "serde 1.0.137",
- "storage-client",
  "storage-interface",
  "structopt",
  "toml",
@@ -3068,7 +3065,6 @@ dependencies = [
  "move-deps",
  "rand 0.7.3",
  "storage-interface",
- "storage-service",
  "vm-genesis",
 ]
 
@@ -7768,7 +7764,6 @@ dependencies = [
  "serde 1.0.137",
  "short-hex-str",
  "storage-interface",
- "storage-service",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -7837,22 +7832,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "213701ba3370744dcd1a12960caa4843b3d68b4d1c0a5d575e0d65b2ee9d16c0"
 
 [[package]]
-name = "storage-client"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-infallible",
- "aptos-logger",
- "aptos-secure-net",
- "aptos-types",
- "aptos-workspace-hack",
- "bcs",
- "serde 1.0.137",
- "storage-interface",
-]
-
-[[package]]
 name = "storage-interface"
 version = "0.1.0"
 dependencies = [
@@ -7868,28 +7847,6 @@ dependencies = [
  "scratchpad",
  "serde 1.0.137",
  "thiserror",
-]
-
-[[package]]
-name = "storage-service"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-crypto",
- "aptos-logger",
- "aptos-metrics-core",
- "aptos-secure-net",
- "aptos-temppath",
- "aptos-types",
- "aptos-workspace-hack",
- "aptosdb",
- "bcs",
- "itertools",
- "proptest",
- "rand 0.7.3",
- "storage-client",
- "storage-interface",
 ]
 
 [[package]]

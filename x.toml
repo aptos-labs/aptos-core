@@ -193,7 +193,6 @@ members = [
     "peer-monitoring-service-server", # This will be removed once the peer monitoring service is plugged in
     "peer-monitoring-service-types", # This will be removed once the peer monitoring service is plugged in
     "smoke-test",
-    "storage-client",
     "transaction-emitter",
     "x",
     "x-core",

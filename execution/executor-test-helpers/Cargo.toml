@@ -28,5 +28,4 @@ executor = { path = "../executor" }
 executor-types = { path = "../executor-types" }
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 storage-interface = { path = "../../storage/storage-interface" }
-storage-service = { path = "../../storage/storage-service" }
 vm-genesis = { path = "../../aptos-move/vm-genesis" }
