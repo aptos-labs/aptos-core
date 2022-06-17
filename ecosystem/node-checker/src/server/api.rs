@@ -59,7 +59,9 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
 // make for more descriptive error messages.
 #[OpenApi]
 impl<M: MetricCollector, R: Runner> Api<M, R> {
-    /// todo
+    /// Check the health of a given target node. You may sepcify a baseline node configuration
+    /// type to use for the evaluation. If you don't specify a baseline node configuration, we
+    /// will attempt to determine the appropriate baseline based on your target node.
     #[oai(path = "/check_node", method = "get")]
     async fn check_node(
         &self,
@@ -72,21 +74,14 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
                 "This node health checker is configured to only check its preconfigured test node"),
             )));
         }
-        // todo check if this is necessary now that the type is URL, and if it is, use set_scheme instead.
-        let mut target_url = request.target_node.url.to_string();
-        if !target_url.starts_with("http") {
-            target_url = format!("http://{}", target_url);
-        }
-        let target_url = match Url::parse(&target_url) {
-            Ok(url) => url,
-            Err(e) => return Err(PoemError::from((StatusCode::BAD_REQUEST, anyhow!(e)))),
-        };
 
         let baseline_node_configuration =
             self.get_baseline_node_configuration(&request.baseline_configuration_name)?;
 
-        let target_metric_collector =
-            ReqwestMetricCollector::new(target_url, request.target_node.metrics_port);
+        let target_metric_collector = ReqwestMetricCollector::new(
+            request.target_node.url.clone(),
+            request.target_node.metrics_port,
+        );
 
         let complete_evaluation_result = baseline_node_configuration
             .runner
@@ -102,7 +97,8 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
         }
     }
 
-    /// todo
+    /// Check the health of the preconfigured node. If none was specified when the node health
+    /// checker was started, this will return an error.
     #[oai(path = "/check_preconfigured_node", method = "get")]
     async fn check_preconfigured_node(
         &self,

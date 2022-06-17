@@ -27,14 +27,14 @@ pub struct Create {
 }
 
 pub async fn create(args: Create) -> Result<()> {
-    let s = match args.format {
+    let output = match args.format {
         OutputFormat::Json => serde_json::to_string_pretty(&args.node_configuration)?,
         OutputFormat::Yaml => serde_yaml::to_string(&args.node_configuration)?,
     };
 
     match args.output_path {
-        Some(path) => std::fs::write(path, s)?,
-        None => println!("{}", s),
+        Some(path) => std::fs::write(path, output)?,
+        None => println!("{}", output),
     }
 
     Ok(())

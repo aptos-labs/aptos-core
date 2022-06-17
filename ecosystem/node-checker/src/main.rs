@@ -9,7 +9,6 @@ mod server;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use log::{debug, info};
 
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {

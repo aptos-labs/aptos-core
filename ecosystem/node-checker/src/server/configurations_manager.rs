@@ -15,7 +15,7 @@ use anyhow::{Context, Result};
 /// node configurations.
 #[derive(Debug)]
 pub struct ConfigurationsManager<M: MetricCollector, R: Runner> {
-    /// They key here is the configuration_name.
+    /// The key here is the configuration_name.
     pub configurations: HashMap<String, NodeConfigurationWrapper<M, R>>,
 }
 
@@ -26,9 +26,9 @@ pub struct NodeConfigurationWrapper<M: MetricCollector, R: Runner> {
     pub runner: R,
 }
 
-// Gross function name but there isn't a great way to do this programmatically.
-// We've piped trait bounds throughout our code but here we're finally facing
-// the music and actually choosing some concrete types).
+// In this function we finally build our trait objects with concrete implementaitons.
+// We've piped trait bounds throughout our code but here we're finally facing the
+// music and actually choosing some concrete types).
 fn build_node_configuration_wrapper_with_blocking_runner_and_reqwest_metric_collector(
     node_configuration: NodeConfiguration,
 ) -> Result<NodeConfigurationWrapper<ReqwestMetricCollector, BlockingRunner<ReqwestMetricCollector>>>

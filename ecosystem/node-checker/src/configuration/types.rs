@@ -20,10 +20,10 @@ pub static DEFAULT_METRICS_PORT_STR: Lazy<String> =
 pub static DEFAULT_API_PORT_STR: Lazy<String> = Lazy::new(|| format!("{}", DEFAULT_API_PORT));
 pub static DEFAULT_NOISE_PORT_STR: Lazy<String> = Lazy::new(|| format!("{}", DEFAULT_NOISE_PORT));
 
-// Todo write about why these structs derive a billion different things:
-// - clap: to allow users to generate configs easily using nhc configuration create
-// - serde: so we can read / write configs from / to disk
-// - poemobject: so we can return the configuration over the API
+// To briefly explain why many of these structs derive 3 different classes of traits:
+// - Parser (clap): To allow users to generate configs easily using nhc configuration create
+// - Serialize / Deserialize (serde): So we can read / write configs from / to disk
+// - PoemoOject: So we can return the configuration over the API
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
 #[clap(author, version, about, long_about = None)]

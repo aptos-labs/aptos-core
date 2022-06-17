@@ -10,8 +10,6 @@ use crate::{
     metric_evaluator::{EvaluationSummary, MetricsEvaluatorError},
 };
 
-// todo: Rename MetricsEvaluator to MetricEvaluator
-
 #[derive(Debug, ThisError)]
 pub enum RunnerError {
     /// We failed to collect metrics for some reason.
