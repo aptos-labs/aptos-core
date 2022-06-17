@@ -89,7 +89,7 @@ function withSimulatedExtensionContainer<T>(Component: ComponentType<T>) {
         </VStack>
       );
     }
-    setColorMode('dark');
+    setColorMode('light');
     return (
       <VStack w="100vw" h="100vh" spacing={0}>
         <Component {...hocProps} />
