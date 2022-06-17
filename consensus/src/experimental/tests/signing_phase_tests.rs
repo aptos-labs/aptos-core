@@ -23,7 +23,10 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
 };
 use safety_rules::Error;
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    sync::{atomic::AtomicU64, Arc},
+};
 
 pub fn prepare_signing_pipeline(
     signing_phase: SigningPhase,
@@ -36,8 +39,12 @@ pub fn prepare_signing_pipeline(
     let (in_channel_tx, in_channel_rx) = create_channel::<SigningRequest>();
     let (out_channel_tx, out_channel_rx) = create_channel::<SigningResponse>();
 
-    let signing_phase_pipeline =
-        PipelinePhase::new(in_channel_rx, Some(out_channel_tx), Box::new(signing_phase));
+    let signing_phase_pipeline = PipelinePhase::new(
+        in_channel_rx,
+        Some(out_channel_tx),
+        Box::new(signing_phase),
+        Arc::new(AtomicU64::new(0)),
+    );
 
     (in_channel_tx, out_channel_rx, signing_phase_pipeline)
 }

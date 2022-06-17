@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
+use std::sync::{atomic::AtomicU64, Arc};
 
 use aptos_crypto::HashValue;
 use aptos_types::{ledger_info::LedgerInfo, validator_verifier::random_validator_verifier};
@@ -94,6 +94,7 @@ fn execution_phase_tests() {
         in_channel_rx,
         Some(out_channel_tx),
         Box::new(execution_phase),
+        Arc::new(AtomicU64::new(0)),
     );
 
     runtime.spawn(execution_phase_pipeline.start());

@@ -19,7 +19,7 @@ use aptos_types::{account_address::AccountAddress, validator_verifier::Validator
 use channel::aptos_channel::Receiver;
 use consensus_types::common::Author;
 use futures::channel::mpsc::UnboundedReceiver;
-use std::sync::Arc;
+use std::sync::{atomic::AtomicU64, Arc};
 
 /// build channels and return phases and buffer manager
 pub fn prepare_phases_and_buffer_manager(
@@ -44,11 +44,14 @@ pub fn prepare_phases_and_buffer_manager(
     let (execution_phase_response_tx, execution_phase_response_rx) =
         create_channel::<ExecutionResponse>();
 
+    let ongoing_tasks = Arc::new(AtomicU64::new(0));
+
     let execution_phase_processor = ExecutionPhase::new(execution_proxy);
     let execution_phase = PipelinePhase::new(
         execution_phase_request_rx,
         Some(execution_phase_response_tx),
         Box::new(execution_phase_processor),
+        ongoing_tasks.clone(),
     );
 
     // Signing Phase
@@ -61,6 +64,7 @@ pub fn prepare_phases_and_buffer_manager(
         signing_phase_request_rx,
         Some(signing_phase_response_tx),
         Box::new(signing_phase_processor),
+        ongoing_tasks.clone(),
     );
 
     // Persisting Phase
@@ -72,6 +76,7 @@ pub fn prepare_phases_and_buffer_manager(
         persisting_phase_request_rx,
         None,
         Box::new(persisting_phase_processor),
+        ongoing_tasks.clone(),
     );
 
     (
@@ -90,6 +95,7 @@ pub fn prepare_phases_and_buffer_manager(
             block_rx,
             sync_rx,
             verifier,
+            ongoing_tasks,
         ),
     )
 }

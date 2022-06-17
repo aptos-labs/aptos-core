@@ -1,7 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 
 use futures::{
     channel::{
@@ -90,6 +93,8 @@ pub struct BufferManager {
     stop: bool,
 
     verifier: ValidatorVerifier,
+
+    ongoing_tasks: Arc<AtomicU64>,
 }
 
 impl BufferManager {
@@ -105,6 +110,7 @@ impl BufferManager {
         block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
         verifier: ValidatorVerifier,
+        ongoing_tasks: Arc<AtomicU64>,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -131,6 +137,7 @@ impl BufferManager {
             stop: false,
 
             verifier,
+            ongoing_tasks,
         }
     }
 
@@ -240,7 +247,7 @@ impl BufferManager {
     }
 
     /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
-    fn process_reset_request(&mut self, request: ResetRequest) {
+    async fn process_reset_request(&mut self, request: ResetRequest) {
         let ResetRequest { tx, stop } = request;
         debug!("Receive reset");
 
@@ -248,6 +255,10 @@ impl BufferManager {
         self.buffer = Buffer::new();
         self.execution_root = None;
         self.signing_root = None;
+        // Wait for ongoing tasks to finish before sending back ack.
+        while self.ongoing_tasks.load(Ordering::SeqCst) > 0 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
 
         tx.send(sync_ack_new()).unwrap();
     }
@@ -418,7 +429,7 @@ impl BufferManager {
                     }
                 }
                 Some(reset_event) = self.reset_rx.next() => {
-                    self.process_reset_request(reset_event);
+                    self.process_reset_request(reset_event).await;
                 }
                 Some(response) = self.execution_phase_rx.next() => {
                     self.process_execution_response(response).await;
