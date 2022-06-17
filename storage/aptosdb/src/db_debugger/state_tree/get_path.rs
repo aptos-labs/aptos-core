@@ -45,12 +45,13 @@ impl Cmd {
         let mut iter = db.rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
         iter.seek_for_prev(&NodeKey::new_empty_path(self.before_version - 1))?;
         let mut version = iter.next().transpose()?.unwrap().0.version();
+        let root_version = version;
 
         let mut cur_pos = NibblePath::new_even(vec![]);
         // let mut version = self.before_version;
         let mut expected_node_hash = None;
         for nibble in self.target_pos.nibbles() {
-            match self.render_node(&db, version, &cur_pos, Some(nibble), expected_node_hash)? {
+            match self.render_node(&db, version, &cur_pos, root_version, Some(nibble), expected_node_hash)? {
                 Some((ver, node_hash)) => {
                     version = ver;
                     expected_node_hash = Some(node_hash);
@@ -60,7 +61,7 @@ impl Cmd {
 
             cur_pos.push(nibble);
         }
-        self.render_node(&db, version, &cur_pos, None, expected_node_hash)?;
+        self.render_node(&db, version, &cur_pos, root_version, None, expected_node_hash)?;
         Ok(())
     }
 
@@ -69,6 +70,7 @@ impl Cmd {
         db: &schemadb::DB,
         version: Version,
         pos: &NibblePath,
+        root_version: Version,
         target_nibble: Option<Nibble>,
         expected_hash: Option<HashValue>,
     ) -> Result<Option<(Version, HashValue)>> {
@@ -127,7 +129,13 @@ impl Cmd {
                             if is_target {
                                 ret = Some((*version, *hash));
                             }
-                            format!("{:>8} {} ver:{} ", child_type, hash, version)
+                            format!("{:>8} {} ver:{} {}", child_type, hash, version,
+                                    if root_version == *version {
+                                        "*"
+                                    } else {
+                                        ""
+                                    }.green()
+                            )
                         }
                     };
                     if is_target {
