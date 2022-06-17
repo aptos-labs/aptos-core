@@ -3,7 +3,7 @@
 
 use anyhow::bail;
 use aptos_crypto::hash::DefaultHasher;
-use aptos_crypto::{HashValue};
+use aptos_crypto::HashValue;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::transaction::SignedTransaction;
 use aptos_types::PeerId;

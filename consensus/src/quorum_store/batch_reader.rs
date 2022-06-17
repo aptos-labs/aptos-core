@@ -9,7 +9,7 @@ use crate::{
     quorum_store::{batch_requester::BatchRequester, batch_store::BatchStoreCommand},
 };
 use aptos_crypto::HashValue;
-use aptos_types::{PeerId};
+use aptos_types::PeerId;
 use consensus_types::common::Round;
 use consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
 use dashmap::DashMap;
