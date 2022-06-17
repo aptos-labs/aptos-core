@@ -70,7 +70,7 @@ mod tests {
     }
 
     fn setup(maximum_amount: Option<u64>) -> (AccountStates, Arc<Service>) {
-        let mut keygen = KeyGen::from_os_rng();
+        let mut keygen = KeyGen::from_seed([0; 32]);
         let (private_key, public_key) = keygen.generate_ed25519_keypair();
         let account_address = AuthenticationKey::ed25519(&public_key).derived_address();
 

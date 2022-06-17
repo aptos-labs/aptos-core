@@ -44,7 +44,7 @@ impl KeyGen {
     pub fn generate_x25519_private_key(
         &mut self,
     ) -> Result<x25519::PrivateKey, CryptoMaterialError> {
-        let ed25519_private_key = Ed25519PrivateKey::generate(&mut self.0);
+        let ed25519_private_key = self.generate_ed25519_private_key();
         x25519::PrivateKey::from_ed25519_private_bytes(&ed25519_private_key.to_bytes())
     }
     /// Generate a x25519 key pair.

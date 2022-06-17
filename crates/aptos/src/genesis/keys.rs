@@ -3,7 +3,7 @@
 
 use crate::{
     common::{
-        types::{CliError, CliTypedResult, PromptOptions},
+        types::{CliError, CliTypedResult, PromptOptions, RngArgs},
         utils::{check_if_file_exists, read_from_file, write_to_user_only_file},
     },
     genesis::{
@@ -14,7 +14,6 @@ use crate::{
 };
 use aptos_config::{config::IdentityBlob, keys::ConfigKey};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, x25519, PrivateKey};
-use aptos_keygen::KeyGen;
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use async_trait::async_trait;
 use clap::Parser;
@@ -31,6 +30,8 @@ const VFN_FILE: &str = "validator-full-node-identity.yaml";
 pub struct GenerateKeys {
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
+    #[clap(flatten)]
+    pub rng_args: RngArgs,
     /// Output path for the three keys
     #[clap(long, parse(from_os_str), default_value = ".")]
     pub(crate) output_dir: PathBuf,
@@ -50,7 +51,7 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
         check_if_file_exists(validator_file.as_path(), self.prompt_options)?;
         check_if_file_exists(vfn_file.as_path(), self.prompt_options)?;
 
-        let mut keygen = KeyGen::from_os_rng();
+        let mut keygen = self.rng_args.key_generator()?;
         let account_key = ConfigKey::new(keygen.generate_ed25519_private_key());
         let consensus_key = ConfigKey::new(keygen.generate_ed25519_private_key());
         let validator_network_key = ConfigKey::new(keygen.generate_x25519_private_key()?);

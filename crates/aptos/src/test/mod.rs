@@ -12,7 +12,7 @@ use crate::{
         init::InitTool,
         types::{
             CliConfig, CliTypedResult, EncodingOptions, PrivateKeyInputOptions, ProfileOptions,
-            PromptOptions, RestOptions, WriteTransactionOptions,
+            PromptOptions, RestOptions, RngArgs, WriteTransactionOptions,
         },
     },
     CliCommand,
@@ -134,6 +134,7 @@ impl CliTestFramework {
         InitTool {
             rest_url: Some(self.endpoint.clone()),
             faucet_url: Some(self.faucet_endpoint.clone()),
+            rng_args: RngArgs::from_seed([0; 32]),
             private_key_options: private_key_options(private_key),
             profile_options: profile(index),
             prompt_options: PromptOptions::yes(),

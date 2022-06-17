@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::{types::PromptOptions, utils::write_to_file},
+    common::{
+        types::{PromptOptions, RngArgs},
+        utils::write_to_file,
+    },
     genesis::{
         config::{HostAndPort, Layout},
         git::{GitOptions, SetupGit},
@@ -31,7 +34,7 @@ async fn test_genesis_e2e_flow() {
     let user_b = "user_b".to_string();
     let chain_id = ChainId::test();
 
-    let mut keygen = KeyGen::from_os_rng();
+    let mut keygen = KeyGen::from_seed([0; 32]);
 
     // First step is setup the local git repo
     let root_private_key = keygen.generate_ed25519_private_key();
@@ -144,6 +147,7 @@ async fn generate_keys() -> TempPath {
     dir.create_as_dir().unwrap();
     let output_dir = PathBuf::from(dir.path());
     let command = GenerateKeys {
+        rng_args: RngArgs::from_seed([0; 32]),
         prompt_options: PromptOptions::yes(),
         output_dir,
     };

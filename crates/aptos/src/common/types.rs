@@ -15,11 +15,13 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
+use aptos_keygen::KeyGen;
 use aptos_logger::debug;
 use aptos_rest_client::{aptos_api_types::WriteSetChange, Client, Transaction};
 use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
+use hex::FromHexError;
 use move_deps::move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
@@ -123,6 +125,13 @@ impl From<aptos_crypto::CryptoMaterialError> for CliError {
         CliError::UnexpectedError(e.to_string())
     }
 }
+
+impl From<hex::FromHexError> for CliError {
+    fn from(e: FromHexError) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
 /// Config saved to `.aptos/config.yaml`
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {
@@ -351,6 +360,37 @@ impl EncodingType {
                     CliError::UnableToParse(name, format!("Failed to parse key {:?}", err))
                 })
             }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Parser)]
+pub struct RngArgs {
+    /// The seed used for key generation, should be a 64 character hex string and mainly used for testing
+    ///
+    /// This field is hidden from the CLI input for now
+    #[clap(skip)]
+    random_seed: Option<String>,
+}
+
+impl RngArgs {
+    pub fn from_seed(seed: [u8; 32]) -> RngArgs {
+        RngArgs {
+            random_seed: Some(hex::encode(seed)),
+        }
+    }
+
+    /// Returns a key generator with the seed if given
+    pub fn key_generator(&self) -> CliTypedResult<KeyGen> {
+        if let Some(ref seed) = self.random_seed {
+            // Strip 0x
+            let seed = seed.strip_prefix("0x").unwrap_or(seed);
+            let mut seed_slice = [0u8; 32];
+
+            hex::decode_to_slice(seed, &mut seed_slice)?;
+            Ok(KeyGen::from_seed(seed_slice))
+        } else {
+            Ok(KeyGen::from_os_rng())
         }
     }
 }

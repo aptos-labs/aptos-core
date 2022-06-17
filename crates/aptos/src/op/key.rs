@@ -5,7 +5,7 @@ use crate::{
     common::{
         types::{
             CliError, CliTypedResult, EncodingOptions, EncodingType, ExtractPublicKey, KeyType,
-            PrivateKeyInputOptions, ProfileOptions, SaveFile,
+            PrivateKeyInputOptions, ProfileOptions, RngArgs, SaveFile,
         },
         utils::{append_file_extension, check_if_file_exists, write_to_file},
     },
@@ -13,7 +13,6 @@ use crate::{
 };
 use aptos_config::config::{Peer, PeerRole};
 use aptos_crypto::{ed25519, x25519, PrivateKey, ValidCryptoMaterial};
-use aptos_keygen::KeyGen;
 use aptos_types::account_address::{from_identity_public_key, AccountAddress};
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
@@ -104,6 +103,8 @@ pub struct GenerateKey {
     #[clap(long, default_value_t = KeyType::Ed25519)]
     key_type: KeyType,
     #[clap(flatten)]
+    pub rng_args: RngArgs,
+    #[clap(flatten)]
     save_params: SaveKey,
 }
 
@@ -115,7 +116,7 @@ impl CliCommand<HashMap<&'static str, PathBuf>> for GenerateKey {
 
     async fn execute(self) -> CliTypedResult<HashMap<&'static str, PathBuf>> {
         self.save_params.check_key_file()?;
-        let mut keygen = KeyGen::from_os_rng();
+        let mut keygen = self.rng_args.key_generator()?;
 
         match self.key_type {
             KeyType::X25519 => {
