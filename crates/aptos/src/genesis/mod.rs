@@ -199,7 +199,7 @@ fn get_config(client: &Client, user: &str) -> CliTypedResult<Validator> {
         validator_host,
         full_node_network_public_key: full_node_network_key,
         full_node_host,
-        stake_amount: 0,
+        stake_amount: config.stake_amount,
     };
     config.try_into()
 }
