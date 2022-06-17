@@ -82,6 +82,7 @@ jobs:
     env:
       RAILS_ENV: test
       NODE_ENV: test
+      CI: true
       COMMUNITY_DB_USER: complat
       COMMUNITY_DB_PASS: password
       COMMUNITY_DB_HOST: localhost
@@ -99,6 +100,8 @@ jobs:
         with:
           node-version-file: .node-version
       - run: bin/setup
+      - run: yarn build
+      - run: yarn build:css
       - run: bin/rails test
 
   docs-lint:

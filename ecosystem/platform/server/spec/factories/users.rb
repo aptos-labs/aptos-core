@@ -5,7 +5,9 @@
 
 FactoryBot.define do
   factory :user, class: User do
-    password { 'aptos' }
+    username { 'aptos' }
+    password { 'aptos1234' }
+    email { 'aptos@example.org' }
 
     factory :admin_user do
       is_root { true }

@@ -31,10 +31,8 @@ class OnboardingController < ApplicationController
     end
 
     email_params = params.require(:user).permit(:email, :username, :terms_accepted)
-    if current_user.update(email_params.merge(confirmation_token: Devise.friendly_token))
+    if current_user.update(email_params)
       log current_user, 'email updated'
-      url = confirmation_url(current_user, confirmation_token: current_user.confirmation_token)
-      SendConfirmEmailJob.perform_now({ user_id: current_user.id, template_vars: { CONFIRM_LINK: url } })
       redirect_to onboarding_email_success_path
     else
       render :email, status: :unprocessable_entity

@@ -8,6 +8,10 @@ class SendConfirmEmailJob < SendEmailJob
 
   private
 
+  def to_emails
+    [@user.unconfirmed_email]
+  end
+
   def template_name
     :confirm
   end

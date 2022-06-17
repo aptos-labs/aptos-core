@@ -14,15 +14,16 @@ Rails.application.routes.draw do
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
-  namespace :api do
-    # get ':provider/callback', to: 'sessions#create'
-    get 'users/me', to: 'users#me'
-    resources :users, only: %i[show update]
-  end
-
   namespace :user do
     root to: redirect('/it1') # creates user_root_path, where users go after confirming email
   end
+
+  # Settings
+  get 'settings', to: redirect('/settings/profile')
+  get 'settings/profile'
+  patch 'settings/profile', to: 'settings#profile_update'
+  get 'settings/connections'
+  delete 'settings/connections', to: 'settings#connections_delete'
 
   # KYC routes
   get 'onboarding/kyc_redirect', to: 'onboarding#kyc_redirect'

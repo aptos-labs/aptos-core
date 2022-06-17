@@ -11,4 +11,8 @@ class Authorization < ApplicationRecord
   def display_name
     "#{provider} [#{full_name || username || email || uid}]"
   end
+
+  def display_shortname
+    username || email
+  end
 end
