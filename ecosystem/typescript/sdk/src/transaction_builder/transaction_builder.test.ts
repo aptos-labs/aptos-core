@@ -177,7 +177,7 @@ test('serialize script payload with type args but no function args', () => {
   );
 });
 
-test('serialize script payload with one type arg and one function arg', () => {
+test('serialize script payload with type arg and function arg', () => {
   const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::TestCoin::TestCoin`));
 
   const argU8 = new TransactionArgumentU8(2);

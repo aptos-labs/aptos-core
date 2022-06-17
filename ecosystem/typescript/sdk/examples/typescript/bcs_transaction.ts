@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
 import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes } from 'aptos';
+import assert from 'assert';
 
 const NODE_URL = process.env.APTOS_NODE_URL || 'https://fullnode.devnet.aptoslabs.com';
 const FAUCET_URL = process.env.APTOS_FAUCET_URL || 'https://faucet.devnet.aptoslabs.com';
@@ -19,7 +20,7 @@ const {
  */
 (async () => {
   const client = new AptosClient(NODE_URL);
-  const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL, null);
+  const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
   // Generates key pair for a new account
   const account1 = new AptosAccount();
@@ -27,14 +28,18 @@ const {
   await faucetClient.fundAccount(account1.address(), 5000);
   let resources = await client.getAccountResources(account1.address());
   let accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
-  console.log(`account2 coins: ${(accountResource.data as any).coin.value}. Should be 5000!`);
+  let balance = parseInt((accountResource?.data as any).coin.value);
+  assert(balance === 5000);
+  console.log(`account2 coins: ${balance}. Should be 5000!`);
 
   const account2 = new AptosAccount();
   // Creates the second account and fund the account with 0 TestCoin
   await faucetClient.fundAccount(account2.address(), 0);
   resources = await client.getAccountResources(account2.address());
   accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
-  console.log(`account2 coins: ${(accountResource.data as any).coin.value}. Should be 0!`);
+  balance = parseInt((accountResource?.data as any).coin.value);
+  assert(balance === 0);
+  console.log(`account2 coins: ${balance}. Should be 0!`);
 
   const token = new TypeTagStruct(StructTag.fromString('0x1::TestCoin::TestCoin'));
 
@@ -83,5 +88,7 @@ const {
 
   resources = await client.getAccountResources(account2.address());
   accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
-  console.log(`account2 coins: ${(accountResource.data as any).coin.value}. Should be 717!`);
+  balance = parseInt((accountResource?.data as any).coin.value);
+  assert(balance === 717);
+  console.log(`account2 coins: ${balance}. Should be 717!`);
 })();

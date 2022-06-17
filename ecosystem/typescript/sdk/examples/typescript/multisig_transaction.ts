@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
 import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes, TransactionBuilderMultiEd25519 } from 'aptos';
+import assert from 'assert';
 
 const NODE_URL = process.env.APTOS_NODE_URL || 'https://fullnode.devnet.aptoslabs.com';
 const FAUCET_URL = process.env.APTOS_FAUCET_URL || 'https://faucet.devnet.aptoslabs.com';
@@ -12,7 +13,7 @@ type SigningMessage = TxnBuilderTypes.SigningMessage;
  */
 (async () => {
   const client = new AptosClient(NODE_URL);
-  const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL, null);
+  const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
   // Genereate 3 key pairs and account instances
   const account1 = new AptosAccount();
@@ -42,14 +43,18 @@ type SigningMessage = TxnBuilderTypes.SigningMessage;
 
   let resources = await client.getAccountResources(mutisigAccountAddress);
   let accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
-  console.log(`multisig account coins: ${(accountResource.data as any).coin.value}. Should be 5000!`);
+  let balance = parseInt((accountResource?.data as any).coin.value);
+  assert(balance === 5000);
+  console.log(`multisig account coins: ${balance}. Should be 5000!`);
 
   const account4 = new AptosAccount();
   // Creates a receiver account and fund the account with 0 TestCoin
   await faucetClient.fundAccount(account4.address(), 0);
   resources = await client.getAccountResources(account4.address());
   accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
-  console.log(`multisig account coins: ${(accountResource.data as any).coin.value}. Should be 0!`);
+  balance = parseInt((accountResource?.data as any).coin.value);
+  assert(balance === 0);
+  console.log(`multisig account coins: ${balance}. Should be 0!`);
 
   const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString('0x1::TestCoin::TestCoin'));
 
@@ -117,5 +122,7 @@ type SigningMessage = TxnBuilderTypes.SigningMessage;
 
   resources = await client.getAccountResources(account4.address());
   accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
-  console.log(`multisig account coins: ${(accountResource.data as any).coin.value}. Should be 123!`);
+  balance = parseInt((accountResource?.data as any).coin.value);
+  assert(balance === 123);
+  console.log(`multisig account coins: ${balance}. Should be 123!`);
 })();
