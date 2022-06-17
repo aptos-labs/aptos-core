@@ -24,13 +24,13 @@ pub async fn setup_test(
     // Connect the operator tool to the node's JSON RPC API
     let tool = CliTestFramework::new(
         validator.rest_api_endpoint(),
-        "http://localhost:9996".parse().unwrap(),
+        "http://localhost:9997".parse().unwrap(),
         2,
     )
     .await;
 
     // And the client
-    let rosetta_socket_addr = "127.0.0.1:9997";
+    let rosetta_socket_addr = "127.0.0.1:9998";
     let rosetta_url = format!("http://{}", rosetta_socket_addr).parse().unwrap();
     let rosetta_client = RosettaClient::new(rosetta_url);
     let api_config = ApiConfig {
@@ -58,6 +58,7 @@ pub async fn setup_test(
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_account_balance() {
     let (swarm, _cli, rosetta_client) = setup_test(1, 1).await;
     let account = CliTestFramework::account_id(0);
@@ -79,6 +80,8 @@ async fn test_account_balance() {
 }
 
 #[tokio::test]
+#[ignore]
+// TODO: Fix test so it doesn't conflict with other tests
 async fn test_block() {
     let (swarm, _cli, rosetta_client) = setup_test(1, 0).await;
     let chain_id = swarm.chain_id();
