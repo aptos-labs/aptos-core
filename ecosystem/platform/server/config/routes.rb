@@ -25,6 +25,9 @@ Rails.application.routes.draw do
   get 'settings/connections'
   delete 'settings/connections', to: 'settings#connections_delete'
 
+  # Discourse SSO
+  get 'discourse/sso', to: 'discourse#sso'
+
   # KYC routes
   get 'onboarding/kyc_redirect', to: 'onboarding#kyc_redirect'
   get 'onboarding/kyc_callback', to: 'onboarding#kyc_callback'

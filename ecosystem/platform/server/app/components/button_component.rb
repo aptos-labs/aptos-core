@@ -5,9 +5,9 @@
 
 class ButtonComponent < ViewComponent::Base
   SCHEME_CLASSES = {
-    primary: 'bg-teal-400 hover:brightness-105 text-neutral-800 font-mono uppercase font-bold flex '\
+    primary: 'bg-teal-400 hover:brightness-105 text-neutral-800 font-mono uppercase font-bold flex ' \
              'items-center justify-center',
-    secondary: 'border border-teal-400 hover:border-teal-300 text-white font-mono uppercase flex '\
+    secondary: 'border border-teal-400 hover:border-teal-300 text-white font-mono uppercase flex ' \
                'items-center justify-center'
   }.freeze
 
