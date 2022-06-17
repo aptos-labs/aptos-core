@@ -9,6 +9,7 @@ use crate::{
     evaluator::EvaluationSummary,
     metric_collector::{MetricCollector, MetricCollectorError},
     metric_evaluator::MetricsEvaluatorError,
+    system_information_evaluator::SystemInformationEvaluatorError,
 };
 
 #[derive(Debug, ThisError)]
@@ -21,10 +22,16 @@ pub enum RunnerError {
     #[error("Failed to parse metrics")]
     ParseMetricsError(Error),
 
-    /// One of the evaluators failed. This is not the same as a poor score from
+    /// One of the metrics evaluators failed. This is not the same as a poor score from
     /// an evaluator, this is an actual failure in the evaluation process.
     #[error("Failed to evaluate metrics")]
     MetricEvaluatorError(MetricsEvaluatorError),
+
+    /// One of the system information evaluators failed. This is not the same
+    /// as a poor score from an evaluator, this is an actual failure in the
+    /// evaluation process.
+    #[error("Failed to evaluate system information")]
+    SystemInformationEvaluatorError(SystemInformationEvaluatorError),
 }
 
 // This runner doesn't block in the multithreading sense, but from the user

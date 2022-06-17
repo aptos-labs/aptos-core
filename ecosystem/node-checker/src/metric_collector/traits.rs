@@ -8,6 +8,9 @@ use thiserror::Error as ThisError;
 
 // TODO: Consider using thiserror.
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct SystemInformation(pub HashMap<String, String>);
+
 #[derive(Debug, ThisError)]
 pub enum MetricCollectorError {
     /// We were unable to get data from the node.
@@ -36,7 +39,5 @@ pub trait MetricCollector: Sync + Send + 'static {
     /// Hit the system_information endpoint of the metrics port and return the response
     /// as a hashmap. Unfortunately the endpoint itself returns the results as just a
     /// map, not as a serialized version of a type, so this is the best we can do for now.
-    async fn collect_system_information(
-        &self,
-    ) -> Result<HashMap<String, String>, MetricCollectorError>;
+    async fn collect_system_information(&self) -> Result<SystemInformation, MetricCollectorError>;
 }
