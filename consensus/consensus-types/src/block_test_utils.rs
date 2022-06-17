@@ -46,6 +46,7 @@ prop_compose! {
             aptos_infallible::duration_since_epoch().as_micros() as u64,
             parent_qc,
             &signer,
+            Vec::new(),
         )
     }
 }
@@ -87,6 +88,7 @@ prop_compose! {
                 block_data: BlockData::new_proposal(
                     block.payload().unwrap().clone(),
                     block.author().unwrap(),
+                    (*block.block_data().failed_authors().unwrap()).clone(),
                     block.round(),
                     aptos_infallible::duration_since_epoch().as_micros() as u64,
                     block.quorum_cert().clone(),

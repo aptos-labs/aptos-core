@@ -45,6 +45,7 @@ fn test_is_valid_proposal() {
         1,
         quorum_cert.clone(),
         &chosen_validator_signer,
+        Vec::new(),
     );
     let bad_author_proposal = Block::new_proposal(
         Payload::new_empty(),
@@ -52,6 +53,7 @@ fn test_is_valid_proposal() {
         1,
         quorum_cert.clone(),
         &another_validator_signer,
+        Vec::new(),
     );
     let bad_duplicate_proposal = Block::new_proposal(
         Payload::new_empty(),
@@ -59,6 +61,7 @@ fn test_is_valid_proposal() {
         2,
         quorum_cert.clone(),
         &chosen_validator_signer,
+        Vec::new(),
     );
     let next_good_proposal = Block::new_proposal(
         Payload::new_empty(),
@@ -66,6 +69,7 @@ fn test_is_valid_proposal() {
         3,
         quorum_cert.clone(),
         &chosen_validator_signer,
+        Vec::new(),
     );
     let next_bad_duplicate_proposal = Block::new_proposal(
         Payload::new_empty(),
@@ -73,6 +77,7 @@ fn test_is_valid_proposal() {
         4,
         quorum_cert,
         &chosen_validator_signer,
+        Vec::new(),
     );
 
     let pe =

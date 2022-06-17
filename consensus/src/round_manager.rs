@@ -257,9 +257,10 @@ impl RoundManager {
                 .await;
         }
         .boxed();
+
         let proposal = self
             .proposal_generator
-            .generate_proposal(new_round_event.round, callback)
+            .generate_proposal(new_round_event.round, &mut self.proposer_election, callback)
             .await?;
         let signature = self.safety_rules.lock().sign_proposal(&proposal)?;
         let signed_proposal =
@@ -524,9 +525,23 @@ impl RoundManager {
 
         ensure!(
             self.proposer_election.is_valid_proposal(&proposal),
-            "[RoundManager] Proposer {} for block {} is not a valid proposer for this round",
+            "[RoundManager] Proposer {} for block {} is not a valid proposer for this round or created duplicate proposal",
             author,
             proposal,
+        );
+
+        // Validate that failed_authors list is correctly specified in the block.
+        let expected_failed_authors = self.proposal_generator.compute_failed_authors(
+            proposal.round(),
+            proposal.quorum_cert().certified_block().round(),
+            &mut self.proposer_election,
+        );
+        ensure!(
+            proposal.block_data().failed_authors().map_or(false, |failed_authors| *failed_authors == expected_failed_authors),
+            "[RoundManager] Proposal for block {} has invalid failed_authors list {:?}, expected {:?}",
+            proposal.round(),
+            proposal.block_data().failed_authors(),
+            expected_failed_authors,
         );
 
         let block_time_since_epoch = Duration::from_micros(proposal.timestamp_usecs());

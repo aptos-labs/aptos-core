@@ -7,7 +7,7 @@ use aptos_logger::Level;
 use aptos_types::{ledger_info::LedgerInfo, validator_signer::ValidatorSigner};
 use consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
-    common::Round,
+    common::{Author, Round},
     executed_block::ExecutedBlock,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
@@ -136,6 +136,7 @@ impl TreeInserter {
                 parent.timestamp_usecs() + 1,
                 round,
                 Payload::new_empty(),
+                vec![],
             ))
             .await
             .unwrap()
@@ -166,8 +167,16 @@ impl TreeInserter {
         timestamp_usecs: u64,
         round: Round,
         payload: Payload,
+        failed_authors: Vec<(Round, Author)>,
     ) -> Block {
-        Block::new_proposal(payload, round, timestamp_usecs, parent_qc, &self.signer)
+        Block::new_proposal(
+            payload,
+            round,
+            timestamp_usecs,
+            parent_qc,
+            &self.signer,
+            failed_authors,
+        )
     }
 }
 

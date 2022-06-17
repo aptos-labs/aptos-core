@@ -23,6 +23,10 @@ pub enum BlockType {
         payload: Payload,
         /// Author of the block that can be validated by the author's public key and the signature
         author: Author,
+        /// Failed authors from the parent's block to this block.
+        /// I.e. the list of consecutive proposers from the
+        /// immediately preceeding rounds that didn't produce a successful block.
+        failed_authors: Vec<(Round, Author)>,
     },
     /// NIL blocks don't have authors or signatures: they're generated upon timeouts to fill in the
     /// gaps in the rounds.
@@ -116,6 +120,19 @@ impl BlockData {
         matches!(self.block_type, BlockType::NilBlock)
     }
 
+    /// the list of consecutive proposers from the immediately preceeding
+    /// rounds that didn't produce a successful block
+    pub fn failed_authors(&self) -> Option<&Vec<(Round, Author)>> {
+        if let BlockType::Proposal {
+            ref failed_authors, ..
+        } = self.block_type
+        {
+            Some(failed_authors)
+        } else {
+            None
+        }
+    }
+
     pub fn new_genesis_from_ledger_info(ledger_info: &LedgerInfo) -> Self {
         assert!(ledger_info.ends_epoch());
         let ancestor = BlockInfo::new(
@@ -188,6 +205,7 @@ impl BlockData {
     pub fn new_proposal(
         payload: Payload,
         author: Author,
+        failed_authors: Vec<(Round, Author)>,
         round: Round,
         timestamp_usecs: u64,
         quorum_cert: QuorumCert,
@@ -197,7 +215,11 @@ impl BlockData {
             round,
             timestamp_usecs,
             quorum_cert,
-            block_type: BlockType::Proposal { payload, author },
+            block_type: BlockType::Proposal {
+                payload,
+                author,
+                failed_authors,
+            },
         }
     }
 
@@ -235,6 +257,7 @@ fn test_reconfiguration_suffix() {
     let reconfig_suffix_block = BlockData::new_proposal(
         Payload::new_empty(),
         AccountAddress::random(),
+        Vec::new(),
         2,
         2,
         quorum_cert,

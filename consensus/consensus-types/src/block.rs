@@ -194,10 +194,12 @@ impl Block {
         timestamp_usecs: u64,
         quorum_cert: QuorumCert,
         validator_signer: &ValidatorSigner,
+        failed_authors: Vec<(Round, Author)>,
     ) -> Self {
         let block_data = BlockData::new_proposal(
             payload,
             validator_signer.author(),
+            failed_authors,
             round,
             timestamp_usecs,
             quorum_cert,
@@ -264,6 +266,32 @@ impl Block {
                 "Reconfiguration suffix should not carry payload"
             );
         }
+        if let Some(failed_authors) = self.block_data().failed_authors() {
+            // when validating for being well formed,
+            // allow for missing failed authors,
+            // for whatever reason (from different max configuration, etc),
+            // but don't allow anything that shouldn't be there.
+            //
+            // we validate the full correctness of this field in round_manager.process_proposal()
+            let skipped_rounds = self.round().checked_sub(parent.round() + 1);
+            ensure!(
+                skipped_rounds.is_some(),
+                "Block round is smaller than block's parent round"
+            );
+            ensure!(
+                failed_authors.len() <= skipped_rounds.unwrap() as usize,
+                "Block has more failed authors than missed rounds"
+            );
+            let mut bound = parent.round();
+            for (round, _) in failed_authors {
+                ensure!(
+                    bound < *round && *round < self.round(),
+                    "Incorrect round in failed authors"
+                );
+                bound = *round;
+            }
+        }
+
         if self.is_nil_block() || parent.has_reconfiguration() {
             ensure!(
                 self.timestamp_usecs() == parent.timestamp_usecs(),

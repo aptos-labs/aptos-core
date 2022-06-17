@@ -98,7 +98,8 @@ prop_compose! {
     ) -> BlockType {
         BlockType::Proposal{
             payload: Payload::DirectMempool(txns),
-            author
+            author,
+            failed_authors: Vec::new(),
         }
     }
 }

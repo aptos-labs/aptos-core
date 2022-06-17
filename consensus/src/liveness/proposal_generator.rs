@@ -17,6 +17,10 @@ use consensus_types::common::{Payload, PayloadFilter};
 use futures::future::BoxFuture;
 use std::sync::Arc;
 
+use super::{
+    proposer_election::ProposerElection, unequivocal_proposer_election::UnequivocalProposerElection,
+};
+
 #[cfg(test)]
 #[path = "proposal_generator_test.rs"]
 mod proposal_generator_test;
@@ -43,6 +47,8 @@ pub struct ProposalGenerator {
     time_service: Arc<dyn TimeService>,
     // Max number of transactions to be added to a proposed block.
     max_block_size: u64,
+    // Max number of failed authors to be added to a proposed block.
+    max_failed_authors_to_store: usize,
     // Last round that a proposal was generated
     last_round_generated: Mutex<Round>,
 }
@@ -54,6 +60,7 @@ impl ProposalGenerator {
         payload_manager: Arc<dyn PayloadManager>,
         time_service: Arc<dyn TimeService>,
         max_block_size: u64,
+        max_failed_authors_to_store: usize,
     ) -> Self {
         Self {
             author,
@@ -61,6 +68,7 @@ impl ProposalGenerator {
             payload_manager,
             time_service,
             max_block_size,
+            max_failed_authors_to_store,
             last_round_generated: Mutex::new(0),
         }
     }
@@ -88,6 +96,7 @@ impl ProposalGenerator {
     pub async fn generate_proposal(
         &mut self,
         round: Round,
+        proposer_election: &mut UnequivocalProposerElection,
         wait_callback: BoxFuture<'static, ()>,
     ) -> anyhow::Result<BlockData> {
         {
@@ -153,13 +162,20 @@ impl ProposalGenerator {
             (payload, timestamp.as_micros() as u64)
         };
 
+        let quorum_cert = hqc.as_ref().clone();
+        let failed_authors = self.compute_failed_authors(
+            round,
+            quorum_cert.certified_block().round(),
+            proposer_election,
+        );
         // create block proposal
         Ok(BlockData::new_proposal(
             payload,
             self.author,
+            failed_authors,
             round,
             timestamp,
-            hqc.as_ref().clone(),
+            quorum_cert,
         ))
     }
 
@@ -177,5 +193,25 @@ impl ProposalGenerator {
         );
 
         Ok(hqc)
+    }
+
+    /// Compute the list of consecutive proposers from the
+    /// immediately preceeding rounds that didn't produce a successful block
+    pub fn compute_failed_authors(
+        &self,
+        round: Round,
+        previous_round: Round,
+        proposer_election: &mut UnequivocalProposerElection,
+    ) -> Vec<(Round, Author)> {
+        let mut failed_authors = Vec::new();
+        let start = std::cmp::max(
+            previous_round + 1,
+            round.saturating_sub(self.max_failed_authors_to_store as u64),
+        );
+        for i in start..round {
+            failed_authors.push((i, proposer_election.get_valid_proposer(i)));
+        }
+
+        failed_authors
     }
 }

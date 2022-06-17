@@ -350,6 +350,7 @@ async fn test_illegal_timestamp() {
         genesis.timestamp_usecs(),
         certificate_for_genesis(),
         &signer,
+        Vec::new(),
     );
     let result = block_store
         .execute_and_insert_block(block_with_illegal_timestamp)

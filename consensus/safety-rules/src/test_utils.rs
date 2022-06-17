@@ -68,6 +68,7 @@ pub fn make_proposal_with_qc_and_proof(
             qc.certified_block().timestamp_usecs() + 1,
             qc,
             validator_signer,
+            Vec::new(),
         ),
         None,
         false,

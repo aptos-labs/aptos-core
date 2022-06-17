@@ -69,8 +69,8 @@ use std::{
 };
 
 /// Range of rounds (window) that we might be calling proposer election
-/// functions with at any given time.
-const PROPSER_ELECTION_CACHING_WINDOW: usize = 3;
+/// functions with at any given time, in addition to the proposer history length.
+const PROPSER_ELECTION_CACHING_WINDOW_ADDITION: usize = 3;
 
 #[allow(clippy::large_enum_variant)]
 pub enum LivenessStorageData {
@@ -218,7 +218,8 @@ impl EpochManager {
                 // LeaderReputation is not cheap, so we can cache the amount of rounds round_manager needs.
                 Box::new(CachedProposerElection::new(
                     proposer_election,
-                    PROPSER_ELECTION_CACHING_WINDOW,
+                    self.config.max_failed_authors_to_store
+                        + PROPSER_ELECTION_CACHING_WINDOW_ADDITION,
                 ))
             }
             ConsensusProposerType::RoundProposer(round_proposers) => {
@@ -490,6 +491,7 @@ impl EpochManager {
             Arc::new(payload_manager),
             self.time_service.clone(),
             self.config.max_block_size,
+            self.config.max_failed_authors_to_store,
         );
 
         let mut round_manager = RoundManager::new(

@@ -614,7 +614,14 @@ mod tests {
         );
         let previous_qc = certificate_for_genesis();
         let proposal = ProposalMsg::new(
-            Block::new_proposal(Payload::new_empty(), 1, 1, previous_qc.clone(), &signers[0]),
+            Block::new_proposal(
+                Payload::new_empty(),
+                1,
+                1,
+                previous_qc.clone(),
+                &signers[0],
+                Vec::new(),
+            ),
             SyncInfo::new(previous_qc.clone(), previous_qc, None),
         );
         timed_block_on(&mut runtime, async {

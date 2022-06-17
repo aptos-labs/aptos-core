@@ -99,6 +99,11 @@ BlockType:
               TYPENAME: Payload
           - author:
               TYPENAME: AccountAddress
+          - failed_authors:
+              SEQ:
+                TUPLE:
+                  - U64
+                  - TYPENAME: AccountAddress
     1:
       NilBlock: UNIT
     2:

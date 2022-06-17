@@ -145,6 +145,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         Arc::new(MockPayloadManager::new(None)),
         time_service,
         1,
+        10,
     );
 
     //
