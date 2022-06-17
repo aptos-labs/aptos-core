@@ -30,6 +30,10 @@ module AptosFramework::Genesis {
         epoch_interval: u64,
         minimum_stake: u64,
         maximum_stake: u64,
+        min_lockup_duration_secs: u64,
+        max_lockup_duration_secs: u64,
+        post_genesis_validator_set_change_allowed: bool,
+        rewards_rate_percentage: u64,
     ) {
         initialize_internal(
             &core_resource_account,
@@ -45,6 +49,10 @@ module AptosFramework::Genesis {
             epoch_interval,
             minimum_stake,
             maximum_stake,
+            min_lockup_duration_secs,
+            max_lockup_duration_secs,
+            post_genesis_validator_set_change_allowed,
+            rewards_rate_percentage,
         )
     }
 
@@ -62,6 +70,10 @@ module AptosFramework::Genesis {
         epoch_interval: u64,
         minimum_stake: u64,
         maximum_stake: u64,
+        min_lockup_duration_secs: u64,
+        max_lockup_duration_secs: u64,
+        post_genesis_validator_set_change_allowed: bool,
+        rewards_rate_percentage: u64,
     ) {
         // initialize the core resource account
         Account::initialize(
@@ -84,7 +96,15 @@ module AptosFramework::Genesis {
         // Consensus config setup
         ConsensusConfig::initialize(core_resource_account);
         Version::initialize(core_resource_account, initial_version);
-        Stake::initialize_validator_set(core_resource_account, minimum_stake, maximum_stake);
+        Stake::initialize_validator_set(
+            core_resource_account,
+            minimum_stake,
+            maximum_stake,
+            min_lockup_duration_secs,
+            max_lockup_duration_secs,
+            post_genesis_validator_set_change_allowed,
+            rewards_rate_percentage,
+        );
 
         VMConfig::initialize(
             core_resource_account,
@@ -165,7 +185,7 @@ module AptosFramework::Genesis {
             Coin::register<TestCoin>(&owner_account);
             Coin::transfer<TestCoin>(&core_resource_account, *owner, amount);
             Stake::add_stake(&owner_account, amount);
-            Stake::join_validator_set(&owner_account, *owner);
+            Stake::join_validator_set_internal(&owner_account, *owner);
 
             i = i + 1;
         };
@@ -187,7 +207,11 @@ module AptosFramework::Genesis {
             1,
             0,
             0,
-            0
+            0,
+            0,
+            0,
+            true,
+            0,
         )
     }
 

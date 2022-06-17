@@ -196,6 +196,10 @@ fn create_and_initialize_main_accounts(
     let epoch_interval = 86400 * 1000000;
     let minimum_stake = 0;
     let maximum_stake = 1000000;
+    let min_lockup_duration_secs = 0;
+    let max_lockup_duration_secs = 7 * 24 * 60 * 60; // 7 days
+    let allow_validator_set_change = false;
+    let rewards_rate_percentage = 1;
 
     exec_function(
         session,
@@ -216,6 +220,10 @@ fn create_and_initialize_main_accounts(
             MoveValue::U64(epoch_interval),
             MoveValue::U64(minimum_stake),
             MoveValue::U64(maximum_stake),
+            MoveValue::U64(min_lockup_duration_secs),
+            MoveValue::U64(max_lockup_duration_secs),
+            MoveValue::Bool(allow_validator_set_change),
+            MoveValue::U64(rewards_rate_percentage),
         ]),
     );
 }
