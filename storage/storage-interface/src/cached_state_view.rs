@@ -24,10 +24,10 @@ pub struct CachedStateView {
     /// For logging and debugging purpose, identifies what this view is for.
     id: StateViewId,
 
-    /// A readable state checkpoint in the persistent storage.
-    persisted_checkpoint: Option<(Version, HashValue)>,
+    /// A readable snapshot in the persistent storage.
+    snapshot: Option<(Version, HashValue)>,
 
-    /// The in-memory state on top of the persisted checkpoint.
+    /// The in-memory state on top of the snapshot.
     speculative_state: FrozenSparseMerkleTree<StateValue>,
 
     /// The cache of verified account states from `reader` and `speculative_state_view`,
@@ -86,15 +86,15 @@ impl CachedStateView {
         speculative_state: SparseMerkleTree<StateValue>,
         proof_fetcher: Arc<dyn ProofFetcher>,
     ) -> Result<Self> {
-        // n.b. Freeze the state before getting the state checkpoint, otherwise it's possible that
-        // after we got the checkpoint, in-mem trees newer than it gets dropped before being frozen,
+        // n.b. Freeze the state before getting the state snapshot, otherwise it's possible that
+        // after we got the snapshot, in-mem trees newer than it gets dropped before being frozen,
         // due to a commit happening from another thread.
         let speculative_state = speculative_state.freeze();
-        let persisted_checkpoint = reader.get_state_checkpoint_before(next_version)?;
+        let snapshot = reader.get_state_snapshot_before(next_version)?;
 
         Ok(Self {
             id,
-            persisted_checkpoint,
+            snapshot,
             speculative_state,
             state_cache: RwLock::new(HashMap::new()),
             proof_fetcher,
@@ -128,7 +128,7 @@ impl CachedStateView {
             // No matter it is in db or unknown, we have to query from db since even the
             // former case, we don't have the blob data but only its hash.
             StateStoreStatus::ExistsInDB | StateStoreStatus::Unknown => {
-                match self.persisted_checkpoint {
+                match self.snapshot {
                     Some((version, root_hash)) => {
                         let (value, proof) = self
                             .proof_fetcher
@@ -184,6 +184,6 @@ impl StateView for CachedStateView {
     }
 
     fn is_genesis(&self) -> bool {
-        self.persisted_checkpoint.is_none()
+        self.snapshot.is_none()
     }
 }

@@ -13,7 +13,7 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, state_store::state_key::StateKeyTag,
 };
-use storage_interface::{jmt_update_refs, jmt_updates, StateSnapshotReceiver};
+use storage_interface::{jmt_update_refs, jmt_updates, DbReader, StateSnapshotReceiver};
 
 use crate::{pruner, AptosDB};
 
@@ -76,7 +76,7 @@ fn verify_value_and_proof_in_store(
     root: HashValue,
 ) {
     let (value, proof) = store
-        .get_value_with_proof_by_version(&key, version)
+        .get_state_value_with_proof_by_version(&key, version)
         .unwrap();
     assert_eq!(value.as_ref(), expected_value);
     proof.verify(root, key.hash(), value.as_ref()).unwrap();
@@ -88,7 +88,7 @@ fn verify_value_index_in_store(
     expected_value: Option<&StateValue>,
     version: Version,
 ) {
-    let value = store.get_value_by_version(&key, version).unwrap();
+    let value = store.get_state_value_by_version(&key, version).unwrap();
     assert_eq!(value.as_ref(), expected_value);
 }
 
@@ -98,7 +98,9 @@ fn test_empty_store() {
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
     let key = StateKey::Raw(String::from("test_key").into_bytes());
-    assert!(store.get_value_with_proof_by_version(&key, 0).is_err());
+    assert!(store
+        .get_state_value_with_proof_by_version(&key, 0)
+        .is_err());
 }
 
 #[test]
@@ -293,7 +295,9 @@ fn test_retired_records() {
             100, /* limit */
         );
         // root0 is gone.
-        assert!(store.get_value_with_proof_by_version(&key2, 0).is_err());
+        assert!(store
+            .get_state_value_with_proof_by_version(&key2, 0)
+            .is_err());
         // root1 is still there.
         verify_value_and_proof(store, key1.clone(), Some(&value1), 1, root1);
         verify_value_and_proof(store, key2.clone(), Some(&value2_update), 1, root1);
@@ -307,7 +311,9 @@ fn test_retired_records() {
             100, /* limit */
         );
         // root1 is gone.
-        assert!(store.get_value_with_proof_by_version(&key2, 1).is_err());
+        assert!(store
+            .get_state_value_with_proof_by_version(&key2, 1)
+            .is_err());
         // root2 is still there.
         verify_value_and_proof(store, key1, Some(&value1), 2, root2);
         verify_value_and_proof(store, key2, Some(&value2_update), 2, root2);

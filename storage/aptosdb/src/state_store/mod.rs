@@ -34,7 +34,7 @@ use aptos_types::{
 };
 use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::{collections::HashMap, sync::Arc};
-use storage_interface::StateSnapshotReceiver;
+use storage_interface::{DbReader, StateSnapshotReceiver};
 
 type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
 type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
@@ -48,6 +48,77 @@ pub(crate) struct StateStore {
     ledger_db: Arc<DB>,
     state_merkle_db: Arc<DB>,
     latest_checkpoint: Mutex<Option<(Version, HashValue)>>,
+}
+
+// "using an Arc<dyn DbReader> as an Arc<dyn StateReader>" is not allowed in stable Rust. Actually we
+// want another trait, `StateReader`, which is a subset of `DbReaer` here but Rust does not support trait
+// upcasting coercion for now. Should change it to a different trait once upcasting is stablized.
+// ref: https://github.com/rust-lang/rust/issues/65991
+impl DbReader for StateStore {
+    /// Get the state value with proof given the state key and version
+    fn get_state_value_with_proof_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
+        let (leaf_data, proof) =
+            JellyfishMerkleTree::new(self).get_with_proof(state_key.hash(), version)?;
+        Ok((
+            match leaf_data {
+                Some((_, (key, version))) => Some(self.expect_value_by_version(&key, version)?),
+                None => None,
+            },
+            proof,
+        ))
+    }
+
+    /// Get the lastest state value of the given key up to the given version. Only used for testing for now
+    /// but should replace the `get_value_with_proof_by_version` call for VM execution if just fetch the
+    /// value without proof.
+    fn get_state_value_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<StateValue>> {
+        let mut read_opts = ReadOptions::default();
+        // We want `None` if the state_key changes in iteration.
+        read_opts.set_prefix_same_as_start(true);
+        let mut iter = self.ledger_db.iter::<StateValueSchema>(read_opts)?;
+        iter.seek(&(state_key.clone(), version))?;
+        iter.next()
+            .transpose()?
+            .map(|(_, state_value)| Ok(state_value))
+            // A hack to deal with PRE_GENESIS_VERSION
+            .or_else(|| {
+                self.ledger_db
+                    .get::<StateValueSchema>(&(state_key.clone(), PRE_GENESIS_VERSION))
+                    .transpose()
+            })
+            .transpose()
+    }
+
+    /// Returns the latest state snapshot strictly before `next_version` if any.
+    fn get_state_snapshot_before(
+        &self,
+        next_version: Version,
+    ) -> Result<Option<(Version, HashValue)>> {
+        ensure!(
+            next_version != PRE_GENESIS_VERSION,
+            "Nothing before pre-genesis"
+        );
+
+        if let Some((version, root_hash)) = self.latest_checkpoint() {
+            if next_version > version {
+                Ok(Some((version, root_hash)))
+            } else {
+                self.find_latest_persisted_version_from_db(next_version)?
+                    .map(|ver| Ok((ver, self.get_root_hash(ver)?)))
+                    .transpose()
+            }
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 impl StateStore {
@@ -79,33 +150,13 @@ impl StateStore {
         *self.latest_checkpoint.lock() = Some((version, root_hash))
     }
 
-    pub fn get_checkpoint_before(
-        &self,
-        next_version: Version,
-    ) -> Result<Option<(Version, HashValue)>> {
-        ensure!(
-            next_version != PRE_GENESIS_VERSION,
-            "Nothing before pre-genesis"
-        );
-
-        if let Some((version, root_hash)) = self.latest_checkpoint() {
-            if next_version > version {
-                Ok(Some((version, root_hash)))
-            } else {
-                self.find_latest_persisted_version_from_db(next_version)?
-                    .map(|ver| Ok((ver, self.get_root_hash(ver)?)))
-                    .transpose()
-            }
-        } else {
-            Ok(None)
-        }
-    }
-
     pub fn find_latest_persisted_version_less_than(
         &self,
         next_version: Version,
     ) -> Result<Option<Version>> {
-        Ok(self.get_checkpoint_before(next_version)?.map(|(v, _h)| v))
+        Ok(self
+            .get_state_snapshot_before(next_version)?
+            .map(|(v, _h)| v))
     }
 
     fn find_latest_persisted_version_from_db(
@@ -129,23 +180,6 @@ impl StateStore {
             .state_merkle_db
             .get::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(PRE_GENESIS_VERSION))?
             .map(|_pre_genesis_root| PRE_GENESIS_VERSION))
-    }
-
-    /// Get the state value with proof given the state key and version
-    pub fn get_value_with_proof_by_version(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        let (leaf_data, proof) =
-            JellyfishMerkleTree::new(self).get_with_proof(state_key.hash(), version)?;
-        Ok((
-            match leaf_data {
-                Some((_, (key, version))) => Some(self.expect_value_by_version(&key, version)?),
-                None => None,
-            },
-            proof,
-        ))
     }
 
     /// Returns the key, value pairs for a particular state key prefix at at desired version. This
@@ -209,7 +243,7 @@ impl StateStore {
         state_key: &StateKey,
         version: Version,
     ) -> Result<StateValue> {
-        self.get_value_by_version(state_key, version)
+        self.get_state_value_by_version(state_key, version)
             .and_then(|opt| {
                 opt.ok_or_else(|| {
                     format_err!(
@@ -219,31 +253,6 @@ impl StateStore {
                     )
                 })
             })
-    }
-
-    /// Get the lastest state value of the given key up to the given version. Only used for testing for now
-    /// but should replace the `get_value_with_proof_by_version` call for VM execution if just fetch the
-    /// value without proof.
-    pub fn get_value_by_version(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<StateValue>> {
-        let mut read_opts = ReadOptions::default();
-        // We want `None` if the state_key changes in iteration.
-        read_opts.set_prefix_same_as_start(true);
-        let mut iter = self.ledger_db.iter::<StateValueSchema>(read_opts)?;
-        iter.seek(&(state_key.clone(), version))?;
-        iter.next()
-            .transpose()?
-            .map(|(_, state_value)| Ok(state_value))
-            // A hack to deal with PRE_GENESIS_VERSION
-            .or_else(|| {
-                self.ledger_db
-                    .get::<StateValueSchema>(&(state_key.clone(), PRE_GENESIS_VERSION))
-                    .transpose()
-            })
-            .transpose()
     }
 
     /// Gets the proof that proves a range of accounts.

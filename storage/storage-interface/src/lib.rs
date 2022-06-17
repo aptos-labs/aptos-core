@@ -377,8 +377,8 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// Returns the latest state checkpoint strictly before `next_version` if any.
-    fn get_state_checkpoint_before(
+    /// Returns the latest state snapshot strictly before `next_version` if any.
+    fn get_state_snapshot_before(
         &self,
         next_version: Version,
     ) -> Result<Option<(Version, HashValue)>> {

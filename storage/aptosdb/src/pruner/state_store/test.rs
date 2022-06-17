@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
-use storage_interface::{jmt_update_refs, jmt_updates};
+use storage_interface::{jmt_update_refs, jmt_updates, DbReader};
 
 use crate::{change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB};
 
@@ -42,7 +42,7 @@ fn verify_state_in_store(
     version: Version,
 ) {
     let (value, _proof) = state_store
-        .get_value_with_proof_by_version(&key, version)
+        .get_state_value_with_proof_by_version(&key, version)
         .unwrap();
 
     assert_eq!(value.as_ref(), expected_value);
@@ -120,7 +120,7 @@ fn test_state_store_pruner() {
             .unwrap();
         for i in 0..prune_batch_size {
             assert!(state_store
-                .get_value_with_proof_by_version(&key, i as u64)
+                .get_state_value_with_proof_by_version(&key, i as u64)
                 .is_err());
         }
         for i in prune_batch_size..num_versions as usize {
