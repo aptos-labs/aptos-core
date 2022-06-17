@@ -1,5 +1,7 @@
 # syntax=docker/dockerfile:1.4
 
+# NOTE: We're only using this base image for the preinstalled dependencies. We
+# are using Puma as the app server, not Passenger.
 FROM phusion/passenger-full:2.3.0
 
 RUN npm install -g yarn && \
