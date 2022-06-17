@@ -156,7 +156,7 @@ The Wallet is now integrated with our dapp. Next, we will integrate the Aptos SD
 First, add the SDK to the project's dependencies:
 
 ```console
-$ npm add --save aptos
+$ npm install --save aptos
 ```
 
 You will now see `"aptos": "^0.0.20"` (or similar) in your `package.json`.
