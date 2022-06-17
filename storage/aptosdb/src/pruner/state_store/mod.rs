@@ -137,6 +137,12 @@ impl StateStorePruner {
         // least 60000 versions (assuming the pruner deletes as slow as 1000 versions per second,
         // this imposes at most one minute of work in vain after restarting.)
         let now = Instant::now();
+        if self.min_readable_version.load(Ordering::Relaxed) < self.index_min_nonpurged_version() {
+            warn!("State pruner inconsistent, min_readable_version is {} and  index_min_non-purged_version is {}",
+                self.min_readable_version.load(Ordering::Relaxed), self.index_min_nonpurged_version());
+            return Ok(());
+        }
+
         if now - *self.index_purged_at.lock() > MIN_INTERVAL
             && self.min_readable_version.load(Ordering::Relaxed)
                 - self.index_min_nonpurged_version()
