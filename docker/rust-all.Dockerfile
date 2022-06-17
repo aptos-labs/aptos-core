@@ -107,6 +107,7 @@ COPY --from=builder /aptos/target/release/db-backup /usr/local/bin/
 COPY --from=builder /aptos/target/release/db-backup-verify /usr/local/bin/
 COPY --from=builder /aptos/target/release/db-restore /usr/local/bin/
 COPY --from=builder /aptos/target/release/aptos-transaction-replay /usr/local/bin/
+COPY --from=builder /aptos/target/release/aptos /usr/local/bin/
 
 ### Get Aptos Move modules bytecodes for genesis ceremony
 RUN mkdir -p /aptos-framework/move/build
@@ -118,7 +119,7 @@ RUN rm -rf /aptos-framework/move/build
 
 
 ### Init / Genesis Image ###
-### TODO(christian|rusty|sherry): This image is appears to be a subset of the tools image. We can probably get rid of this in favor for the tools image.
+### TODO(christian|rustie|sherry): This image is appears to be a subset of the tools image. We can probably get rid of this in favor for the tools image.
 
 FROM debian-base AS init
 
@@ -129,6 +130,7 @@ RUN cd /usr/local/bin && wget "https://releases.hashicorp.com/vault/1.5.0/vault_
 RUN mkdir -p /opt/aptos/bin
 COPY --from=builder /aptos/target/release/aptos-genesis-tool /usr/local/bin/
 COPY --from=builder /aptos/target/release/aptos-operational-tool /usr/local/bin/
+COPY --from=builder /aptos/target/release/aptos /usr/local/bin/
 
 ### Get Aptos Move modules bytecodes for genesis ceremony
 RUN mkdir -p /aptos-framework/move/build

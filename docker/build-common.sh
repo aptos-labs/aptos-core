@@ -35,6 +35,7 @@ if [ "$IMAGE_TARGET" = "release" ]; then
           -p aptos-writeset-generator \
           -p transaction-emitter \
           -p aptos-indexer \
+          -p aptos \
           "$@"
 
   # Build our core modules!
