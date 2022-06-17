@@ -1,57 +1,58 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { MessageMethod } from '../core/types'
+import { MessageMethod } from '../core/types';
 
 class Web3 {
-  requestId
+  requestId;
 
-  constructor () {
-    this.requestId = 0
+  constructor() {
+    this.requestId = 0;
   }
 
-  connect () {
-    return this._message(MessageMethod.CONNECT, {})
+  connect() {
+    return this.message(MessageMethod.CONNECT, {});
   }
 
-  disconnect () {
-    return this._message(MessageMethod.DISCONNECT, {})
+  disconnect() {
+    return this.message(MessageMethod.DISCONNECT, {});
   }
 
-  isConnected () {
-    return this._message(MessageMethod.IS_CONNECTED, {})
+  isConnected() {
+    return this.message(MessageMethod.IS_CONNECTED, {});
   }
 
-  account () {
-    return this._message(MessageMethod.GET_ACCOUNT_ADDRESS, {})
+  account() {
+    return this.message(MessageMethod.GET_ACCOUNT_ADDRESS, {});
   }
 
-  signAndSubmitTransaction (transaction) {
-    return this._message(MessageMethod.SIGN_AND_SUBMIT_TRANSACTION, { transaction })
+  signAndSubmitTransaction(transaction) {
+    return this.message(MessageMethod.SIGN_AND_SUBMIT_TRANSACTION, { transaction });
   }
 
-  signTransaction (transaction) {
-    return this._message(MessageMethod.SIGN_TRANSACTION, { transaction })
+  signTransaction(transaction) {
+    return this.message(MessageMethod.SIGN_TRANSACTION, { transaction });
   }
 
-  _message(method, args) {
-    const id = this.requestId++
-    return new Promise(function (resolve, reject) {
-      window.postMessage({ method, args, id })
-      window.addEventListener('message', function handler (event) {
-        if (event.data.responseMethod === method &&
-            event.data.id === id) {
-          const response = event.data.response
-          this.removeEventListener('message', handler)
+  message(method, args) {
+    this.requestId += 1;
+    const id = this.requestId;
+    return new Promise((resolve, reject) => {
+      window.postMessage({ args, id, method });
+      window.addEventListener('message', function handler(event) {
+        if (event.data.responseMethod === method
+            && event.data.id === id) {
+          const { response } = event.data;
+          this.removeEventListener('message', handler);
           if (response.error) {
-            reject(response.error ?? 'Error')
+            reject(response.error ?? 'Error');
           } else {
-            resolve(response)
+            resolve(response);
           }
         }
-      })
-    })
+      });
+    });
   }
 }
 
-window.aptos = new Web3()
+window.aptos = new Web3();

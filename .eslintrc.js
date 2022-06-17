@@ -12,7 +12,6 @@ module.exports = {
   ],
   ignorePatterns: [
     '*.css',
-    '*.js',
     '*.jsx'
   ],
   parser: '@typescript-eslint/parser',
