@@ -25,7 +25,6 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, str::FromStr};
 
-const MIN_PRICE_PER_GAS_UNIT: u64 = 1;
 const WAYPOINT_FILE: &str = "waypoint.txt";
 const GENESIS_FILE: &str = "genesis.blob";
 
@@ -133,7 +132,14 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
         layout.root_key,
         validators,
         modules,
-        MIN_PRICE_PER_GAS_UNIT,
+        layout.min_price_per_gas_unit,
+        layout.allow_new_validators,
+        layout.min_stake,
+        layout.max_stake,
+        layout.min_lockup_duration_secs,
+        layout.max_lockup_duration_secs,
+        layout.epoch_duration_secs,
+        layout.initial_lockup_timestamp,
     )?)
 }
 

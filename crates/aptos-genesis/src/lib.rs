@@ -24,12 +24,30 @@ use vm_genesis::Validator;
 /// Holder object for all pieces needed to generate a genesis transaction
 #[derive(Clone)]
 pub struct GenesisInfo {
+    /// ChainId for identifying the network
     chain_id: ChainId,
+    /// Key used for minting tokens
     root_key: Ed25519PublicKey,
+    /// Set of configurations for validators on the network
     validators: Vec<Validator>,
     /// Compiled bytecode of framework modules
     modules: Vec<Vec<u8>>,
     min_price_per_gas_unit: u64,
+    /// Whether to allow new validators to join the set after genesis
+    pub allow_new_validators: bool,
+    /// Minimum stake to be in the validator set
+    pub min_stake: u64,
+    /// Maximum stake to be in the validator set
+    pub max_stake: u64,
+    /// Minimum number of seconds to lockup staked coins
+    pub min_lockup_duration_secs: u64,
+    /// Maximum number of seconds to lockup staked coins
+    pub max_lockup_duration_secs: u64,
+    /// Duration of an epoch
+    pub epoch_duration_secs: u64,
+    /// Initial timestamp for genesis validators to be locked up
+    pub initial_lockup_timestamp: u64,
+    /// The genesis transaction, once it's been generated
     genesis: Option<Transaction>,
 }
 
@@ -40,6 +58,13 @@ impl GenesisInfo {
         configs: Vec<ValidatorConfiguration>,
         modules: Vec<Vec<u8>>,
         min_price_per_gas_unit: u64,
+        allow_new_validators: bool,
+        min_stake: u64,
+        max_stake: u64,
+        min_lockup_duration_secs: u64,
+        max_lockup_duration_secs: u64,
+        epoch_duration_secs: u64,
+        initial_lockup_timestamp: u64,
     ) -> anyhow::Result<GenesisInfo> {
         let mut validators = Vec::new();
 
@@ -53,6 +78,13 @@ impl GenesisInfo {
             validators,
             modules,
             min_price_per_gas_unit,
+            allow_new_validators,
+            min_stake,
+            max_stake,
+            min_lockup_duration_secs,
+            max_lockup_duration_secs,
+            epoch_duration_secs,
+            initial_lockup_timestamp,
             genesis: None,
         })
     }

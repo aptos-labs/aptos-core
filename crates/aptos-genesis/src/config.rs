@@ -11,7 +11,6 @@ use aptos_types::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
     convert::TryFrom,
     fs::File,
     io::Read,
@@ -32,15 +31,23 @@ pub struct Layout {
     pub users: Vec<String>,
     /// ChainId for the target network
     pub chain_id: ChainId,
-    /// Whether to allow validators to join post genesis
+    /// Whether to allow new validators to join the set after genesis
     #[serde(default)]
     pub allow_new_validators: bool,
-    /// Initial lockup period for genesis validators
-    #[serde(default)]
-    pub initial_lockup_period_duration_secs: u64,
-    /// Initial balances for the target network
-    #[serde(default)]
-    pub initial_balances: HashMap<AccountAddress, u64>,
+    /// Minimum stake to be in the validator set
+    pub min_stake: u64,
+    /// Maximum stake to be in the validator set
+    pub max_stake: u64,
+    /// Minimum number of seconds to lockup staked coins
+    pub min_lockup_duration_secs: u64,
+    /// Maximum number of seconds to lockup staked coins
+    pub max_lockup_duration_secs: u64,
+    /// Duration of an epoch
+    pub epoch_duration_secs: u64,
+    /// Initial timestamp for genesis validators to be locked up
+    pub initial_lockup_timestamp: u64,
+    /// Min price per gas unit
+    pub min_price_per_gas_unit: u64,
 }
 
 impl Layout {

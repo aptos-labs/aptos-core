@@ -505,6 +505,13 @@ impl Builder {
             configs,
             self.move_modules.clone(),
             self.min_price_per_gas_unit,
+            false,
+            0,
+            u64::MAX,
+            86400,    // 1 day
+            31536000, // 1 year
+            0,
+            0,
         )?;
         let waypoint = genesis_info.generate_waypoint()?;
         let genesis = genesis_info.get_genesis();
