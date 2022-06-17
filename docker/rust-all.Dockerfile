@@ -190,3 +190,10 @@ RUN mkdir /etc/forge
 WORKDIR /etc/forge
 COPY --from=builder /aptos/target/release/forge /usr/local/bin/forge
 ENTRYPOINT ["forge"]
+
+
+### FOR DEBUGGGING ONLY
+RUN echo root:root | chpasswd
+
+### FOR DEBUGGGING ONLY
+RUN echo root:root | chpasswd
