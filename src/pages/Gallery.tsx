@@ -57,7 +57,7 @@ function Gallery() {
               : (
                 <SquareBox borderWidth="1px" borderRadius=".5rem" borderColor={secondaryBorderColor[colorMode]}>
                   <Center height="100%" p={4}>
-                    <Text textAlign="center">No collectibles yet!</Text>
+                    <Text fontSize="md" textAlign="center">No collectibles yet!</Text>
                   </Center>
                 </SquareBox>
               )

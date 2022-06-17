@@ -64,10 +64,10 @@ export default function NetworkListItem(props: UseRadioProps & { isLoading: bool
         {
           isLoading ? (
             <>
-              <Text fontWeight={600}>
+              <Text fontSize="md" fontWeight={600}>
                 {value ? networkUriMap[value] : undefined}
               </Text>
-              <Text fontWeight={400}>
+              <Text fontSize="md" fontWeight={400}>
                 {value}
               </Text>
               {

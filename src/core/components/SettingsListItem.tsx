@@ -79,7 +79,7 @@ export default function SettingsListItem({
           as={icon}
         />
       </Center>
-      <Text color={textColorDict[colorMode]} fontWeight={600}>
+      <Text color={textColorDict[colorMode]} fontWeight={600} fontSize="md">
         {title}
       </Text>
     </Grid>

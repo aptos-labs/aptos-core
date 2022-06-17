@@ -14,9 +14,7 @@ import {
   Grid,
   Input,
   InputGroup,
-  InputRightAddon,
   SimpleGrid,
-  Tag,
   Text,
   useColorMode,
   useDisclosure,
@@ -31,14 +29,15 @@ import {
   getAccountResources,
   getTestCoinTokenBalanceFromAccountResources,
   useAccountExists,
+  useAccountResources,
 } from 'core/queries/account';
 import { useSubmitTestCoinTransfer } from 'core/mutations/transaction';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import {
   secondaryErrorMessageColor, STATIC_GAS_AMOUNT,
 } from 'core/constants';
-import numeral from 'numeral';
 import { GraceHopperBoringAvatar } from 'core/components/BoringAvatar';
+import numeral from 'numeral';
 import { secondaryTextColor } from '../../pages/Login';
 
 export const secondaryDividerColor = {
@@ -58,9 +57,27 @@ function TransferDrawer() {
     isLoading: isTransferLoading,
     mutateAsync: submitSendTransaction,
   } = useSubmitTestCoinTransfer();
+  const {
+    data: accountResources,
+  } = useAccountResources();
+
+  const tokenBalance = getTestCoinTokenBalanceFromAccountResources({ accountResources });
+  const tokenBalanceString = numeral(tokenBalance).format('0,0.0000');
 
   const transferAmount: string | undefined | null = watch('transferAmount');
   const transferAmountNumeral = numeral(transferAmount).format('0,0');
+  const transferAmountInputFontSize = useMemo(() => {
+    if (!transferAmount) {
+      return 64;
+    }
+    if (transferAmount.length <= 6) {
+      return 64;
+    }
+    if (transferAmount.length > 6 && transferAmount.length <= 10) {
+      return 48;
+    }
+    return 36;
+  }, [transferAmount]);
 
   const {
     onChange: addressOnChange,
@@ -86,10 +103,10 @@ function TransferDrawer() {
         address: aptosAccount.address().hex(),
         nodeUrl: aptosNetwork,
       });
-      const tokenBalance = getTestCoinTokenBalanceFromAccountResources({
+      const currentTokenBalance = getTestCoinTokenBalanceFromAccountResources({
         accountResources: fromAccountResources,
       });
-      if (Number(transferAmount) >= Number(tokenBalance) - STATIC_GAS_AMOUNT) {
+      if (Number(transferAmount) >= Number(currentTokenBalance) - STATIC_GAS_AMOUNT) {
         setError('toAddress', { message: 'Insufficient balance', type: 'custom' });
         return;
       }
@@ -140,13 +157,24 @@ function TransferDrawer() {
                   </Box>
                 </Box>
                 <VStack boxSizing="border-box" spacing={0} alignItems="flex-start" width="100%" maxW="100%">
-                  <Text
-                    fontSize="md"
-                    noOfLines={1}
-                    maxW="280px"
-                  >
-                    {toAddressStatus}
-                  </Text>
+                  <InputGroup pb={1}>
+                    <Input
+                      fontWeight={600}
+                      size="sm"
+                      variant="unstyled"
+                      placeholder={toAddressStatus}
+                      required
+                      maxLength={70}
+                      minLength={60}
+                      onChange={addressOnChange}
+                      autoComplete="off"
+                      ref={(e) => {
+                        toAddressRef(e);
+                        addressInputRef.current = e || undefined;
+                      }}
+                      {...toAddressRest}
+                    />
+                  </InputGroup>
                   {toAddressAccountExists ? (
                     <Button
                       color={secondaryTextColor[colorMode]}
@@ -177,63 +205,55 @@ function TransferDrawer() {
                 </VStack>
               </Grid>
             </DrawerHeader>
-            <DrawerBody px={0}>
-              <VStack spacing={4}>
+            <DrawerBody px={0} py={0}>
+              <VStack width="100%" spacing={0}>
                 <VStack
-                  py={10}
-                >
-                  <Text color={secondaryTextColor[colorMode]}>Send</Text>
-                  <Text
-                    fontSize="5xl"
-                    fontWeight={600}
-                    noOfLines={1}
-                    maxW="250px"
-                  >
-                    {transferAmountNumeral}
-                  </Text>
-                  <Tag
-                    borderRadius="full"
-                    variant="solid"
-                  >
-                    coins
-                  </Tag>
-                </VStack>
-                <VStack
-                  borderTopWidth="1px"
-                  borderTopColor={secondaryDividerColor[colorMode]}
-                  pt={4}
-                  px={4}
+                  spacing={8}
                   width="100%"
                 >
                   <InputGroup>
                     <Input
-                      variant="filled"
-                      placeholder="To address"
-                      required
-                      maxLength={70}
-                      minLength={60}
-                      onChange={addressOnChange}
-                      autoComplete="off"
-                      ref={(e) => {
-                        toAddressRef(e);
-                        addressInputRef.current = e || undefined;
-                      }}
-                      {...toAddressRest}
-                    />
-                  </InputGroup>
-                  <InputGroup>
-                    <Input
+                      textAlign="center"
                       type="number"
                       variant="filled"
-                      placeholder="Transfer amount"
+                      placeholder="0"
                       min={0}
+                      py={32}
+                      fontSize={transferAmountInputFontSize}
+                      borderRadius="0px"
                       required
-                      {...register('transferAmount')}
+                      size="lg"
+                      _focusVisible={{
+                        outline: 'none',
+                      }}
+                      {...register('transferAmount', {
+                        max: 10000000,
+                      })}
                     />
-                    <InputRightAddon>
-                      coins
-                    </InputRightAddon>
                   </InputGroup>
+                </VStack>
+                <VStack
+                  borderTopWidth="1px"
+                  borderTopColor={secondaryDividerColor[colorMode]}
+                  p={4}
+                  width="100%"
+                  spacing={0}
+                  mt={0}
+                >
+                  <SimpleGrid width="100%" columns={2}>
+                    <Flex>
+                      <Text fontWeight={600} fontSize="md">
+                        Balance
+                      </Text>
+                    </Flex>
+                    <Flex justifyContent="right">
+                      <Text color={secondaryTextColor[colorMode]} fontSize="md">
+                        {tokenBalanceString}
+                        {' '}
+                        coins
+                      </Text>
+                    </Flex>
+                  </SimpleGrid>
                   <Flex overflowY="auto" maxH="100px">
                     <Text
                       fontSize="xs"
@@ -247,14 +267,18 @@ function TransferDrawer() {
               </VStack>
             </DrawerBody>
             <DrawerFooter borderTopColor={secondaryDividerColor[colorMode]} borderTopWidth="1px" px={4}>
-              <SimpleGrid spacing={4} width="100%" columns={2}>
+              <Grid gap={4} width="100%" templateColumns="2fr 1fr">
                 <Button colorScheme="teal" isLoading={isTransferLoading} isDisabled={isTransferLoading} type="submit">
-                  Submit
+                  Send
+                  {' '}
+                  {transferAmountNumeral}
+                  {' '}
+                  coins
                 </Button>
                 <Button onClick={onClose} isDisabled={isTransferLoading}>
                   Cancel
                 </Button>
-              </SimpleGrid>
+              </Grid>
             </DrawerFooter>
           </DrawerContent>
         </form>
