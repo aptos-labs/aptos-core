@@ -3,7 +3,7 @@
 
 use std::net::{IpAddr, Ipv4Addr};
 
-use super::traits::{MetricCollector, MetricCollectorError};
+use super::traits::{MetricCollector, MetricCollectorError, SystemInformation};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use log::debug;
@@ -90,9 +90,7 @@ impl MetricCollector for ReqwestMetricCollector {
     /// We know that this endpoint returns JSON that is actually just HashMap<String, String>.
     /// Better than this would be to have that endpoint return a serialized struct that we can
     /// use here to deseralize. TODO for that.
-    async fn collect_system_information(
-        &self,
-    ) -> Result<HashMap<String, String>, MetricCollectorError> {
+    async fn collect_system_information(&self) -> Result<SystemInformation, MetricCollectorError> {
         let body = self.get_data_from_node("system_information").await?;
         let raw_map: HashMap<String, serde_json::Value> = serde_json::from_str(&body)
             .context("Failed to process response body as JSON")
@@ -106,6 +104,6 @@ impl MetricCollector for ReqwestMetricCollector {
                 .to_owned();
             out.insert(key, string_value);
         }
-        Ok(out)
+        Ok(SystemInformation(out))
     }
 }
