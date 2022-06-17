@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::service::TelemetryEvent;
-use aptos_config::config::RoleType;
+use aptos_config::config::NodeConfig;
 use state_sync_driver::metrics::StorageSynchronizerOperations;
 use std::collections::BTreeMap;
 
@@ -24,9 +24,9 @@ const ROLE_TYPE: &str = "role_type";
 // TODO(joshlind): add metrics for REST API and telemetry
 
 /// Collects and sends the build information via telemetry
-pub(crate) async fn create_core_metric_telemetry_event(node_role_type: RoleType) -> TelemetryEvent {
+pub(crate) async fn create_core_metric_telemetry_event(node_config: &NodeConfig) -> TelemetryEvent {
     // Collect the core metrics
-    let core_metrics = get_core_metrics(node_role_type);
+    let core_metrics = get_core_metrics(node_config);
 
     // Create and return a new telemetry event
     TelemetryEvent {
@@ -36,21 +36,22 @@ pub(crate) async fn create_core_metric_telemetry_event(node_role_type: RoleType)
 }
 
 /// Used to expose core metrics for the node
-pub fn get_core_metrics(node_role_type: RoleType) -> BTreeMap<String, String> {
+pub fn get_core_metrics(node_config: &NodeConfig) -> BTreeMap<String, String> {
     let mut core_metrics: BTreeMap<String, String> = BTreeMap::new();
-    collect_core_metrics(&mut core_metrics, node_role_type);
+    collect_core_metrics(&mut core_metrics, node_config);
     core_metrics
 }
 
 /// Collects the core metrics and appends them to the given map
-fn collect_core_metrics(core_metrics: &mut BTreeMap<String, String>, node_role_type: RoleType) {
+fn collect_core_metrics(core_metrics: &mut BTreeMap<String, String>, node_config: &NodeConfig) {
     // Collect the core metrics for each component
     collect_consensus_metrics(core_metrics);
     collect_mempool_metrics(core_metrics);
-    collect_state_sync_metrics(core_metrics);
+    collect_state_sync_metrics(core_metrics, node_config);
     collect_storage_metrics(core_metrics);
 
     // Collect the node role
+    let node_role_type = node_config.base.role;
     core_metrics.insert(ROLE_TYPE.into(), node_role_type.as_str().into());
 }
 
@@ -83,21 +84,42 @@ fn collect_mempool_metrics(core_metrics: &mut BTreeMap<String, String>) {
 }
 
 /// Collects the state sync metrics and appends it to the given map
-fn collect_state_sync_metrics(core_metrics: &mut BTreeMap<String, String>) {
-    core_metrics.insert(
-        STATE_SYNC_SYNCED_EPOCH.into(),
-        state_sync_driver::metrics::STORAGE_SYNCHRONIZER_OPERATIONS
-            .with_label_values(&[StorageSynchronizerOperations::SyncedEpoch.get_label()])
-            .get()
-            .to_string(),
-    );
-    core_metrics.insert(
-        STATE_SYNC_SYNCED_VERSION.into(),
-        state_sync_driver::metrics::STORAGE_SYNCHRONIZER_OPERATIONS
-            .with_label_values(&[StorageSynchronizerOperations::Synced.get_label()])
-            .get()
-            .to_string(),
-    );
+fn collect_state_sync_metrics(
+    core_metrics: &mut BTreeMap<String, String>,
+    node_config: &NodeConfig,
+) {
+    // Depending on which state sync version is running, we need to grab the
+    // appropriate counter. Otherwise, the node will panic due to a previously
+    // registered lazy.
+    // TODO(joshlind): remove this when v1 is gone!
+    if node_config
+        .state_sync
+        .state_sync_driver
+        .enable_state_sync_v2
+    {
+        core_metrics.insert(
+            STATE_SYNC_SYNCED_EPOCH.into(),
+            state_sync_driver::metrics::STORAGE_SYNCHRONIZER_OPERATIONS
+                .with_label_values(&[StorageSynchronizerOperations::SyncedEpoch.get_label()])
+                .get()
+                .to_string(),
+        );
+        core_metrics.insert(
+            STATE_SYNC_SYNCED_VERSION.into(),
+            state_sync_driver::metrics::STORAGE_SYNCHRONIZER_OPERATIONS
+                .with_label_values(&[StorageSynchronizerOperations::Synced.get_label()])
+                .get()
+                .to_string(),
+        );
+    } else {
+        core_metrics.insert(
+            STATE_SYNC_SYNCED_EPOCH.into(),
+            state_sync_v1::counters::VERSION
+                .with_label_values(&["synced"])
+                .get()
+                .to_string(),
+        );
+    }
     // TODO(joshlind): populate the state sync mode using the config!
 }
 

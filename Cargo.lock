@@ -1004,6 +1004,7 @@ dependencies = [
  "serde_json",
  "shadow-rs",
  "state-sync-driver",
+ "state-sync-v1",
  "sysinfo",
  "tokio",
  "tokio-stream",

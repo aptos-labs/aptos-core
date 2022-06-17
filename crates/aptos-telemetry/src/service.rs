@@ -15,7 +15,7 @@ use crate::{
     network_metrics::create_network_metric_telemetry_event,
     system_information::create_system_info_telemetry_event,
 };
-use aptos_config::config::{NodeConfig, RoleType};
+use aptos_config::config::NodeConfig;
 use aptos_logger::prelude::*;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -57,10 +57,9 @@ pub fn start_telemetry_service(node_config: NodeConfig, chain_id: String) -> Opt
 
     // Spawn the telemetry service
     let peer_id = fetch_peer_id(&node_config);
-    let node_role_type = node_config.base.role;
     telemetry_runtime
         .handle()
-        .spawn(spawn_telemetry_service(peer_id, chain_id, node_role_type));
+        .spawn(spawn_telemetry_service(peer_id, chain_id, node_config));
 
     Some(telemetry_runtime)
 }
@@ -75,7 +74,7 @@ fn fetch_peer_id(node_config: &NodeConfig) -> String {
 }
 
 /// Spawns the dedicated telemetry service that operates periodically
-async fn spawn_telemetry_service(peer_id: String, chain_id: String, node_role_type: RoleType) {
+async fn spawn_telemetry_service(peer_id: String, chain_id: String, node_config: NodeConfig) {
     // Send build information once (only on startup)
     send_build_information(peer_id.clone(), chain_id.clone()).await;
 
@@ -104,7 +103,7 @@ async fn spawn_telemetry_service(peer_id: String, chain_id: String, node_role_ty
                 send_system_information(peer_id.clone()).await;
             }
             _ = core_metrics_interval.select_next_some() => {
-                send_node_core_metrics(peer_id.clone(), node_role_type).await;
+                send_node_core_metrics(peer_id.clone(), &node_config).await;
             }
             _ = network_metrics_interval.select_next_some() => {
                 send_node_network_metrics(peer_id.clone()).await;
@@ -120,8 +119,8 @@ async fn send_build_information(peer_id: String, chain_id: String) {
 }
 
 /// Collects and sends the core node metrics via telemetry
-async fn send_node_core_metrics(peer_id: String, node_role_type: RoleType) {
-    let telemetry_event = create_core_metric_telemetry_event(node_role_type).await;
+async fn send_node_core_metrics(peer_id: String, node_config: &NodeConfig) {
+    let telemetry_event = create_core_metric_telemetry_event(node_config).await;
     let _join_handle = send_telemetry_event_with_ip(peer_id, telemetry_event).await;
 }
 
