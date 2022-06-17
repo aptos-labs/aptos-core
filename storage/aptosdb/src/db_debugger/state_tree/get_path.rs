@@ -21,7 +21,7 @@ pub struct Cmd {
     db_dir: DbDir,
 
     #[clap(long)]
-    version: Version,
+    before_version: Version,
 
     #[clap(long, parse(try_from_str=parse_nibble_path))]
     target_pos: NibblePath,
@@ -29,6 +29,7 @@ pub struct Cmd {
 
 impl Cmd {
     pub fn run(self) -> Result<()> {
+        /*
         println!(
             "{}",
             format!(
@@ -37,11 +38,16 @@ impl Cmd {
             )
             .yellow()
         );
+         */
 
         let db = self.db_dir.open_schemadb()?;
 
+        let mut iter = db.rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+        iter.seek_for_prev(&NodeKey::new_empty_path(self.before_version - 1))?;
+        let mut version = iter.next().transpose()?.unwrap().0.version();
+
         let mut cur_pos = NibblePath::new_even(vec![]);
-        let mut version = self.version;
+        // let mut version = self.before_version;
         let mut expected_node_hash = None;
         for nibble in self.target_pos.nibbles() {
             match self.render_node(&db, version, &cur_pos, Some(nibble), expected_node_hash)? {
