@@ -639,7 +639,7 @@ impl EpochManager {
             // same epoch -> run well-formedness + signature check
             let verified_event = unverified_event
                 .clone()
-                .verify(&self.epoch_state().verifier)
+                .verify(peer_id, &self.epoch_state().verifier)
                 .context("[EpochManager] Verify event")
                 .map_err(|err| {
                     error!(

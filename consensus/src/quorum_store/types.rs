@@ -3,15 +3,13 @@
 
 use anyhow::bail;
 use aptos_crypto::hash::DefaultHasher;
-use aptos_crypto::{ed25519::Ed25519Signature, HashValue};
+use aptos_crypto::{HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::transaction::SignedTransaction;
-use aptos_types::validator_signer::ValidatorSigner;
-use aptos_types::{validator_verifier::ValidatorVerifier, PeerId};
+use aptos_types::PeerId;
 use bcs::to_bytes;
 use consensus_types::proof_of_store::LogicalTime;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 pub(crate) type BatchId = u64;
 pub type Data = Vec<SignedTransaction>;
@@ -91,7 +89,7 @@ impl FragmentInfo {
 pub struct Fragment {
     pub source: PeerId,
     pub fragment_info: FragmentInfo,
-    pub signature: Ed25519Signature,
+    // pub signature: Ed25519Signature,
 }
 
 impl Fragment {
@@ -102,7 +100,7 @@ impl Fragment {
         fragment_payload: Data,
         maybe_expiration: Option<LogicalTime>,
         peer_id: PeerId,
-        validator_signer: Arc<ValidatorSigner>,
+        // validator_signer: Arc<ValidatorSigner>,
     ) -> Self {
         let fragment_info = FragmentInfo::new(
             epoch,
@@ -111,21 +109,26 @@ impl Fragment {
             fragment_payload,
             maybe_expiration,
         );
-        let signature = validator_signer.sign(&fragment_info);
+        // let signature = validator_signer.sign(&fragment_info);
         Self {
             source: peer_id,
             fragment_info,
-            signature,
+            // signature,
         }
     }
 
-    pub(crate) fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+    pub(crate) fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
         if let Some(expiration) = &self.fragment_info.maybe_expiration {
             if expiration.epoch() != self.fragment_info.epoch {
                 bail!("Incorrect expiration epoch");
             }
         }
-        Ok(validator.verify(self.source, &self.fragment_info, &self.signature)?)
+        if self.source == peer_id {
+            Ok(())
+        } else {
+            bail!("wrong sender");
+        }
+        // Ok(validator.verify(self.source, &self.fragment_info, &self.signature)?)
     }
 
     pub(crate) fn epoch(&self) -> u64 {
@@ -161,7 +164,7 @@ pub struct Batch {
     // None is a request, Some(payload) is a response.
     pub(crate) maybe_payload: Option<Data>,
     pub(crate) batch_info: BatchInfo,
-    pub(crate) maybe_signature: Option<Ed25519Signature>,
+    // pub(crate) maybe_signature: Option<Ed25519Signature>,
 }
 
 // TODO: make epoch, source, signature fields treatment consistent across structs.
@@ -171,22 +174,22 @@ impl Batch {
         source: PeerId,
         digest_hash: HashValue,
         maybe_payload: Option<Data>,
-        signer: Arc<ValidatorSigner>,
+        // signer: Arc<ValidatorSigner>,
     ) -> Self {
         let batch_info = BatchInfo {
             epoch,
             digest: digest_hash,
         };
-        let signature = if maybe_payload.is_some() {
-            Some(signer.sign(&batch_info))
-        } else {
-            None
-        };
+        // let signature = if maybe_payload.is_some() {
+        //     Some(signer.sign(&batch_info))
+        // } else {
+        //     None
+        // };
         Self {
             source,
             maybe_payload,
             batch_info,
-            maybe_signature: signature,
+            // maybe_signature: signature,
         }
     }
 
@@ -196,7 +199,7 @@ impl Batch {
 
     //TODO: maybe we should verify signature anyway.
     //TODO: maybe we dont need to verify signatures at all - network should check the sender
-    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+    pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
         if self.maybe_payload.is_some() {
             let mut hasher = DefaultHasher::new(b"QuorumStoreBatch");
             let serialized_payload: Vec<u8> = self
@@ -214,11 +217,16 @@ impl Batch {
                 bail!("Payload does not fit digest")
             }
         } else {
-            if let Some(signature) = &self.maybe_signature {
-                Ok(validator.verify(self.source, &self.batch_info, signature)?)
+            if self.source == peer_id {
+                Ok(())
             } else {
-                bail!("Missing signature");
+                bail!("wrong sender");
             }
+            // if let Some(signature) = &self.maybe_signature {
+            //     Ok(validator.verify(self.source, &self.batch_info, signature)?)
+            // } else {
+            //     bail!("Missing signature");
+            // }
         }
     }
 

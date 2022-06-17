@@ -104,14 +104,14 @@ impl BatchStore {
         }
         let batch_reader: Arc<BatchReader> = Arc::new(batch_reader);
         let batch_reader_clone = batch_reader.clone();
-        let validator_signer_clone = validator_signer.clone();
+        // let validator_signer_clone = validator_signer.clone();
         let net = network_sender.clone();
         tokio::spawn(async move {
             batch_reader_clone
                 .start(
                     batch_reader_rx,
                     net,
-                    validator_signer_clone,
+                    // validator_signer_clone,
                     batch_request_num_peers,
                     batch_request_timeout_ms,
                 )
@@ -206,7 +206,7 @@ impl BatchStore {
                                     self.my_peer_id,
                                     digest,
                                     Some(maybe_persisted_value.unwrap().maybe_payload.unwrap()),
-                                    self.validator_signer.clone(),
+                                    // self.validator_signer.clone(),
                                 );
                                 let msg = ConsensusMsg::BatchMsg(Box::new(batch));
                                 self.network_sender.send(msg, vec![peer_id]).await;

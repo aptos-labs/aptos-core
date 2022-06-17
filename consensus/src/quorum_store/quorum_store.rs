@@ -56,7 +56,7 @@ pub struct QuorumStore {
     batch_aggregator: BatchAggregator,
     batch_store_tx: Sender<BatchStoreCommand>,
     proof_builder_tx: Sender<ProofBuilderCommand>,
-    validator_signer: Arc<ValidatorSigner>,
+    // validator_signer: Arc<ValidatorSigner>,
     digest_end_batch: HashMap<HashValue, (Fragment, ProofReturnChannel)>,
 }
 
@@ -134,7 +134,7 @@ impl QuorumStore {
                 batch_aggregator: BatchAggregator::new(config.max_batch_size),
                 batch_store_tx,
                 proof_builder_tx,
-                validator_signer,
+                // validator_signer,
                 digest_end_batch: HashMap::new(),
             },
             batch_reader,
@@ -156,7 +156,7 @@ impl QuorumStore {
                 fragment_payload,
                 None,
                 self.my_peer_id,
-                self.validator_signer.clone(),
+                // self.validator_signer.clone(),
             );
             Some(ConsensusMsg::FragmentMsg(Box::new(fragment)))
         } else {
@@ -186,7 +186,7 @@ impl QuorumStore {
                 fragment_payload,
                 Some(expiration.clone()),
                 self.my_peer_id,
-                self.validator_signer.clone(),
+                // self.validator_signer.clone(),
             );
             self.digest_end_batch
                 .insert(digest_hash, (fragment, proof_tx));

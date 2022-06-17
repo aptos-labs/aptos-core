@@ -9,7 +9,7 @@ use crate::{
     quorum_store::{batch_requester::BatchRequester, batch_store::BatchStoreCommand},
 };
 use aptos_crypto::HashValue;
-use aptos_types::{validator_signer::ValidatorSigner, PeerId};
+use aptos_types::{PeerId};
 use consensus_types::common::Round;
 use consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
 use dashmap::DashMap;
@@ -21,7 +21,7 @@ use std::{
     sync::{
         atomic::{AtomicU64, Ordering},
         mpsc::{Receiver as SyncReceiver, RecvTimeoutError, SyncSender},
-        Arc, Mutex,
+        Mutex,
     },
     time::Duration,
 };
@@ -297,7 +297,7 @@ impl BatchReader {
         &self,
         batch_reader_rx: SyncReceiver<BatchReaderCommand>,
         network_sender: NetworkSender,
-        signer: Arc<ValidatorSigner>,
+        // signer: Arc<ValidatorSigner>,
         request_num_peers: usize,
         request_timeout_ms: usize,
     ) {
@@ -331,7 +331,7 @@ impl BatchReader {
                                     self.my_peer_id,
                                     digest,
                                     Some(value.maybe_payload.as_ref().unwrap().clone()),
-                                    signer.clone(),
+                                    // signer.clone(),
                                 );
                                 let msg = ConsensusMsg::BatchMsg(Box::new(batch));
                                 network_sender.send(msg, vec![peer_id]).await;
@@ -349,7 +349,7 @@ impl BatchReader {
                                 proof.digest().clone(),
                                 proof.shuffled_signers(),
                                 ret_tx,
-                                signer.clone(),
+                                // signer.clone(),
                             )
                             .await;
                         // TODO: actual send over network and local match one-shot / time-out logic.
@@ -359,7 +359,9 @@ impl BatchReader {
                     }
                 }
             }
-            batch_requester.handle_timeouts(signer.clone()).await;
+            batch_requester.handle_timeouts(
+                // signer.clone()
+            ).await;
         }
     }
 }

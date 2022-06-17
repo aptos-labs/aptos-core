@@ -4,8 +4,8 @@ use crate::quorum_store::quorum_store::QuorumStoreError;
 use crate::quorum_store::types::{Batch, Data};
 use crate::quorum_store::utils::DigestTimeouts;
 use aptos_crypto::HashValue;
-use aptos_types::{validator_signer::ValidatorSigner, PeerId};
-use std::{collections::HashMap, sync::Arc};
+use aptos_types::{PeerId};
+use std::{collections::HashMap};
 use tokio::sync::oneshot;
 
 struct BatchRequesterState {
@@ -92,13 +92,18 @@ impl BatchRequester {
         &self,
         digest: HashValue,
         request_peers: Vec<PeerId>,
-        self_signer: Arc<ValidatorSigner>,
+        // self_signer: Arc<ValidatorSigner>,
     ) {
         debug_assert!(
             !request_peers.contains(&self.my_peer_id),
             "Should never request from self over network"
         );
-        let batch = Batch::new(self.epoch, self.my_peer_id, digest, None, self_signer);
+        let batch = Batch::new(self.epoch,
+                               self.my_peer_id,
+                               digest,
+                               None,
+                               // self_signer,
+        );
         let msg = ConsensusMsg::BatchMsg(Box::new(batch));
         self.network_sender.send(msg, request_peers).await;
     }
@@ -108,25 +113,31 @@ impl BatchRequester {
         digest: HashValue,
         signers: Vec<PeerId>,
         ret_tx: oneshot::Sender<Result<Data, QuorumStoreError>>,
-        self_signer: Arc<ValidatorSigner>,
+        // self_signer: Arc<ValidatorSigner>,
     ) {
         let mut request_state = BatchRequesterState::new(signers, ret_tx);
 
         let request_peers = request_state
             .next_request_peers(self.request_num_peers)
             .unwrap(); //note: this is the first try
-        self.send_requests(digest, request_peers, self_signer).await;
+        self.send_requests(digest,
+                           request_peers,
+                           // self_signer,
+        ).await;
         self.digest_to_state.insert(digest, request_state);
         self.timeouts.add_digest(digest, self.request_timeout_ms);
     }
 
-    pub(crate) async fn handle_timeouts(&mut self, self_signer: Arc<ValidatorSigner>) {
-        // let mut expired_states = Vec::new();
+    pub(crate) async fn handle_timeouts(&mut self,
+                                        // self_signer: Arc<ValidatorSigner>
+    ) {
         for digest in self.timeouts.expire() {
             if let Some(state) = self.digest_to_state.get_mut(&digest) {
                 if let Some(request_peers) = state.next_request_peers(self.request_num_peers) {
-                    self.send_requests(digest, request_peers, self_signer.clone())
-                        .await;
+                    self.send_requests(digest,
+                                       request_peers,
+                                       // self_signer.clone()
+                    ).await;
                     self.timeouts.add_digest(digest, self.request_timeout_ms);
                 } else {
                     let state = self.digest_to_state.remove(&digest).unwrap();

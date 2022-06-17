@@ -27,7 +27,7 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::monitor;
 use aptos_types::{
     epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
-    validator_verifier::ValidatorVerifier,
+    validator_verifier::ValidatorVerifier, PeerId,
 };
 use channel::aptos_channel;
 use consensus_types::proof_of_store::SignedDigest;
@@ -65,8 +65,13 @@ pub enum UnverifiedEvent {
 }
 
 impl UnverifiedEvent {
-    pub fn verify(self, validator: &ValidatorVerifier) -> Result<VerifiedEvent, VerifyError> {
+    pub fn verify(
+        self,
+        peer_id: PeerId,
+        validator: &ValidatorVerifier,
+    ) -> Result<VerifiedEvent, VerifyError> {
         Ok(match self {
+            //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
                 p.verify(validator)?;
                 VerifiedEvent::ProposalMsg(p)
@@ -90,11 +95,11 @@ impl UnverifiedEvent {
                 VerifiedEvent::SignedDigest(sd)
             }
             UnverifiedEvent::Fragment(f) => {
-                f.verify(validator)?;
+                f.verify(peer_id)?;
                 VerifiedEvent::Fragment(f)
             }
             UnverifiedEvent::Batch(b) => {
-                b.verify(validator)?;
+                b.verify(peer_id)?;
                 VerifiedEvent::Batch(b)
             }
         })

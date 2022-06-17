@@ -207,7 +207,9 @@ async fn loopback_commit_vote(
         Some(Event::Message(author, msg)) => {
             let event: UnverifiedEvent = msg.into();
             // verify the message and send the message into self loop
-            msg_tx.push(author, event.verify(verifier).unwrap()).ok();
+            msg_tx
+                .push(author, event.verify(author, verifier).unwrap())
+                .ok();
         }
         _ => {
             panic!("We are expecting a commit vote message.");
