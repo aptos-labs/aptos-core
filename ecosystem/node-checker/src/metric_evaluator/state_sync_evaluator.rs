@@ -1,12 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{common::get_metric_value, MetricsEvaluator, MetricsEvaluatorError};
-use crate::public_types::EvaluationResult;
+use super::{
+    common::get_metric_value, types::EvaluationResult, MetricsEvaluator, MetricsEvaluatorError,
+};
 use anyhow::Result;
 use clap::Parser;
 use log::debug;
+use poem_openapi::Object as PoemObject;
 use prometheus_parse::{Scrape as PrometheusScrape, Value as PrometheusValue};
+use serde::{Deserialize, Serialize};
 
 pub const NAME: &str = "state_sync";
 
@@ -15,7 +18,7 @@ pub const NAME: &str = "state_sync";
 // at compile time.
 const STATE_SYNC_METRIC: &str = "aptos_state_sync_version";
 
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
 pub struct StateSyncMetricsEvaluatorArgs {
     #[clap(long, default_value = "5000")]
     pub version_delta_tolerance: u64,

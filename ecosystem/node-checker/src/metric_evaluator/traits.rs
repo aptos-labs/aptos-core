@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::public_types::EvaluationResult;
+use super::types::EvaluationResult;
 use anyhow::{Error, Result};
 use prometheus_parse::Scrape as PrometheusScrape;
 use thiserror::Error as ThisError;

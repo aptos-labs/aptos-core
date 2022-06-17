@@ -2,15 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    args::Args,
+    configuration::EvaluatorArgs,
     metric_evaluator::{MetricsEvaluator, StateSyncMetricsEvaluator, STATE_SYNC_EVALUATOR_NAME},
 };
 use anyhow::{bail, Result};
 use log::{info, warn};
 use std::collections::HashSet;
 
-pub fn build_evaluators(args: &Args) -> Result<Vec<Box<dyn MetricsEvaluator>>> {
-    let evaluator_strings: HashSet<String> = args.evaluators.iter().cloned().collect();
+pub fn build_evaluators(
+    evaluators: &[String],
+    evaluator_args: &EvaluatorArgs,
+) -> Result<Vec<Box<dyn MetricsEvaluator>>> {
+    let evaluator_strings: HashSet<String> = evaluators.iter().cloned().collect();
     if evaluator_strings.is_empty() {
         bail!("No evaluators specified");
     }
@@ -19,7 +22,7 @@ pub fn build_evaluators(args: &Args) -> Result<Vec<Box<dyn MetricsEvaluator>>> {
 
     if evaluator_strings.contains(STATE_SYNC_EVALUATOR_NAME) {
         let state_sync_evaluator =
-            StateSyncMetricsEvaluator::new(args.evaluator_args.state_sync_evaluator_args.clone());
+            StateSyncMetricsEvaluator::new(evaluator_args.state_sync_evaluator_args.clone());
         evaluators.push(Box::new(state_sync_evaluator));
     }
 

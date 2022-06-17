@@ -1,53 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::args::{DEFAULT_API_PORT, DEFAULT_METRICS_PORT, DEFAULT_NOISE_PORT};
 use poem_openapi::{types::Example, Object as PoemObject};
-
-#[derive(Clone, Debug, PoemObject)]
-#[oai(example)]
-pub struct NodeUrl {
-    /// Target URL. This should include a scheme (e.g. http://). If there is
-    /// no scheme, we will prepend http://.
-    pub url: String,
-
-    /// Metrics port.
-    #[oai(default = "Self::default_metrics_port")]
-    pub metrics_port: u16,
-
-    /// API port.
-    #[oai(default = "Self::default_api_port")]
-    pub api_port: u16,
-
-    /// Validator communication port.
-    #[oai(default = "Self::default_noise_port")]
-    pub noise_port: u16,
-}
-
-impl NodeUrl {
-    fn default_metrics_port() -> u16 {
-        DEFAULT_METRICS_PORT
-    }
-
-    fn default_api_port() -> u16 {
-        DEFAULT_API_PORT
-    }
-
-    fn default_noise_port() -> u16 {
-        DEFAULT_NOISE_PORT
-    }
-}
-
-impl Example for NodeUrl {
-    fn example() -> Self {
-        Self {
-            url: "mynode.mysite.com".to_string(),
-            metrics_port: Self::default_metrics_port(),
-            api_port: Self::default_api_port(),
-            noise_port: Self::default_noise_port(),
-        }
-    }
-}
 
 // TODO: Should I find a way to have typed actual + expected fields?
 #[derive(Clone, Debug, PoemObject)]

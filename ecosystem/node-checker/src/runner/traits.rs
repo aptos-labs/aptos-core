@@ -7,9 +7,11 @@ use thiserror::Error as ThisError;
 
 use crate::{
     metric_collector::{MetricCollector, MetricCollectorError},
-    metric_evaluator::MetricsEvaluatorError,
-    public_types::EvaluationSummary,
+    metric_evaluator::{EvaluationSummary, MetricsEvaluatorError},
 };
+
+// TODO: Consider using thiserror.
+// todo: Rename MetricsEvaluator to MetricEvaluator
 
 #[derive(Debug, ThisError)]
 pub enum RunnerError {
