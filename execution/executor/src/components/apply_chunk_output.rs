@@ -4,10 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    components::{
-        chunk_output::ChunkOutput,
-        in_memory_state_calculator::{InMemoryStateCalculator, NEW_EPOCH_EVENT_KEY},
-    },
+    components::{chunk_output::ChunkOutput, in_memory_state_calculator::InMemoryStateCalculator},
     metrics::APTOS_EXECUTOR_ERRORS,
 };
 use anyhow::{ensure, Result};
@@ -230,7 +227,7 @@ impl From<TransactionOutput> for ParsedTransactionOutput {
         let reconfig_events = output
             .events()
             .iter()
-            .filter(|e| *e.key() == *NEW_EPOCH_EVENT_KEY)
+            .filter(|e| *e.key() == aptos_types::on_chain_config::new_epoch_event_key())
             .cloned()
             .collect();
         Self {

@@ -109,7 +109,7 @@ proptest! {
         let db = set_up(&tmp_dir, &ledger_infos_with_sigs);
         put_transaction_infos(&db, &txn_infos);
 
-        let (latest_li, epoch_state, synced_version_opt) = db.ledger_store.get_startup_info().unwrap().unwrap();
+        let (latest_li, epoch_state, latest_version) = db.ledger_store.get_ledger_startup_info().unwrap().unwrap();
         assert_eq!(latest_li, *ledger_infos_with_sigs.last().unwrap());
         let li = latest_li.ledger_info();
         let expected_epoch_state = if li.next_epoch_state().is_none() {
@@ -118,13 +118,8 @@ proptest! {
             None
         };
         assert_eq!(epoch_state, expected_epoch_state);
-        let synced_version = (txn_infos.len() - 1) as u64;
-        let expected_synced_version = if synced_version > li.version() {
-                Some(synced_version)
-        } else {
-            None
-        };
-        assert_eq!(synced_version_opt, expected_synced_version);
+        let expected_latest_version = (txn_infos.len() - 1) as u64;
+        assert_eq!(expected_latest_version, latest_version);
     }
 }
 

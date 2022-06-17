@@ -9,22 +9,28 @@ mod state_store_test;
 use crate::{
     change_set::ChangeSet,
     ledger_counters::LedgerCounter,
+    ledger_store::LedgerStore,
     schema::{
         jellyfish_merkle_node::JellyfishMerkleNodeSchema, stale_node_index::StaleNodeIndexSchema,
         state_value::StateValueSchema,
     },
+    transaction_store::TransactionStore,
     AptosDbError,
 };
 use anyhow::{anyhow, ensure, format_err, Result};
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::{
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    HashValue,
+};
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{
     iterator::JellyfishMerkleIterator, node_type::NodeKey, restore::StateSnapshotRestore,
     JellyfishMerkleTree, StateValueWriter, TreeReader, TreeWriter,
 };
+use aptos_state_view::StateViewId;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
-    proof::{SparseMerkleProof, SparseMerkleRangeProof},
+    proof::{definition::LeafCount, SparseMerkleProof, SparseMerkleRangeProof},
     state_store::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
@@ -32,10 +38,17 @@ use aptos_types::{
     },
     transaction::{Version, PRE_GENESIS_VERSION},
 };
+use executor_types::ProofReader;
 use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::{collections::HashMap, sync::Arc};
-use storage_interface::{DbReader, StateSnapshotReceiver};
+use storage_interface::{
+    cached_state_view::{CachedStateView, StateCache},
+    gen_updates, process_write_set,
+    sync_proof_fetcher::SyncProofFetcher,
+    DbReader, StateSnapshotReceiver,
+};
 
+pub(crate) type StateSparseMerkle = scratchpad::SparseMerkleTree<StateValue>;
 type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
 type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
 type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKey>;
@@ -43,11 +56,32 @@ type StateValueBatch = aptos_jellyfish_merkle::StateValueBatch<StateKey, StateVa
 
 pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 
+const MAX_WRITE_SETS_AFTER_CHECKPOINT: LeafCount = 200_000;
+
+fn state_snapshot_next_version(snapshot_version: Option<Version>) -> Version {
+    match snapshot_version {
+        None => 0,
+        Some(v) => {
+            if v == PRE_GENESIS_VERSION {
+                0
+            } else {
+                v + 1
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+struct PendingCheckpoint {
+    snapshot_with_version: (StateSparseMerkle, Option<Version>),
+    checkpoint_with_version: (StateSparseMerkle, Option<Version>),
+}
+
 #[derive(Debug)]
 pub(crate) struct StateStore {
     ledger_db: Arc<DB>,
     state_merkle_db: Arc<DB>,
-    latest_checkpoint: Mutex<Option<(Version, HashValue)>>,
+    pending_checkpoint: Mutex<PendingCheckpoint>,
 }
 
 // "using an Arc<dyn DbReader> as an Arc<dyn StateReader>" is not allowed in stable Rust. Actually we
@@ -107,9 +141,10 @@ impl DbReader for StateStore {
             "Nothing before pre-genesis"
         );
 
-        if let Some((version, root_hash)) = self.latest_checkpoint() {
+        let (smt, version) = self.latest_snapshot_with_version();
+        if let Some(version) = version {
             if next_version > version {
-                Ok(Some((version, root_hash)))
+                Ok(Some((version, smt.root_hash())))
             } else {
                 self.find_latest_persisted_version_from_db(next_version)?
                     .map(|ver| Ok((ver, self.get_root_hash(ver)?)))
@@ -122,32 +157,123 @@ impl DbReader for StateStore {
 }
 
 impl StateStore {
-    pub fn new(ledger_db: Arc<DB>, state_merkle_db: Arc<DB>) -> Self {
-        let myself = Self {
+    pub fn new(ledger_db: Arc<DB>, state_merkle_db: Arc<DB>, readonly: bool) -> Result<Arc<Self>> {
+        let empty_pending_checkpoint = PendingCheckpoint {
+            snapshot_with_version: (StateSparseMerkle::new_empty(), None),
+            checkpoint_with_version: (StateSparseMerkle::new_empty(), None),
+        };
+        let myself = Arc::new(Self {
             ledger_db,
             state_merkle_db,
-            latest_checkpoint: Mutex::new(None),
-        };
+            pending_checkpoint: Mutex::new(empty_pending_checkpoint),
+        });
 
-        let latest_version = myself
-            .find_latest_persisted_version_from_db(Version::MAX)
-            .expect("Failed to query latest node on initialization.");
-        if let Some(version) = latest_version {
-            let root_hash = myself
-                .get_root_hash(version)
-                .expect("Failed to query latest checkpoint root hash on initialization.");
-            myself.set_latest_checkpoint(version, root_hash)
+        // In readonly mode, we don't ensure the consistency.
+        if readonly {
+            return Ok(myself);
         }
 
-        myself
+        let latest_snapshot_version = myself
+            .find_latest_persisted_version_from_db(Version::MAX)
+            .expect("Failed to query latest node on initialization.");
+        let latest_snapshot_root_hash = if let Some(version) = latest_snapshot_version {
+            myself
+                .get_root_hash(version)
+                .expect("Failed to query latest checkpoint root hash on initialization.")
+        } else {
+            *SPARSE_MERKLE_PLACEHOLDER_HASH
+        };
+
+        let latest_snapshot = StateSparseMerkle::new(latest_snapshot_root_hash);
+        myself.set_latest_snapshot_with_version(latest_snapshot.clone(), latest_snapshot_version);
+        let snapshot_next_version = state_snapshot_next_version(latest_snapshot_version);
+
+        let next_version_from_txn_info = LedgerStore::new(myself.ledger_db.clone())
+            .get_latest_transaction_info_option()?
+            .map(|(version, _)| version + 1)
+            .unwrap_or(0);
+
+        assert!(
+            snapshot_next_version <= next_version_from_txn_info,
+            "num_transactions is less than the next version of latest snapshot version. snapshot_next_version: {}, num_transactions: {}",
+            snapshot_next_version,
+            next_version_from_txn_info
+        );
+
+        if snapshot_next_version == next_version_from_txn_info {
+            myself.set_latest_checkpoint_with_version(latest_snapshot, latest_snapshot_version);
+        } else {
+            ensure!(
+                next_version_from_txn_info - snapshot_next_version <= MAX_WRITE_SETS_AFTER_CHECKPOINT,
+                "Too many versions after state checkpoint. checkpoint_next_version: {}, num_transactions: {}",
+                snapshot_next_version,
+                next_version_from_txn_info
+            );
+            let latest_checkpoint_state_view = CachedStateView::new(
+                StateViewId::Miscellaneous,
+                myself.clone(),
+                next_version_from_txn_info,
+                latest_snapshot.clone(),
+                Arc::new(SyncProofFetcher::new(myself.clone())),
+            )?;
+            let write_sets = TransactionStore::new(myself.ledger_db.clone())
+                .get_write_sets(snapshot_next_version, next_version_from_txn_info)?;
+            latest_checkpoint_state_view.prime_cache_by_write_set(&write_sets)?;
+            let StateCache {
+                frozen_base: _,
+                mut state_cache,
+                proofs,
+            } = latest_checkpoint_state_view.into_state_cache();
+            let updated_keys = write_sets
+                .into_iter()
+                .map(|ws| process_write_set(None, &mut state_cache, ws))
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .flat_map(|x| x.into_iter())
+                .collect();
+            let smt_updates: Vec<_> = gen_updates(&updated_keys, &state_cache)?
+                .into_iter()
+                .map(|(key, value)| (key.hash(), value))
+                .collect();
+            let latest_checkpoint =
+                latest_snapshot.batch_update(smt_updates, &ProofReader::new(proofs))?;
+            myself.set_latest_checkpoint_with_version(
+                latest_checkpoint,
+                next_version_from_txn_info.checked_sub(1),
+            );
+        };
+        Ok(myself)
     }
 
-    pub fn latest_checkpoint(&self) -> Option<(Version, HashValue)> {
-        *self.latest_checkpoint.lock()
+    pub fn latest_checkpoint_with_version(&self) -> (StateSparseMerkle, Option<Version>) {
+        self.pending_checkpoint
+            .lock()
+            .checkpoint_with_version
+            .clone()
     }
 
-    pub fn set_latest_checkpoint(&self, version: Version, root_hash: HashValue) {
-        *self.latest_checkpoint.lock() = Some((version, root_hash))
+    pub fn latest_snapshot_with_version(&self) -> (StateSparseMerkle, Option<Version>) {
+        self.pending_checkpoint.lock().snapshot_with_version.clone()
+    }
+
+    pub fn set_latest_checkpoint_with_version(
+        &self,
+        smt: StateSparseMerkle,
+        version: Option<Version>,
+    ) {
+        self.pending_checkpoint.lock().checkpoint_with_version = (smt, version)
+    }
+
+    pub fn set_latest_snapshot_with_version(
+        &self,
+        smt: StateSparseMerkle,
+        version: Option<Version>,
+    ) {
+        let mut pending = self.pending_checkpoint.lock();
+        pending.snapshot_with_version = (smt, version);
+        if version > pending.checkpoint_with_version.1 {
+            pending.checkpoint_with_version = pending.snapshot_with_version.clone()
+        }
     }
 
     pub fn find_latest_persisted_version_less_than(
@@ -512,7 +638,7 @@ impl TreeWriter<StateKey> for StateStore {
     }
 
     fn finish_version(&self, version: Version, root_hash: HashValue) {
-        self.set_latest_checkpoint(version, root_hash)
+        self.set_latest_snapshot_with_version(StateSparseMerkle::new(root_hash), Some(version))
     }
 }
 

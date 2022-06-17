@@ -35,13 +35,12 @@ use aptos_vm::AptosVM;
 use aptosdb::{AptosDB, GetRestoreHandler};
 use executor::{
     block_executor::BlockExecutor,
-    components::in_memory_state_calculator::IntoLedgerView,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
 };
 use executor_test_helpers::{
     bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
 };
-use executor_types::BlockExecutorTrait;
+use executor_types::{BlockExecutorTrait, ExecutedTrees};
 use move_deps::move_core_types::{
     language_storage::TypeTag,
     move_resource::{MoveResource, MoveStructType},
@@ -210,14 +209,8 @@ fn get_state_backup(
     let proof = backup_handler
         .get_account_state_range_proof(CryptoHash::hash(&accounts.last().unwrap().0), version)
         .unwrap();
-    let db_reader: Arc<dyn DbReader> = db.clone();
-    let root_hash = db
-        .get_latest_tree_state()
-        .unwrap()
-        .into_ledger_view(&db_reader)
-        .unwrap()
-        .state()
-        .root_hash();
+    let executed_trees: ExecutedTrees = db.get_latest_tree_state().unwrap().into();
+    let root_hash = executed_trees.state().root_hash();
 
     (accounts, proof, root_hash)
 }

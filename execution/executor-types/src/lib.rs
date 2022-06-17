@@ -20,7 +20,7 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     nibble::nibble_path::NibblePath,
-    proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof},
+    proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof, SparseMerkleProof},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
@@ -36,10 +36,8 @@ use storage_interface::DbReader;
 pub use executed_chunk::ExecutedChunk;
 use storage_interface::{
     cached_state_view::CachedStateView, in_memory_state::InMemoryState,
-    no_proof_fetcher::NoProofFetcher, sync_proof_fetcher::SyncProofFetcher,
+    no_proof_fetcher::NoProofFetcher, sync_proof_fetcher::SyncProofFetcher, TreeState,
 };
-
-type SparseMerkleProof = aptos_types::proof::SparseMerkleProof;
 
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
@@ -338,6 +336,10 @@ impl ExecutedTrees {
         self.txn_accumulator().root_hash()
     }
 
+    pub fn state_tree(&self) -> SparseMerkleTree<StateValue> {
+        self.state().current.clone()
+    }
+
     pub fn new(
         state: InMemoryState,
         transaction_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
@@ -346,23 +348,6 @@ impl ExecutedTrees {
             state,
             transaction_accumulator,
         }
-    }
-
-    pub fn new_at_state_checkpoint(
-        state_root_hash: HashValue,
-        frozen_subtrees_in_accumulator: Vec<HashValue>,
-        num_leaves_in_accumulator: u64,
-    ) -> Self {
-        let state = InMemoryState::new_at_checkpoint(
-            state_root_hash,
-            num_leaves_in_accumulator.checked_sub(1),
-        );
-        let transaction_accumulator = Arc::new(
-            InMemoryAccumulator::new(frozen_subtrees_in_accumulator, num_leaves_in_accumulator)
-                .expect("The startup info read from storage should be valid."),
-        );
-
-        Self::new(state, transaction_accumulator)
     }
 
     pub fn new_empty() -> Self {
@@ -408,6 +393,24 @@ impl ExecutedTrees {
 impl Default for ExecutedTrees {
     fn default() -> Self {
         Self::new_empty()
+    }
+}
+
+impl From<TreeState> for ExecutedTrees {
+    fn from(tree_state: TreeState) -> Self {
+        let TreeState {
+            num_transactions,
+            ledger_frozen_subtree_hashes,
+            latest_checkpoint,
+        } = tree_state;
+        let state =
+            InMemoryState::new_at_checkpoint(latest_checkpoint, num_transactions.checked_sub(1));
+        let transaction_accumulator = Arc::new(
+            InMemoryAccumulator::new(ledger_frozen_subtree_hashes, num_transactions)
+                .expect("The startup info read from storage should be valid."),
+        );
+
+        Self::new(state, transaction_accumulator)
     }
 }
 

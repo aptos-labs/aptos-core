@@ -16,6 +16,7 @@ use aptos_types::{
     transaction::{Transaction, TransactionInfo, Version, PRE_GENESIS_VERSION},
 };
 use schemadb::DB;
+use scratchpad::SparseMerkleTree;
 use std::sync::Arc;
 use storage_interface::{DbReader, TreeState};
 
@@ -112,10 +113,10 @@ impl RestoreHandler {
                 .unwrap_or(*SPARSE_MERKLE_PLACEHOLDER_HASH),
             Some(ver) => self.state_store.get_root_hash(ver)?,
         };
-        Ok(TreeState::new_at_state_checkpoint(
+        Ok(TreeState::new(
             num_transactions,
             frozen_subtrees,
-            state_root_hash,
+            SparseMerkleTree::<StateValue>::new(state_root_hash),
         ))
     }
 

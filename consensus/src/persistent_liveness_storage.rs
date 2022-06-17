@@ -12,7 +12,7 @@ use aptos_types::{
 use consensus_types::{
     block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
 };
-use executor::components::in_memory_state_calculator::IntoLedgerView;
+use executor_types::ExecutedTrees;
 use std::{cmp::max, collections::HashSet, sync::Arc};
 use storage_interface::DbReader;
 
@@ -365,13 +365,10 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             .expect("startup info is None");
         let ledger_recovery_data = LedgerRecoveryData::new(startup_info.latest_ledger_info.clone());
         let frozen_root_hashes = startup_info
-            .committed_tree_state
+            .latest_tree_state
             .ledger_frozen_subtree_hashes
             .clone();
-        let root_executed_trees = startup_info
-            .committed_tree_state
-            .into_ledger_view(&self.aptos_db)
-            .expect("Failed to construct committed ledger view.");
+        let root_executed_trees: ExecutedTrees = startup_info.latest_tree_state.into();
         match RecoveryData::new(
             last_vote,
             ledger_recovery_data.clone(),

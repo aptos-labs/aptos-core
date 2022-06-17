@@ -128,25 +128,21 @@ impl BackupHandler {
     /// Gets the epoch, committed version, and synced version of the DB.
     pub fn get_db_state(&self) -> Result<Option<DbState>> {
         self.ledger_store
-            .get_startup_info()?
-            .map(
-                |(latest_li, epoch_state_if_not_in_li, synced_version_opt)| {
-                    Ok(DbState {
-                        epoch: latest_li
-                            .ledger_info()
-                            .next_epoch_state()
-                            .unwrap_or_else(|| {
-                                epoch_state_if_not_in_li
-                                    .as_ref()
-                                    .expect("EpochState must exist")
-                            })
-                            .epoch,
-                        committed_version: latest_li.ledger_info().version(),
-                        synced_version: synced_version_opt
-                            .unwrap_or_else(|| latest_li.ledger_info().version()),
-                    })
-                },
-            )
+            .get_ledger_startup_info()?
+            .map(|(latest_li, epoch_state_if_not_in_li, _)| {
+                Ok(DbState {
+                    epoch: latest_li
+                        .ledger_info()
+                        .next_epoch_state()
+                        .unwrap_or_else(|| {
+                            epoch_state_if_not_in_li
+                                .as_ref()
+                                .expect("EpochState must exist")
+                        })
+                        .epoch,
+                    committed_version: latest_li.ledger_info().version(),
+                })
+            })
             .transpose()
     }
 
@@ -185,15 +181,14 @@ impl BackupHandler {
 pub struct DbState {
     pub epoch: u64,
     pub committed_version: Version,
-    pub synced_version: Version,
 }
 
 impl fmt::Display for DbState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "epoch: {}, committed_version: {}, synced_version: {}",
-            self.epoch, self.committed_version, self.synced_version,
+            "epoch: {}, committed_version: {}",
+            self.epoch, self.committed_version,
         )
     }
 }

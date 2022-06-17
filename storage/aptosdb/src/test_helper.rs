@@ -14,10 +14,24 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::accumulator::InMemoryAccumulator,
     proptest_types::{AccountInfoUniverse, BlockGen},
+    transaction::{TransactionToCommit, PRE_GENESIS_VERSION},
 };
 use executor_types::ProofReader;
 use proptest::{collection::vec, prelude::*};
-use scratchpad::SparseMerkleTree;
+use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree};
+
+pub fn update_smt(
+    smt: &FrozenSparseMerkleTree<StateValue>,
+    txns_to_commit: &[TransactionToCommit],
+) -> FrozenSparseMerkleTree<StateValue> {
+    let updates = txns_to_commit
+        .iter()
+        .flat_map(|x| x.state_updates())
+        .map(|(key, value)| (key.hash(), value))
+        .collect();
+    smt.batch_update(updates, &ProofReader::new_empty())
+        .unwrap()
+}
 
 prop_compose! {
     /// This returns a [`proptest`](https://altsysrq.github.io/proptest-book/intro.html)
@@ -155,14 +169,17 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
 
+    let mut smt = SparseMerkleTree::<StateValue>::default().freeze();
     let num_batches = input.len();
     let mut cur_ver = 0;
     let mut all_committed_txns = vec![];
     for (batch_idx, (txns_to_commit, ledger_info_with_sigs)) in input.iter().enumerate() {
+        smt = update_smt(&smt, txns_to_commit.as_slice());
         db.save_transactions(
             txns_to_commit,
             cur_ver, /* first_version */
             Some(ledger_info_with_sigs),
+            smt.clone().unfreeze(),
         )
         .unwrap();
 
@@ -550,11 +567,20 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
     db.state_merkle_db
         .put::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version), &leaf_node)
         .unwrap();
+    let smt = SparseMerkleTree::<StateValue>::default()
+        .batch_update(vec![(key.hash(), &value)], &ProofReader::new_empty())
+        .unwrap();
     db.ledger_db
         .put::<StateValueSchema>(&(key, version), &value)
         .unwrap();
-    db.state_store
-        .set_latest_checkpoint(version, leaf_node.hash());
+    db.state_store.set_latest_checkpoint_with_version(
+        smt,
+        if version == PRE_GENESIS_VERSION {
+            None
+        } else {
+            Some(version)
+        },
+    );
 }
 
 pub fn test_sync_transactions_impl(
@@ -563,23 +589,28 @@ pub fn test_sync_transactions_impl(
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
 
+    let mut smt = SparseMerkleTree::<StateValue>::default().freeze();
     let num_batches = input.len();
     let mut cur_ver = 0;
     for (batch_idx, (txns_to_commit, ledger_info_with_sigs)) in input.iter().enumerate() {
         // if batch has more than 2 transactions, save them in two batches
         let batch1_len = txns_to_commit.len() / 2;
         if batch1_len > 0 {
+            smt = update_smt(&smt, &txns_to_commit[..batch1_len]);
             db.save_transactions(
                 &txns_to_commit[..batch1_len],
                 cur_ver, /* first_version */
                 None,
+                smt.clone().unfreeze(),
             )
             .unwrap();
         }
+        smt = update_smt(&smt, &txns_to_commit[batch1_len..]);
         db.save_transactions(
             &txns_to_commit[batch1_len..],
             cur_ver + batch1_len as u64, /* first_version */
             Some(ledger_info_with_sigs),
+            smt.clone().unfreeze(),
         )
         .unwrap();
 

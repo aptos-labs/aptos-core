@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, format_err, Result};
+use anyhow::{anyhow, bail, format_err, Result};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -29,13 +29,19 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
-        TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
+        AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
+        TransactionOutputListWithProof, TransactionPayload, TransactionToCommit,
+        TransactionWithProof, Version,
     },
-    write_set::WriteSet,
+    write_set::{WriteOp, WriteSet},
 };
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use scratchpad::SparseMerkleTree;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{hash_map, HashMap, HashSet},
+    sync::Arc,
+};
 use thiserror::Error;
 
 pub mod cached_state_view;
@@ -47,29 +53,119 @@ pub mod proof_fetcher;
 pub mod state_view;
 pub mod sync_proof_fetcher;
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+// Checks the write set is a subset of the read set.
+// Updates the `state_cache` to reflect the latest value.
+// Returns all state keys touched.
+pub fn process_write_set(
+    transaction: Option<&Transaction>,
+    state_cache: &mut HashMap<StateKey, StateValue>,
+    write_set: WriteSet,
+) -> Result<HashSet<StateKey>> {
+    // Find all keys this transaction touches while processing each write op.
+    let mut updated_keys = HashSet::new();
+    for (state_key, write_op) in write_set.into_iter() {
+        process_state_key_write_op(
+            transaction,
+            state_cache,
+            &mut updated_keys,
+            state_key,
+            write_op,
+        )?;
+    }
+
+    Ok(updated_keys)
+}
+
+pub fn gen_updates<'a, 'b>(
+    updated_keys: &'a HashSet<StateKey>,
+    state_cache: &'b HashMap<StateKey, StateValue>,
+) -> Result<HashMap<&'a StateKey, &'b StateValue>> {
+    updated_keys
+        .iter()
+        .collect::<Vec<_>>()
+        .par_iter()
+        .with_min_len(100)
+        .map(|key| {
+            Ok((
+                *key,
+                state_cache
+                    .get(key)
+                    .ok_or_else(|| anyhow!("State value should exist."))?,
+            ))
+        })
+        .collect::<Result<_>>()
+}
+
+fn process_state_key_write_op(
+    transaction: Option<&Transaction>,
+    state_cache: &mut HashMap<StateKey, StateValue>,
+    updated_keys: &mut HashSet<StateKey>,
+    state_key: StateKey,
+    write_op: WriteOp,
+) -> Result<()> {
+    match state_cache.entry(state_key.clone()) {
+        hash_map::Entry::Occupied(mut entry) => {
+            match write_op {
+                WriteOp::Value(new_value) => entry.insert(StateValue::from(new_value)),
+                WriteOp::Deletion => entry.insert(StateValue::empty()),
+            };
+        }
+        hash_map::Entry::Vacant(entry) => {
+            if let Some(txn) = transaction {
+                ensure_txn_valid_for_vacant_entry(txn)?;
+            }
+            match write_op {
+                WriteOp::Value(new_value) => entry.insert(StateValue::from(new_value)),
+                WriteOp::Deletion => entry.insert(StateValue::empty()),
+            };
+        }
+    }
+    updated_keys.insert(state_key);
+    Ok(())
+}
+
+fn ensure_txn_valid_for_vacant_entry(transaction: &Transaction) -> Result<()> {
+    // Before writing to an account, VM should always read that account. So we
+    // should not reach this code path. The exception is genesis transaction (and
+    // maybe other writeset transactions).
+    match transaction {
+        Transaction::GenesisTransaction(_) => (),
+        Transaction::BlockMetadata(_) => {
+            bail!("Write set should be a subset of read set.")
+        }
+        Transaction::UserTransaction(txn) => match txn.payload() {
+            TransactionPayload::ModuleBundle(_)
+            | TransactionPayload::Script(_)
+            | TransactionPayload::ScriptFunction(_) => {
+                bail!("Write set should be a subset of read set.")
+            }
+            TransactionPayload::WriteSet(_) => (),
+        },
+        Transaction::StateCheckpoint => {}
+    }
+    Ok(())
+}
+
+#[derive(Clone, Debug)]
 pub struct StartupInfo {
     /// The latest ledger info.
     pub latest_ledger_info: LedgerInfoWithSignatures,
     /// If the above ledger info doesn't carry a validator set, the latest validator set. Otherwise
     /// `None`.
     pub latest_epoch_state: Option<EpochState>,
-    pub committed_tree_state: TreeState,
-    pub synced_tree_state: Option<TreeState>,
+    pub latest_tree_state: TreeState,
 }
 
 impl StartupInfo {
     pub fn new(
         latest_ledger_info: LedgerInfoWithSignatures,
         latest_epoch_state: Option<EpochState>,
-        committed_tree_state: TreeState,
-        synced_tree_state: Option<TreeState>,
+        latest_tree_state: TreeState,
     ) -> Self {
         Self {
             latest_ledger_info,
             latest_epoch_state,
-            committed_tree_state,
-            synced_tree_state,
+            latest_tree_state,
         }
     }
 
@@ -80,19 +176,16 @@ impl StartupInfo {
         let latest_ledger_info =
             LedgerInfoWithSignatures::genesis(HashValue::zero(), ValidatorSet::empty());
         let latest_epoch_state = None;
-        let committed_tree_state = TreeState {
+        let latest_tree_state = TreeState {
             num_transactions: 0,
             ledger_frozen_subtree_hashes: Vec::new(),
-            state_checkpoint_hash: *SPARSE_MERKLE_PLACEHOLDER_HASH,
-            state_checkpoint_version: None,
+            latest_checkpoint: SparseMerkleTree::new_empty(),
         };
-        let synced_tree_state = None;
 
         Self {
             latest_ledger_info,
             latest_epoch_state,
-            committed_tree_state,
-            synced_tree_state,
+            latest_tree_state,
         }
     }
 
@@ -108,56 +201,40 @@ impl StartupInfo {
     }
 
     pub fn into_latest_tree_state(self) -> TreeState {
-        self.synced_tree_state.unwrap_or(self.committed_tree_state)
+        self.latest_tree_state
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TreeState {
     pub num_transactions: LeafCount,
     pub ledger_frozen_subtree_hashes: Vec<HashValue>,
-    /// Root hash of the state checkpoint (global sparse merkle tree).
-    pub state_checkpoint_hash: HashValue,
-    pub state_checkpoint_version: Option<Version>,
+    /// The latest state checkpoint (global sparse merkle tree).
+    pub latest_checkpoint: SparseMerkleTree<StateValue>,
 }
 
 impl TreeState {
     pub fn new(
         num_transactions: LeafCount,
         ledger_frozen_subtree_hashes: Vec<HashValue>,
-        state_checkpoint_hash: HashValue,
-        state_checkpoint_version: Option<Version>,
+        // Doesn't consider the possibility of PRE_GENESIS exists
+        latest_checkpoint: SparseMerkleTree<StateValue>,
     ) -> Self {
         Self {
             num_transactions,
             ledger_frozen_subtree_hashes,
-            state_checkpoint_hash,
-            state_checkpoint_version,
-        }
-    }
-
-    pub fn new_at_state_checkpoint(
-        num_transactions: LeafCount,
-        ledger_frozen_subtree_hashes: Vec<HashValue>,
-        state_root_hash: HashValue,
-    ) -> Self {
-        Self {
-            num_transactions,
-            ledger_frozen_subtree_hashes,
-            state_checkpoint_hash: state_root_hash,
-            // Doesn't consider the possibility of PRE_GENESIS exists
-            state_checkpoint_version: num_transactions.checked_sub(1),
+            latest_checkpoint,
         }
     }
 
     pub fn new_empty() -> Self {
-        Self::new_at_state_checkpoint(0, Vec::new(), *SPARSE_MERKLE_PLACEHOLDER_HASH)
+        Self::new(0, Vec::new(), SparseMerkleTree::new_empty())
     }
 
     pub fn describe(&self) -> &'static str {
         if self.num_transactions != 0 {
             "DB has been bootstrapped."
-        } else if self.state_checkpoint_hash != *SPARSE_MERKLE_PLACEHOLDER_HASH {
+        } else if self.latest_checkpoint.root_hash() != *SPARSE_MERKLE_PLACEHOLDER_HASH {
             "DB has no transaction, but a non-empty pre-genesis state."
         } else {
             "DB is empty, has no transaction or state."
@@ -373,7 +450,7 @@ pub trait DbReader: Send + Sync {
     }
 
     /// Returns the latest state checkpoint version if any.
-    fn get_latest_state_checkpoint(&self) -> Result<Option<(Version, HashValue)>> {
+    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         unimplemented!()
     }
 
@@ -608,9 +685,8 @@ impl MoveStorage for &dyn DbReader {
     }
 
     fn fetch_latest_state_checkpoint_version(&self) -> Result<Version> {
-        self.get_latest_state_checkpoint()?
-            .ok_or_else(|| format_err!("[MoveStorage] Latest state checkpoint not found."))
-            .map(|(v, _)| v)
+        self.get_latest_state_checkpoint_version()?
+            .ok_or_else(|| format_err!("[MoveStorage] Latest state checkpoint version not found."))
     }
 }
 
@@ -661,6 +737,7 @@ pub trait DbWriter: Send + Sync {
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         save_state_snapshots: bool,
+        checkpoint: SparseMerkleTree<StateValue>,
     ) -> Result<()> {
         unimplemented!()
     }
@@ -670,12 +747,14 @@ pub trait DbWriter: Send + Sync {
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        checkpoint: SparseMerkleTree<StateValue>,
     ) -> Result<()> {
         self.save_transactions_ext(
             txns_to_commit,
             first_version,
             ledger_info_with_sigs,
             true, /* save_state_snapshots */
+            checkpoint,
         )
     }
 
@@ -688,6 +767,7 @@ pub trait DbWriter: Send + Sync {
         jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         version: Version,
+        checkpoint_at_snapshot: SparseMerkleTree<StateValue>,
     ) -> Result<()> {
         unimplemented!()
     }

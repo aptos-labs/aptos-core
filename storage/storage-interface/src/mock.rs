@@ -5,7 +5,6 @@
 
 use crate::{DbReader, DbWriter};
 use anyhow::{anyhow, Result};
-use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
@@ -37,9 +36,9 @@ impl DbReader for MockDbReaderWriter {
         Ok(Some(1))
     }
 
-    fn get_latest_state_checkpoint(&self) -> Result<Option<(Version, HashValue)>> {
+    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         // return a dummy version for tests
-        Ok(Some((1, HashValue::zero())))
+        Ok(Some(1))
     }
 
     fn get_state_value_by_version(

@@ -45,7 +45,7 @@ impl LatestDbStateCheckpointView for Arc<dyn DbReader> {
     fn latest_state_checkpoint_view(&self) -> Result<DbStateView> {
         Ok(DbStateView {
             db: self.clone(),
-            version: self.get_latest_state_checkpoint()?.map(|(v, _)| v),
+            version: self.get_latest_state_checkpoint_version()?,
         })
     }
 }

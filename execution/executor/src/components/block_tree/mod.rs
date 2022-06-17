@@ -6,10 +6,7 @@
 #[cfg(test)]
 mod test;
 
-use crate::{
-    components::in_memory_state_calculator::IntoLedgerView,
-    logging::{LogEntry, LogSchema},
-};
+use crate::logging::{LogEntry, LogSchema};
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
@@ -18,7 +15,7 @@ use aptos_types::{
     ledger_info::LedgerInfo, proof::definition::LeafCount, state_store::state_value::StateValue,
 };
 use consensus_types::block::Block as ConsensusBlock;
-use executor_types::{Error, ExecutedChunk};
+use executor_types::{Error, ExecutedChunk, ExecutedTrees};
 use scratchpad::SparseMerkleTree;
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -222,10 +219,13 @@ impl BlockTree {
             ledger_info.consensus_block_id()
         };
 
-        let result_view = startup_info
-            .committed_tree_state
-            .clone()
-            .into_ledger_view(db)?;
+        let result_view: ExecutedTrees = startup_info.latest_tree_state.into();
+
+        // Make sure the result_view is at the checkpoint boundary but not halfway completed state sync.
+        ensure!(
+            result_view.version() == Some(ledger_info.version()),
+            "Checkpoint version doesn't equal to ledger version. The db is probably still in sync mode."
+        );
         block_lookup.fetch_or_add_block(id, ExecutedChunk::new_empty(result_view), None)
     }
 

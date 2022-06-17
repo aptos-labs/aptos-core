@@ -44,8 +44,10 @@ impl InMemoryState {
         Self::new(smt.clone(), None, smt, HashSet::new())
     }
 
-    pub fn new_at_checkpoint(root_hash: HashValue, checkpoint_version: Option<Version>) -> Self {
-        let smt = SparseMerkleTree::new(root_hash);
+    pub fn new_at_checkpoint(
+        smt: SparseMerkleTree<StateValue>,
+        checkpoint_version: Option<Version>,
+    ) -> Self {
         Self::new(smt.clone(), checkpoint_version, smt, HashSet::new())
     }
 

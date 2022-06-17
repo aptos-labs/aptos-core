@@ -3,7 +3,15 @@
 
 #![forbid(unsafe_code)]
 
-use crate::logging::{LogEntry, LogSchema};
+use crate::{
+    components::{block_tree::BlockTree, chunk_output::ChunkOutput},
+    logging::{LogEntry, LogSchema},
+    metrics::{
+        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS, APTOS_EXECUTOR_TRANSACTIONS_SAVED,
+        APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+    },
+};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -17,15 +25,6 @@ use executor_types::{BlockExecutorTrait, Error, StateComputeResult, StateSnapsho
 use fail::fail_point;
 use scratchpad::SparseMerkleTree;
 use std::marker::PhantomData;
-
-use crate::{
-    components::{block_tree::BlockTree, chunk_output::ChunkOutput},
-    metrics::{
-        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS, APTOS_EXECUTOR_TRANSACTIONS_SAVED,
-        APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
-    },
-};
 use storage_interface::{jmt_updates, DbReaderWriter};
 
 pub struct BlockExecutor<V> {
@@ -184,16 +183,24 @@ where
             fail_point!("executor::commit_blocks", |_| {
                 Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
             });
+
             self.db.writer.save_transactions_ext(
                 &txns_to_commit,
                 first_version,
                 Some(&ledger_info_with_sigs),
                 save_state_snapshots,
+                self.block_tree
+                    .get_block(block_id_to_commit)?
+                    .output
+                    .result_view
+                    .state_tree(),
             )?;
+
             self.block_tree
                 .prune(ledger_info_with_sigs.ledger_info())
                 .expect("Failure pruning block tree.")
         };
+
         let jmt_updates = txns_to_commit
             .iter()
             .flat_map(|t| jmt_updates(t.state_updates()))

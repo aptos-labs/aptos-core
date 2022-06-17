@@ -124,8 +124,7 @@ pub fn create_startup_info() -> StartupInfo {
     StartupInfo::new(
         create_epoch_ending_ledger_info(),
         Some(EpochState::empty()),
-        TreeState::new_at_state_checkpoint(0, vec![], HashValue::random()),
-        None,
+        TreeState::new_empty(),
     )
 }
 

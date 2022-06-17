@@ -35,6 +35,7 @@ use data_streaming_service::{
 };
 use executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use mockall::mock;
+use scratchpad::SparseMerkleTree;
 use std::sync::Arc;
 use storage_interface::{
     DbReader, DbReaderWriter, DbWriter, Order, StartupInfo, StateSnapshotReceiver, TreeState,
@@ -303,6 +304,7 @@ mock! {
             txns_to_commit: &[TransactionToCommit],
             first_version: Version,
             ledger_info_with_sigs: Option<&'a LedgerInfoWithSignatures>,
+            checkpoint: SparseMerkleTree<StateValue>,
         ) -> Result<()>;
 
         fn delete_genesis(&self) -> Result<()>;

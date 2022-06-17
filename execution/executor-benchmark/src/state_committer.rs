@@ -98,7 +98,12 @@ impl StateCommitter {
             .freeze()
             .new_node_hashes_since(&self.committed_smt.clone().freeze());
         self.db
-            .save_state_snapshot(to_commit, Some(&node_hashes), self.version)
+            .save_state_snapshot(
+                to_commit,
+                Some(&node_hashes),
+                self.version,
+                self.smt.clone(),
+            )
             .unwrap();
         info!("Committing state. Saved.");
 

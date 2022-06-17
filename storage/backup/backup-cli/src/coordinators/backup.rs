@@ -376,7 +376,6 @@ mod tests {
         let _state = |v| DbState {
             epoch: 0,
             committed_version: v,
-            synced_version: v,
         };
 
         assert_eq!(get_next_snapshot(None, _state(90), 100), 0);

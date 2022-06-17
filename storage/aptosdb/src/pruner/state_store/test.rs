@@ -1,14 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashMap;
-
+use crate::{change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB};
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
+use scratchpad::SparseMerkleTree;
+use std::collections::HashMap;
 use storage_interface::{jmt_update_refs, jmt_updates, DbReader};
-
-use crate::{change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB};
 
 fn put_value_set(
     db: &DB,
@@ -30,7 +29,7 @@ fn put_value_set(
         .put_value_sets(vec![&value_set], version, &mut cs)
         .unwrap();
     db.write_schemas(cs.batch).unwrap();
-    state_store.set_latest_checkpoint(version, root);
+    state_store.set_latest_snapshot_with_version(SparseMerkleTree::new(root), Some(version));
 
     root
 }
@@ -59,7 +58,9 @@ fn test_state_store_pruner() {
     let state_store = &StateStore::new(
         Arc::clone(&aptos_db.ledger_db),
         Arc::clone(&aptos_db.state_merkle_db),
-    );
+        false, /* readonly */
+    )
+    .unwrap();
     let pruner = Pruner::new(
         Arc::clone(&aptos_db.ledger_db),
         Arc::clone(&aptos_db.state_merkle_db),
@@ -145,7 +146,12 @@ fn test_worker_quit_eagerly() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let db = aptos_db.ledger_db;
-    let state_store = &StateStore::new(Arc::clone(&db), Arc::clone(&aptos_db.state_merkle_db));
+    let state_store = &StateStore::new(
+        Arc::clone(&db),
+        Arc::clone(&aptos_db.state_merkle_db),
+        false, /* readonly */
+    )
+    .unwrap();
 
     let _root0 = put_value_set(
         &db,

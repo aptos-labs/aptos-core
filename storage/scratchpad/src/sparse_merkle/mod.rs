@@ -287,6 +287,15 @@ pub struct SparseMerkleTree<V> {
     inner: Arc<Inner<V>>,
 }
 
+impl<V> PartialEq for SparseMerkleTree<V>
+where
+    V: Clone + CryptoHash + Send + Sync,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.root_hash() == other.root_hash()
+    }
+}
+
 impl<V> SparseMerkleTree<V>
 where
     V: Clone + CryptoHash + Send + Sync,

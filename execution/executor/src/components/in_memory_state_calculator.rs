@@ -2,105 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::components::apply_chunk_output::ParsedTransactionOutput;
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{anyhow, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_state_view::{account_with_state_cache::AsAccountWithStateCache, StateViewId};
+use aptos_state_view::account_with_state_cache::AsAccountWithStateCache;
 use aptos_types::{
     account_view::AccountView,
     epoch_state::EpochState,
-    event::EventKey,
     nibble::nibble_path::NibblePath,
     on_chain_config,
-    proof::{accumulator::InMemoryAccumulator, definition::LeafCount},
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{Transaction, TransactionPayload, Version, PRE_GENESIS_VERSION},
-    write_set::{WriteOp, WriteSet},
+    transaction::{Transaction, Version},
 };
-use executor_types::{ExecutedTrees, ProofReader};
-use once_cell::sync::Lazy;
+use executor_types::ProofReader;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
-use std::{
-    collections::{hash_map, HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
 use storage_interface::{
-    cached_state_view::{CachedStateView, StateCache},
-    in_memory_state::InMemoryState,
-    sync_proof_fetcher::SyncProofFetcher,
-    DbReader, TreeState,
+    cached_state_view::StateCache, gen_updates, in_memory_state::InMemoryState, process_write_set,
 };
-
-pub trait IntoLedgerView {
-    fn into_ledger_view(self, db: &Arc<dyn DbReader>) -> Result<ExecutedTrees>;
-}
-
-impl IntoLedgerView for TreeState {
-    fn into_ledger_view(self, db: &Arc<dyn DbReader>) -> Result<ExecutedTrees> {
-        let checkpoint_state = InMemoryState::new_at_checkpoint(
-            self.state_checkpoint_hash,
-            self.state_checkpoint_version,
-        );
-        let checkpoint_next_version = state_checkpoint_next_version(self.state_checkpoint_version);
-        ensure!(
-            checkpoint_next_version <= self.num_transactions,
-            "checkpoint is after latest version. checkpoint_next_version: {}, num_transactions: {}",
-            checkpoint_next_version,
-            self.num_transactions,
-        );
-
-        let state = if self.num_transactions == checkpoint_next_version {
-            checkpoint_state
-        } else {
-            ensure!(
-                self.num_transactions - checkpoint_next_version <= MAX_WRITE_SETS_AFTER_CHECKPOINT,
-                "Too many versions after state checkpoint. checkpoint_next_version: {}, num_transactions: {}",
-                checkpoint_next_version,
-                self.num_transactions,
-            );
-            let checkpoint_state_view = CachedStateView::new(
-                StateViewId::Miscellaneous,
-                db.clone(),
-                self.num_transactions,
-                checkpoint_state.checkpoint.clone(),
-                Arc::new(SyncProofFetcher::new(db.clone())),
-            )?;
-            let write_sets = db.get_write_sets(checkpoint_next_version, self.num_transactions)?;
-            checkpoint_state_view.prime_cache_by_write_set(&write_sets)?;
-            let state_cache = checkpoint_state_view.into_state_cache();
-            let calculator = InMemoryStateCalculator::new(
-                &checkpoint_state,
-                state_cache,
-                checkpoint_next_version,
-            );
-            calculator.calculate_for_write_sets_after_checkpoint(&write_sets)?
-        };
-
-        let transaction_accumulator = Arc::new(InMemoryAccumulator::new(
-            self.ledger_frozen_subtree_hashes,
-            self.num_transactions,
-        )?);
-
-        Ok(ExecutedTrees::new(state, transaction_accumulator))
-    }
-}
-
-const MAX_WRITE_SETS_AFTER_CHECKPOINT: LeafCount = 200_000;
-
-fn state_checkpoint_next_version(checkpoint_version: Option<Version>) -> Version {
-    match checkpoint_version {
-        None => 0,
-        Some(v) => {
-            if v == PRE_GENESIS_VERSION {
-                0
-            } else {
-                v + 1
-            }
-        }
-    }
-}
-
-pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);
 
 /// Helper class for calculating `InMemState` after a chunk or block of transactions are executed.
 ///
@@ -312,15 +231,15 @@ impl InMemoryStateCalculator {
     }
 
     fn finish(self) -> Result<(InMemoryState, HashMap<StateKey, StateValue>)> {
-        let updates_after_latest = self.updates_after_latest()?;
+        let updates_after_latest = gen_updates(&self.updated_after_latest, &self.state_cache)?;
         let smt_updates: Vec<_> = updates_after_latest
             .iter()
-            .map(|(key, value)| (key.hash(), value))
+            .map(|(key, value)| (key.hash(), *value))
             .collect();
         let latest = self.latest.batch_update(smt_updates, &self.proof_reader)?;
 
         let mut updated_since_checkpoint = self.updated_between_checkpoint_and_latest;
-        updated_since_checkpoint.extend(updates_after_latest.keys().cloned());
+        updated_since_checkpoint.extend(updates_after_latest.into_keys().cloned());
 
         let result_state = InMemoryState::new(
             self.checkpoint,
@@ -331,91 +250,4 @@ impl InMemoryStateCalculator {
 
         Ok((result_state, self.state_cache))
     }
-
-    pub fn calculate_for_write_sets_after_checkpoint(
-        mut self,
-        write_sets: &[WriteSet],
-    ) -> Result<InMemoryState> {
-        for write_set in write_sets {
-            let state_updates =
-                process_write_set(None, &mut self.state_cache, (*write_set).clone())?;
-            self.updated_after_latest.extend(state_updates.into_iter());
-            self.next_version += 1;
-        }
-        let (result_state, _) = self.finish()?;
-        Ok(result_state)
-    }
-}
-
-// Checks the write set is a subset of the read set.
-// Updates the `state_cache` to reflect the latest value.
-// Returns all state keys touched.
-pub fn process_write_set(
-    transaction: Option<&Transaction>,
-    state_cache: &mut HashMap<StateKey, StateValue>,
-    write_set: WriteSet,
-) -> Result<HashSet<StateKey>> {
-    // Find all keys this transaction touches while processing each write op.
-    let mut updated_keys = HashSet::new();
-    for (state_key, write_op) in write_set.into_iter() {
-        process_state_key_write_op(
-            transaction,
-            state_cache,
-            &mut updated_keys,
-            state_key,
-            write_op,
-        )?;
-    }
-
-    Ok(updated_keys)
-}
-
-fn process_state_key_write_op(
-    transaction: Option<&Transaction>,
-    state_cache: &mut HashMap<StateKey, StateValue>,
-    updated_keys: &mut HashSet<StateKey>,
-    state_key: StateKey,
-    write_op: WriteOp,
-) -> Result<()> {
-    match state_cache.entry(state_key.clone()) {
-        hash_map::Entry::Occupied(mut entry) => {
-            match write_op {
-                WriteOp::Value(new_value) => entry.insert(StateValue::from(new_value)),
-                WriteOp::Deletion => entry.insert(StateValue::empty()),
-            };
-        }
-        hash_map::Entry::Vacant(entry) => {
-            if let Some(txn) = transaction {
-                ensure_txn_valid_for_vacant_entry(txn)?;
-            }
-            match write_op {
-                WriteOp::Value(new_value) => entry.insert(StateValue::from(new_value)),
-                WriteOp::Deletion => entry.insert(StateValue::empty()),
-            };
-        }
-    }
-    updated_keys.insert(state_key);
-    Ok(())
-}
-
-fn ensure_txn_valid_for_vacant_entry(transaction: &Transaction) -> Result<()> {
-    // Before writing to an account, VM should always read that account. So we
-    // should not reach this code path. The exception is genesis transaction (and
-    // maybe other writeset transactions).
-    match transaction {
-        Transaction::GenesisTransaction(_) => (),
-        Transaction::BlockMetadata(_) => {
-            bail!("Write set should be a subset of read set.")
-        }
-        Transaction::UserTransaction(txn) => match txn.payload() {
-            TransactionPayload::ModuleBundle(_)
-            | TransactionPayload::Script(_)
-            | TransactionPayload::ScriptFunction(_) => {
-                bail!("Write set should be a subset of read set.")
-            }
-            TransactionPayload::WriteSet(_) => (),
-        },
-        Transaction::StateCheckpoint => {}
-    }
-    Ok(())
 }

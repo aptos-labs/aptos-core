@@ -1,23 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashSet;
-
-use proptest::{
-    collection::{hash_map, vec},
-    prelude::*,
-};
-
+use super::*;
+use crate::{pruner, AptosDB};
 use aptos_jellyfish_merkle::restore::StateSnapshotRestore;
 use aptos_temppath::TempPath;
 use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, state_store::state_key::StateKeyTag,
 };
+use proptest::{
+    collection::{hash_map, vec},
+    prelude::*,
+};
+use scratchpad::SparseMerkleTree;
+use std::collections::HashSet;
 use storage_interface::{jmt_update_refs, jmt_updates, DbReader, StateSnapshotReceiver};
-
-use crate::{pruner, AptosDB};
-
-use super::*;
 
 fn put_value_set(
     state_store: &StateStore,
@@ -38,7 +35,7 @@ fn put_value_set(
         .put_value_sets(vec![&value_set], version, &mut cs)
         .unwrap();
     state_store.ledger_db.write_schemas(cs.batch).unwrap();
-    state_store.set_latest_checkpoint(version, root);
+    state_store.set_latest_snapshot_with_version(SparseMerkleTree::new(root), Some(version));
     root
 }
 
@@ -454,31 +451,6 @@ pub fn test_find_latest_persisted_version_less_than_with_pre_genesis() {
         store.find_latest_persisted_version_less_than(0).unwrap(),
         Some(PRE_GENESIS_VERSION),
     );
-
-    // re-open DB
-    drop(db);
-    let db = AptosDB::new_for_test(&tmp_dir);
-    let store = &db.state_store;
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(4).unwrap(),
-        Some(2)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(3).unwrap(),
-        Some(2)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(2).unwrap(),
-        Some(0)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(1).unwrap(),
-        Some(0)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(0).unwrap(),
-        Some(PRE_GENESIS_VERSION),
-    );
 }
 
 proptest! {
@@ -692,6 +664,7 @@ fn update_store(
             .put_value_sets(vec![&value_state_set], version, &mut cs)
             .unwrap();
         store.ledger_db.write_schemas(cs.batch).unwrap();
-        store.set_latest_checkpoint(version, root_hashes[0]);
+        store
+            .set_latest_snapshot_with_version(SparseMerkleTree::new(root_hashes[0]), Some(version));
     }
 }

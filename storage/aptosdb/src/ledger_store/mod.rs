@@ -160,13 +160,13 @@ impl LedgerStore {
         Accumulator::get_frozen_subtree_hashes(self, num_transactions)
     }
 
-    pub fn get_startup_info(
+    pub fn get_ledger_startup_info(
         &self,
     ) -> Result<
         Option<(
             LedgerInfoWithSignatures, // latest ledger info
             Option<EpochState>,       // latest epoch state if not in the above ledger info
-            Option<Version>,          // synced version if newer than the ledger info
+            Version,                  // latest version commited
         )>,
     > {
         // Get the latest ledger info. Return None if not bootstrapped.
@@ -185,16 +185,11 @@ impl LedgerStore {
         let li_version = latest_ledger_info.ledger_info().version();
         let (latest_version, _) = self.get_latest_transaction_info()?;
         assert!(latest_version >= li_version);
-        let synced_version_opt = if latest_version == li_version {
-            None
-        } else {
-            Some(latest_version)
-        };
 
         Ok(Some((
             latest_ledger_info,
             latest_epoch_state_if_not_in_li,
-            synced_version_opt,
+            latest_version,
         )))
     }
 

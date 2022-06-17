@@ -12,7 +12,6 @@ use crate::{
     },
 };
 
-use crate::components::in_memory_state_calculator::IntoLedgerView;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_state_view::StateViewId;
 use aptos_types::{
@@ -359,12 +358,7 @@ fn apply_transaction_by_writeset(
     db: &DbReaderWriter,
     transactions_and_writesets: Vec<(Transaction, WriteSet)>,
 ) {
-    let ledger_view: ExecutedTrees = db
-        .reader
-        .get_latest_tree_state()
-        .unwrap()
-        .into_ledger_view(&db.reader)
-        .unwrap();
+    let ledger_view: ExecutedTrees = db.reader.get_latest_tree_state().unwrap().into();
 
     let transactions_and_outputs = transactions_and_writesets
         .iter()
@@ -404,6 +398,7 @@ fn apply_transaction_by_writeset(
             &executed.transactions_to_commit().unwrap(),
             ledger_view.txn_accumulator().num_leaves(),
             None,
+            executed.result_view.state_tree(),
         )
         .unwrap();
 }
@@ -522,12 +517,7 @@ impl TestBlock {
 fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
     let executor = TestExecutor::new();
     let db = &executor.db;
-    let mut ledger_view: ExecutedTrees = db
-        .reader
-        .get_latest_tree_state()
-        .unwrap()
-        .into_ledger_view(&db.reader)
-        .unwrap();
+    let mut ledger_view: ExecutedTrees = db.reader.get_latest_tree_state().unwrap().into();
 
     for txn in transactions {
         let out = ChunkOutput::by_transaction_execution::<MockVM>(
@@ -543,6 +533,7 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
                 &executed.transactions_to_commit().unwrap(),
                 ledger_view.txn_accumulator().num_leaves(),
                 None,
+                executed.result_view.state_tree(),
             )
             .unwrap();
         ledger_view = executed.result_view;

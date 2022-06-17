@@ -17,6 +17,7 @@ use aptos_types::{
     transaction::{ExecutionStatus, TransactionInfo, PRE_GENESIS_VERSION},
 };
 use proptest::prelude::*;
+use scratchpad::SparseMerkleTree;
 use std::{sync::Arc, time::Duration};
 use storage_interface::{DbReader, Order, TreeState};
 use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
@@ -120,7 +121,7 @@ fn test_get_latest_tree_state() {
 
     // entirely emtpy db
     let empty = db.get_latest_tree_state().unwrap();
-    assert_eq!(empty, TreeState::new_empty(),);
+    assert_eq!(empty, TreeState::new_empty());
 
     // unbootstrapped db with pre-genesis state
     let key = StateKey::Raw(String::from("test_key").into_bytes());
@@ -131,7 +132,7 @@ fn test_get_latest_tree_state() {
     let pre_genesis = db.get_latest_tree_state().unwrap();
     assert_eq!(
         pre_genesis,
-        TreeState::new(0, vec![], hash, Some(PRE_GENESIS_VERSION))
+        TreeState::new(0, vec![], SparseMerkleTree::new(hash),)
     );
 
     // bootstrapped db (any transaction info is in)
@@ -152,8 +153,7 @@ fn test_get_latest_tree_state() {
         TreeState::new(
             1,
             vec![txn_info.hash()],
-            txn_info.state_checkpoint_hash().unwrap(),
-            Some(0),
+            SparseMerkleTree::new(txn_info.state_checkpoint_hash().unwrap()),
         ),
     );
 }

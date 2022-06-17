@@ -5,7 +5,6 @@
 
 use anyhow::{anyhow, Result};
 
-use crate::components::in_memory_state_calculator::IntoLedgerView;
 use executor_types::{ExecutedChunk, ExecutedTrees};
 use std::{collections::VecDeque, sync::Arc};
 use storage_interface::DbReader;
@@ -21,7 +20,7 @@ impl ChunkCommitQueue {
             .get_startup_info()?
             .ok_or_else(|| anyhow!("DB not bootstrapped."))?
             .into_latest_tree_state()
-            .into_ledger_view(db)?;
+            .into();
         Ok(Self::new(persisted_view))
     }
 

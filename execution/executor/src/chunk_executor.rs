@@ -97,6 +97,7 @@ impl<V> ChunkExecutor<V> {
                 &txns_to_commit,
                 base_view.txn_accumulator().num_leaves(),
                 ledger_info,
+                to_commit.result_view.state_tree(),
             )?;
         }
 

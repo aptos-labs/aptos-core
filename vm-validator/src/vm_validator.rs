@@ -11,7 +11,7 @@ use aptos_types::{
     transaction::{SignedTransaction, VMValidatorResult},
 };
 use aptos_vm::AptosVM;
-use executor::components::in_memory_state_calculator::IntoLedgerView;
+use executor_types::ExecutedTrees;
 use fail::fail_point;
 use std::sync::Arc;
 use storage_interface::{
@@ -36,11 +36,10 @@ pub trait TransactionValidation: Send + Sync + Clone {
 }
 
 fn latest_state_view(db_reader: &Arc<dyn DbReader>) -> CachedStateView {
-    let ledger_view = db_reader
+    let ledger_view: ExecutedTrees = db_reader
         .get_latest_tree_state()
         .expect("Should not fail.")
-        .into_ledger_view(db_reader)
-        .expect("Should not fail.");
+        .into();
 
     ledger_view
         .state_view(

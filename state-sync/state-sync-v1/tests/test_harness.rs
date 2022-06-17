@@ -608,13 +608,7 @@ impl MockStorage {
 
     fn add_txns(&mut self, txns: &mut Vec<Transaction>) {
         self.transactions.append(txns);
-        let num_leaves = self.transactions.len() + 1;
-        let frozen_subtree_roots = vec![HashValue::zero(); num_leaves.count_ones() as usize];
-        self.synced_trees = ExecutedTrees::new_at_state_checkpoint(
-            HashValue::zero(), /* dummy_state_root */
-            frozen_subtree_roots,
-            num_leaves as u64,
-        );
+        self.synced_trees = ExecutedTrees::new_empty();
     }
 
     pub fn version(&self) -> u64 {
