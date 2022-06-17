@@ -28,6 +28,7 @@ pub struct StateCommitter {
     version: Version,
     smt: SparseMerkleTree<StateValue>,
     committed_smt: SparseMerkleTree<StateValue>,
+    committed_version: Option<Version>,
     updates: Vec<(HashValue, (HashValue, StateKey))>,
     num_pending_commits: usize,
 }
@@ -37,6 +38,7 @@ impl StateCommitter {
         commit_receiver: mpsc::Receiver<StateSnapshotDelta>,
         db: Arc<dyn DbWriter>,
         committed_smt: SparseMerkleTree<StateValue>,
+        committed_version: Option<Version>,
     ) -> Self {
         let mut cache_queue = VecDeque::new();
         cache_queue.push_back(committed_smt.clone());
@@ -49,6 +51,7 @@ impl StateCommitter {
             version: 0,
             smt: committed_smt.clone(),
             committed_smt,
+            committed_version,
             updates: Vec::new(),
             num_pending_commits: 0,
         }
@@ -98,13 +101,19 @@ impl StateCommitter {
             .freeze()
             .new_node_hashes_since(&self.committed_smt.clone().freeze());
         self.db
-            .save_state_snapshot(to_commit, Some(&node_hashes), self.version)
+            .save_state_snapshot(
+                to_commit,
+                Some(&node_hashes),
+                self.version,
+                self.committed_version,
+            )
             .unwrap();
         info!("Committing state. Saved.");
 
         // reset pending updates
         self.num_pending_commits = 0;
         self.committed_smt = self.smt.clone();
+        self.committed_version = Some(self.version);
 
         // cache maintenance
         if self.cache_queue.len() >= NUM_COMMITTED_SMTS_TO_CACHE {

@@ -302,6 +302,7 @@ mock! {
             &self,
             txns_to_commit: &[TransactionToCommit],
             first_version: Version,
+            base_state_version: Option<Version>,
             ledger_info_with_sigs: Option<&'a LedgerInfoWithSignatures>,
         ) -> Result<()>;
 

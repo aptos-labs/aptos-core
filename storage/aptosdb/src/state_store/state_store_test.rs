@@ -23,6 +23,7 @@ fn put_value_set(
     state_store: &StateStore,
     value_set: Vec<(StateKey, StateValue)>,
     version: Version,
+    base_version: Option<Version>,
 ) -> HashValue {
     let mut cs = ChangeSet::new();
     let value_set: HashMap<_, _> = value_set
@@ -32,7 +33,13 @@ fn put_value_set(
     let jmt_updates = jmt_updates(&value_set);
 
     let root = state_store
-        .merklize_value_sets(vec![jmt_update_refs(&jmt_updates)], None, version, &mut cs)
+        .merklize_value_sets(
+            vec![jmt_update_refs(&jmt_updates)],
+            None,
+            version,
+            base_version,
+            &mut cs,
+        )
         .unwrap()[0];
     state_store
         .put_value_sets(vec![&value_set], version, &mut cs)
@@ -122,6 +129,7 @@ fn test_state_store_reader_writer() {
         store,
         vec![(key1.clone(), value1.clone())],
         0, /* version */
+        None,
     );
     verify_value_and_proof(store, key1.clone(), Some(&value1), 0, root);
 
@@ -139,6 +147,7 @@ fn test_state_store_reader_writer() {
             (key3.clone(), value3.clone()),
         ],
         1, /* version */
+        Some(0),
     );
 
     verify_value_and_proof(store, key1, Some(&value1_update), 1, root);
@@ -168,6 +177,7 @@ fn test_get_values_by_key_prefix() {
             (key2.clone(), value2_v0.clone()),
         ],
         0,
+        None,
     );
 
     let key_value_map = store
@@ -189,6 +199,7 @@ fn test_get_values_by_key_prefix() {
             (key4.clone(), value4_v1.clone()),
         ],
         1,
+        Some(0),
     );
 
     // Ensure that we still get only values for key1 and key2 for version 0 after the update
@@ -215,7 +226,7 @@ fn test_get_values_by_key_prefix() {
 
     let account1_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address1.to_vec());
 
-    put_value_set(store, vec![(key5.clone(), value5_v2.clone())], 2);
+    put_value_set(store, vec![(key5.clone(), value5_v2.clone())], 2, Some(1));
 
     // address1 did not exist in version 0 and 1.
     let key_value_map = store
@@ -262,6 +273,7 @@ fn test_retired_records() {
         store,
         vec![(key1.clone(), value1.clone()), (key2.clone(), value2)],
         0, /* version */
+        None,
     );
     let root1 = put_value_set(
         store,
@@ -270,11 +282,13 @@ fn test_retired_records() {
             (key3.clone(), value3.clone()),
         ],
         1, /* version */
+        Some(0),
     );
     let root2 = put_value_set(
         store,
         vec![(key3.clone(), value3_update.clone())],
         2, /* version */
+        Some(1),
     );
 
     // Verify.
@@ -338,7 +352,7 @@ pub fn test_find_latest_persisted_version_less_than() {
         StateKey::Raw(b"key".to_vec()),
         StateValue::from(b"value".to_vec()),
     )];
-    put_value_set(store, kv.clone(), 0);
+    put_value_set(store, kv.clone(), 0, None);
     assert_eq!(
         store.find_latest_persisted_version_less_than(0).unwrap(),
         None
@@ -353,7 +367,7 @@ pub fn test_find_latest_persisted_version_less_than() {
     );
 
     // put in another version
-    put_value_set(store, kv, 2);
+    put_value_set(store, kv, 2, Some(0));
     assert_eq!(
         store.find_latest_persisted_version_less_than(4).unwrap(),
         Some(2)
@@ -387,7 +401,7 @@ pub fn test_find_latest_persisted_version_less_than_with_pre_genesis() {
         let tmp_dir1 = TempPath::new();
         let db1 = AptosDB::new_for_test(&tmp_dir1);
         let store1 = &db1.state_store;
-        put_value_set(store1, kv.clone(), 0);
+        put_value_set(store1, kv.clone(), 0, None);
         let root_hash = store1.get_root_hash(0).unwrap();
         let tmp_dir2 = TempPath::new();
         let db2 = AptosDB::new_for_test(&tmp_dir2);
@@ -418,7 +432,7 @@ pub fn test_find_latest_persisted_version_less_than_with_pre_genesis() {
     );
 
     // put in genesis
-    put_value_set(store, kv.clone(), 0);
+    put_value_set(store, kv.clone(), 0, None);
     assert_eq!(
         store.find_latest_persisted_version_less_than(0).unwrap(),
         Some(PRE_GENESIS_VERSION),
@@ -433,7 +447,7 @@ pub fn test_find_latest_persisted_version_less_than_with_pre_genesis() {
     );
 
     // put in another version
-    put_value_set(store, kv, 2);
+    put_value_set(store, kv, 2, Some(0));
     assert_eq!(
         store.find_latest_persisted_version_less_than(4).unwrap(),
         Some(2)
@@ -686,7 +700,13 @@ fn update_store(
         let jmt_updates = jmt_updates(&value_state_set);
         let version = first_version + i as Version;
         let root_hashes = store
-            .merklize_value_sets(vec![jmt_update_refs(&jmt_updates)], None, version, &mut cs)
+            .merklize_value_sets(
+                vec![jmt_update_refs(&jmt_updates)],
+                None,
+                version,
+                version.checked_sub(1),
+                &mut cs,
+            )
             .unwrap();
         store
             .put_value_sets(vec![&value_state_set], version, &mut cs)

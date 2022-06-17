@@ -289,15 +289,11 @@ impl StateStore {
         value_sets: Vec<Vec<(HashValue, &(HashValue, StateKey))>>,
         node_hashes: Option<Vec<&HashMap<NibblePath, HashValue>>>,
         first_version: Version,
+        base_version: Option<Version>,
         ledger_db_cs: &mut ChangeSet,
     ) -> Result<Vec<HashValue>> {
         let (new_root_hash_vec, tree_update_batch) = JellyfishMerkleTree::new(self)
-            .batch_put_value_sets(
-                value_sets,
-                node_hashes,
-                self.find_latest_persisted_version_less_than(first_version)?,
-                first_version,
-            )?;
+            .batch_put_value_sets(value_sets, node_hashes, base_version, first_version)?;
 
         let num_versions = new_root_hash_vec.len();
         assert_eq!(num_versions, tree_update_batch.node_stats.len());
