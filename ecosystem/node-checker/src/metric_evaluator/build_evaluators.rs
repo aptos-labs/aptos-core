@@ -8,28 +8,25 @@ use crate::{
         CONSENSUS_PROPOSALS_EVALUATOR_NAME, STATE_SYNC_EVALUATOR_NAME,
     },
 };
-use anyhow::{bail, Result};
-use log::info;
+use anyhow::Result;
 use std::collections::HashSet;
 
 pub fn build_evaluators(
-    evaluators: &[String],
+    evaluators_strings: &mut HashSet<String>,
     evaluator_args: &EvaluatorArgs,
 ) -> Result<Vec<Box<dyn MetricsEvaluator>>> {
-    let evaluator_strings: HashSet<String> = evaluators.iter().cloned().collect();
-    if evaluator_strings.is_empty() {
-        bail!("No evaluators specified");
-    }
-
     let mut evaluators: Vec<Box<dyn MetricsEvaluator>> = vec![];
 
-    if evaluator_strings.contains(STATE_SYNC_EVALUATOR_NAME) {
+    if evaluators_strings.take(STATE_SYNC_EVALUATOR_NAME).is_some() {
         evaluators.push(Box::new(StateSyncMetricsEvaluator::new(
             evaluator_args.state_sync_evaluator_args.clone(),
         )));
     }
 
-    if evaluator_strings.contains(CONSENSUS_PROPOSALS_EVALUATOR_NAME) {
+    if evaluators_strings
+        .take(CONSENSUS_PROPOSALS_EVALUATOR_NAME)
+        .is_some()
+    {
         evaluators.push(Box::new(ConsensusProposalsEvaluator::new(
             evaluator_args
                 .consensus_evaluator_args
@@ -37,21 +34,6 @@ pub fn build_evaluators(
                 .clone(),
         )));
     }
-
-    let in_use_evaluators_names = evaluators
-        .iter()
-        .map(|e| e.get_name())
-        .collect::<HashSet<_>>();
-    for evaluator_string in evaluator_strings {
-        if !in_use_evaluators_names.contains(&evaluator_string) {
-            bail!("Evaluator {} does not exist", evaluator_string);
-        }
-    }
-
-    info!(
-        "Running with the following evaluators: {:?}",
-        in_use_evaluators_names
-    );
 
     Ok(evaluators)
 }

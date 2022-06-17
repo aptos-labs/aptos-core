@@ -3,9 +3,8 @@
 
 #![allow(dead_code)]
 
-use crate::evaluator::EvaluationResult;
+use crate::{evaluator::EvaluationResult, metric_collector::SystemInformation};
 use anyhow::Result;
-use std::collections::HashMap;
 use thiserror::Error as ThisError;
 
 #[derive(Debug, ThisError)]
@@ -26,8 +25,8 @@ pub enum SystemInformationEvaluatorError {
 pub trait SystemInformationEvaluator: Sync + Send {
     fn evaluate_system_information(
         &self,
-        baseline_system_information: &HashMap<String, String>,
-        target_system_information: &HashMap<String, String>,
+        baseline_system_information: &SystemInformation,
+        target_system_information: &SystemInformation,
     ) -> Result<Vec<EvaluationResult>, SystemInformationEvaluatorError>;
 
     fn get_name(&self) -> String;

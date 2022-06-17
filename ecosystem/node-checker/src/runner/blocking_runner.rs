@@ -8,6 +8,7 @@ use crate::{
     evaluator::EvaluationSummary,
     metric_collector::MetricCollector,
     metric_evaluator::{parse_metrics, MetricsEvaluator},
+    system_information_evaluator::SystemInformationEvaluator,
 };
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -27,19 +28,22 @@ pub struct BlockingRunnerArgs {
 pub struct BlockingRunner<M: MetricCollector> {
     args: BlockingRunnerArgs,
     baseline_metric_collector: M,
-    evaluators: Vec<Box<dyn MetricsEvaluator>>,
+    metrics_evaluators: Vec<Box<dyn MetricsEvaluator>>,
+    system_information_evaluators: Vec<Box<dyn SystemInformationEvaluator>>,
 }
 
 impl<M: MetricCollector> BlockingRunner<M> {
     pub fn new(
         args: BlockingRunnerArgs,
         baseline_metric_collector: M,
-        evaluators: Vec<Box<dyn MetricsEvaluator>>,
+        metrics_evaluators: Vec<Box<dyn MetricsEvaluator>>,
+        system_information_evaluators: Vec<Box<dyn SystemInformationEvaluator>>,
     ) -> Self {
         Self {
             args,
             baseline_metric_collector,
-            evaluators,
+            metrics_evaluators,
+            system_information_evaluators,
         }
     }
 
@@ -112,7 +116,7 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
 
         let mut evaluation_results = Vec::new();
 
-        for evaluator in &self.evaluators {
+        for evaluator in &self.metrics_evaluators {
             let mut es = evaluator
                 .evaluate_metrics(
                     &first_baseline_metrics,
@@ -121,6 +125,16 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
                     &second_target_metrics,
                 )
                 .map_err(RunnerError::MetricEvaluatorError)?;
+            evaluation_results.append(&mut es);
+        }
+
+        for evaluator in &self.system_information_evaluators {
+            let mut es = evaluator
+                .evaluate_system_information(
+                    &baseline_system_information,
+                    &target_system_information,
+                )
+                .map_err(RunnerError::SystemInformationEvaluatorError)?;
             evaluation_results.append(&mut es);
         }
 
