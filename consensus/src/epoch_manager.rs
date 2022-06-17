@@ -12,6 +12,7 @@ use crate::{
         ordering_state_computer::OrderingStateComputer,
     },
     liveness::{
+        cached_proposer_election::CachedProposerElection,
         leader_reputation::{ActiveInactiveHeuristic, AptosDBBackend, LeaderReputation},
         proposal_generator::ProposalGenerator,
         proposer_election::ProposerElection,
@@ -66,6 +67,10 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+
+/// Range of rounds (window) that we might be calling proposer election
+/// functions with at any given time.
+const PROPSER_ELECTION_CACHING_WINDOW: usize = 3;
 
 #[allow(clippy::large_enum_variant)]
 pub enum LivenessStorageData {
@@ -203,12 +208,17 @@ impl EpochManager {
                     heuristic_config.active_weights,
                     heuristic_config.inactive_weights,
                 ));
-                Box::new(LeaderReputation::new(
+                let proposer_election = Box::new(LeaderReputation::new(
                     epoch_state.epoch,
                     proposers,
                     backend,
                     heuristic,
                     onchain_config.leader_reputation_exclude_round(),
+                ));
+                // LeaderReputation is not cheap, so we can cache the amount of rounds round_manager needs.
+                Box::new(CachedProposerElection::new(
+                    proposer_election,
+                    PROPSER_ELECTION_CACHING_WINDOW,
                 ))
             }
             ConsensusProposerType::RoundProposer(round_proposers) => {
