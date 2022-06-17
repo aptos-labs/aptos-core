@@ -38,7 +38,7 @@ permissions:
 jobs:
   rust-images:
     # trigger only for push events (on protected branches as defined above) OR on PR events with the "CICD:build-images" label.
-    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'CICD:build-images')
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'CICD:build-images')
     strategy:
       matrix:
         IMAGE_TARGET: [release, test]
