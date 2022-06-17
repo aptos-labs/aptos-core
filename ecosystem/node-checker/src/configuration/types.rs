@@ -4,6 +4,7 @@
 use crate::{
     metric_evaluator::{ConsensusMetricsEvaluatorArgs, StateSyncMetricsEvaluatorArgs},
     runner::BlockingRunnerArgs,
+    system_information_evaluator::BuildVersionEvaluatorArgs,
 };
 use anyhow::Result;
 use clap::Parser;
@@ -102,6 +103,9 @@ pub struct EvaluatorArgs {
 
     #[clap(flatten)]
     pub consensus_evaluator_args: ConsensusMetricsEvaluatorArgs,
+
+    #[clap(flatten)]
+    pub build_version_evaluator_args: BuildVersionEvaluatorArgs,
 }
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
