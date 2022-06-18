@@ -197,3 +197,6 @@ RUN echo root:root | chpasswd
 
 ### FOR DEBUGGGING ONLY
 RUN echo root:root | chpasswd
+
+### FOR DEBUGGGING ONLY
+RUN echo root:root | chpasswd
