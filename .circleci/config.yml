@@ -1,0 +1,138 @@
+version: 2.1
+
+executors:
+  ubuntu-2xl:
+    docker:
+      - image: cimg/rust:1.61
+    resource_class: xlarge
+
+jobs:
+  unit-test:
+    parameters:
+      run:
+        type: integer
+    executor: ubuntu-2xl
+    steps:
+      - dev-setup
+      - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - run: echo "export INDEXER_DATABASE_URL=postgresql://postgres@localhost/postgres" >> $BASH_ENV
+      - run: cargo nextest --nextest-profile ci --partition hash:1/1 --unit --exclude backup-cli
+  unit-test-changed-since:
+    parameters:
+      run:
+        type: integer
+    executor: ubuntu-2xl
+    steps:
+      - dev-setup
+      - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - run: echo "export INDEXER_DATABASE_URL=postgresql://postgres@localhost/postgres" >> $BASH_ENV
+      - run: cargo nextest --nextest-profile ci --partition hash:1/1 --unit --exclude backup-cli --changed-since=origin/main
+workflows:
+  build-test-deploy:
+    when:
+      not:
+        equal: [main, << pipeline.git.branch >>]
+    jobs:
+      # - unit-test:
+      #     matrix:
+      #       parameters:
+      #         run:
+      #           [
+      #             1,
+      #             2,
+      #             3,
+      #             4,
+      #             5,
+      #             6,
+      #             7,
+      #             8,
+      #             9,
+      #             10,
+      #             11,
+      #             12,
+      #             13,
+      #             14,
+      #             15,
+      #             16,
+      #             17,
+      #             18,
+      #             19,
+      #             20,
+      #             21,
+      #             22,
+      #             23,
+      #             24,
+      #             25,
+      #             26,
+      #             27,
+      #             28,
+      #             29,
+      #             30,
+      #             31,
+      #             32,
+      #             33,
+      #             34,
+      #             35,
+      #             36,
+      #             37,
+      #             38,
+      #             39,
+      #             40,
+      #           ]
+      # - unit-test-changed-since:
+      #     matrix:
+      #       parameters:
+      #         run:
+      #           [
+      #             1,
+      #             2,
+      #             3,
+      #             4,
+      #             5,
+      #             6,
+      #             7,
+      #             8,
+      #             9,
+      #             10,
+      #             11,
+      #             12,
+      #             13,
+      #             14,
+      #             15,
+      #             16,
+      #             17,
+      #             18,
+      #             19,
+      #             20,
+      #             21,
+      #             22,
+      #             23,
+      #             24,
+      #             25,
+      #             26,
+      #             27,
+      #             28,
+      #             29,
+      #             30,
+      #             31,
+      #             32,
+      #             33,
+      #             34,
+      #             35,
+      #             36,
+      #             37,
+      #             38,
+      #             39,
+      #             40,
+      #           ]
+
+commands:
+  dev-setup:
+    steps:
+      - checkout
+      - run: sudo apt-get update
+      - run: sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config --no-install-recommends --assume-yes
+      # - run: curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+      # - run: cat $HOME/.cargo/env >> $BASH_ENV
+      - setup_remote_docker:
+          version: 20.10.14

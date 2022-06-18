@@ -1,51 +1,334 @@
 gcp_credentials: ENCRYPTED[!5ff02fd27fc6c3255c96ec64c3f7e9ce650b306988e2ff6f8aa22d7ddd5d786dc0b7d0edc72c103c1b0437d8342502a5!]
 
-rust_lint_task:
+
+
+rust_nextest_gke_task:
   gke_container:
-    image: rust:1.61.0-buster
-    cpu: 54
-    memory: 200G
+    image: ubuntu:22.04
+    cpu: 26
+    memory: 100GB
     cluster_name: ci-cluster
-    location: us-west1-b
+    zone: us-west1-b
     namespace: cirrus-ci
+    additional_containers:
+      - name: postgres
+        image: cimg/postgres:14.2
+        port: 5432
+        cpu: 0.5
+        memory: 1024Mi
   env:
     CARGO_INCREMENTAL: "0"
-  install_script: apt-get update && apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config --no-install-recommends --assume-yes
-  registry_cache:
-    folder: $CARGO_HOME/registry
-    fingerprint_script: cat Cargo.lock
-  target_cache:
-    folder: target
-    fingerprint_script:
-      - rustc --version
-      - cat Cargo.lock
-  test_script:
-    - rustup update
-    - rustup component add clippy
-    - rustup component add rustfmt
-    - cargo x lint
-    - cargo xclippy --workspace --all-targets
-    - cargo xfmt --check
-    - cargo install cargo-sort
-    # Temporary workaround for unsorted hakari generated Cargo files (https://github.com/DevinR528/cargo-sort/issues/38).
-    - cargo sort --grouped crates/aptos-workspace-hack
-    - cargo sort --grouped --check --workspace
-  before_cache_script:
-    #  # Delete loose files in the debug directory
-    - find ./target/debug -maxdepth 1 -type f -delete
-    # Delete the test and benchmark executables. Finding these all might take some
-    # experimentation.
-    - rm -rf ./target/debug/deps/*aptos*
-    # Delete the associated metadata files for those executables
-    - rm -rf ./target/debug/.fingerprint/*aptos*
-    # Note that all of the above need to be repeated for `debug/` instead of
-    # `debug/` if your build script builds artifacts in debug mode.
-    # This is just more metadata
-    - rm -f  ./target/.rustc_info.json
-    # Also delete the saved benchmark data from the test benchmarks. If you
-    # have Criterion.rs benchmarks, you'll probably want to do this as well, or set
-    # the CRITERION_HOME environment variable to move that data out of the
-    # `target/` directory.
-    # Also delete cargo's registry index. This is updated on every build, but it's
-    # way cheaper to re-download than the whole cache is.
-    - rm -rf ~/.cargo/registry/index/
+    INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+    CIRRUS_SHELL: bash
+    PATH: /root/.cargo/bin:$PATH
+    # CIRRUS_CLONE_DEPTH: "0"
+    # matrix:
+    #   - BATCH: 0
+    #   - BATCH: 1
+    matrix:
+      - RUN: 1
+      - RUN: 2
+      - RUN: 3
+      - RUN: 4
+      - RUN: 5
+      - RUN: 6
+      - RUN: 7
+      - RUN: 8
+      - RUN: 9
+      - RUN: 10
+      - RUN: 11
+      - RUN: 12
+      - RUN: 13
+      - RUN: 14
+      - RUN: 15
+      - RUN: 16
+      - RUN: 17
+      - RUN: 18
+      - RUN: 19
+      - RUN: 20
+      - RUN: 21
+      - RUN: 22
+      - RUN: 23
+      - RUN: 24
+      - RUN: 25
+      - RUN: 26
+      - RUN: 27
+      - RUN: 28
+      - RUN: 29
+      - RUN: 30
+      - RUN: 31
+      - RUN: 32
+      - RUN: 33
+      - RUN: 34
+      - RUN: 35
+      - RUN: 36
+      - RUN: 37
+      - RUN: 38
+      - RUN: 39
+      - RUN: 40
+
+  # clone_script: |
+  #   git clone https://x-access-token:${CIRRUS_REPO_CLONE_TOKEN}@github.com/${CIRRUS_REPO_FULL_NAME}.git $CIRRUS_WORKING_DIR
+  #   git checkout $CIRRUS_BRANCH
+
+  install_script: |
+    apt-get update
+    apt-get install gnupg lsb-release build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config --no-install-recommends --assume-yes
+
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt-get update -y
+    apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
+    curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
+  # install_script: |
+  #   apt-get update
+  #   apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config --no-install-recommends --assume-yes
+
+  #   # mkdir -p /etc/apt/keyrings
+  #   # curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  #   # echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  #   # apt-get update -y
+  #   # apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
+  #   # curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
+  # prepare_script: docker run --detach -p 5432:5432 cimg/postgres:14.2
+  # registry_cache:
+  #   folder: $CARGO_HOME/registry
+  #   fingerprint_script: cat Cargo.lock
+  # target_cache:
+  #   folder: target
+  #   fingerprint_script:
+  #     - rustc --version
+  #     - cat Cargo.lock
+  test_script: |
+    cargo nextest --nextest-profile ci --partition hash:1/1 --unit --exclude backup-cli
+  # before_cache_script:
+  #   #  # Delete loose files in the debug directory
+  #   - find ./target/debug -maxdepth 1 -type f -delete
+  #   # Delete the test and benchmark executables. Finding these all might take some
+  #   # experimentation.
+  #   - rm -rf ./target/debug/deps/*aptos*
+  #   # Delete the associated metadata files for those executables
+  #   - rm -rf ./target/debug/.fingerprint/*aptos*
+  #   # Note that all of the above need to be repeated for `debug/` instead of
+  #   # `debug/` if your build script builds artifacts in debug mode.
+  #   # This is just more metadata
+  #   - rm -f  ./target/.rustc_info.json
+  #   # Also delete the saved benchmark data from the test benchmarks. If you
+  #   # have Criterion.rs benchmarks, you'll probably want to do this as well, or set
+  #   # the CRITERION_HOME environment variable to move that data out of the
+  #   # `target/` directory.
+  #   # Also delete cargo's registry index. This is updated on every build, but it's
+  #   # way cheaper to re-download than the whole cache is.
+  #   - rm -rf $CARGO_HOME/registry/index/
+
+# rust_nextest_task:
+#   gke_container:
+#     image: rust:1.61.0-buster
+#     cpu: 14
+#     memory:  60
+#     cluster_name: ci-cluster
+#     location: us-west1-b
+#     namespace: cirrus-ci
+#     additional_containers:
+#       - name: postgres
+#         image: cimg/postgres:14.2
+#         port: 5432
+#         cpu: 2.0
+#         memory: 1024Mi
+#   env:
+#     CARGO_INCREMENTAL: "0"
+#     INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+#     # CIRRUS_CLONE_DEPTH: "0"
+#     matrix:
+#       - RUN: 1
+#       - RUN: 2
+#       - RUN: 3
+#       - RUN: 4
+#       - RUN: 5
+#       - RUN: 6
+#       - RUN: 7
+#       - RUN: 8
+#       - RUN: 9
+#       - RUN: 10
+#       - RUN: 11
+#       - RUN: 12
+#       - RUN: 13
+#       - RUN: 14
+#       - RUN: 15
+#       - RUN: 16
+#       - RUN: 17
+#       - RUN: 18
+#       - RUN: 19
+#       - RUN: 20
+#       - RUN: 21
+#       - RUN: 22
+#       - RUN: 23
+#       - RUN: 24
+#       - RUN: 25
+#       - RUN: 26
+#       - RUN: 27
+#       - RUN: 28
+#       - RUN: 29
+#       - RUN: 30
+#       - RUN: 31
+#       - RUN: 32
+#       - RUN: 33
+#       - RUN: 34
+#       - RUN: 35
+#       - RUN: 36
+#       - RUN: 37
+#       - RUN: 38
+#       - RUN: 39
+#       - RUN: 40
+
+# clone_script: |
+#   git clone https://x-access-token:${CIRRUS_REPO_CLONE_TOKEN}@github.com/${CIRRUS_REPO_FULL_NAME}.git $CIRRUS_WORKING_DIR
+#   git checkout $CIRRUS_BRANCH
+# install_script: apt-get update && apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config --no-install-recommends --assume-yes
+# registry_cache:
+#   folder: $CARGO_HOME/registry
+#   fingerprint_script: cat Cargo.lock
+# target_cache:
+#   folder: target
+#   fingerprint_script:
+#     - rustc --version
+#     - cat Cargo.lock
+# test_script: cargo nextest --nextest-profile ci --partition hash:1/1 --unit --exclude backup-cli
+# before_cache_script:
+#   #  # Delete loose files in the debug directory
+#   - find ./target/debug -maxdepth 1 -type f -delete
+#   # Delete the test and benchmark executables. Finding these all might take some
+#   # experimentation.
+#   - rm -rf ./target/debug/deps/*aptos*
+#   # Delete the associated metadata files for those executables
+#   - rm -rf ./target/debug/.fingerprint/*aptos*
+#   # Note that all of the above need to be repeated for `debug/` instead of
+#   # `debug/` if your build script builds artifacts in debug mode.
+#   # This is just more metadata
+#   - rm -f  ./target/.rustc_info.json
+#   # Also delete the saved benchmark data from the test benchmarks. If you
+#   # have Criterion.rs benchmarks, you'll probably want to do this as well, or set
+#   # the CRITERION_HOME environment variable to move that data out of the
+#   # `target/` directory.
+#   # Also delete cargo's registry index. This is updated on every build, but it's
+#   # way cheaper to re-download than the whole cache is.
+#   - rm -rf $CARGO_HOME/registry/index/
+
+# rust_nextest_vm_task:
+#   gce_instance:
+#     image_project: ubuntu-os-cloud
+#     image_name: ubuntu-2204-jammy-v20220616
+#     # container: rust:1.61.0-buster
+#     # additional_containers:
+#     # - name: postgres
+#     #   image: cimg/postgres:14.2
+#     #   port: 5432
+#     # cpu: 60
+#     # memory: 200GB
+#     location: us-central1
+#     # type: c2-standard-60
+#     # image:
+#     matrix:
+#       - type: c2-standard-16
+#       - type: c2-standard-30
+#       - type: c2-standard-30
+#     # matrix:
+#     #   - disk: 800
+#     disk: 200
+#     preemptible: true
+#     use_ssd: true # default to false
+#   env:
+#     CARGO_INCREMENTAL: "0"
+#     INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+#     CIRRUS_SHELL: bash
+#     PATH: /root/.cargo/bin:$PATH
+#     # CIRRUS_CLONE_DEPTH: "0"
+#     # matrix:
+#     #   - BATCH: 0
+#     #   - BATCH: 1
+#     matrix:
+#       - RUN: 1
+#       - RUN: 2
+#       - RUN: 3
+#       - RUN: 4
+#       - RUN: 5
+#       - RUN: 6
+#       - RUN: 7
+#       - RUN: 8
+#       - RUN: 9
+#       - RUN: 10
+#       - RUN: 11
+#       - RUN: 12
+#       - RUN: 13
+#       - RUN: 14
+#       - RUN: 15
+#       # - RUN: 16
+#       # - RUN: 17
+#       # - RUN: 18
+#       # - RUN: 19
+#       # - RUN: 20
+#       # - RUN: 21
+#       # - RUN: 22
+#       # - RUN: 23
+#       # - RUN: 24
+#       # - RUN: 25
+#       # - RUN: 26
+#       # - RUN: 27
+#       # - RUN: 28
+#       # - RUN: 29
+#       # - RUN: 30
+#       # - RUN: 31
+#       # - RUN: 32
+#       # - RUN: 33
+#       # - RUN: 34
+#       # - RUN: 35
+#       # - RUN: 36
+#       # - RUN: 37
+#       # - RUN: 38
+#       # - RUN: 39
+#       # - RUN: 40
+
+#   # clone_script: |
+#   #   git clone https://x-access-token:${CIRRUS_REPO_CLONE_TOKEN}@github.com/${CIRRUS_REPO_FULL_NAME}.git $CIRRUS_WORKING_DIR
+#   #   git checkout $CIRRUS_BRANCH
+#   install_script: |
+#     apt-get update
+#     apt-get install gnupg lsb-release build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config --no-install-recommends --assume-yes
+
+#     mkdir -p /etc/apt/keyrings
+#     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+#     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+#     apt-get update -y
+#     apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
+#     curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
+#   prepare_script: docker run --detach -p 5432:5432 cimg/postgres:14.2
+#   # registry_cache:
+#   #   folder: $CARGO_HOME/registry
+#   #   fingerprint_script: cat Cargo.lock
+#   # target_cache:
+#   #   folder: target
+#   #   fingerprint_script:
+#   #     - rustc --version
+#   #     - cat Cargo.lock
+#   test_script: |
+#     cargo nextest --nextest-profile ci --partition hash:1/1 --unit --exclude backup-cli
+#   # before_cache_script:
+#   #   #  # Delete loose files in the debug directory
+#   #   - find ./target/debug -maxdepth 1 -type f -delete
+#   #   # Delete the test and benchmark executables. Finding these all might take some
+#   #   # experimentation.
+#   #   - rm -rf ./target/debug/deps/*aptos*
+#   #   # Delete the associated metadata files for those executables
+#   #   - rm -rf ./target/debug/.fingerprint/*aptos*
+#   #   # Note that all of the above need to be repeated for `debug/` instead of
+#   #   # `debug/` if your build script builds artifacts in debug mode.
+#   #   # This is just more metadata
+#   #   - rm -f  ./target/.rustc_info.json
+#   #   # Also delete the saved benchmark data from the test benchmarks. If you
+#   #   # have Criterion.rs benchmarks, you'll probably want to do this as well, or set
+#   #   # the CRITERION_HOME environment variable to move that data out of the
+#   #   # `target/` directory.
+#   #   # Also delete cargo's registry index. This is updated on every build, but it's
+#   #   # way cheaper to re-download than the whole cache is.
+#   #   - rm -rf $CARGO_HOME/registry/index/
