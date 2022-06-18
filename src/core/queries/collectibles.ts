@@ -118,6 +118,7 @@ export const getGalleryItems = async ({
 export const collectiblesQueryKeys = Object.freeze({
   getGalleryItems: 'getGalleryItems',
   getTokenData: 'getTokenData',
+  isValidMetadataStructure: 'isValidMetadataStructure',
 } as const);
 
 interface GetTokenDataProps {
@@ -190,4 +191,65 @@ export const useGalleryItems = () => {
   }, [aptosAccount, aptosNetwork]);
 
   return useQuery(collectiblesQueryKeys.getGalleryItems, getGalleryItemsQuery);
+};
+
+interface IsValidMetadataStructureProps {
+  uri: string;
+}
+
+export const getIsValidMetadataStructure = async ({
+  uri,
+}: IsValidMetadataStructureProps) => {
+  try {
+    const { data } = await axios.get<MetadataJson>(uri);
+    if (!(
+      data.description
+    && data.image
+    && data.name
+    && data.properties
+    && data.seller_fee_basis_points
+    && data.symbol
+    )) {
+      return false;
+    }
+
+    if (!(
+      data.properties.category
+    && data.properties.creators
+    && data.properties.files
+    )) {
+      return false;
+    }
+
+    // eslint-disable-next-line no-restricted-syntax
+    for (const creator of data.properties.creators) {
+      if (!(creator.address && creator.share)) {
+        return false;
+      }
+    }
+
+    // eslint-disable-next-line no-restricted-syntax
+    for (const file of data.properties.files) {
+      if (!(
+        file.type
+      && file.uri
+      )) {
+        return false;
+      }
+    }
+
+    return true;
+  } catch (err) {
+    return false;
+  }
+};
+
+export const useIsValidMetadataStructure = ({
+  uri,
+}: IsValidMetadataStructureProps) => {
+  const isValidMetadataStructureQuery = useCallback(async () => {
+    const result = await getIsValidMetadataStructure({ uri });
+    return result;
+  }, [uri]);
+  return useQuery(collectiblesQueryKeys.isValidMetadataStructure, isValidMetadataStructureQuery);
 };

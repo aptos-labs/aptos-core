@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosClient, TokenClient, RequestError } from 'aptos';
+import { getIsValidMetadataStructure } from 'core/queries/collectibles';
 import queryKeys from 'core/queries/queryKeys';
 import { AptosAccountState } from 'core/types';
 import { AptosNetwork } from 'core/utils/network';
@@ -25,14 +26,29 @@ export const defaultRequestErrorAttributes = {
   statusText: 'Move abort',
 };
 
+const ERROR_CODES = Object.freeze({
+  URI_GENERAL: 'URI is invalid',
+  URI_METADATA_FORMAT: 'Wrong metadata format in URI',
+} as const);
+
 export interface RaiseForErrorProps {
-  vmStatus: string
+  error?: string;
+  vmStatus?: string
 }
 
 const raiseForError = ({
+  error,
   vmStatus,
 }: RaiseForErrorProps) => {
-  if (vmStatus.includes('Move abort')) {
+  if (error?.includes(ERROR_CODES.URI_METADATA_FORMAT)) {
+    throw new RequestError(error, {
+      data: {
+        message: error,
+      },
+      ...defaultRequestErrorAttributes,
+      statusText: error,
+    });
+  } else if (vmStatus?.includes('Move abort')) {
     throw new RequestError(vmStatus, {
       data: {
         message: vmStatus,
@@ -54,6 +70,12 @@ export const createTokenAndCollection = async ({
   if (!account || !(collectionName && description && uri && name)) {
     return;
   }
+  const isValidUri = await getIsValidMetadataStructure({ uri });
+  raiseForError({
+    error: (isValidUri)
+      ? undefined
+      : `${ERROR_CODES.URI_METADATA_FORMAT} or ${ERROR_CODES.URI_GENERAL}`,
+  });
   const aptosClient = new AptosClient(nodeUrl);
   const tokenClient = new TokenClient(aptosClient);
 

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AddIcon } from '@chakra-ui/icons';
+import { AddIcon, ExternalLinkIcon } from '@chakra-ui/icons';
 import {
   Button,
   Drawer,
@@ -10,8 +10,10 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerOverlay,
+  Flex,
   FormControl,
   FormLabel,
+  Grid,
   Input,
   Text,
   useColorMode,
@@ -75,7 +77,7 @@ export default function CreateNFTModal() {
         <DrawerOverlay />
         <DrawerContent>
           <form onSubmit={handleSubmit(onSubmit)}>
-            <DrawerHeader>Create an NFT</DrawerHeader>
+            <DrawerHeader>Create a collectible</DrawerHeader>
             <DrawerBody>
               <VStack>
                 <FormControl isRequired>
@@ -127,9 +129,31 @@ export default function CreateNFTModal() {
                   />
                 </FormControl>
                 <FormControl isRequired>
-                  <FormLabel fontWeight={400} color={secondaryTextColor[colorMode]}>
-                    Uri
-                  </FormLabel>
+                  <Grid templateColumns="1fr 200px">
+                    <Flex>
+                      <FormLabel
+                        fontWeight={400}
+                        color={secondaryTextColor[colorMode]}
+                      >
+                        Uri
+                      </FormLabel>
+                    </Flex>
+                    <Flex justifyContent="flex-end">
+                      <Button
+                        fontSize="md"
+                        fontWeight={400}
+                        as="a"
+                        target="_blank"
+                        rightIcon={<ExternalLinkIcon />}
+                        variant="unstyled"
+                        cursor="pointer"
+                        color={secondaryTextColor[colorMode]}
+                        href="https://github.com/aptos-labs/aptos-core/blob/8b826d88b0f17255a753214ede48cbc44e484a97/ecosystem/web-wallet/src/core/types/TokenMetadata.ts"
+                      >
+                        (Metadata structure)
+                      </Button>
+                    </Flex>
+                  </Grid>
                   <Input
                     {...register('uri')}
                     variant="filled"
