@@ -20,6 +20,7 @@ use proptest::{collection::vec, prelude::*};
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
+    #[ignore]
     #[test]
     fn test_txn_store_pruner(txns in vec(
         prop_oneof![
