@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosClient } from 'aptos';
+import fetchAdapter from '@vespaiach/axios-fetch-adapter';
 import { DEVNET_NODE_URL } from '../core/constants';
 import { MessageMethod, PermissionType } from '../core/types';
 import { getBackgroundAptosAccountState } from '../core/utils/account';
@@ -16,7 +17,7 @@ async function getCurrentDomain() {
 }
 
 async function signTransaction(client, account, transaction) {
-  const address = account.address();
+  const address = account.address().hex();
   const txn = await client.generateTransaction(address, transaction);
   return client.signTransaction(account, txn);
 }
@@ -79,8 +80,8 @@ async function signAndSubmitTransaction(client, account, transaction, sendRespon
     return;
   }
   try {
-    const signedTransaction = signTransaction(client, account, transaction);
-    const response = await client.submitTransaction(account, signedTransaction);
+    const signedTransaction = await signTransaction(client, account, transaction);
+    const response = await client.submitTransaction(signedTransaction);
     sendResponse(response);
   } catch (error) {
     sendResponse({ error });
@@ -101,7 +102,7 @@ async function signTransactionAndSendResponse(client, account, transaction, send
     return;
   }
   try {
-    const signedTransaction = signTransaction(client, account, transaction);
+    const signedTransaction = await signTransaction(client, account, transaction);
     sendResponse({ signedTransaction });
   } catch (error) {
     sendResponse({ error });
@@ -115,7 +116,8 @@ async function handleDappRequest(request, sendResponse) {
     return;
   }
 
-  const client = new AptosClient(DEVNET_NODE_URL);
+  // The fetch adapter is neccessary to use axios from a service worker
+  const client = new AptosClient(DEVNET_NODE_URL, { adapter: fetchAdapter });
   switch (request.method) {
     case MessageMethod.CONNECT:
       connect(account, sendResponse);
