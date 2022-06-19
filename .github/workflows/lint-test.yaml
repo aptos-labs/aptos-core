@@ -11,6 +11,12 @@ on:
 
 env:
   HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
+  CARGO_INCREMENTAL: "0"
+
+# cancel redundant builds
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   scripts-lint:
@@ -135,7 +141,7 @@ jobs:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: ./.github/actions/rust-setup
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo nextest --nextest-profile ci --partition hash:1/1 --unit --exclude backup-cli --changed-since "origin/main"
+      - run: cargo nextest --nextest-profile ci --test-threads 16 --retries 2 --unit --exclude backup-cli --changed-since "origin/main"
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 
@@ -158,7 +164,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
       # --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
-      - run: cargo nextest --nextest-profile ci --partition hash:1/1 --package smoke-test --test-threads 6 --retries 3
+      - run: cargo nextest --nextest-profile ci --package smoke-test --test-threads 6 --retries 3
         env:
           RUST_BACKTRACE: full
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
