@@ -101,7 +101,7 @@ rust_nextest_gke_task:
   #     - rustc --version
   #     - cat Cargo.lock
   test_script: |
-    cargo nextest --nextest-profile ci --partition hash:1/1 --unit --exclude backup-cli
+    cargo nextest --nextest-profile ci --test-threads=16 --unit --exclude backup-cli
   # before_cache_script:
   #   #  # Delete loose files in the debug directory
   #   - find ./target/debug -maxdepth 1 -type f -delete
