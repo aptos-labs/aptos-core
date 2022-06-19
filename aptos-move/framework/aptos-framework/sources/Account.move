@@ -434,4 +434,43 @@ module AptosFramework::Account {
         move_to(&resource_account_from_cap, DummyResource { });
         borrow_global<DummyResource>(Signer::address_of(&resource_account));
     }
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Test-only sequence number mocking for extant Account resource
+    ///////////////////////////////////////////////////////////////////////////
+
+    #[test_only]
+    /// Increment sequence number of account at address `addr`
+    public fun increment_sequence_number(
+        addr: address,
+    ) acquires Account {
+        let acct = borrow_global_mut<Account>(addr);
+        acct.sequence_number = acct.sequence_number + 1;
+    }
+
+    #[test_only]
+    /// Update address `addr` to have `s` as its sequence number
+    public fun set_sequence_number(
+        addr: address,
+        s: u64
+    ) acquires Account {
+        borrow_global_mut<Account>(addr).sequence_number = s;
+    }
+
+    #[test]
+    /// Verify test-only sequence number mocking
+    public(script) fun mock_sequence_numbers()
+    acquires Account {
+        let addr: address = @0x1234; // Define test address
+        create_account(addr); // Initialize account resource
+        // Assert sequence number intializes to 0
+        assert!(borrow_global<Account>(addr).sequence_number == 0, 0);
+        increment_sequence_number(addr); // Increment sequence number
+        // Assert correct mock value post-increment
+        assert!(borrow_global<Account>(addr).sequence_number == 1, 1);
+        set_sequence_number(addr, 10); // Set mock sequence number
+        // Assert correct mock value post-modification
+        assert!(borrow_global<Account>(addr).sequence_number == 10, 2);
+    }
+
 }
