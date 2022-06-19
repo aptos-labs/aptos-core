@@ -33,11 +33,12 @@
     "lint:fix": "eslint ./src --fix",
     "tauri": "tauri",
     "prebuild": "rimraf build",
-    "build": "yarn run lint:fix && yarn run build:app && yarn run build:bg && yarn run build:inpage",
+    "build": "yarn run lint:fix && yarn run build:app && yarn run build:bg && yarn run build:inpage && yarn run build:prompt",
     "build:tauri": "yarn tauri build --target aarch64-apple-darwin",
     "build:app": "INLINE_RUNTIME_CHUNK=false react-scripts build",
     "build:bg": "webpack --mode production ./src/scripts/background.js --output-path ./build --output-filename background.js",
     "build:inpage": "webpack --mode production ./src/scripts/inpage.js --output-path ./build --output-filename inpage.js",
+    "build:prompt": "webpack --mode production ./src/scripts/prompt.jsx --output-path ./build --output-filename prompt.jsx",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -63,6 +64,7 @@
     ]
   },
   "devDependencies": {
+    "@babel/preset-react": "^7.17.12",
     "@tauri-apps/cli": "^1.0.0-rc.13",
     "@types/chrome": "^0.0.183",
     "@types/react": "^18.0.6",

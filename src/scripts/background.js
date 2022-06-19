@@ -3,7 +3,7 @@
 
 import { AptosClient } from 'aptos';
 import { DEVNET_NODE_URL } from '../core/constants';
-import { MessageMethod } from '../core/types';
+import { MessageMethod, PermissionType } from '../core/types';
 import { getBackgroundAptosAccountState } from '../core/utils/account';
 import Permissions from '../core/utils/permissions';
 
@@ -29,6 +29,10 @@ async function checkConnected(sendResponse) {
   return false;
 }
 
+function rejectRequest(sendResponse) {
+  sendResponse({ error: 'User rejected request' });
+}
+
 // Aptos dApp methods
 
 function getAccountAddress(account, sendResponse) {
@@ -44,8 +48,11 @@ function getAccountAddress(account, sendResponse) {
 }
 
 async function connect(account, sendResponse) {
-  await Permissions.addDomain(await getCurrentDomain());
-  getAccountAddress(account, sendResponse);
+  if (await Permissions.requestPermissions(PermissionType.CONNECT, await getCurrentDomain())) {
+    getAccountAddress(account, sendResponse);
+  } else {
+    rejectRequest(sendResponse);
+  }
 }
 
 async function disconnect(sendResponse) {
@@ -63,6 +70,14 @@ async function signAndSubmitTransaction(client, account, transaction, sendRespon
     return;
   }
 
+  const permission = await Permissions.requestPermissions(
+    PermissionType.SIGN_AND_SUBMIT_TRANSACTION,
+    await getCurrentDomain(),
+  );
+  if (!permission) {
+    rejectRequest(sendResponse);
+    return;
+  }
   try {
     const signedTransaction = signTransaction(client, account, transaction);
     const response = await client.submitTransaction(account, signedTransaction);
@@ -77,6 +92,14 @@ async function signTransactionAndSendResponse(client, account, transaction, send
     return;
   }
 
+  const permission = await Permissions.requestPermissions(
+    PermissionType.SIGN_TRANSACTION,
+    await getCurrentDomain(),
+  );
+  if (!permission) {
+    rejectRequest(sendResponse);
+    return;
+  }
   try {
     const signedTransaction = signTransaction(client, account, transaction);
     sendResponse({ signedTransaction });
@@ -113,7 +136,8 @@ async function handleDappRequest(request, sendResponse) {
       signTransactionAndSendResponse(client, account, request.args.transaction, sendResponse);
       break;
     default:
-      throw new Error(`${request.method} method is not supported`);
+      // method not supported
+      break;
   }
 }
 
