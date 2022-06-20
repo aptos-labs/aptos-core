@@ -77,7 +77,7 @@ use aptos_types::{
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
         TransactionOutput, TransactionOutputListWithProof, TransactionToCommit,
-        TransactionWithProof, Version,
+        TransactionWithProof, Version, PRE_GENESIS_VERSION,
     },
     write_set::WriteSet,
 };
@@ -512,13 +512,14 @@ impl AptosDB {
             .ledger_store
             .get_frozen_subtree_hashes(num_transactions)?;
 
-        let checkpoint_version = self
+        let (checkpoint_version, checkpoint_root_hash) = if let Some((version, hash)) = self
             .state_store
-            .find_latest_persisted_version_less_than(num_transactions)?;
-        let checkpoint_root_hash = checkpoint_version
-            .map_or(Ok(*SPARSE_MERKLE_PLACEHOLDER_HASH), |ver| {
-                self.state_store.get_root_hash(ver)
-            })?;
+            .get_state_snapshot_before(num_transactions)?
+        {
+            (Some(version), hash)
+        } else {
+            (None, *SPARSE_MERKLE_PLACEHOLDER_HASH)
+        };
 
         Ok(TreeState::new(
             num_transactions,
@@ -1164,7 +1165,8 @@ impl DbReader for AptosDB {
 
     fn get_latest_state_checkpoint(&self) -> Result<Option<(Version, HashValue)>> {
         gauged_api("get_latest_state_checkpoint_version", || {
-            Ok(self.state_store.latest_checkpoint())
+            self.state_store
+                .get_state_snapshot_before(PRE_GENESIS_VERSION - 1)
         })
     }
 
@@ -1267,9 +1269,14 @@ impl DbWriter for AptosDB {
                     base_version,
                     &mut cs,
                 )?
-                .first()
+                .pop()
                 .expect("One root hash expected");
-            self.state_store.set_latest_checkpoint(version, root_hash);
+            debug!(
+                version = version,
+                base_version = base_version,
+                root_hash = root_hash,
+                "State snapshot committed."
+            );
             Ok(())
         })
     }

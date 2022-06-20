@@ -75,8 +75,6 @@ where
     fn write_node_batch(&self, node_batch: &NodeBatch<K>) -> Result<()> {
         self.tree_store.write_node_batch(node_batch)
     }
-
-    fn finish_version(&self, _version: Version, _root_hash: HashValue) {}
 }
 
 fn init_mock_store<V>(kvs: &BTreeMap<V, V>) -> (MockSnapshotStore<V, V>, Version)

@@ -111,8 +111,6 @@ impl TreeWriter<StateKey> for MockStore {
     fn write_node_batch(&self, _node_batch: &NodeBatch<StateKey>) -> Result<()> {
         Ok(())
     }
-
-    fn finish_version(&self, _version: Version, _root_hash: HashValue) {}
 }
 
 impl StateValueWriter<StateKey, StateValue> for MockStore {

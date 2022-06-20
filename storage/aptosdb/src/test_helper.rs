@@ -554,8 +554,6 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
     db.ledger_db
         .put::<StateValueSchema>(&(key, version), &value)
         .unwrap();
-    db.state_store
-        .set_latest_checkpoint(version, leaf_node.hash());
 }
 
 pub fn test_sync_transactions_impl(

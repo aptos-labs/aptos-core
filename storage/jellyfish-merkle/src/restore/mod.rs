@@ -680,8 +680,6 @@ where
 
         self.freeze(0);
         self.store.write_node_batch(&self.frozen_nodes)?;
-        self.store
-            .finish_version(self.version, self.expected_root_hash);
         Ok(())
     }
 }

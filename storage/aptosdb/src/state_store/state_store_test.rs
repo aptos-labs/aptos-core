@@ -45,7 +45,6 @@ fn put_value_set(
         .put_value_sets(vec![&value_set], version, &mut cs)
         .unwrap();
     state_store.ledger_db.write_schemas(cs.batch).unwrap();
-    state_store.set_latest_checkpoint(version, root);
     root
 }
 
@@ -336,72 +335,45 @@ fn test_retired_records() {
 }
 
 #[test]
-pub fn test_find_latest_persisted_version_less_than() {
+pub fn test_get_state_snapshot_before() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
 
     // Empty store
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(0).unwrap(),
-        None,
-    );
+    assert_eq!(store.get_state_snapshot_before(0).unwrap(), None,);
 
     // put in genesis
     let kv = vec![(
         StateKey::Raw(b"key".to_vec()),
         StateValue::from(b"value".to_vec()),
     )];
-    put_value_set(store, kv.clone(), 0, None);
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(0).unwrap(),
-        None
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(1).unwrap(),
-        Some(0)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(2).unwrap(),
-        Some(0)
-    );
+    let hash = put_value_set(store, kv.clone(), 0, None);
+    assert_eq!(store.get_state_snapshot_before(0).unwrap(), None);
+    assert_eq!(store.get_state_snapshot_before(1).unwrap(), Some((0, hash)));
+    assert_eq!(store.get_state_snapshot_before(2).unwrap(), Some((0, hash)));
 
     // put in another version
     put_value_set(store, kv, 2, Some(0));
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(4).unwrap(),
-        Some(2)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(3).unwrap(),
-        Some(2)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(2).unwrap(),
-        Some(0)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(1).unwrap(),
-        Some(0)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(0).unwrap(),
-        None,
-    );
+    assert_eq!(store.get_state_snapshot_before(4).unwrap(), Some((2, hash)));
+    assert_eq!(store.get_state_snapshot_before(3).unwrap(), Some((2, hash)));
+    assert_eq!(store.get_state_snapshot_before(2).unwrap(), Some((0, hash)));
+    assert_eq!(store.get_state_snapshot_before(1).unwrap(), Some((0, hash)));
+    assert_eq!(store.get_state_snapshot_before(0).unwrap(), None,);
 }
 
 #[test]
-pub fn test_find_latest_persisted_version_less_than_with_pre_genesis() {
+pub fn test_get_state_snapshot_before_with_pre_genesis() {
     let kv = vec![(
         StateKey::Raw(b"key".to_vec()),
         StateValue::from(b"value".to_vec()),
     )];
     // make a DB with PRE_GENESIS
-    let tmp_dir = {
+    let (tmp_dir, hash) = {
         let tmp_dir1 = TempPath::new();
         let db1 = AptosDB::new_for_test(&tmp_dir1);
         let store1 = &db1.state_store;
-        put_value_set(store1, kv.clone(), 0, None);
+        let hash = put_value_set(store1, kv.clone(), 0, None);
         let root_hash = store1.get_root_hash(0).unwrap();
         let tmp_dir2 = TempPath::new();
         let db2 = AptosDB::new_for_test(&tmp_dir2);
@@ -412,7 +384,7 @@ pub fn test_find_latest_persisted_version_less_than_with_pre_genesis() {
         let chunk = store1.get_value_chunk_with_proof(0, 0, 1).unwrap();
         restore.add_chunk(chunk.raw_values, chunk.proof).unwrap();
         restore.finish_box().unwrap();
-        tmp_dir2
+        (tmp_dir2, hash)
     };
     // re-open the DB, to mimic the real use case (pre-genesis DB is pre-generated with db-restore)
     let db = AptosDB::new_for_test(&tmp_dir);
@@ -420,78 +392,48 @@ pub fn test_find_latest_persisted_version_less_than_with_pre_genesis() {
 
     // Assert we see the pre-genesis
     assert!(store
-        .find_latest_persisted_version_less_than(PRE_GENESIS_VERSION)
+        .get_state_snapshot_before(PRE_GENESIS_VERSION)
         .is_err());
     assert_eq!(
-        store.find_latest_persisted_version_less_than(0).unwrap(),
-        Some(PRE_GENESIS_VERSION)
+        store.get_state_snapshot_before(0).unwrap(),
+        Some((PRE_GENESIS_VERSION, hash))
     );
     assert_eq!(
-        store.find_latest_persisted_version_less_than(1).unwrap(),
-        Some(PRE_GENESIS_VERSION)
+        store.get_state_snapshot_before(1).unwrap(),
+        Some((PRE_GENESIS_VERSION, hash))
     );
 
     // put in genesis
     put_value_set(store, kv.clone(), 0, None);
     assert_eq!(
-        store.find_latest_persisted_version_less_than(0).unwrap(),
-        Some(PRE_GENESIS_VERSION),
+        store.get_state_snapshot_before(0).unwrap(),
+        Some((PRE_GENESIS_VERSION, hash))
     );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(1).unwrap(),
-        Some(0)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(2).unwrap(),
-        Some(0)
-    );
+    assert_eq!(store.get_state_snapshot_before(1).unwrap(), Some((0, hash)));
+    assert_eq!(store.get_state_snapshot_before(2).unwrap(), Some((0, hash)));
 
     // put in another version
-    put_value_set(store, kv, 2, Some(0));
+    put_value_set(store, kv, 2, Some(PRE_GENESIS_VERSION));
+    assert_eq!(store.get_state_snapshot_before(4).unwrap(), Some((2, hash)));
+    assert_eq!(store.get_state_snapshot_before(3).unwrap(), Some((2, hash)));
+    assert_eq!(store.get_state_snapshot_before(2).unwrap(), Some((0, hash)));
+    assert_eq!(store.get_state_snapshot_before(1).unwrap(), Some((0, hash)));
     assert_eq!(
-        store.find_latest_persisted_version_less_than(4).unwrap(),
-        Some(2)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(3).unwrap(),
-        Some(2)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(2).unwrap(),
-        Some(0)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(1).unwrap(),
-        Some(0)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(0).unwrap(),
-        Some(PRE_GENESIS_VERSION),
+        store.get_state_snapshot_before(0).unwrap(),
+        Some((PRE_GENESIS_VERSION, hash))
     );
 
     // re-open DB
     drop(db);
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
+    assert_eq!(store.get_state_snapshot_before(4).unwrap(), Some((2, hash)));
+    assert_eq!(store.get_state_snapshot_before(3).unwrap(), Some((2, hash)));
+    assert_eq!(store.get_state_snapshot_before(2).unwrap(), Some((0, hash)));
+    assert_eq!(store.get_state_snapshot_before(1).unwrap(), Some((0, hash)));
     assert_eq!(
-        store.find_latest_persisted_version_less_than(4).unwrap(),
-        Some(2)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(3).unwrap(),
-        Some(2)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(2).unwrap(),
-        Some(0)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(1).unwrap(),
-        Some(0)
-    );
-    assert_eq!(
-        store.find_latest_persisted_version_less_than(0).unwrap(),
-        Some(PRE_GENESIS_VERSION),
+        store.get_state_snapshot_before(0).unwrap(),
+        Some((PRE_GENESIS_VERSION, hash))
     );
 }
 
@@ -699,7 +641,7 @@ fn update_store(
         let value_state_set = vec![(key, value)].into_iter().collect();
         let jmt_updates = jmt_updates(&value_state_set);
         let version = first_version + i as Version;
-        let root_hashes = store
+        store
             .merklize_value_sets(
                 vec![jmt_update_refs(&jmt_updates)],
                 None,
@@ -712,6 +654,5 @@ fn update_store(
             .put_value_sets(vec![&value_state_set], version, &mut cs)
             .unwrap();
         store.ledger_db.write_schemas(cs.batch).unwrap();
-        store.set_latest_checkpoint(version, root_hashes[0]);
     }
 }
