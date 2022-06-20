@@ -8,6 +8,7 @@ use crate::{
 use ::aptos_logger::*;
 use anyhow::{anyhow, bail, format_err};
 use aptos_config::config::NodeConfig;
+use aptos_retrier::ExponentWithLimitDelay;
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{
@@ -197,8 +198,19 @@ impl Swarm for K8sSwarm {
     }
 }
 
-pub(crate) fn k8s_retry_strategy() -> impl Iterator<Item = Duration> {
-    aptos_retrier::exp_retry_strategy(1000, 10000, 50)
+/// Amount of time to wait for the CLI to be working correctly
+pub fn k8s_wait_cli_strategy() -> impl Iterator<Item = Duration> {
+    ExponentWithLimitDelay::new(1000, 10000, 60)
+}
+
+/// Amount of time to wait for genesis to complete
+pub fn k8s_wait_genesis_strategy() -> impl Iterator<Item = Duration> {
+    ExponentWithLimitDelay::new(1000, 10000, 300)
+}
+
+/// Amount of time to wait for nodes to respond on the REST API
+pub fn k8s_wait_nodes_strategy() -> impl Iterator<Item = Duration> {
+    ExponentWithLimitDelay::new(1000, 10000, 300)
 }
 
 #[derive(Clone, Debug)]
@@ -316,7 +328,7 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
         let node_name = node.name().to_string();
         println!("Attempting health check: {}", node_name);
         // perform healthcheck with retry, returning unhealthy
-        let check = aptos_retrier::retry_async(k8s_retry_strategy(), || {
+        let check = aptos_retrier::retry_async(k8s_wait_nodes_strategy(), || {
             Box::pin(async move {
                 println!("Attempting health check: {}", node.name());
                 match node.rest_client().get_ledger_information().await {

@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{get_validators, k8s_retry_strategy, nodes_healthcheck, Result};
+use crate::{
+    get_validators, k8s_wait_cli_strategy, k8s_wait_genesis_strategy, nodes_healthcheck, Result,
+};
 use ::aptos_logger::*;
 use anyhow::{bail, format_err};
 use k8s_openapi::api::batch::v1::Job;
@@ -28,7 +30,7 @@ const HEALTH_CHECK_URL: &str = "http://127.0.0.1:8001";
 const GENESIS_MODULES_DIR: &str = "/aptos-framework/move/modules";
 
 async fn wait_genesis_job(kube_client: &K8sClient, era: &str) -> Result<()> {
-    aptos_retrier::retry_async(k8s_retry_strategy(), || {
+    aptos_retrier::retry_async(k8s_wait_genesis_strategy(), || {
         let jobs: Api<Job> = Api::namespaced(kube_client.clone(), "default");
         Box::pin(async move {
             let job_name = format!("aptos-testnet-genesis-e{}", era);
@@ -328,7 +330,7 @@ fn era_to_string(era_value: &Value) -> Result<String> {
 
 pub async fn create_k8s_client() -> K8sClient {
     let _ = Command::new(KUBECTL_BIN).arg("proxy").spawn();
-    let _ = aptos_retrier::retry_async(k8s_retry_strategy(), || {
+    let _ = aptos_retrier::retry_async(k8s_wait_cli_strategy(), || {
         Box::pin(async move {
             debug!("Running local kube pod healthcheck on {}", HEALTH_CHECK_URL);
             reqwest::get(HEALTH_CHECK_URL).await?.text().await?;
