@@ -34,19 +34,31 @@ The wallet has implemented some of the basics of interacting with Aptos
 - Fund your account with test coins
 - Send coins to another address
 - Link to your account resources on Explorer
+- View and create NFTs
+- Select different networks
 
 ## Step 3) dApp Integration
-Currently we have two requests a dApp webpage can make to the wallet:
+dApps can make requests to the wallet from their website:
+- `connect()`: prompts the user to allow connection from the dApp (*neccessary to make other requests*)
+- `isConnected()`: returns if the dApp has established a connection with the wallet
 - `account()`: gets the address of the account signed into the wallet
 - `signAndSubmitTransaction(transaction)`: signs the given transaction and submits to chain
+- `signTransaction(transaction)`: signs the given transaction and returns it to be submitted by the dApp
+- `disconnect()`: Removes connection between dApp and wallet. Useful when the user wants to remove the connection.
 
 ### Usage
 
 ```typescript
+// Establish connection to the wallet
+const result = await (window as any).aptos.connect()
+
+// Check connection status of wallet
+const status = await (window as any).aptos.isConnected()
+
 // Gets the address of the account signed into the wallet
 const accountAddress = await (window as any).aptos.account()
 
-// Create a transaction dictionary
+// Create a transaction
 const transaction = {
     type: 'script_function_payload',
     function: '0x1::Coin::transfer',
@@ -56,4 +68,10 @@ const transaction = {
 
 // Send transaction to the extension to be signed and submitted to chain
 const response = await (window as any).aptos.signAndSubmitTransaction(transaction)
+
+// Send transaction to the extension to be signed and returns
+const signedTransaction = await (window as any).aptos.signTransaction(transaction)
+
+// Disconnect dApp from the wallet
+await (window as any).aptos.disconnect(transaction)
 ```
