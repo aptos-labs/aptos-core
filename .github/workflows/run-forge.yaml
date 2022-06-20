@@ -14,6 +14,7 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_REGION: us-west-2
   IMAGE_TAG: ${{ inputs.GIT_SHA }}
+  FORGE_ENABLED: ${{ secrets.FORGE_ENABLED }}
 
 jobs:
   forge:
@@ -23,12 +24,15 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v3
+        if: env.FORGE_ENABLED == 'true'
         with:
           ref: ${{ inputs.GIT_SHA }}
 
       - name: Ensure image exists
+        if: env.FORGE_ENABLED == 'true'
         run: aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG
       - name: Run Forge
+        if: env.FORGE_ENABLED == 'true'
         shell: bash
         run: |
           set +e
@@ -39,6 +43,7 @@ jobs:
           echo "FGI_EXIT_CODE=$FGI_EXIT_CODE" >> $GITHUB_ENV
 
       - name: Post Forge test results
+        if: env.FORGE_ENABLED == 'true'
         shell: bash
         env:
           PUSH_GATEWAY: ${{ secrets.PUSH_GATEWAY }}
@@ -66,6 +71,7 @@ jobs:
           echo "forge_job_status {FGI_EXIT_CODE=\"$FGI_EXIT_CODE\"} $GITHUB_RUN_ID" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
 
       - name: Post result as PR comment
+        if: env.FORGE_ENABLED == 'true'
         uses: thollander/actions-comment-pull-request@v1
         with:
           message: |
@@ -75,6 +81,7 @@ jobs:
           pr_number: ${{ env.PR_NUMBER }}
 
       - name: Check Forge status
+        if: env.FORGE_ENABLED == 'true'
         shell: bash
         run: |
           if [ -n "$FORGE_BLOCKING" ]; then
