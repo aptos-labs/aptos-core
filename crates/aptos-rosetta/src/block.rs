@@ -40,7 +40,7 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
 
     check_network(request.network_identifier, &server_context)?;
 
-    let rest_client = &server_context.rest_client;
+    let rest_client = server_context.rest_client()?;
 
     // Retrieve by block or by hash, both or neither is not allowed
     let (parent_transaction, transaction): (Transaction, _) = match (

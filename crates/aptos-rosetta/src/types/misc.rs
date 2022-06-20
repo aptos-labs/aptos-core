@@ -9,7 +9,7 @@ use std::{
     str::FromStr,
 };
 
-///
+/// Errors that can be returned by the API
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/Error.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
