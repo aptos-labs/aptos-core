@@ -105,6 +105,12 @@ impl GenesisInfo {
             &self.modules,
             self.chain_id,
             self.min_price_per_gas_unit,
+            self.epoch_duration_secs,
+            self.min_stake,
+            self.max_stake,
+            self.min_lockup_duration_secs,
+            self.max_lockup_duration_secs,
+            self.allow_new_validators,
         )
     }
 

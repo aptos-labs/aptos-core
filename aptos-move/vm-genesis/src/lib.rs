@@ -43,6 +43,8 @@ const GENESIS_SEED: [u8; 32] = [42; 32];
 
 const GENESIS_MODULE_NAME: &str = "Genesis";
 
+const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
+
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
     let mut rng = StdRng::from_seed(GENESIS_SEED);
     let private_key = Ed25519PrivateKey::generate(&mut rng);
@@ -56,6 +58,12 @@ pub fn encode_genesis_transaction(
     stdlib_module_bytes: &[Vec<u8>],
     chain_id: ChainId,
     min_price_per_gas_unit: u64,
+    epoch_duration_secs: u64,
+    min_stake: u64,
+    max_stake: u64,
+    min_lockup_duration_secs: u64,
+    max_lockup_duration_secs: u64,
+    allow_new_validators: bool,
 ) -> Transaction {
     let consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1 {
         decoupled_execution: true,
@@ -71,6 +79,12 @@ pub fn encode_genesis_transaction(
         consensus_config,
         chain_id,
         min_price_per_gas_unit,
+        epoch_duration_secs,
+        min_stake,
+        max_stake,
+        min_lockup_duration_secs,
+        max_lockup_duration_secs,
+        allow_new_validators,
     )))
 }
 
@@ -82,6 +96,12 @@ pub fn encode_genesis_change_set(
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     min_price_per_gas_unit: u64,
+    epoch_duration_secs: u64,
+    min_stake: u64,
+    max_stake: u64,
+    min_lockup_duration_secs: u64,
+    max_lockup_duration_secs: u64,
+    allow_new_validators: bool,
 ) -> ChangeSet {
     let mut stdlib_modules = Vec::new();
     // create a data view for move_vm
@@ -104,6 +124,12 @@ pub fn encode_genesis_change_set(
         consensus_config,
         chain_id,
         min_price_per_gas_unit,
+        epoch_duration_secs,
+        min_stake,
+        max_stake,
+        min_lockup_duration_secs,
+        max_lockup_duration_secs,
+        allow_new_validators,
     );
     // generate the genesis WriteSet
     create_and_initialize_validators(&mut session, validators);
@@ -170,6 +196,12 @@ fn create_and_initialize_main_accounts(
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     min_price_per_gas_unit: u64,
+    epoch_duration_secs: u64,
+    min_stake: u64,
+    max_stake: u64,
+    min_lockup_duration_secs: u64,
+    max_lockup_duration_secs: u64,
+    allow_new_validators: bool,
 ) {
     let aptos_root_auth_key = AuthenticationKey::ed25519(aptos_root_key);
 
@@ -192,15 +224,12 @@ fn create_and_initialize_main_accounts(
     let consensus_config_bytes =
         bcs::to_bytes(&consensus_config).expect("Failure serializing genesis consensus config");
 
-    // TODO: make these configurable
-    let epoch_interval = 86400 * 1000000;
-    let minimum_stake = 0;
-    let maximum_stake = 1000000;
-    let min_lockup_duration_secs = 0;
-    let max_lockup_duration_secs = 7 * 24 * 60 * 60; // 7 days
-    let allow_validator_set_change = false;
+    // TODO: Make reward rate configurable in the genesis blob.
     let rewards_rate_percentage = 1;
 
+    // Block timestamps are in microseconds and epoch_interval is used to check if a block timestamp
+    // has crossed into a new epoch. So epoch_interval also needs to be in micro seconds.
+    let epoch_interval_usecs = epoch_duration_secs * MICRO_SECONDS_PER_SECOND;
     exec_function(
         session,
         GENESIS_MODULE_NAME,
@@ -217,12 +246,12 @@ fn create_and_initialize_main_accounts(
             MoveValue::U64(APTOS_MAX_KNOWN_VERSION.major),
             MoveValue::vector_u8(consensus_config_bytes),
             MoveValue::U64(min_price_per_gas_unit),
-            MoveValue::U64(epoch_interval),
-            MoveValue::U64(minimum_stake),
-            MoveValue::U64(maximum_stake),
+            MoveValue::U64(epoch_interval_usecs),
+            MoveValue::U64(min_stake),
+            MoveValue::U64(max_stake),
             MoveValue::U64(min_lockup_duration_secs),
             MoveValue::U64(max_lockup_duration_secs),
-            MoveValue::Bool(allow_validator_set_change),
+            MoveValue::Bool(allow_new_validators),
             MoveValue::U64(rewards_rate_percentage),
         ]),
     );
@@ -420,6 +449,12 @@ pub fn generate_test_genesis(
         OnChainConsensusConfig::default(),
         ChainId::test(),
         0,
+        86400,
+        0,
+        1000000,
+        0,
+        86400 * 365,
+        false,
     );
     (genesis, test_validators)
 }

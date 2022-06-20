@@ -211,6 +211,12 @@ impl<S: KVStorage> GenesisBuilder<S> {
             &move_modules,
             chain_id,
             min_price_per_gas_unit,
+            86400,
+            0,
+            1000000,
+            0,
+            86400 * 365,
+            false,
         );
 
         Ok(genesis)

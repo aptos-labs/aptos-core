@@ -32,7 +32,7 @@ module AptosFramework::Genesis {
         maximum_stake: u64,
         min_lockup_duration_secs: u64,
         max_lockup_duration_secs: u64,
-        post_genesis_validator_set_change_allowed: bool,
+        allow_validator_set_change: bool,
         rewards_rate_percentage: u64,
     ) {
         initialize_internal(
@@ -51,7 +51,7 @@ module AptosFramework::Genesis {
             maximum_stake,
             min_lockup_duration_secs,
             max_lockup_duration_secs,
-            post_genesis_validator_set_change_allowed,
+            allow_validator_set_change,
             rewards_rate_percentage,
         )
     }
@@ -72,7 +72,7 @@ module AptosFramework::Genesis {
         maximum_stake: u64,
         min_lockup_duration_secs: u64,
         max_lockup_duration_secs: u64,
-        post_genesis_validator_set_change_allowed: bool,
+        allow_validator_set_change: bool,
         rewards_rate_percentage: u64,
     ) {
         // initialize the core resource account
@@ -102,7 +102,7 @@ module AptosFramework::Genesis {
             maximum_stake,
             min_lockup_duration_secs,
             max_lockup_duration_secs,
-            post_genesis_validator_set_change_allowed,
+            allow_validator_set_change,
             rewards_rate_percentage,
         );
 
