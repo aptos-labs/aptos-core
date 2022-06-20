@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    backend::k8s::node::K8sNode, create_k8s_client, query_sequence_numbers, remove_helm_release,
+    backend::k8s::node::K8sNode, create_k8s_client, query_sequence_numbers,
     set_validator_image_tag, ChainInfo, FullNode, Node, Result, Swarm, Validator, Version,
 };
 use ::aptos_logger::*;
 use anyhow::{anyhow, bail, format_err};
 use aptos_config::config::NodeConfig;
+use aptos_retrier::ExponentWithLimitDelay;
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{
@@ -20,20 +21,19 @@ use kube::{
     api::{Api, ListParams},
     client::Client as K8sClient,
 };
-use std::{collections::HashMap, convert::TryFrom, env, process::Command, str, sync::Arc};
+use std::{collections::HashMap, convert::TryFrom, env, str, sync::Arc};
 use tokio::time::Duration;
 
 const JSON_RPC_PORT: u32 = 80;
 const REST_API_PORT: u32 = 80;
-const VALIDATOR_LB: &str = "validator-validator-lb";
-const FULLNODES_LB: &str = "validator-fullnode-lb";
+const VALIDATOR_LB: &str = "validator-lb";
+const FULLNODES_LB: &str = "fullnode-lb";
 
 pub struct K8sSwarm {
     validators: HashMap<PeerId, K8sNode>,
     fullnodes: HashMap<PeerId, K8sNode>,
     root_account: LocalAccount,
     kube_client: K8sClient,
-    cluster_name: String,
     helm_repo: String,
     versions: Arc<HashMap<Version, String>>,
     pub chain_id: ChainId,
@@ -42,7 +42,6 @@ pub struct K8sSwarm {
 impl K8sSwarm {
     pub async fn new(
         root_key: &[u8],
-        cluster_name: &str,
         helm_repo: &str,
         image_tag: &str,
         base_image_tag: &str,
@@ -80,7 +79,6 @@ impl K8sSwarm {
             root_account,
             kube_client,
             chain_id: ChainId::new(NamedChain::DEVNET.id()),
-            cluster_name: cluster_name.to_string(),
             helm_repo: helm_repo.to_string(),
             versions: Arc::new(versions),
         })
@@ -145,7 +143,11 @@ impl Swarm for K8sSwarm {
             .get(version)
             .cloned()
             .ok_or_else(|| anyhow!("Invalid version: {:?}", version))?;
-        set_validator_image_tag(validator.name(), &version, &self.helm_repo)
+        set_validator_image_tag(
+            validator.name().to_string(),
+            version,
+            self.helm_repo.clone(),
+        )
     }
 
     fn full_nodes<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn FullNode> + 'a> {
@@ -172,8 +174,8 @@ impl Swarm for K8sSwarm {
         todo!()
     }
 
-    fn remove_validator(&mut self, id: PeerId) -> Result<()> {
-        remove_helm_release(self.validator(id).unwrap().name())
+    fn remove_validator(&mut self, _id: PeerId) -> Result<()> {
+        todo!()
     }
 
     fn add_full_node(&mut self, _version: &Version, _template: NodeConfig) -> Result<PeerId> {
@@ -193,26 +195,21 @@ impl Swarm for K8sSwarm {
         ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
     }
 
-    // Returns env CENTRAL_LOGGING_ADDRESS if present (without timestamps)
-    // otherwise returns a kubectl logs command to retrieve the logs manually
+    // returns a kubectl logs command to retrieve the logs manually
+    // and instructions to check the actual live logs location from fgi
     fn logs_location(&mut self) -> String {
-        if let Ok(central_logging_address) = std::env::var("CENTRAL_LOGGING_ADDRESS") {
-            central_logging_address
-        } else {
-            let hostname_output = Command::new("hostname")
-                .output()
-                .expect("failed to get pod hostname");
-            let hostname = String::from_utf8(hostname_output.stdout).unwrap();
-            format!(
-                "aws eks --region us-west-2 update-kubeconfig --name {} && kubectl logs {}",
-                &self.cluster_name, hostname
-            )
-        }
+        "See fgi output for more information.".to_string()
     }
 }
 
-pub(crate) fn k8s_retry_strategy() -> impl Iterator<Item = Duration> {
-    aptos_retrier::exp_retry_strategy(1000, 10000, 50)
+/// Amount of time to wait for genesis to complete
+pub fn k8s_wait_genesis_strategy() -> impl Iterator<Item = Duration> {
+    ExponentWithLimitDelay::new(1000, 10 * 1000, 60 * 1000)
+}
+
+/// Amount of time to wait for nodes to respond on the REST API
+pub fn k8s_wait_nodes_strategy() -> impl Iterator<Item = Duration> {
+    ExponentWithLimitDelay::new(1000, 10 * 1000, 10 * 60 * 1000)
 }
 
 #[derive(Clone, Debug)]
@@ -256,7 +253,8 @@ pub(crate) async fn get_validators(
             let node_id = parse_node_id(&s.name).expect("error to parse node id");
             let node = K8sNode {
                 name: format!("val{}", node_id),
-                sts_name: format!("val{}-aptos-validator-validator", node_id),
+                // TODO(rustielin): get the helm release name. prefix everything with forge?
+                sts_name: format!("rustie-test-aptos-node-{}-validator", node_id),
                 // TODO: fetch this from running node
                 peer_id: PeerId::random(),
                 node_id,
@@ -311,12 +309,17 @@ pub(crate) async fn get_fullnodes(
     Ok(fullnodes)
 }
 
+// gets the node index based on its associated LB service name
+// assumes the input is named <RELEASE>-aptos-node-<INDEX>-<validator|fullnode>-lb
 fn parse_node_id(s: &str) -> Result<usize> {
-    let v = s.split('-').collect::<Vec<&str>>();
-    if v.len() < 5 {
+    // first get rid of the prefixes
+    let v = s.split("aptos-node-").collect::<Vec<&str>>();
+    if v.len() < 2 {
         return Err(format_err!("Failed to parse {:?} node id format", s));
     }
-    let idx: usize = v[0][3..].parse().unwrap();
+    // then get rid of the service name suffix
+    let v = v[1].split('-').collect::<Vec<&str>>();
+    let idx: usize = v[0].parse().unwrap();
     Ok(idx)
 }
 
@@ -326,13 +329,14 @@ fn load_root_key(root_key_bytes: &[u8]) -> Ed25519PrivateKey {
 
 pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
     let mut unhealthy_nodes = vec![];
+
+    // TODO(rustielin): do all nodes healthchecks in parallel
     for node in nodes {
         let node_name = node.name().to_string();
-        println!("Attempting health check: {}", node_name);
         // perform healthcheck with retry, returning unhealthy
-        let check = aptos_retrier::retry_async(k8s_retry_strategy(), || {
+        let check = aptos_retrier::retry_async(k8s_wait_nodes_strategy(), || {
             Box::pin(async move {
-                println!("Attempting health check: {}", node.name());
+                println!("Attempting health check: {:?}", node);
                 match node.rest_client().get_ledger_information().await {
                     Ok(_) => {
                         println!("Node {} healthy", node.name());

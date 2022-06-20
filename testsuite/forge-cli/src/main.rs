@@ -80,8 +80,6 @@ struct K8sSwarm {
         default_value = "devnet"
     )]
     base_image_tag: String,
-    #[structopt(long, help = "Name of the EKS cluster")]
-    cluster_name: String,
     #[structopt(
         long,
         help = "Path to flattened directory containing compiled Move modules"
@@ -103,12 +101,7 @@ struct SetValidator {
 }
 
 #[derive(StructOpt, Debug)]
-struct CleanUp {
-    #[structopt(long, help = "If set, uses k8s service account to auth with AWS")]
-    auth_with_k8s_env: bool,
-    #[structopt(long, help = "Name of the EKS cluster")]
-    cluster_name: String,
-}
+struct CleanUp {}
 
 #[derive(StructOpt, Debug)]
 struct Resize {
@@ -131,16 +124,12 @@ struct Resize {
         help = "If set, performs validator healthcheck and assumes k8s DNS access"
     )]
     require_validator_healthcheck: bool,
-    #[structopt(long, help = "If set, uses k8s service account to auth with AWS")]
-    auth_with_k8s_env: bool,
     #[structopt(
         long,
         help = "Override the helm repo used for k8s tests",
         default_value = "testnet-internal"
     )]
     helm_repo: String,
-    #[structopt(long, help = "Name of the EKS cluster")]
-    cluster_name: String,
     #[structopt(
         long,
         help = "Path to flattened directory containing compiled Move modules"
@@ -182,13 +171,7 @@ fn main() -> Result<()> {
                 }
                 run_forge(
                     test_suite,
-                    K8sFactory::new(
-                        k8s.cluster_name,
-                        k8s.helm_repo,
-                        k8s.image_tag,
-                        k8s.base_image_tag,
-                    )
-                    .unwrap(),
+                    K8sFactory::new(k8s.helm_repo, k8s.image_tag, k8s.base_image_tag).unwrap(),
                     &args.options,
                     args.changelog,
                     global_emit_job_request,
@@ -198,26 +181,14 @@ fn main() -> Result<()> {
         // cmd input for cluster operations
         CliCommand::Operator(op_cmd) => match op_cmd {
             OperatorCommand::SetValidator(set_validator) => set_validator_image_tag(
-                &set_validator.validator_name,
-                &set_validator.image_tag,
-                &set_validator.helm_repo,
+                set_validator.validator_name,
+                set_validator.image_tag,
+                set_validator.helm_repo,
             ),
-            OperatorCommand::CleanUp(cleanup) => {
-                uninstall_from_k8s_cluster()?;
-                runtime.block_on(set_eks_nodegroup_size(
-                    cleanup.cluster_name,
-                    0,
-                    cleanup.auth_with_k8s_env,
-                ))
-            }
+            OperatorCommand::CleanUp(_) => runtime.block_on(uninstall_testnet_resources()),
             OperatorCommand::Resize(resize) => {
-                runtime.block_on(set_eks_nodegroup_size(
-                    resize.cluster_name,
-                    resize.num_validators,
-                    resize.auth_with_k8s_env,
-                ))?;
-                uninstall_from_k8s_cluster()?;
-                runtime.block_on(clean_k8s_cluster(
+                runtime.block_on(uninstall_testnet_resources())?;
+                runtime.block_on(reinstall_testnet_resources(
                     resize.helm_repo,
                     resize.num_validators,
                     resize.validator_image_tag,

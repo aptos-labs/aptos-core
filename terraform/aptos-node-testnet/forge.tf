@@ -102,6 +102,7 @@ data "aws_iam_policy_document" "forge" {
     actions = [
       "s3:GetObject",
       "s3:ListBucket",
+      "s3:PutObject",
     ]
     resources = [
       "arn:aws:s3:::${aws_s3_bucket.aptos-testnet-helm[0].id}",

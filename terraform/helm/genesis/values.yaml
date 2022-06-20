@@ -3,6 +3,16 @@ chain:
   era: 1
   chain_id: 4
   root_key: '0x5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956'
+  min_stake: 0
+  max_stake: 100000
+  min_lockup_duration_secs: 0
+  max_lockup_duration_secs: 2592000 # 1 month
+  epoch_duration_secs: 86400 # 1 day
+  # instead of specifying "initial_lockup_timestamp", just take the delta between
+  # the current timestamp
+  initial_lockup_duration: 1d
+  min_price_per_gas_unit: 1
+  allow_new_validators: false
 
 imageTag: testnet
 
@@ -18,6 +28,9 @@ genesis:
   username_prefix: aptos-node
   validator_host_suffix: validator-lb
   fullnode_host_suffix: fullnode-lb
+  # The path or move modules in the docker image to pull
+  # Defaults to the aptos-framework in the aptoslabs/init docker image
+  moveModulesDir: /aptos-framework/move/modules
 
 serviceAccount:
   # Specifies whether a service account should be created

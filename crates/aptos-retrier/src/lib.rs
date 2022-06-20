@@ -4,7 +4,13 @@
 #![forbid(unsafe_code)]
 
 use aptos_logger::debug;
-use std::{cmp::min, future::Future, pin::Pin, thread, time::Duration};
+use std::{
+    cmp::min,
+    future::Future,
+    pin::Pin,
+    thread,
+    time::{Duration, Instant},
+};
 
 /// Given an operation retries it successfully sleeping everytime it fails
 /// If the operation succeeds before the iterator runs out, it returns success
@@ -54,14 +60,6 @@ pub fn fixed_retry_strategy(delay_ms: u64, tries: usize) -> impl Iterator<Item =
     FixedDelay::new(delay_ms).take(tries)
 }
 
-pub fn exp_retry_strategy(
-    start_ms: u64,
-    limit_ms: u64,
-    tries: usize,
-) -> impl Iterator<Item = Duration> {
-    ExponentWithLimitDelay::new(start_ms, limit_ms).take(tries)
-}
-
 /// An iterator which uses a fixed delay
 pub struct FixedDelay {
     duration: Duration,
@@ -70,6 +68,8 @@ pub struct FixedDelay {
 pub struct ExponentWithLimitDelay {
     current: Duration,
     limit: Duration,
+    start: Instant,
+    timeout: Duration,
     exp: f64,
 }
 
@@ -83,10 +83,12 @@ impl FixedDelay {
 }
 
 impl ExponentWithLimitDelay {
-    fn new(start_ms: u64, limit_ms: u64) -> Self {
+    pub fn new(start_ms: u64, limit_ms: u64, timeout_ms: u64) -> Self {
         ExponentWithLimitDelay {
             current: Duration::from_millis(start_ms),
             limit: Duration::from_millis(limit_ms),
+            start: Instant::now(),
+            timeout: Duration::from_millis(timeout_ms),
             exp: 1.5,
         }
     }
@@ -104,6 +106,14 @@ impl Iterator for ExponentWithLimitDelay {
     type Item = Duration;
 
     fn next(&mut self) -> Option<Duration> {
+        // If we've hit the timeout, no more delays.
+        // This may go slightly over the limit, but it's close enough
+        let elapsed = self.start.elapsed();
+        if elapsed + self.current > self.timeout {
+            return None;
+        }
+
+        // Backoff up to the max limit
         let duration = self.current;
         self.current = min(
             Duration::from_millis((self.current.as_millis() as f64 * self.exp) as u64),

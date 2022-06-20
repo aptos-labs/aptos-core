@@ -71,10 +71,7 @@ def create_forge_job(context, user, tag, base_tag, timeout_secs, forge_envs, for
     cmd = template["spec"]["template"]["spec"]["containers"][0]["command"][2]
     template["spec"]["template"]["spec"]["containers"][0]["command"][2] = cmd.replace(
         "tail -f /dev/null",
-        "echo hello world"
-        # TODO(rustielin): actually start forge when the rust bindings are complete
-        #                  forge is shut down in the interim
-        # f"timeout {timeout_secs} forge {' '.join(forge_args)} test k8s-swarm --cluster-name {cluster_name} --image-tag {tag} --base-image-tag {base_tag}".strip(),
+        f"timeout {timeout_secs} forge {' '.join(forge_args)} test k8s-swarm --image-tag {tag} --base-image-tag {base_tag}".strip(),
     )
     # additional environment variables
     for env_var in forge_envs:
@@ -310,13 +307,12 @@ def helm_s3_init(workspace):
     """Initializes the S3 bucket used as an internal Helm repo for Forge"""
     bucket_url = WORKSPACE_CHART_BUCKETS[workspace]
     subprocess.run(
-        f"helm plugin install https://github.com/C123R/helm-blob.git || true",
-        shell=True,
-        check=True
+        ["helm", "plugin", "install", "https://github.com/C123R/helm-blob.git"],
+        check=False
     )
     subprocess.run(
         ["helm", "blob", "init", f"s3://{bucket_url}/charts"],
-        check=True
+        check=False
     )
     subprocess.run(
         ["helm", "repo", "add",

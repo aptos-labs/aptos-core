@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Factory, GenesisConfig, Result, Swarm, Version};
-use anyhow::{bail, format_err};
+use anyhow::bail;
 use rand::rngs::StdRng;
-use std::{env, fs::File, io::Read, num::NonZeroUsize, path::PathBuf};
-use tokio::runtime::Runtime;
+use std::{convert::TryInto, num::NonZeroUsize};
 
 mod cluster_helper;
 mod node;
@@ -16,72 +15,27 @@ pub use node::K8sNode;
 pub use swarm::*;
 
 use aptos_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
-use aptos_secure_storage::{CryptoStorage, KVStorage, VaultStorage};
 
 pub struct K8sFactory {
     root_key: [u8; ED25519_PRIVATE_KEY_LENGTH],
-    cluster_name: String,
     helm_repo: String,
     image_tag: String,
     base_image_tag: String,
 }
 
+const DEFAULT_ROOT_KEY: &str = "5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956";
+
 impl K8sFactory {
-    pub fn new(
-        cluster_name: String,
-        helm_repo: String,
-        image_tag: String,
-        base_image_tag: String,
-    ) -> Result<K8sFactory> {
-        let vault_addr = env::var("VAULT_ADDR")
-            .map_err(|_| format_err!("Expected environment variable VAULT_ADDR"))?;
-        let vault_cacert = env::var("VAULT_CACERT")
-            .map_err(|_| format_err!("Expected environment variable VAULT_CACERT"))?;
-        let vault_token = env::var("VAULT_TOKEN")
-            .map_err(|_| format_err!("Expected environment variable VAULT_TOKEN"))?;
-
-        let vault_cacert_path = PathBuf::from(vault_cacert.clone());
-
-        let mut vault_cacert_file = File::open(vault_cacert_path)
-            .map_err(|_| format_err!("Failed to open VAULT_CACERT file at {}", &vault_cacert))?;
-        let mut vault_cacert_contents = String::new();
-        vault_cacert_file
-            .read_to_string(&mut vault_cacert_contents)
-            .map_err(|_| format_err!("Failed to read VAULT_CACERT file at {}", &vault_cacert))?;
-
-        let vault = VaultStorage::new(
-            vault_addr,
-            vault_token,
-            Some(vault_cacert_contents),
-            None,
-            false,
-            None,
-            None,
-        );
-        vault.available()?;
-        let root_key = vault
-            .export_private_key("aptos__aptos_root")
-            .unwrap()
-            .to_bytes();
+    pub fn new(helm_repo: String, image_tag: String, base_image_tag: String) -> Result<K8sFactory> {
+        let root_key: [u8; ED25519_PRIVATE_KEY_LENGTH] =
+            hex::decode(DEFAULT_ROOT_KEY)?.try_into().unwrap();
 
         Ok(Self {
             root_key,
-            cluster_name,
             helm_repo,
             image_tag,
             base_image_tag,
         })
-    }
-}
-
-impl Drop for K8sFactory {
-    // When the K8sSwarm struct goes out of scope we need to wipe the chain state and scale down
-    fn drop(&mut self) {
-        uninstall_from_k8s_cluster().unwrap();
-        let runtime = Runtime::new().unwrap();
-        runtime
-            .block_on(set_eks_nodegroup_size(self.cluster_name.clone(), 0, true))
-            .unwrap();
     }
 }
 
@@ -113,9 +67,8 @@ impl Factory for K8sFactory {
             None => None,
         };
 
-        set_eks_nodegroup_size(self.cluster_name.clone(), node_num.get(), true).await?;
-        uninstall_from_k8s_cluster()?;
-        let era = clean_k8s_cluster(
+        uninstall_testnet_resources().await?;
+        let era = reinstall_testnet_resources(
             self.helm_repo.clone(),
             node_num.get(),
             format!("{}", init_version),
@@ -127,7 +80,6 @@ impl Factory for K8sFactory {
 
         let swarm = K8sSwarm::new(
             &self.root_key,
-            &self.cluster_name,
             &self.helm_repo,
             &self.image_tag,
             &self.base_image_tag,

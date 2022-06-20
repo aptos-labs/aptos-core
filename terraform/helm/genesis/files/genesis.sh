@@ -16,6 +16,7 @@ WORKSPACE=${WORKSPACE:-/tmp}
 USERNAME_PREFIX=${USERNAME_PREFIX:-aptos-node}
 VALIDATOR_HOST_SUFFIX=${VALIDATOR_HOST_SUFFIX:-validator-lb}
 FULLNODE_HOST_SUFFIX=${FULLNODE_HOST_SUFFIX:-fullnode-lb}
+MOVE_MODULES_DIR=${MOVE_MODULES_DIR:-"/aptos-framework/move/modules"}
 
 if [[ -z ${ERA} ]] || [[ -z ${NUM_VALIDATORS} ]]; then
     echo "ERA (${ERA:-null}) and NUM_VALIDATORS (${NUM_VALIDATORS:-null}) must be set"
@@ -43,8 +44,7 @@ done
 
 # get the framework
 # this is the directory the aptos-framework is located in the aptoslabs/init docker image
-FRAMEWORK_DIR="/aptos-framework/move/modules"
-cp -R $FRAMEWORK_DIR ${WORKSPACE}/framework
+cp -R $MOVE_MODULES_DIR ${WORKSPACE}/framework
 
 # run genesis
 aptos genesis generate-genesis --local-repository-dir ${WORKSPACE} --output-dir ${WORKSPACE}

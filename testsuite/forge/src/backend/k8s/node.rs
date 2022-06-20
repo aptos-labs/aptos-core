@@ -188,6 +188,6 @@ impl FullNode for K8sNode {}
 
 impl Debug for K8sNode {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.name)
+        write!(f, "{} @ {}:{}", self.name, self.ip, self.rest_api_port)
     }
 }

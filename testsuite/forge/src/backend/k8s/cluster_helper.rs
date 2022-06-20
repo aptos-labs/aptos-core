@@ -1,92 +1,49 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{get_validators, k8s_retry_strategy, nodes_healthcheck, Result};
-use ::aptos_logger::*;
-use anyhow::{bail, format_err};
-use futures::future::try_join_all;
-use hyper::{Client, Uri};
-use hyper_proxy::{Intercept, Proxy, ProxyConnector};
-use hyper_tls::HttpsConnector;
-use k8s_openapi::api::batch::v1::Job;
-use kube::{api::Api, client::Client as K8sClient, Config};
-use rand::Rng;
-use rayon::prelude::*;
-use regex::Regex;
-use rusoto_core::Region;
-use rusoto_credential::EnvironmentProvider;
-use rusoto_eks::{
-    DescribeUpdateRequest, Eks, EksClient, NodegroupScalingConfig, UpdateNodegroupConfigRequest,
+use crate::{get_validators, k8s_wait_genesis_strategy, nodes_healthcheck, Result};
+use anyhow::bail;
+use k8s_openapi::api::{
+    apps::v1::{Deployment, StatefulSet},
+    batch::v1::Job,
 };
-use rusoto_sts::WebIdentityProvider;
-use serde_json::Value;
+use kube::{
+    api::{Api, DeleteParams, ListParams, Meta},
+    client::Client as K8sClient,
+    Config,
+};
+use rand::Rng;
+use serde::de::DeserializeOwned;
 use std::{
-    cmp,
     convert::TryFrom,
-    env,
-    fs::File,
-    io::Write,
     process::{Command, Stdio},
     str,
 };
-use tempfile::TempDir;
 
 const HELM_BIN: &str = "helm";
 const KUBECTL_BIN: &str = "kubectl";
 const MAX_NUM_VALIDATORS: usize = 30;
-const HEALTH_CHECK_URL: &str = "http://127.0.0.1:8001";
-const VALIDATOR_SCALING_FACTOR: i64 = 3;
-const UTILITIES_SCALING_FACTOR: i64 = 3;
-
-const GENESIS_MODULES_DIR: &str = "/aptos-framework/move/modules";
 
 async fn wait_genesis_job(kube_client: &K8sClient, era: &str) -> Result<()> {
-    aptos_retrier::retry_async(k8s_retry_strategy(), || {
+    aptos_retrier::retry_async(k8s_wait_genesis_strategy(), || {
         let jobs: Api<Job> = Api::namespaced(kube_client.clone(), "default");
         Box::pin(async move {
-            let job_name = format!("aptos-testnet-genesis-e{}", era);
-            debug!("Running get job: {}", &job_name);
+            let job_name = format!("genesis-aptos-genesis-e{}", era);
+            println!("Checking status of k8s job: {}", &job_name);
             let genesis_job = jobs.get_status(&job_name).await.unwrap();
-            debug!("Status: {:?}", genesis_job.status);
+            println!("Status: {:?}", genesis_job.status);
+
             let status = genesis_job.status.unwrap();
+            match status.active {
+                Some(_) => bail!("Genesis still running or pending"),
+                None => println!("Genesis completed running"),
+            }
             match status.succeeded {
-                Some(1) => {
-                    println!("Genesis job completed");
+                Some(_) => {
+                    println!("Genesis done");
                     Ok(())
                 }
-                _ => bail!("Genesis job not completed"),
-            }
-        })
-    })
-    .await
-}
-
-async fn nodegroup_state_check(desire_size: i64) -> Result<()> {
-    // we do not check node state for scaling down
-    if desire_size == 0 {
-        return Ok(());
-    }
-
-    aptos_retrier::retry_async(k8s_retry_strategy(), || {
-        Box::pin(async move {
-            let status_args = ["get", "nodes"];
-            let raw_nodegroup_values = Command::new(KUBECTL_BIN)
-                .args(&status_args)
-                .output()
-                .unwrap_or_else(|_| panic!("failed to nodegroup status"));
-
-            let nodegroup_states = String::from_utf8(raw_nodegroup_values.stdout).unwrap();
-            let v: Vec<_> = nodegroup_states.match_indices("Ready").collect();
-            println!(
-                "Desire size of nodegroup is {}, currently {} nodes are ready to schedule",
-                desire_size,
-                v.len()
-            );
-            if v.len() < desire_size as usize {
-                bail!("nodegroup is not healthy");
-            } else {
-                println!("All nodes are ready");
-                Ok(())
+                _ => bail!("Genesis did not succeed"),
             }
         })
     })
@@ -94,68 +51,65 @@ async fn nodegroup_state_check(desire_size: i64) -> Result<()> {
 }
 
 pub fn set_validator_image_tag(
-    validator_name: &str,
-    image_tag: &str,
-    helm_repo: &str,
+    validator_name: String,
+    image_tag: String,
+    helm_repo: String,
 ) -> Result<()> {
-    let validator_upgrade_options = [
-        "--reuse-values",
-        "--history-max",
-        "2",
-        "--set",
-        &format!("imageTag={}", image_tag),
+    let validator_upgrade_options = vec![
+        "--reuse-values".to_string(),
+        "--history-max".to_string(),
+        "2".to_string(),
+        "--set".to_string(),
+        format!("imageTag={}", image_tag),
     ];
     upgrade_validator(validator_name, helm_repo, &validator_upgrade_options)
 }
 
-pub(crate) fn remove_helm_release(release_name: &str) -> Result<()> {
-    let release_uninstall_args = ["uninstall", "--keep-history", release_name];
-    println!("{:?}", release_uninstall_args);
-    let release_uninstall_output = Command::new(HELM_BIN)
-        .stdout(Stdio::inherit())
-        .args(&release_uninstall_args)
-        .output()
-        .expect("failed to helm uninstall valNN");
+/// Deletes a collection of resources in k8s
+async fn delete_k8s_collection<T: Clone + DeserializeOwned + Meta>(
+    api: Api<T>,
+    name: &'static str,
+) -> Result<()> {
+    println!("gonna match");
+    match api
+        .delete_collection(&DeleteParams::default(), &ListParams::default())
+        .await?
+    {
+        either::Left(list) => {
+            let names: Vec<_> = list.iter().map(Meta::name).collect();
+            println!("Deleting collection of {}: {:?}", name, names);
+        }
+        either::Right(status) => {
+            println!("Deleted collection of {}: status={:?}", name, status);
+        }
+    }
 
-    let uninstalled_re = Regex::new(r"already deleted").unwrap();
-    let uninstall_stderr = String::from_utf8(release_uninstall_output.stderr).unwrap();
-    let already_uninstalled = uninstalled_re.is_match(&uninstall_stderr);
-    assert!(
-        release_uninstall_output.status.success() || already_uninstalled,
-        "{}",
-        uninstall_stderr
-    );
     Ok(())
 }
 
-fn helm_release_patch(release_name: &str, version: usize) -> Result<()> {
-    // trick helm into letting us upgrade later
-    // https://phoenixnap.com/kb/helm-has-no-deployed-releases#ftoc-heading-5
-    let helm_patch_args = [
-        "patch",
-        "secret",
-        &format!("sh.helm.release.v1.{}.v{}", release_name, version),
-        "--type=merge",
-        "-p",
-        "{\"metadata\":{\"labels\":{\"status\":\"deployed\"}}}",
+pub(crate) async fn delete_k8s_cluster() -> Result<()> {
+    let client: K8sClient = create_k8s_client().await;
+    let deployments: Api<Deployment> = Api::namespaced(client.clone(), "default");
+    let stateful_sets: Api<StatefulSet> = Api::namespaced(client, "default");
+
+    // delete all deployments and statefulsets
+    // cross this with all the compute resources created by aptos-node helm chart
+    delete_k8s_collection(deployments, "deployments").await?;
+    delete_k8s_collection(stateful_sets, "stateful_sets").await?;
+
+    Ok(())
+}
+
+fn upgrade_helm_release(
+    release_name: String,
+    helm_chart: String,
+    options: &[String],
+) -> Result<()> {
+    let upgrade_base_args = [
+        "upgrade".to_string(),
+        release_name.clone(),
+        helm_chart.clone(),
     ];
-    println!("{:?}", helm_patch_args);
-    let helm_patch_output = Command::new(KUBECTL_BIN)
-        .stdout(Stdio::inherit())
-        .args(&helm_patch_args)
-        .output()
-        .expect("failed to kubectl patch secret valNN");
-    assert!(
-        helm_patch_output.status.success(),
-        "{}",
-        String::from_utf8(helm_patch_output.stderr).unwrap()
-    );
-
-    Ok(())
-}
-
-fn upgrade_helm_release(release_name: &str, helm_chart: &str, options: &[&str]) -> Result<()> {
-    let upgrade_base_args = ["upgrade", release_name, helm_chart];
     let upgrade_args = [&upgrade_base_args, options].concat();
     println!("{:?}", upgrade_args);
     let upgrade_output = Command::new(HELM_BIN)
@@ -178,51 +132,41 @@ fn upgrade_helm_release(release_name: &str, helm_chart: &str, options: &[&str]) 
     Ok(())
 }
 
-fn upgrade_validator(validator_name: &str, helm_repo: &str, options: &[&str]) -> Result<()> {
+fn upgrade_validator(validator_name: String, helm_repo: String, options: &[String]) -> Result<()> {
     upgrade_helm_release(
         validator_name,
-        &format!("{}/aptos-validator", helm_repo),
+        format!("{}/aptos-validator", helm_repo),
         options,
     )
 }
 
-fn upgrade_testnet(helm_repo: &str, options: &[&str]) -> Result<()> {
-    upgrade_helm_release("aptos", &format!("{}/testnet", helm_repo), options)
+fn upgrade_aptos_node_helm(
+    release_name: String,
+    helm_repo: &str,
+    options: &[String],
+) -> Result<()> {
+    upgrade_helm_release(release_name, format!("{}/aptos-node", helm_repo), options)
 }
 
-fn get_helm_status(helm_release_name: &str) -> Result<Value> {
-    let status_args = ["status", helm_release_name, "-o", "json"];
-    println!("{:?}", status_args);
-    let raw_helm_values = Command::new(HELM_BIN)
-        .args(&status_args)
-        .output()
-        .unwrap_or_else(|_| panic!("failed to helm status {}", helm_release_name));
-
-    let helm_values = String::from_utf8(raw_helm_values.stdout).unwrap();
-    serde_json::from_str(&helm_values)
-        .map_err(|e| format_err!("failed to deserialize helm values: {}", e))
+// runs helm upgrade on the installed aptos-genesis release named "genesis"
+// if a new "era" is specified, a new genesis will be created, and old resources will be destroyed
+fn upgrade_genesis_helm(helm_repo: &str, options: &[String]) -> Result<()> {
+    upgrade_helm_release(
+        "genesis".to_string(),
+        format!("{}/aptos-genesis", helm_repo),
+        options,
+    )
 }
 
-fn get_helm_values(helm_release_name: &str) -> Result<Value> {
-    let mut v: Value = get_helm_status(helm_release_name)
-        .map_err(|e| format_err!("failed to helm get values aptos: {}", e))?;
-    Ok(v["config"].take())
-}
+pub async fn uninstall_testnet_resources() -> Result<()> {
+    // delete kubernetes resources
+    delete_k8s_cluster().await?;
+    println!("aptos-node resources removed");
 
-pub fn uninstall_from_k8s_cluster() -> Result<()> {
-    // helm uninstall validators while keeping history for later
-    (0..MAX_NUM_VALIDATORS).into_par_iter().for_each(|i| {
-        remove_helm_release(&format!("val{}", i)).unwrap();
-    });
-    println!("All validators removed");
-
-    // NOTE: for now, do not remove testnet helm chart since it is more expensive
-    // remove_helm_release("aptos").unwrap();
-    // println!("Testnet release removed");
     Ok(())
 }
 
-pub async fn clean_k8s_cluster(
+pub async fn reinstall_testnet_resources(
     helm_repo: String,
     base_num_validators: usize,
     base_validator_image_tag: String,
@@ -233,112 +177,61 @@ pub async fn clean_k8s_cluster(
     assert!(base_num_validators <= MAX_NUM_VALIDATORS);
 
     let new_era = get_new_era().unwrap();
+    let kube_client = create_k8s_client().await;
 
-    let tmp_dir = TempDir::new().expect("Could not create temp dir");
+    // just helm upgrade
 
-    // prepare for scale up. get the helm values to upgrade later
-    (0..base_num_validators).into_par_iter().for_each(|i| {
-        let v: Value = get_helm_status(&format!("val{}", i)).unwrap();
-        let version = v["version"].as_i64().expect("not a i64") as usize;
-        let config = &v["config"];
-
-        let era: &str = &era_to_string(&v["config"]["chain"]["era"]).unwrap();
-        assert!(
-            !&new_era.eq(era),
-            "New era {} is the same as past release era {}",
-            new_era,
-            era
-        );
-
-        // store the helm values for later use
-        let file_path = tmp_dir.path().join(format!("val{}_status.json", i));
-        println!("Wrote helm values to: {:?}", &file_path);
-        let mut file = File::create(file_path).expect("Could not create file in temp dir");
-        file.write_all(&config.to_string().into_bytes())
-            .expect("Could not write to file");
-
-        helm_release_patch(&format!("val{}", i), version).unwrap();
-    });
-    println!("All validators prepare for upgrade");
-
-    // upgrade validators in parallel
-    (0..base_num_validators).into_par_iter().for_each(|i| {
-        let file_path = tmp_dir
-            .path()
-            .join(format!("val{}_status.json", i))
-            .display()
-            .to_string();
-        let validator_upgrade_options = [
-            "-f",
-            &file_path,
-            "--install",
-            "--history-max",
-            "2",
-            "--set",
-            &format!("chain.era={}", &new_era),
-            "--set",
-            &format!("imageTag={}", &base_validator_image_tag),
-        ];
-        upgrade_validator(&format!("val{}", i), &helm_repo, &validator_upgrade_options).unwrap();
-    });
-    println!("All validators upgraded");
-
-    // get testnet values
-    let v: Value = get_helm_status("aptos").unwrap();
-    let version = v["version"].as_i64().expect("not a i64") as usize;
-    let config = &v["config"];
-
-    // prep testnet chart for release
-    helm_release_patch("aptos", version).unwrap();
-
-    // store the helm values for later use
-    let file_path = tmp_dir.path().join("aptos_status.json");
-    println!("Wrote helm values to: {:?}", &file_path);
-    let mut file = File::create(file_path).expect("Could not create file in temp dir");
-    file.write_all(&config.to_string().into_bytes())
-        .expect("Could not write to file");
-    let file_path_str = tmp_dir
-        .path()
-        .join("aptos_status.json")
-        .display()
-        .to_string();
-
-    // run genesis from the directory in aptos/init image
-    let move_modules_dir = if let Some(genesis_modules_path) = genesis_modules_path {
-        genesis_modules_path
-    } else {
-        GENESIS_MODULES_DIR.to_string()
-    };
-    let testnet_upgrade_options = [
-        "-f",
-        &file_path_str,
-        "--install",
-        "--history-max",
-        "2",
-        "--set",
-        &format!("genesis.era={}", &new_era),
-        "--set",
-        &format!("genesis.numValidators={}", base_num_validators),
-        "--set",
-        &format!("imageTag={}", &base_genesis_image_tag),
-        "--set",
-        "monitoring.prometheus.useHttps=false",
-        "--set",
-        &format!("genesis.moveModuleDir={}", &move_modules_dir),
+    let aptos_node_upgrade_options = vec![
+        "--reuse-values".to_string(),
+        "--history-max".to_string(),
+        "2".to_string(),
+        "--set".to_string(),
+        format!("chain.era={}", &new_era),
+        "--set".to_string(),
+        format!("numValidators={}", base_num_validators),
+        "--set".to_string(),
+        format!("imageTag={}", &base_genesis_image_tag),
     ];
 
+    // TODO(rustielin): get the helm releases to be consistent
+    upgrade_aptos_node_helm(
+        "rustie-test".to_string(),
+        &helm_repo,
+        aptos_node_upgrade_options.as_slice(),
+    )?;
+
+    let mut genesis_upgrade_options = vec![
+        "--reuse-values".to_string(),
+        "--history-max".to_string(),
+        "2".to_string(),
+        "--set".to_string(),
+        format!("chain.era={}", &new_era),
+        "--set".to_string(),
+        format!("genesis.numValidators={}", base_num_validators),
+        "--set".to_string(),
+        format!("imageTag={}", &base_genesis_image_tag),
+    ];
+
+    // run genesis from the directory in aptos/init image
+    if let Some(genesis_modules_path) = genesis_modules_path {
+        genesis_upgrade_options.extend([
+            "--set".to_string(),
+            format!("genesis.moveModulesDir={}", genesis_modules_path),
+        ]);
+    }
+
     // upgrade testnet
-    upgrade_testnet(&helm_repo, &testnet_upgrade_options)?;
+    upgrade_genesis_helm(&helm_repo, genesis_upgrade_options.as_slice())?;
 
     // wait for genesis to run again, and get the updated validators
-    let kube_client = create_k8s_client().await;
-    wait_genesis_job(&kube_client, &new_era).await.unwrap();
-    let vals = get_validators(kube_client.clone(), &base_validator_image_tag)
-        .await
-        .unwrap();
-    let all_nodes = vals.values().collect();
+    wait_genesis_job(&kube_client, &new_era).await?;
+
     // healthcheck on each of the validators wait until they all healthy
     let unhealthy_nodes = if require_validator_healthcheck {
+        let vals = get_validators(kube_client.clone(), &base_validator_image_tag)
+            .await
+            .unwrap();
+        let all_nodes = vals.values().collect();
         nodes_healthcheck(all_nodes).await.unwrap()
     } else {
         vec![]
@@ -351,235 +244,18 @@ pub async fn clean_k8s_cluster(
 }
 
 fn get_new_era() -> Result<String> {
-    let v: Value = get_helm_values("aptos")?;
-    println!("{}", v["genesis"]["era"]);
-    let chain_era: &str = &era_to_string(&v["genesis"]["era"]).unwrap();
-
-    // get the new era
+    // get a random new era to wipe the chain
     let mut rng = rand::thread_rng();
     let new_era: &str = &format!("fg{}", rng.gen::<u32>());
-    println!("genesis.era: {} --> {}", chain_era, new_era);
+    println!("new chain era: {}", new_era);
     Ok(new_era.to_string())
 }
 
-// sometimes helm will try to interpret era as a number in scientific notation
-fn era_to_string(era_value: &Value) -> Result<String> {
-    match era_value {
-        Value::Number(num) => Ok(format!("{}", num)),
-        Value::String(s) => Ok(s.to_string()),
-        _ => bail!("Era is not a number {}", era_value),
-    }
-}
-
 pub async fn create_k8s_client() -> K8sClient {
-    let _ = Command::new(KUBECTL_BIN).arg("proxy").spawn();
-    let _ = aptos_retrier::retry_async(k8s_retry_strategy(), || {
-        Box::pin(async move {
-            debug!("Running local kube pod healthcheck on {}", HEALTH_CHECK_URL);
-            reqwest::get(HEALTH_CHECK_URL).await?.text().await?;
-            println!("Local kube pod healthcheck passed");
-            Ok::<(), reqwest::Error>(())
-        })
-    })
-    .await;
-    let config = Config::new(
-        reqwest::Url::parse(HEALTH_CHECK_URL).expect("Failed to parse kubernetes endpoint url"),
-    );
-    K8sClient::try_from(config).unwrap()
-}
-
-fn create_eks_client(auth_with_k8s_env: bool) -> Result<EksClient> {
-    let connector = HttpsConnector::new();
-    let http_connector: hyper_proxy::ProxyConnector<
-        hyper_tls::HttpsConnector<hyper::client::HttpConnector>,
-    > = if let Ok(proxy_url) = std::env::var("HTTP_PROXY") {
-        let proxy = Proxy::new(Intercept::All, proxy_url.parse::<Uri>()?);
-        ProxyConnector::from_proxy(connector, proxy)
-    } else {
-        ProxyConnector::new(connector)
-    }?;
-
-    let mut hyper_builder = Client::builder();
-    // disabling due to connection closed issue
-    hyper_builder.pool_max_idle_per_host(0);
-    let dispatcher = rusoto_core::HttpClient::from_builder(hyper_builder, http_connector);
-    let eks_client = if auth_with_k8s_env {
-        EksClient::new_with(
-            dispatcher,
-            WebIdentityProvider::from_k8s_env(),
-            Region::UsWest2,
-        )
-    } else {
-        EksClient::new_with(dispatcher, EnvironmentProvider::default(), Region::UsWest2)
-    };
-    Ok(eks_client)
-}
-
-fn create_update_nodegroup_config_request(
-    cluster_name: &str,
-    nodegroup_name: &str,
-    nodegroup_scaling_config: NodegroupScalingConfig,
-) -> UpdateNodegroupConfigRequest {
-    UpdateNodegroupConfigRequest {
-        client_request_token: None,
-        cluster_name: cluster_name.to_string(),
-        labels: None,
-        nodegroup_name: nodegroup_name.to_string(),
-        scaling_config: Some(nodegroup_scaling_config),
-    }
-}
-
-async fn submit_update_nodegroup_config_request(
-    eks_client: &EksClient,
-    cluster_name: &str,
-    nodegroup_name: &str,
-    nodegroup_scaling_config: NodegroupScalingConfig,
-) -> Result<String> {
-    let update_nodegroup_request = create_update_nodegroup_config_request(
-        cluster_name,
-        nodegroup_name,
-        nodegroup_scaling_config,
-    );
-    let update_response = eks_client
-        .update_nodegroup_config(update_nodegroup_request)
-        .await;
-    let update_id = update_response.unwrap().update.unwrap().id.unwrap();
-    println!(
-        "Created {} nodegroup update request with ID: {}",
-        nodegroup_name, update_id
-    );
-    Ok(update_id)
-}
-
-pub async fn set_eks_nodegroup_size(
-    cluster_name: String,
-    num_validators: usize,
-    auth_with_k8s_env: bool,
-) -> Result<()> {
-    // https://github.com/lucdew/rusoto-example/blob/master/src/client.rs
-    // Create rusoto client through an http proxy
-    let eks_client = create_eks_client(auth_with_k8s_env)?;
-    println!("Created rusoto http client");
-
-    // nodegroup scaling factors
-    let max_surge = 2; // multiplier for max size
-    let num_validators: i64 = num_validators as i64;
-    let idle_utilities_size = 10; // keep extra utilities nodes around for forge pods and monitoring
-    let buffer_node = if num_validators != 0 {
-        cmp::max(5, num_validators / 5)
-    } else {
-        0
-    };
-    let validator_scaling = NodegroupScalingConfig {
-        desired_size: Some(cmp::max(
-            num_validators * VALIDATOR_SCALING_FACTOR + buffer_node,
-            1,
-        )),
-        max_size: Some(cmp::max(
-            (num_validators * VALIDATOR_SCALING_FACTOR + 1) * max_surge,
-            1,
-        )),
-        min_size: Some(cmp::max(num_validators * VALIDATOR_SCALING_FACTOR, 1)),
-    };
-    let utilities_scaling = NodegroupScalingConfig {
-        desired_size: Some(cmp::max(
-            num_validators * UTILITIES_SCALING_FACTOR + buffer_node,
-            idle_utilities_size,
-        )),
-        max_size: Some(cmp::max(
-            num_validators * UTILITIES_SCALING_FACTOR * max_surge,
-            idle_utilities_size,
-        )),
-        min_size: Some(cmp::max(
-            num_validators * UTILITIES_SCALING_FACTOR,
-            idle_utilities_size,
-        )),
-    };
-    let desire_nodegroup_size =
-        num_validators * (VALIDATOR_SCALING_FACTOR + UTILITIES_SCALING_FACTOR);
-
-    // submit the scaling requests
-    let validators_update_id = submit_update_nodegroup_config_request(
-        &eks_client,
-        &cluster_name,
-        "validators",
-        validator_scaling,
-    )
-    .await?;
-    let utilities_update_id = submit_update_nodegroup_config_request(
-        &eks_client,
-        &cluster_name,
-        "utilities",
-        utilities_scaling,
-    )
-    .await?;
-
-    // wait for nodegroup updates
-    let updates: Vec<(&str, &str)> = vec![
-        ("validators", &validators_update_id),
-        ("utilities", &utilities_update_id),
-    ];
-    try_join_all(updates.into_iter().map(|(nodegroup_name, update_id)| {
-        describe_update(
-            eks_client.clone(),
-            cluster_name.clone(),
-            nodegroup_name.to_string(),
-            update_id.to_string(),
-        )
-    }))
-    .await
-    .unwrap();
-
-    nodegroup_state_check(desire_nodegroup_size).await.unwrap();
-
-    Ok(())
-}
-
-async fn describe_update(
-    eks_client: EksClient,
-    cluster_name: String,
-    nodegroup_name: String,
-    update_id: String,
-) -> Result<()> {
-    aptos_retrier::retry_async(k8s_retry_strategy(), || {
-        let client = eks_client.clone();
-        let nodegroup_name = nodegroup_name.clone();
-        let update_id = update_id.clone();
-        let request = DescribeUpdateRequest {
-            addon_name: None,
-            name: cluster_name.clone(),
-            nodegroup_name: Some(nodegroup_name.clone()),
-            update_id: update_id.clone(),
-        };
-        Box::pin(async move {
-            let describe_update = match client.describe_update(request).await {
-                Ok(resp) => resp.update.unwrap(),
-                Err(err) => bail!(err),
-            };
-            if let Some(s) = describe_update.status {
-                match s.as_str() {
-                    "Failed" => bail!("Nodegroup update failed"),
-                    "Successful" => {
-                        println!(
-                            "{} nodegroup update {} successful!!!",
-                            &nodegroup_name, update_id
-                        );
-                        Ok(())
-                    }
-                    &_ => {
-                        println!(
-                            "Waiting for {} update {}: {} ...",
-                            &nodegroup_name, update_id, s
-                        );
-                        bail!("Waiting for valid update status")
-                    }
-                }
-            } else {
-                bail!("Failed to describe nodegroup update")
-            }
-        })
-    })
-    .await
+    // get the client from the local kube context
+    // TODO(rustielin|geekflyer): use proxy or port-forward to make REST API available
+    let config_infer = Config::infer().await.unwrap();
+    K8sClient::try_from(config_infer).unwrap()
 }
 
 pub fn scale_sts_replica(sts_name: &str, replica_num: u64) -> Result<()> {

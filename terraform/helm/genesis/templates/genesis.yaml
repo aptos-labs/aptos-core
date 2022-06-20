@@ -13,6 +13,13 @@ data:
     - {{ printf "%s-%d" $.Values.genesis.username_prefix $i | squote }}
     {{- end }}
     chain_id: {{ .Values.chain.chain_id | int }}
+    min_stake: {{ .Values.chain.min_stake | int }}
+    max_stake: {{ .Values.chain.max_stake | int }}
+    min_lockup_duration_secs: {{ .Values.chain.min_lockup_duration_secs | int }}
+    max_lockup_duration_secs: {{ .Values.chain.max_lockup_duration_secs | int }}
+    epoch_duration_secs: {{ .Values.chain.epoch_duration_secs | int }}
+    initial_lockup_timestamp: {{ now | date_modify (printf "+%s" .Values.chain.initial_lockup_duration) | unixEpoch }}
+    allow_new_validators: {{ .Values.chain.allow_new_validators }}
 
 ---
 
@@ -98,6 +105,8 @@ spec:
           value: {{ .Values.genesis.username_prefix | quote }}
         - name: ERA
           value: {{ .Values.chain.era | quote }}
+        - name: MOVE_MODULES_DIR
+          value: {{ .Values.genesis.moveModulesDir | quote }}
         volumeMounts:
         - name: layout
           mountPath: /tmp/layout.yaml
