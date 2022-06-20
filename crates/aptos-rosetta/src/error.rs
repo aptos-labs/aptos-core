@@ -38,78 +38,60 @@ pub enum ApiError {
     BadSignatureCount,
     #[error("historic balances unsupported")]
     HistoricBalancesUnsupported,
+    #[error("node is offline")]
+    NodeIsOffline,
 }
 
 impl ApiError {
     pub fn all() -> Vec<ApiError> {
+        use ApiError::*;
         vec![
-            ApiError::AptosError(String::new()),
-            ApiError::BadBlockRequest,
-            ApiError::BadNetwork,
-            ApiError::DeserializationFailed(String::new()),
-            ApiError::BadTransferOperations(String::new()),
-            ApiError::AccountNotFound,
-            ApiError::BadSignature,
-            ApiError::BadSignatureType,
-            ApiError::BadTransactionScript,
-            ApiError::BadTransactionPayload,
-            ApiError::BadCoin,
-            ApiError::BadSignatureCount,
-            ApiError::HistoricBalancesUnsupported,
+            AptosError(String::new()),
+            BadBlockRequest,
+            BadNetwork,
+            DeserializationFailed(String::new()),
+            BadTransferOperations(String::new()),
+            AccountNotFound,
+            BadSignature,
+            BadSignatureType,
+            BadTransactionScript,
+            BadTransactionPayload,
+            BadCoin,
+            BadSignatureCount,
+            HistoricBalancesUnsupported,
+            NodeIsOffline,
         ]
     }
 
     pub fn code(&self) -> u64 {
+        use ApiError::*;
         match self {
-            ApiError::AptosError(_) => 10,
-            ApiError::BadBlockRequest => 20,
-            ApiError::BadNetwork => 40,
-            ApiError::DeserializationFailed(_) => 50,
-            ApiError::BadTransferOperations(_) => 70,
-            ApiError::AccountNotFound => 80,
-            ApiError::BadSignature => 110,
-            ApiError::BadSignatureType => 120,
-            ApiError::BadTransactionScript => 130,
-            ApiError::BadTransactionPayload => 140,
-            ApiError::BadCoin => 150,
-            ApiError::BadSignatureCount => 160,
-            ApiError::HistoricBalancesUnsupported => 170,
+            AptosError(_) => 10,
+            BadBlockRequest => 20,
+            BadNetwork => 40,
+            DeserializationFailed(_) => 50,
+            BadTransferOperations(_) => 70,
+            AccountNotFound => 80,
+            BadSignature => 110,
+            BadSignatureType => 120,
+            BadTransactionScript => 130,
+            BadTransactionPayload => 140,
+            BadCoin => 150,
+            BadSignatureCount => 160,
+            HistoricBalancesUnsupported => 170,
+            NodeIsOffline => 180,
         }
     }
 
     pub fn retriable(&self) -> bool {
-        match self {
-            ApiError::AptosError(_) => false,
-            ApiError::BadBlockRequest => false,
-            ApiError::BadNetwork => false,
-            ApiError::DeserializationFailed(_) => false,
-            ApiError::BadTransferOperations(_) => false,
-            ApiError::AccountNotFound => true,
-            ApiError::BadSignature => false,
-            ApiError::BadSignatureType => false,
-            ApiError::BadTransactionScript => false,
-            ApiError::BadTransactionPayload => false,
-            ApiError::BadCoin => false,
-            ApiError::BadSignatureCount => false,
-            ApiError::HistoricBalancesUnsupported => false,
-        }
+        matches!(self, ApiError::AccountNotFound)
     }
 
     pub fn status_code(&self) -> StatusCode {
+        use ApiError::*;
         match self {
-            ApiError::AptosError(_) => StatusCode::BAD_REQUEST,
-            ApiError::BadBlockRequest => StatusCode::BAD_REQUEST,
-            ApiError::BadNetwork => StatusCode::BAD_REQUEST,
-            ApiError::DeserializationFailed(_) => StatusCode::BAD_REQUEST,
-            ApiError::BadTransferOperations(_) => StatusCode::BAD_REQUEST,
-            ApiError::AccountNotFound => StatusCode::NOT_FOUND,
-            ApiError::BadSignature => StatusCode::BAD_REQUEST,
-            ApiError::BadSignatureType => StatusCode::BAD_REQUEST,
-            ApiError::BadTransactionScript => StatusCode::BAD_REQUEST,
-            ApiError::BadTransactionPayload => StatusCode::BAD_REQUEST,
-            ApiError::BadCoin => StatusCode::BAD_REQUEST,
-            ApiError::BadSignatureCount => StatusCode::BAD_REQUEST,
-            ApiError::HistoricBalancesUnsupported => StatusCode::BAD_REQUEST,
+            AccountNotFound => StatusCode::NOT_FOUND,
+            _ => StatusCode::BAD_REQUEST,
         }
     }
 

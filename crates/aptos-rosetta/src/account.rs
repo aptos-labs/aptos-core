@@ -50,9 +50,9 @@ async fn account_balance(
     if request.block_identifier.is_some() {
         return Err(ApiError::HistoricBalancesUnsupported);
     }
-    let rest_client = server_context.rest_client;
+    let rest_client = server_context.rest_client()?;
     let address = request.account_identifier.account_address()?;
-    let response = get_account(&rest_client, address).await?;
+    let response = get_account(rest_client, address).await?;
     let state = response.state();
     let txns = rest_client
         .get_transactions(Some(state.version), Some(1))
@@ -67,7 +67,7 @@ async fn account_balance(
         .transaction_info()
         .map_err(|err| ApiError::AptosError(err.to_string()))?;
 
-    let response = get_account_balance(&rest_client, address).await?;
+    let response = get_account_balance(rest_client, address).await?;
     let balance = response.into_inner();
 
     let response = AccountBalanceResponse {

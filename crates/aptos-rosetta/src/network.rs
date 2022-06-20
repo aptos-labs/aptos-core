@@ -131,7 +131,7 @@ async fn network_status(
 
     check_network(request.network_identifier, &server_context)?;
 
-    let rest_client = &server_context.rest_client;
+    let rest_client = server_context.rest_client()?;
     let response = get_genesis_transaction(rest_client).await?;
     let state = response.state();
     let transaction = response.inner();

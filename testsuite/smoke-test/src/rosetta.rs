@@ -45,7 +45,9 @@ pub async fn setup_test(
     let _rosetta = aptos_rosetta::bootstrap_async(
         swarm.chain_id(),
         api_config,
-        aptos_rest_client::Client::new(validator.rest_api_endpoint()),
+        Some(aptos_rest_client::Client::new(
+            validator.rest_api_endpoint(),
+        )),
     )
     .await
     .unwrap();

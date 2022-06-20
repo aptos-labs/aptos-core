@@ -7,6 +7,7 @@
 
 extern crate core;
 
+use crate::error::ApiError;
 use aptos_api::runtime::WebServer;
 use aptos_config::config::ApiConfig;
 use aptos_logger::debug;
@@ -38,15 +39,27 @@ pub const ROSETTA_VERSION: &str = "1.4.12";
 /// Rosetta API context for use on all APIs
 #[derive(Clone, Debug)]
 pub struct RosettaContext {
-    pub rest_client: aptos_rest_client::Client,
+    /// A rest client to connect to a fullnode
+    rest_client: Option<aptos_rest_client::Client>,
+    /// ChainId of the chain to connect to
     pub chain_id: ChainId,
+}
+
+impl RosettaContext {
+    fn rest_client(&self) -> Result<&aptos_rest_client::Client, ApiError> {
+        if let Some(ref client) = self.rest_client {
+            Ok(client)
+        } else {
+            Err(ApiError::NodeIsOffline)
+        }
+    }
 }
 
 /// Creates HTTP server (warp-based) for Rosetta
 pub fn bootstrap(
     chain_id: ChainId,
     api_config: ApiConfig,
-    rest_client: aptos_rest_client::Client,
+    rest_client: Option<aptos_rest_client::Client>,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .thread_name("rosetta")
@@ -70,7 +83,7 @@ pub fn bootstrap(
 pub async fn bootstrap_async(
     chain_id: ChainId,
     api_config: ApiConfig,
-    rest_client: aptos_rest_client::Client,
+    rest_client: Option<aptos_rest_client::Client>,
 ) -> anyhow::Result<JoinHandle<()>> {
     debug!("Starting up Rosetta server with {:?}", api_config);
     let api = WebServer::from(api_config);
