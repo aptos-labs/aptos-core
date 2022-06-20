@@ -6,11 +6,18 @@ use crate::{
 };
 use ::aptos_logger::*;
 use anyhow::{bail, format_err};
-use k8s_openapi::api::batch::v1::Job;
-use kube::{api::Api, client::Client as K8sClient, Config};
+use k8s_openapi::api::{
+    apps::v1::{Deployment, StatefulSet},
+    batch::v1::Job,
+};
+use kube::{
+    api::{Api, DeleteParams, ListParams, Meta},
+    client::Client as K8sClient,
+    Config,
+};
 use rand::Rng;
 use rayon::prelude::*;
-use regex::Regex;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::{
     convert::TryFrom,
@@ -65,23 +72,35 @@ pub fn set_validator_image_tag(
     upgrade_validator(validator_name, helm_repo, &validator_upgrade_options)
 }
 
-pub(crate) fn remove_helm_release(release_name: &str) -> Result<()> {
-    let release_uninstall_args = ["uninstall", "--keep-history", release_name];
-    println!("{:?}", release_uninstall_args);
-    let release_uninstall_output = Command::new(HELM_BIN)
-        .stdout(Stdio::inherit())
-        .args(&release_uninstall_args)
-        .output()
-        .expect("failed to helm uninstall valNN");
+/// Deletes a collection of resources in k8s
+async fn delete_k8s_collection<T: Clone + DeserializeOwned + Meta>(
+    api: Api<T>,
+    name: &'static str,
+) -> Result<()> {
+    match api
+        .delete_collection(&DeleteParams::default(), &ListParams::default())
+        .await?
+    {
+        either::Left(list) => {
+            let names: Vec<_> = list.iter().map(Meta::name).collect();
+            println!("Deleting collection of {}: {:?}", name, names);
+        }
+        either::Right(status) => {
+            println!("Deleted collection of {}: status={:?}", name, status);
+        }
+    }
 
-    let uninstalled_re = Regex::new(r"already deleted").unwrap();
-    let uninstall_stderr = String::from_utf8(release_uninstall_output.stderr).unwrap();
-    let already_uninstalled = uninstalled_re.is_match(&uninstall_stderr);
-    assert!(
-        release_uninstall_output.status.success() || already_uninstalled,
-        "{}",
-        uninstall_stderr
-    );
+    Ok(())
+}
+
+pub(crate) async fn delete_k8s_cluster() -> Result<()> {
+    let client: K8sClient = create_k8s_client().await;
+    let deployments: Api<Deployment> = Api::namespaced(client.clone(), "default");
+    let stateful_sets: Api<StatefulSet> = Api::namespaced(client, "default");
+
+    delete_k8s_collection(deployments, "deployments").await?;
+    delete_k8s_collection(stateful_sets, "stateful_sets").await?;
+
     Ok(())
 }
 
@@ -166,11 +185,9 @@ fn get_helm_values(helm_release_name: &str) -> Result<Value> {
     Ok(v["config"].take())
 }
 
-pub fn uninstall_from_k8s_cluster() -> Result<()> {
+pub async fn uninstall_from_k8s_cluster() -> Result<()> {
     // helm uninstall validators while keeping history for later
-    (0..MAX_NUM_VALIDATORS).into_par_iter().for_each(|i| {
-        remove_helm_release(&format!("val{}", i)).unwrap();
-    });
+    delete_k8s_cluster().await?;
     println!("All validators removed");
 
     // NOTE: for now, do not remove testnet helm chart since it is more expensive

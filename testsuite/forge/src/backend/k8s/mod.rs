@@ -66,13 +66,6 @@ impl K8sFactory {
     }
 }
 
-impl Drop for K8sFactory {
-    // When the K8sSwarm struct goes out of scope we need to wipe the chain state
-    fn drop(&mut self) {
-        uninstall_from_k8s_cluster().unwrap();
-    }
-}
-
 #[async_trait::async_trait]
 impl Factory for K8sFactory {
     fn versions<'a>(&'a self) -> Box<dyn Iterator<Item = Version> + 'a> {
@@ -101,7 +94,7 @@ impl Factory for K8sFactory {
             None => None,
         };
 
-        uninstall_from_k8s_cluster()?;
+        uninstall_from_k8s_cluster().await?;
         let era = clean_k8s_cluster(
             self.helm_repo.clone(),
             node_num.get(),

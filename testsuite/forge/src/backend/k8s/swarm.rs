@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    backend::k8s::node::K8sNode, create_k8s_client, query_sequence_numbers, remove_helm_release,
+    backend::k8s::node::K8sNode, create_k8s_client, query_sequence_numbers,
     set_validator_image_tag, ChainInfo, FullNode, Node, Result, Swarm, Validator, Version,
 };
 use ::aptos_logger::*;
@@ -170,8 +170,8 @@ impl Swarm for K8sSwarm {
         todo!()
     }
 
-    fn remove_validator(&mut self, id: PeerId) -> Result<()> {
-        remove_helm_release(self.validator(id).unwrap().name())
+    fn remove_validator(&mut self, _id: PeerId) -> Result<()> {
+        todo!()
     }
 
     fn add_full_node(&mut self, _version: &Version, _template: NodeConfig) -> Result<PeerId> {

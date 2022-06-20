@@ -185,9 +185,9 @@ fn main() -> Result<()> {
                 &set_validator.image_tag,
                 &set_validator.helm_repo,
             ),
-            OperatorCommand::CleanUp(_) => uninstall_from_k8s_cluster(),
+            OperatorCommand::CleanUp(_) => runtime.block_on(uninstall_from_k8s_cluster()),
             OperatorCommand::Resize(resize) => {
-                uninstall_from_k8s_cluster()?;
+                runtime.block_on(uninstall_from_k8s_cluster())?;
                 runtime.block_on(clean_k8s_cluster(
                     resize.helm_repo,
                     resize.num_validators,
