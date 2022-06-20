@@ -1,0 +1,91 @@
+terraform {
+  backend "s3" {}
+}
+
+provider "aws" {
+  region = var.region
+}
+
+data "aws_caller_identity" "current" {}
+
+locals {
+  workspace = var.workspace_name_override != "" ? var.workspace_name_override : terraform.workspace
+  aws_tags  = "Terraform=testnet,Workspace=${local.workspace}"
+}
+
+module "validator" {
+  source = "../aptos-node/aws"
+
+  region                      = var.region
+  iam_path                    = var.iam_path
+  permissions_boundary_policy = var.permissions_boundary_policy
+  workspace_name_override     = var.workspace_name_override
+
+  k8s_api_sources = var.admin_sources_ipv4
+  k8s_admin_roles = var.k8s_admin_roles
+  k8s_admins      = var.k8s_admins
+
+  chain_id       = var.chain_id
+  era            = var.era
+  chain_name     = var.chain_name
+  image_tag      = var.image_tag
+  validator_name = "aptos-node"
+
+  num_validators = var.num_validators
+  helm_values    = var.aptos_node_helm_values
+
+  # allow all nodegroups to surge to 2x their size, in case of total nodes replacement
+  validator_instance_num = var.num_validator_instance > 0 ? 2 * var.num_validator_instance : var.num_validators
+  # create one utility instance per validator, since HAProxy requires resources 1.5 CPU, 2Gi memory for now
+  utility_instance_num = var.num_utility_instance > 0 ? var.num_utility_instance : var.num_validators
+
+  utility_instance_type   = var.utility_instance_type
+  validator_instance_type = var.validator_instance_type
+
+  # addons
+  enable_monitoring      = true
+  enable_logger          = true
+  monitoring_helm_values = var.monitoring_helm_values
+  logger_helm_values     = var.logger_helm_values
+}
+
+locals {
+  aptos_node_helm_prefix = "${module.validator.helm_release_name}-aptos-node"
+}
+
+provider "helm" {
+  kubernetes {
+    host                   = module.validator.aws_eks_cluster.endpoint
+    cluster_ca_certificate = base64decode(module.validator.aws_eks_cluster.certificate_authority.0.data)
+    token                  = module.validator.aws_eks_cluster_auth_token
+  }
+}
+
+provider "kubernetes" {
+  host                   = module.validator.aws_eks_cluster.endpoint
+  cluster_ca_certificate = base64decode(module.validator.aws_eks_cluster.certificate_authority.0.data)
+  token                  = module.validator.aws_eks_cluster_auth_token
+}
+
+resource "helm_release" "genesis" {
+  name        = "genesis"
+  chart       = "${path.module}/../helm/genesis"
+  max_history = 5
+  wait        = false
+
+  values = [
+    jsonencode({
+      chain = {
+        name     = var.chain_name
+        era      = var.era
+        chain_id = var.chain_id
+      }
+      imageTag = var.image_tag
+      genesis = {
+        numValidators = var.num_validators
+        username_prefix = local.aptos_node_helm_prefix
+      }
+    }),
+    jsonencode(var.genesis_helm_values)
+  ]
+}

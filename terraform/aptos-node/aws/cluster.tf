@@ -33,12 +33,16 @@ locals {
   pools = {
     utilities = {
       instance_type = var.utility_instance_type
-      size          = var.utility_instance_num
+      min_size      = var.utility_instance_min_num
+      desired_size  = var.utility_instance_num
+      max_size      = var.utility_instance_max_num > 0 ? var.utility_instance_max_num : 2 * var.utility_instance_num
       taint         = false
     }
     validators = {
       instance_type = var.validator_instance_type
-      size          = var.validator_instance_num
+      min_size      = var.validator_instance_min_num
+      desired_size  = var.validator_instance_num
+      max_size      = var.validator_instance_max_num > 0 ? var.validator_instance_max_num : 2 * var.validator_instance_num
       taint         = true
     }
   }
@@ -48,7 +52,7 @@ resource "aws_launch_template" "nodes" {
   for_each      = local.pools
   name          = "aptos-${local.workspace_name}/${each.key}"
   instance_type = each.value.instance_type
-  user_data     = base64encode(
+  user_data = base64encode(
     templatefile("${path.module}/templates/eks_user_data.sh", {
       taints = each.value.taint ? "aptos.org/nodepool=${each.key}:NoExecute" : ""
     })
@@ -71,19 +75,26 @@ resource "aws_eks_node_group" "nodes" {
   subnet_ids      = [aws_subnet.private[0].id]
   tags            = local.default_tags
 
+  lifecycle {
+    ignore_changes = [
+      # ignore changes to the desired size that may occur due to cluster autoscaler
+      scaling_config[0].desired_size
+    ]
+  }
+
   launch_template {
     id      = aws_launch_template.nodes[each.key].id
     version = aws_launch_template.nodes[each.key].latest_version
   }
 
   scaling_config {
-    desired_size = lookup(var.node_pool_sizes, each.key, each.value.size)
-    min_size     = lookup(var.node_pool_sizes, each.key, each.value.size)
-    max_size     = lookup(var.node_pool_sizes, each.key, each.value.size)
+    desired_size = each.value.desired_size
+    min_size     = each.value.min_size
+    max_size     = each.value.max_size
   }
 
   update_config {
-    max_unavailable = 1
+    max_unavailable_percentage = 50
   }
 
   depends_on = [
@@ -92,4 +103,14 @@ resource "aws_eks_node_group" "nodes" {
     aws_iam_role_policy_attachment.nodes-ecr,
     kubernetes_config_map.aws-auth,
   ]
+}
+
+resource "aws_iam_openid_connect_provider" "cluster" {
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = ["9e99a48a9960b14926bb7f3b02e22da2b0ab7280"] # Thumbprint of Root CA for EKS OIDC, Valid until 2037
+  url             = aws_eks_cluster.aptos.identity[0].oidc[0].issuer
+}
+
+locals {
+  oidc_provider = replace(aws_iam_openid_connect_provider.cluster.url, "https://", "")
 }
