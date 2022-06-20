@@ -6,7 +6,7 @@ custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/crypto/crypt
 
 The crypto component hosts all the implementations of cryptographic primitives we use in Aptos: hashing, (multi)signatures, and key derivation/generation.
 
-To enforce type safety for signature schemes, we rely on traits from  [`traits.rs`](src/traits.rs) and [`validatable.rs`](src/validatable.rs).
+To enforce type-safety for signature schemes, we rely on traits from  [`traits.rs`](src/traits.rs) and [`validatable.rs`](src/validatable.rs).
 
 ## Overview
 
@@ -31,7 +31,7 @@ Aptos makes use of several cryptographic algorithms:
 
 ## Traits for safer cryptography implementation
 
-Before implementing a cryptographic primitive, be sure to read [`traits.rs`](src/traits.rs) and [`validatable.rs`](src/validatable.rs) to understand how to comply with our API as well as **some** of the security issues involved.
+Before implementing a cryptographic primitive, be sure to read [`traits.rs`](src/traits.rs) and [`validatable.rs`](src/validatable.rs) to understand how to comply with our API as well as **some** of the security concerns involved.
 
 ## How is this module organized?
 ```
