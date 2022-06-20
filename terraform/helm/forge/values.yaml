@@ -1,4 +1,4 @@
-# Experimental "Forge" testing framework
+# Forge testing framework
 forge:
   numValidators:
   helmBucket:
@@ -25,23 +25,3 @@ serviceAccount:
   name:
   annotations: {}
 
-vault:
-  image:
-    repo: vault
-    tag: 1.4.0
-    pullPolicy: IfNotPresent
-  resources:
-    limits:
-      cpu: 0.1
-      memory: 128Mi
-    requests:
-      cpu: 0.1
-      memory: 128Mi
-  server:
-    address:
-  tls: {}
-  auth:
-    type: kubernetes
-    mount_path: auth/kubernetes-val0
-    config:
-      role: forge

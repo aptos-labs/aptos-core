@@ -9,14 +9,11 @@ import tempfile
 import time
 
 FORGE_K8S_CLUSTERS = [
-    "forge-0",
-    "forge-1",
+    "rustie-test"
 ]
 
 WORKSPACE_CHART_BUCKETS = {
-    "forge-0": "aptos-testnet-forge-0-helm-312428ba",
-    "forge-1": "aptos-testnet-forge-1-helm-a2b65112",
-    "forge-dev": "aptos-testnet-forge-dev-helm-8d0a5291",
+    "rustie-test": "aptos-testnet-rustie-test-helm-0066a343"
 }
 
 AWS_ACCOUNT = (
@@ -74,7 +71,10 @@ def create_forge_job(context, user, tag, base_tag, timeout_secs, forge_envs, for
     cmd = template["spec"]["template"]["spec"]["containers"][0]["command"][2]
     template["spec"]["template"]["spec"]["containers"][0]["command"][2] = cmd.replace(
         "tail -f /dev/null",
-        f"timeout {timeout_secs} forge {' '.join(forge_args)} test k8s-swarm --cluster-name {cluster_name} --image-tag {tag} --base-image-tag {base_tag}".strip(),
+        "echo hello world"
+        # TODO(rustielin): actually start forge when the rust bindings are complete
+        #                  forge is shut down in the interim
+        # f"timeout {timeout_secs} forge {' '.join(forge_args)} test k8s-swarm --cluster-name {cluster_name} --image-tag {tag} --base-image-tag {base_tag}".strip(),
     )
     # additional environment variables
     for env_var in forge_envs:
@@ -305,16 +305,17 @@ def get_forge_job_jsonpath(job_name, context, jsonpath):
     )
 
 
+# TODO(rustielin|geekflyer): init at an s3 path matching the forge namespace for full autoscaling
 def helm_s3_init(workspace):
     """Initializes the S3 bucket used as an internal Helm repo for Forge"""
     bucket_url = WORKSPACE_CHART_BUCKETS[workspace]
     subprocess.run(
-        f"helm plugin install https://github.com/hypnoglow/helm-s3.git || true",
+        f"helm plugin install https://github.com/C123R/helm-blob.git || true",
         shell=True,
         check=True
     )
     subprocess.run(
-        ["helm", "s3", "init", f"s3://{bucket_url}/charts"],
+        ["helm", "blob", "init", f"s3://{bucket_url}/charts"],
         check=True
     )
     subprocess.run(
@@ -341,7 +342,7 @@ def helm_package_push(chart_path, chart_name, workspace, dir):
         check=True
     )
     subprocess.run(
-        f"helm s3 push --force {dir}/{chart_name}-*.tgz testnet-{workspace}",
+        f"helm blob push --force {dir}/{chart_name}-*.tgz testnet-{workspace}",
         shell=True,
         check=True,
     )
@@ -354,9 +355,7 @@ def push_helm_charts(workspace):
     """
     helm_s3_init(workspace)
     tempdir = tempfile.mkdtemp()
-    helm_package_push("terraform/testnet/testnet",
-                      "testnet", workspace, tempdir)
-    helm_package_push("terraform/helm/validator",
-                      "aptos-validator", workspace, tempdir)
-    helm_package_push("terraform/helm/fullnode",
-                      "aptos-fullnode", workspace, tempdir)
+    helm_package_push("terraform/helm/genesis",
+                      "aptos-genesis", workspace, tempdir)
+    helm_package_push("terraform/helm/aptos-node",
+                      "aptos-node", workspace, tempdir)

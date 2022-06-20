@@ -7,8 +7,3 @@
 helm plugin install https://github.com/hypnoglow/helm-s3.git
 helm repo add testnet-internal s3://{{ .Values.forge.helmBucket }}/charts
 helm search repo testnet-internal --versions
-
-# init vault
-export VAULT_ADDR="{{ .Values.vault.server.address }}"
-export VAULT_CACERT="{{ .Values.vault.server.ca_cert }}"
-export VAULT_TOKEN=$(cat /opt/vault/token)

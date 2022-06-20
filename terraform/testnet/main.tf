@@ -150,7 +150,6 @@ resource "helm_release" "validator" {
   values = [
     module.validator.helm_values,
     jsonencode({
-      exposeValidatorRestApi = var.enable_forge
       validator = {
         name = "val${count.index}"
       }
@@ -200,7 +199,7 @@ resource "helm_release" "public-fullnode" {
   count       = var.num_public_fullnodes
   name        = "pfn${count.index}"
   chart       = "${path.module}/../helm/fullnode"
-  max_history = var.enable_forge ? 2 : 10
+  max_history = 10
   wait        = false
 
   values = [
@@ -237,7 +236,7 @@ resource "helm_release" "pfn-logger" {
   count       = var.enable_pfn_logger ? 1 : 0
   name        = "testnet-pfn"
   chart       = "${path.module}/../../helm/logger"
-  max_history = var.enable_forge ? 2 : 10
+  max_history = 10
   wait        = false
 
   values = [
@@ -250,45 +249,6 @@ resource "helm_release" "pfn-logger" {
         name = "aptos-${terraform.workspace}"
       }
     }),
-  ]
-
-  set {
-    name  = "timestamp"
-    value = timestamp()
-  }
-}
-
-resource "helm_release" "forge" {
-  count       = var.enable_forge ? 1 : 0
-  name        = "forge"
-  chart       = "${path.module}/forge"
-  max_history = 2
-  wait        = false
-
-  depends_on = [
-    null_resource.helm-s3-package
-  ]
-
-  values = [
-    jsonencode({
-      forge = {
-        numValidators = var.num_validators
-        helmBucket    = aws_s3_bucket.aptos-testnet-helm[0].bucket
-        image = {
-          tag = local.image_tag
-        }
-      }
-      serviceAccount = {
-        annotations = {
-          "eks.amazonaws.com/role-arn" = aws_iam_role.forge[0].arn
-        }
-      }
-      vault = {
-        server = module.validator.vault.server
-        tls    = module.validator.vault.tls
-      }
-    }),
-    jsonencode(var.forge_helm_values),
   ]
 
   set {

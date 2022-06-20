@@ -135,3 +135,15 @@ variable "validator_instance_type" {
   default     = "c5.xlarge"
 }
 
+### Forge
+
+variable "enable_forge" {
+  description = "Enable Forge test framework, also creating an internal helm repo"
+  default     = false
+}
+
+variable "forge_helm_values" {
+  description = "Map of values to pass to Forge Helm"
+  type        = any
+  default     = {}
+}
