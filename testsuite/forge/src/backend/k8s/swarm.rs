@@ -20,7 +20,7 @@ use kube::{
     api::{Api, ListParams},
     client::Client as K8sClient,
 };
-use std::{collections::HashMap, convert::TryFrom, env, process::Command, str, sync::Arc};
+use std::{collections::HashMap, convert::TryFrom, env, str, sync::Arc};
 use tokio::time::Duration;
 
 const JSON_RPC_PORT: u32 = 80;
@@ -33,7 +33,6 @@ pub struct K8sSwarm {
     fullnodes: HashMap<PeerId, K8sNode>,
     root_account: LocalAccount,
     kube_client: K8sClient,
-    cluster_name: String,
     helm_repo: String,
     versions: Arc<HashMap<Version, String>>,
     pub chain_id: ChainId,
@@ -42,7 +41,6 @@ pub struct K8sSwarm {
 impl K8sSwarm {
     pub async fn new(
         root_key: &[u8],
-        cluster_name: &str,
         helm_repo: &str,
         image_tag: &str,
         base_image_tag: &str,
@@ -80,7 +78,6 @@ impl K8sSwarm {
             root_account,
             kube_client,
             chain_id: ChainId::new(NamedChain::DEVNET.id()),
-            cluster_name: cluster_name.to_string(),
             helm_repo: helm_repo.to_string(),
             versions: Arc::new(versions),
         })
@@ -193,21 +190,10 @@ impl Swarm for K8sSwarm {
         ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
     }
 
-    // Returns env CENTRAL_LOGGING_ADDRESS if present (without timestamps)
-    // otherwise returns a kubectl logs command to retrieve the logs manually
+    // returns a kubectl logs command to retrieve the logs manually
+    // and instructions to check the actual live logs location from fgi
     fn logs_location(&mut self) -> String {
-        if let Ok(central_logging_address) = std::env::var("CENTRAL_LOGGING_ADDRESS") {
-            central_logging_address
-        } else {
-            let hostname_output = Command::new("hostname")
-                .output()
-                .expect("failed to get pod hostname");
-            let hostname = String::from_utf8(hostname_output.stdout).unwrap();
-            format!(
-                "aws eks --region us-west-2 update-kubeconfig --name {} && kubectl logs {}",
-                &self.cluster_name, hostname
-            )
-        }
+        "See fgi output for more information.".to_string()
     }
 }
 
