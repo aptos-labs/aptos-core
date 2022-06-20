@@ -38,7 +38,7 @@ impl MetadataBackend for MockHistory {
 }
 
 fn create_block(epoch: u64, proposer: Author, voters: Vec<bool>) -> NewBlockEvent {
-    NewBlockEvent::new(epoch, 0, voters, proposer, 0)
+    NewBlockEvent::new(epoch, 0, voters, proposer, vec![], 0)
 }
 
 #[test]

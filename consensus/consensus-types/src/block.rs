@@ -23,6 +23,7 @@ use mirai_annotations::debug_checked_verify_eq;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{
     collections::BTreeMap,
+    convert::TryFrom,
     fmt::{self, Display, Formatter},
     iter::once,
 };
@@ -348,6 +349,11 @@ impl Block {
             Self::voters_to_bitmap(validators, self.quorum_cert().ledger_info().signatures()),
             // For nil block, we use 0x0 which is convention for nil address in move.
             self.author().unwrap_or(AccountAddress::ZERO),
+            self.block_data()
+                .failed_authors()
+                .map_or(vec![], |failed_authors| {
+                    Self::failed_authors_to_indices(validators, failed_authors)
+                }),
             self.timestamp_usecs(),
         )
     }
@@ -359,6 +365,27 @@ impl Block {
         validators
             .iter()
             .map(|address| voters.contains_key(address))
+            .collect()
+    }
+
+    fn failed_authors_to_indices(
+        validators: &[AccountAddress],
+        failed_authors: &[(Round, Author)],
+    ) -> Vec<u32> {
+        failed_authors
+            .iter()
+            .map(|(_round, failed_author)| {
+                validators
+                    .iter()
+                    .position(|&v| v == *failed_author)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Failed author {} not in validator list {:?}",
+                            *failed_author, validators
+                        )
+                    })
+            })
+            .map(|index| u32::try_from(index).unwrap())
             .collect()
     }
 }

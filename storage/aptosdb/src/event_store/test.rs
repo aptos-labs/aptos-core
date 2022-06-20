@@ -274,9 +274,11 @@ prop_compose! {
             version += v;
             timestamp += t;
             let new_block_event = NewBlockEvent::new(
+                0, // epoch
                 seq, // round
+                vec![], // prev block voters
                 address, // proposer
-                Vec::new(), // prev block voters
+                Vec::new(), // failed_proposers
                 timestamp,
             );
             let event = ContractEvent::new(

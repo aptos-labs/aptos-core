@@ -35,6 +35,8 @@ BlockMetadata:
         SEQ: BOOL
     - proposer:
         TYPENAME: AccountAddress
+    - failed_proposer_indices:
+        SEQ: U32
     - timestamp_usecs: U64
 ChainId:
   NEWTYPESTRUCT: U8

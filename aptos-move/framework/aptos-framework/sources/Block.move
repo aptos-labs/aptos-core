@@ -21,6 +21,7 @@ module AptosFramework::Block {
         round: u64,
         previous_block_votes: vector<bool>,
         proposer: address,
+        failed_proposer_indices: vector<u64>,
         /// On-chain time during  he block at the given height
         time_microseconds: u64,
     }
@@ -62,6 +63,7 @@ module AptosFramework::Block {
         previous_block_votes: vector<bool>,
         missed_votes: vector<u64>,
         proposer: address,
+        failed_proposer_indices: vector<u64>,
         timestamp: u64
     ) acquires BlockMetadata {
         Timestamp::assert_operating();
@@ -84,6 +86,7 @@ module AptosFramework::Block {
                 round,
                 previous_block_votes,
                 proposer,
+                failed_proposer_indices,
                 time_microseconds: timestamp,
             }
         );
