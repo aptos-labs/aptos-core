@@ -13,11 +13,12 @@ import {
 } from '@chakra-ui/react';
 import React from 'react';
 import SquareBox from 'core/components/SquareBox';
-import CreateNFTModal from 'core/components/CreateNFTModal';
+import CreateNFTModal from 'core/components/CreateNFTDrawer';
 import GalleryItem from 'core/components/GalleryItem';
 import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import WalletLayout from 'core/layouts/WalletLayout';
 import { useGalleryItems } from 'core/queries/collectibles';
+import AuthLayout from 'core/layouts/AuthLayout';
 
 const secondaryBorderColor = {
   dark: 'gray.600',
@@ -31,19 +32,20 @@ function Gallery() {
   } = useGalleryItems();
 
   return (
-    <WalletLayout>
-      <VStack width="100%" paddingTop={8} px={4}>
-        <Grid pb={4} templateColumns="1fr 72px" width="100%">
-          <Heading fontSize="xl">Collectibles</Heading>
-          <Flex justifyContent="right">
-            <CreateNFTModal />
+    <AuthLayout redirectPath="/">
+      <WalletLayout>
+        <VStack width="100%" paddingTop={8} px={4}>
+          <Grid pb={4} templateColumns="1fr 72px" width="100%">
+            <Heading fontSize="xl">Collectibles</Heading>
+            <Flex justifyContent="right">
+              <CreateNFTModal />
+            </Flex>
+          </Grid>
+          <Flex alignItems="flex-start" width="100%">
+            <Heading fontWeight={500} fontSize="md">Created by you</Heading>
           </Flex>
-        </Grid>
-        <Flex alignItems="flex-start" width="100%">
-          <Heading fontWeight={500} fontSize="md">Created by you</Heading>
-        </Flex>
-        <SimpleGrid w="100%" columns={2} spacing={2}>
-          {
+          <SimpleGrid w="100%" columns={2} spacing={2}>
+            {
             (galleryItems && galleryItems.length > 0)
               ? (
                 galleryItems?.map((item) => (
@@ -62,10 +64,11 @@ function Gallery() {
                 </SquareBox>
               )
           }
-        </SimpleGrid>
-      </VStack>
-    </WalletLayout>
+          </SimpleGrid>
+        </VStack>
+      </WalletLayout>
+    </AuthLayout>
   );
 }
 
-export default withSimulatedExtensionContainer(Gallery);
+export default withSimulatedExtensionContainer({ Component: Gallery });

@@ -21,7 +21,7 @@ import Network from 'pages/Network';
 import Token from 'pages/Token';
 
 const theme: ThemeConfig = extendTheme({
-  initialColorMode: 'dark',
+  initialColorMode: 'light',
   styles: {
     global: {
       'html, body': {
@@ -43,7 +43,7 @@ root.render(
     <QueryClientProvider client={queryClient}>
       <ChakraProvider theme={theme}>
         <WalletStateProvider>
-          <MemoryRouter initialEntries={['/']}>
+          <MemoryRouter>
             <Routes>
               <Route path="/" element={<Login />} />
               <Route path="/wallet" element={<Wallet />} />

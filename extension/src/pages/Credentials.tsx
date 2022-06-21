@@ -9,17 +9,21 @@ import {
 import WalletLayout from 'core/layouts/WalletLayout';
 import CredentialsBody from 'core/components/CredentialsBody';
 import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
+import AuthLayout from 'core/layouts/AuthLayout';
 
 function Credentials() {
   return (
-    <WalletLayout backPage="/settings">
-      <VStack width="100%" paddingTop={8}>
-        <Box px={4} pb={4} width="100%">
-          <CredentialsBody />
-        </Box>
-      </VStack>
-    </WalletLayout>
+    <AuthLayout redirectPath="/">
+      <WalletLayout backPage="/settings">
+        <VStack width="100%" paddingTop={8}>
+          <Box px={4} pb={4} width="100%">
+            <CredentialsBody />
+          </Box>
+        </VStack>
+      </WalletLayout>
+    </AuthLayout>
+
   );
 }
 
-export default withSimulatedExtensionContainer(Credentials);
+export default withSimulatedExtensionContainer({ Component: Credentials });

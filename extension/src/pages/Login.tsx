@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { AptosAccount } from 'aptos';
 import { Buffer } from 'buffer';
 import {
@@ -27,6 +27,7 @@ import { AptosWhiteLogo, AptosBlackLogo } from 'core/components/AptosLogo';
 import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import { secondaryBgColor, secondaryErrorMessageColor } from 'core/constants';
 import { getAccountResources } from 'core/queries/account';
+import ReverseAuthLayout from 'core/layouts/ReverseAuthLayout';
 
 export const secondaryTextColor = {
   dark: 'gray.400',
@@ -35,7 +36,7 @@ export const secondaryTextColor = {
 
 function Login() {
   const { colorMode } = useColorMode();
-  const { aptosAccount, aptosNetwork, updateWalletState } = useWalletState();
+  const { aptosNetwork, updateWalletState } = useWalletState();
   const navigate = useNavigate();
   const {
     formState: { errors }, handleSubmit, register, setError, watch,
@@ -63,82 +64,80 @@ function Login() {
     }
   };
 
-  useEffect(() => {
-    if (aptosAccount) {
-      navigate('/wallet');
-    }
-  }, [aptosAccount, navigate]);
-
   return (
-    <VStack
-      bgColor={secondaryBgColor[colorMode]}
-      justifyContent="center"
-      spacing={4}
-      width="100%"
-      height="100%"
-    >
-      <Flex w="100%" flexDir="column">
-        <Center>
-          <Box width="75px" pb={4}>
-            {
+    <ReverseAuthLayout redirectPath="/wallet">
+      <VStack
+        bgColor={secondaryBgColor[colorMode]}
+        justifyContent="center"
+        spacing={4}
+        width="100%"
+        height="100%"
+      >
+        <Flex w="100%" flexDir="column">
+          <Center>
+            <Box width="75px" pb={4}>
+              {
               (colorMode === 'dark')
                 ? <AptosWhiteLogo />
                 : <AptosBlackLogo />
             }
-          </Box>
-        </Center>
-        <Heading textAlign="center">Wallet</Heading>
-        <Text
-          textAlign="center"
-          pb={8}
-          color={secondaryTextColor[colorMode]}
-          fontSize="lg"
-        >
-          An Aptos crypto wallet
-        </Text>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <VStack spacing={4}>
-            <Center minW="100%" px={4}>
-              <Box>
-                <InputGroup>
-                  <Input
-                    maxW="350px"
-                    {...register('privateKey')}
-                    variant="filled"
-                    required
-                    placeholder="Private key..."
-                    autoComplete="off"
-                  />
-                  <InputRightAddon>
-                    <Button type="submit" variant="unstyled">
-                      Submit
-                    </Button>
-                  </InputRightAddon>
-                </InputGroup>
-                <Center>
-                  <Text fontSize="xs" color={secondaryErrorMessageColor[colorMode]}>
-                    {(errors?.privateKey?.message)}
-                  </Text>
-                </Center>
-              </Box>
-            </Center>
-            <ChakraLink to="/create-wallet">
-              <Button colorScheme="teal" variant="ghost">
-                Create a new wallet
-              </Button>
-            </ChakraLink>
-          </VStack>
-        </form>
-      </Flex>
-      {/* TODO: Fill this in later */}
-      {/* <HStack spacing={2} color={secondaryTextColor[colorMode]}>
+            </Box>
+          </Center>
+          <Heading textAlign="center">Wallet</Heading>
+          <Text
+            textAlign="center"
+            pb={8}
+            color={secondaryTextColor[colorMode]}
+            fontSize="lg"
+          >
+            An Aptos crypto wallet
+          </Text>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <VStack spacing={4}>
+              <Center minW="100%" px={4}>
+                <Box>
+                  <InputGroup>
+                    <Input
+                      maxW="350px"
+                      {...register('privateKey')}
+                      variant="filled"
+                      required
+                      placeholder="Private key..."
+                      autoComplete="off"
+                    />
+                    <InputRightAddon>
+                      <Button type="submit" variant="unstyled">
+                        Submit
+                      </Button>
+                    </InputRightAddon>
+                  </InputGroup>
+                  <Center>
+                    <Text fontSize="xs" color={secondaryErrorMessageColor[colorMode]}>
+                      {(errors?.privateKey?.message)}
+                    </Text>
+                  </Center>
+                </Box>
+              </Center>
+              <ChakraLink to="/create-wallet">
+                <Button colorScheme="teal" variant="ghost">
+                  Create a new wallet
+                </Button>
+              </ChakraLink>
+            </VStack>
+          </form>
+        </Flex>
+        {/* TODO: Fill this in later */}
+        {/* <HStack spacing={2} color={secondaryTextColor[colorMode]}>
         <QuestionIcon />
         <ChakraLink to="/help" fontSize="xs">
           Help
         </ChakraLink>
       </HStack> */}
-    </VStack>
+      </VStack>
+    </ReverseAuthLayout>
   );
 }
 
-export default withSimulatedExtensionContainer(Login);
+export default withSimulatedExtensionContainer({
+  Component: Login,
+});

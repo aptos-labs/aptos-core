@@ -3,15 +3,19 @@
 
 import TokenBody from 'core/components/TokenBody';
 import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
+import AuthLayout from 'core/layouts/AuthLayout';
 import WalletLayout from 'core/layouts/WalletLayout';
 import React from 'react';
 
 function Token() {
   return (
-    <WalletLayout backPage="/gallery">
-      <TokenBody />
-    </WalletLayout>
+    <AuthLayout redirectPath="/">
+      <WalletLayout backPage="/gallery">
+        <TokenBody />
+      </WalletLayout>
+    </AuthLayout>
+
   );
 }
 
-export default withSimulatedExtensionContainer(Token);
+export default withSimulatedExtensionContainer({ Component: Token });

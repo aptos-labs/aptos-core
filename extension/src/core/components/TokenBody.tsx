@@ -163,7 +163,7 @@ function TokenBody() {
                 <Icon fontSize={28} as={BsFillCollectionFill} />
               </Box>
               <Box>
-                <Text>{data?.collection}</Text>
+                <Text fontSize="md">{data?.collection}</Text>
                 <Text fontSize="xs" fontWeight={600} color={secondaryAttributeColor[colorMode]}>Collection</Text>
               </Box>
             </Grid>

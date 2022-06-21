@@ -19,6 +19,7 @@ import useWalletState from 'core/hooks/useWalletState';
 import WalletLayout from 'core/layouts/WalletLayout';
 import SettingsPaths from 'core/components/SettingsPaths';
 import SettingsListItem from 'core/components/SettingsListItem';
+import AuthLayout from 'core/layouts/AuthLayout';
 import withSimulatedExtensionContainer from '../core/components/WithSimulatedExtensionContainer';
 import { CredentialHeaderAndBodyProps } from './CreateWallet';
 import { secondaryTextColor } from './Login';
@@ -55,26 +56,27 @@ function Account() {
   const explorerAddress = `https://explorer.devnet.aptos.dev/account/${address}`;
 
   return (
-    <WalletLayout>
-      <VStack width="100%" paddingTop={8}>
-        <Box px={4} pb={4} width="100%">
-          <Heading fontSize="xl">Settings</Heading>
-          <Flex pb={2} pt={1}>
-            <Button
-              fontSize="sm"
-              fontWeight={400}
-              as="a"
-              target="_blank"
-              rightIcon={<ExternalLinkIcon />}
-              variant="unstyled"
-              cursor="pointer"
-              href={explorerAddress}
-            >
-              View on explorer
-            </Button>
-          </Flex>
-          <VStack spacing={2}>
-            {
+    <AuthLayout redirectPath="/">
+      <WalletLayout>
+        <VStack width="100%" paddingTop={8}>
+          <Box px={4} pb={4} width="100%">
+            <Heading fontSize="xl">Settings</Heading>
+            <Flex pb={2} pt={1}>
+              <Button
+                fontSize="sm"
+                fontWeight={400}
+                as="a"
+                target="_blank"
+                rightIcon={<ExternalLinkIcon />}
+                variant="unstyled"
+                cursor="pointer"
+                href={explorerAddress}
+              >
+                View on explorer
+              </Button>
+            </Flex>
+            <VStack spacing={2}>
+              {
               SettingsPaths.map((value) => (
                 <SettingsListItem
                   key={value.path}
@@ -82,11 +84,12 @@ function Account() {
                 />
               ))
             }
-          </VStack>
-        </Box>
-      </VStack>
-    </WalletLayout>
+            </VStack>
+          </Box>
+        </VStack>
+      </WalletLayout>
+    </AuthLayout>
   );
 }
 
-export default withSimulatedExtensionContainer(Account);
+export default withSimulatedExtensionContainer({ Component: Account });

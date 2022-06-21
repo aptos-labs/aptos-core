@@ -22,6 +22,7 @@ import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtens
 import { createNewAccount } from 'core/utils/account';
 import { secondaryBgColor } from 'core/constants';
 import { ChevronRightIcon } from '@chakra-ui/icons';
+import ReverseAuthLayout from 'core/layouts/ReverseAuthLayout';
 
 export interface CredentialHeaderAndBodyProps {
   body?: string;
@@ -125,18 +126,22 @@ function CreateWallet() {
   const { colorMode } = useColorMode();
 
   return (
-    <VStack
-      bgColor={secondaryBgColor[colorMode]}
-      spacing={4}
-      width="100%"
-      height="100%"
-    >
-      <CreateWalletHeader />
-      <VStack width="100%" pt={4}>
-        <NewAccountState />
+    <ReverseAuthLayout redirectPath="/wallet">
+      <VStack
+        bgColor={secondaryBgColor[colorMode]}
+        spacing={4}
+        width="100%"
+        height="100%"
+      >
+        <CreateWalletHeader />
+        <VStack width="100%" pt={4}>
+          <NewAccountState />
+        </VStack>
       </VStack>
-    </VStack>
+    </ReverseAuthLayout>
   );
 }
 
-export default withSimulatedExtensionContainer(CreateWallet);
+export default withSimulatedExtensionContainer({
+  Component: CreateWallet,
+});

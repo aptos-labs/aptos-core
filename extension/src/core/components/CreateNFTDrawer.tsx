@@ -78,7 +78,7 @@ export default function CreateNFTModal() {
         <DrawerContent>
           <form onSubmit={handleSubmit(onSubmit)}>
             <DrawerHeader>Create a collectible</DrawerHeader>
-            <DrawerBody>
+            <DrawerBody overflowY="auto" maxH="450px">
               <VStack>
                 <FormControl isRequired>
                   <FormLabel fontWeight={400} color={secondaryTextColor[colorMode]}>
@@ -142,6 +142,7 @@ export default function CreateNFTModal() {
                       <Button
                         fontSize="md"
                         fontWeight={400}
+                        height="24px"
                         as="a"
                         target="_blank"
                         rightIcon={<ExternalLinkIcon />}
@@ -165,7 +166,7 @@ export default function CreateNFTModal() {
                 {
                   (isError)
                     ? (
-                      <Text color="red.400">
+                      <Text color="red.400" maxW="100%">
                         {errorMessage}
                       </Text>
                     )
