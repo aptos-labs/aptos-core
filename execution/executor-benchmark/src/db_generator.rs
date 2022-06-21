@@ -1,10 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
-    StateCommitter, TransactionCommitter,
-};
+use crate::{transaction_generator::TransactionGenerator, Pipeline};
 use aptos_config::{
     config::{RocksdbConfig, StoragePrunerConfig},
     utils::get_genesis_txn,
@@ -19,12 +16,7 @@ use executor::{
     block_executor::BlockExecutor,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
 };
-use executor_types::BlockExecutorTrait;
-use std::{
-    fs,
-    path::Path,
-    sync::{mpsc, Arc},
-};
+use std::{fs, path::Path};
 use storage_interface::DbReaderWriter;
 
 pub fn run(
@@ -59,68 +51,13 @@ pub fn run(
     let waypoint = generate_waypoint::<AptosVM>(&db_rw, get_genesis_txn(&config).unwrap()).unwrap();
     maybe_bootstrap::<AptosVM>(&db_rw, get_genesis_txn(&config).unwrap(), waypoint).unwrap();
 
-    let executor = Arc::new(BlockExecutor::new(db_rw.clone()));
-    let base_smt = executor.root_smt();
-    let executor_2 = executor.clone();
-    let genesis_block_id = executor.committed_block_id();
-    let (block_sender, block_receiver) = mpsc::sync_channel(3 /* bound */);
-    let (commit_sender, commit_receiver) = mpsc::sync_channel(3 /* bound */);
-    let (state_commit_sender, state_commit_receiver) = mpsc::sync_channel(100 /* bound */);
-
-    // Set a progressing bar
-    // Spawn threads to run transaction generator, executor and committer separately.
-    let gen_thread = std::thread::Builder::new()
-        .name("txn_generator".to_string())
-        .spawn(move || {
-            let mut generator =
-                TransactionGenerator::new_with_sender(genesis_key, num_accounts, block_sender);
-            generator.run_mint(init_account_balance, block_size);
-            generator
-        })
-        .expect("Failed to spawn transaction generator thread.");
-    let exe_thread = std::thread::Builder::new()
-        .name("txn_executor".to_string())
-        .spawn(move || {
-            let mut exe = TransactionExecutor::new(
-                executor,
-                genesis_block_id,
-                0, /* start_verison */
-                Some(commit_sender),
-            );
-            while let Ok(transactions) = block_receiver.recv() {
-                exe.execute_block(transactions);
-            }
-        })
-        .expect("Failed to spawn transaction executor thread.");
-    let commit_thread = std::thread::Builder::new()
-        .name("txn_committer".to_string())
-        .spawn(move || {
-            let mut committer =
-                TransactionCommitter::new(executor_2, 0, commit_receiver, state_commit_sender);
-            committer.run();
-        })
-        .expect("Failed to spawn transaction committer thread.");
-    let db_writer = db_rw.writer.clone();
-    let state_commit_thread = std::thread::Builder::new()
-        .name("state_committer".to_string())
-        .spawn(|| {
-            let committer =
-                StateCommitter::new(state_commit_receiver, db_writer, base_smt, Some(0));
-            committer.run();
-        })
-        .expect("Failed to spawn transaction committer thread.");
-
-    // Wait for generator to finish.
-    let mut generator = gen_thread.join().unwrap();
-
-    println!("Finishing up...");
-
+    let executor = BlockExecutor::new(db_rw.clone());
+    let (pipeline, block_sender) = Pipeline::new(db_rw, executor, 0);
+    let mut generator =
+        TransactionGenerator::new_with_sender(genesis_key, num_accounts, block_sender);
+    generator.run_mint(init_account_balance, block_size);
     generator.drop_sender();
-    // Wait until all transactions are committed.
-    exe_thread.join().unwrap();
-    commit_thread.join().unwrap();
-    aptos_logger::Logger::new().init(); // see final logs on screen
-    state_commit_thread.join().unwrap();
+    pipeline.join();
 
     if verify_sequence_numbers {
         println!("Verifying sequence numbers...");
