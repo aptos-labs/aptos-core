@@ -106,7 +106,7 @@ test(
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString('0x1::TestCoin::TestCoin'));
 
     const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natual(
+      TxnBuilderTypes.ScriptFunction.natural(
         '0x1::Coin',
         'transfer',
         [token],
@@ -177,7 +177,7 @@ test(
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString('0x1::TestCoin::TestCoin'));
 
     const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natual(
+      TxnBuilderTypes.ScriptFunction.natural(
         '0x1::Coin',
         'transfer',
         [token],

@@ -53,7 +53,7 @@ function sign(rawTxn: RawTransaction): Bytes {
 
 test('serialize script function payload with no type args', () => {
   const scriptFunctionPayload = new TransactionPayloadScriptFunction(
-    ScriptFunction.natual(
+    ScriptFunction.natural(
       `${ADDRESS_1}::TestCoin`,
       'transfer',
       [],
@@ -82,7 +82,7 @@ test('serialize script function payload with type args', () => {
   const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::TestCoin::TestCoin`));
 
   const scriptFunctionPayload = new TransactionPayloadScriptFunction(
-    ScriptFunction.natual(
+    ScriptFunction.natural(
       `${ADDRESS_1}::Coin`,
       'transfer',
       [token],
@@ -111,7 +111,7 @@ test('serialize script function payload with type args but no function args', ()
   const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::TestCoin::TestCoin`));
 
   const scriptFunctionPayload = new TransactionPayloadScriptFunction(
-    ScriptFunction.natual(`${ADDRESS_1}::Coin`, 'fake_func', [token], []),
+    ScriptFunction.natural(`${ADDRESS_1}::Coin`, 'fake_func', [token], []),
   );
 
   const rawTxn = new RawTransaction(

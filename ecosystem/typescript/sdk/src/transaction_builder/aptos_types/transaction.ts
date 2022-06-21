@@ -161,8 +161,17 @@ export class ScriptFunction {
    * ```
    * @returns
    */
-  static natual(module: string, func: string, ty_args: Seq<TypeTag>, args: Seq<Bytes>): ScriptFunction {
+  static natural(module: string, func: string, ty_args: Seq<TypeTag>, args: Seq<Bytes>): ScriptFunction {
     return new ScriptFunction(ModuleId.fromStr(module), new Identifier(func), ty_args, args);
+  }
+
+  /**
+   * `natual` is deprecated, please use `natural`
+   *
+   * @deprecated.
+   */
+  static natual(module: string, func: string, ty_args: Seq<TypeTag>, args: Seq<Bytes>): ScriptFunction {
+    return ScriptFunction.natural(module, func, ty_args, args);
   }
 
   serialize(serializer: Serializer): void {
