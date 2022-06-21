@@ -82,6 +82,13 @@ const sidebars = {
         "tutorials/run-a-fullnode-on-gcp",
       ],
     },
+    {
+      type: "category",
+      label: "SDKs",
+      collapsible: true,
+      collapsed: true,
+      items: ["sdks/sdk-overview"],
+    },
     "tutorials/local-testnet-devnet-incentivized-testnet",
     {
       type: "category",
