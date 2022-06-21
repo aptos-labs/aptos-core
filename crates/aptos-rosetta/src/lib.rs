@@ -5,8 +5,6 @@
 //!
 //! [Rosetta API Spec](https://www.rosetta-api.org/docs/Reference.html)
 
-extern crate core;
-
 use crate::error::ApiError;
 use aptos_api::runtime::WebServer;
 use aptos_config::config::ApiConfig;
@@ -104,6 +102,7 @@ pub fn routes(
 ) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
     account::routes(context.clone())
         .or(block::routes(context.clone()))
+        .or(construction::routes(context.clone()))
         .or(network::routes(context))
         // TODO: Add health check?
         .with(

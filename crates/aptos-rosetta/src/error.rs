@@ -163,6 +163,12 @@ impl From<anyhow::Error> for ApiError {
     }
 }
 
+impl From<std::num::ParseIntError> for ApiError {
+    fn from(err: std::num::ParseIntError) -> Self {
+        ApiError::AptosError(err.to_string())
+    }
+}
+
 impl warp::reject::Reject for ApiError {}
 
 impl Reply for ApiError {
