@@ -1,6 +1,5 @@
 # Forge testing framework
 forge:
-  numValidators:
   helmBucket:
   image:
     repo: aptos/forge

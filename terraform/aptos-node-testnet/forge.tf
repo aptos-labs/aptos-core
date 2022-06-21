@@ -158,8 +158,7 @@ resource "helm_release" "forge" {
   values = [
     jsonencode({
       forge = {
-        numValidators = var.num_validators
-        helmBucket    = aws_s3_bucket.aptos-testnet-helm[0].bucket
+        helmBucket = aws_s3_bucket.aptos-testnet-helm[0].bucket
         image = {
           tag = var.image_tag
         }

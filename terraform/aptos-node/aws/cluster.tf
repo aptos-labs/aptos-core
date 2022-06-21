@@ -78,7 +78,9 @@ resource "aws_eks_node_group" "nodes" {
   lifecycle {
     ignore_changes = [
       # ignore changes to the desired size that may occur due to cluster autoscaler
-      scaling_config[0].desired_size
+      scaling_config[0].desired_size,
+      # ignore changes to max size, especially when it decreases to < desired_size, which fails
+      scaling_config[0].max_size,
     ]
   }
 
