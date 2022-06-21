@@ -22,7 +22,7 @@ yarn-error.log*
 !default.mode2v3
 *.perspectivev3
 !default.perspectivev3
-xcuserdata
+mobile/xcuserdata
 *.xccheckout
 *.moved-aside
 DerivedData
@@ -32,17 +32,17 @@ DerivedData
 
 # Android/IntelliJ
 #
-.idea
-.gradle
-local.properties
+mobile/.idea
+mobile/.gradle
+mobile/local.properties
 *.iml
 *.hprof
 
 # BUCK
-buck-out/
-.buckd/
+mobile/buck-out/
+mobile/.buckd/
 *.keystore
-!debug.keystore
+mobile/!debug.keystore
 
 # fastlane
 #
@@ -56,8 +56,8 @@ buck-out/
 */fastlane/screenshots
 
 # Bundle artifact
-*.jsbundle
+mobile/*.jsbundle
 
 # Ruby / CocoaPods
-ios/Pods/
-vendor/bundle/
+mobile/ios/Pods/
+mobile/vendor/bundle/
