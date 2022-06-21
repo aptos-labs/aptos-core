@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod account;
+pub mod aggregator;
 pub mod hash;
 pub mod signature;
 pub mod type_info;
@@ -28,6 +29,7 @@ pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
     const NATIVES: &[(&str, &str, NativeFunction)] = &[
         ("Account", "create_address", account::native_create_address),
         ("Account", "create_signer", account::native_create_signer),
+        ("Aggregator", "get_bucket", aggregator::native_get_bucket),
         (
             "Signature",
             "ed25519_validate_pubkey",
