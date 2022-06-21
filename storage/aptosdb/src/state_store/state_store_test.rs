@@ -32,13 +32,8 @@ fn put_value_set(
     let jmt_updates = jmt_updates(&value_set);
 
     let root = state_store
-        .merklize_value_sets(
-            vec![jmt_update_refs(&jmt_updates)],
-            None,
-            version,
-            base_version,
-        )
-        .unwrap()[0];
+        .merklize_value_set(jmt_update_refs(&jmt_updates), None, version, base_version)
+        .unwrap();
     let mut cs = ChangeSet::new();
     state_store
         .put_value_sets(vec![&value_set], version, &mut cs)
@@ -640,8 +635,8 @@ fn update_store(
         let jmt_updates = jmt_updates(&value_state_set);
         let version = first_version + i as Version;
         store
-            .merklize_value_sets(
-                vec![jmt_update_refs(&jmt_updates)],
+            .merklize_value_set(
+                jmt_update_refs(&jmt_updates),
                 None,
                 version,
                 version.checked_sub(1),

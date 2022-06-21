@@ -23,13 +23,13 @@ fn put_value_set(
     let jmt_updates = jmt_updates(&value_set);
 
     let root = state_store
-        .merklize_value_sets(
-            vec![jmt_update_refs(&jmt_updates)],
+        .merklize_value_set(
+            jmt_update_refs(&jmt_updates),
             None,
             version,
             version.checked_sub(1),
         )
-        .unwrap()[0];
+        .unwrap();
 
     let mut cs = ChangeSet::new();
     state_store
