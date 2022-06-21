@@ -307,6 +307,20 @@ module AptosFramework::Coin {
         move_to(account, coin_store);
     }
 
+    /// "Route" `amount` of coins of `CoinType` from `from` to `to`.
+    /// Like `transfer()` but for standalone `Coin` instances not kept
+    /// in a `CoinStore` (alternatively, like `merge()`, but for an
+    /// in-place extraction from `source_coin`). Automatically aborts
+    /// for insufficient `value` held in `from`, per integer underflow.
+    public fun route<CoinType>(
+        from: &mut Coin<CoinType>,
+        to: &mut Coin<CoinType>,
+        amount: u64
+    ) {
+        from.value = from.value - amount;
+        to.value = to.value + amount;
+    }
+
     /// Transfers `amount` of coins `CoinType` from `from` to `to`.
     public(script) fun transfer<CoinType>(
         from: &signer,
@@ -592,6 +606,47 @@ module AptosFramework::Coin {
             mint_cap,
             burn_cap
         });
+    }
+
+    #[test(authority = @0x1)]
+    /// Verify proper routing in-place
+    public(script) fun test_route(
+        authority: &signer
+    ) acquires CoinInfo {
+        let name = ASCII::string(b"Fake money"); // Fake coin name
+        let symbol = ASCII::string(b"FMD"); // Fake coin symbol
+        let (m_c, b_c) = // Register fake money coin, store capabilities
+            initialize<FakeMoney>(authority, name, symbol, 1, false);
+        let from = mint<FakeMoney>(10, &m_c); // Mint from coin
+        let to = mint<FakeMoney>(5, &m_c); // Mint to coin
+        route(&mut from, &mut to, 3); // Route 3 indivisible subunits
+        assert!(from.value == 7 && to.value == 8, 0); // Assert values
+        // Destroy coins via unpacking
+        let Coin{value: _} = from; let Coin{value: _} = to;
+        // Destroy capabilities via unpacking
+        let BurnCapability<FakeMoney>{} = b_c;
+        let MintCapability<FakeMoney>{} = m_c;
+    }
+
+    #[test(authority = @0x1)]
+    #[expected_failure]
+    /// Verify routing failure for attempting to route too much
+    public(script) fun test_route_failure_underflow(
+        authority: &signer
+    ) acquires CoinInfo {
+        let name = ASCII::string(b"Fake money"); // Fake coin name
+        let symbol = ASCII::string(b"FMD"); // Fake coin symbol
+        let (m_c, b_c) = // Register fake money coin, store capabilities
+            initialize<FakeMoney>(authority, name, symbol, 1, false);
+        let from = mint<FakeMoney>(10, &m_c); // Mint from coin
+        let to = mint<FakeMoney>(5, &m_c); // Mint to coin
+        // Attempt invalid routing of 100 indivisible subunits
+        route(&mut from, &mut to, 100);
+        // Destroy coins via unpacking
+        let Coin{value: _} = from; let Coin{value: _} = to;
+        // Destroy capabilities via unpacking
+        let BurnCapability<FakeMoney>{} = b_c;
+        let MintCapability<FakeMoney>{} = m_c;
     }
 
     #[test]
