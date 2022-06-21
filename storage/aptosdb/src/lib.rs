@@ -1261,7 +1261,6 @@ impl DbWriter for AptosDB {
         base_version: Option<Version>,
     ) -> Result<()> {
         gauged_api("save_state_snapshot", || {
-            let mut cs = ChangeSet::new();
             let root_hash = self
                 .state_store
                 .merklize_value_sets(
@@ -1269,7 +1268,6 @@ impl DbWriter for AptosDB {
                     node_hashes.map(|hashes| vec![hashes]),
                     version,
                     base_version,
-                    &mut cs,
                 )?
                 .pop()
                 .expect("One root hash expected");

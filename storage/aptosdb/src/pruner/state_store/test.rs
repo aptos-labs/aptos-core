@@ -16,7 +16,6 @@ fn put_value_set(
     value_set: Vec<(StateKey, StateValue)>,
     version: Version,
 ) -> HashValue {
-    let mut cs = ChangeSet::new();
     let value_set: HashMap<_, _> = value_set
         .iter()
         .map(|(key, value)| (key.clone(), value.clone()))
@@ -29,9 +28,10 @@ fn put_value_set(
             None,
             version,
             version.checked_sub(1),
-            &mut cs,
         )
         .unwrap()[0];
+
+    let mut cs = ChangeSet::new();
     state_store
         .put_value_sets(vec![&value_set], version, &mut cs)
         .unwrap();

@@ -8,7 +8,6 @@ mod state_store_test;
 
 use crate::{
     change_set::ChangeSet,
-    ledger_counters::LedgerCounter,
     schema::{
         jellyfish_merkle_node::JellyfishMerkleNodeSchema, stale_node_index::StaleNodeIndexSchema,
         state_value::StateValueSchema,
@@ -246,25 +245,12 @@ impl StateStore {
         node_hashes: Option<Vec<&HashMap<NibblePath, HashValue>>>,
         first_version: Version,
         base_version: Option<Version>,
-        ledger_db_cs: &mut ChangeSet,
     ) -> Result<Vec<HashValue>> {
         let (new_root_hash_vec, tree_update_batch) = JellyfishMerkleTree::new(self)
             .batch_put_value_sets(value_sets, node_hashes, base_version, first_version)?;
 
         let num_versions = new_root_hash_vec.len();
         assert_eq!(num_versions, tree_update_batch.node_stats.len());
-
-        tree_update_batch
-            .node_stats
-            .iter()
-            .enumerate()
-            .for_each(|(i, stats)| {
-                let counter_bumps = ledger_db_cs.counter_bumps(first_version + i as u64);
-                counter_bumps.bump(LedgerCounter::NewStateNodes, stats.new_nodes);
-                counter_bumps.bump(LedgerCounter::NewStateLeaves, stats.new_leaves);
-                counter_bumps.bump(LedgerCounter::StaleStateNodes, stats.stale_nodes);
-                counter_bumps.bump(LedgerCounter::StaleStateLeaves, stats.stale_leaves);
-            });
 
         let mut batch = SchemaBatch::new();
         add_node_batch(&mut batch, &tree_update_batch.node_batch)?;
