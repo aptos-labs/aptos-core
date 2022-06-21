@@ -1,19 +1,10 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-node_modules
-build
+# OSX
+#
 .DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.yarn-integrity
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
 # Xcode
 #
+build/
 *.pbxuser
 !default.pbxuser
 *.mode1v3
@@ -32,6 +23,7 @@ DerivedData
 
 # Android/IntelliJ
 #
+build/
 .idea
 .gradle
 local.properties
@@ -40,7 +32,7 @@ local.properties
 
 # BUCK
 buck-out/
-.buckd/
+\.buckd/
 *.keystore
 !debug.keystore
 
@@ -59,5 +51,5 @@ buck-out/
 *.jsbundle
 
 # Ruby / CocoaPods
-ios/Pods/
-vendor/bundle/
+/ios/Pods/
+/vendor/bundle/
