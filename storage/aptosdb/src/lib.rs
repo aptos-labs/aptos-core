@@ -1261,16 +1261,12 @@ impl DbWriter for AptosDB {
         base_version: Option<Version>,
     ) -> Result<()> {
         gauged_api("save_state_snapshot", || {
-            let root_hash = self
-                .state_store
-                .merklize_value_sets(
-                    vec![jmt_update_refs(&jmt_updates)],
-                    node_hashes.map(|hashes| vec![hashes]),
-                    version,
-                    base_version,
-                )?
-                .pop()
-                .expect("One root hash expected");
+            let root_hash = self.state_store.merklize_value_set(
+                jmt_update_refs(&jmt_updates),
+                node_hashes,
+                version,
+                base_version,
+            )?;
             debug!(
                 version = version,
                 base_version = base_version,
