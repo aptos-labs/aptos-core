@@ -13,7 +13,10 @@ use crate::{
     },
     liveness::{
         cached_proposer_election::CachedProposerElection,
-        leader_reputation::{ActiveInactiveHeuristic, AptosDBBackend, LeaderReputation},
+        leader_reputation::{
+            ActiveInactiveHeuristic, AptosDBBackend, LeaderReputation, ProposerAndVoterHeuristic,
+            ReputationHeuristic,
+        },
         proposal_generator::ProposalGenerator,
         proposer_election::ProposerElection,
         rotating_proposer_election::{choose_leader, RotatingProposer},
@@ -32,7 +35,9 @@ use crate::{
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, Context};
-use aptos_config::config::{ConsensusConfig, ConsensusProposerType, NodeConfig};
+use aptos_config::config::{
+    ConsensusConfig, ConsensusProposerType, LeaderReputationType, NodeConfig,
+};
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
@@ -197,16 +202,47 @@ impl EpochManager {
                     self.config.contiguous_rounds,
                 ))
             }
-            ConsensusProposerType::LeaderReputation(heuristic_config) => {
+            ConsensusProposerType::LeaderReputation(leader_reputation_type) => {
+                let (heuristic, window_size) = match &leader_reputation_type {
+                    LeaderReputationType::ActiveInactive(active_inactive_config) => {
+                        let window_size = proposers.len()
+                            * active_inactive_config.window_num_validators_multiplier;
+                        let heuristic: Box<dyn ReputationHeuristic> =
+                            Box::new(ActiveInactiveHeuristic::new(
+                                self.author,
+                                active_inactive_config.active_weight,
+                                active_inactive_config.inactive_weight,
+                                window_size,
+                            ));
+                        (heuristic, window_size)
+                    }
+                    LeaderReputationType::ProposerAndVoter(proposer_and_voter_config) => {
+                        let proposer_window_size = proposers.len()
+                            * proposer_and_voter_config.proposer_window_num_validators_multiplier;
+                        let voter_window_size = proposers.len()
+                            * proposer_and_voter_config.voter_window_num_validators_multiplier;
+                        let heuristic: Box<dyn ReputationHeuristic> =
+                            Box::new(ProposerAndVoterHeuristic::new(
+                                self.author,
+                                proposer_and_voter_config.active_weight,
+                                proposer_and_voter_config.inactive_weight,
+                                proposer_and_voter_config.failed_weight,
+                                proposer_and_voter_config.failure_threshold_percent,
+                                voter_window_size,
+                                proposer_window_size,
+                            ));
+                        (
+                            heuristic,
+                            std::cmp::max(proposer_window_size, voter_window_size),
+                        )
+                    }
+                };
+
                 let backend = Box::new(AptosDBBackend::new(
-                    proposers.len(),
+                    epoch_state.epoch,
+                    window_size,
                     onchain_config.leader_reputation_exclude_round() + 10,
                     self.storage.aptos_db(),
-                ));
-                let heuristic = Box::new(ActiveInactiveHeuristic::new(
-                    self.author,
-                    heuristic_config.active_weights,
-                    heuristic_config.inactive_weights,
                 ));
                 let proposer_election = Box::new(LeaderReputation::new(
                     epoch_state.epoch,
