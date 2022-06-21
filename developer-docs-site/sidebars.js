@@ -87,7 +87,7 @@ const sidebars = {
       label: "SDKs",
       collapsible: true,
       collapsed: true,
-      items: ["sdks/sdk-overview"],
+      items: ["sdks/sdk-overview", "sdks/submit-a-transaction"],
     },
     "tutorials/local-testnet-devnet-incentivized-testnet",
     {
