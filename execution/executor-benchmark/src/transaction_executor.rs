@@ -14,7 +14,7 @@ use std::{
 pub struct TransactionExecutor {
     executor: Arc<BlockExecutor<AptosVM>>,
     parent_block_id: HashValue,
-    start_time: Instant,
+    start_time: Option<Instant>,
     version: Version,
     // If commit_sender is `None`, we will commit all the execution result immediately in this struct.
     commit_sender:
@@ -34,16 +34,20 @@ impl TransactionExecutor {
             executor,
             parent_block_id,
             version,
-            start_time: Instant::now(),
+            start_time: None,
             commit_sender,
         }
     }
 
     pub fn execute_block(&mut self, transactions: Vec<Transaction>) {
+        if self.start_time.is_none() {
+            self.start_time = Some(Instant::now())
+        }
+
         let num_txns = transactions.len();
         self.version += num_txns as Version;
 
-        let execution_start = std::time::Instant::now();
+        let execution_start = Instant::now();
 
         let block_id = HashValue::random();
         let output = self
@@ -58,7 +62,7 @@ impl TransactionExecutor {
                 .send((
                     block_id,
                     output.root_hash(),
-                    self.start_time,
+                    self.start_time.unwrap(),
                     execution_start,
                     Instant::now().duration_since(execution_start),
                     num_txns,
