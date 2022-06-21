@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::types::{
-    AccountIdentifier, Allow, Amount, Block, BlockIdentifier, Currency, NetworkIdentifier,
-    Operation, PartialBlockIdentifier, Peer, PublicKey, Signature, SigningPayload, SyncStatus,
-    Transaction, TransactionIdentifier, Version,
+    AccountIdentifier, Allow, Amount, Block, BlockIdentifier, Currency, InternalOperation,
+    NetworkIdentifier, Operation, PartialBlockIdentifier, Peer, PublicKey, Signature,
+    SigningPayload, SyncStatus, Transaction, TransactionIdentifier, Version,
 };
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
@@ -138,8 +138,9 @@ pub struct ConstructionMetadataRequest {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct MetadataOptions {
-    /// The account that will construct the transaction
-    pub sender_address: String,
+    pub internal_operation: InternalOperation,
+    pub max_gas: u64,
+    pub gas_price_per_unit: u64,
 }
 
 /// Response with network specific data for constructing a transaction
@@ -159,6 +160,8 @@ pub struct ConstructionMetadataResponse {
 pub struct ConstructionMetadata {
     /// Sequence number of the sending account
     pub sequence_number: u64,
+    pub max_gas: u64,
+    pub gas_price_per_unit: u64,
 }
 
 /// Request to parse a signed or unsigned transaction into operations

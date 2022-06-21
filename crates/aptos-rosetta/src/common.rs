@@ -6,11 +6,16 @@ use crate::{
     types::NetworkIdentifier,
     RosettaContext,
 };
+use aptos_crypto::ValidCryptoMaterial;
 use aptos_rest_client::{aptos::Balance, Account, Response, Transaction};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
-use serde::{Deserialize, Serialize};
-use std::{convert::Infallible, future::Future, str::FromStr};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::{
+    convert::{Infallible, TryInto},
+    future::Future,
+    str::FromStr,
+};
 use warp::Filter;
 
 pub const BLOCKCHAIN: &str = "aptos";
@@ -112,4 +117,24 @@ pub fn get_timestamp<T>(response: &Response<T>) -> u64 {
 /// Strips the `0x` prefix on hex strings
 pub fn strip_hex_prefix(str: &str) -> &str {
     str.strip_prefix("0x").unwrap_or(str)
+}
+
+pub fn encode_bcs<T: Serialize>(obj: &T) -> ApiResult<String> {
+    let bytes = bcs::to_bytes(obj)?;
+    Ok(hex::encode(bytes))
+}
+
+pub fn decode_bcs<T: DeserializeOwned>(str: &str, type_name: &'static str) -> ApiResult<T> {
+    let bytes = hex::decode(str)?;
+    bcs::from_bytes(&bytes).map_err(|_| ApiError::deserialization_failed(type_name))
+}
+
+pub fn decode_key<T: DeserializeOwned + ValidCryptoMaterial>(
+    str: &str,
+    type_name: &'static str,
+) -> ApiResult<T> {
+    hex::decode(str)?
+        .as_slice()
+        .try_into()
+        .map_err(|_| ApiError::deserialization_failed(type_name))
 }

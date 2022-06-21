@@ -2,14 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    error::ApiResult,
     types::{
         AccountIdentifier, BlockIdentifier, Error, NetworkIdentifier, OperationIdentifier,
-        OperationStatus, TransactionIdentifier,
+        OperationStatus, OperationType, TransactionIdentifier,
     },
-    CURRENCY, NUM_DECIMALS,
+    ApiError,
 };
 use aptos_rest_client::{aptos::Balance, aptos_api_types::TransactionInfo};
+use aptos_types::account_address::AccountAddress;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+    str::FromStr,
+};
 
 /// A description of all types used by the Rosetta implementation.
 ///
@@ -63,7 +71,7 @@ impl From<Balance> for Amount {
         Amount {
             value: balance.coin.value.to_string(),
             // TODO: Support other currencies
-            currency: Currency::test_coin(),
+            currency: SupportedCurrencies::NativeCoin.into(),
         }
     }
 }
@@ -159,11 +167,38 @@ pub struct Currency {
     pub decimals: u64,
 }
 
-impl Currency {
-    pub fn test_coin() -> Self {
-        Currency {
-            symbol: CURRENCY.to_string(),
-            decimals: NUM_DECIMALS,
+pub const APTOS: &str = "aptos";
+pub const APTOS_DECIMALS: u64 = 6;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SupportedCurrencies {
+    NativeCoin,
+}
+
+impl From<SupportedCurrencies> for Currency {
+    fn from(currency: SupportedCurrencies) -> Self {
+        match currency {
+            SupportedCurrencies::NativeCoin => Currency {
+                symbol: APTOS.to_string(),
+                decimals: APTOS_DECIMALS,
+            },
+        }
+    }
+}
+
+impl TryFrom<&Currency> for SupportedCurrencies {
+    type Error = ApiError;
+
+    fn try_from(value: &Currency) -> Result<Self, Self::Error> {
+        match value.symbol.as_str() {
+            APTOS => {
+                if value.decimals != APTOS_DECIMALS {
+                    Err(ApiError::BadCoin)
+                } else {
+                    Ok(Self::NativeCoin)
+                }
+            }
+            _ => Err(ApiError::BadCoin),
         }
     }
 }
@@ -347,5 +382,112 @@ impl From<&TransactionInfo> for Transaction {
             operations: vec![],
             related_transactions: None,
         }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum InternalOperation {
+    Transfer(Transfer),
+}
+
+impl InternalOperation {
+    pub fn extract_transfer(operations: &Vec<Operation>) -> ApiResult<InternalOperation> {
+        Ok(Self::Transfer(Transfer::extract_transfer(operations)?))
+    }
+
+    pub fn sender(&self) -> AccountAddress {
+        match self {
+            Self::Transfer(transfer) => transfer.sender,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct Transfer {
+    pub sender: AccountAddress,
+    pub receiver: AccountAddress,
+    pub amount: u64,
+    pub currency: Currency,
+}
+
+impl Transfer {
+    pub fn extract_transfer(operations: &Vec<Operation>) -> ApiResult<Transfer> {
+        // Only support 1:1 P2P transfer
+        // This is composed of a Deposit and a Withdraw operation
+        if operations.len() != 2
+            && (!operations.iter().any(|op| {
+                OperationType::from_str(&op.operation_type).unwrap_or(OperationType::Withdraw)
+                    == OperationType::Deposit
+            }) || !operations.iter().any(|op| {
+                OperationType::from_str(&op.operation_type).unwrap_or(OperationType::Deposit)
+                    == OperationType::Withdraw
+            }))
+        {
+            return Err(ApiError::BadTransferOperations(
+                "Must have exactly 1 withdraw and 1 deposit".to_string(),
+            ));
+        }
+
+        let mut op_map = HashMap::new();
+        for op in operations {
+            let op_type = OperationType::from_str(&op.operation_type)?;
+            op_map.insert(op_type, op);
+        }
+        let mut keys = op_map.keys();
+        if !keys.contains(&OperationType::Withdraw) || !keys.contains(&OperationType::Deposit) {
+            return Err(ApiError::BadTransferOperations(
+                "Must have exactly 1 withdraw and 1 deposit".to_string(),
+            ));
+        }
+
+        // Verify accounts and amounts
+        let withdraw = op_map.get(&OperationType::Withdraw).unwrap();
+        let sender = if let Some(ref account) = withdraw.account {
+            account.try_into()?
+        } else {
+            return Err(ApiError::AccountNotFound);
+        };
+
+        let deposit = op_map.get(&OperationType::Deposit).unwrap();
+        let receiver = if let Some(ref account) = deposit.account {
+            account.try_into()?
+        } else {
+            return Err(ApiError::AccountNotFound);
+        };
+
+        let (amount, currency): (u64, Currency) =
+            if let (Some(withdraw_amount), Some(deposit_amount)) =
+                (&withdraw.amount, &deposit.amount)
+            {
+                // Currencies have to be the same
+                if withdraw_amount.currency != deposit_amount.currency {
+                    return Err(ApiError::BadCoin);
+                }
+
+                // Check that the currency is supported
+                // TODO: in future use currency, since there's more than just 1
+                let _ = SupportedCurrencies::try_from(&withdraw_amount.currency)?;
+
+                let withdraw_value = i64::from_str(&withdraw_amount.value)
+                    .map_err(|_| ApiError::BadTransactionPayload)?;
+                let deposit_value = i64::from_str(&deposit_amount.value)
+                    .map_err(|_| ApiError::BadTransactionPayload)?;
+
+                // We can't create or destroy coins, they must be negatives of each other
+                if -withdraw_value != deposit_value {
+                    return Err(ApiError::BadTransactionPayload);
+                }
+
+                (deposit_value as u64, deposit_amount.currency.clone())
+            } else {
+                return Err(ApiError::BadTransactionPayload);
+            };
+
+        Ok(Transfer {
+            sender,
+            receiver,
+            amount,
+            currency,
+        })
     }
 }
