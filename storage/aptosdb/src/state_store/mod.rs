@@ -43,12 +43,12 @@ type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
 type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
 type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKey>;
 type StateValueBatch = aptos_jellyfish_merkle::StateValueBatch<StateKey, StateValue>;
-type TreeUpdateBatch = aptos_jellyfish_merkle::TreeUpdateBatch<StateKey>;
+pub type TreeUpdateBatch = aptos_jellyfish_merkle::TreeUpdateBatch<StateKey>;
 
 pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 
 #[derive(Debug)]
-pub(crate) struct StateStore {
+pub struct StateStore {
     ledger_db: Arc<DB>,
     state_merkle_db: Arc<DB>,
     version_cache: VersionedNodeCache,

@@ -4,6 +4,7 @@
 mod account_generator;
 pub mod db_generator;
 pub mod pipeline;
+pub mod state_commit_maker;
 pub mod state_committer;
 pub mod transaction_committer;
 pub mod transaction_executor;
@@ -17,15 +18,15 @@ use aptos_config::config::{
     NodeConfig, RocksdbConfig, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 
-use crate::{pipeline::Pipeline, state_committer::StateCommitter};
+use crate::{pipeline::Pipeline, state_commit_maker::StateCommitMaker};
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use executor::block_executor::BlockExecutor;
-use std::{fs, path::Path};
-use storage_interface::DbReaderWriter;
+use std::{fs, path::Path, sync::Arc};
+use storage_interface::{DbReader, DbReaderWriter};
 
-pub fn init_db_and_executor(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<AptosVM>) {
-    let db = DbReaderWriter::new(
+pub fn init_db_and_executor(config: &NodeConfig) -> (Arc<AptosDB>, BlockExecutor<AptosVM>) {
+    let (db, db_rw) = DbReaderWriter::wrap(
         AptosDB::open(
             &config.storage.dir(),
             false,                       /* readonly */
@@ -35,7 +36,7 @@ pub fn init_db_and_executor(config: &NodeConfig) -> (DbReaderWriter, BlockExecut
         .expect("DB should open."),
     );
 
-    let executor = BlockExecutor::new(db.clone());
+    let executor = BlockExecutor::new(db_rw);
 
     (db, executor)
 }
@@ -81,7 +82,7 @@ pub fn run_benchmark(
     pipeline.join();
 
     if verify_sequence_numbers {
-        generator.verify_sequence_numbers(db.reader);
+        generator.verify_sequence_numbers(db);
     }
 }
 

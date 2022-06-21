@@ -35,7 +35,7 @@ aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
-aptosdb = { path = "../../storage/aptosdb" }
+aptosdb = { path = "../../storage/aptosdb", features=["fuzzing"] }
 executor = { path = "../executor" }
 executor-types = { path = "../executor-types" }
 schemadb = { path = "../../storage/schemadb" }

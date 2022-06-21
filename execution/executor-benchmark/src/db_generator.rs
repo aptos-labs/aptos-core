@@ -51,8 +51,8 @@ pub fn run(
     let waypoint = generate_waypoint::<AptosVM>(&db_rw, get_genesis_txn(&config).unwrap()).unwrap();
     maybe_bootstrap::<AptosVM>(&db_rw, get_genesis_txn(&config).unwrap(), waypoint).unwrap();
 
-    let executor = BlockExecutor::new(db_rw.clone());
-    let (pipeline, block_sender) = Pipeline::new(db_rw, executor, 0);
+    let executor = BlockExecutor::new(db_rw);
+    let (pipeline, block_sender) = Pipeline::new(db.state_store(), executor, 0);
     let mut generator =
         TransactionGenerator::new_with_sender(genesis_key, num_accounts, block_sender);
     generator.run_mint(init_account_balance, block_size);
