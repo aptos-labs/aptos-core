@@ -73,8 +73,8 @@ variable "era" {
 }
 
 variable "chain_name" {
-  description = "Aptos chain name"
-  default     = "devnet"
+  description = "Aptos chain name. If unset, defaults to using the workspace name"
+  default     = ""
 }
 
 variable "image_tag" {

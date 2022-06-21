@@ -11,6 +11,7 @@ data "aws_caller_identity" "current" {}
 locals {
   workspace = var.workspace_name_override != "" ? var.workspace_name_override : terraform.workspace
   aws_tags  = "Terraform=testnet,Workspace=${local.workspace}"
+  chain_name = var.chain_name != "" ? var.chain_name : "${local.workspace}net"
 }
 
 module "validator" {
@@ -27,7 +28,7 @@ module "validator" {
 
   chain_id       = var.chain_id
   era            = var.era
-  chain_name     = var.chain_name
+  chain_name     = local.chain_name
   image_tag      = var.image_tag
   validator_name = "aptos-node"
 
@@ -76,7 +77,7 @@ resource "helm_release" "genesis" {
   values = [
     jsonencode({
       chain = {
-        name     = var.chain_name
+        name     = local.chain_name
         era      = var.era
         chain_id = var.chain_id
       }
