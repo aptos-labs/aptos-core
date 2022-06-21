@@ -12,6 +12,7 @@ use aptos_rest_client::aptos_api_types::mime_types::JSON;
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient};
 use url::Url;
 
+/// Client for testing & interacting with a Rosetta service
 pub struct RosettaClient {
     address: Url,
     inner: ReqwestClient,
