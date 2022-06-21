@@ -168,7 +168,7 @@ module AptosFramework::Coin {
     }
 
     /// Burn `coin` from the specified `account` with capability.
-    /// The capability `_cap` should be passed as a reference to `BurnCapability<CoinType>`.
+    /// The capability `burn_cap` should be passed as a reference to `BurnCapability<CoinType>`.
     public fun burn_from<CoinType>(
         account_addr: address,
         amount: u64,
