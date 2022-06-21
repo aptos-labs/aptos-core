@@ -77,16 +77,18 @@ pub struct Version {
     pub middleware_version: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum OperationType {
-    Transfer,
+    Deposit,
+    Withdraw,
 }
 
 impl OperationType {
-    const TRANSFER: &'static str = "transfer";
+    const DEPOSIT: &'static str = "deposit";
+    const WITHDRAW: &'static str = "withdraw";
 
     pub fn all() -> Vec<OperationType> {
-        vec![OperationType::Transfer]
+        vec![OperationType::Deposit, OperationType::Withdraw]
     }
 }
 
@@ -95,7 +97,8 @@ impl FromStr for OperationType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().trim() {
-            Self::TRANSFER => Ok(OperationType::Transfer),
+            Self::DEPOSIT => Ok(OperationType::Deposit),
+            Self::WITHDRAW => Ok(OperationType::Withdraw),
             _ => Err(ApiError::DeserializationFailed(format!(
                 "Invalid OperationType: {}",
                 s
@@ -107,7 +110,8 @@ impl FromStr for OperationType {
 impl Display for OperationType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            OperationType::Transfer => Self::TRANSFER,
+            OperationType::Deposit => Self::DEPOSIT,
+            OperationType::Withdraw => Self::WITHDRAW,
         })
     }
 }
