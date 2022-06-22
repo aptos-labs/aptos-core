@@ -34,6 +34,11 @@ module AptosFramework::Coin {
     /// When destruction of `Coin` resource contains non-zero value attempted.
     const EDESTRUCTION_OF_NONZERO_TOKEN: u64 = 6;
 
+    /// Total supply of the coin overflows. No additional coins can be minted.
+    const ETOTAL_SUPPLY_OVERFLOW: u64 = 7;
+
+    const MAX_U128: u128 = 340282366920938463463374607431768211455;
+
     /// Core data structures
 
     /// Central coin events that are emitted for all coin stores.
@@ -66,7 +71,7 @@ module AptosFramework::Coin {
         /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
         decimals: u64,
         /// Amount of this coin type in existence.
-        supply: Option<u64>,
+        supply: Option<u128>,
     }
 
     /// Event emitted when some amount of a coin is deposited into an account.
@@ -139,7 +144,7 @@ module AptosFramework::Coin {
     }
 
     /// Returns the amount of coin in existence.
-    public fun supply<CoinType>(): Option<u64> acquires CoinInfo {
+    public fun supply<CoinType>(): Option<u128> acquires CoinInfo {
         let type_info = TypeInfo::type_of<CoinType>();
         let coin_address = TypeInfo::account_address(&type_info);
         borrow_global<CoinInfo<CoinType>>(coin_address).supply
@@ -158,7 +163,7 @@ module AptosFramework::Coin {
         let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_addr).supply;
         if (Option::is_some(supply)) {
             let supply = Option::borrow_mut(supply);
-            *supply = *supply - amount;
+            *supply = *supply - (amount as u128);
         }
     }
 
@@ -264,7 +269,9 @@ module AptosFramework::Coin {
         let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_addr).supply;
         if (Option::is_some(supply)) {
             let supply = Option::borrow_mut(supply);
-            *supply = *supply + amount;
+            let amount_u128 = (amount as u128);
+            assert!(*supply <= MAX_U128 - amount_u128, Errors::invalid_argument(ETOTAL_SUPPLY_OVERFLOW));
+            *supply = *supply + amount_u128;
         };
 
         Coin<CoinType> { value: amount }
