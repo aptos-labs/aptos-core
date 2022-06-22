@@ -246,14 +246,14 @@ impl StateStore {
         version: Version,
         base_version: Option<Version>,
     ) -> Result<HashValue> {
-        let (mut new_root_hash_vec, tree_update_batch) = {
+        let (new_root_hash, tree_update_batch) = {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["jmt_update"])
                 .start_timer();
 
-            JellyfishMerkleTree::new(self).batch_put_value_sets(
-                vec![value_set],
-                node_hashes.map(|x| vec![x]),
+            JellyfishMerkleTree::new(self).batch_put_value_set(
+                value_set,
+                node_hashes,
                 base_version,
                 version,
             )
@@ -277,7 +277,7 @@ impl StateStore {
         // commit jellyfish merkle nodes
         self.state_merkle_db.write_schemas(batch)?;
 
-        Ok(new_root_hash_vec.pop().unwrap())
+        Ok(new_root_hash)
     }
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {

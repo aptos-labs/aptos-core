@@ -322,28 +322,16 @@ where
     /// the returned batch, the state `S_{i+1}` is ready to be read from the tree by calling
     /// [`get_with_proof`](struct.JellyfishMerkleTree.html#method.get_with_proof). Anything inside
     /// the batch is not reachable from public interfaces before being committed.
-    pub fn batch_put_value_sets(
+    pub fn batch_put_value_set(
         &self,
-        value_sets: Vec<Vec<(HashValue, &(HashValue, K))>>,
-        node_hashes: Option<Vec<&HashMap<NibblePath, HashValue>>>,
+        value_set: Vec<(HashValue, &(HashValue, K))>,
+        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         persisted_version: Option<Version>,
-        first_version: Version,
-    ) -> Result<(Vec<HashValue>, TreeUpdateBatch<K>)> {
-        let mut tree_cache = TreeCache::new(self.reader, first_version, persisted_version)?;
-        let hash_sets: Vec<_> = match node_hashes {
-            Some(hashes) => hashes.into_iter().map(Some).collect(),
-            None => (0..value_sets.len()).map(|_| None).collect(),
-        };
+        version: Version,
+    ) -> Result<(HashValue, TreeUpdateBatch<K>)> {
+        let mut tree_cache = TreeCache::new(self.reader, version, persisted_version)?;
 
-        for (idx, (value_set, hash_set)) in
-            itertools::zip_eq(value_sets.into_iter(), hash_sets.into_iter()).enumerate()
-        {
-            if value_set.is_empty() {
-                tree_cache.freeze();
-                continue;
-            }
-
-            let version = first_version + idx as u64;
+        if !value_set.is_empty() {
             let deduped_and_sorted_kvs = value_set
                 .into_iter()
                 .collect::<BTreeMap<_, _>>()
@@ -355,31 +343,17 @@ where
                 version,
                 deduped_and_sorted_kvs.as_slice(),
                 0,
-                &hash_set,
+                &node_hashes,
                 &mut tree_cache,
             )?;
             tree_cache.set_root_node_key(new_root_node_key);
-
-            // Freezes the current cache to make all contents in the current cache immutable.
-            tree_cache.freeze();
         }
 
-        Ok(tree_cache.into())
-    }
-
-    #[cfg(any(test, feature = "fuzzing"))]
-    pub fn batch_put_value_sets_test(
-        &self,
-        value_sets: Vec<Vec<(HashValue, &(HashValue, K))>>,
-        node_hashes: Option<Vec<&HashMap<NibblePath, HashValue>>>,
-        first_version: Version,
-    ) -> Result<(Vec<HashValue>, TreeUpdateBatch<K>)> {
-        self.batch_put_value_sets(
-            value_sets,
-            node_hashes,
-            first_version.checked_sub(1),
-            first_version,
-        )
+        // Freezes the current cache to make all contents in the current cache immutable.
+        tree_cache.freeze();
+        let (mut hashes, batch): (Vec<_>, _) = tree_cache.into();
+        let hash = hashes.pop().expect("Must return 1 root hash.");
+        Ok((hash, batch))
     }
 
     fn batch_insert_at(
@@ -605,22 +579,16 @@ where
     }
 
     /// This is a convenient function that calls
-    /// [`put_value_sets`](struct.JellyfishMerkleTree.html#method.put_value_sets) with a single
-    /// `keyed_value_set`.
+    ///
+    /// [`put_value_sets`](struct.JellyfishMerkleTree.html#method.put_value_set) without the node hash
+    /// cache and assuming the base version is the immediate previous version.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn put_value_set_test(
         &self,
         value_set: Vec<(HashValue, &(HashValue, K))>,
         version: Version,
     ) -> Result<(HashValue, TreeUpdateBatch<K>)> {
-        let (root_hashes, tree_update_batch) =
-            self.batch_put_value_sets_test(vec![value_set], None, version)?;
-        assert_eq!(
-            root_hashes.len(),
-            1,
-            "root_hashes must consist of a single value.",
-        );
-        Ok((root_hashes[0], tree_update_batch))
+        self.batch_put_value_set(value_set, None, version.checked_sub(1), version)
     }
 
     /// Returns the value (if applicable) and the corresponding merkle proof.
