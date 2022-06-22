@@ -95,7 +95,6 @@ pub enum SignedDigestError {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 #[allow(dead_code)]
 pub struct ProofOfStore {
-    epoch: u64,
     info: SignedDigestInfo,
     aggregated_signature: BTreeMap<PeerId, Ed25519Signature>,
     // TODO: should we add sender + signature(digest + sender)?
@@ -103,9 +102,8 @@ pub struct ProofOfStore {
 
 #[allow(dead_code)]
 impl ProofOfStore {
-    pub fn new(epoch: u64, info: SignedDigestInfo) -> Self {
+    pub fn new(info: SignedDigestInfo) -> Self {
         Self {
-            epoch,
             info,
             aggregated_signature: BTreeMap::new(),
         }
@@ -147,6 +145,6 @@ impl ProofOfStore {
     }
 
     pub fn epoch(&self) -> u64 {
-        self.epoch
+        self.info.expiration.epoch
     }
 }

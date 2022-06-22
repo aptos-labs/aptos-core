@@ -99,7 +99,7 @@ impl QuorumStore {
             proof_builder_tx.clone(),
             config.max_batch_size,
         );
-        let proof_builder = ProofBuilder::new(epoch, config.proof_timeout_ms);
+        let proof_builder = ProofBuilder::new(config.proof_timeout_ms);
         let (batch_store, batch_reader) = BatchStore::new(
             epoch,
             last_committed_round,
@@ -168,14 +168,17 @@ impl QuorumStore {
         fragment_payload: Data,
         expiration: LogicalTime,
         proof_tx: ProofReturnChannel,
-    ) -> Option<(BatchStoreCommand, oneshot::Receiver<SignedDigest>)> {
+    ) -> Option<(
+        BatchStoreCommand,
+        tokio::sync::oneshot::Receiver<SignedDigest>,
+    )> {
         if let Some((num_bytes, payload, digest_hash)) = self.batch_aggregator.end_batch(
             self.batch_id,
             self.fragment_id,
             fragment_payload.clone(),
             AggregationMode::AssertMissedFragment,
         ) {
-            let (persist_request_tx, persist_request_rx) = oneshot::channel();
+            let (persist_request_tx, persist_request_rx) = tokio::sync::oneshot::channel();
 
             let fragment = Fragment::new(
                 self.epoch,

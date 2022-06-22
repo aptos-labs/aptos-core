@@ -54,7 +54,7 @@ pub(crate) enum BatchStoreCommand {
     BatchRequest(
         HashValue,
         PeerId,
-        Option<futures::channel::oneshot::Sender<Result<Data, QuorumStoreError>>>,
+        Option<oneshot::Sender<Result<Data, QuorumStoreError>>>,
     ),
     Clean(Vec<HashValue>),
 }
