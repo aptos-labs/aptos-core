@@ -1,17 +1,25 @@
 ---
-title: "Submitting a transaction"
-slug: "submit-a-transaction"
+title: "Transactions with Typescript SDK"
+slug: "transactions-with-ts-sdk"
 ---
 
-# Submitting Transactions through TS SDK
+# Transactions with Typescript SDK
 
-This tutorial shows the steps of creating, signing and submitting a transaction through Typescript SDK. As tutorial **[Your First Transaction](https://aptos.dev/tutorials/your-first-transaction)** points out, transactions in JSON format can be submitted through Aptos REST APIs. Typescript SDK provides wrappers to significantly reduce the amount of manual work needed to prepare and submit transactions in JSON format. Typescript SDK also supports signing and submitting transactions in BCS format. See [Creating a Signed Transaction](https://aptos.dev/guides/creating-a-signed-transaction) for more info. In this tutorial you will submit a transaction in BCS format.
+This tutorial shows the steps of creating, signing and submitting a transaction through Typescript SDK. 
 
-# Prerequisites
+As described in the tutorial [Your First Transaction](../tutorials/first-transaction.md), transactions in JSON format can be submitted through Aptos REST APIs. The Typescript SDK provides wrappers to significantly reduce the amount of manual work needed to prepare and submit transactions in JSON format. 
 
-In order to follow along the tutorial, you need to install the latest TS SDK. Go to your project root directory and run
+The Typescript SDK also supports signing and submitting transactions in BCS format. See [Creating a Signed Transaction](../guides/sign-a-transaction.md). In this tutorial you will submit a transaction in BCS format.
 
-`npm install aptos` or `yarn add aptos`
+## Before you proceed
+
+Before you proceed, install the latest Aptos TS SDK. Go to your project root directory and run:
+
+`npm install aptos` 
+
+or 
+
+`yarn add aptos`
 
 :::note
 Although Typescript is used in this tutorial, Aptos TS SDK also works in Javascript projects.
@@ -19,7 +27,7 @@ Although Typescript is used in this tutorial, Aptos TS SDK also works in Javascr
 
 The source code of this tutorial can be found here: TODO add link
 
-# Step 1: Create accounts
+## Step 1: Create accounts
 
 Let’s assume user Alice wants to send 717 test coins to user Bob. We need to create two user accounts first.
 
@@ -52,15 +60,25 @@ accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::Te
 console.log(`Bob coins: ${(accountResource?.data as any).coin.value}. Should be 0!`);
 ```
 
-We created two accounts on Aptos’s devenet, and minted 5000 test coins for Alice’s account and 0 test coin for Bob’s account.
+With the above code we created two accounts on Aptos’s devnet, and minted 5000 test coins for Alice’s account and 0 test coin for Bob’s account.
 
-# Step 2: Prepare transaction payload
+## Step 2: Prepare the transaction payload
 
-Typescript SDK supports 3 types of transaction payloads: `ScriptFunction`, `Script` and `ModuleBundle`. See [https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html](https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html) for the details.
+The Typescript SDK supports three types of transaction payloads:
 
-ScriptFunction payload is used to invoke an on-chain Move script function. Within ScriptFunction payload, you are able to specify the function name, arguments, etc. Script payload contains the bytecodes for Aptos VM to execute. Within Script payload, you are able to provide script code in bytes and the arguments to the script. ModuleBundle payload is used to publish multiple modules at once. Within ModuleBundle payload, you are able to provide the module bytecodes.
+1. `ScriptFunction`
+2. `Script` and
+3. `ModuleBundle`. 
 
-To transfer coins from Alice’s account to Bob’s account, we need to prepare a ScriptFunction payload with a `transfer` function.
+See [https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html](https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html) for details.
+
+The `ScriptFunction` payload is used to invoke an on-chain Move script function. Within `ScriptFunction` payload, you are able to specify the function name and arguments. 
+
+The `Script` payload contains the bytecode for the Aptos MoveVM (Move Virtual Machine) to execute. Within the `Script` payload, you are able to provide the script code in bytes and the arguments to the script. 
+
+The `ModuleBundle` payload is used to publish multiple modules at once. Within `ModuleBundle` payload, you are able to provide the module bytecodes.
+
+To transfer coins from Alice’s account to Bob’s account, we need to prepare a `ScriptFunction` payload with a `transfer` function.
 
 ```ts
 // We need to pass a token type to the `transfer` function.
@@ -80,13 +98,17 @@ const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFuncti
 );
 ```
 
-The Move function `transfer` requires a coin type as type argument. Function `transfer` is defined here [https://github.com/aptos-labs/aptos-core/blob/faf4f94260d4716c8a774b3c17f579d203cc4013/aptos-move/framework/aptos-framework/sources/Coin.move#L311](https://github.com/aptos-labs/aptos-core/blob/faf4f94260d4716c8a774b3c17f579d203cc4013/aptos-move/framework/aptos-framework/sources/Coin.move#L311). In above code snippet, we want to transfer the `TestCoin` that is defined under account `0x1` and module `TestCoin`. The fully qualified name for the TestCoin is therefore “0x1::TestCoin::TestCoin”.
+The Move function `transfer` requires a coin type as type argument. The function `transfer` is defined here [https://github.com/aptos-labs/aptos-core/blob/faf4f94260d4716c8a774b3c17f579d203cc4013/aptos-move/framework/aptos-framework/sources/Coin.move#L311](https://github.com/aptos-labs/aptos-core/blob/faf4f94260d4716c8a774b3c17f579d203cc4013/aptos-move/framework/aptos-framework/sources/Coin.move#L311). 
 
-All arguments in ScriptFunction payload need to be BCS serialized. In above snippet, we serialized Bob’s account address and the amount number to transfer.
+In above code snippet, we want to transfer the `TestCoin` that is defined under account `0x1` and module `TestCoin`. The fully qualified name for the `TestCoin` is therefore `0x1::TestCoin::TestCoin`.
 
-# Step 3: Sign and submit the transaction
+:::note
+All arguments in `ScriptFunction` payload must be BCS serialized. In above code, we serialized Bob’s account address and the amount number to transfer.
+:::
 
-After assembling a transaction payload, we are ready to create a RawTransaction instance that wraps the payload we just created. RawTransaction can then be signed and submitted.
+## Step 3: Sign and submit the transaction
+
+After assembling a transaction payload, we are ready to create a `RawTransaction` instance that wraps the payload we just created. The `RawTransaction` can then be signed and submitted.
 
 ```ts
 // Sequence number is a security measure to prevent re-play attack.
@@ -127,7 +149,7 @@ accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::Te
 console.log(`Bob coins: ${(accountResource?.data as any).coin.value}. Should be 717!`);
 ```
 
-# Output
+## Output
 
 The output after executing:
 
@@ -137,6 +159,8 @@ Bob coins: 0. Should be 0!
 Bob coins: 717. Should be 717!
 ```
 
-# Security of BCS transaction
+## Security of BCS transaction
 
-Submitting transactions in BCS format is more secure than submitting transaction in JSON format. Code that submits transactions in JSON format delegates the signing messages creation to REST API server. This renders a risk that a user signs an unintended transaction faked by a malicious API server. The malicious API server could potentially transfer all the balance under a user’s account to another account.
+Submitting transactions in the BCS format is more secure than submitting transaction in JSON format. See [Aptos Client](aptos-sdk-overview#aptos-client). 
+
+The code that submits the transactions in JSON format delegates the signing messages creation to the REST API server. This creates a risk that a user signs an unintended transaction faked by a malicious API server. 

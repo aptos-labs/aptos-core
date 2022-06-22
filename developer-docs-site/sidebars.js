@@ -87,7 +87,7 @@ const sidebars = {
       label: "SDKs",
       collapsible: true,
       collapsed: true,
-      items: ["sdks/sdk-overview", "sdks/submit-a-transaction"],
+      items: ["sdks/aptos-sdk-overview", "sdks/transactions-with-ts-sdk"],
     },
     "tutorials/local-testnet-devnet-incentivized-testnet",
     {
