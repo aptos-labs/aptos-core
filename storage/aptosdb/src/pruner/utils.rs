@@ -10,6 +10,7 @@ use crate::{
     },
     EventStore, LedgerStore, TransactionStore,
 };
+use aptos_config::config::StoragePrunerConfig;
 use aptos_infallible::Mutex;
 use schemadb::DB;
 use std::{sync::Arc, time::Instant};
@@ -18,18 +19,27 @@ use std::{sync::Arc, time::Instant};
 pub fn create_db_pruners(
     ledger_db: Arc<DB>,
     state_merkle_db: Arc<DB>,
-) -> Vec<Mutex<Arc<dyn DBPruner + Send + Sync>>> {
+    storage_pruner_config: StoragePrunerConfig,
+) -> Vec<Option<Mutex<Arc<dyn DBPruner + Send + Sync>>>> {
     vec![
-        Mutex::new(Arc::new(StateStorePruner::new(
-            Arc::clone(&state_merkle_db),
-            0,
-            Instant::now(),
-        ))),
-        Mutex::new(Arc::new(LedgerPruner::new(
-            Arc::clone(&ledger_db),
-            Arc::new(TransactionStore::new(Arc::clone(&ledger_db))),
-            Arc::new(EventStore::new(Arc::clone(&ledger_db))),
-            Arc::new(LedgerStore::new(Arc::clone(&ledger_db))),
-        ))),
+        if storage_pruner_config.state_store_prune_window.is_some() {
+            Some(Mutex::new(Arc::new(StateStorePruner::new(
+                Arc::clone(&state_merkle_db),
+                0,
+                Instant::now(),
+            ))))
+        } else {
+            None
+        },
+        if storage_pruner_config.ledger_prune_window.is_some() {
+            Some(Mutex::new(Arc::new(LedgerPruner::new(
+                Arc::clone(&ledger_db),
+                Arc::new(TransactionStore::new(Arc::clone(&ledger_db))),
+                Arc::new(EventStore::new(Arc::clone(&ledger_db))),
+                Arc::new(LedgerStore::new(Arc::clone(&ledger_db))),
+            ))))
+        } else {
+            None
+        },
     ]
 }

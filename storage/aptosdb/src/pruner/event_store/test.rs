@@ -30,6 +30,23 @@ proptest! {
         verify_event_store_pruner(event_batches);
     }
 
+        #[test]
+    fn test_event_store_pruner_disabled(
+        mut universe in any_with::<AccountInfoUniverse>(3),
+        gen_batches in vec(vec((any::<Index>(), any::<ContractEventGen>()), 0..=2), 0..4),
+    ) {
+        let event_batches = gen_batches
+            .into_iter()
+            .map(|gens| {
+                gens.into_iter()
+                    .map(|(index, gen)| gen.materialize(*index, &mut universe))
+                    .collect()
+            })
+            .collect();
+
+        verify_event_store_pruner_disabled(event_batches);
+    }
+
 }
 
 fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
@@ -75,6 +92,44 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
             verify_events_in_store(&events, j as u64, event_store);
             verify_event_by_key_in_store(&events, j as u64, event_store);
             verify_event_by_version_in_store(&events, j as u64, event_store);
+        }
+    }
+}
+
+fn verify_event_store_pruner_disabled(events: Vec<Vec<ContractEvent>>) {
+    let tmp_dir = TempPath::new();
+    let aptos_db = AptosDB::new_for_test(&tmp_dir);
+    let event_store = &aptos_db.event_store;
+    let mut cs = ChangeSet::new();
+    let num_versions = events.len();
+    let pruner = Pruner::new(
+        Arc::clone(&aptos_db.ledger_db),
+        Arc::clone(&aptos_db.state_merkle_db),
+        StoragePrunerConfig {
+            state_store_prune_window: Some(0),
+            ledger_prune_window: None,
+            pruning_batch_size: 1,
+        },
+    );
+
+    // Write events to DB
+    for (version, events_for_version) in events.iter().enumerate() {
+        event_store
+            .put_events(version as u64, events_for_version, &mut cs)
+            .unwrap();
+    }
+    aptos_db.ledger_db.write_schemas(cs.batch).unwrap();
+
+    // Verify no pruning has happened.
+    for _i in (0..=num_versions).step_by(2) {
+        pruner
+            .ensure_disabled(PrunerIndex::LedgerPrunerIndex as usize)
+            .unwrap();
+        // ensure that all events up to i * 2 are valid in DB
+        for version in 0..num_versions {
+            verify_events_in_store(&events, version as u64, event_store);
+            verify_event_by_key_in_store(&events, version as u64, event_store);
+            verify_event_by_version_in_store(&events, version as u64, event_store);
         }
     }
 }

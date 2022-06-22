@@ -161,14 +161,17 @@ fn error_if_version_is_pruned(
     version: Version,
 ) -> Result<()> {
     if let Some(pruner) = pruner.as_ref() {
-        let min_readable_version = pruner.get_min_readable_version_by_pruner_index(pruner_index);
-        ensure!(
-            version >= min_readable_version,
-            "{} version {} is pruned, min available version is {}.",
-            data_type,
-            version,
-            min_readable_version
-        );
+        if let Some(min_readable_version) =
+            pruner.get_min_readable_version_by_pruner_index(pruner_index)
+        {
+            ensure!(
+                version >= min_readable_version,
+                "{} version {} is pruned, min available version is {}.",
+                data_type,
+                version,
+                min_readable_version
+            );
+        }
     }
     Ok(())
 }
@@ -249,6 +252,7 @@ pub struct AptosDB {
     state_store: Arc<StateStore>,
     system_store: Arc<SystemStore>,
     transaction_store: Arc<TransactionStore>,
+    pruner_config: StoragePrunerConfig,
     pruner: Option<Pruner>,
     _rocksdb_property_reporter: RocksdbPropertyReporter,
 }
@@ -261,15 +265,16 @@ impl AptosDB {
     ) -> Self {
         let arc_ledger_rocksdb = Arc::new(ledger_rocksdb);
         let arc_state_merkle_rocksdb = Arc::new(state_merkle_rocksdb);
-        let pruner = if storage_pruner_config.ledger_prune_window.is_none()
-            && storage_pruner_config.state_store_prune_window.is_none()
+        let pruner_config = storage_pruner_config;
+        let pruner = if pruner_config.ledger_prune_window.is_none()
+            && pruner_config.state_store_prune_window.is_none()
         {
             None
         } else {
             Some(Pruner::new(
                 Arc::clone(&arc_ledger_rocksdb),
                 Arc::clone(&arc_state_merkle_rocksdb),
-                storage_pruner_config,
+                pruner_config,
             ))
         };
         AptosDB {
@@ -283,6 +288,7 @@ impl AptosDB {
             )),
             system_store: Arc::new(SystemStore::new(Arc::clone(&arc_ledger_rocksdb))),
             transaction_store: Arc::new(TransactionStore::new(Arc::clone(&arc_ledger_rocksdb))),
+            pruner_config,
             pruner,
             _rocksdb_property_reporter: RocksdbPropertyReporter::new(
                 Arc::clone(&arc_ledger_rocksdb),
@@ -898,7 +904,7 @@ impl DbReader for AptosDB {
         gauged_api("get_first_txn_version", || {
             if let Some(pruner) = self.pruner.as_ref() {
                 // If pruning is enabled, we can get the min readable version from the pruner.
-                Ok(Some(pruner.get_min_readable_ledger_version()))
+                Ok(pruner.get_min_readable_ledger_version())
             } else {
                 self.transaction_store.get_first_txn_version()
             }
@@ -910,7 +916,7 @@ impl DbReader for AptosDB {
         gauged_api("get_first_write_set_version", || {
             if let Some(pruner) = self.pruner.as_ref() {
                 // If pruning is enabled, we can get the min readable version from the pruner.
-                Ok(Some(pruner.get_min_readable_ledger_version()))
+                Ok(pruner.get_min_readable_ledger_version())
             } else {
                 self.transaction_store.get_first_write_set_version()
             }
@@ -1208,19 +1214,25 @@ impl DbReader for AptosDB {
 
     fn get_state_prune_window(&self) -> Result<Option<usize>> {
         gauged_api("get_state_prune_window", || {
-            Ok(self
-                .pruner
-                .as_ref()
-                .map(|x| x.get_state_store_pruner_window() as usize))
+            let mut pruner_window = None;
+            if let Some(pruner) = self.pruner.as_ref() {
+                if let Some(window) = pruner.get_state_store_pruner_window() {
+                    pruner_window = Some(window as usize);
+                }
+            }
+            Ok(pruner_window)
         })
     }
 
     fn get_ledger_prune_window(&self) -> Result<Option<usize>> {
         gauged_api("get_ledger_prune_window", || {
-            Ok(self
-                .pruner
-                .as_ref()
-                .map(|x| x.get_ledger_pruner_window() as usize))
+            let mut pruner_window = None;
+            if let Some(pruner) = self.pruner.as_ref() {
+                if let Some(window) = pruner.get_ledger_pruner_window() {
+                    pruner_window = Some(window as usize);
+                }
+            }
+            Ok(pruner_window)
         })
     }
 }
@@ -1452,13 +1464,14 @@ impl DbWriter for AptosDB {
             let db_pruners = utils::create_db_pruners(
                 Arc::clone(&self.ledger_db),
                 Arc::clone(&self.state_merkle_db),
+                self.pruner_config,
             );
 
             // Execute each pruner to clean up the genesis state
             let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive).
             let max_version = 1; // We should only really be pruning at a single version.
             let mut db_batch = SchemaBatch::new();
-            for db_pruner in db_pruners {
+            for db_pruner in db_pruners.into_iter().flatten() {
                 db_pruner.lock().set_target_version(target_version);
                 db_pruner.lock().prune(&mut db_batch, max_version)?;
             }

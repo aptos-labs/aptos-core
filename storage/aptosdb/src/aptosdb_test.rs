@@ -90,7 +90,7 @@ fn test_error_if_version_is_pruned() {
             pruning_batch_size: 1,
         },
     );
-    pruner.testonly_update_min_version(&[5, 10]);
+    pruner.testonly_update_min_version(&[Some(5), Some(10)]);
     let pruner = Some(pruner);
     assert_eq!(
         error_if_version_is_pruned(&pruner, PrunerIndex::StateStorePrunerIndex, "State", 4)
