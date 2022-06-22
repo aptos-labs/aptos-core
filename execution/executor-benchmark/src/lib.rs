@@ -171,8 +171,6 @@ mod tests {
             true,
         );
 
-        aptos_logger::info!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-
         super::run_benchmark(
             5, /* block_size */
             5, /* num_transfer_blocks */

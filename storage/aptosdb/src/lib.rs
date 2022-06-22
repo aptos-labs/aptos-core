@@ -1262,7 +1262,7 @@ impl DbWriter for AptosDB {
     ) -> Result<()> {
         gauged_api("save_state_snapshot", || {
             let mut cs = ChangeSet::new();
-            let root_hash = *self
+            let root_hash = self
                 .state_store
                 .merklize_value_sets(
                     vec![jmt_update_refs(&jmt_updates)],
