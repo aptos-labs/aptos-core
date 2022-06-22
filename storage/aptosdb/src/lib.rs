@@ -255,6 +255,7 @@ pub struct AptosDB {
     pruner_config: StoragePrunerConfig,
     pruner: Option<Pruner>,
     _rocksdb_property_reporter: RocksdbPropertyReporter,
+    ledger_commit_lock: std::sync::Mutex<()>,
 }
 
 impl AptosDB {
@@ -294,6 +295,7 @@ impl AptosDB {
                 Arc::clone(&arc_ledger_rocksdb),
                 Arc::clone(&arc_state_merkle_rocksdb),
             ),
+            ledger_commit_lock: std::sync::Mutex::new(()),
         }
     }
 
@@ -1295,6 +1297,14 @@ impl DbWriter for AptosDB {
         save_state_snapshots: bool,
     ) -> Result<()> {
         gauged_api("save_transactions", || {
+            // Executing and committing from more than one threads not allowed -- consensus and
+            // state sync must hand over to each other after all pending execution and committing
+            // complete.
+            let _lock = self
+                .ledger_commit_lock
+                .try_lock()
+                .expect("Concurrent committing detected.");
+
             let num_txns = txns_to_commit.len() as u64;
             // ledger_info_with_sigs could be None if we are doing state synchronization. In this case
             // txns_to_commit should not be empty. Otherwise it is okay to commit empty blocks.
