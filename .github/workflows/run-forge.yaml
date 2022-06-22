@@ -8,6 +8,14 @@ on:
         required: true
         type: string
         description:
+      merge_or_canary:
+        required: true
+        type: string
+        description: "indicate whether this is a forge run for an auto-merge or a canary, must be `merge` or `canary`"
+
+# temporarily limit amount of concurrent forge runs until we have autoscaling forge
+concurrency:
+  group: ${{ inputs.merge_or_canary }}
 
 env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

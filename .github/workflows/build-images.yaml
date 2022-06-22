@@ -1,9 +1,21 @@
+## IMPORTANT NOTE TO EDITORS OF THIS FILE ## 
+
+## Note that when you create a PR the jobs in this file are triggered off the `pull_request_target` event instead of `pull_request` event.
+## This is because the `pull_request` event makes secrets only available to PRs from branches, not from forks, and some of these jobs require secrets.
+## So with `pull_request_target` we're making secrets available to fork-based PRs too.
+## Using `pull_request_target" has a side effect, which is that the workflow execution will be driven by the state of the <workflow>.yaml on the `main` (=target) branch, even if you edited the <workflow>.yaml in your PR.
+## So when you for example add a new job here, you won't see that job appear in the PR itself. It will only become effective once you merge the PR to main.
+## Therefore, if you want to add a new job here and want to test it's functionality prior to a merge to main, you have to to _temporarily_ change the trigger event from `pull_request_target` to `pull_request`.
+
+## Additionally, because `pull_request_target` gets secrets injected for forked PRs we use `https://github.com/sushichop/action-repository-permission`
+## to ensure these jobs are only executed when a repo member with "write" permission has triggered the workflow (directly through a push or indirectly by applying a label or enabling auto_merge).
+
 name: "Build+Push Images"
 on: # build on main branch OR when a PR is labeled with `CICD:build-images`
   # Allow us to run this specific workflow without a PR
   workflow_dispatch:
-  pull_request:
-    types: [labeled, opened, synchronize, reopened]
+  pull_request_target:
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
       # - main - TODO - this disables main branch image building since we assume it's already being built from the auto branch before merging (due to how bors works), possibly reactivate this if we move away from bors
@@ -36,9 +48,21 @@ permissions:
   pull-requests: write
 
 jobs:
+
+  permission-check:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'CICD:build-images') || github.event.pull_request.auto_merge != null
+    runs-on: ubuntu-latest
+    steps: 
+    - name: Check repository permission for user which triggered job
+      id: permission
+      uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
+      with:
+        required-permission: write
+        comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
+
   rust-images:
     # trigger only for push events (on protected branches as defined above) OR on PR events with the "CICD:build-images" label.
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'CICD:build-images')
+    needs: permission-check
     strategy:
       matrix:
         IMAGE_TARGET: [release, test]
@@ -82,8 +106,10 @@ jobs:
     secrets: inherit
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      merge_or_canary: ${{ github.event.pull_request.auto_merge != null && 'merge' || 'canary' }}
 
   community-platform:
+    needs: permission-check
     if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'CICD:build-images')
     runs-on: high-perf-docker
     steps:
@@ -113,7 +139,7 @@ jobs:
           docker buildx bake --progress=plain --push -f ./docker-bake.hcl
 
   indexer-server:
-    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'CICD:build-images')
+    needs: permission-check
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
