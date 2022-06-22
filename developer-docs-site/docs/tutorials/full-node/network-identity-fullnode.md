@@ -42,7 +42,11 @@ To create a static identity for your FullNode:
 
 Follow the below detailed steps:
 
-1. Clone the [aptos-labs/aptos-core](https://github.com/aptos-labs/aptos-core) repo. For example:
+1. Preparation
+    
+    **Using Aptos-core source code**
+    
+    Clone the [aptos-labs/aptos-core](https://github.com/aptos-labs/aptos-core) repo. For example:
 
     ```
     $ git clone https://github.com/aptos-labs/aptos-core.git
@@ -62,7 +66,11 @@ Follow the below detailed steps:
     $ docker run -it aptoslabs/tools:devnet /bin/bash
     ```
 
-2. Run the [Aptos CLI](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md) `aptos` to produce a hex encoded static x25519 private key. This will be the private key for your network identity.
+2. Generate the private key
+
+  **Using Aptos-core source code**
+  
+  Run the [Aptos CLI](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md) `aptos` to produce a hex encoded static x25519 private key. This will be the private key for your network identity.
 
   :::note
 
@@ -97,24 +105,24 @@ Follow the below detailed steps:
   ```
 
 3. Retrieve the peer identity
-
-  When you use Aptos-core source to generate a private key, use the below Aptos CLI command to generate the `peer_id`:
+  
+  **Using Aptos-core source code**
 
   ```
   aptos key extract-peer  --private-key-file private-key.txt  \
       --output-file peer-info.yaml
   ```
 
-    **Using Docker**
+   **Using Docker**
 
-    From inside the `aptoslabs/tools` Docker container:
+   From inside the `aptoslabs/tools` Docker container:
 
-    ```
-    $ aptos-operational-tool extract-peer-from-file \
-        --encoding hex \
-        --key-file /path/to/private-key.txt \
-        --output-file /path/to/peer-info.yaml
-    ```
+   ```
+   $ aptos-operational-tool extract-peer-from-file \
+       --encoding hex \
+       --key-file /path/to/private-key.txt \
+       --output-file /path/to/peer-info.yaml
+   ```
 
   This will create a YAML file that will have your `peer_id` corresponding to the `private-key.txt` you provided.
 
