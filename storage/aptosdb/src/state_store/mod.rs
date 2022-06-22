@@ -12,7 +12,7 @@ use crate::{
         jellyfish_merkle_node::JellyfishMerkleNodeSchema, stale_node_index::StaleNodeIndexSchema,
         state_value::StateValueSchema,
     },
-    AptosDbError,
+    AptosDbError, OTHER_TIMERS_SECONDS,
 };
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -246,22 +246,33 @@ impl StateStore {
         version: Version,
         base_version: Option<Version>,
     ) -> Result<HashValue> {
-        let (mut new_root_hash_vec, tree_update_batch) = JellyfishMerkleTree::new(self)
-            .batch_put_value_sets(
+        let (mut new_root_hash_vec, tree_update_batch) = {
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["jmt_update"])
+                .start_timer();
+
+            JellyfishMerkleTree::new(self).batch_put_value_sets(
                 vec![value_set],
                 node_hashes.map(|x| vec![x]),
                 base_version,
                 version,
-            )?;
+            )
+        }?;
 
         let mut batch = SchemaBatch::new();
-        add_node_batch(&mut batch, &tree_update_batch.node_batch)?;
+        {
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["serialize_jmt_commit"])
+                .start_timer();
 
-        tree_update_batch
-            .stale_node_index_batch
-            .iter()
-            .map(|row| batch.put::<StaleNodeIndexSchema>(row, &()))
-            .collect::<Result<Vec<()>>>()?;
+            add_node_batch(&mut batch, &tree_update_batch.node_batch)?;
+
+            tree_update_batch
+                .stale_node_index_batch
+                .iter()
+                .map(|row| batch.put::<StaleNodeIndexSchema>(row, &()))
+                .collect::<Result<Vec<()>>>()?;
+        }
 
         // commit jellyfish merkle nodes
         self.state_merkle_db.write_schemas(batch)?;
