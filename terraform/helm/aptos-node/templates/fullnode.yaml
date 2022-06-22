@@ -1,23 +1,17 @@
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: {{ include "aptos-validator.fullname" . }}-fullnode
-  labels:
-    {{- include "aptos-validator.labels" . | nindent 4 }}
-
-{{- range .Values.fullnode.groups }}
+{{- range $i, $e := until (int .Values.numValidators) }}
+{{- range $.Values.fullnode.groups }}
 ---
 
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "aptos-validator.fullname" $ }}-{{ .name }}
+  name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-{{ .name }}
   labels:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
 spec:
   selector:
     {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
-    app.kubernetes.io/name: fullnode
+    app.kubernetes.io/name: fullnode-{{$i}}
     group: {{ .name }}
   ports:
   - name: aptosnet
@@ -32,19 +26,19 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "aptos-validator.fullname" $ }}-{{ .name }}-e{{ $.Values.chain.era }}
+  name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-{{ .name }}-e{{ $.Values.chain.era }}
   labels:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
-    app.kubernetes.io/name: fullnode
+    app.kubernetes.io/name: fullnode-{{$i}}
     group: {{ .name }}
 spec:
-  serviceName: {{ include "aptos-validator.fullname" $ }}-{{ .name }}
+  serviceName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-{{ .name }}
   replicas: {{ .replicas }}
   podManagementPolicy: Parallel
   selector:
     matchLabels:
       {{- include "aptos-validator.selectorLabels" $ | nindent 6 }}
-      app.kubernetes.io/name: fullnode
+      app.kubernetes.io/name: fullnode-{{$i}}
       group: {{ .name }}
   volumeClaimTemplates:
   - metadata:
@@ -60,7 +54,7 @@ spec:
     metadata:
       labels:
         {{- include "aptos-validator.selectorLabels" $ | nindent 8 }}
-        app.kubernetes.io/name: fullnode
+        app.kubernetes.io/name: fullnode-{{$i}}
         group: {{ .name }}
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
@@ -138,14 +132,15 @@ spec:
       volumes:
       - name: aptos-config
         configMap:
-          name: {{ include "aptos-validator.fullname" $ }}
+          name: {{ include "aptos-validator.fullname" $ }}-{{$i}}
       - name: genesis-config
         secret:
-          secretName: {{ include "aptos-validator.fullname" $ }}-genesis-e{{ $.Values.chain.era }}
+          secretName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-genesis-e{{ $.Values.chain.era }}
       serviceAccountName: {{ include "aptos-validator.fullname" $ }}-fullnode
       {{- if $.Values.imagePullSecret }}
       imagePullSecrets:
       - name: {{ $.Values.imagePullSecret }}
       {{- end }}
 
+{{- end }}
 {{- end }}

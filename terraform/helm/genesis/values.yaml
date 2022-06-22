@@ -1,0 +1,28 @@
+chain:
+  name: testnet
+  era: 1
+  chain_id: 4
+  root_key: '0x5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956'
+
+imageTag: testnet
+
+genesis:
+  image:
+    repo: aptoslabs/init
+    tag:
+    pullPolicy: IfNotPresent
+  # Number of validators to include in genesis
+  numValidators: 1
+  # Assumes the validators and fullnodes are using the service names from
+  # aptos-node helm chart
+  username_prefix: aptos-node
+  validator_host_suffix: validator-lb
+  fullnode_host_suffix: fullnode-lb
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
+

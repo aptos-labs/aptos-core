@@ -33,6 +33,7 @@ pub fn tmp_db_with_random_content() -> (
         db.save_transactions(
             txns_to_commit,
             cur_ver, /* first_version */
+            cur_ver.checked_sub(1),
             Some(ledger_info_with_sigs),
         )
         .unwrap();

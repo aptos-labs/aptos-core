@@ -1,0 +1,148 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "aptos-genesis.fullname" . }}-layout-e{{ .Values.chain.era }}
+  labels:
+    {{- include "aptos-genesis.labels" . | nindent 4 }}
+data:
+  layout.yaml: |-
+    ---
+    root_key: {{ .Values.chain.root_key | squote }}
+    users:
+    {{- range $i, $e := until (int .Values.genesis.numValidators) }}
+    - {{ printf "%s-%d" $.Values.genesis.username_prefix $i | squote }}
+    {{- end }}
+    chain_id: {{ .Values.chain.chain_id | int }}
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "aptos-genesis.fullname" . }}-script
+  labels:
+    {{- include "aptos-genesis.labels" . | nindent 4 }}
+data:
+  genesis.sh: |-
+{{ .Files.Get "files/genesis.sh" | indent 4 }}
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "aptos-genesis.fullname" . }}
+  labels:
+    {{- include "aptos-genesis.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  verbs: ["list", "create", "delete"]
+  resources: ["configmaps", "secrets", "persistentvolumeclaims"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "aptos-genesis.fullname" . }}
+  labels:
+    {{- include "aptos-genesis.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "aptos-genesis.fullname" . }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "aptos-genesis.serviceAccountName" . }}
+
+---
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "aptos-genesis.fullname" . }}-e{{ .Values.chain.era }}
+  labels:
+    {{- include "aptos-genesis.labels" . | nindent 4 }}
+    app.kubernetes.io/name: genesis
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "aptos-genesis.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: genesis
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: runtime/default
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: genesis
+        image: {{ .Values.genesis.image.repo }}:{{ .Values.genesis.image.tag | default .Values.imageTag }}
+        imagePullPolicy: {{ .Values.genesis.image.pullPolicy }}
+        workingDir: /tmp
+        command:
+        - sh
+        - -c
+        - |-
+          set -ex
+          . /tmp/genesis.sh
+        resources:
+          {{- toYaml .Values.genesis.resources | nindent 10 }}
+        env:
+        - name: RUST_BACKTRACE
+          value: "1"
+        - name: NUM_VALIDATORS
+          value: {{ .Values.genesis.numValidators | quote }}
+        - name: WORKSPACE
+          value: /tmp
+        - name: USERNAME_PREFIX
+          value: {{ .Values.genesis.username_prefix | quote }}
+        - name: ERA
+          value: {{ .Values.chain.era | quote }}
+        volumeMounts:
+        - name: layout
+          mountPath: /tmp/layout.yaml
+          subPath: layout.yaml
+        - name: script
+          mountPath: /tmp/genesis.sh
+          subPath: genesis.sh
+        - name: tmp
+          mountPath: /tmp
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      {{- with .Values.genesis }}
+      {{- with .nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 6180
+        runAsGroup: 6180
+        fsGroup: 6180
+      {{- end }}
+      volumes:
+      - name: layout
+        configMap:
+          name: {{ include "aptos-genesis.fullname" . }}-layout-e{{ .Values.chain.era }}
+      - name: script
+        configMap:
+          name: {{ include "aptos-genesis.fullname" . }}-script
+      - name: tmp
+        emptyDir: {}
+      serviceAccountName: {{ include "aptos-genesis.serviceAccountName" . }}
+      {{- if .Values.imagePullSecret }}
+      imagePullSecrets:
+      - name: {{.Values.imagePullSecret}}
+      {{- end }}

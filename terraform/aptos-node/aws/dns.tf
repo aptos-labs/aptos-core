@@ -46,11 +46,3 @@ resource "aws_route53_record" "fullnode" {
   ttl     = 3600
   records = [data.kubernetes_service.fullnode-lb[0].status[0].load_balancer[0].ingress[0].hostname]
 }
-
-output "validator_endpoint" {
-  value = var.zone_id != "" ? "/dns4/${aws_route53_record.validator[0].fqdn}/tcp/${data.kubernetes_service.validator-lb[0].spec[0].port[0].port}" : null
-}
-
-output "fullnode_endpoint" {
-  value = var.zone_id != "" ? "/dns4/${aws_route53_record.fullnode[0].fqdn}/tcp/${data.kubernetes_service.fullnode-lb[0].spec[0].port[0].port}" : null
-}

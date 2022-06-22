@@ -26,7 +26,7 @@ provider "helm" {
 resource "helm_release" "validator" {
   name        = terraform.workspace
   chart       = var.helm_chart != "" ? var.helm_chart : "${path.module}/../../helm/aptos-node"
-  max_history = 100
+  max_history = 5
   wait        = false
 
   values = [

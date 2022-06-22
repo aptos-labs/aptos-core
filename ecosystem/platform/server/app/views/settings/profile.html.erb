@@ -1,0 +1,29 @@
+<% content_for(:page_title, 'Profile Settings') %>
+<h3 class="text-4xl mb-8 font-display font-light">Profile</h3>
+<%= form_with(model: @user, url: settings_profile_url, builder: AptosFormBuilder) do |f| %>
+  <% if @user.errors.any? %>
+    <div id="error_explanation" class="flex p-4 mb-4 bg-red-100 rounded-lg dark:bg-red-200 lg:w-96" role="alert">
+      <div class="ml-3 text-sm font-medium text-red-700 dark:text-red-800">
+        <h2><%= pluralize(@user.errors.count, "error") %> prohibited this from being saved:</h2>
+
+        <ul>
+          <% @user.errors.each do |error| %>
+            <li><%= error.full_message %></li>
+          <% end %>
+        </ul>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="mb-6">
+    <%= f.label :username, class: "font-mono uppercase block mb-2" %>
+    <%= f.text_field :username, autofocus: true, spellcheck: false, pattern: '[a-zA-Z0-9]+', minlength: 3, maxlength: 20 %>
+  </div>
+
+  <div class="mb-6">
+    <%= f.label :email, class: "font-mono uppercase block mb-2" %>
+    <%= f.email_field :email, autofocus: true, spellcheck: false %>
+  </div>
+
+  <%= f.submit 'Update' %>
+<% end %>

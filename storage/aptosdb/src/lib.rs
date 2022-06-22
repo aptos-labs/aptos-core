@@ -77,7 +77,7 @@ use aptos_types::{
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
         TransactionOutput, TransactionOutputListWithProof, TransactionToCommit,
-        TransactionWithProof, Version,
+        TransactionWithProof, Version, PRE_GENESIS_VERSION,
     },
     write_set::WriteSet,
 };
@@ -161,14 +161,17 @@ fn error_if_version_is_pruned(
     version: Version,
 ) -> Result<()> {
     if let Some(pruner) = pruner.as_ref() {
-        let min_readable_version = pruner.get_min_readable_version_by_pruner_index(pruner_index);
-        ensure!(
-            version >= min_readable_version,
-            "{} version {} is pruned, min available version is {}.",
-            data_type,
-            version,
-            min_readable_version
-        );
+        if let Some(min_readable_version) =
+            pruner.get_min_readable_version_by_pruner_index(pruner_index)
+        {
+            ensure!(
+                version >= min_readable_version,
+                "{} version {} is pruned, min available version is {}.",
+                data_type,
+                version,
+                min_readable_version
+            );
+        }
     }
     Ok(())
 }
@@ -249,8 +252,10 @@ pub struct AptosDB {
     state_store: Arc<StateStore>,
     system_store: Arc<SystemStore>,
     transaction_store: Arc<TransactionStore>,
+    pruner_config: StoragePrunerConfig,
     pruner: Option<Pruner>,
     _rocksdb_property_reporter: RocksdbPropertyReporter,
+    ledger_commit_lock: std::sync::Mutex<()>,
 }
 
 impl AptosDB {
@@ -261,15 +266,16 @@ impl AptosDB {
     ) -> Self {
         let arc_ledger_rocksdb = Arc::new(ledger_rocksdb);
         let arc_state_merkle_rocksdb = Arc::new(state_merkle_rocksdb);
-        let pruner = if storage_pruner_config.ledger_prune_window.is_none()
-            && storage_pruner_config.state_store_prune_window.is_none()
+        let pruner_config = storage_pruner_config;
+        let pruner = if pruner_config.ledger_prune_window.is_none()
+            && pruner_config.state_store_prune_window.is_none()
         {
             None
         } else {
             Some(Pruner::new(
                 Arc::clone(&arc_ledger_rocksdb),
                 Arc::clone(&arc_state_merkle_rocksdb),
-                storage_pruner_config,
+                pruner_config,
             ))
         };
         AptosDB {
@@ -283,11 +289,13 @@ impl AptosDB {
             )),
             system_store: Arc::new(SystemStore::new(Arc::clone(&arc_ledger_rocksdb))),
             transaction_store: Arc::new(TransactionStore::new(Arc::clone(&arc_ledger_rocksdb))),
+            pruner_config,
             pruner,
             _rocksdb_property_reporter: RocksdbPropertyReporter::new(
                 Arc::clone(&arc_ledger_rocksdb),
                 Arc::clone(&arc_state_merkle_rocksdb),
             ),
+            ledger_commit_lock: std::sync::Mutex::new(()),
         }
     }
 
@@ -506,13 +514,14 @@ impl AptosDB {
             .ledger_store
             .get_frozen_subtree_hashes(num_transactions)?;
 
-        let checkpoint_version = self
+        let (checkpoint_version, checkpoint_root_hash) = if let Some((version, hash)) = self
             .state_store
-            .find_latest_persisted_version_less_than(num_transactions)?;
-        let checkpoint_root_hash = checkpoint_version
-            .map_or(Ok(*SPARSE_MERKLE_PLACEHOLDER_HASH), |ver| {
-                self.state_store.get_root_hash(ver)
-            })?;
+            .get_state_snapshot_before(num_transactions)?
+        {
+            (Some(version), hash)
+        } else {
+            (None, *SPARSE_MERKLE_PLACEHOLDER_HASH)
+        };
 
         Ok(TreeState::new(
             num_transactions,
@@ -898,7 +907,7 @@ impl DbReader for AptosDB {
         gauged_api("get_first_txn_version", || {
             if let Some(pruner) = self.pruner.as_ref() {
                 // If pruning is enabled, we can get the min readable version from the pruner.
-                Ok(Some(pruner.get_min_readable_ledger_version()))
+                Ok(pruner.get_min_readable_ledger_version())
             } else {
                 self.transaction_store.get_first_txn_version()
             }
@@ -910,7 +919,7 @@ impl DbReader for AptosDB {
         gauged_api("get_first_write_set_version", || {
             if let Some(pruner) = self.pruner.as_ref() {
                 // If pruning is enabled, we can get the min readable version from the pruner.
-                Ok(Some(pruner.get_min_readable_ledger_version()))
+                Ok(pruner.get_min_readable_ledger_version())
             } else {
                 self.transaction_store.get_first_write_set_version()
             }
@@ -1158,7 +1167,8 @@ impl DbReader for AptosDB {
 
     fn get_latest_state_checkpoint(&self) -> Result<Option<(Version, HashValue)>> {
         gauged_api("get_latest_state_checkpoint_version", || {
-            Ok(self.state_store.latest_checkpoint())
+            self.state_store
+                .get_state_snapshot_before(PRE_GENESIS_VERSION - 1)
         })
     }
 
@@ -1208,19 +1218,25 @@ impl DbReader for AptosDB {
 
     fn get_state_prune_window(&self) -> Result<Option<usize>> {
         gauged_api("get_state_prune_window", || {
-            Ok(self
-                .pruner
-                .as_ref()
-                .map(|x| x.get_state_store_pruner_window() as usize))
+            let mut pruner_window = None;
+            if let Some(pruner) = self.pruner.as_ref() {
+                if let Some(window) = pruner.get_state_store_pruner_window() {
+                    pruner_window = Some(window as usize);
+                }
+            }
+            Ok(pruner_window)
         })
     }
 
     fn get_ledger_prune_window(&self) -> Result<Option<usize>> {
         gauged_api("get_ledger_prune_window", || {
-            Ok(self
-                .pruner
-                .as_ref()
-                .map(|x| x.get_ledger_pruner_window() as usize))
+            let mut pruner_window = None;
+            if let Some(pruner) = self.pruner.as_ref() {
+                if let Some(window) = pruner.get_ledger_pruner_window() {
+                    pruner_window = Some(window as usize);
+                }
+            }
+            Ok(pruner_window)
         })
     }
 }
@@ -1242,20 +1258,27 @@ impl DbWriter for AptosDB {
         jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         version: Version,
+        base_version: Option<Version>,
     ) -> Result<()> {
         gauged_api("save_state_snapshot", || {
             let mut cs = ChangeSet::new();
-            let root_hash = *self
+            let root_hash = self
                 .state_store
                 .merklize_value_sets(
                     vec![jmt_update_refs(&jmt_updates)],
                     node_hashes.map(|hashes| vec![hashes]),
                     version,
+                    base_version,
                     &mut cs,
                 )?
-                .first()
+                .pop()
                 .expect("One root hash expected");
-            self.state_store.set_latest_checkpoint(version, root_hash);
+            debug!(
+                version = version,
+                base_version = base_version,
+                root_hash = root_hash,
+                "State snapshot committed."
+            );
             Ok(())
         })
     }
@@ -1269,10 +1292,19 @@ impl DbWriter for AptosDB {
         &self,
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
+        base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         save_state_snapshots: bool,
     ) -> Result<()> {
         gauged_api("save_transactions", || {
+            // Executing and committing from more than one threads not allowed -- consensus and
+            // state sync must hand over to each other after all pending execution and committing
+            // complete.
+            let _lock = self
+                .ledger_commit_lock
+                .try_lock()
+                .expect("Concurrent committing detected.");
+
             let num_txns = txns_to_commit.len() as u64;
             // ledger_info_with_sigs could be None if we are doing state synchronization. In this case
             // txns_to_commit should not be empty. Otherwise it is okay to commit empty blocks.
@@ -1299,6 +1331,7 @@ impl DbWriter for AptosDB {
                 self.save_transactions_impl(txns_to_commit, first_version, &mut cs)?;
 
             if save_state_snapshots {
+                let mut base_version = base_state_version;
                 // find all the checkpoint versions
                 for (idx, jmt_updates, jf_node_hashes) in txns_to_commit
                     .iter()
@@ -1312,11 +1345,9 @@ impl DbWriter for AptosDB {
                         )
                     })
                 {
-                    self.save_state_snapshot(
-                        jmt_updates,
-                        jf_node_hashes,
-                        first_version + idx as LeafCount,
-                    )?;
+                    let version = first_version + idx as LeafCount;
+                    self.save_state_snapshot(jmt_updates, jf_node_hashes, version, base_version)?;
+                    base_version = Some(version);
                 }
             }
 
@@ -1452,13 +1483,14 @@ impl DbWriter for AptosDB {
             let db_pruners = utils::create_db_pruners(
                 Arc::clone(&self.ledger_db),
                 Arc::clone(&self.state_merkle_db),
+                self.pruner_config,
             );
 
             // Execute each pruner to clean up the genesis state
             let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive).
             let max_version = 1; // We should only really be pruning at a single version.
             let mut db_batch = SchemaBatch::new();
-            for db_pruner in db_pruners {
+            for db_pruner in db_pruners.into_iter().flatten() {
                 db_pruner.lock().set_target_version(target_version);
                 db_pruner.lock().prune(&mut db_batch, max_version)?;
             }

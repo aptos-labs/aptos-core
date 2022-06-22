@@ -194,28 +194,3 @@ resource "aws_security_group_rule" "nodes-egress" {
   cidr_blocks       = ["0.0.0.0/0"]
   description       = "Allow all outgoing traffic"
 }
-
-output "vpc_id" {
-  value     = aws_vpc.vpc.id
-  sensitive = true
-}
-
-output "aws_subnet_public" {
-  value     = aws_subnet.public
-}
-
-output "aws_subnet_private" {
-  value     = aws_subnet.private
-}
-
-output "aws_vpc_cidr_block" {
-  value = aws_vpc.vpc.cidr_block
-}
-
-output "aws_eip_nat_public_ip" {
-  value = aws_eip.nat.public_ip
-}
-
-output "cluster_security_group_id" {
-  value = aws_eks_cluster.aptos.vpc_config[0].cluster_security_group_id
-}

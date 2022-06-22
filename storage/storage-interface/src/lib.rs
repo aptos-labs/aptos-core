@@ -659,6 +659,7 @@ pub trait DbWriter: Send + Sync {
         &self,
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
+        base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         save_state_snapshots: bool,
     ) -> Result<()> {
@@ -669,11 +670,13 @@ pub trait DbWriter: Send + Sync {
         &self,
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
+        base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
         self.save_transactions_ext(
             txns_to_commit,
             first_version,
+            base_state_version,
             ledger_info_with_sigs,
             true, /* save_state_snapshots */
         )
@@ -688,6 +691,7 @@ pub trait DbWriter: Send + Sync {
         jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         version: Version,
+        base_version: Option<Version>,
     ) -> Result<()> {
         unimplemented!()
     }

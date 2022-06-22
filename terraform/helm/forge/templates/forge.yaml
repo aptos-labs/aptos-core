@@ -51,30 +51,6 @@ spec:
         volumeMounts:
         - name: forge-scripts
           mountPath: /etc/forge/scripts
-        - name: vault-config
-          mountPath: /etc/vault
-        - name: vault-token
-          mountPath: /opt/vault
-      initContainers:
-      {{- with .Values.vault }}
-      - name: vault
-        image: {{ .image.repo }}:{{ .image.tag }}
-        imagePullPolicy: {{ .image.pullPolicy }}
-        command: ["vault", "agent", "-config=/etc/vault/forge.json", "-exit-after-auth"]
-        resources:
-          {{- toYaml .resources | nindent 10 }}
-        volumeMounts:
-        - name: vault-config
-          mountPath: /etc/vault
-        - name: vault-token
-          mountPath: /opt/vault
-        securityContext:
-          readOnlyRootFilesystem: true
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-      {{- end }}
       {{- with .Values.forge }}
       {{- with .nodeSelector }}
       nodeSelector:
@@ -93,12 +69,6 @@ spec:
       - name: forge-scripts
         configMap:
           name: {{ include "forge.fullname" . }}-scripts
-      - name: vault-config
-        configMap:
-          name: {{ include "forge.fullname" . }}-vault
-      - name: vault-token
-        emptyDir:
-          medium: Memory
       serviceAccountName: {{ include "forge.serviceAccountName" . }}
       {{- if .Values.imagePullSecret }}
       imagePullSecrets:

@@ -42,3 +42,7 @@ jobs:
           APTOS_NODE_URL: http://localhost:8080
           APTOS_FAUCET_URL: http://localhost:8000
       - run: cd ./ecosystem/typescript/sdk && yarn build
+      # Run example code in typescript
+      - run: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install && yarn test
+      # Run example code in javascript
+      - run: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install && yarn test

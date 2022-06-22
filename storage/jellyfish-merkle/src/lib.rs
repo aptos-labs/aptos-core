@@ -129,9 +129,6 @@ pub trait TreeReader<K> {
 pub trait TreeWriter<K>: Send + Sync {
     /// Writes a node batch into storage.
     fn write_node_batch(&self, node_batch: &NodeBatch<K>) -> Result<()>;
-
-    /// Inform underlying store that a latest version is complete and readable.
-    fn finish_version(&self, version: Version, root_hash: HashValue);
 }
 
 pub trait StateValueWriter<K, V>: Send + Sync {

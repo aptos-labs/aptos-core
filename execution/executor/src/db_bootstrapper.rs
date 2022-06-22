@@ -16,7 +16,7 @@ use aptos_types::{
     on_chain_config::{config_address, ConfigurationResource},
     state_store::state_key::StateKey,
     timestamp::TimestampResource,
-    transaction::Transaction,
+    transaction::{Transaction, Version},
     waypoint::Waypoint,
 };
 use aptos_vm::VMExecutor;
@@ -65,11 +65,16 @@ pub fn maybe_bootstrap<V: VMExecutor>(
 pub struct GenesisCommitter {
     db: Arc<dyn DbWriter>,
     output: ExecutedChunk,
+    base_state_version: Option<Version>,
     waypoint: Waypoint,
 }
 
 impl GenesisCommitter {
-    pub fn new(db: Arc<dyn DbWriter>, output: ExecutedChunk) -> Result<Self> {
+    pub fn new(
+        db: Arc<dyn DbWriter>,
+        output: ExecutedChunk,
+        base_state_version: Option<Version>,
+    ) -> Result<Self> {
         let ledger_info = output
             .ledger_info
             .as_ref()
@@ -81,6 +86,7 @@ impl GenesisCommitter {
             db,
             output,
             waypoint,
+            base_state_version,
         })
     }
 
@@ -92,6 +98,7 @@ impl GenesisCommitter {
         self.db.save_transactions(
             &self.output.transactions_to_commit()?,
             self.output.result_view.txn_accumulator().version(),
+            self.base_state_version,
             self.output.ledger_info.as_ref(),
         )?;
         info!("Genesis commited.");
@@ -166,7 +173,11 @@ pub fn calculate_genesis<V: VMExecutor>(
     );
     output.ledger_info = Some(ledger_info_with_sigs);
 
-    let committer = GenesisCommitter::new(db.writer.clone(), output)?;
+    let committer = GenesisCommitter::new(
+        db.writer.clone(),
+        output,
+        base_view.state().checkpoint_version,
+    )?;
     info!(
         "Genesis calculated: ledger_info_with_sigs {:?}, waypoint {:?}",
         &committer.output.ledger_info, committer.waypoint,

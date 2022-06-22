@@ -4,6 +4,7 @@ use aptos_types::transaction::Version;
 use schemadb::{SchemaBatch, DB};
 
 use crate::pruner::{db_pruner::DBPruner, utils};
+use aptos_config::config::StoragePrunerConfig;
 use aptos_infallible::Mutex;
 use itertools::zip_eq;
 use std::sync::{mpsc::Receiver, Arc};
@@ -13,12 +14,14 @@ use std::sync::{mpsc::Receiver, Arc};
 pub struct Worker {
     ledger_db: Arc<DB>,
     command_receiver: Receiver<Command>,
-    /// Keeps tracks of all the DB pruners
-    db_pruners: Vec<Mutex<Arc<dyn DBPruner + Send + Sync>>>,
+    /// Keeps tracks of all the DB pruners. The order of the pruners are defined in PrunerIndex.
+    /// If a pruner is not enabled, its value will be None.
+    db_pruners: Vec<Option<Mutex<Arc<dyn DBPruner + Send + Sync>>>>,
     /// Keeps a record of the pruning progress. If this equals to version `V`, we know versions
     /// smaller than `V` are no longer readable.
     /// This being an atomic value is to communicate the info with the Pruner thread (for tests).
-    min_readable_versions: Arc<Mutex<Vec<Version>>>,
+    /// If the pruner is disabled, its value will be None.
+    min_readable_versions: Arc<Mutex<Vec<Option<Version>>>>,
     /// Indicates if there's NOT any pending work to do currently, to hint
     /// `Self::receive_commands()` to `recv()` blocking-ly.
     blocking_recv: bool,
@@ -30,17 +33,18 @@ impl Worker {
         ledger_db: Arc<DB>,
         state_merkle_db: Arc<DB>,
         command_receiver: Receiver<Command>,
-        min_readable_versions: Arc<Mutex<Vec<Version>>>,
-        max_version_to_prune_per_batch: u64,
+        min_readable_versions: Arc<Mutex<Vec<Option<Version>>>>,
+        storage_pruner_config: StoragePrunerConfig,
     ) -> Self {
-        let db_pruners = utils::create_db_pruners(ledger_db.clone(), state_merkle_db);
+        let db_pruners =
+            utils::create_db_pruners(ledger_db.clone(), state_merkle_db, storage_pruner_config);
         Self {
             ledger_db: Arc::clone(&ledger_db),
             db_pruners,
             command_receiver,
             min_readable_versions,
             blocking_recv: true,
-            max_version_to_prune_per_batch,
+            max_version_to_prune_per_batch: storage_pruner_config.pruning_batch_size as u64,
         }
     }
 
@@ -50,7 +54,7 @@ impl Worker {
             // in case `Command::Quit` is received (that's when we should quit.)
             let mut error_in_pruning = false;
             let mut ledger_db_batch = SchemaBatch::new();
-            for db_pruner in &self.db_pruners {
+            for db_pruner in self.db_pruners.iter().flatten() {
                 let result = db_pruner
                     .lock()
                     .prune(&mut ledger_db_batch, self.max_version_to_prune_per_batch);
@@ -62,7 +66,7 @@ impl Worker {
                 .map_err(|_| error_in_pruning = true)
                 .ok();
             let mut pruning_pending = false;
-            for db_pruner in &self.db_pruners {
+            for db_pruner in self.db_pruners.iter().flatten() {
                 // if any of the pruner has pending pruning, then we don't block on receive
                 if db_pruner.lock().is_pruning_pending() {
                     pruning_pending = true;
@@ -78,9 +82,9 @@ impl Worker {
     }
 
     fn record_progress(&mut self) {
-        let mut updated_min_readable_versions: Vec<Version> = Vec::new();
-        for x in &self.db_pruners {
-            updated_min_readable_versions.push(x.lock().min_readable_version())
+        let mut updated_min_readable_versions: Vec<Option<Version>> = Vec::new();
+        for pruner in self.db_pruners.iter().flatten() {
+            updated_min_readable_versions.push(Some(pruner.lock().min_readable_version()))
         }
         *self.min_readable_versions.lock() = updated_min_readable_versions;
     }
@@ -111,15 +115,20 @@ impl Worker {
                 // On `Command::Quit` inform the outer loop to quit by returning `false`.
                 Command::Quit => return false,
                 Command::Prune { target_db_versions } => {
-                    for (new_target_version, pruner) in
+                    for (new_target_version_option, pruner_option) in
                         zip_eq(&target_db_versions, &self.db_pruners)
                     {
-                        if *new_target_version > pruner.lock().target_version() {
-                            // Switch to non-blocking to allow some work to be done after the
-                            // channel has drained.
-                            self.blocking_recv = false;
+                        if let Some(pruner) = pruner_option {
+                            assert!(new_target_version_option.is_some());
+                            if new_target_version_option.unwrap() > pruner.lock().target_version() {
+                                // Switch to non-blocking to allow some work to be done after the
+                                // channel has drained.
+                                self.blocking_recv = false;
+                            }
+                            pruner
+                                .lock()
+                                .set_target_version(new_target_version_option.unwrap());
                         }
-                        pruner.lock().set_target_version(*new_target_version);
                     }
                 }
             }
@@ -129,5 +138,10 @@ impl Worker {
 
 pub enum Command {
     Quit,
-    Prune { target_db_versions: Vec<Version> },
+    Prune {
+        /// The first element represents the target DB version for state store pruner while the
+        /// second element is for ledger pruner. If a pruner is not enabled, the corresponding
+        /// value is None.
+        target_db_versions: Vec<Option<Version>>,
+    },
 }

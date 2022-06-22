@@ -96,6 +96,7 @@ impl<V> ChunkExecutor<V> {
             self.db.writer.save_transactions(
                 &txns_to_commit,
                 base_view.txn_accumulator().num_leaves(),
+                base_view.state().checkpoint_version,
                 ledger_info,
             )?;
         }

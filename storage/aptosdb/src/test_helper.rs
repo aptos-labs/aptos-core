@@ -161,7 +161,8 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
     for (batch_idx, (txns_to_commit, ledger_info_with_sigs)) in input.iter().enumerate() {
         db.save_transactions(
             txns_to_commit,
-            cur_ver, /* first_version */
+            cur_ver,                /* first_version */
+            cur_ver.checked_sub(1), /* base_state_version */
             Some(ledger_info_with_sigs),
         )
         .unwrap();
@@ -553,8 +554,6 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
     db.ledger_db
         .put::<StateValueSchema>(&(key, version), &value)
         .unwrap();
-    db.state_store
-        .set_latest_checkpoint(version, leaf_node.hash());
 }
 
 pub fn test_sync_transactions_impl(
@@ -564,14 +563,16 @@ pub fn test_sync_transactions_impl(
     let db = AptosDB::new_for_test(&tmp_dir);
 
     let num_batches = input.len();
-    let mut cur_ver = 0;
+    let mut cur_ver: Version = 0;
     for (batch_idx, (txns_to_commit, ledger_info_with_sigs)) in input.iter().enumerate() {
         // if batch has more than 2 transactions, save them in two batches
         let batch1_len = txns_to_commit.len() / 2;
+        let base_state_version = cur_ver.checked_sub(1);
         if batch1_len > 0 {
             db.save_transactions(
                 &txns_to_commit[..batch1_len],
                 cur_ver, /* first_version */
+                base_state_version,
                 None,
             )
             .unwrap();
@@ -579,6 +580,7 @@ pub fn test_sync_transactions_impl(
         db.save_transactions(
             &txns_to_commit[batch1_len..],
             cur_ver + batch1_len as u64, /* first_version */
+            base_state_version,
             Some(ledger_info_with_sigs),
         )
         .unwrap();

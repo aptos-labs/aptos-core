@@ -150,7 +150,7 @@ where
 
         let root_node_key = if let Some(version) = persisted_version {
             if version == PRE_GENESIS_VERSION {
-                assert_eq!(next_version, 0);
+                assert_ne!(next_version, PRE_GENESIS_VERSION);
             } else {
                 assert!(next_version > version);
             }

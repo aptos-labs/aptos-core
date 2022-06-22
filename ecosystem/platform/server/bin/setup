@@ -23,10 +23,8 @@ FileUtils.chdir APP_ROOT do
   system('bundle check') || system!('bundle install')
   system('yarn check') || system!('yarn install')
 
-  # puts "\n== Copying sample files =="
-  # unless File.exist?("config/database.yml")
-  #   FileUtils.cp "config/database.yml.sample", "config/database.yml"
-  # end
+  puts "\n== Copying sample files =="
+  FileUtils.cp '.env.example', '.env' unless File.exist?('.env')
 
   puts "\n== Preparing database =="
   system! 'bin/rails db:prepare'

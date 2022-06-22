@@ -127,17 +127,6 @@ variable "pfn_logger_helm_values" {
   default     = {}
 }
 
-variable "enable_forge" {
-  description = "Enable Forge test framework, also creating an internal helm repo"
-  default     = false
-}
-
-variable "forge_helm_values" {
-  description = "Map of values to pass to Forge Helm"
-  type        = any
-  default     = {}
-}
-
 variable "utility_instance_type" {
   description = "Instance type used for utilities"
   default     = "t3.medium"

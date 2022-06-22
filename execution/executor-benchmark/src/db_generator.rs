@@ -104,7 +104,8 @@ pub fn run(
     let state_commit_thread = std::thread::Builder::new()
         .name("state_committer".to_string())
         .spawn(|| {
-            let committer = StateCommitter::new(state_commit_receiver, db_writer, base_smt);
+            let committer =
+                StateCommitter::new(state_commit_receiver, db_writer, base_smt, Some(0));
             committer.run();
         })
         .expect("Failed to spawn transaction committer thread.");

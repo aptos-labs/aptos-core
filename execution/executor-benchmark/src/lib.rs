@@ -127,8 +127,13 @@ pub fn run_benchmark(
     let db_writer = db.writer.clone();
     let state_commit_thread = std::thread::Builder::new()
         .name("state_committer".to_string())
-        .spawn(|| {
-            let committer = StateCommitter::new(state_commit_receiver, db_writer, base_smt);
+        .spawn(move || {
+            let committer = StateCommitter::new(
+                state_commit_receiver,
+                db_writer,
+                base_smt,
+                Some(start_version),
+            );
             committer.run();
         })
         .expect("Failed to spawn transaction committer thread.");

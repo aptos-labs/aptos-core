@@ -187,6 +187,11 @@ where
             self.db.writer.save_transactions_ext(
                 &txns_to_commit,
                 first_version,
+                committed_block
+                    .output
+                    .result_view
+                    .state()
+                    .checkpoint_version,
                 Some(&ledger_info_with_sigs),
                 save_state_snapshots,
             )?;

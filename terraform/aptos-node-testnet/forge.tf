@@ -2,13 +2,13 @@
 # an internal helm repository hosted on S3
 
 resource "random_id" "helm-bucket" {
+  count       = var.enable_forge ? 1 : 0
   byte_length = 4
 }
 
 resource "aws_s3_bucket" "aptos-testnet-helm" {
-  count = var.enable_forge ? 1 : 0
-
-  bucket = "aptos-testnet-${terraform.workspace}-helm-${random_id.helm-bucket.hex}"
+  count  = var.enable_forge ? 1 : 0
+  bucket = "aptos-testnet-${local.workspace}-helm-${random_id.helm-bucket[0].hex}"
 }
 
 resource "aws_s3_bucket_public_access_block" "aptos-testnet-helm" {
@@ -20,7 +20,7 @@ resource "aws_s3_bucket_public_access_block" "aptos-testnet-helm" {
   restrict_public_buckets = true
 }
 
-# install a helm repo called "testnet-${terraform.workspace}" at the s3 bucket
+# install a helm repo called "testnet-${local.workspace}" at the s3 bucket
 # this helm repo includes all the charts deployed onto a testnet
 resource "null_resource" "helm-s3-init" {
   count = var.enable_forge ? 1 : 0
@@ -34,9 +34,9 @@ resource "null_resource" "helm-s3-init" {
 
   provisioner "local-exec" {
     command = <<-EOT
-      helm plugin install https://github.com/hypnoglow/helm-s3.git || true
-      helm s3 init s3://${aws_s3_bucket.aptos-testnet-helm[0].bucket}/charts
-      helm repo add testnet-${terraform.workspace} s3://${aws_s3_bucket.aptos-testnet-helm[0].bucket}/charts
+      helm plugin install https://github.com/C123R/helm-blob.git || true
+      helm blob init s3://${aws_s3_bucket.aptos-testnet-helm[0].bucket}/charts
+      helm repo add testnet-${local.workspace} s3://${aws_s3_bucket.aptos-testnet-helm[0].bucket}/charts
     EOT
   }
 }
@@ -58,13 +58,11 @@ resource "null_resource" "helm-s3-package" {
     command = <<-EOT
       set -e
       TEMPDIR="$(mktemp -d)"
-      helm package ${path.module}/testnet -d "$TEMPDIR" --app-version 1.0.0 --version 1.0.0
-      helm package ${path.module}/../helm/validator -d "$TEMPDIR" --app-version 1.0.0 --version 1.0.0
-      helm package ${path.module}/../helm/fullnode -d "$TEMPDIR" --app-version 1.0.0 --version 1.0.0
-      helm s3 push --force "$TEMPDIR"/testnet-*.tgz testnet-${terraform.workspace}
-      helm s3 push --force "$TEMPDIR"/aptos-validator-*.tgz testnet-${terraform.workspace}
-      helm s3 push --force "$TEMPDIR"/aptos-fullnode-*.tgz testnet-${terraform.workspace}
-      echo "pushed to fullnode"
+      helm package ${path.module}/../helm/aptos-node -d "$TEMPDIR" --app-version 1.0.0 --version 1.0.0
+      helm package ${path.module}/../helm/genesis -d "$TEMPDIR" --app-version 1.0.0 --version 1.0.0
+      helm blob push --force "$TEMPDIR"/aptos-node-*.tgz testnet-${local.workspace}
+      helm blob push --force "$TEMPDIR"/aptos-genesis-*.tgz testnet-${local.workspace}
+      echo "pushed to internal helm repo"
     EOT
   }
 }
@@ -121,16 +119,16 @@ data "aws_iam_policy_document" "forge" {
       "eks:UpdateNodegroupVersion"
     ]
     resources = [
-      data.aws_eks_cluster.aptos.arn,
-      "arn:aws:eks:${var.region}:${data.aws_caller_identity.current.account_id}:cluster/${data.aws_eks_cluster.aptos.name}/*",
-      "arn:aws:eks:${var.region}:${data.aws_caller_identity.current.account_id}:nodegroup/${data.aws_eks_cluster.aptos.name}/*"
+      module.validator.aws_eks_cluster.arn,
+      "arn:aws:eks:${var.region}:${data.aws_caller_identity.current.account_id}:cluster/${module.validator.aws_eks_cluster.name}/*",
+      "arn:aws:eks:${var.region}:${data.aws_caller_identity.current.account_id}:nodegroup/${module.validator.aws_eks_cluster.name}/*"
     ]
   }
 }
 
 resource "aws_iam_role" "forge" {
   count                = var.enable_forge ? 1 : 0
-  name                 = "aptos-testnet-${terraform.workspace}-forge"
+  name                 = "aptos-testnet-${local.workspace}-forge"
   path                 = var.iam_path
   permissions_boundary = var.permissions_boundary_policy
   assume_role_policy   = data.aws_iam_policy_document.forge-assume-role[0].json
@@ -143,12 +141,40 @@ resource "aws_iam_role_policy" "forge" {
   policy = data.aws_iam_policy_document.forge[0].json
 }
 
-# vault auth
-resource "vault_kubernetes_auth_backend_role" "forge" {
-  count                            = var.enable_forge ? 1 : 0
-  backend                          = module.vault[0].kubernetes_auth_path
-  role_name                        = "forge"
-  bound_service_account_names      = ["forge"]
-  bound_service_account_namespaces = ["*"]
-  token_policies                   = concat([vault_policy.genesis-root.name], formatlist("val%s-management", range(var.num_validators)))
+### Forge helm release
+
+
+resource "helm_release" "forge" {
+  count       = var.enable_forge ? 1 : 0
+  name        = "forge"
+  chart       = "${path.module}/../helm/forge"
+  max_history = 2
+  wait        = false
+
+  depends_on = [
+    null_resource.helm-s3-package
+  ]
+
+  values = [
+    jsonencode({
+      forge = {
+        helmBucket = aws_s3_bucket.aptos-testnet-helm[0].bucket
+        image = {
+          tag = var.image_tag
+        }
+      }
+      serviceAccount = {
+        annotations = {
+          "eks.amazonaws.com/role-arn" = aws_iam_role.forge[0].arn
+        }
+      }
+    }),
+    jsonencode(var.forge_helm_values),
+  ]
+
+  set {
+    name  = "timestamp"
+    value = timestamp()
+  }
 }
+

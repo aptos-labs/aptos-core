@@ -8,19 +8,23 @@ variable "k8s_api_sources" {
   default     = ["0.0.0.0/0"]
 }
 
+variable "num_validators" {
+  default = 1
+}
+
 variable "era" {
   description = "Chain era, used to start a clean chain"
-  default = 1
+  default     = 1
 }
 
 variable "chain_id" {
   description = "Aptos chain ID"
-  default = "TESTING"
+  default     = "TESTING"
 }
 
 variable "chain_name" {
   description = "Aptos chain name"
-  default = "testnet"
+  default     = "testnet"
 }
 
 variable "validator_name" {
@@ -120,11 +124,6 @@ variable "helm_enable_validator" {
   default     = true
 }
 
-variable "helm_release_name" {
-  description = "Override the Helm release name used when referencing Kubernetes service accounts"
-  default     = ""
-}
-
 variable "utility_instance_type" {
   description = "Instance type used for utilities"
   default     = "t3.medium"
@@ -133,6 +132,16 @@ variable "utility_instance_type" {
 variable "utility_instance_num" {
   description = "Number of instances for utilities"
   default     = 1
+}
+
+variable "utility_instance_min_num" {
+  description = "Minimum number of instances for utilities"
+  default     = 1
+}
+
+variable "utility_instance_max_num" {
+  description = "Maximum number of instances for utilities. If left 0, defaults to 2 * var.utility_instance_num"
+  default     = 0
 }
 
 variable "validator_instance_type" {
@@ -145,10 +154,14 @@ variable "validator_instance_num" {
   default     = 2
 }
 
-variable "node_pool_sizes" {
-  type        = map(number)
-  default     = {}
-  description = "Override the number of nodes in the specified pool"
+variable "validator_instance_min_num" {
+  description = "Minimum number of instances for validators"
+  default     = 1
+}
+
+variable "validator_instance_max_num" {
+  description = "Maximum number of instances for utilities. If left 0, defaults to 2 * var.validator_instance_num"
+  default     = 0
 }
 
 variable "workspace_name_override" {

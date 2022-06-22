@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "ts-node index.ts"
+    "test": "run-s basic bcs_transaction multisig_transaction",
+    "basic": "ts-node index.ts",
+    "bcs_transaction": "ts-node bcs_transaction.ts",
+    "multisig_transaction": "ts-node multisig_transaction.ts"
   },
   "keywords": [],
   "author": "",
@@ -14,6 +17,7 @@
   },
   "devDependencies": {
     "@types/node": "^17.0.23",
+    "npm-run-all": "^4.1.5",
     "ts-node": "^10.7.0",
     "typescript": "^4.6.3"
   }

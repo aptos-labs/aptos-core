@@ -25,8 +25,6 @@ pub enum ConsensusScheme {
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ValidatorSet {
     scheme: ConsensusScheme,
-    minimum_stake: u64,
-    maximum_stake: u64,
     active_validators: Vec<ValidatorInfo>,
     pending_inactive: Vec<ValidatorInfo>,
     pending_active: Vec<ValidatorInfo>,
@@ -50,8 +48,6 @@ impl ValidatorSet {
 
         Self {
             scheme: ConsensusScheme::Ed25519,
-            minimum_stake: 0,
-            maximum_stake: 0,
             active_validators: payload,
             pending_inactive: vec![],
             pending_active: vec![],

@@ -11,7 +11,8 @@ class User < ApplicationRecord
          :omniauthable, omniauth_providers: %i[discord github google],
                         authentication_keys: [:username]
 
-  validates :username, uniqueness: { case_sensitive: false }, allow_nil: true
+  validates :username, uniqueness: { case_sensitive: false }, length: { minimum: 3, maximum: 20 },
+                       format: { with: /\A[a-zA-Z0-9]+\z/ }, allow_nil: true
   validates :email, uniqueness: { case_sensitive: false }, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_nil: true
 
   validate_aptos_address :mainnet_address
@@ -116,8 +117,13 @@ class User < ApplicationRecord
     false
   end
 
-  # This is to allow username instead of email login in devise (for aptos admins)
-  def will_save_change_to_email?
-    false
+  # Use mailchimp instead of the default devise confirmation email.
+  def send_confirmation_instructions
+    generate_confirmation_token! unless @raw_confirmation_token
+
+    url_options = Rails.application.config.action_mailer.default_url_options
+    url = Rails.application.routes.url_helpers.user_confirmation_url(**url_options,
+                                                                     confirmation_token: @raw_confirmation_token)
+    SendConfirmEmailJob.perform_now({ user_id: id, template_vars: { CONFIRM_LINK: url } })
   end
 end

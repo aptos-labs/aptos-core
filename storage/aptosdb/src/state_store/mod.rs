@@ -17,7 +17,6 @@ use crate::{
 };
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{
     iterator::JellyfishMerkleIterator, node_type::NodeKey, restore::StateSnapshotRestore,
     JellyfishMerkleTree, StateValueWriter, TreeReader, TreeWriter,
@@ -47,7 +46,6 @@ pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 pub(crate) struct StateStore {
     ledger_db: Arc<DB>,
     state_merkle_db: Arc<DB>,
-    latest_checkpoint: Mutex<Option<(Version, HashValue)>>,
 }
 
 // "using an Arc<dyn DbReader> as an Arc<dyn StateReader>" is not allowed in stable Rust. Actually we
@@ -102,67 +100,25 @@ impl DbReader for StateStore {
         &self,
         next_version: Version,
     ) -> Result<Option<(Version, HashValue)>> {
-        ensure!(
-            next_version != PRE_GENESIS_VERSION,
-            "Nothing before pre-genesis"
-        );
-
-        if let Some((version, root_hash)) = self.latest_checkpoint() {
-            if next_version > version {
-                Ok(Some((version, root_hash)))
-            } else {
-                self.find_latest_persisted_version_from_db(next_version)?
-                    .map(|ver| Ok((ver, self.get_root_hash(ver)?)))
-                    .transpose()
-            }
-        } else {
-            Ok(None)
-        }
+        self.get_state_snapshot_version_before(next_version)?
+            .map(|ver| Ok((ver, self.get_root_hash(ver)?)))
+            .transpose()
     }
 }
 
 impl StateStore {
     pub fn new(ledger_db: Arc<DB>, state_merkle_db: Arc<DB>) -> Self {
-        let myself = Self {
+        Self {
             ledger_db,
             state_merkle_db,
-            latest_checkpoint: Mutex::new(None),
-        };
-
-        let latest_version = myself
-            .find_latest_persisted_version_from_db(Version::MAX)
-            .expect("Failed to query latest node on initialization.");
-        if let Some(version) = latest_version {
-            let root_hash = myself
-                .get_root_hash(version)
-                .expect("Failed to query latest checkpoint root hash on initialization.");
-            myself.set_latest_checkpoint(version, root_hash)
         }
-
-        myself
     }
 
-    pub fn latest_checkpoint(&self) -> Option<(Version, HashValue)> {
-        *self.latest_checkpoint.lock()
-    }
-
-    pub fn set_latest_checkpoint(&self, version: Version, root_hash: HashValue) {
-        *self.latest_checkpoint.lock() = Some((version, root_hash))
-    }
-
-    pub fn find_latest_persisted_version_less_than(
-        &self,
-        next_version: Version,
-    ) -> Result<Option<Version>> {
-        Ok(self
-            .get_state_snapshot_before(next_version)?
-            .map(|(v, _h)| v))
-    }
-
-    fn find_latest_persisted_version_from_db(
-        &self,
-        next_version: Version,
-    ) -> Result<Option<Version>> {
+    fn get_state_snapshot_version_before(&self, next_version: Version) -> Result<Option<Version>> {
+        ensure!(
+            next_version != PRE_GENESIS_VERSION,
+            "Nothing before pre-genesis"
+        );
         if next_version > 0 {
             let max_possible_version = next_version - 1;
             let mut iter = self
@@ -289,15 +245,11 @@ impl StateStore {
         value_sets: Vec<Vec<(HashValue, &(HashValue, StateKey))>>,
         node_hashes: Option<Vec<&HashMap<NibblePath, HashValue>>>,
         first_version: Version,
+        base_version: Option<Version>,
         ledger_db_cs: &mut ChangeSet,
     ) -> Result<Vec<HashValue>> {
         let (new_root_hash_vec, tree_update_batch) = JellyfishMerkleTree::new(self)
-            .batch_put_value_sets(
-                value_sets,
-                node_hashes,
-                self.find_latest_persisted_version_less_than(first_version)?,
-                first_version,
-            )?;
+            .batch_put_value_sets(value_sets, node_hashes, base_version, first_version)?;
 
         let num_versions = new_root_hash_vec.len();
         assert_eq!(num_versions, tree_update_batch.node_stats.len());
@@ -509,10 +461,6 @@ impl TreeWriter<StateKey> for StateStore {
         let mut batch = SchemaBatch::new();
         add_node_batch(&mut batch, node_batch)?;
         self.state_merkle_db.write_schemas(batch)
-    }
-
-    fn finish_version(&self, version: Version, root_hash: HashValue) {
-        self.set_latest_checkpoint(version, root_hash)
     }
 }
 

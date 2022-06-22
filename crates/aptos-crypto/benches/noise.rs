@@ -23,9 +23,9 @@ const MSG_SIZE: usize = 4096;
 
 fn benchmarks(c: &mut Criterion) {
     // bench the handshake
-    let mut group = c.benchmark_group("handshake");
+    let mut group = c.benchmark_group("noise-handshake");
     group.throughput(Throughput::Elements(1));
-    group.bench_function("xx", |b| {
+    group.bench_function("connect", |b| {
         // setup keys first
         let mut rng = ::rand::rngs::StdRng::from_seed(TEST_SEED);
         let initiator_static = x25519::PrivateKey::generate(&mut rng);
@@ -72,10 +72,10 @@ fn benchmarks(c: &mut Criterion) {
     });
     group.finish();
 
-    let mut transport_group = c.benchmark_group("transport");
+    let mut transport_group = c.benchmark_group("noise-transport");
     transport_group.throughput(Throughput::Bytes(MSG_SIZE as u64 * 2));
     transport_group.bench_function("AES-GCM throughput", |b| {
-        let mut buffer_msg = [0u8; MSG_SIZE * 2];
+        let mut buffer_msg = [0u8; MSG_SIZE + AES_GCM_TAGLEN];
 
         // setup keys first
         let mut rng = ::rand::rngs::StdRng::from_seed(TEST_SEED);
