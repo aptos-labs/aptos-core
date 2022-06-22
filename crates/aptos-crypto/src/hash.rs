@@ -100,7 +100,7 @@
 #![allow(clippy::integer_arithmetic)]
 use bytes::Bytes;
 use hex::FromHex;
-use mirai_annotations::*;
+use mirai_annotations::assume;
 use once_cell::sync::{Lazy, OnceCell};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;

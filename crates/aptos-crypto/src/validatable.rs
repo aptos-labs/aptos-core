@@ -67,12 +67,12 @@ impl<V: Validate> Validatable<V> {
         &self.unvalidated
     }
 
-    /// Try to validate the unvalidated form returning `Some(&V)` on success and `None` on failure.
+    /// Try to validate the unvalidated form, returning `Some(&V)` on success and `None` on failure.
     pub fn valid(&self) -> Option<&V> {
         self.validate().ok()
     }
 
-    // TODO maybe optimize to only try once and keep track when we fail
+    // TODO maybe optimize to only try once and keep track when we fail. This would avoid multiple calls to validate() by valid() when validation fails
     /// Attempt to validate `V::Unvalidated` and return a reference to a valid `V`
     pub fn validate(&self) -> Result<&V> {
         self.maybe_valid
@@ -80,6 +80,7 @@ impl<V: Validate> Validatable<V> {
     }
 }
 
+/// Serializes a `Validatable<V>` using the `serde::Serialize` implementation of `V::Unvalidated`
 impl<V> Serialize for Validatable<V>
 where
     V: Validate + Serialize,
@@ -93,6 +94,8 @@ where
     }
 }
 
+/// Deserializes a `Validatable<V>` using the `serde::Deserialize` implementation of `V::Unvalidated`.
+/// Does *not* perform validation on the deserialized `V::Unvalidated` object.
 impl<'de, V> Deserialize<'de> for Validatable<V>
 where
     V: Validate,
@@ -107,6 +110,7 @@ where
     }
 }
 
+/// Simply calls the equality operator of `V::Unvalidated`
 impl<V> PartialEq for Validatable<V>
 where
     V: Validate,
@@ -124,6 +128,7 @@ where
 {
 }
 
+/// Simply calls the `Hash` implementation of `V::Unvalidated`
 impl<V> Hash for Validatable<V>
 where
     V: Validate,
@@ -214,7 +219,29 @@ impl Validate for Ed25519PublicKey {
     type Unvalidated = UnvalidatedEd25519PublicKey;
 
     fn validate(unvalidated: &Self::Unvalidated) -> Result<Self> {
+        // NOTE: We don't need to actually check prime-order subgroup membership because our signature
+        // verification code does it implicitly. The current design is a bit confusing and should be fixed.
+        // to fix it.
         Self::try_from(unvalidated.0.as_ref()).map_err(Into::into)
+
+        // let compressed = curve25519_dalek::edwards::CompressedEdwardsY(unvalidated.0);
+        // let point = compressed
+        //     .decompress()
+        //     .ok_or(CryptoMaterialError::DeserializationError)?;
+        //
+        // // Check if the point lies on a small subgroup. This is required when using curves with a
+        // // small cofactor (e.g., in Ed25519, cofactor = 8).
+        // if point.is_small_order() {
+        //     return Err(anyhow!("{:?}", CryptoMaterialError::SmallSubgroupError));
+        // }
+        //
+        // // NOTE: There is no way to construct an ed25519_dalek::PublicKey directly from the decompressed
+        // // point above. Instead, we have to call from_bytes(), which re-does the work from above.
+        // // Accessing the elliptic-curve point in a deserialized ed25519_dalek::PublicKey is also not
+        // // possible, so we are stuck with doing the same deserialization work twice until the following
+        // // pull request is merged: https://github.com/dalek-cryptography/ed25519-dalek/pull/188
+        // Ok(Ed25519PublicKey::from_bytes_unchecked(&unvalidated.0[..])
+        //     .expect("second deserialization should have succeeded too"))
     }
 
     fn to_unvalidated(&self) -> Self::Unvalidated {

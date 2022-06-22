@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module provides an API for the PureEdDSA signature scheme over the ed25519 twisted
+//! This module provides an API for the PureEdDSA signature scheme over the Ed25519 twisted
 //! Edwards curve as defined in [RFC8032](https://tools.ietf.org/html/rfc8032).
 //!
 //! Signature verification also checks and rejects non-canonical signatures.
@@ -15,20 +15,20 @@
 //!     traits::{Signature, SigningKey, Uniform},
 //! };
 //! use rand::{rngs::StdRng, SeedableRng};
+//! use rand_core::OsRng;
 //! use serde::{Serialize, Deserialize};
+//! use aptos_crypto::test_utils::KeyPair;
 //!
 //! #[derive(Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 //! pub struct TestCryptoDocTest(String);
 //! let message = TestCryptoDocTest("Test message".to_string());
 //!
-//! let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
-//! let private_key = Ed25519PrivateKey::generate(&mut rng);
-//! let public_key: Ed25519PublicKey = (&private_key).into();
-//! let signature = private_key.sign(&message);
-//! assert!(signature.verify(&message, &public_key).is_ok());
+//! let mut rng = OsRng;
+//! let kp = KeyPair::<Ed25519PrivateKey, Ed25519PublicKey>::generate(&mut rng);
+//!
+//! let signature = kp.private_key.sign(&message);
+//! assert!(signature.verify(&message, &kp.public_key).is_ok());
 //! ```
-//! **Note**: The above example generates a private key using a private function intended only for
-//! testing purposes. Production code should find an alternate means for secure key generation.
 #![allow(clippy::integer_arithmetic)]
 
 use crate::{
@@ -38,11 +38,9 @@ use crate::{
 use anyhow::{anyhow, Result};
 use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use core::convert::TryFrom;
-use mirai_annotations::*;
+pub use ed25519_dalek;
 use serde::Serialize;
 use std::{cmp::Ordering, fmt};
-
-pub use ed25519_dalek;
 
 /// The length of the Ed25519PrivateKey
 pub const ED25519_PRIVATE_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
@@ -75,11 +73,6 @@ impl Clone for Ed25519PrivateKey {
 /// An Ed25519 public key
 #[derive(DeserializeKey, Clone, SerializeKey)]
 pub struct Ed25519PublicKey(ed25519_dalek::PublicKey);
-
-#[cfg(mirai)]
-use crate::tags::ValidatedPublicKeyTag;
-#[cfg(not(mirai))]
-struct ValidatedPublicKeyTag {}
 
 /// An Ed25519 signature
 #[derive(DeserializeKey, Clone, SerializeKey)]
@@ -122,7 +115,10 @@ impl Ed25519PublicKey {
         self.0.to_bytes()
     }
 
-    /// Deserialize an Ed25519PublicKey without any validation checks apart from expected key size.
+    /// Deserialize an Ed25519PublicKey without any validation checks apart from expected key size
+    /// and valid curve point, although not necessarily in the prime-order subgroup.
+    ///
+    /// This function does NOT check the public key for membership in a small subgroup.
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<Ed25519PublicKey, CryptoMaterialError> {
@@ -137,6 +133,8 @@ impl Ed25519PublicKey {
     /// compensate for the poor key storage capabilities of key management
     /// solutions, and NOT to promote double usage of keys under several
     /// schemes, which would lead to BAD vulnerabilities.
+    ///
+    /// This function does NOT check if the public key lies in a small subgroup.
     ///
     /// Arguments:
     /// - `x25519_bytes`: bit representation of a public key in clamped
@@ -178,7 +176,7 @@ impl Ed25519Signature {
     }
 
     /// Deserialize an Ed25519Signature without any validation checks (malleability)
-    /// apart from expected key size.
+    /// apart from expected signature size.
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<Ed25519Signature, CryptoMaterialError> {
@@ -215,10 +213,23 @@ impl Ed25519Signature {
         if bytes.len() != ED25519_SIGNATURE_LENGTH {
             return Err(CryptoMaterialError::WrongLengthError);
         }
-        if !check_s_lt_l(&bytes[32..]) {
+        if !Ed25519Signature::check_s_lt_l(&bytes[32..]) {
             return Err(CryptoMaterialError::CanonicalRepresentationError);
         }
         Ok(())
+    }
+
+    /// Check if S < L to capture invalid signatures.
+    fn check_s_lt_l(s: &[u8]) -> bool {
+        for i in (0..32).rev() {
+            match s[i].cmp(&L[i]) {
+                Ordering::Less => return true,
+                Ordering::Greater => return false,
+                _ => {}
+            }
+        }
+        // As this stage S == L which implies a non canonical S.
+        false
     }
 }
 
@@ -261,15 +272,17 @@ impl PartialEq<Self> for Ed25519PrivateKey {
 
 impl Eq for Ed25519PrivateKey {}
 
-// We could have a distinct kind of validation for the PrivateKey, for
-// ex. checking the derived PublicKey is valid?
+// We could have a distinct kind of validation for the PrivateKey: e.g., checking the derived
+// PublicKey is valid?
 impl TryFrom<&[u8]> for Ed25519PrivateKey {
     type Error = CryptoMaterialError;
 
-    /// Deserialize an Ed25519PrivateKey. This method will also check for key validity.
+    /// Deserialize an Ed25519PrivateKey. This method will NOT check for private key validity beyond
+    /// correct key length.
     fn try_from(bytes: &[u8]) -> std::result::Result<Ed25519PrivateKey, CryptoMaterialError> {
         // Note that the only requirement is that the size of the key is 32 bytes, something that
         // is already checked during deserialization of ed25519_dalek::SecretKey
+        //
         // Also, the underlying ed25519_dalek implementation ensures that the derived public key
         // is safe and it will not lie in a small-order group, thus no extra check for PublicKey
         // validation is required.
@@ -353,8 +366,10 @@ impl fmt::Debug for Ed25519PublicKey {
 impl TryFrom<&[u8]> for Ed25519PublicKey {
     type Error = CryptoMaterialError;
 
-    /// Deserialize an Ed25519PublicKey. This method will also check for key validity, for instance
-    ///  it will only deserialize keys that are safe against small subgroup attacks.
+    /// Deserialize an Ed25519PublicKey. This method will NOT check for key validity, which means
+    /// the returned public key could be in a small subgroup. Nonetheless, our signature
+    /// verification implicitly checks if the public key lies in a small subgroup, so canonical
+    /// uses of this library will not be susceptible to small subgroup attacks.
     fn try_from(bytes: &[u8]) -> std::result::Result<Ed25519PublicKey, CryptoMaterialError> {
         Ed25519PublicKey::from_bytes_unchecked(bytes)
     }
@@ -380,16 +395,19 @@ impl Signature for Ed25519Signature {
     type VerifyingKeyMaterial = Ed25519PublicKey;
     type SigningKeyMaterial = Ed25519PrivateKey;
 
-    /// Verifies that the provided signature is valid for the provided
-    /// message, according to the RFC8032 algorithm. This strict verification performs the
-    /// recommended check of 5.1.7 §3, on top of the required RFC8032 verifications.
+    /// Verifies that the provided signature is valid for the provided message, going beyond the
+    /// [RFC8032](https://tools.ietf.org/html/rfc8032) specification, checking both scalar
+    /// malleability and point malleability (see documentation [here](https://docs.rs/ed25519-dalek/latest/ed25519_dalek/struct.PublicKey.html#on-the-multiple-sources-of-malleability-in-ed25519-signatures)).
+    ///
+    /// This _strict_ verification performs steps 1,2 and 3 from Section 5.1.7 in RFC8032, and an
+    /// additional scalar malleability check (via [Ed25519Signature::check_malleability][Ed25519Signature::check_malleability]).
+    ///
+    /// This function will ensure both the signature and the `public_key` are not in a small subgroup.
     fn verify<T: CryptoHash + Serialize>(
         &self,
         message: &T,
         public_key: &Ed25519PublicKey,
     ) -> Result<()> {
-        // Public keys should be validated to be safe against small subgroup attacks, etc.
-        precondition!(has_tag!(public_key, ValidatedPublicKeyTag));
         let mut bytes = <T::Hasher as CryptoHasher>::seed().to_vec();
         bcs::serialize_into(&mut bytes, &message)
             .map_err(|_| CryptoMaterialError::SerializationError)?;
@@ -398,12 +416,14 @@ impl Signature for Ed25519Signature {
 
     /// Checks that `self` is valid for an arbitrary &[u8] `message` using `public_key`.
     /// Outside of this crate, this particular function should only be used for native signature
-    /// verification in move
+    /// verification in Move.
+    ///
+    /// This function will check both the signature and `public_key` for small subgroup attacks.
     fn verify_arbitrary_msg(&self, message: &[u8], public_key: &Ed25519PublicKey) -> Result<()> {
-        // Public keys should be validated to be safe against small subgroup attacks, etc.
-        precondition!(has_tag!(public_key, ValidatedPublicKeyTag));
         Ed25519Signature::check_malleability(&self.to_bytes())?;
 
+        // NOTE: ed25519::PublicKey::verify_strict checks that the signature's R-component and
+        // the public key are *not* in a small subgroup.
         public_key
             .0
             .verify_strict(message, &self.0)
@@ -413,35 +433,6 @@ impl Signature for Ed25519Signature {
 
     fn to_bytes(&self) -> Vec<u8> {
         self.0.to_bytes().to_vec()
-    }
-
-    /// Batch signature verification as described in the original EdDSA article
-    /// by Bernstein et al. "High-speed high-security signatures". Current implementation works for
-    /// signatures on the same message and it checks for malleability.
-    #[cfg(feature = "batch")]
-    fn batch_verify<T: CryptoHash + Serialize>(
-        message: &T,
-        keys_and_signatures: Vec<(Self::VerifyingKeyMaterial, Self)>,
-    ) -> Result<()> {
-        for (_, sig) in keys_and_signatures.iter() {
-            Ed25519Signature::check_malleability(&sig.to_bytes())?
-        }
-        let mut message_bytes = <T::Hasher as CryptoHasher>::seed().to_vec();
-        bcs::serialize_into(&mut message_bytes, &message)
-            .map_err(|_| CryptoMaterialError::SerializationError)?;
-
-        let batch_argument = keys_and_signatures
-            .iter()
-            .map(|(key, signature)| (key.0, signature.0));
-        let (dalek_public_keys, dalek_signatures): (Vec<_>, Vec<_>) = batch_argument.unzip();
-        let message_ref = &(&message_bytes)[..];
-        // The original batching algorithm works for different messages and it expects as many
-        // messages as the number of signatures. In our case, we just populate the same
-        // message to meet dalek's api requirements.
-        let messages = vec![message_ref; dalek_signatures.len()];
-        ed25519_dalek::verify_batch(&messages[..], &dalek_signatures[..], &dalek_public_keys[..])
-            .map_err(|e| anyhow!("{}", e))?;
-        Ok(())
     }
 }
 
@@ -494,18 +485,9 @@ impl fmt::Debug for Ed25519Signature {
     }
 }
 
-/// Check if S < L to capture invalid signatures.
-fn check_s_lt_l(s: &[u8]) -> bool {
-    for i in (0..32).rev() {
-        match s[i].cmp(&L[i]) {
-            Ordering::Less => return true,
-            Ordering::Greater => return false,
-            _ => {}
-        }
-    }
-    // As this stage S == L which implies a non canonical S.
-    false
-}
+/////////////
+// Fuzzing //
+/////////////
 
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::test_utils::{self, KeyPair};
