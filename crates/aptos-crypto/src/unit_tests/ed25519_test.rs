@@ -18,6 +18,7 @@ use core::{
 };
 use ed25519_dalek::ed25519::signature::Verifier as _;
 
+use crate::validatable::{Validatable, Validate};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use digest::Digest;
 use proptest::{collection::vec, prelude::*};
@@ -207,6 +208,7 @@ proptest! {
 
         let bad_key = ed25519_dalek::PublicKey::from_bytes(&bad_pub_key_point.compress().to_bytes()).unwrap();
         // We check that we would have caught this one on the public key
+        // NOTE: This will fail now, since Ed25519PublicKey::TryFrom<&[u8]> no longer checks for small subgroup membership
         prop_assert!(Ed25519PublicKey::try_from(&bad_pub_key_point.compress().to_bytes()[..]).is_err());
 
         let bad_signature = ed25519_dalek::Signature::from_bytes(&[
@@ -439,18 +441,23 @@ proptest! {
 }
 
 // Test against known small subgroup public keys.
+// NOTE: Ignored for now, because our signature verification code implicitly checks the PK for
+// small subgroup membership, so our Validate implementation is a dummy implementation.
 #[ignore]
 #[test]
 fn test_publickey_smallorder() {
     for torsion_point in &EIGHT_TORSION {
         let serialized: &[u8] = torsion_point;
+
         // We expect from_bytes_unchecked to pass, as it does not validate the key.
-        assert!(Ed25519PublicKey::from_bytes_unchecked(serialized).is_ok());
-        // from_bytes will fail on invalid key.
-        assert_eq!(
-            Ed25519PublicKey::try_from(serialized),
-            Err(CryptoMaterialError::SmallSubgroupError)
-        );
+        let result = Ed25519PublicKey::from_bytes_unchecked(serialized);
+        assert!(result.is_ok());
+        let pk = result.unwrap();
+
+        // ...but we expect validation to fail using the Validatable trait
+        let unvalidated = pk.to_unvalidated();
+        let pkv = Validatable::<Ed25519PublicKey>::new_unvalidated(unvalidated);
+        assert!(pkv.validate().is_err());
     }
 }
 
@@ -466,7 +473,7 @@ fn test_publickey_smallorder() {
 // The following byte arrays have been ported from curve25519-dalek /backend/serial/u64/constants.rs
 // and they represent the serialised version of the CompressedEdwardsY points.
 
-const EIGHT_TORSION: [[u8; 32]; 8] = [
+pub const EIGHT_TORSION: [[u8; 32]; 8] = [
     [
         1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0,
@@ -503,10 +510,10 @@ const EIGHT_TORSION: [[u8; 32]; 8] = [
 
 /// The `Scalar52` struct represents an element in
 /// ℤ/ℓℤ as 5 52-bit limbs.
-struct Scalar52(pub [u64; 5]);
+pub struct Scalar52(pub [u64; 5]);
 
 /// `L` is the order of base point, i.e. 2^252 + 27742317777372353535851937790883648493
-const L: Scalar52 = Scalar52([
+pub const L: Scalar52 = Scalar52([
     0x0002_631a_5cf5_d3ed,
     0x000d_ea2f_79cd_6581,
     0x0000_0000_0014_def9,
@@ -521,7 +528,7 @@ impl Scalar52 {
     }
 
     /// Unpack a 32 byte / 256 bit scalar into 5 52-bit limbs.
-    fn from_bytes(bytes: &[u8; 32]) -> Scalar52 {
+    pub fn from_bytes(bytes: &[u8; 32]) -> Scalar52 {
         let mut words = [0u64; 4];
         for i in 0..4 {
             for j in 0..8 {
@@ -543,7 +550,7 @@ impl Scalar52 {
     }
 
     /// Pack the limbs of this `Scalar52` into 32 bytes
-    fn to_bytes(&self) -> [u8; 32] {
+    pub fn to_bytes(&self) -> [u8; 32] {
         let mut s = [0u8; 32];
 
         s[0] = self.0[0] as u8;
@@ -583,7 +590,7 @@ impl Scalar52 {
     }
 
     /// Compute `a + b` (without mod ℓ)
-    fn add(a: &Scalar52, b: &Scalar52) -> Scalar52 {
+    pub fn add(a: &Scalar52, b: &Scalar52) -> Scalar52 {
         let mut sum = Scalar52::zero();
         let mask = (1u64 << 52) - 1;
 
