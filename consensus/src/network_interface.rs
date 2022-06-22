@@ -11,7 +11,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{epoch_change::EpochChangeProof, PeerId};
 use async_trait::async_trait;
 use channel::{aptos_channel, message_queues::QueueStyle};
-use consensus_types::proof_of_store::SignedDigest;
+use consensus_types::proof_of_store::{ProofOfStore, SignedDigest};
 use consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
@@ -70,6 +70,8 @@ pub enum ConsensusMsg {
     BatchMsg(Box<Batch>), //TODO: add to the networking flow - note that it translates into two events
     /// TODO
     FragmentMsg(Box<Fragment>),
+    /// TODO
+    ProofOfStoreBroadcastMsg(Box<ProofOfStore>),
 }
 
 /// The interface from Network to Consensus layer.

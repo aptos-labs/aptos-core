@@ -21,16 +21,14 @@ use aptos_types::{
 use channel::aptos_channel;
 use consensus_types::common::Round;
 use consensus_types::proof_of_store::{LogicalTime, ProofOfStore, SignedDigest};
+use futures::channel::oneshot;
 use futures::{
     future::BoxFuture,
     stream::{futures_unordered::FuturesUnordered, StreamExt as _},
 };
 use std::collections::HashMap;
 use std::sync::{mpsc::sync_channel, Arc};
-use tokio::sync::{
-    mpsc::{channel, Receiver, Sender},
-    oneshot,
-};
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 pub type ProofReturnChannel = oneshot::Sender<Result<ProofOfStore, QuorumStoreError>>;
 
@@ -170,14 +168,17 @@ impl QuorumStore {
         fragment_payload: Data,
         expiration: LogicalTime,
         proof_tx: ProofReturnChannel,
-    ) -> Option<(BatchStoreCommand, oneshot::Receiver<SignedDigest>)> {
+    ) -> Option<(
+        BatchStoreCommand,
+        tokio::sync::oneshot::Receiver<SignedDigest>,
+    )> {
         if let Some((num_bytes, payload, digest_hash)) = self.batch_aggregator.end_batch(
             self.batch_id,
             self.fragment_id,
             fragment_payload.clone(),
             AggregationMode::AssertMissedFragment,
         ) {
-            let (persist_request_tx, persist_request_rx) = oneshot::channel();
+            let (persist_request_tx, persist_request_rx) = tokio::sync::oneshot::channel();
 
             let fragment = Fragment::new(
                 self.epoch,
