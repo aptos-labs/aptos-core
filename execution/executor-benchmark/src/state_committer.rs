@@ -17,7 +17,7 @@ use std::{
 use storage_interface::DbWriter;
 
 const NUM_COMMITTED_SMTS_TO_CACHE: usize = 5;
-const NUM_MIN_COMMITS_TO_BATCH: usize = 20;
+const NUM_MIN_COMMITS_TO_BATCH: usize = 2;
 
 pub struct StateCommitter {
     commit_receiver: mpsc::Receiver<StateSnapshotDelta>,
