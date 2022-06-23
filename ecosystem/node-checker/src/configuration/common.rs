@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::types::NodeConfiguration;
+use crate::evaluators::build_evaluators;
 use anyhow::{anyhow, Context, Result};
 use std::{
     convert::{TryFrom, TryInto},
@@ -59,4 +60,13 @@ impl TryInto<NodeConfiguration> for FileType {
 pub fn read_configuration_from_file(path: PathBuf) -> Result<NodeConfiguration> {
     let file_type = FileType::try_from(path)?;
     file_type.try_into()
+}
+
+pub fn validate_configuration(node_configuration: &NodeConfiguration) -> Result<()> {
+    build_evaluators(
+        &node_configuration.evaluators,
+        &node_configuration.evaluator_args,
+    )
+    .context("Failed to build evaluators")?;
+    Ok(())
 }

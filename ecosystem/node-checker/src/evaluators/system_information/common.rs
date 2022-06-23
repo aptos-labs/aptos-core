@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::{evaluator::EvaluationResult, metric_collector::SystemInformation};
 
 /// This is a convenience function that returns the value if it was
