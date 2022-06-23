@@ -88,10 +88,12 @@ use aptos_types::{
     transaction::Version,
 };
 use node_type::{Child, Children, InternalNode, LeafNode, Node, NodeKey, NodeType};
+use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::arbitrary::Arbitrary;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
+use rayon::{prelude::*, ThreadPool, ThreadPoolBuilder};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -99,6 +101,16 @@ use std::{
     marker::PhantomData,
 };
 use thiserror::Error;
+
+const MAX_PARALLELIZABLE_DEPTH: usize = 2;
+const NUM_IO_THREADS: usize = 32;
+
+pub static IO_POOL: Lazy<ThreadPool> = Lazy::new(|| {
+    ThreadPoolBuilder::new()
+        .num_threads(NUM_IO_THREADS)
+        .build()
+        .unwrap()
+});
 
 #[derive(Error, Debug)]
 #[error("Missing state root node at version {version}, probably pruned.")]
@@ -190,8 +202,8 @@ pub struct StaleNodeIndex {
 /// which is a vector of `hashed_account_address` and `new_value` pairs.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct TreeUpdateBatch<K> {
-    pub node_batch: Vec<(NodeKey, Node<K>)>,
-    pub stale_node_index_batch: Vec<StaleNodeIndex>,
+    pub node_batch: Vec<Vec<(NodeKey, Node<K>)>>,
+    pub stale_node_index_batch: Vec<Vec<StaleNodeIndex>>,
     pub num_new_leaves: usize,
     pub num_stale_leaves: usize,
 }
@@ -199,11 +211,25 @@ pub struct TreeUpdateBatch<K> {
 impl<K> TreeUpdateBatch<K> {
     pub fn new() -> Self {
         Self {
-            node_batch: vec![],
-            stale_node_index_batch: vec![],
+            node_batch: vec![vec![]],
+            stale_node_index_batch: vec![vec![]],
             num_new_leaves: 0,
             num_stale_leaves: 0,
         }
+    }
+
+    pub fn combine(&mut self, other: Self) {
+        let Self {
+            node_batch,
+            stale_node_index_batch,
+            num_new_leaves,
+            num_stale_leaves,
+        } = other;
+
+        self.node_batch.extend(node_batch);
+        self.stale_node_index_batch.extend(stale_node_index_batch);
+        self.num_new_leaves += num_new_leaves;
+        self.num_stale_leaves += num_stale_leaves;
     }
 
     pub fn inc_num_new_leaves(&mut self) {
@@ -215,11 +241,11 @@ impl<K> TreeUpdateBatch<K> {
     }
 
     pub fn put_node(&mut self, node_key: NodeKey, node: Node<K>) {
-        self.node_batch.push((node_key, node))
+        self.node_batch[0].push((node_key, node))
     }
 
     pub fn put_stale_node(&mut self, node_key: NodeKey, stale_since_version: Version) {
-        self.stale_node_index_batch.push(StaleNodeIndex {
+        self.stale_node_index_batch[0].push(StaleNodeIndex {
             node_key,
             stale_since_version,
         });
@@ -278,7 +304,7 @@ pub struct JellyfishMerkleTree<'a, R, K> {
 
 impl<'a, R, K> JellyfishMerkleTree<'a, R, K>
 where
-    R: 'a + TreeReader<K>,
+    R: 'a + TreeReader<K> + Sync,
     K: Key,
 {
     /// Creates a `JellyfishMerkleTree` backed by the given [`TreeReader`](trait.TreeReader.html).
@@ -362,14 +388,16 @@ where
 
         let mut batch = TreeUpdateBatch::new();
         let (_root_node_key, root_node) = if let Some(persisted_version) = persisted_version {
-            self.batch_insert_at(
-                NodeKey::new_empty_path(persisted_version),
-                version,
-                &deduped_and_sorted_kvs,
-                0,
-                &node_hashes,
-                &mut batch,
-            )?
+            IO_POOL.install(|| {
+                self.batch_insert_at(
+                    NodeKey::new_empty_path(persisted_version),
+                    version,
+                    &deduped_and_sorted_kvs,
+                    0,
+                    &node_hashes,
+                    &mut batch,
+                )
+            })?
         } else {
             self.batch_create_subtree(
                 NodeKey::new_empty_path(version),
@@ -402,21 +430,52 @@ where
                 let mut children: Children = internal_node.clone().into();
 
                 // Traverse all the path touched by `kvs` from this internal node.
-                let new_children: Vec<_> = NibbleRangeIterator::new(kvs, depth)
-                    .map(|(left, right)| {
-                        self.insert_at_child(
-                            &node_key,
-                            &internal_node,
-                            version,
-                            kvs,
-                            left,
-                            right,
-                            depth,
-                            hash_cache,
-                            batch,
-                        )
-                    })
-                    .collect::<Result<_>>()?;
+                let range_iter = NibbleRangeIterator::new(kvs, depth);
+                let new_children: Vec<_> = if depth <= MAX_PARALLELIZABLE_DEPTH {
+                    range_iter
+                        .collect::<Vec<_>>()
+                        .par_iter()
+                        .map(|(left, right)| {
+                            let mut sub_batch = TreeUpdateBatch::new();
+                            Ok((
+                                self.insert_at_child(
+                                    &node_key,
+                                    &internal_node,
+                                    version,
+                                    kvs,
+                                    *left,
+                                    *right,
+                                    depth,
+                                    hash_cache,
+                                    &mut sub_batch,
+                                )?,
+                                sub_batch,
+                            ))
+                        })
+                        .collect::<Result<Vec<_>>>()?
+                        .into_iter()
+                        .map(|(ret, sub_batch)| {
+                            batch.combine(sub_batch);
+                            ret
+                        })
+                        .collect()
+                } else {
+                    range_iter
+                        .map(|(left, right)| {
+                            self.insert_at_child(
+                                &node_key,
+                                &internal_node,
+                                version,
+                                kvs,
+                                left,
+                                right,
+                                depth,
+                                hash_cache,
+                                batch,
+                            )
+                        })
+                        .collect::<Result<_>>()?
+                };
                 children.extend(new_children.into_iter());
 
                 let new_internal_node = InternalNode::new(children);
