@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    metric_evaluator::{ConsensusMetricsEvaluatorArgs, StateSyncMetricsEvaluatorArgs},
+    evaluators::{
+        metrics::{ConsensusProposalsEvaluatorArgs, StateSyncVersionEvaluatorArgs},
+        system_information::SystemInformationBuildVersionEvaluatorArgs,
+    },
     runner::BlockingRunnerArgs,
-    system_information_evaluator::BuildVersionEvaluatorArgs,
 };
 use anyhow::Result;
 use clap::Parser;
@@ -99,13 +101,13 @@ impl NodeConfiguration {
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
 pub struct EvaluatorArgs {
     #[clap(flatten)]
-    pub state_sync_evaluator_args: StateSyncMetricsEvaluatorArgs,
+    pub state_sync_version_args: StateSyncVersionEvaluatorArgs,
 
     #[clap(flatten)]
-    pub consensus_evaluator_args: ConsensusMetricsEvaluatorArgs,
+    pub consensus_proposals_args: ConsensusProposalsEvaluatorArgs,
 
     #[clap(flatten)]
-    pub build_version_evaluator_args: BuildVersionEvaluatorArgs,
+    pub system_information_build_version_args: SystemInformationBuildVersionEvaluatorArgs,
 }
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]

@@ -4,20 +4,20 @@
 use super::{
     super::{
         common::{get_metric, GetMetricResult},
-        MetricsEvaluator, MetricsEvaluatorError,
+        types::{MetricsEvaluatorError, MetricsEvaluatorInput},
     },
-    CONSENSUS_EVALUATOR_SOURCE,
+    types::CATEGORY,
 };
-use crate::evaluator::EvaluationResult;
+use crate::{
+    configuration::EvaluatorArgs,
+    evaluator::{EvaluationResult, Evaluator},
+};
 use anyhow::Result;
 use clap::Parser;
 use log::debug;
 use poem_openapi::Object as PoemObject;
 use prometheus_parse::Scrape as PrometheusScrape;
 use serde::{Deserialize, Serialize};
-
-pub const CONSENSUS_PROPOSALS_EVALUATOR_NAME: &str =
-    const_format::concatcp!(CONSENSUS_EVALUATOR_SOURCE, "_", "proposals");
 
 // TODO: When we have it, switch to using a crate that unifies metric names.
 // As it is now, this metric name could change and we'd never catch it here
@@ -43,17 +43,32 @@ impl ConsensusProposalsEvaluator {
         metrics: &PrometheusScrape,
         metrics_round: &str,
     ) -> GetMetricResult {
-        let evaluation_on_missing_fn = || EvaluationResult {
-            headline: "Consensus proposals metric missing".to_string(),
-            score: 0,
-            explanation: format!(
+        let evaluation_on_missing_fn = || {
+            self.build_evaluation_result(
+                "Consensus proposals metric missing".to_string(),
+                0,
+                format!(
                 "The {} set of metrics from the target node is missing the proposals metric: {}",
                 metrics_round, PROPOSALS_METRIC
-            ),
-            source: CONSENSUS_EVALUATOR_SOURCE.to_string(),
-            links: vec![],
+            )
         };
         get_metric(metrics, PROPOSALS_METRIC, None, evaluation_on_missing_fn)
+    }
+
+    fn build_evaluation_result(
+        &self,
+        headline: String,
+        score: u8,
+        explanation: String,
+    ) -> EvaluationResult {
+        EvaluationResult {
+            headline,
+            score,
+            explanation,
+            category: CATEGORY.to_string(),
+            evaluator_name: Self::get_name(),
+            links: vec![],
+        }
     }
 
     fn build_evaluation(
@@ -65,50 +80,42 @@ impl ConsensusProposalsEvaluator {
         let progress = latest_proposals_count as i64 - previous_proposals_count as i64;
         match progress {
             progress if (progress == 0) => {
-                EvaluationResult {
-                    headline: "Proposals count is not progressing".to_string(),
-                    score: 50,
-                    explanation: "Successfully pulled metrics from target node twice, but the proposal count isn't progressing.".to_string(),
-                    source: CONSENSUS_EVALUATOR_SOURCE.to_string(),
-                    links: vec![],
+                self.build_evaluation_result(
+                    "Proposals count is not progressing".to_string(),
+                    50,
+                    "Successfully pulled metrics from target node twice, but the proposal count isn't progressing.".to_string(),
+                )
               }
-            }
             progress if (progress < 0) => {
-                EvaluationResult {
-                    headline: "Proposals count went backwards!".to_string(),
-                    score: 0,
-                    explanation: "Successfully pulled metrics from target node twice, but the second time the proposals count went backwards!".to_string(),
-                    source: CONSENSUS_EVALUATOR_SOURCE.to_string(),
-                    links: vec![],
-                }
+                self.build_evaluation_result(
+                    "Proposals count went backwards!".to_string(),
+                    0,
+                    "Successfully pulled metrics from target node twice, but the second time the proposals count went backwards!".to_string(),
+                )
             }
             _wildcard => {
-                EvaluationResult {
-                    headline: "Proposals count is increasing".to_string(),
-                    score: 100,
-                    explanation: "Successfully pulled metrics from target node twice and saw that proposals count is increasing".to_string(),
-                    source: CONSENSUS_EVALUATOR_SOURCE.to_string(),
-                    links: vec![],
-                }
+                self.build_evaluation_result(
+                    "Proposals count is increasing".to_string(),
+                    100,
+                    "Successfully pulled metrics from target node twice and saw that proposals count is increasing".to_string(),
+                )
             }
         }
     }
 }
 
-impl MetricsEvaluator for ConsensusProposalsEvaluator {
+#[async_trait::async_trait]
+impl Evaluator for ConsensusProposalsEvaluator {
+    type Input = MetricsEvaluatorInput;
+    type Error = MetricsEvaluatorError;
+
     /// Assert that the proposals count is increasing on the target node.
-    fn evaluate_metrics(
-        &self,
-        _previous_baseline_metrics: &PrometheusScrape,
-        previous_target_metrics: &PrometheusScrape,
-        _latest_baseline_metrics: &PrometheusScrape,
-        latest_target_metrics: &PrometheusScrape,
-    ) -> Result<Vec<EvaluationResult>, MetricsEvaluatorError> {
+    async fn evaluate(&self, input: &Self::Input) -> Result<Vec<EvaluationResult>, Self::Error> {
         let mut evaluation_results = vec![];
 
         // Get previous proposals count from the target node.
         let previous_proposals_count =
-            match self.get_proposals_count(previous_target_metrics, "first") {
+            match self.get_proposals_count(&input.previous_target_metrics, "first") {
                 GetMetricResult::Present(metric) => Some(metric),
                 GetMetricResult::Missing(evaluation_result) => {
                     evaluation_results.push(evaluation_result);
@@ -117,14 +124,14 @@ impl MetricsEvaluator for ConsensusProposalsEvaluator {
             };
 
         // Get the latest proposals count from the target node.
-        let latest_proposals_count = match self.get_proposals_count(latest_target_metrics, "second")
-        {
-            GetMetricResult::Present(metric) => Some(metric),
-            GetMetricResult::Missing(evaluation_result) => {
-                evaluation_results.push(evaluation_result);
-                None
-            }
-        };
+        let latest_proposals_count =
+            match self.get_proposals_count(&input.latest_target_metrics, "second") {
+                GetMetricResult::Present(metric) => Some(metric),
+                GetMetricResult::Missing(evaluation_result) => {
+                    evaluation_results.push(evaluation_result);
+                    None
+                }
+            };
 
         match (previous_proposals_count, latest_proposals_count) {
             (Some(previous), Some(latest)) => {
@@ -140,15 +147,18 @@ impl MetricsEvaluator for ConsensusProposalsEvaluator {
         Ok(evaluation_results)
     }
 
-    fn get_name(&self) -> String {
-        CONSENSUS_PROPOSALS_EVALUATOR_NAME.to_string()
+    fn get_name() -> String {
+        format!("{}_proposals", CATEGORY)
+    }
+
+    fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Self {
+        Self::new(evaluator_args.consensus_proposals_args.clone())
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::metric_evaluator::common::parse_metrics;
+    use super::{super::super::parse_metrics, *};
 
     fn get_metric_strings(value: u64) -> Vec<String> {
         vec![
@@ -157,7 +167,7 @@ mod test {
         ]
     }
 
-    fn test_proposals_evaluator(
+    async fn test_proposals_evaluator(
         previous_target_proposals: Option<u64>,
         latest_target_proposals: Option<u64>,
         expected_score: u8,
@@ -172,14 +182,19 @@ mod test {
             None => vec![],
         };
 
-        let evaluator = ConsensusProposalsEvaluator::new(ConsensusProposalsEvaluatorArgs {});
-        let evaluations = evaluator
-            .evaluate_metrics(
-                &parse_metrics(vec![]).unwrap(),
-                &parse_metrics(previous_target_metrics).unwrap(),
-                &parse_metrics(vec![]).unwrap(),
-                &parse_metrics(latest_target_metrics).unwrap(),
-            )
+        let evaluator =
+            ConsensusProposalsEvaluator::new(ConsensusProposalsEvaluatorArgs {});
+
+        let input = MetricsEvaluatorInput {
+            previous_baseline_metrics: parse_metrics(vec![]).unwrap(),
+            previous_target_metrics: parse_metrics(previous_target_metrics).unwrap(),
+            latest_baseline_metrics: parse_metrics(vec![]).unwrap(),
+            latest_target_metrics: parse_metrics(latest_target_metrics).unwrap(),
+        };
+
+        let evaluations = evaluator 
+            .evaluate(&input)
+            .await
             .expect("Failed to evaluate metrics");
 
         let expected_evaluations_len =
@@ -192,23 +207,23 @@ mod test {
         assert_eq!(evaluations[0].score, expected_score);
     }
 
-    #[test]
-    fn test_progressing() {
-        test_proposals_evaluator(Some(500), Some(600), 100);
+    #[tokio::test]
+    async fn test_progressing() {
+        test_proposals_evaluator(Some(500), Some(600), 100).await;
     }
 
-    #[test]
-    fn test_not_progressing() {
-        test_proposals_evaluator(Some(500), Some(500), 50);
+    #[tokio::test]
+    async fn test_not_progressing() {
+        test_proposals_evaluator(Some(500), Some(500), 50).await;
     }
 
-    #[test]
-    fn test_missing_metric() {
-        test_proposals_evaluator(Some(500), None, 0);
+    #[tokio::test]
+    async fn test_missing_metric() {
+        test_proposals_evaluator(Some(500), None, 0).await;
     }
 
-    #[test]
-    fn test_both_missing_metrics() {
-        test_proposals_evaluator(None, None, 0);
+    #[tokio::test]
+    async fn test_both_missing_metrics() {
+        test_proposals_evaluator(None, None, 0).await;
     }
 }

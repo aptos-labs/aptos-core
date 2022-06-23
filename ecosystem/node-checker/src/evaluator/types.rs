@@ -15,8 +15,11 @@ pub struct EvaluationResult {
     /// Explanation of the evaluation.
     pub explanation: String,
 
-    /// Name of the evaluator where the evaluation came from, e.g. state_sync.
-    pub source: String,
+    /// Name of the evaluator where the evaluation came from, e.g. state_sync_version.
+    pub evaluator_name: String,
+
+    /// Category of the evaluator where the evaluation came from, e.g. state_sync.
+    pub category: String,
 
     /// Links that might help the user fix a potential problem.
     pub links: Vec<String>,
