@@ -111,7 +111,6 @@ function withSimulatedExtensionContainer<T>({
       extensionComponent,
     ]);
 
-    setColorMode('light');
     return trueComponent;
   }
   HOC.displayName = 'withSimulatedExtensionContainerHOC';

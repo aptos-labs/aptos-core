@@ -3,20 +3,57 @@
 
 import { Box } from '@chakra-ui/react';
 import useWalletState from 'core/hooks/useWalletState';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
+import { RoutePaths } from 'core/routes';
 
 interface AuthLayoutProps {
   children: React.ReactNode,
-  redirectPath: string;
+  routePath: RoutePaths;
 }
 
 export default function AuthLayout({
   children,
-  redirectPath,
+  routePath,
 }: AuthLayoutProps) {
   const { aptosAccount } = useWalletState();
-  return aptosAccount
-    ? <Box width="100%" height="100%">{children}</Box>
-    : <Navigate to={redirectPath} />;
+  const page = <Box width="100%" height="100%">{children}</Box>;
+
+  const redirectPath = useMemo(() => {
+    switch (routePath) {
+      case '/':
+      case '/create-wallet':
+      case '/help':
+        return '/wallet';
+      case '/gallery':
+      case '/password':
+      case '/settings':
+      case '/settings/credentials':
+      case '/settings/network':
+      case '/tokens/:id':
+      case '/wallet':
+        return '/';
+      default:
+        return '/';
+    }
+  }, []);
+
+  const redirect = <Navigate to={redirectPath} />;
+
+  switch (routePath) {
+    case '/':
+    case '/create-wallet':
+    case '/help':
+      return aptosAccount ? redirect : page;
+    case '/gallery':
+    case '/password':
+    case '/settings':
+    case '/settings/credentials':
+    case '/settings/network':
+    case '/tokens/:id':
+    case '/wallet':
+      return aptosAccount ? page : redirect;
+    default:
+      return page;
+  }
 }

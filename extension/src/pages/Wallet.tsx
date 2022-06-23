@@ -12,10 +12,11 @@ import WalletAccountBalance from 'core/components/WalletAccountBalance';
 import TransferDrawer from 'core/components/TransferDrawer';
 import Faucet from 'core/components/Faucet';
 import AuthLayout from 'core/layouts/AuthLayout';
+import { Routes as PageRoutes } from 'core/routes';
 
 function Wallet() {
   return (
-    <AuthLayout redirectPath="/">
+    <AuthLayout routePath={PageRoutes.wallet.routePath}>
       <WalletLayout>
         <VStack width="100%" paddingTop={8}>
           <WalletAccountBalance />

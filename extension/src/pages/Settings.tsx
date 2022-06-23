@@ -20,6 +20,7 @@ import WalletLayout from 'core/layouts/WalletLayout';
 import SettingsPaths from 'core/components/SettingsPaths';
 import SettingsListItem from 'core/components/SettingsListItem';
 import AuthLayout from 'core/layouts/AuthLayout';
+import { Routes as PageRoutes } from 'core/routes';
 import withSimulatedExtensionContainer from '../core/components/WithSimulatedExtensionContainer';
 import { CredentialHeaderAndBodyProps } from './CreateWallet';
 import { secondaryTextColor } from './Login';
@@ -56,7 +57,7 @@ function Account() {
   const explorerAddress = `https://explorer.devnet.aptos.dev/account/${address}`;
 
   return (
-    <AuthLayout redirectPath="/">
+    <AuthLayout routePath={PageRoutes.settings.routePath}>
       <WalletLayout>
         <VStack width="100%" paddingTop={8}>
           <Box px={4} pb={4} width="100%">

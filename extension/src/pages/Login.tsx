@@ -27,7 +27,8 @@ import { AptosWhiteLogo, AptosBlackLogo } from 'core/components/AptosLogo';
 import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import { secondaryBgColor, secondaryErrorMessageColor } from 'core/constants';
 import { getAccountResources } from 'core/queries/account';
-import ReverseAuthLayout from 'core/layouts/ReverseAuthLayout';
+import AuthLayout from 'core/layouts/AuthLayout';
+import { Routes as PageRoutes } from 'core/routes';
 
 export const secondaryTextColor = {
   dark: 'gray.400',
@@ -65,7 +66,7 @@ function Login() {
   };
 
   return (
-    <ReverseAuthLayout redirectPath="/wallet">
+    <AuthLayout routePath={PageRoutes.login.routePath}>
       <VStack
         bgColor={secondaryBgColor[colorMode]}
         justifyContent="center"
@@ -134,7 +135,7 @@ function Login() {
         </ChakraLink>
       </HStack> */}
       </VStack>
-    </ReverseAuthLayout>
+    </AuthLayout>
   );
 }
 

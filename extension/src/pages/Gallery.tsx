@@ -19,6 +19,7 @@ import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtens
 import WalletLayout from 'core/layouts/WalletLayout';
 import { useGalleryItems } from 'core/queries/collectibles';
 import AuthLayout from 'core/layouts/AuthLayout';
+import { Routes as PageRoutes } from 'core/routes';
 
 const secondaryBorderColor = {
   dark: 'gray.600',
@@ -32,7 +33,7 @@ function Gallery() {
   } = useGalleryItems();
 
   return (
-    <AuthLayout redirectPath="/">
+    <AuthLayout routePath={PageRoutes.gallery.routePath}>
       <WalletLayout>
         <VStack width="100%" paddingTop={8} px={4}>
           <Grid pb={4} templateColumns="1fr 72px" width="100%">

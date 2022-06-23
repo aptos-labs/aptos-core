@@ -6,10 +6,11 @@ import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtens
 import AuthLayout from 'core/layouts/AuthLayout';
 import WalletLayout from 'core/layouts/WalletLayout';
 import React from 'react';
+import { Routes as PageRoutes } from 'core/routes';
 
 function Token() {
   return (
-    <AuthLayout redirectPath="/">
+    <AuthLayout routePath={PageRoutes.token.routePath}>
       <WalletLayout backPage="/gallery">
         <TokenBody />
       </WalletLayout>
