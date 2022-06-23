@@ -10,7 +10,8 @@ spec:
   podSelector:
     matchLabels:
       {{- include "aptos-validator.selectorLabels" $ | nindent 6 }}
-      app.kubernetes.io/name: validator-{{$i}}
+      app.kubernetes.io/name: validator
+      app.kubernetes.io/instance: validator-{{$i}}
   policyTypes:
   - Ingress
   - Egress
@@ -20,14 +21,15 @@ spec:
     - podSelector:
         matchLabels:
           {{- include "aptos-validator.selectorLabels" $ | nindent 10 }}
-          app.kubernetes.io/name: haproxy-{{$i}}
+          app.kubernetes.io/name: haproxy
+          app.kubernetes.io/instance: haproxy-{{$i}}
     ports:
       # AptosNet from HAproxy
     - protocol: TCP
       port: 6180
     - protocol: TCP
       port: 9101
-  {{- if $.Values.validator.exposeRestApi }}
+  {{- if $.Values.service.validator.enableRestApi }}
       # REST API from HAproxy
     - protocol: TCP
       port: 8080
@@ -46,7 +48,8 @@ spec:
     - podSelector:
         matchLabels:
           {{- include "aptos-validator.selectorLabels" $ | nindent 10 }}
-          app.kubernetes.io/name: fullnode-{{$i}}
+          app.kubernetes.io/name: fullnode
+          app.kubernetes.io/instance: fullnode-{{$i}}
     ports:
     - protocol: TCP
       port: 6181

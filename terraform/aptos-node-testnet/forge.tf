@@ -109,22 +109,6 @@ data "aws_iam_policy_document" "forge" {
       "arn:aws:s3:::${aws_s3_bucket.aptos-testnet-helm[0].id}/*"
     ]
   }
-
-  statement {
-    sid = "UpdateEksNodegroups"
-    actions = [
-      "eks:ListNodegroups",
-      "eks:DescribeNodegroup",
-      "eks:DescribeUpdate",
-      "eks:UpdateNodegroupConfig",
-      "eks:UpdateNodegroupVersion"
-    ]
-    resources = [
-      module.validator.aws_eks_cluster.arn,
-      "arn:aws:eks:${var.region}:${data.aws_caller_identity.current.account_id}:cluster/${module.validator.aws_eks_cluster.name}/*",
-      "arn:aws:eks:${var.region}:${data.aws_caller_identity.current.account_id}:nodegroup/${module.validator.aws_eks_cluster.name}/*"
-    ]
-  }
 }
 
 resource "aws_iam_role" "forge" {

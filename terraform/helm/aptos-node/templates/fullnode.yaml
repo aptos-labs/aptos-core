@@ -11,7 +11,8 @@ metadata:
 spec:
   selector:
     {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
-    app.kubernetes.io/name: fullnode-{{$i}}
+    app.kubernetes.io/name: fullnode
+    app.kubernetes.io/instance: fullnode-{{$i}}
     group: {{ .name }}
   ports:
   - name: aptosnet
@@ -29,7 +30,8 @@ metadata:
   name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-{{ .name }}-e{{ $.Values.chain.era }}
   labels:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
-    app.kubernetes.io/name: fullnode-{{$i}}
+    app.kubernetes.io/name: fullnode
+    app.kubernetes.io/instance: fullnode-{{$i}}
     group: {{ .name }}
 spec:
   serviceName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-{{ .name }}
@@ -38,7 +40,8 @@ spec:
   selector:
     matchLabels:
       {{- include "aptos-validator.selectorLabels" $ | nindent 6 }}
-      app.kubernetes.io/name: fullnode-{{$i}}
+      app.kubernetes.io/name: fullnode
+      app.kubernetes.io/instance: fullnode-{{$i}}
       group: {{ .name }}
   volumeClaimTemplates:
   - metadata:
@@ -54,7 +57,8 @@ spec:
     metadata:
       labels:
         {{- include "aptos-validator.selectorLabels" $ | nindent 8 }}
-        app.kubernetes.io/name: fullnode-{{$i}}
+        app.kubernetes.io/name: fullnode
+        app.kubernetes.io/instance: fullnode-{{$i}}
         group: {{ .name }}
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default

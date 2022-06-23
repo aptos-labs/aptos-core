@@ -138,3 +138,40 @@ resource "helm_release" "chaos-mesh" {
     })
   ]
 }
+
+resource "helm_release" "testnet-addons" {
+  name        = "testnet-addons"
+  chart       = "${path.module}/../helm/testnet-addons"
+  max_history = 5
+  wait        = false
+
+  values = [
+    jsonencode({
+      a = "b"
+      aws = {
+        region       = var.region
+        cluster_name = module.validator.aws_eks_cluster.name
+        vpc_id       = module.validator.vpc_id
+        role_arn     = aws_iam_role.k8s-aws-integrations.arn
+        zone_name    = var.zone_id != "" ? data.aws_route53_zone.aptos[0].name : null
+      }
+      genesis = {
+        era             = var.era
+        username_prefix = local.aptos_node_helm_prefix
+      }
+      service = {
+        domain = local.domain
+        aws_tags = local.aws_tags
+      }
+      ingress = {
+        acm_certificate          = aws_acm_certificate.ingress[0].arn
+        loadBalancerSourceRanges = var.client_sources_ipv4
+      }
+    })
+  ]
+
+  set {
+    name  = "timestamp"
+    value = timestamp()
+  }
+}

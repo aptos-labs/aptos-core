@@ -134,6 +134,9 @@ locals {
         "eks.amazonaws.com/nodegroup" = "utilities"
       }
     }
+    service = {
+      domain = local.domain
+    }
   })
 }
 

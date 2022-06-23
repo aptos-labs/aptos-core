@@ -1,0 +1,27 @@
+aws:
+  region:
+  cluster_name:
+  vpc_id:
+  role_arn:
+  zone_name:
+
+genesis:
+  # prefix used to get the genesis configuration
+  username_prefix: aptos-node
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
+
+service:
+  domain:
+
+ingress:
+  acm_certificate:
+  wafAclArn:
+  loadBalancerSourceRanges:
+  enableStickyness: true
+  cookieDurationSeconds: 86400

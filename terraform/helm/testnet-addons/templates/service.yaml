@@ -1,0 +1,18 @@
+# aggregate service to serve all REST API from all aptos-node haproxies
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "testnet-addons.fullname" . }}-api
+  labels:
+    {{- include "testnet-addons.labels" . | nindent 4 }}
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-path: /-/healthy
+spec:
+  selector:
+    app.kubernetes.io/part-of: aptos-node
+    app.kubernetes.io/name: haproxy
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: NodePort
+  externalTrafficPolicy: Local

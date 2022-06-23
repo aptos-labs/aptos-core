@@ -24,17 +24,23 @@ metadata:
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-type: nlb
     service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: All
+    {{- if $.Values.service.domain }}
+    external-dns.alpha.kubernetes.io/hostname: val{{$i}}.{{ $.Values.service.domain }}
+    {{- end }}
 spec:
   selector:
     {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
-    app.kubernetes.io/name: haproxy-{{$i}}
+    app.kubernetes.io/name: haproxy
+    app.kubernetes.io/instance: haproxy-{{$i}}
   ports:
   - name: validator
     port: 6180
+  {{- if $.Values.service.validator.enableMetricsPort }}
   - name: metrics
     port: 9101
     targetPort: 9102
-  {{- if $.Values.validator.exposeRestApi }}
+  {{- end }}
+  {{- if $.Values.service.validator.enableRestApi }}
   - name: api
     port: 80
     targetPort: 8180
@@ -57,18 +63,24 @@ metadata:
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-type: nlb
     service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: All
+    {{- if $.Values.service.domain }}
+    external-dns.alpha.kubernetes.io/hostname: {{ $config.name }}{{$i}}.{{ $.Values.service.domain }}
+    {{- end }}
 spec:
   selector:
     {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
-    app.kubernetes.io/name: haproxy-{{$i}}
+    app.kubernetes.io/name: haproxy
+    app.kubernetes.io/instance: haproxy-{{$i}}
   ports:
   - name: aptosnet
     port: 6182
     targetPort: {{ add 6182 $index }}
+  {{- if $.Values.service.fullnode.enableMetricsPort }}
   - name: metrics
     port: 9101
     targetPort: {{ add 9103 $index }}
-  {{- if $config.enableRestApi }}
+  {{- end }}
+  {{- if $.Values.service.fullnode.enableRestApi }}
   - name: api
     port: 80
     targetPort: {{ add 8080 $index }}
@@ -95,7 +107,8 @@ metadata:
   name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-haproxy
   labels:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
-    app.kubernetes.io/name: haproxy-{{$i}}
+    app.kubernetes.io/name: haproxy
+    app.kubernetes.io/instance: haproxy-{{$i}}
 spec:
   replicas: {{ $.Values.haproxy.replicas }}
   strategy:
@@ -104,12 +117,14 @@ spec:
   selector:
     matchLabels:
       {{- include "aptos-validator.selectorLabels" $ | nindent 6 }}
-      app.kubernetes.io/name: haproxy-{{$i}}
+      app.kubernetes.io/name: haproxy
+      app.kubernetes.io/instance: haproxy-{{$i}}
   template:
     metadata:
       labels:
         {{- include "aptos-validator.selectorLabels" $ | nindent 8 }}
-        app.kubernetes.io/name: haproxy-{{$i}}
+        app.kubernetes.io/name: haproxy
+        app.kubernetes.io/instance: haproxy-{{$i}}
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
         checksum/haproxy.cfg: {{ tpl ($.Files.Get "files/haproxy.cfg") $ | sha256sum }}
