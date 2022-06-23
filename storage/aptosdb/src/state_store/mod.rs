@@ -33,6 +33,7 @@ use aptos_types::{
     },
     transaction::{Version, PRE_GENESIS_VERSION},
 };
+use rayon::prelude::*;
 use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::{collections::HashMap, sync::Arc};
 use storage_interface::{DbReader, StateSnapshotReceiver};
@@ -264,27 +265,37 @@ impl StateStore {
             )
         }?;
 
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         {
             let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["serialize_jmt_commit"])
+                .with_label_values(&["serialize_jmt_update"])
                 .start_timer();
 
-            add_node_batch(
-                &mut batch,
-                tree_update_batch
-                    .node_batch
-                    .iter()
-                    .flatten()
-                    .map(|(k, v)| (k, v)),
-            )?;
+            tree_update_batch
+                .node_batch
+                .iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .par_iter()
+                .with_min_len(100)
+                .map(|(node_key, node)| batch.put::<JellyfishMerkleNodeSchema>(node_key, node))
+                .collect::<Result<Vec<_>>>()?;
 
             tree_update_batch
                 .stale_node_index_batch
                 .iter()
                 .flatten()
+                .collect::<Vec<_>>()
+                .par_iter()
+                .with_min_len(100)
                 .map(|row| batch.put::<StaleNodeIndexSchema>(row, &()))
                 .collect::<Result<Vec<()>>>()?;
+        }
+
+        {
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["update_node_cache"])
+                .start_timer();
 
             self.node_cache.add_version(
                 version,

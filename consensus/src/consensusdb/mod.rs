@@ -80,14 +80,14 @@ impl ConsensusDB {
     }
 
     pub fn save_highest_2chain_timeout_certificate(&self, tc: Vec<u8>) -> Result<(), DbError> {
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         batch.put::<SingleEntrySchema>(&SingleEntryKey::Highest2ChainTimeoutCert, &tc)?;
         self.commit(batch)?;
         Ok(())
     }
 
     pub fn save_vote(&self, last_vote: Vec<u8>) -> Result<(), DbError> {
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         batch.put::<SingleEntrySchema>(&SingleEntryKey::LastVote, &last_vote)?;
         self.commit(batch)
     }
@@ -100,7 +100,7 @@ impl ConsensusDB {
         if block_data.is_empty() && qc_data.is_empty() {
             return Err(anyhow::anyhow!("Consensus block and qc data is empty!").into());
         }
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         block_data
             .iter()
             .try_for_each(|block| batch.put::<BlockSchema>(&block.id(), block))?;
@@ -117,7 +117,7 @@ impl ConsensusDB {
         if block_ids.is_empty() {
             return Err(anyhow::anyhow!("Consensus block ids is empty!").into());
         }
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         block_ids.iter().try_for_each(|hash| {
             batch.delete::<BlockSchema>(hash)?;
             batch.delete::<QCSchema>(hash)
@@ -140,7 +140,7 @@ impl ConsensusDB {
     }
 
     pub fn delete_highest_2chain_timeout_certificate(&self) -> Result<(), DbError> {
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         batch.delete::<SingleEntrySchema>(&SingleEntryKey::Highest2ChainTimeoutCert)?;
         self.commit(batch)
     }
@@ -152,7 +152,7 @@ impl ConsensusDB {
     }
 
     pub fn delete_last_vote_msg(&self) -> Result<(), DbError> {
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         batch.delete::<SingleEntrySchema>(&SingleEntryKey::LastVote)?;
         self.commit(batch)?;
         Ok(())

@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::Node;
-use crate::metrics::{NODE_CACHE_HIT, NODE_CACHE_TOTAL};
+use crate::{
+    metrics::{NODE_CACHE_HIT, NODE_CACHE_TOTAL},
+    OTHER_TIMERS_SECONDS,
+};
 use aptos_infallible::RwLock;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_types::transaction::Version;
@@ -28,6 +31,10 @@ impl VersionedNodeCache {
     }
 
     pub fn add_version(&self, version: Version, nodes: NodeCache) {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["node_cache_add_version"])
+            .start_timer();
+
         let mut locked = self.inner.write();
         if !locked.is_empty() {
             let (last_version, _) = locked.back().unwrap();
