@@ -402,48 +402,23 @@ where
                 let mut children: Children = internal_node.clone().into();
 
                 // Traverse all the path touched by `kvs` from this internal node.
-                for (left, right) in NibbleRangeIterator::new(kvs, depth) {
-                    // Traverse downwards from this internal node recursively by splitting the updates into
-                    // each child index
-                    let child_index = kvs[left].0.get_nibble(depth);
-
-                    let (new_child_node_key, new_child_node) =
-                        match internal_node.child(child_index) {
-                            Some(child) => {
-                                let child_node_key =
-                                    node_key.gen_child_node_key(child.version, child_index);
-                                self.batch_insert_at(
-                                    child_node_key,
-                                    version,
-                                    &kvs[left..=right],
-                                    depth + 1,
-                                    hash_cache,
-                                    batch,
-                                )?
-                            }
-                            None => {
-                                let new_child_node_key =
-                                    node_key.gen_child_node_key(version, child_index);
-                                self.batch_create_subtree(
-                                    new_child_node_key,
-                                    version,
-                                    &kvs[left..=right],
-                                    depth + 1,
-                                    hash_cache,
-                                    batch,
-                                )?
-                            }
-                        };
-
-                    children.insert(
-                        child_index,
-                        Child::new(
-                            Self::get_hash(&new_child_node_key, &new_child_node, hash_cache),
+                let new_children: Vec<_> = NibbleRangeIterator::new(kvs, depth)
+                    .map(|(left, right)| {
+                        self.insert_at_child(
+                            &node_key,
+                            &internal_node,
                             version,
-                            new_child_node.node_type(),
-                        ),
-                    );
-                }
+                            kvs,
+                            left,
+                            right,
+                            depth,
+                            hash_cache,
+                            batch,
+                        )
+                    })
+                    .collect::<Result<_>>()?;
+                children.extend(new_children.into_iter());
+
                 let new_internal_node = InternalNode::new(children);
                 node_key.set_version(version);
                 batch.put_node(node_key.clone(), new_internal_node.clone().into());
@@ -458,6 +433,50 @@ where
                 )?
             }
         })
+    }
+
+    fn insert_at_child(
+        &self,
+        node_key: &NodeKey,
+        internal_node: &InternalNode,
+        version: Version,
+        kvs: &[(HashValue, &(HashValue, K))],
+        left: usize,
+        right: usize,
+        depth: usize,
+        hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
+        batch: &mut TreeUpdateBatch<K>,
+    ) -> Result<(Nibble, Child)> {
+        let child_index = kvs[left].0.get_nibble(depth);
+        let child = internal_node.child(child_index);
+
+        let (node_key, node) = match child {
+            Some(child) => self.batch_insert_at(
+                node_key.gen_child_node_key(child.version, child_index),
+                version,
+                &kvs[left..=right],
+                depth + 1,
+                hash_cache,
+                batch,
+            )?,
+            None => self.batch_create_subtree(
+                node_key.gen_child_node_key(version, child_index),
+                version,
+                &kvs[left..=right],
+                depth + 1,
+                hash_cache,
+                batch,
+            )?,
+        };
+
+        Ok((
+            child_index,
+            Child::new(
+                Self::get_hash(&node_key, &node, hash_cache),
+                version,
+                node.node_type(),
+            ),
+        ))
     }
 
     fn batch_create_subtree_with_existing_leaf(
