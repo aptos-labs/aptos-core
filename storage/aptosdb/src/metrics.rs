@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter, register_int_gauge, register_int_gauge_vec,
-    HistogramVec, IntCounter, IntGauge, IntGaugeVec,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
+    register_int_gauge_vec, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -154,6 +154,24 @@ pub(crate) static BACKUP_STATE_SNAPSHOT_LEAF_IDX: Lazy<IntGauge> = Lazy::new(|| 
     register_int_gauge!(
         "aptos_backup_handler_state_snapshot_leaf_index",
         "Index of current leaf index returned in a state snapshot backup."
+    )
+    .unwrap()
+});
+
+pub static NODE_CACHE_HIT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_storage_node_cache_hit",
+        "Aptos storage state store node cache hit.",
+        &["type"]
+    )
+    .unwrap()
+});
+
+pub static NODE_CACHE_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_storage_node_cache_total",
+        "Aptos storage state store node cache total requests.",
+        &["type"]
     )
     .unwrap()
 });

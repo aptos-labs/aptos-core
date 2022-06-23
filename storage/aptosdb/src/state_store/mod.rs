@@ -6,12 +6,15 @@
 #[cfg(test)]
 mod state_store_test;
 
+mod versioned_node_cache;
+
 use crate::{
     change_set::ChangeSet,
     schema::{
         jellyfish_merkle_node::JellyfishMerkleNodeSchema, stale_node_index::StaleNodeIndexSchema,
         state_value::StateValueSchema,
     },
+    state_store::versioned_node_cache::VersionedNodeCache,
     AptosDbError, OTHER_TIMERS_SECONDS,
 };
 use anyhow::{anyhow, ensure, format_err, Result};
@@ -45,6 +48,7 @@ pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 pub(crate) struct StateStore {
     ledger_db: Arc<DB>,
     state_merkle_db: Arc<DB>,
+    node_cache: VersionedNodeCache,
 }
 
 // "using an Arc<dyn DbReader> as an Arc<dyn StateReader>" is not allowed in stable Rust. Actually we
@@ -110,6 +114,7 @@ impl StateStore {
         Self {
             ledger_db,
             state_merkle_db,
+            node_cache: VersionedNodeCache::new(),
         }
     }
 
@@ -280,6 +285,11 @@ impl StateStore {
                 .flatten()
                 .map(|row| batch.put::<StaleNodeIndexSchema>(row, &()))
                 .collect::<Result<Vec<()>>>()?;
+
+            self.node_cache.add_version(
+                version,
+                tree_update_batch.node_batch.into_iter().flatten().collect(),
+            )
         }
 
         // commit jellyfish merkle nodes
@@ -397,8 +407,12 @@ impl StateStore {
 
 impl TreeReader<StateKey> for StateStore {
     fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node>> {
-        self.state_merkle_db
-            .get::<JellyfishMerkleNodeSchema>(node_key)
+        if let Some(node_cache) = self.node_cache.get_version(node_key.version()) {
+            Ok(node_cache.get(node_key).cloned())
+        } else {
+            self.state_merkle_db
+                .get::<JellyfishMerkleNodeSchema>(node_key)
+        }
     }
 
     fn get_rightmost_leaf(&self) -> Result<Option<(NodeKey, LeafNode)>> {
