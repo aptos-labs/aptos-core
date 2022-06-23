@@ -2,10 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    common::{get_metric, GetMetricResult, Label},
-    MetricsEvaluator, MetricsEvaluatorError,
+    super::{
+        common::{get_metric, GetMetricResult, Label},
+        types::{MetricsEvaluatorError, MetricsEvaluatorInput},
+    },
+    types::CATEGORY,
 };
-use crate::evaluator::EvaluationResult;
+use crate::{
+    configuration::EvaluatorArgs,
+    evaluator::{EvaluationResult, Evaluator},
+};
 use anyhow::Result;
 use clap::Parser;
 use log::debug;
@@ -13,8 +19,6 @@ use once_cell::sync::Lazy;
 use poem_openapi::Object as PoemObject;
 use prometheus_parse::Scrape as PrometheusScrape;
 use serde::{Deserialize, Serialize};
-
-pub const NAME: &str = "state_sync";
 
 // TODO: When we have it, switch to using a crate that unifies metric names.
 // As it is now, this metric name could change and we'd never catch it here
@@ -27,31 +31,31 @@ pub static SYNC_VERSION_METRIC_LABEL: Lazy<Label> = Lazy::new(|| Label {
 });
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
-pub struct StateSyncMetricsEvaluatorArgs {
+pub struct StateSyncVersionEvaluatorArgs {
     #[clap(long, default_value = "5000")]
     pub version_delta_tolerance: u64,
 }
 
 #[derive(Debug)]
-pub struct StateSyncMetricsEvaluator {
-    args: StateSyncMetricsEvaluatorArgs,
+pub struct StateSyncVersionEvaluator {
+    args: StateSyncVersionEvaluatorArgs,
 }
 
-impl StateSyncMetricsEvaluator {
-    pub fn new(args: StateSyncMetricsEvaluatorArgs) -> Self {
+impl StateSyncVersionEvaluator {
+    pub fn new(args: StateSyncVersionEvaluatorArgs) -> Self {
         Self { args }
     }
 
     fn get_sync_version(&self, metrics: &PrometheusScrape, metrics_round: &str) -> GetMetricResult {
-        let evaluation_on_missing_fn = || EvaluationResult {
-            headline: "State sync version metric missing".to_string(),
-            score: 0,
-            explanation: format!(
+        let evaluation_on_missing_fn = || {
+            self.build_evaluation_result(
+                "State sync version metric missing".to_string(),
+                0,
+                format!(
                 "The {} set of metrics from the target node is missing the state sync metric: {}",
                 metrics_round, STATE_SYNC_METRIC
             ),
-            source: self.get_name(),
-            links: vec![],
+            )
         };
         get_metric(
             metrics,
@@ -59,6 +63,22 @@ impl StateSyncMetricsEvaluator {
             Some(&SYNC_VERSION_METRIC_LABEL),
             evaluation_on_missing_fn,
         )
+    }
+
+    fn build_evaluation_result(
+        &self,
+        headline: String,
+        score: u8,
+        explanation: String,
+    ) -> EvaluationResult {
+        EvaluationResult {
+            headline,
+            score,
+            explanation,
+            category: CATEGORY.to_string(),
+            evaluator_name: Self::get_name(),
+            links: vec![],
+        }
     }
 
     fn build_state_sync_version_evaluation(
@@ -71,44 +91,38 @@ impl StateSyncMetricsEvaluator {
         let target_progress = latest_target_version as i64 - previous_target_version as i64;
         match target_progress {
             target_progress if (target_progress == 0) => {
-                EvaluationResult {
-                    headline: "State sync version is not progressing".to_string(),
-                    score: 50,
-                    explanation: "Successfully pulled metrics from target node twice, but the metrics aren't progressing.".to_string(),
-                    source: self.get_name(),
-                    links: vec![],
-              }
+                self.build_evaluation_result(
+                    "State sync version is not progressing".to_string(),
+                     50,
+                    "Successfully pulled metrics from target node twice, but the metrics aren't progressing.".to_string(),
+                )
             }
             target_progress if (target_progress < 0) => {
-                EvaluationResult {
-                    headline: "State sync version went backwards!".to_string(),
-                    score: 0,
-                    explanation: "Successfully pulled metrics from target node twice, but the second time the state sync version went backwards!".to_string(),
-                    source: self.get_name(),
-                    links: vec![],
-                }
+                self.build_evaluation_result(
+                    "State sync version went backwards!".to_string(),
+                    0,
+                    "Successfully pulled metrics from target node twice, but the second time the state sync version went backwards!".to_string(),
+                )
             }
             _wildcard => {
                 // We convert to i64 to avoid potential overflow if the target is ahead of the baseline.
                 let delta_from_baseline = latest_baseline_version as i64 - latest_target_version as i64;
                 if delta_from_baseline > self.args.version_delta_tolerance as i64 {
-                    EvaluationResult {
-                        headline: "State sync version is lagging".to_string(),
-                        score: 70,
-                        explanation: format!(
+                    self.build_evaluation_result(
+                        "State sync version is lagging".to_string(),
+                        70,
+                        format!(
                             "Successfully pulled metrics from target node twice and saw the \
                             version was progressing, but it is lagging {} versions behind the baseline node. \
                             Target version: {}. Baseline version: {}. Tolerance: {}.",
                             delta_from_baseline, latest_target_version, latest_baseline_version, self.args.version_delta_tolerance
-                        ),
-                        source: self.get_name(),
-                        links: vec![],
-                    }
+                        )
+                    )
                 } else {
-                    EvaluationResult {
-                        headline: "State sync version is within tolerance".to_string(),
-                        score: 100,
-                        explanation: format!(
+                    self.build_evaluation_result(
+                        "State sync version is within tolerance".to_string(),
+                        100,
+                        format!(
                             "Successfully pulled metrics from target node twice, saw the \
                             version was progressing, and saw that it is within tolerance \
                             of the baseline node. \
@@ -116,51 +130,49 @@ impl StateSyncMetricsEvaluator {
                             latest_target_version,
                             latest_baseline_version,
                             self.args.version_delta_tolerance
-                        ),
-                        source: self.get_name(),
-                        links: vec![],
-                    }
+                        )
+                    )
                 }
             }
         }
     }
 }
 
-impl MetricsEvaluator for StateSyncMetricsEvaluator {
+#[async_trait::async_trait]
+impl Evaluator for StateSyncVersionEvaluator {
+    type Input = MetricsEvaluatorInput;
+    type Error = MetricsEvaluatorError;
+
     /// Assert that the state sync version is increasing on the target node
     /// and that we're within tolerance of the baseline node's latest version.
-    fn evaluate_metrics(
-        &self,
-        _previous_baseline_metrics: &PrometheusScrape,
-        previous_target_metrics: &PrometheusScrape,
-        latest_baseline_metrics: &PrometheusScrape,
-        latest_target_metrics: &PrometheusScrape,
-    ) -> Result<Vec<EvaluationResult>, MetricsEvaluatorError> {
+    async fn evaluate(&self, input: &Self::Input) -> Result<Vec<EvaluationResult>, Self::Error> {
         let mut evaluation_results = vec![];
 
         // Get previous version from the target node.
-        let previous_target_version = match self.get_sync_version(previous_target_metrics, "first")
-        {
-            GetMetricResult::Present(metric) => Some(metric),
-            GetMetricResult::Missing(evaluation_result) => {
-                evaluation_results.push(evaluation_result);
-                None
-            }
-        };
+        let previous_target_version =
+            match self.get_sync_version(&input.previous_target_metrics, "first") {
+                GetMetricResult::Present(metric) => Some(metric),
+                GetMetricResult::Missing(evaluation_result) => {
+                    evaluation_results.push(evaluation_result);
+                    None
+                }
+            };
 
         // Get the latest version from the target node.
-        let latest_target_version = match self.get_sync_version(latest_target_metrics, "second") {
-            GetMetricResult::Present(metric) => Some(metric),
-            GetMetricResult::Missing(evaluation_result) => {
-                evaluation_results.push(evaluation_result);
-                None
-            }
-        };
+        let latest_target_version =
+            match self.get_sync_version(&input.latest_target_metrics, "second") {
+                GetMetricResult::Present(metric) => Some(metric),
+                GetMetricResult::Missing(evaluation_result) => {
+                    evaluation_results.push(evaluation_result);
+                    None
+                }
+            };
 
         // Get the latest version from the baseline node. In this case, if we
         // cannot find the value, we return an error instead of a negative evalution,
         // since this implies some issue with the baseline node / this code.
-        let latest_baseline_version = match self.get_sync_version(latest_baseline_metrics, "second")
+        let latest_baseline_version = match self
+            .get_sync_version(&input.latest_baseline_metrics, "second")
         {
             GetMetricResult::Present(metric) => metric,
             GetMetricResult::Missing(_) => {
@@ -189,15 +201,18 @@ impl MetricsEvaluator for StateSyncMetricsEvaluator {
         Ok(evaluation_results)
     }
 
-    fn get_name(&self) -> String {
-        NAME.to_string()
+    fn get_name() -> String {
+        format!("{}_version", CATEGORY)
+    }
+
+    fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Self {
+        Self::new(evaluator_args.state_sync_version_args.clone())
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::metric_evaluator::common::parse_metrics;
+    use super::{super::super::parse_metrics, *};
 
     fn get_metric_string(value: u64) -> String {
         let mut metric_string = r#"aptos_state_sync_version{type="synced"} "#.to_string();
@@ -205,7 +220,7 @@ mod test {
         metric_string
     }
 
-    fn test_state_sync_metrics_evaluator(
+    async fn test_state_sync_metrics_evaluator(
         previous_target_version: u64,
         latest_baseline_version: u64,
         latest_target_version: u64,
@@ -227,16 +242,20 @@ mod test {
         };
 
         let state_sync_metrics_evaluator =
-            StateSyncMetricsEvaluator::new(StateSyncMetricsEvaluatorArgs {
+            StateSyncVersionEvaluator::new(StateSyncVersionEvaluatorArgs {
                 version_delta_tolerance: 1000,
             });
+
+        let metrics_evaluator_input = MetricsEvaluatorInput {
+            previous_baseline_metrics: parse_metrics(previous_baseline_metrics).unwrap(),
+            previous_target_metrics: parse_metrics(previous_target_metrics).unwrap(),
+            latest_baseline_metrics: parse_metrics(latest_baseline_metrics).unwrap(),
+            latest_target_metrics: parse_metrics(latest_target_metrics).unwrap(),
+        };
+
         let evaluations = state_sync_metrics_evaluator
-            .evaluate_metrics(
-                &parse_metrics(previous_baseline_metrics).unwrap(),
-                &parse_metrics(previous_target_metrics).unwrap(),
-                &parse_metrics(latest_baseline_metrics).unwrap(),
-                &parse_metrics(latest_target_metrics).unwrap(),
-            )
+            .evaluate(&metrics_evaluator_input)
+            .await
             .expect("Failed to evaluate metrics");
 
         let expected_evaluations_len =
@@ -249,28 +268,28 @@ mod test {
         assert_eq!(evaluations[0].score, expected_score);
     }
 
-    #[test]
-    fn test_in_sync_and_progressing() {
-        test_state_sync_metrics_evaluator(1000, 2000, 1700, 100, false, false);
+    #[tokio::test]
+    async fn test_in_sync_and_progressing() {
+        test_state_sync_metrics_evaluator(1000, 2000, 1700, 100, false, false).await;
     }
 
-    #[test]
-    fn test_progressing_but_lagging() {
-        test_state_sync_metrics_evaluator(1000, 5000, 3000, 70, false, false);
+    #[tokio::test]
+    async fn test_progressing_but_lagging() {
+        test_state_sync_metrics_evaluator(1000, 5000, 3000, 70, false, false).await;
     }
 
-    #[test]
-    fn test_not_progressing() {
-        test_state_sync_metrics_evaluator(1000, 5000, 1000, 50, false, false);
+    #[tokio::test]
+    async fn test_not_progressing() {
+        test_state_sync_metrics_evaluator(1000, 5000, 1000, 50, false, false).await;
     }
 
-    #[test]
-    fn test_missing_metric() {
-        test_state_sync_metrics_evaluator(1000, 5000, 1000, 0, true, false);
+    #[tokio::test]
+    async fn test_missing_metric() {
+        test_state_sync_metrics_evaluator(1000, 5000, 1000, 0, true, false).await;
     }
 
-    #[test]
-    fn test_both_missing_metrics() {
-        test_state_sync_metrics_evaluator(1000, 5000, 1000, 0, true, true);
+    #[tokio::test]
+    async fn test_both_missing_metrics() {
+        test_state_sync_metrics_evaluator(1000, 5000, 1000, 0, true, true).await;
     }
 }

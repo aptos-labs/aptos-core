@@ -803,7 +803,6 @@ dependencies = [
  "aptos-workspace-hack",
  "async-trait",
  "clap 3.1.18",
- "const_format",
  "env_logger 0.8.4",
  "futures",
  "log",
