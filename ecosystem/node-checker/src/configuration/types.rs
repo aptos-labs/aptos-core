@@ -31,12 +31,17 @@ pub struct NodeConfiguration {
     #[clap(flatten)]
     pub node_address: NodeAddress,
 
+    /// This is the name we expect clients to send over the wire to select
+    /// which configuration they want to use. e.g. devnet_fullnode
+    #[clap(long)]
+    pub configuration_name: String,
+
     /// This is the name we will show for this configuration to users.
     /// For example, if someone opens the NHC frontend, they will see this name
     /// in a dropdown list of configurations they can test their node against.
-    /// e.g. "Devnet Full Node", "Testnet Validator Node", etc.
+    /// e.g. "Devnet FullNode", "Testnet Validator Node", etc.
     #[clap(long)]
-    pub configuration_name: String,
+    pub configuration_name_pretty: String,
 
     /// The chain ID we expect to find when we speak to the node.
     /// If not given, we will just assume the value we find is correct.
@@ -127,15 +132,15 @@ pub struct NodeAddress {
 }
 
 impl NodeAddress {
-    fn default_metrics_port() -> u16 {
+    pub fn default_metrics_port() -> u16 {
         DEFAULT_METRICS_PORT
     }
 
-    fn default_api_port() -> u16 {
+    pub fn default_api_port() -> u16 {
         DEFAULT_API_PORT
     }
 
-    fn default_noise_port() -> u16 {
+    pub fn default_noise_port() -> u16 {
         DEFAULT_NOISE_PORT
     }
 }

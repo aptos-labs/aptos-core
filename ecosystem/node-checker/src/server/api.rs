@@ -9,7 +9,9 @@ use crate::{
 };
 use anyhow::anyhow;
 use poem::{http::StatusCode, Error as PoemError, Result as PoemResult};
-use poem_openapi::{payload::Json, types::Example, Object as PoemObject, OpenApi, OpenApiService};
+use poem_openapi::{
+    param::Query, payload::Json, types::Example, Object as PoemObject, OpenApi, OpenApiService,
+};
 use url::Url;
 
 use super::configurations_manager::{ConfigurationsManager, NodeConfigurationWrapper};
@@ -56,17 +58,33 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
 }
 
 // I choose to keep both methods rather than making these two separate APIs because it'll
-// make for more descriptive error messages.
+// make for more descriptive error messages. We write the function comment on one line
+// because the OpenAPI generator does some wonky newline stuff otherwise. Currently Poem
+// doesn't support "flattening" a struct into separate query parameters, so I do that
+// myself. See https://github.com/poem-web/poem/issues/241.
 #[OpenApi]
 impl<M: MetricCollector, R: Runner> Api<M, R> {
-    /// Check the health of a given target node. You may sepcify a baseline node configuration
-    /// type to use for the evaluation. If you don't specify a baseline node configuration, we
-    /// will attempt to determine the appropriate baseline based on your target node.
+    /// Check the health of a given target node. You may specify a baseline node configuration to use for the evaluation. If you don't specify a baseline node configuration, we will attempt to determine the appropriate baseline based on your target node.
     #[oai(path = "/check_node", method = "get")]
     async fn check_node(
         &self,
-        request: Json<CheckNodeRequest>,
+        /// The URL of the node to check. e.g. http://44.238.19.217 or http://fullnode.mysite.com
+        node_url: Query<Url>,
+        /// The name of the baseline node configuration to use for the evaluation, e.g. devnet_fullnode
+        baseline_configuration_name: Query<Option<String>>,
+        #[oai(default = "NodeAddress::default_metrics_port")] metrics_port: Query<u16>,
+        #[oai(default = "NodeAddress::default_api_port")] api_port: Query<u16>,
+        #[oai(default = "NodeAddress::default_noise_port")] noise_port: Query<u16>,
     ) -> PoemResult<Json<EvaluationSummary>> {
+        let request = CheckNodeRequest {
+            baseline_configuration_name: baseline_configuration_name.0,
+            target_node: NodeAddress {
+                url: node_url.0,
+                metrics_port: metrics_port.0,
+                api_port: api_port.0,
+                noise_port: noise_port.0,
+            },
+        };
         if self.allow_preconfigured_test_node_only {
             return Err(PoemError::from((
                 StatusCode::METHOD_NOT_ALLOWED,
@@ -97,12 +115,11 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
         }
     }
 
-    /// Check the health of the preconfigured node. If none was specified when the node health
-    /// checker was started, this will return an error.
+    /// Check the health of the preconfigured node. If none was specified when this instance of the node checker was started, this will return an error. You may specify a baseline node configuration to use for the evaluation. If you don't specify a baseline node configuration, we will attempt to determine the appropriate baseline based on your target node.
     #[oai(path = "/check_preconfigured_node", method = "get")]
     async fn check_preconfigured_node(
         &self,
-        baseline_configuration_name: Json<Option<String>>,
+        baseline_configuration_name: Query<Option<String>>,
     ) -> PoemResult<Json<EvaluationSummary>> {
         if self.target_metric_collector.is_none() {
             return Err(PoemError::from((

@@ -6,30 +6,77 @@
   },
   "servers": [
     {
-      "url": "http://localhost:20121/api"
+      "url": "http://0.0.0.0:20121/api"
     }
   ],
   "tags": [],
   "paths": {
     "/check_node": {
       "get": {
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NodeUrl"
-              }
-            }
+        "summary": "Check the health of a given target node. You may specify a baseline node configuration to use for the evaluation. If you don't specify a baseline node configuration, we will attempt to determine the appropriate baseline based on your target node.",
+        "parameters": [
+          {
+            "name": "node_url",
+            "schema": {
+              "type": "string",
+              "format": "url"
+            },
+            "in": "query",
+            "description": "The URL of the node to check. e.g. http://44.238.19.217 or http://fullnode.mysite.com",
+            "required": true,
+            "deprecated": false
           },
-          "required": true
-        },
+          {
+            "name": "baseline_configuration_name",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "description": "The name of the baseline node configuration to use for the evaluation, e.g. devnet_fullnode",
+            "required": false,
+            "deprecated": false
+          },
+          {
+            "name": "metrics_port",
+            "schema": {
+              "type": "integer",
+              "format": "uint16",
+              "default": 9101
+            },
+            "in": "query",
+            "required": false,
+            "deprecated": false
+          },
+          {
+            "name": "api_port",
+            "schema": {
+              "type": "integer",
+              "format": "uint16",
+              "default": 8080
+            },
+            "in": "query",
+            "required": false,
+            "deprecated": false
+          },
+          {
+            "name": "noise_port",
+            "schema": {
+              "type": "integer",
+              "format": "uint16",
+              "default": 6180
+            },
+            "in": "query",
+            "required": false,
+            "deprecated": false
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CompleteEvaluation"
+                  "$ref": "#/components/schemas/EvaluationSummary"
                 }
               }
             }
@@ -39,13 +86,25 @@
     },
     "/check_preconfigured_node": {
       "get": {
+        "summary": "Check the health of the preconfigured node. If none was specified when this instance of the node checker was started, this will return an error. You may specify a baseline node configuration to use for the evaluation. If you don't specify a baseline node configuration, we will attempt to determine the appropriate baseline based on your target node.",
+        "parameters": [
+          {
+            "name": "baseline_configuration_name",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "required": false,
+            "deprecated": false
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CompleteEvaluation"
+                  "$ref": "#/components/schemas/EvaluationSummary"
                 }
               }
             }
@@ -56,39 +115,14 @@
   },
   "components": {
     "schemas": {
-      "CompleteEvaluation": {
-        "type": "object",
-        "required": [
-          "evaluations",
-          "summary_score",
-          "summary_explanation"
-        ],
-        "properties": {
-          "evaluations": {
-            "type": "array",
-            "description": "All the evaluations we ran.",
-            "items": {
-              "$ref": "#/components/schemas/Evaluation"
-            }
-          },
-          "summary_score": {
-            "type": "integer",
-            "format": "uint8",
-            "description": "An aggeregated summary (method TBA)."
-          },
-          "summary_explanation": {
-            "type": "string",
-            "description": "An overall explanation of the results."
-          }
-        }
-      },
-      "Evaluation": {
+      "EvaluationResult": {
         "type": "object",
         "required": [
           "headline",
           "score",
           "explanation",
-          "source"
+          "source",
+          "links"
         ],
         "properties": {
           "headline": {
@@ -107,43 +141,40 @@
           "source": {
             "type": "string",
             "description": "Name of the evaluator where the evaluation came from, e.g. state_sync."
+          },
+          "links": {
+            "type": "array",
+            "description": "Links that might help the user fix a potential problem.",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
-      "NodeUrl": {
+      "EvaluationSummary": {
         "type": "object",
         "required": [
-          "url"
+          "evaluation_results",
+          "summary_score",
+          "summary_explanation"
         ],
         "properties": {
-          "url": {
+          "evaluation_results": {
+            "type": "array",
+            "description": "Results from all the evaluations NHC ran.",
+            "items": {
+              "$ref": "#/components/schemas/EvaluationResult"
+            }
+          },
+          "summary_score": {
+            "type": "integer",
+            "format": "uint8",
+            "description": "An aggeregated summary (method TBA)."
+          },
+          "summary_explanation": {
             "type": "string",
-            "description": "Target URL. This should include a scheme (e.g. http://). If there is\nno scheme, we will prepend http://."
-          },
-          "metrics_port": {
-            "type": "integer",
-            "format": "uint16",
-            "description": "Metrics port.",
-            "default": 9101
-          },
-          "api_port": {
-            "type": "integer",
-            "format": "uint16",
-            "description": "API port.",
-            "default": 8080
-          },
-          "noise_port": {
-            "type": "integer",
-            "format": "uint16",
-            "description": "Validator communication port.",
-            "default": 6180
+            "description": "An overall explanation of the results."
           }
-        },
-        "example": {
-          "url": "mynode.mysite.com",
-          "metrics_port": 9101,
-          "api_port": 8080,
-          "noise_port": 6180
         }
       }
     }

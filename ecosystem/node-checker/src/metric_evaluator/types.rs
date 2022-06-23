@@ -24,8 +24,8 @@ pub struct EvaluationResult {
 
 #[derive(Clone, Debug, PoemObject)]
 pub struct EvaluationSummary {
-    /// All the evaluations we ran.
-    pub evaluations: Vec<EvaluationResult>,
+    /// Results from all the evaluations NHC ran.
+    pub evaluation_results: Vec<EvaluationResult>,
 
     /// An aggeregated summary (method TBA).
     pub summary_score: u8,
@@ -36,10 +36,13 @@ pub struct EvaluationSummary {
 
 impl From<Vec<EvaluationResult>> for EvaluationSummary {
     // Very basic for now, we likely want a trait for this.
-    fn from(evaluations: Vec<EvaluationResult>) -> Self {
-        let summary_score = match evaluations.len() {
+    fn from(evaluation_results: Vec<EvaluationResult>) -> Self {
+        let summary_score = match evaluation_results.len() {
             0 => 0,
-            _ => evaluations.iter().map(|e| e.score).sum::<u8>() / evaluations.len() as u8,
+            _ => {
+                evaluation_results.iter().map(|e| e.score).sum::<u8>()
+                    / evaluation_results.len() as u8
+            }
         };
         let summary_explanation = match summary_score {
             summary_score if summary_score > 95 => format!("{}: Awesome!", summary_score),
@@ -48,7 +51,7 @@ impl From<Vec<EvaluationResult>> for EvaluationSummary {
             wildcard => format!("{}: Not good enough :(", wildcard),
         };
         EvaluationSummary {
-            evaluations,
+            evaluation_results,
             summary_score,
             summary_explanation,
         }

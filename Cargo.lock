@@ -1320,6 +1320,7 @@ dependencies = [
  "toml",
  "tracing",
  "tracing-core",
+ "url",
  "warp",
 ]
 
@@ -2796,7 +2797,7 @@ dependencies = [
  "diesel_derives",
  "num-bigint 0.2.6",
  "num-integer",
- "num-traits 0.2.15",
+ "num-traits 0.1.43",
  "pq-sys",
  "r2d2",
  "serde_json",
