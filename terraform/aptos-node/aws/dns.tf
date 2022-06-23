@@ -9,14 +9,21 @@ resource "random_string" "validator-dns" {
   length  = 16
 }
 
+data "aws_route53_zone" "aptos" {
+  count   = var.zone_id != "" ? 1 : 0
+  zone_id = var.zone_id
+}
+
 locals {
   record_name = replace(var.record_name, "<workspace>", local.workspace_name)
+  # domain name for external-dns, if it is installed
+  domain = var.zone_id != "" ? "${local.workspace_name}.${data.aws_route53_zone.aptos[0].name}" : null
 }
 
 data "kubernetes_service" "validator-lb" {
   count = var.zone_id != "" ? 1 : 0
   metadata {
-    name = "${local.workspace_name}-aptos-node-validator-lb"
+    name = "${local.workspace_name}-aptos-node-0-validator-lb"
   }
   depends_on = [time_sleep.lb_creation]
 }
@@ -24,7 +31,7 @@ data "kubernetes_service" "validator-lb" {
 data "kubernetes_service" "fullnode-lb" {
   count = var.zone_id != "" ? 1 : 0
   metadata {
-    name = "${local.workspace_name}-aptos-node-fullnode-lb"
+    name = "${local.workspace_name}-aptos-node-0-fullnode-lb"
   }
   depends_on = [time_sleep.lb_creation]
 }

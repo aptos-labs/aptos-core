@@ -1,0 +1,4 @@
+apiVersion: v2
+name: testnet-addons
+version: 0.1
+description: Additional components for aptos-nodes testnet

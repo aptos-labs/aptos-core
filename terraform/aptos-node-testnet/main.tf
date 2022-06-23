@@ -9,8 +9,8 @@ provider "aws" {
 data "aws_caller_identity" "current" {}
 
 locals {
-  workspace = var.workspace_name_override != "" ? var.workspace_name_override : terraform.workspace
-  aws_tags  = "Terraform=testnet,Workspace=${local.workspace}"
+  workspace  = var.workspace_name_override != "" ? var.workspace_name_override : terraform.workspace
+  aws_tags   = "Terraform=testnet,Workspace=${local.workspace}"
   chain_name = var.chain_name != "" ? var.chain_name : "${local.workspace}net"
 }
 
@@ -19,6 +19,7 @@ module "validator" {
 
   region                      = var.region
   iam_path                    = var.iam_path
+  zone_id                     = var.zone_id
   permissions_boundary_policy = var.permissions_boundary_policy
   workspace_name_override     = var.workspace_name_override
 
@@ -33,7 +34,7 @@ module "validator" {
   validator_name = "aptos-node"
 
   num_validators = var.num_validators
-  helm_values    = var.aptos_node_helm_values
+  helm_values = var.aptos_node_helm_values
 
   # allow all nodegroups to surge to 2x their size, in case of total nodes replacement
   validator_instance_num = var.num_validator_instance > 0 ? 2 * var.num_validator_instance : var.num_validators
@@ -83,7 +84,7 @@ resource "helm_release" "genesis" {
       }
       imageTag = var.image_tag
       genesis = {
-        numValidators = var.num_validators
+        numValidators   = var.num_validators
         username_prefix = local.aptos_node_helm_prefix
       }
     }),

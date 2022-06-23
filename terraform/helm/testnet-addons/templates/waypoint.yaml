@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "testnet-addons.fullname" . }}-waypoint
+  labels:
+    {{- include "testnet-addons.labels" . | nindent 4 }}
+    app: {{ include "testnet-addons.fullname" . }}-waypoint
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+spec:
+  selector:
+    {{- include "testnet-addons.selectorLabels" . | nindent 4 }}
+    app: {{ include "testnet-addons.fullname" . }}-waypoint
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: NodePort
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "testnet-addons.fullname" . }}-waypoint
+  labels:
+    {{- include "testnet-addons.labels" . | nindent 4 }}
+    app: {{ include "testnet-addons.fullname" . }}-waypoint
+spec:
+  selector:
+    matchLabels:
+      {{- include "testnet-addons.selectorLabels" . | nindent 6 }}
+      app: {{ include "testnet-addons.fullname" . }}-waypoint
+  template:
+    metadata:
+      labels:
+        {{- include "testnet-addons.selectorLabels" . | nindent 8 }}
+        app: {{ include "testnet-addons.fullname" . }}-waypoint
+    spec:
+      containers:
+      - name: http
+        image: pierrezemb/gostatic
+        imagePullPolicy: IfNotPresent
+        args: ["-port", "8080", "-enable-health"]
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: genesis
+          mountPath: /srv/http
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      volumes:
+      - name: genesis
+        secret:
+          # all validator genesis secrets will have waypoint.txt and genesis.blob
+          secretName: {{ .Values.genesis.username_prefix }}-0-genesis-e{{ .Values.genesis.era }}
+      serviceAccountName: {{ include "testnet-addons.serviceAccountName" . }}

@@ -9,7 +9,8 @@ metadata:
 spec:
   selector:
     {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
-    app.kubernetes.io/name: validator-{{$i}}
+    app.kubernetes.io/name: validator
+    app.kubernetes.io/instance: validator-{{$i}}
   ports:
   - name: validator
     port: 6180
@@ -17,7 +18,7 @@ spec:
     port: 6181
   - name: metrics
     port: 9101
-  {{- if $.Values.validator.exposeRestApi }}
+  {{- if $.Values.service.validator.enableRestApi }}
   - name: api
     port: 8080
   {{- end }}
@@ -46,7 +47,8 @@ metadata:
   name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-validator
   labels:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
-    app.kubernetes.io/name: validator-{{$i}}
+    app.kubernetes.io/name: validator
+    app.kubernetes.io/instance: validator-{{$i}}
 spec:
   serviceName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-validator
   replicas: 1
@@ -54,12 +56,14 @@ spec:
   selector:
     matchLabels:
       {{- include "aptos-validator.selectorLabels" $ | nindent 6 }}
-      app.kubernetes.io/name: validator-{{$i}}
+      app.kubernetes.io/name: validator
+      app.kubernetes.io/instance: validator-{{$i}}
   template:
     metadata:
       labels:
         {{- include "aptos-validator.selectorLabels" $ | nindent 8 }}
-        app.kubernetes.io/name: validator-{{$i}}
+        app.kubernetes.io/name: validator
+        app.kubernetes.io/instance: validator-{{$i}}
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
         checksum/validator.yaml: {{ tpl ($.Files.Get "files/configs/validator.yaml") $ | sha256sum }}

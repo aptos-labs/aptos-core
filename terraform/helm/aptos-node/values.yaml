@@ -39,13 +39,11 @@ validator:
     ledger_prune_window: 10000000
     state_store_prune_window: 1000000
     pruning_batch_size: 10000
-  exposeRestApi: false
 
 fullnode:
   groups:
   - name: fullnode
     replicas: 1
-    enableRestApi: true
   resources:
     limits:
       cpu: 3.5
@@ -88,12 +86,18 @@ haproxy:
   tls_secret:
 
 service:
+  domain:
   external:
     type: LoadBalancer
   validator:
     loadBalancerSourceRanges:
+    enableRestApi: false
+    enableMetricsPort: false
+  # NOTE: these values apply for all fullnode groups
   fullnode:
     loadBalancerSourceRanges:
+    enableRestApi: false
+    enableMetricsPort: false
 
 serviceAccount:
   # Specifies whether a service account should be created
