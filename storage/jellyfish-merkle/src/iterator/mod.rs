@@ -13,7 +13,7 @@ use crate::{
     node_type::{Child, InternalNode, Node, NodeKey},
     TreeReader,
 };
-use anyhow::{bail, ensure, format_err, Result};
+use anyhow::{bail, ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
@@ -177,7 +177,6 @@ where
                     }
                 }
             }
-            Node::Null => done = true,
         }
 
         Ok(Self {
@@ -220,9 +219,6 @@ where
         let mut leaves_skipped = 0;
         for _ in 0..=ROOT_NIBBLE_HEIGHT {
             match current_node {
-                Node::Null => {
-                    unreachable!("The Node::Null case has already been covered before loop.")
-                }
                 Node::Leaf(_) => {
                     ensure!(
                         leaves_skipped == start_idx,
@@ -304,7 +300,6 @@ where
                     // iterated past the last key.
                     return None;
                 }
-                Ok(Node::Null) => unreachable!("We would have set done to true in new."),
                 Err(err) => return Some(Err(err)),
             }
         }
@@ -334,7 +329,6 @@ where
                     Self::cleanup_stack(&mut self.parent_stack);
                     return Some(Ok(ret));
                 }
-                Ok(Node::Null) => return Some(Err(format_err!("Should not reach a null node."))),
                 Err(err) => return Some(Err(err)),
             }
         }
