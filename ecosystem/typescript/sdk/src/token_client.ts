@@ -296,6 +296,6 @@ export class TokenClient {
     };
 
     const tableItem = await this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
-    return tableItem;
+    return tableItem?.data;
   }
 }

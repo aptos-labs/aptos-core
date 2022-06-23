@@ -10,10 +10,14 @@ import {
   TransactionAuthenticatorEd25519,
   TransactionAuthenticatorMultiEd25519,
   SigningMessage,
+  MultiAgentRawTransaction,
 } from './aptos_types';
 import { bcsToBytes, Bytes } from './bcs';
 
-const SALT = 'APTOS::RawTransaction';
+const RAW_TRANSACTION_SALT = 'APTOS::RawTransaction';
+const RAW_TRANSACTION_WITH_DATA_SALT = 'APTOS::RawTransactionWithData';
+
+type AnyRawTransaction = RawTransaction | MultiAgentRawTransaction;
 
 /**
  * Function that takes in a Signing Message (serialized raw transaction)
@@ -21,7 +25,7 @@ const SALT = 'APTOS::RawTransaction';
  */
 export type SigningFn = (txn: SigningMessage) => Ed25519Signature | MultiEd25519Signature;
 
-class TransactionBuilder<F extends SigningFn> {
+export class TransactionBuilder<F extends SigningFn> {
   protected readonly signingFunction: F;
 
   constructor(signingFunction: F) {
@@ -29,9 +33,15 @@ class TransactionBuilder<F extends SigningFn> {
   }
 
   /** Generates a Signing Message out of a raw transaction. */
-  static getSigningMessage(rawTxn: RawTransaction): SigningMessage {
+  static getSigningMessage(rawTxn: AnyRawTransaction): SigningMessage {
     const hash = SHA3.sha3_256.create();
-    hash.update(Buffer.from(SALT));
+    if (rawTxn instanceof RawTransaction) {
+      hash.update(Buffer.from(RAW_TRANSACTION_SALT));
+    } else if (rawTxn instanceof MultiAgentRawTransaction) {
+      hash.update(Buffer.from(RAW_TRANSACTION_WITH_DATA_SALT));
+    } else {
+      throw new Error('Unknown transaction type.');
+    }
 
     const prefix = new Uint8Array(hash.arrayBuffer());
 

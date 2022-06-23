@@ -315,6 +315,43 @@ export class SignedTransaction {
   }
 }
 
+export abstract class RawTransactionWithData {
+  abstract serialize(serializer: Serializer): void;
+
+  static deserialize(deserializer: Deserializer): RawTransactionWithData {
+    const index = deserializer.deserializeUleb128AsU32();
+    switch (index) {
+      case 0:
+        return MultiAgentRawTransaction.load(deserializer);
+      default:
+        throw new Error(`Unknown variant index for RawTransactionWithData: ${index}`);
+    }
+  }
+}
+
+export class MultiAgentRawTransaction extends RawTransactionWithData {
+  constructor(
+    public readonly raw_txn: RawTransaction,
+    public readonly secondary_signer_addresses: Seq<AccountAddress>,
+  ) {
+    super();
+  }
+
+  serialize(serializer: Serializer): void {
+    // enum variant index
+    serializer.serializeU32AsUleb128(0);
+    this.raw_txn.serialize(serializer);
+    serializeVector<TransactionArgument>(this.secondary_signer_addresses, serializer);
+  }
+
+  static load(deserializer: Deserializer): MultiAgentRawTransaction {
+    const rawTxn = RawTransaction.deserialize(deserializer);
+    const secondarySignerAddresses = deserializeVector(deserializer, AccountAddress);
+
+    return new MultiAgentRawTransaction(rawTxn, secondarySignerAddresses);
+  }
+}
+
 export abstract class TransactionPayload {
   abstract serialize(serializer: Serializer): void;
 
