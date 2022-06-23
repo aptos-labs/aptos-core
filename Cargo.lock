@@ -2164,6 +2164,7 @@ dependencies = [
  "futures",
  "itertools",
  "mirai-annotations",
+ "move-deps",
  "network",
  "num-derive",
  "num-traits 0.2.15",

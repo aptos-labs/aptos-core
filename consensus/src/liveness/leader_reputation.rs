@@ -8,7 +8,7 @@ use crate::{
     },
     liveness::proposer_election::{next, ProposerElection},
 };
-use aptos_infallible::Mutex;
+use aptos_infallible::{Mutex, MutexGuard};
 use aptos_logger::prelude::*;
 use aptos_types::block_metadata::{new_block_event_key, NewBlockEvent};
 use consensus_types::common::{Author, Round};
@@ -25,70 +25,117 @@ pub trait MetadataBackend: Send + Sync {
 pub struct AptosDBBackend {
     epoch: u64,
     window_size: usize,
-    seek_len: u64,
+    seek_len: usize,
     aptos_db: Arc<dyn DbReader>,
-    window: Mutex<Vec<(u64, NewBlockEvent)>>,
+    db_result: Mutex<(Vec<NewBlockEvent>, u64, bool)>,
 }
 
 impl AptosDBBackend {
-    pub fn new(epoch: u64, window_size: usize, seek_len: u64, aptos_db: Arc<dyn DbReader>) -> Self {
+    pub fn new(
+        epoch: u64,
+        window_size: usize,
+        seek_len: usize,
+        aptos_db: Arc<dyn DbReader>,
+    ) -> Self {
         Self {
             epoch,
             window_size,
             seek_len,
             aptos_db,
-            window: Mutex::new(vec![]),
+            db_result: Mutex::new((vec![], 0u64, true)),
         }
     }
 
-    fn refresh_window(&self, target_round: Round) -> anyhow::Result<()> {
+    fn refresh_db_result(
+        &self,
+        mut locked: MutexGuard<'_, (Vec<NewBlockEvent>, u64, bool)>,
+        lastest_db_version: u64,
+    ) -> anyhow::Result<(Vec<NewBlockEvent>, u64, bool)> {
         // assumes target round is not too far from latest commit
+        let limit = self.window_size + self.seek_len;
+
+        // there is a race condition between the next two lines, and new events being added.
+        // I.e. when latest_db_version is fetched, and get_events are called.
+        // if in between a new entry gets added max_returned_version will be larger than
+        // latest_db_version, and so we should take the max of the two.
+
+        // we cannot reorder those two functions, as if get_events is first,
+        // and then new entry gets added before get_latest_version is called,
+        // we would incorrectly think that we have a newer version.
         let events = self.aptos_db.get_events(
             &new_block_event_key(),
             u64::max_value(),
             Order::Descending,
-            self.window_size as u64 + self.seek_len,
+            limit as u64,
         )?;
+
+        let max_returned_version = events.first().map_or(0, |first| first.transaction_version);
+
+        let new_block_events: Vec<NewBlockEvent> = itertools::process_results(
+            events
+                .into_iter()
+                .map(|event| bcs::from_bytes::<NewBlockEvent>(event.event.event_data())),
+            |iter| iter.filter(|e| e.epoch() == self.epoch).collect(),
+        )?;
+
+        let hit_end = new_block_events.len() < limit;
+
+        let result = (
+            new_block_events,
+            std::cmp::max(lastest_db_version, max_returned_version),
+            hit_end,
+        );
+        *locked = result.clone();
+        Ok(result)
+    }
+
+    fn get_from_db_result(
+        &self,
+        target_round: Round,
+        events: &Vec<NewBlockEvent>,
+        hit_end: bool,
+    ) -> Vec<NewBlockEvent> {
         let mut result = vec![];
         for event in events {
-            let e = bcs::from_bytes::<NewBlockEvent>(event.event.event_data())?;
-            if e.epoch() == self.epoch
-                && e.round() <= target_round
-                && result.len() < self.window_size
-            {
-                result.push((event.transaction_version, e));
+            if event.round() <= target_round && result.len() < self.window_size {
+                result.push(event.clone());
             }
         }
-        *self.window.lock() = result;
-        Ok(())
+
+        if result.len() < self.window_size && !hit_end {
+            error!("We are not fetching far enough in history, we filtered from {} to {}, but asked for {}", events.len(), result.len(), self.window_size);
+        }
+        result
     }
 }
 
 impl MetadataBackend for AptosDBBackend {
     // assume the target_round only increases
     fn get_block_metadata(&self, target_round: Round) -> Vec<NewBlockEvent> {
-        let (known_version, known_round) = self
-            .window
-            .lock()
-            .first()
-            .map(|(v, e)| (*v, e.round()))
-            .unwrap_or((0, 0));
-        if !(known_round == target_round
-            || known_version == self.aptos_db.get_latest_version().unwrap_or(0))
-        {
-            if let Err(e) = self.refresh_window(target_round) {
-                error!(
-                    error = ?e, "[leader reputation] Fail to refresh window",
-                );
-                return vec![];
+        let locked = self.db_result.lock();
+        let events = &locked.0;
+        let version = locked.1;
+        let hit_end = locked.2;
+
+        let has_larger = events.first().map_or(false, |e| e.round() >= target_round);
+        let lastest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
+        // check if fresher data has potential to give us different result
+        if !has_larger && version < lastest_db_version {
+            let fresh_db_result = self.refresh_db_result(locked, lastest_db_version);
+            match fresh_db_result {
+                Ok((events, _version, hit_end)) => {
+                    self.get_from_db_result(target_round, &events, hit_end)
+                }
+                Err(e) => {
+                    error!(
+                        error = ?e, "[leader reputation] Fail to refresh window",
+                    );
+                    vec![]
+                }
             }
+        } else {
+            self.get_from_db_result(target_round, events, hit_end)
         }
-        self.window
-            .lock()
-            .clone()
-            .into_iter()
-            .map(|(_, e)| e)
-            .collect()
     }
 }
 

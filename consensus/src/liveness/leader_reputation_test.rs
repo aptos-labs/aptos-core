@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::liveness::{
     leader_reputation::{
@@ -11,14 +11,22 @@ use crate::liveness::{
     proposer_election::{next, ProposerElection},
 };
 
+use aptos_infallible::Mutex;
 use aptos_types::{
-    account_address::AccountAddress, block_metadata::NewBlockEvent,
+    account_address::AccountAddress,
+    account_config,
+    block_metadata::{new_block_event_key, NewBlockEvent},
+    contract_event::{ContractEvent, EventWithVersion},
+    event::EventKey,
+    transaction::Version,
     validator_signer::ValidatorSigner,
 };
 use consensus_types::common::{Author, Round};
 use itertools::Itertools;
+use move_deps::move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
+use storage_interface::{DbReader, Order};
 
-use super::leader_reputation::ProposerAndVoterHeuristic;
+use super::leader_reputation::{AptosDBBackend, ProposerAndVoterHeuristic};
 
 struct MockHistory {
     window_size: usize,
@@ -185,8 +193,6 @@ impl Example1 {
         ));
     }
 }
-
-fn example1_init() {}
 
 #[test]
 fn test_aggregation_counting() {
@@ -487,4 +493,174 @@ fn test_api() {
     assert_eq!(output, proposers[expected_index]);
     assert!(leader_reputation.is_valid_proposer(proposers[expected_index], 42));
     assert!(!leader_reputation.is_valid_proposer(proposers[unexpected_index], 42));
+}
+
+struct MockDbReader {
+    events: Mutex<Vec<EventWithVersion>>,
+    random_address: Author,
+    last_timestamp: Mutex<u64>,
+    idx: Mutex<u64>,
+    to_add_event_after_call: Mutex<Option<(u64, Round)>>,
+
+    fetched: Mutex<usize>,
+}
+
+impl MockDbReader {
+    pub fn new() -> MockDbReader {
+        Self {
+            events: Mutex::new(vec![]),
+            random_address: Author::random(),
+            last_timestamp: Mutex::new(100000),
+            idx: Mutex::new(0),
+            to_add_event_after_call: Mutex::new(None),
+            fetched: Mutex::new(0),
+        }
+    }
+
+    pub fn add_event(&self, epoch: u64, round: Round) {
+        let mut idx = self.idx.lock();
+        *idx += 1;
+        self.events.lock().push(EventWithVersion::new(
+            *idx,
+            ContractEvent::new(
+                new_block_event_key(),
+                *idx,
+                TypeTag::Struct(account_config::NewBlockEvent::struct_tag()),
+                bcs::to_bytes(&account_config::NewBlockEvent::new(
+                    epoch,
+                    round,
+                    vec![],
+                    self.random_address,
+                    vec![],
+                    *self.last_timestamp.lock(),
+                ))
+                .unwrap(),
+            ),
+        ));
+        *self.last_timestamp.lock() += 100;
+    }
+
+    pub fn add_another_transaction(&self) {
+        *self.idx.lock() += 1;
+    }
+
+    pub fn add_event_after_call(&self, epoch: u64, round: Round) {
+        *self.to_add_event_after_call.lock() = Some((epoch, round));
+    }
+
+    fn fetched(&self) -> usize {
+        *self.fetched.lock()
+    }
+}
+
+impl DbReader for MockDbReader {
+    fn get_events(
+        &self,
+        _event_key: &EventKey,
+        start: u64,
+        order: Order,
+        limit: u64,
+    ) -> anyhow::Result<Vec<EventWithVersion>> {
+        *self.fetched.lock() += 1;
+        assert_eq!(start, u64::max_value());
+        assert!(order == Order::Descending);
+        let events = self.events.lock();
+        // println!("Events {:?}", *events);
+        Ok(events
+            .iter()
+            .skip(events.len().saturating_sub(limit as usize))
+            .rev()
+            .cloned()
+            .collect())
+    }
+
+    /// Returns the latest version, error on on non-bootstrapped DB.
+    fn get_latest_version(&self) -> anyhow::Result<Version> {
+        let version = *self.idx.lock();
+        let mut to_add = self.to_add_event_after_call.lock();
+        if let Some((epoch, round)) = *to_add {
+            self.add_event(epoch, round);
+            *to_add = None;
+        }
+        Ok(version)
+    }
+}
+
+#[test]
+fn backend_wrapper_test() {
+    let aptos_db = Arc::new(MockDbReader::new());
+    let backend = AptosDBBackend::new(1, 3, 3, aptos_db.clone());
+
+    aptos_db.add_event(0, 1);
+    for i in 2..6 {
+        aptos_db.add_event(1, i);
+    }
+    let mut fetch_count = 0;
+
+    let mut assert_history = |round, expected_history: Vec<Round>, to_fetch| {
+        let history: Vec<Round> = backend
+            .get_block_metadata(round)
+            .iter()
+            .map(|e| e.round())
+            .collect();
+        assert_eq!(expected_history, history, "At round {}", round);
+        if to_fetch {
+            fetch_count += 1;
+        }
+        assert_eq!(fetch_count, aptos_db.fetched(), "At round {}", round);
+    };
+
+    assert_history(6, vec![5, 4, 3], true);
+    // while history doesn't change, no need to refetch, no matter the round
+    assert_history(5, vec![5, 4, 3], false);
+    assert_history(4, vec![4, 3, 2], false);
+    assert_history(3, vec![3, 2], false);
+    assert_history(5, vec![5, 4, 3], false);
+    assert_history(6, vec![5, 4, 3], false);
+
+    // as soon as history change, we fetch again
+    aptos_db.add_event(1, 6);
+    assert_history(6, vec![6, 5, 4], true);
+    aptos_db.add_event(1, 7);
+    assert_history(6, vec![6, 5, 4], false);
+    aptos_db.add_event(1, 8);
+    assert_history(6, vec![6, 5, 4], false);
+
+    assert_history(9, vec![8, 7, 6], true);
+    aptos_db.add_event(1, 10);
+    // we need to refetch, as we don't know if round that arrived is for 9 or not.
+    assert_history(9, vec![8, 7, 6], true);
+    assert_history(9, vec![8, 7, 6], false);
+    aptos_db.add_event(1, 11);
+    // since we already saw round 10, and are asking for round 9, no need to fetch again.
+    assert_history(9, vec![8, 7, 6], false);
+    aptos_db.add_event(1, 12);
+    assert_history(9, vec![8, 7, 6], false);
+
+    // last time we fetched, we saw 10, so we don't need to fetch for 10
+    // but need to fetch for 11.
+    assert_history(10, vec![10, 8, 7], false);
+    assert_history(11, vec![11, 10, 8], true);
+    assert_history(12, vec![12, 11, 10], false);
+
+    // since history include target round, unrelated transaction don't require refresh
+    aptos_db.add_another_transaction();
+    assert_history(12, vec![12, 11, 10], false);
+
+    // since history doesn't include target round, any unrelated transaction requires refresh
+    assert_history(13, vec![12, 11, 10], true);
+    aptos_db.add_another_transaction();
+    assert_history(13, vec![12, 11, 10], true);
+    assert_history(13, vec![12, 11, 10], false);
+    aptos_db.add_another_transaction();
+    assert_history(13, vec![12, 11, 10], true);
+    assert_history(13, vec![12, 11, 10], false);
+
+    // check for race condition
+    aptos_db.add_another_transaction();
+    aptos_db.add_event_after_call(1, 13);
+    // in the first we add event after latest_db_version is fetched, as a race.
+    // Second one should know that there is nothing new.
+    assert_history(14, vec![13, 12, 11], true);
+    assert_history(14, vec![13, 12, 11], false);
 }
