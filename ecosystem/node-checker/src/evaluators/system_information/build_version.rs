@@ -6,45 +6,64 @@
 // what to do in this case.
 
 use super::{
-    get_value, GetValueResult, SystemInformationEvaluator, SystemInformationEvaluatorError,
-    EVALUATOR_SOURCE,
+    common::{get_value, GetValueResult},
+    types::{SystemInformationEvaluatorError, SystemInformationEvaluatorInput},
+    CATEGORY,
 };
-use crate::{evaluator::EvaluationResult, metric_collector::SystemInformation};
+use crate::{
+    configuration::EvaluatorArgs,
+    evaluator::{EvaluationResult, Evaluator},
+    metric_collector::SystemInformation,
+};
 use anyhow::Result;
 use clap::Parser;
 use log::debug;
 use poem_openapi::Object as PoemObject;
 use serde::{Deserialize, Serialize};
 
-pub const BUILD_VERSION_EVALUATOR_NAME: &str = "build_commit_hash";
-
 // TODO: Use the key in crates/aptos-telemetry/src/build_information.rs
 const BUILD_COMMIT_HASH_KEY: &str = "build_commit_hash";
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
-pub struct BuildVersionEvaluatorArgs {}
+pub struct SystemInformationBuildVersionEvaluatorArgs {}
 
 #[allow(dead_code)]
 #[derive(Debug)]
-pub struct BuildVersionEvaluator {
-    args: BuildVersionEvaluatorArgs,
+pub struct SystemInformationBuildVersionEvaluator {
+    args: SystemInformationBuildVersionEvaluatorArgs,
 }
 
-impl BuildVersionEvaluator {
-    pub fn new(args: BuildVersionEvaluatorArgs) -> Self {
+impl SystemInformationBuildVersionEvaluator {
+    pub fn new(args: SystemInformationBuildVersionEvaluatorArgs) -> Self {
         Self { args }
     }
 
-    fn get_build_commit_hash(&self, system_information: &SystemInformation) -> GetValueResult {
-        let evaluation_on_missing_fn = || EvaluationResult {
-            headline: "Build commit hash value missing".to_string(),
-            score: 0,
-            explanation: format!(
-                "The build information from the node is missing: {}",
-                BUILD_COMMIT_HASH_KEY
-            ),
-            source: EVALUATOR_SOURCE.to_string(),
+    fn build_evaluation_result(
+        &self,
+        headline: String,
+        score: u8,
+        explanation: String,
+    ) -> EvaluationResult {
+        EvaluationResult {
+            headline,
+            score,
+            explanation,
+            category: CATEGORY.to_string(),
+            evaluator_name: Self::get_name(),
             links: vec![],
+        }
+    }
+
+    fn get_build_commit_hash(&self, system_information: &SystemInformation) -> GetValueResult {
+        let evaluation_on_missing_fn = || {
+            self.build_evaluation_result(
+                "Build commit hash value missing".to_string(),
+                0,
+                format!(
+                    "The build information from the node is missing: {}",
+                    BUILD_COMMIT_HASH_KEY
+                ),
+            )
         };
         get_value(
             system_information,
@@ -54,17 +73,17 @@ impl BuildVersionEvaluator {
     }
 }
 
-impl SystemInformationEvaluator for BuildVersionEvaluator {
+#[async_trait::async_trait]
+impl Evaluator for SystemInformationBuildVersionEvaluator {
+    type Input = SystemInformationEvaluatorInput;
+    type Error = SystemInformationEvaluatorError;
+
     /// Assert that the build commit hashes match.
-    fn evaluate_system_information(
-        &self,
-        baseline_system_information: &SystemInformation,
-        target_system_information: &SystemInformation,
-    ) -> Result<Vec<EvaluationResult>, SystemInformationEvaluatorError> {
+    async fn evaluate(&self, input: &Self::Input) -> Result<Vec<EvaluationResult>, Self::Error> {
         let mut evaluation_results = vec![];
 
         let baseline_build_commit_hash = match self
-            .get_build_commit_hash(baseline_system_information)
+            .get_build_commit_hash(&input.baseline_system_information)
         {
             GetValueResult::Present(value) => value,
             GetValueResult::Missing(_evaluation_result) => {
@@ -76,39 +95,36 @@ impl SystemInformationEvaluator for BuildVersionEvaluator {
             }
         };
 
-        let target_build_commit_hash = match self.get_build_commit_hash(target_system_information) {
-            GetValueResult::Present(value) => Some(value),
-            GetValueResult::Missing(evaluation_result) => {
-                evaluation_results.push(evaluation_result);
-                None
-            }
-        };
+        let target_build_commit_hash =
+            match self.get_build_commit_hash(&input.target_system_information) {
+                GetValueResult::Present(value) => Some(value),
+                GetValueResult::Missing(evaluation_result) => {
+                    evaluation_results.push(evaluation_result);
+                    None
+                }
+            };
 
         match target_build_commit_hash {
             Some(target_build_commit_hash) => {
                 evaluation_results.push({
                     if baseline_build_commit_hash == target_build_commit_hash {
-                        EvaluationResult {
-                            headline: "Build commit hashes match".to_string(),
-                            score: 100,
-                            explanation: format!(
+                        self.build_evaluation_result(
+                            "Build commit hashes match".to_string(),
+                            100,
+                            format!(
                                 "The build commit hash from the target node ({}) matches the build commit hash from the baseline node ({}).",
                                 target_build_commit_hash, baseline_build_commit_hash
                             ),
-                            source: EVALUATOR_SOURCE.to_string(),
-                            links: vec![],
-                        }
+                        )
                     } else {
-                        EvaluationResult {
-                            headline: "Build commit hash mismatch".to_string(),
-                            score: 50,
-                            explanation: format!(
+                        self.build_evaluation_result(
+                            "Build commit hash mismatch".to_string(),
+                            50,
+                            format!(
                                 "The build commit hash from the target node ({}) does not match the build commit hash from the baseline node ({}).",
                                 target_build_commit_hash, baseline_build_commit_hash
                             ),
-                            source: EVALUATOR_SOURCE.to_string(),
-                            links: vec![],
-                        }
+                        )
                     }
                 });
             }
@@ -120,8 +136,12 @@ impl SystemInformationEvaluator for BuildVersionEvaluator {
         Ok(evaluation_results)
     }
 
-    fn get_name(&self) -> String {
-        BUILD_VERSION_EVALUATOR_NAME.to_string()
+    fn get_name() -> String {
+        format!("{}_build_commit_hash", CATEGORY)
+    }
+
+    fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Self {
+        Self::new(evaluator_args.system_information_build_version_args.clone())
     }
 }
 
@@ -139,7 +159,7 @@ mod test {
         SystemInformation(inner)
     }
 
-    fn test_evaluator(
+    async fn test_evaluator(
         baseline_build_commit_hash: Option<&str>,
         target_build_commit_hash: Option<&str>,
         expected_score: u8,
@@ -154,33 +174,42 @@ mod test {
             None => SystemInformation(HashMap::new()),
         };
 
-        let evaluator = BuildVersionEvaluator::new(BuildVersionEvaluatorArgs {});
+        let evaluator = SystemInformationBuildVersionEvaluator::new(
+            SystemInformationBuildVersionEvaluatorArgs {},
+        );
+
+        let system_information_evaluator_input = SystemInformationEvaluatorInput {
+            baseline_system_information,
+            target_system_information,
+        };
+
         let evaluations = evaluator
-            .evaluate_system_information(&baseline_system_information, &target_system_information)
+            .evaluate(&system_information_evaluator_input)
+            .await
             .expect("Failed to evaluate system information");
 
         assert_eq!(evaluations.len(), 1);
         assert_eq!(evaluations[0].score, expected_score);
     }
 
-    #[test]
-    fn test_same() {
-        test_evaluator(Some("aaaaaaaaaa"), Some("aaaaaaaaaa"), 100);
+    #[tokio::test]
+    async fn test_same() {
+        test_evaluator(Some("aaaaaaaaaa"), Some("aaaaaaaaaa"), 100).await;
     }
 
-    #[test]
-    fn test_different() {
-        test_evaluator(Some("aaaaaaaaaa"), Some("bbbbbbbbbb"), 50);
+    #[tokio::test]
+    async fn test_different() {
+        test_evaluator(Some("aaaaaaaaaa"), Some("bbbbbbbbbb"), 50).await;
     }
 
-    #[test]
-    fn test_missing_target_metric() {
-        test_evaluator(Some("aaaaaaaaaa"), None, 0);
+    #[tokio::test]
+    async fn test_missing_target_metric() {
+        test_evaluator(Some("aaaaaaaaaa"), None, 0).await;
     }
 
-    #[test]
+    #[tokio::test]
     #[should_panic(expected = "did not contain the necessary key")]
-    fn test_both_missing_metrics() {
-        test_evaluator(None, None, 0);
+    async fn test_both_missing_metrics() {
+        test_evaluator(None, None, 0).await;
     }
 }

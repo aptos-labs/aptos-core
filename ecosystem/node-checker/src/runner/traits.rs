@@ -7,9 +7,10 @@ use thiserror::Error as ThisError;
 
 use crate::{
     evaluator::EvaluationSummary,
+    evaluators::{
+        metrics::MetricsEvaluatorError, system_information::SystemInformationEvaluatorError,
+    },
     metric_collector::{MetricCollector, MetricCollectorError},
-    metric_evaluator::MetricsEvaluatorError,
-    system_information_evaluator::SystemInformationEvaluatorError,
 };
 
 #[derive(Debug, ThisError)]
@@ -42,6 +43,9 @@ pub enum RunnerError {
 // seen sets of metrics and do more complex analysis. Additionally we could leverage
 // things like long polling +/ sticky routing to make it that the client request
 // doesn't just hang waiting for the run to complete.
+
+// todo update the below confirming that it does need to be send and sync to live
+// inside Api, whichw will be shared across threads.
 
 /// todo describe the trait
 /// todo assert these trait constraints are necessary
