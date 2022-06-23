@@ -12,9 +12,9 @@ use crate::{
         get_child_and_sibling_half_start, Child, Children, InternalNode, LeafNode, Node, NodeKey,
         NodeType,
     },
-    NibbleExt, NodeBatch, StateValueWriter, TreeReader, TreeWriter, ROOT_NIBBLE_HEIGHT,
+    NibbleExt, StateValueWriter, TreeReader, TreeWriter, ROOT_NIBBLE_HEIGHT,
 };
-use anyhow::{bail, ensure, Result};
+use anyhow::{ensure, Result};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -28,7 +28,7 @@ use aptos_types::{
     transaction::Version,
 };
 use mirai_annotations::*;
-use std::{cmp::Eq, hash::Hash, sync::Arc};
+use std::{cmp::Eq, collections::HashMap, hash::Hash, sync::Arc};
 use storage_interface::StateSnapshotReceiver;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -148,7 +148,7 @@ struct JellyfishMerkleRestore<K> {
     partial_nodes: Vec<InternalInfo<K>>,
 
     /// The nodes that have been fully restored and are ready to be written to storage.
-    frozen_nodes: NodeBatch<K>,
+    frozen_nodes: HashMap<NodeKey, Node<K>>,
 
     /// The most recently added leaf. This is used to ensure the keys come in increasing
     /// order and do proof verification.
@@ -191,7 +191,7 @@ where
             store,
             version,
             partial_nodes,
-            frozen_nodes: NodeBatch::new(),
+            frozen_nodes: HashMap::new(),
             previous_leaf,
             num_keys_received: 0,
             expected_root_hash,
@@ -207,7 +207,7 @@ where
             store,
             version,
             partial_nodes: vec![InternalInfo::new_empty(NodeKey::new_empty_path(version))],
-            frozen_nodes: NodeBatch::new(),
+            frozen_nodes: HashMap::new(),
             previous_leaf: None,
             num_keys_received: 0,
             expected_root_hash,
@@ -256,7 +256,6 @@ where
                             leaf_count: Some(internal_node.leaf_count()),
                         },
                         Node::Leaf(leaf_node) => ChildInfo::Leaf(leaf_node),
-                        Node::Null => bail!("Null node should not appear in storage."),
                     };
                     internal_info.set_child(i, child_info);
                 }

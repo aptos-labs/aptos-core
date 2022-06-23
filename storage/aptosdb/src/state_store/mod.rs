@@ -265,7 +265,10 @@ impl StateStore {
                 .with_label_values(&["serialize_jmt_commit"])
                 .start_timer();
 
-            add_node_batch(&mut batch, &tree_update_batch.node_batch)?;
+            add_node_batch(
+                &mut batch,
+                tree_update_batch.node_batch.iter().map(|(k, v)| (k, v)),
+            )?;
 
             tree_update_batch
                 .stale_node_index_batch
@@ -458,7 +461,7 @@ impl TreeReader<StateKey> for StateStore {
 impl TreeWriter<StateKey> for StateStore {
     fn write_node_batch(&self, node_batch: &NodeBatch) -> Result<()> {
         let mut batch = SchemaBatch::new();
-        add_node_batch(&mut batch, node_batch)?;
+        add_node_batch(&mut batch, node_batch.iter())?;
         self.state_merkle_db.write_schemas(batch)
     }
 }
@@ -471,14 +474,12 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
     }
 }
 
-fn add_node_batch(batch: &mut SchemaBatch, node_batch: &NodeBatch) -> Result<()> {
+fn add_node_batch<'a>(
+    batch: &'a mut SchemaBatch,
+    mut node_batch: impl Iterator<Item = (&'a NodeKey, &'a Node)>,
+) -> Result<()> {
     node_batch
-        .iter()
-        .map(|(node_key, node)| batch.put::<JellyfishMerkleNodeSchema>(node_key, node))
-        .collect::<Result<Vec<_>>>()?;
-
-    // Add kv_batch
-    Ok(())
+        .try_for_each(|(node_key, node)| batch.put::<JellyfishMerkleNodeSchema>(node_key, node))
 }
 
 fn add_kv_batch(batch: &mut SchemaBatch, kv_batch: &StateValueBatch) -> Result<()> {
