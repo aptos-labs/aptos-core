@@ -97,11 +97,13 @@ where
         batch
             .node_batch
             .into_iter()
+            .flatten()
             .map(|(k, v)| self.put_node(k, v))
             .collect::<Result<Vec<_>>>()?;
         batch
             .stale_node_index_batch
             .into_iter()
+            .flatten()
             .map(|i| self.put_stale_node_index(i))
             .collect::<Result<Vec<_>>>()?;
         Ok(())

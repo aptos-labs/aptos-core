@@ -44,7 +44,12 @@ fn test_insert_to_empty_tree() {
     let (_new_root_hash, batch) = tree
         .put_value_set_test(vec![(key, &(value_hash, state_key))], 0 /* version */)
         .unwrap();
-    assert!(batch.stale_node_index_batch.is_empty());
+    assert!(batch
+        .stale_node_index_batch
+        .iter()
+        .flatten()
+        .next()
+        .is_none());
 
     db.write_tree_update_batch(batch).unwrap();
 
@@ -102,7 +107,12 @@ fn test_insert_at_leaf_with_internal_created() {
         .put_value_set_test(vec![(key1, &value1)], 0 /* version */)
         .unwrap();
 
-    assert!(batch.stale_node_index_batch.is_empty());
+    assert!(batch
+        .stale_node_index_batch
+        .iter()
+        .flatten()
+        .next()
+        .is_none());
     db.write_tree_update_batch(batch).unwrap();
     assert_eq!(tree.get(key1, 0).unwrap().unwrap(), value1.0);
 

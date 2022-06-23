@@ -267,12 +267,17 @@ impl StateStore {
 
             add_node_batch(
                 &mut batch,
-                tree_update_batch.node_batch.iter().map(|(k, v)| (k, v)),
+                tree_update_batch
+                    .node_batch
+                    .iter()
+                    .flatten()
+                    .map(|(k, v)| (k, v)),
             )?;
 
             tree_update_batch
                 .stale_node_index_batch
                 .iter()
+                .flatten()
                 .map(|row| batch.put::<StaleNodeIndexSchema>(row, &()))
                 .collect::<Result<Vec<()>>>()?;
         }
