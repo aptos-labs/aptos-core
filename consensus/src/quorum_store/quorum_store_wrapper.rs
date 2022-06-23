@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::data_manager::DataManager;
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::batch_reader::BatchReader;
 use crate::quorum_store::quorum_store::QuorumStoreError;
 use crate::quorum_store::types::TxnData;
 use crate::quorum_store::utils::MempoolProxy;
@@ -38,66 +38,58 @@ use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
 
-const MAX_FRAGMENT_SIZE: usize = 50; // TODO: make sure this times max transaction size is smaller than quorumstore max batch size in bytes
-
 // TODO: Consider storing batches and retrying upon QuorumStoreError:Timeout
 #[allow(dead_code)]
 pub struct QuorumStoreWrapper {
-    batch_reader: Arc<BatchReader>,
-    network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
-    max_batch_size: usize,
-    consensus_receiver: Receiver<WrapperCommand>,
+    // TODO: remove, DataManager sends msg to wrapper
+    data_manager: Arc<dyn DataManager>,
     mempool_proxy: MempoolProxy,
     quorum_store_sender: tokio::sync::mpsc::Sender<QuorumStoreCommand>,
-    network_sender: NetworkSender,
-    batches_to_filter: HashMap<HashValue, Vec<TransactionSummary>>,
+    batches_to_filter: HashMap<HashValue, Vec<TransactionSummary>>, // TODO: batch_in_progress
     // TODO: add the expiration priority queue
     batch_in_progress: Vec<TransactionSummary>,
     bytes_in_progress: usize,
     latest_logical_time: LogicalTime,
     batches_for_consensus: HashMap<HashValue, ProofOfStore>, // TODO: use expiration priority queue as well
-                                                             // TODO: store all ProofOfStore (created locally, and received via broadcast)
-                                                             // TODO: need to be notified of ProofOfStore's that were committed
+    // TODO: store all ProofOfStore (created locally, and received via broadcast)
+    // TODO: need to be notified of ProofOfStore's that were committed
+    mempool_txn_pull_max_count: u64, // TODO: make sure this times max transaction size is smaller than quorumstore max batch size in bytes
+    quorum_store_max_batch_bytes: u64,
 }
 
 impl QuorumStoreWrapper {
     pub fn new(
         epoch: u64,
-        network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
-        max_batch_size: usize,
-        batch_reader: Arc<BatchReader>,
-        consensus_receiver: Receiver<WrapperCommand>,
+        data_manager: Arc<dyn DataManager>,
         mempool_tx: Sender<QuorumStoreRequest>,
         quorum_store_sender: tokio::sync::mpsc::Sender<QuorumStoreCommand>,
-        network_sender: NetworkSender,
         mempool_txn_pull_timeout_ms: u64,
+        mempool_txn_pull_max_count: u64,
+        quorum_store_max_batch_bytes: u64,
     ) -> Self {
         Self {
-            batch_reader,
-            network_msg_rx,
-            max_batch_size,
-            consensus_receiver,
+            data_manager,
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
             quorum_store_sender,
-            network_sender,
             batches_to_filter: HashMap::new(),
             batch_in_progress: Vec::new(),
             bytes_in_progress: 0,
             latest_logical_time: LogicalTime::new(epoch, 0),
             batches_for_consensus: HashMap::new(),
+            mempool_txn_pull_max_count,
+            quorum_store_max_batch_bytes,
         }
     }
 
-    async fn handle_scheduled_pull(
+    pub(crate) async fn handle_scheduled_pull(
         &mut self,
     ) -> Option<oneshot::Receiver<Result<ProofOfStore, QuorumStoreError>>> {
-        let mut exclude_txns: Vec<TransactionSummary> =
-            self.batches_to_filter.values().flatten().cloned().collect();
+        let mut exclude_txns: Vec<_> = self.batches_to_filter.values().flatten().cloned().collect();
         exclude_txns.extend(self.batch_in_progress.clone());
         // TODO: size and unwrap or not?
         let pulled_txns = self
             .mempool_proxy
-            .pull_internal(MAX_FRAGMENT_SIZE as u64, exclude_txns)
+            .pull_internal(self.mempool_txn_pull_max_count, exclude_txns)
             .await
             .unwrap();
 
@@ -108,8 +100,9 @@ impl QuorumStoreWrapper {
         let mut pulled_txns_cloned = pulled_txns.clone();
         for txn in pulled_txns {
             let bytes = to_bytes(&txn).unwrap();
-            if self.bytes_in_progress + bytes.len() > self.max_batch_size {
+            if self.bytes_in_progress + bytes.len() > self.quorum_store_max_batch_bytes as usize {
                 end_batch = true;
+                self.bytes_in_progress = 0;
                 break;
             } else {
                 self.batch_in_progress.push(TransactionSummary {
@@ -176,27 +169,20 @@ impl QuorumStoreWrapper {
         }
     }
 
-    async fn handle_proof_completed(&mut self, msg: Result<ProofOfStore, QuorumStoreError>) {
-        match msg {
-            Ok(proof) => {
-                self.network_sender
-                    .broadcast_without_self(ConsensusMsg::ProofOfStoreBroadcastMsg(Box::new(
-                        proof.clone(),
-                    )))
-                    .await;
-                self.handle_proof(proof);
-            }
-            Err(QuorumStoreError::Timeout(digest)) => {
-                self.batches_to_filter.remove(&digest);
-            }
-            Err(_) => {
-                unreachable!();
-            }
-        }
+    pub(crate) async fn broadcast_completed_proof(
+        &mut self,
+        proof: ProofOfStore,
+        network_sender: &mut NetworkSender,
+    ) {
+        network_sender
+            .broadcast_without_self(ConsensusMsg::ProofOfStoreBroadcastMsg(Box::new(
+                proof.clone(),
+            )))
+            .await;
     }
 
     // TODO: priority queue on LogicalTime to clean old proofs
-    fn handle_proof(&mut self, mut new_proof: ProofOfStore) {
+    pub(crate) async fn insert_proof(&mut self, mut new_proof: ProofOfStore) {
         let maybe_proof = self.batches_for_consensus.remove(new_proof.digest());
         if let Some(proof) = maybe_proof {
             if proof.expiration() > new_proof.expiration() {
@@ -207,7 +193,27 @@ impl QuorumStoreWrapper {
             .insert(new_proof.digest().clone(), new_proof);
     }
 
-    async fn handle_consensus_request(&mut self, msg: WrapperCommand) {
+    pub(crate) async fn handle_local_proof(
+        &mut self,
+        msg: Result<ProofOfStore, QuorumStoreError>,
+        network_sender: &mut NetworkSender,
+    ) {
+        match msg {
+            Ok(proof) => {
+                self.insert_proof(proof.clone()).await;
+                self.broadcast_completed_proof(proof, network_sender).await;
+            }
+            Err(QuorumStoreError::Timeout(digest)) => {
+                // TODO: even if broadcast fails, we should not remove it?
+                // self.batches_to_filter.remove(&digest);
+            }
+            Err(_) => {
+                unreachable!();
+            }
+        }
+    }
+
+    pub(crate) async fn handle_consensus_request(&mut self, msg: WrapperCommand) {
         match msg {
             // TODO: check what max_block_size consensus is using
             WrapperCommand::GetBlockRequest(max_block_size, filter, callback) => {
@@ -235,19 +241,29 @@ impl QuorumStoreWrapper {
                     .send(Ok(res))
                     .expect("BlcokResponse receiver not available");
             }
-
             WrapperCommand::CleanRequest(logical_time, digests) => {
                 self.latest_logical_time = logical_time;
                 for digest in digests {
                     self.batches_to_filter.remove(&digest);
                     self.batches_for_consensus.remove(&digest);
                 }
+                // TODO: remove but make CleanRequest not a ConsensusRequest,
+                // TODO: as notify_commit now calls CleanRequest.
+                // self.data_manager
+                //     .notify_commit(self.latest_logical_time)
+                //     .await;
             }
         }
     }
 
     // TODO: use tokio select for the internal timeout feature
-    pub async fn start(mut self) {
+    pub async fn start(
+        mut self,
+        mut network_sender: NetworkSender,
+        mut consensus_receiver: Receiver<WrapperCommand>,
+        mut shutdown: Receiver<()>,
+        mut network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
+    ) {
         let mut scheduled_pulls: FuturesUnordered<ScheduledPull> = FuturesUnordered::new();
         scheduled_pulls.push(ScheduledPull::new(
             Instant::now() + Duration::from_millis(50),
@@ -257,6 +273,7 @@ impl QuorumStoreWrapper {
 
         loop {
             let _timer = counters::MAIN_LOOP.start_timer();
+            // TODO: need an explicit shutdown message, as pulls will continue to schedule
             ::futures::select! {
                 _backoff = scheduled_pulls.next() => {
                     if let Some(proof_rx) = self.handle_scheduled_pull().await {
@@ -270,15 +287,18 @@ impl QuorumStoreWrapper {
                 next = proofs_in_progress.next() => {
                     // TODO: handle failures
                     if let Some(Ok(msg)) = next {
-                        self.handle_proof_completed(msg).await;
+                        self.handle_local_proof(msg, &mut network_sender).await;
                     }
                 },
-                msg = self.consensus_receiver.select_next_some() => {
+                msg = consensus_receiver.select_next_some() => {
                     self.handle_consensus_request(msg).await;
+                },
+                _ = shutdown.select_next_some() => {
+                    break;
                 }
-                msg = self.network_msg_rx.next() => {
+                msg = network_msg_rx.next() => {
                    if let Some(VerifiedEvent::ProofOfStoreBroadcast(proof)) = msg{
-                        self.handle_proof(*proof);
+                        self.insert_proof(*proof).await;
                     }
                 }
                 complete => break,
