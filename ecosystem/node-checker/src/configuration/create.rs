@@ -1,12 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::path::PathBuf;
-
-use anyhow::Result;
+use super::{common::validate_configuration, NodeConfiguration};
+use anyhow::{Context, Result};
 use clap::{ArgEnum, Parser};
-
-use super::NodeConfiguration;
+use std::path::PathBuf;
 
 #[derive(ArgEnum, Clone, Debug)]
 enum OutputFormat {
@@ -24,6 +22,9 @@ pub struct Create {
 
     #[clap(short, long, arg_enum, default_value = "yaml")]
     format: OutputFormat,
+
+    #[clap(long)]
+    do_not_validate: bool,
 }
 
 pub async fn create(args: Create) -> Result<()> {
@@ -31,6 +32,11 @@ pub async fn create(args: Create) -> Result<()> {
         OutputFormat::Json => serde_json::to_string_pretty(&args.node_configuration)?,
         OutputFormat::Yaml => serde_yaml::to_string(&args.node_configuration)?,
     };
+
+    if !args.do_not_validate {
+        validate_configuration(&args.node_configuration)
+            .context("Configuration failed validation")?;
+    }
 
     match args.output_path {
         Some(path) => std::fs::write(path, output)?,
