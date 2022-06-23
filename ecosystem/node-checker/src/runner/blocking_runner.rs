@@ -6,9 +6,12 @@ use std::time::Duration;
 use super::{Runner, RunnerError};
 use crate::{
     evaluator::EvaluationSummary,
+    evaluators::{
+        metrics::{parse_metrics, MetricsEvaluatorInput},
+        system_information::SystemInformationEvaluatorInput,
+        EvaluatorType,
+    },
     metric_collector::MetricCollector,
-    metric_evaluator::{parse_metrics, MetricsEvaluator},
-    system_information_evaluator::SystemInformationEvaluator,
 };
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -28,22 +31,19 @@ pub struct BlockingRunnerArgs {
 pub struct BlockingRunner<M: MetricCollector> {
     args: BlockingRunnerArgs,
     baseline_metric_collector: M,
-    metrics_evaluators: Vec<Box<dyn MetricsEvaluator>>,
-    system_information_evaluators: Vec<Box<dyn SystemInformationEvaluator>>,
+    evaluators: Vec<EvaluatorType>,
 }
 
 impl<M: MetricCollector> BlockingRunner<M> {
     pub fn new(
         args: BlockingRunnerArgs,
         baseline_metric_collector: M,
-        metrics_evaluators: Vec<Box<dyn MetricsEvaluator>>,
-        system_information_evaluators: Vec<Box<dyn SystemInformationEvaluator>>,
+        evaluators: Vec<EvaluatorType>,
     ) -> Self {
         Self {
             args,
             baseline_metric_collector,
-            metrics_evaluators,
-            system_information_evaluators,
+            evaluators,
         }
     }
 
@@ -116,26 +116,30 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
 
         let mut evaluation_results = Vec::new();
 
-        for evaluator in &self.metrics_evaluators {
-            let mut es = evaluator
-                .evaluate_metrics(
-                    &first_baseline_metrics,
-                    &first_target_metrics,
-                    &second_baseline_metrics,
-                    &second_target_metrics,
-                )
-                .map_err(RunnerError::MetricEvaluatorError)?;
-            evaluation_results.append(&mut es);
-        }
+        let metrics_evaluator_input = MetricsEvaluatorInput {
+            previous_baseline_metrics: first_baseline_metrics,
+            previous_target_metrics: first_target_metrics,
+            latest_baseline_metrics: second_baseline_metrics,
+            latest_target_metrics: second_target_metrics,
+        };
 
-        for evaluator in &self.system_information_evaluators {
-            let mut es = evaluator
-                .evaluate_system_information(
-                    &baseline_system_information,
-                    &target_system_information,
-                )
-                .map_err(RunnerError::SystemInformationEvaluatorError)?;
-            evaluation_results.append(&mut es);
+        let system_information_evaluator_input = SystemInformationEvaluatorInput {
+            baseline_system_information,
+            target_system_information,
+        };
+
+        for evaluator in &self.evaluators {
+            let mut local_evaluation_results = match evaluator {
+                EvaluatorType::Metrics(evaluator) => evaluator
+                    .evaluate(&metrics_evaluator_input)
+                    .await
+                    .map_err(RunnerError::MetricEvaluatorError)?,
+                EvaluatorType::SystemInformation(evaluator) => evaluator
+                    .evaluate(&system_information_evaluator_input)
+                    .await
+                    .map_err(RunnerError::SystemInformationEvaluatorError)?,
+            };
+            evaluation_results.append(&mut local_evaluation_results);
         }
 
         let complete_evaluation = EvaluationSummary::from(evaluation_results);
