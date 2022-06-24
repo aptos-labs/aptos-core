@@ -159,9 +159,11 @@ impl StateComputer for ExecutionProxy {
 
         for block in blocks {
             block_ids.push(block.id());
-            let payload = block.get_payload();
-            let signed_txns = self.data_manager.get_data(payload.clone()).await?;
-            payloads.push(payload);
+            let maybe_payload = block.get_payload();
+            let signed_txns = self.data_manager.get_data(maybe_payload.clone()).await?;
+            if maybe_payload.is_some(){
+                payloads.push(maybe_payload.unwrap());
+            }
             txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));
             reconfig_events.extend(block.reconfig_event());
 

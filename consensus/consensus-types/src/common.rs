@@ -33,16 +33,10 @@ pub enum Payload {
 }
 
 impl Payload {
+    // TODO: that is a potential bug.
     pub fn new_empty() -> Self {
         Payload::DirectMempool(Vec::new())
     }
-
-    // pub fn len(&self) -> usize {
-    //     match self {
-    //         Payload::DirectMempool(txns) => txns.len(),
-    //         Payload::InQuorumStore(_poavs) => todo!(),
-    //     }
-    // }
 
     pub fn is_empty(&self) -> bool {
         match self {
@@ -52,19 +46,6 @@ impl Payload {
     }
 }
 
-// // TODO: What I really want is an iterator that isn't necessarily a vector (e.g., read lazily from RocksDB). This doesn't seem like the way.
-// impl IntoIterator for Payload {
-//     type Item = SignedTransaction;
-//     type IntoIter = std::vec::IntoIter<Self::Item>;
-//
-//     // TODO: delete
-//     fn into_iter(self) -> Self::IntoIter {
-//         match self {
-//             Payload::DirectMempool(txns) => txns.into_iter(),
-//             Payload::InQuorumStore(_poavs) => todo!(),
-//         }
-//     }
-// }
 
 impl fmt::Display for Payload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
