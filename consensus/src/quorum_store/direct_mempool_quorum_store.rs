@@ -37,23 +37,24 @@ impl DirectMempoolQuorumStore {
         callback: oneshot::Sender<Result<ConsensusResponse>>,
     ) {
         let get_batch_start_time = Instant::now();
-        let (txns, result) = match payload_filter {
-            PayloadFilter::DirectMempool(exclude_txns) => {
-                match self
-                    .mempool_proxy
-                    .pull_internal(max_size, exclude_txns)
-                    .await
-                {
-                    Err(_) => {
-                        error!("GetBatch failed");
-                        (vec![], counters::REQUEST_FAIL_LABEL)
-                    }
-                    Ok(txns) => (txns, counters::REQUEST_SUCCESS_LABEL),
-                }
-            }
-            _ => {
+        let exclude_txns = match payload_filter {
+            PayloadFilter::DirectMempool(exclude_txns) => exclude_txns,
+            PayloadFilter::InQuorumStore(_) => {
                 unreachable!("Unknown payload_filter: {}", payload_filter)
             }
+            PayloadFilter::Empty => Vec::new(),
+        };
+
+        let (txns, result) = match self
+            .mempool_proxy
+            .pull_internal(max_size, exclude_txns)
+            .await
+        {
+            Err(_) => {
+                error!("GetBatch failed");
+                (vec![], counters::REQUEST_FAIL_LABEL)
+            }
+            Ok(txns) => (txns, counters::REQUEST_SUCCESS_LABEL),
         };
         counters::quorum_store_service_latency(
             counters::GET_BATCH_LABEL,

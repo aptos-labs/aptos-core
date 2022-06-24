@@ -187,13 +187,12 @@ impl QuorumStoreWrapper {
             // TODO: check what max_block_size consensus is using
             ConsensusRequest::GetBlockRequest(max_block_size, filter, callback) => {
                 // TODO: Pass along to batch_store
-                let excluded_pos: HashSet<HashValue> = match filter {
+                let excluded_proofs: HashSet<HashValue> = match filter {
+                    PayloadFilter::Empty => HashSet::new(),
                     PayloadFilter::DirectMempool(_) => {
                         unreachable!()
                     }
-                    PayloadFilter::InQuorumStore(proofs) => {
-                        proofs.iter().map(|proof| proof.digest().clone()).collect()
-                    }
+                    PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
                 let mut batch = Vec::new();
@@ -201,7 +200,7 @@ impl QuorumStoreWrapper {
                     if batch.len() == max_block_size as usize {
                         break;
                     }
-                    if excluded_pos.contains(proof.digest()) {
+                    if excluded_proofs.contains(proof.digest()) {
                         continue;
                     }
                     batch.push(proof.clone());

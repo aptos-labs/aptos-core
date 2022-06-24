@@ -309,9 +309,9 @@ impl Block {
         std::iter::once(Transaction::BlockMetadata(
             self.new_block_metadata(validators),
         ))
-            .chain(txns.into_iter().map(Transaction::UserTransaction))
-            .chain(once(Transaction::StateCheckpoint))
-            .collect()
+        .chain(txns.into_iter().map(Transaction::UserTransaction))
+        .chain(once(Transaction::StateCheckpoint))
+        .collect()
     }
 
     fn new_block_metadata(&self, validators: &[AccountAddress]) -> BlockMetadata {
@@ -367,8 +367,8 @@ mod test {
 
 impl<'de> Deserialize<'de> for Block {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
         #[serde(rename = "Block")]

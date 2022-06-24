@@ -6,7 +6,7 @@ use anyhow::{format_err, Result};
 use aptos_mempool::QuorumStoreRequest;
 use aptos_metrics_core::monitor;
 use aptos_types::transaction::{SignedTransaction, TransactionStatus};
-use consensus_types::{common::TransactionSummary};
+use consensus_types::common::TransactionSummary;
 use executor_types::StateComputeResult;
 use futures::channel::{mpsc, oneshot};
 use itertools::Itertools;

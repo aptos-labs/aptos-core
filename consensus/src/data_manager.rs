@@ -62,7 +62,7 @@ impl DataManager for QuorumStoreDataManager {
                     unreachable!()
                 }
                 Payload::InQuorumStore(proofs) => proofs,
-                Payload::Empty => { Vec::new() }
+                Payload::Empty => Vec::new(),
             })
             .flatten()
             .map(|proof| proof.digest().clone())
@@ -81,7 +81,7 @@ impl DataManager for QuorumStoreDataManager {
     // TODO: handle the case that the data was garbage collected and return error
     async fn get_data(&self, payload: Payload) -> Result<Vec<SignedTransaction>, Error> {
         match payload {
-            Payload::Empty => { Ok(Vec::new()) }
+            Payload::Empty => Ok(Vec::new()),
             Payload::DirectMempool(_) => {
                 unreachable!("Quorum store should be used.")
             }
@@ -138,7 +138,7 @@ impl DataManager for DummyDataManager {
 
     async fn get_data(&self, payload: Payload) -> Result<Vec<SignedTransaction>, Error> {
         match payload {
-            Payload::Empty => { Ok(Vec::new()) }
+            Payload::Empty => Ok(Vec::new()),
             Payload::DirectMempool(txns) => Ok(txns),
             Payload::InQuorumStore(_) => {
                 unreachable!("Quorum store should not be used.")
@@ -146,4 +146,3 @@ impl DataManager for DummyDataManager {
         }
     }
 }
-
