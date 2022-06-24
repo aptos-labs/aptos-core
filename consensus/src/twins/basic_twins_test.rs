@@ -7,7 +7,9 @@ use crate::{
     test_utils::{consensus_runtime, timed_block_on},
     twins::twins_node::SMRNode,
 };
-use aptos_config::config::ConsensusProposerType::{FixedProposer, RotatingProposer, RoundProposer};
+use aptos_types::on_chain_config::ProposerElectionType::{
+    FixedProposer, RotatingProposer, RoundProposer,
+};
 use consensus_types::{block::Block, common::Round};
 use futures::StreamExt;
 use std::collections::HashMap;
@@ -31,7 +33,7 @@ fn basic_start_test() {
         num_nodes,
         num_twins,
         &mut playground,
-        RotatingProposer,
+        RotatingProposer(2),
         None,
     );
     let genesis = Block::make_genesis_block_from_ledger_info(&nodes[0].storage.get_ledger_info());
@@ -83,7 +85,7 @@ fn drop_config_test() {
         num_nodes,
         num_twins,
         &mut playground,
-        FixedProposer,
+        FixedProposer(2),
         None,
     );
 
@@ -139,7 +141,7 @@ fn twins_vote_dedup_test() {
         num_nodes,
         num_twins,
         &mut playground,
-        RotatingProposer,
+        RotatingProposer(2),
         None,
     );
 

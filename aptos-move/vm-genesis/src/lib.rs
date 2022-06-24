@@ -67,11 +67,7 @@ pub fn encode_genesis_transaction(
     max_lockup_duration_secs: u64,
     allow_new_validators: bool,
 ) -> Transaction {
-    let consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1 {
-        decoupled_execution: true,
-        back_pressure_limit: 10,
-        exclude_round: 20,
-    });
+    let consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1::default());
 
     Transaction::GenesisTransaction(WriteSetPayload::Direct(encode_genesis_change_set(
         &aptos_root_key,

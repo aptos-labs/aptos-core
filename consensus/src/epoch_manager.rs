@@ -35,9 +35,7 @@ use crate::{
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, Context};
-use aptos_config::config::{
-    ConsensusConfig, ConsensusProposerType, LeaderReputationType, NodeConfig,
-};
+use aptos_config::config::{ConsensusConfig, NodeConfig};
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
@@ -46,7 +44,10 @@ use aptos_types::{
     account_address::AccountAddress,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
-    on_chain_config::{OnChainConfigPayload, OnChainConsensusConfig, ValidatorSet},
+    on_chain_config::{
+        LeaderReputationType, OnChainConfigPayload, OnChainConsensusConfig, ProposerElectionType,
+        ValidatorSet,
+    },
     validator_verifier::ValidatorVerifier,
 };
 use channel::{aptos_channel, message_queues::QueueStyle};
@@ -192,20 +193,16 @@ impl EpochManager {
             .verifier
             .get_ordered_account_addresses_iter()
             .collect::<Vec<_>>();
-        match &self.config.proposer_type {
-            ConsensusProposerType::RotatingProposer => Box::new(RotatingProposer::new(
-                proposers,
-                self.config.contiguous_rounds,
-            )),
-            // We don't really have a fixed proposer!
-            ConsensusProposerType::FixedProposer => {
-                let proposer = choose_leader(proposers);
-                Box::new(RotatingProposer::new(
-                    vec![proposer],
-                    self.config.contiguous_rounds,
-                ))
+        match &onchain_config.proposer_election_type() {
+            ProposerElectionType::RotatingProposer(contiguous_rounds) => {
+                Box::new(RotatingProposer::new(proposers, *contiguous_rounds))
             }
-            ConsensusProposerType::LeaderReputation(leader_reputation_type) => {
+            // We don't really have a fixed proposer!
+            ProposerElectionType::FixedProposer(contiguous_rounds) => {
+                let proposer = choose_leader(proposers);
+                Box::new(RotatingProposer::new(vec![proposer], *contiguous_rounds))
+            }
+            ProposerElectionType::LeaderReputation(leader_reputation_type) => {
                 let (heuristic, window_size) = match &leader_reputation_type {
                     LeaderReputationType::ActiveInactive(active_inactive_config) => {
                         let window_size = proposers.len()
@@ -245,7 +242,7 @@ impl EpochManager {
                     epoch_state.epoch,
                     window_size,
                     onchain_config.leader_reputation_exclude_round() as usize
-                        + self.config.max_failed_authors_to_store
+                        + onchain_config.max_failed_authors_to_store()
                         + PROPSER_ROUND_BEHIND_STORAGE_BUFFER,
                     self.storage.aptos_db(),
                 ));
@@ -259,11 +256,11 @@ impl EpochManager {
                 // LeaderReputation is not cheap, so we can cache the amount of rounds round_manager needs.
                 Box::new(CachedProposerElection::new(
                     proposer_election,
-                    self.config.max_failed_authors_to_store
+                    onchain_config.max_failed_authors_to_store()
                         + PROPSER_ELECTION_CACHING_WINDOW_ADDITION,
                 ))
             }
-            ConsensusProposerType::RoundProposer(round_proposers) => {
+            ProposerElectionType::RoundProposer(round_proposers) => {
                 // Hardcoded to the first proposer
                 let default_proposer = proposers.get(0).unwrap();
                 Box::new(RoundProposer::new(
@@ -532,7 +529,7 @@ impl EpochManager {
             Arc::new(payload_manager),
             self.time_service.clone(),
             self.config.max_block_size,
-            self.config.max_failed_authors_to_store,
+            onchain_config.max_failed_authors_to_store(),
         );
 
         let mut round_manager = RoundManager::new(
@@ -568,15 +565,23 @@ impl EpochManager {
         };
         self.shutdown_current_processor().await;
 
-        let onchain_config: OnChainConsensusConfig = payload.get().unwrap_or_default();
+        let onchain_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
+        if let Err(error) = &onchain_config {
+            error!("Failed to read on-chain consensus config {}", error);
+        }
+
         self.epoch_state = Some(epoch_state.clone());
 
         let initial_data = self
             .storage
             .start()
             .expect_recovery_data("Consensusdb is corrupted, need to do a backup and restore");
-        self.start_round_manager(initial_data, epoch_state, onchain_config)
-            .await;
+        self.start_round_manager(
+            initial_data,
+            epoch_state,
+            onchain_config.unwrap_or_default(),
+        )
+        .await;
     }
 
     async fn process_message(
