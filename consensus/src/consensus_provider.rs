@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::data_manager::{DataManager, DummyDataManager};
 use crate::{
     counters,
     data_manager::QuorumStoreDataManager,
@@ -31,7 +32,7 @@ pub fn start_consensus(
     mut network_sender: ConsensusNetworkSender,
     network_events: ConsensusNetworkEvents,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
-    consensus_to_mempool_sender: mpsc::Sender<QuorumStoreRequest>,
+    consensus_to_mempool_tx: mpsc::Sender<QuorumStoreRequest>,
     aptos_db: DbReaderWriter,
     reconfig_events: ReconfigNotificationListener,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
@@ -43,10 +44,17 @@ pub fn start_consensus(
         .expect("Failed to create Tokio runtime!");
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
     let txn_notifier = Arc::new(MempoolNotifier::new(
-        consensus_to_mempool_sender.clone(),
+        consensus_to_mempool_tx.clone(),
         node_config.consensus.mempool_executed_txn_timeout_ms,
     ));
-    let data_manager = Arc::new(QuorumStoreDataManager::new());
+
+    let data_manager: Arc<dyn DataManager> = if node_config.consensus.use_quorum_store {
+        Arc::new(QuorumStoreDataManager::new())
+    } else {
+        Arc::new(DummyDataManager::new())
+    };
+
+    Arc::new(QuorumStoreDataManager::new());
 
     let state_computer = Arc::new(ExecutionProxy::new(
         Box::new(BlockExecutor::<AptosVM>::new(aptos_db)),
@@ -68,7 +76,7 @@ pub fn start_consensus(
         self_sender,
         network_sender,
         timeout_sender,
-        consensus_to_mempool_sender,
+        consensus_to_mempool_tx,
         state_computer,
         storage,
         reconfig_events,

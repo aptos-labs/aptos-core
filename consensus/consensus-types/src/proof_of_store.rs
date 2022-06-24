@@ -113,6 +113,10 @@ impl ProofOfStore {
         &self.info.digest
     }
 
+    pub fn expiration(&self) -> LogicalTime {
+        self.info.expiration.clone()
+    }
+
     pub fn ready(&self, validator_verifier: &ValidatorVerifier) -> bool {
         validator_verifier
             .check_voting_power(self.aggregated_signature.keys())
