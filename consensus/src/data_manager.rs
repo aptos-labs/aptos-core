@@ -26,7 +26,7 @@ pub trait DataManager: Send + Sync {
         quorum_store_wrapper_tx: Sender<ConsensusRequest>,
     );
 
-    async fn get_data(&self, maybe_payload: Option<Payload>) -> Result<Vec<SignedTransaction>, Error>;
+    async fn get_data(&self, maybe_payload: Payload) -> Result<Vec<SignedTransaction>, Error>;
 }
 
 /// Execution -> QuorumStore notification of commits.
@@ -62,6 +62,7 @@ impl DataManager for QuorumStoreDataManager {
                     unreachable!()
                 }
                 Payload::InQuorumStore(proofs) => proofs,
+                Payload::Empty => { Vec::new() }
             })
             .flatten()
             .map(|proof| proof.digest().clone())
@@ -78,38 +79,34 @@ impl DataManager for QuorumStoreDataManager {
     }
 
     // TODO: handle the case that the data was garbage collected and return error
-    async fn get_data(&self, maybe_payload: Option<Payload>) -> Result<Vec<SignedTransaction>, Error> {
-        match maybe_payload {
-            None => { Ok(Vec::new()) }
-            Some(payload) => {
-                match payload {
-                    Payload::DirectMempool(_) => {
-                        unreachable!("Quorum store should be used.")
-                    }
-                    Payload::InQuorumStore(poss) => {
-                        let mut receivers = Vec::new();
-                        for pos in poss {
-                            let (tx_data, rx_data) = oneshot::channel();
-                            self.data_reader
-                                .load()
-                                .as_ref()
-                                .unwrap() //TODO: can this be None? Need to make sure we call new_epoch() first.
-                                .get_batch(pos, tx_data)
-                                .await;
-                            receivers.push(rx_data);
+    async fn get_data(&self, payload: Payload) -> Result<Vec<SignedTransaction>, Error> {
+        match payload {
+            Payload::Empty => { Ok(Vec::new()) }
+            Payload::DirectMempool(_) => {
+                unreachable!("Quorum store should be used.")
+            }
+            Payload::InQuorumStore(poss) => {
+                let mut receivers = Vec::new();
+                for pos in poss {
+                    let (tx_data, rx_data) = oneshot::channel();
+                    self.data_reader
+                        .load()
+                        .as_ref()
+                        .unwrap() //TODO: can this be None? Need to make sure we call new_epoch() first.
+                        .get_batch(pos, tx_data)
+                        .await;
+                    receivers.push(rx_data);
+                }
+                let mut ret = Vec::new();
+                for rx in receivers {
+                    match rx.await.expect("oneshot was dropped") {
+                        Ok(data) => ret.push(data),
+                        Err(_) => {
+                            return Err(Error::CouldNotGetData);
                         }
-                        let mut ret = Vec::new();
-                        for rx in receivers {
-                            match rx.await.expect("oneshot was dropped") {
-                                Ok(data) => ret.push(data),
-                                Err(_) => {
-                                    return Err(Error::CouldNotGetData);
-                                }
-                            }
-                        }
-                        Ok(ret.into_iter().flatten().collect())
                     }
                 }
+                Ok(ret.into_iter().flatten().collect())
             }
         }
     }
@@ -139,17 +136,14 @@ impl DataManager for DummyDataManager {
 
     fn new_epoch(&self, _: Arc<BatchReader>, _: Sender<ConsensusRequest>) {}
 
-    async fn get_data(&self, maybe_payload: Option<Payload>) -> Result<Vec<SignedTransaction>, Error> {
-        match maybe_payload {
-            None => { Ok(Vec::new()) }
-            Some(payload) => {
-                match payload {
-                    Payload::DirectMempool(txns) => Ok(txns),
-                    Payload::InQuorumStore(_) => {
-                        unreachable!("Quorum store should not be used.")
-                    }
-                }
+    async fn get_data(&self, payload: Payload) -> Result<Vec<SignedTransaction>, Error> {
+        match payload {
+            Payload::Empty => { Ok(Vec::new()) }
+            Payload::DirectMempool(txns) => Ok(txns),
+            Payload::InQuorumStore(_) => {
+                unreachable!("Quorum store should not be used.")
             }
         }
     }
 }
+

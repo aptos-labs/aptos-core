@@ -30,18 +30,19 @@ impl fmt::Display for TransactionSummary {
 pub enum Payload {
     DirectMempool(Vec<SignedTransaction>),
     InQuorumStore(Vec<ProofOfStore>),
+    Empty,
 }
 
 impl Payload {
-    // TODO: that is a potential bug.
     pub fn new_empty() -> Self {
-        Payload::DirectMempool(Vec::new())
+        Payload::Empty
     }
 
     pub fn is_empty(&self) -> bool {
         match self {
             Payload::DirectMempool(txns) => txns.is_empty(),
             Payload::InQuorumStore(proofs) => proofs.is_empty(),
+            Payload::Empty => true,
         }
     }
 }
@@ -54,6 +55,7 @@ impl fmt::Display for Payload {
                 write!(f, "InMemory txns: {}", txns.len())
             }
             Payload::InQuorumStore(_poavs) => todo!(),
+            Payload::Empty => write!(f, "Empty payload"),
         }
     }
 }
@@ -86,6 +88,7 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                 PayloadFilter::DirectMempool(exclude_txns)
             }
             Payload::InQuorumStore(_) => todo!(),
+            Payload::Empty => unreachable!(),
         }
     }
 }

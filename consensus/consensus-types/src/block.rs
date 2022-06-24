@@ -297,11 +297,8 @@ impl Block {
         Ok(())
     }
 
-    pub fn get_payload(&self) -> Option<Payload> {
-        match self.payload() {
-            None => { None }
-            Some(payload) => { Some(payload.clone()) }
-        }
+    pub fn get_payload(&self) -> Payload {
+        self.payload().unwrap_or(&Payload::new_empty()).clone()
     }
 
     pub fn transactions_to_execute(

@@ -95,7 +95,7 @@ impl ExecutedBlock {
         )
     }
 
-    pub fn get_payload(&self) -> Option<Payload> {
+    pub fn get_payload(&self) -> Payload {
         self.block.get_payload()
     }
 
