@@ -53,14 +53,14 @@ impl VersionedNodeCache {
     }
 
     pub fn get_version(&self, version: Version) -> Option<Arc<NodeCache>> {
-        NODE_CACHE_TOTAL.with_label_values(&["overall"]).inc();
+        NODE_CACHE_TOTAL.with_label_values(&["versioned"]).inc();
         self.inner
             .read()
             .iter()
             .rev()
             .find(|(ver, _nodes)| *ver == version)
             .map(|(_ver, nodes)| {
-                NODE_CACHE_HIT.with_label_values(&["overall"]).inc();
+                NODE_CACHE_HIT.with_label_values(&["versioned"]).inc();
                 nodes.clone()
             })
     }

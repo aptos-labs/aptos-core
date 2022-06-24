@@ -6,6 +6,7 @@
 #[cfg(test)]
 mod state_store_test;
 
+mod lru_node_cache;
 mod versioned_node_cache;
 
 use crate::{
@@ -14,7 +15,7 @@ use crate::{
         jellyfish_merkle_node::JellyfishMerkleNodeSchema, stale_node_index::StaleNodeIndexSchema,
         state_value::StateValueSchema,
     },
-    state_store::versioned_node_cache::VersionedNodeCache,
+    state_store::{lru_node_cache::LruNodeCache, versioned_node_cache::VersionedNodeCache},
     AptosDbError, OTHER_TIMERS_SECONDS,
 };
 use anyhow::{anyhow, ensure, format_err, Result};
@@ -49,7 +50,8 @@ pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 pub(crate) struct StateStore {
     ledger_db: Arc<DB>,
     state_merkle_db: Arc<DB>,
-    node_cache: VersionedNodeCache,
+    version_cache: VersionedNodeCache,
+    lru_cache: LruNodeCache,
 }
 
 // "using an Arc<dyn DbReader> as an Arc<dyn StateReader>" is not allowed in stable Rust. Actually we
@@ -115,7 +117,8 @@ impl StateStore {
         Self {
             ledger_db,
             state_merkle_db,
-            node_cache: VersionedNodeCache::new(),
+            version_cache: VersionedNodeCache::new(),
+            lru_cache: LruNodeCache::new(1024 * 50),
         }
     }
 
@@ -297,7 +300,7 @@ impl StateStore {
                 .with_label_values(&["update_node_cache"])
                 .start_timer();
 
-            self.node_cache.add_version(
+            self.version_cache.add_version(
                 version,
                 tree_update_batch.node_batch.into_iter().flatten().collect(),
             )
@@ -418,12 +421,21 @@ impl StateStore {
 
 impl TreeReader<StateKey> for StateStore {
     fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node>> {
-        if let Some(node_cache) = self.node_cache.get_version(node_key.version()) {
-            Ok(node_cache.get(node_key).cloned())
+        let node_opt = if let Some(node_cache) = self.version_cache.get_version(node_key.version())
+        {
+            node_cache.get(node_key).cloned()
+        } else if let Some(node) = self.lru_cache.get(node_key) {
+            Some(node)
         } else {
-            self.state_merkle_db
-                .get::<JellyfishMerkleNodeSchema>(node_key)
-        }
+            let node_opt = self
+                .state_merkle_db
+                .get::<JellyfishMerkleNodeSchema>(node_key)?;
+            if let Some(node) = &node_opt {
+                self.lru_cache.put(node_key.clone(), node.clone());
+            }
+            node_opt
+        };
+        Ok(node_opt)
     }
 
     fn get_rightmost_leaf(&self) -> Result<Option<(NodeKey, LeafNode)>> {
