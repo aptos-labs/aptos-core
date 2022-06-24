@@ -83,7 +83,7 @@ impl ProofBuilder {
     fn expire(&mut self) {
         for digest in self.timeouts.expire() {
             if let Some((_, tx)) = self.digest_to_proof.remove(&digest) {
-                tx.send(Err(QuorumStoreError::Timeout))
+                tx.send(Err(QuorumStoreError::Timeout(digest)))
                     .expect("Unable to send proof of store");
             }
         }

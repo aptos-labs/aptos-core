@@ -5,8 +5,8 @@ use crate::error::MempoolError;
 use anyhow::{format_err, Result};
 use aptos_mempool::QuorumStoreRequest;
 use aptos_metrics_core::monitor;
-use aptos_types::transaction::TransactionStatus;
-use consensus_types::{block::Block, common::TransactionSummary};
+use aptos_types::transaction::{SignedTransaction, TransactionStatus};
+use consensus_types::common::TransactionSummary;
 use executor_types::StateComputeResult;
 use futures::channel::{mpsc, oneshot};
 use itertools::Itertools;
@@ -20,7 +20,7 @@ pub trait TxnNotifier: Send + Sync {
     /// state sync.)
     async fn notify_failed_txn(
         &self,
-        block: &Block,
+        txns: Vec<SignedTransaction>,
         compute_results: &StateComputeResult,
     ) -> Result<(), MempoolError>;
 }
@@ -49,17 +49,17 @@ impl MempoolNotifier {
 impl TxnNotifier for MempoolNotifier {
     async fn notify_failed_txn(
         &self,
-        block: &Block,
+        txns: Vec<SignedTransaction>,
         compute_results: &StateComputeResult,
     ) -> Result<(), MempoolError> {
         let mut rejected_txns = vec![];
-        let txns: Vec<_> = match block.payload() {
-            Some(payload) => payload,
-            None => return Ok(()),
-        }
-        .clone()
-        .into_iter()
-        .collect();
+        // let txns: Vec<_> = match block.payload() {
+        //     Some(payload) => payload,
+        //     None => return Ok(()),
+        // }
+        // .clone()
+        // .into_iter()
+        // .collect();
 
         if txns.is_empty() {
             return Ok(());

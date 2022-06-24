@@ -31,16 +31,17 @@ use std::sync::{mpsc::sync_channel, Arc};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 pub type ProofReturnChannel = oneshot::Sender<Result<ProofOfStore, QuorumStoreError>>;
+pub type DigestReturnChannel = oneshot::Sender<Result<HashValue, QuorumStoreError>>;
 
-#[allow(dead_code)]
+#[derive(Debug)]
 pub enum QuorumStoreCommand {
     AppendToBatch(Data),
-    EndBatch(Data, LogicalTime, ProofReturnChannel),
+    EndBatch(Data, LogicalTime, DigestReturnChannel, ProofReturnChannel),
 }
 
 #[derive(Debug)]
 pub enum QuorumStoreError {
-    Timeout,
+    Timeout(HashValue),
     BatchSizeLimit,
 }
 
@@ -58,6 +59,7 @@ pub struct QuorumStore {
     digest_end_batch: HashMap<HashValue, (Fragment, ProofReturnChannel)>,
 }
 
+#[derive(Clone)]
 pub struct QuorumStoreConfig {
     pub channel_size: usize,
     pub proof_timeout_ms: usize,
@@ -167,6 +169,7 @@ impl QuorumStore {
         &mut self,
         fragment_payload: Data,
         expiration: LogicalTime,
+        digest_rx: DigestReturnChannel,
         proof_tx: ProofReturnChannel,
     ) -> Option<(
         BatchStoreCommand,
@@ -178,6 +181,9 @@ impl QuorumStore {
             fragment_payload.clone(),
             AggregationMode::AssertMissedFragment,
         ) {
+            digest_rx
+                .send(Ok(digest_hash))
+                .expect("Digest receiver not available");
             let (persist_request_tx, persist_request_rx) = tokio::sync::oneshot::channel();
 
             let fragment = Fragment::new(
@@ -204,7 +210,7 @@ impl QuorumStore {
                 persist_request_rx,
             ))
         } else {
-            proof_tx
+            digest_rx
                 .send(Err(QuorumStoreError::BatchSizeLimit))
                 .expect("Proof receiver not available");
             None
@@ -225,10 +231,10 @@ impl QuorumStore {
                             self.fragment_id = self.fragment_id + 1;
                         }
 
-                        QuorumStoreCommand::EndBatch(fragment_payload, logical_time, tx) => {
+                        QuorumStoreCommand::EndBatch(fragment_payload, logical_time, digest_rx, proof_tx) => {
                             if let
                             Some((batch_store_command, response_rx)) =
-                                self.handle_end_batch(fragment_payload, logical_time, tx){
+                                self.handle_end_batch(fragment_payload, logical_time, digest_rx, proof_tx){
 
                             self.batch_store_tx
                                 .send(batch_store_command)

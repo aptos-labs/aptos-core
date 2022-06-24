@@ -99,7 +99,7 @@ pub struct EpochManager {
     self_sender: channel::Sender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkSender,
     timeout_sender: channel::Sender<Round>,
-    quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
+    quorum_store_to_mempool_tx: Sender<QuorumStoreRequest>,
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
@@ -115,6 +115,7 @@ pub struct EpochManager {
     epoch_state: Option<EpochState>,
     quorum_store_storage: Arc<QuorumStoreDB>,
     quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+    wrapper_quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
 }
 
 impl EpochManager {
@@ -124,7 +125,7 @@ impl EpochManager {
         self_sender: channel::Sender<Event<ConsensusMsg>>,
         network_sender: ConsensusNetworkSender,
         timeout_sender: channel::Sender<Round>,
-        quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
+        quorum_store_to_mempool_tx: Sender<QuorumStoreRequest>,
         commit_state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn PersistentLivenessStorage>,
         reconfig_events: ReconfigNotificationListener,
@@ -142,7 +143,7 @@ impl EpochManager {
             self_sender,
             network_sender,
             timeout_sender,
-            quorum_store_to_mempool_sender,
+            quorum_store_to_mempool_tx,
             commit_state_computer,
             storage,
             safety_rules_manager,
@@ -154,6 +155,7 @@ impl EpochManager {
             epoch_state: None,
             quorum_store_storage: Arc::new(QuorumStoreDB::new(path)),
             quorum_store_msg_tx: None,
+            wrapper_quorum_store_msg_tx: None,
         }
     }
 
@@ -324,19 +326,19 @@ impl EpochManager {
 
     fn spawn_direct_mempool_quorum_store(
         &mut self,
-        consensus_to_quorum_store_receiver: Receiver<ConsensusRequest>,
+        consensus_to_quorum_store_rx: Receiver<ConsensusRequest>,
     ) {
         let quorum_store = DirectMempoolQuorumStore::new(
-            consensus_to_quorum_store_receiver,
-            self.quorum_store_to_mempool_sender.clone(),
+            self.quorum_store_to_mempool_tx.clone(),
             self.config.mempool_txn_pull_timeout_ms,
         );
-        tokio::spawn(quorum_store.start());
+        tokio::spawn(quorum_store.start(consensus_to_quorum_store_rx));
     }
 
     ///this function spawns QuorumStore
     fn spawn_quorum_store(
         &mut self,
+        config: QuorumStoreConfig,
         network_sender: NetworkSender,
         verifier: ValidatorVerifier,
         wrapper_command_rx: tokio::sync::mpsc::Receiver<QuorumStoreCommand>,
@@ -357,7 +359,6 @@ impl EpochManager {
                 self.config.channel_size,
                 None,
             );
-        // TODO: channel for reset
 
         let reader_db = self.storage.aptos_db();
         let latest_ledger_info_with_sigs = reader_db
@@ -378,18 +379,6 @@ impl EpochManager {
         };
 
         self.quorum_store_msg_tx = Some(quorum_store_msg_tx);
-        // TODO: grab config.
-        //TODO: think about these numbers
-        let config = QuorumStoreConfig {
-            channel_size: 100,
-            proof_timeout_ms: 1000,
-            batch_request_num_peers: 3,
-            batch_request_timeout_ms: 1000,
-            max_execution_round_lag: 20,
-            max_batch_size: 10000,
-            memory_quota: 100000000,
-            db_quota: 10000000000,
-        };
 
         let (quorum_store, batch_reader) = QuorumStore::new(
             self.epoch(),
@@ -414,15 +403,27 @@ impl EpochManager {
     fn spawn_quorum_wrapper(
         &mut self,
         batch_reader: Arc<BatchReader>,
+        max_batch_size: usize,
         network_sender: NetworkSender,
         consensus_to_quorum_store_receiver: Receiver<ConsensusRequest>,
         wrapper_to_quorum_store_sender: tokio::sync::mpsc::Sender<QuorumStoreCommand>,
     ) {
+        let (wrapper_quorum_store_msg_tx, wrapper_quorum_store_msg_rx) =
+            aptos_channel::new::<AccountAddress, VerifiedEvent>(
+                QueueStyle::FIFO,
+                self.config.channel_size,
+                None,
+            );
+
+        self.wrapper_quorum_store_msg_tx = Some(wrapper_quorum_store_msg_tx);
+
         let quorum_store_wrapper = QuorumStoreWrapper::new(
             self.epoch(),
+            wrapper_quorum_store_msg_rx,
+            max_batch_size,
             batch_reader,
             consensus_to_quorum_store_receiver,
-            self.quorum_store_to_mempool_sender.clone(),
+            self.quorum_store_to_mempool_tx.clone(),
             wrapper_to_quorum_store_sender,
             network_sender,
             self.config.mempool_txn_pull_timeout_ms,
@@ -550,31 +551,49 @@ impl EpochManager {
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
         //Start QuorumStore
-        let (consensus_to_quorum_store_sender, consensus_to_quorum_store_receiver) =
+        let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
         if self.config.use_quorum_store {
             //TODO: create channels between quorum_store, execution, and wrapper and pass around.
+
+            // TODO: grab config.
+            // TODO: think about these numbers
+            let config = QuorumStoreConfig {
+                channel_size: 100,
+                proof_timeout_ms: 1000,
+                batch_request_num_peers: 3,
+                batch_request_timeout_ms: 1000,
+                max_execution_round_lag: 20,
+                max_batch_size: 10000,
+                memory_quota: 100000000,
+                db_quota: 10000000000,
+            };
+
             let (wrapper_quorum_store_tx, wrapper_quorum_store_rx) =
                 tokio::sync::mpsc::channel(100);
             let data_reader = self.spawn_quorum_store(
+                config.clone(),
                 network_sender.clone(),
                 epoch_state.verifier.clone(),
                 wrapper_quorum_store_rx,
             );
-            self.data_manager.new_epoch(data_reader.clone());
+
+            self.data_manager
+                .new_epoch(data_reader.clone(), consensus_to_quorum_store_tx.clone());
 
             self.spawn_quorum_wrapper(
                 data_reader,
+                config.max_batch_size,
                 network_sender.clone(),
-                consensus_to_quorum_store_receiver,
+                consensus_to_quorum_store_rx,
                 wrapper_quorum_store_tx,
             );
         } else {
-            self.spawn_direct_mempool_quorum_store(consensus_to_quorum_store_receiver);
+            self.spawn_direct_mempool_quorum_store(consensus_to_quorum_store_rx);
         }
 
         let payload_manager = QuorumStoreClient::new(
-            consensus_to_quorum_store_sender.clone(),
+            consensus_to_quorum_store_tx,
             self.config.quorum_store_poll_count,
             self.config.quorum_store_pull_timeout_ms,
         );
@@ -697,7 +716,8 @@ impl EpochManager {
             | ConsensusMsg::CommitDecisionMsg(_)
             | ConsensusMsg::SignedDigestMsg(_)
             | ConsensusMsg::FragmentMsg(_)
-            | ConsensusMsg::BatchMsg(_) => {
+            | ConsensusMsg::BatchMsg(_)
+            | ConsensusMsg::ProofOfStoreBroadcastMsg(_) => {
                 let event: UnverifiedEvent = msg.into();
                 if event.epoch() == self.epoch() {
                     return Ok(Some(event));
@@ -752,6 +772,13 @@ impl EpochManager {
         event: VerifiedEvent,
     ) -> anyhow::Result<()> {
         match event {
+            wrapper_quorum_store_event @ VerifiedEvent::ProofOfStoreBroadcast(_) => {
+                if let Some(sender) = &mut self.wrapper_quorum_store_msg_tx {
+                    sender.push(peer_id, wrapper_quorum_store_event)?;
+                } else {
+                    bail!("QuorumStore wrapper not started but received QuorumStore Message");
+                }
+            }
             quorum_store_event @ (VerifiedEvent::SignedDigest(_)
             | VerifiedEvent::Fragment(_)
             | VerifiedEvent::Batch(_)) => {

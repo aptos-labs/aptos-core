@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::proof_of_store::ProofOfStore;
+use aptos_crypto::HashValue;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fmt;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
@@ -30,38 +32,27 @@ impl fmt::Display for TransactionSummary {
 pub enum Payload {
     DirectMempool(Vec<SignedTransaction>),
     InQuorumStore(Vec<ProofOfStore>),
+    Empty,
 }
 
 impl Payload {
     pub fn new_empty() -> Self {
-        Payload::DirectMempool(Vec::new())
-    }
-
-    pub fn len(&self) -> usize {
-        match self {
-            Payload::DirectMempool(txns) => txns.len(),
-            Payload::InQuorumStore(_poavs) => todo!(),
-        }
+        Payload::Empty
     }
 
     pub fn is_empty(&self) -> bool {
         match self {
             Payload::DirectMempool(txns) => txns.is_empty(),
-            Payload::InQuorumStore(_poavs) => todo!(),
+            Payload::InQuorumStore(proofs) => proofs.is_empty(),
+            Payload::Empty => true,
         }
     }
-}
 
-// TODO: What I really want is an iterator that isn't necessarily a vector (e.g., read lazily from RocksDB). This doesn't seem like the way.
-impl IntoIterator for Payload {
-    type Item = SignedTransaction;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    // TODO: delete
-    fn into_iter(self) -> Self::IntoIter {
+    pub fn is_direct(&self) -> bool {
         match self {
-            Payload::DirectMempool(txns) => txns.into_iter(),
-            Payload::InQuorumStore(_poavs) => todo!(),
+            Payload::DirectMempool(_) => true,
+            Payload::InQuorumStore(_) => false,
+            Payload::Empty => false,
         }
     }
 }
@@ -72,7 +63,10 @@ impl fmt::Display for Payload {
             Payload::DirectMempool(txns) => {
                 write!(f, "InMemory txns: {}", txns.len())
             }
-            Payload::InQuorumStore(_poavs) => todo!(),
+            Payload::InQuorumStore(poavs) => {
+                write!(f, "InMemory poavs: {}", poavs.len())
+            }
+            Payload::Empty => write!(f, "Empty payload"),
         }
     }
 }
@@ -81,30 +75,41 @@ impl fmt::Display for Payload {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum PayloadFilter {
     DirectMempool(Vec<TransactionSummary>),
-    InQuorumStore(Vec<ProofOfStore>),
+    InQuorumStore(HashSet<HashValue>),
+    //
+    Empty,
 }
 
 impl From<&Vec<&Payload>> for PayloadFilter {
     fn from(exclude_payloads: &Vec<&Payload>) -> Self {
         if exclude_payloads.is_empty() {
-            return PayloadFilter::DirectMempool(vec![]);
+            return PayloadFilter::Empty;
         }
-        match exclude_payloads.first().unwrap() {
-            Payload::DirectMempool(_) => {
-                let mut exclude_txns = vec![];
-                for payload in exclude_payloads {
-                    if let Payload::DirectMempool(txns) = payload {
-                        for txn in txns {
-                            exclude_txns.push(TransactionSummary {
-                                sender: txn.sender(),
-                                sequence_number: txn.sequence_number(),
-                            });
-                        }
+        let direct_mode = exclude_payloads.iter().any(|payload| payload.is_direct());
+
+        if direct_mode {
+            let mut exclude_txns = Vec::new();
+            for payload in exclude_payloads {
+                if let Payload::DirectMempool(txns) = payload {
+                    for txn in txns {
+                        exclude_txns.push(TransactionSummary {
+                            sender: txn.sender(),
+                            sequence_number: txn.sequence_number(),
+                        });
                     }
                 }
-                PayloadFilter::DirectMempool(exclude_txns)
             }
-            Payload::InQuorumStore(_) => todo!(),
+            PayloadFilter::DirectMempool(exclude_txns)
+        } else {
+            let mut exclude_proofs = HashSet::new();
+            for payload in exclude_payloads {
+                if let Payload::InQuorumStore(proofs) = payload {
+                    for proof in proofs {
+                        exclude_proofs.insert(proof.digest().clone());
+                    }
+                }
+            }
+            PayloadFilter::InQuorumStore(exclude_proofs)
         }
     }
 }
@@ -119,7 +124,16 @@ impl fmt::Display for PayloadFilter {
                 }
                 write!(f, "{}", txns_str)
             }
-            PayloadFilter::InQuorumStore(_poavs) => todo!(),
+            PayloadFilter::InQuorumStore(exclided_proofs) => {
+                let mut txns_str = "".to_string();
+                for proof in exclided_proofs.iter() {
+                    txns_str += &format!("{} ", proof);
+                }
+                write!(f, "{}", txns_str)
+            }
+            PayloadFilter::Empty => {
+                write!(f, "Empty filter")
+            }
         }
     }
 }

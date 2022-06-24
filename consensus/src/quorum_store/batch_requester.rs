@@ -46,14 +46,14 @@ impl BatchRequesterState {
     }
 
     //TODO: if None, then return an error to the caller
-    fn serve_request(self, maybe_payload: Option<Data>) {
+    fn serve_request(self, digest: HashValue, maybe_payload: Option<Data>) {
         if let Some(payload) = maybe_payload {
             self.ret_tx
                 .send(Ok(payload))
                 .expect("Receiver of requested batch not available");
         } else {
             self.ret_tx
-                .send(Err(QuorumStoreError::Timeout))
+                .send(Err(QuorumStoreError::Timeout(digest)))
                 .expect("Receiver of requested batch not available");
         }
     }
@@ -147,7 +147,7 @@ impl BatchRequester {
                     self.timeouts.add_digest(digest, self.request_timeout_ms);
                 } else {
                     let state = self.digest_to_state.remove(&digest).unwrap();
-                    state.serve_request(None);
+                    state.serve_request(digest, None);
                 }
             }
         }
@@ -156,7 +156,7 @@ impl BatchRequester {
     pub(crate) fn serve_request(&mut self, digest: HashValue, payload: Data) {
         if self.digest_to_state.contains_key(&digest) {
             let state = self.digest_to_state.remove(&digest).unwrap();
-            state.serve_request(Some(payload));
+            state.serve_request(digest, Some(payload));
         }
     }
 }

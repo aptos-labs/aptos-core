@@ -19,6 +19,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
 };
 use consensus_notifications::ConsensusNotificationSender;
+use consensus_types::common::Payload;
 use consensus_types::proof_of_store::LogicalTime;
 use consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
 use executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
@@ -32,7 +33,7 @@ type NotificationType = (
     Vec<ContractEvent>,
 );
 
-type CommitType = (u64, Round);
+type CommitType = (u64, Round, Vec<Payload>);
 
 /// Basic communication with the Execution module;
 /// implements StateComputer traits.
@@ -73,9 +74,9 @@ impl ExecutionProxy {
             channel::new::<CommitType>(10, &counters::PENDING_QUORUM_STORE_COMMIT_NOTIFICATION);
         let data_manager_clone = data_manager.clone();
         handle.spawn(async move {
-            while let Some((epoch, round)) = commit_rx.next().await {
+            while let Some((epoch, round, payloads)) = commit_rx.next().await {
                 data_manager_clone
-                    .notify_commit(LogicalTime::new(epoch, round))
+                    .notify_commit(LogicalTime::new(epoch, round), payloads)
                     .await;
             }
         });
@@ -121,7 +122,7 @@ impl StateComputer for ExecutionProxy {
             self.executor.execute_block(
                 (
                     block.id(),
-                    block.transactions_to_execute(&self.validators.lock(), txns)
+                    block.transactions_to_execute(&self.validators.lock(), txns.clone())
                 ),
                 parent_block_id
             )
@@ -131,7 +132,7 @@ impl StateComputer for ExecutionProxy {
         // notify mempool about failed transaction
         if let Err(e) = self
             .txn_notifier
-            .notify_failed_txn(block, &compute_result)
+            .notify_failed_txn(txns, &compute_result)
             .await
         {
             error!(
@@ -154,11 +155,13 @@ impl StateComputer for ExecutionProxy {
         let skip_clean = blocks.is_empty();
         let mut latest_epoch: u64 = 0;
         let mut latest_round: u64 = 0;
+        let mut payloads = Vec::new();
 
         for block in blocks {
             block_ids.push(block.id());
             let payload = block.get_payload();
-            let signed_txns = self.data_manager.get_data(payload).await?;
+            let signed_txns = self.data_manager.get_data(payload.clone()).await?;
+            payloads.push(payload);
             txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));
             reconfig_events.extend(block.reconfig_event());
 
@@ -191,10 +194,9 @@ impl StateComputer for ExecutionProxy {
         if skip_clean {
             return Ok(());
         }
-        //TODO: what if do not use QuorumStore?
         self.async_commit_notifier
             .clone()
-            .send((latest_epoch, latest_round))
+            .send((latest_epoch, latest_round, payloads))
             .await
             .expect("Failed to send async commit notification");
         Ok(())

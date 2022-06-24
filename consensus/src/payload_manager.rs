@@ -67,9 +67,6 @@ impl QuorumStoreClient {
             }
             Ok(resp) => match resp.map_err(anyhow::Error::from)?? {
                 ConsensusResponse::GetBlockResponse(payload) => Ok(payload),
-                _ => Err(
-                    anyhow::anyhow!("[consensus] did not receive expected GetBlockResponse").into(),
-                ),
             },
         }
     }
