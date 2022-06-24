@@ -153,10 +153,10 @@ mod tests {
                         // yield
                         tokio::time::sleep(Duration::from_millis(sleep_ms)).await;
 
-                        let r = _n_running.fetch_sub(1, Ordering::Relaxed);
+                        let r = _n_running.fetch_sub(1, Ordering::SeqCst);
                         assert!(r > 0 && r <= min(max_in_progress, num_sleeps));
                         if r == max_in_progress {
-                            _seen_max_concurrency.store(true, Ordering::Relaxed);
+                            _seen_max_concurrency.store(true, Ordering::SeqCst);
                         }
 
                         n
