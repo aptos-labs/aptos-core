@@ -136,6 +136,10 @@ impl NodeKey {
         };
         Ok(NodeKey::new(version, nibble_path))
     }
+
+    pub fn unpack(self) -> (Version, NibblePath) {
+        (self.version, self.nibble_path)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

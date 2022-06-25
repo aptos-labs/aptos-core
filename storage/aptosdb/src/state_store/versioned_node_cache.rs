@@ -30,12 +30,13 @@ impl VersionedNodeCache {
         }
     }
 
-    pub fn add_version(&self, version: Version, nodes: NodeCache) {
+    pub fn add_version(&self, version: Version, nodes: NodeCache) -> Option<Arc<NodeCache>> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["node_cache_add_version"])
             .start_timer();
 
         let mut locked = self.inner.write();
+        let mut evicted = None;
         if !locked.is_empty() {
             let (last_version, _) = locked.back().unwrap();
             assert!(
@@ -46,10 +47,12 @@ impl VersionedNodeCache {
             );
 
             if locked.len() >= Self::NUM_VERSIONS_TO_CACHE {
-                locked.pop_front();
+                evicted = locked.pop_front().map(|(_ver, cache)| cache);
             }
         }
+
         locked.push_back((version, Arc::new(nodes)));
+        evicted
     }
 
     pub fn get_version(&self, version: Version) -> Option<Arc<NodeCache>> {

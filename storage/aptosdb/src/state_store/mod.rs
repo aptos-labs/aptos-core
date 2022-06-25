@@ -118,7 +118,7 @@ impl StateStore {
             ledger_db,
             state_merkle_db,
             version_cache: VersionedNodeCache::new(),
-            lru_cache: LruNodeCache::new(1024 * 50),
+            lru_cache: LruNodeCache::new(4 * 1024 * 128),
         }
     }
 
@@ -300,10 +300,19 @@ impl StateStore {
                 .with_label_values(&["update_node_cache"])
                 .start_timer();
 
-            self.version_cache.add_version(
+            if let Some(evicted) = self.version_cache.add_version(
                 version,
                 tree_update_batch.node_batch.into_iter().flatten().collect(),
-            )
+            ) {
+                evicted
+                    .iter()
+                    .collect::<Vec<_>>()
+                    .into_par_iter()
+                    .with_min_len(100)
+                    .for_each(|(node_key, node)| {
+                        self.lru_cache.put(node_key.clone(), node.clone())
+                    });
+            }
         }
 
         // commit jellyfish merkle nodes
