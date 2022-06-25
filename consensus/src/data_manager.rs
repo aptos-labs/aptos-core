@@ -9,7 +9,7 @@ use aptos_types::transaction::SignedTransaction;
 use arc_swap::ArcSwapOption;
 use consensus_types::common::Payload;
 use consensus_types::proof_of_store::LogicalTime;
-use consensus_types::request_response::ConsensusRequest;
+use consensus_types::request_response::WrapperCommand;
 use executor_types::Error;
 use futures::channel::mpsc::Sender;
 use tokio::sync::oneshot;
@@ -23,16 +23,16 @@ pub trait DataManager: Send + Sync {
     fn new_epoch(
         &self,
         data_reader: Arc<BatchReader>,
-        quorum_store_wrapper_tx: Sender<ConsensusRequest>,
+        quorum_store_wrapper_tx: Sender<WrapperCommand>,
     );
 
-    async fn get_data(&self, maybe_payload: Payload) -> Result<Vec<SignedTransaction>, Error>;
+    async fn get_data(&self, payload: Payload) -> Result<Vec<SignedTransaction>, Error>;
 }
 
 /// Execution -> QuorumStore notification of commits.
 pub struct QuorumStoreDataManager {
     data_reader: ArcSwapOption<BatchReader>,
-    quorum_store_wrapper_tx: ArcSwapOption<Sender<ConsensusRequest>>,
+    quorum_store_wrapper_tx: ArcSwapOption<Sender<WrapperCommand>>,
 }
 
 impl QuorumStoreDataManager {
@@ -74,7 +74,7 @@ impl DataManager for QuorumStoreDataManager {
             .unwrap()
             .as_ref()
             .clone()
-            .try_send(ConsensusRequest::CleanRequest(logical_time, digests))
+            .try_send(WrapperCommand::CleanRequest(logical_time, digests))
             .expect("could not send to wrapper");
     }
 
@@ -114,7 +114,7 @@ impl DataManager for QuorumStoreDataManager {
     fn new_epoch(
         &self,
         data_reader: Arc<BatchReader>,
-        quorum_store_wrapper_tx: Sender<ConsensusRequest>,
+        quorum_store_wrapper_tx: Sender<WrapperCommand>,
     ) {
         self.data_reader.swap(Some(data_reader));
         self.quorum_store_wrapper_tx
@@ -134,7 +134,7 @@ impl DummyDataManager {
 impl DataManager for DummyDataManager {
     async fn notify_commit(&self, _: LogicalTime, _: Vec<Payload>) {}
 
-    fn new_epoch(&self, _: Arc<BatchReader>, _: Sender<ConsensusRequest>) {}
+    fn new_epoch(&self, _: Arc<BatchReader>, _: Sender<WrapperCommand>) {}
 
     async fn get_data(&self, payload: Payload) -> Result<Vec<SignedTransaction>, Error> {
         match payload {

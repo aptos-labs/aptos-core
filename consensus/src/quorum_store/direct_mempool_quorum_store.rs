@@ -8,7 +8,7 @@ use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use consensus_types::{
     common::{Payload, PayloadFilter},
-    request_response::{ConsensusRequest, ConsensusResponse},
+    request_response::{ConsensusResponse, WrapperCommand},
 };
 use futures::{
     channel::{
@@ -78,19 +78,19 @@ impl DirectMempoolQuorumStore {
         );
     }
 
-    async fn handle_consensus_request(&self, req: ConsensusRequest) {
+    async fn handle_consensus_request(&self, req: WrapperCommand) {
         match req {
-            ConsensusRequest::GetBlockRequest(max_size, payload_filter, callback) => {
+            WrapperCommand::GetBlockRequest(max_size, payload_filter, callback) => {
                 self.handle_block_request(max_size, payload_filter, callback)
                     .await;
             }
-            ConsensusRequest::CleanRequest(..) => {
+            WrapperCommand::CleanRequest(..) => {
                 unreachable!()
             }
         }
     }
 
-    pub async fn start(self, mut consensus_rx: Receiver<ConsensusRequest>) {
+    pub async fn start(self, mut consensus_rx: Receiver<WrapperCommand>) {
         while let Some(cmd) = consensus_rx.next().await {
             self.handle_consensus_request(cmd).await;
         }

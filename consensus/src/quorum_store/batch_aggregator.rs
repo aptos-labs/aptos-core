@@ -37,7 +37,6 @@ impl IncrementalBatchState {
                 .map(|txn| to_bytes(txn).unwrap())
                 .flatten()
                 .collect();
-            // TODO: store individual hashes in a Vec and return the Hash of the Vector
             self.num_bytes = self.num_bytes + serialized.len();
             self.hasher.update(&serialized);
         }

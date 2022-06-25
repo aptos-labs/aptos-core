@@ -169,7 +169,7 @@ impl QuorumStore {
         &mut self,
         fragment_payload: Data,
         expiration: LogicalTime,
-        digest_rx: DigestReturnChannel,
+        digest_tx: DigestReturnChannel,
         proof_tx: ProofReturnChannel,
     ) -> Option<(
         BatchStoreCommand,
@@ -181,7 +181,7 @@ impl QuorumStore {
             fragment_payload.clone(),
             AggregationMode::AssertMissedFragment,
         ) {
-            digest_rx
+            digest_tx
                 .send(Ok(digest_hash))
                 .expect("Digest receiver not available");
             let (persist_request_tx, persist_request_rx) = tokio::sync::oneshot::channel();
@@ -210,7 +210,7 @@ impl QuorumStore {
                 persist_request_rx,
             ))
         } else {
-            digest_rx
+            digest_tx
                 .send(Err(QuorumStoreError::BatchSizeLimit))
                 .expect("Proof receiver not available");
             None

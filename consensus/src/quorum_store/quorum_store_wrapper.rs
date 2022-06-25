@@ -5,19 +5,22 @@ use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
 use crate::quorum_store::batch_reader::BatchReader;
 use crate::quorum_store::quorum_store::QuorumStoreError;
+use crate::quorum_store::types::TxnData;
 use crate::quorum_store::utils::MempoolProxy;
 use crate::quorum_store::{counters, quorum_store::QuorumStoreCommand};
 use crate::round_manager::VerifiedEvent;
+use aptos_crypto::hash::DefaultHasher;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::PeerId;
+use bcs::to_bytes;
 use channel::aptos_channel;
 use consensus_types::common::{Payload, PayloadFilter};
 use consensus_types::proof_of_store::LogicalTime;
 use consensus_types::request_response::ConsensusResponse;
 use consensus_types::{
-    common::TransactionSummary, proof_of_store::ProofOfStore, request_response::ConsensusRequest,
+    common::TransactionSummary, proof_of_store::ProofOfStore, request_response::WrapperCommand,
 };
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
@@ -35,22 +38,22 @@ use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
 
-const MAX_SUB_BATCH_SIZE: usize = 50;
+const MAX_FRAGMENT_SIZE: usize = 50; // TODO: make sure this times max transaction size is smaller than quorumstore max batch size in bytes
 
 // TODO: Consider storing batches and retrying upon QuorumStoreError:Timeout
-// TODO: how long to keep filtering transactions from a batch? need some kind of notification from consensus?
 #[allow(dead_code)]
 pub struct QuorumStoreWrapper {
     batch_reader: Arc<BatchReader>,
     network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
     max_batch_size: usize,
-    consensus_receiver: Receiver<ConsensusRequest>,
+    consensus_receiver: Receiver<WrapperCommand>,
     mempool_proxy: MempoolProxy,
     quorum_store_sender: tokio::sync::mpsc::Sender<QuorumStoreCommand>,
     network_sender: NetworkSender,
     batches_to_filter: HashMap<HashValue, Vec<TransactionSummary>>,
     // TODO: add the expiration priority queue
     batch_in_progress: Vec<TransactionSummary>,
+    bytes_in_progress: usize,
     latest_logical_time: LogicalTime,
     batches_for_consensus: HashMap<HashValue, ProofOfStore>, // TODO: use expiration priority queue as well
                                                              // TODO: store all ProofOfStore (created locally, and received via broadcast)
@@ -63,7 +66,7 @@ impl QuorumStoreWrapper {
         network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
         max_batch_size: usize,
         batch_reader: Arc<BatchReader>,
-        consensus_receiver: Receiver<ConsensusRequest>,
+        consensus_receiver: Receiver<WrapperCommand>,
         mempool_tx: Sender<QuorumStoreRequest>,
         quorum_store_sender: tokio::sync::mpsc::Sender<QuorumStoreCommand>,
         network_sender: NetworkSender,
@@ -79,6 +82,7 @@ impl QuorumStoreWrapper {
             network_sender,
             batches_to_filter: HashMap::new(),
             batch_in_progress: Vec::new(),
+            bytes_in_progress: 0,
             latest_logical_time: LogicalTime::new(epoch, 0),
             batches_for_consensus: HashMap::new(),
         }
@@ -93,20 +97,40 @@ impl QuorumStoreWrapper {
         // TODO: size and unwrap or not?
         let pulled_txns = self
             .mempool_proxy
-            .pull_internal(MAX_SUB_BATCH_SIZE as u64, exclude_txns)
+            .pull_internal(MAX_FRAGMENT_SIZE as u64, exclude_txns)
             .await
             .unwrap();
-        self.batch_in_progress
-            .extend(pulled_txns.iter().map(|txn| TransactionSummary {
-                sender: txn.sender(),
-                sequence_number: txn.sequence_number(),
-            }));
 
-        // TODO: that is a bug! QuorumStore counts in bytes - need to keep track of it.
-        // TODO: also some timer if there are not enough txns
-        if self.batch_in_progress.len() <= self.max_batch_size - MAX_SUB_BATCH_SIZE {
+        let mut end_batch = false;
+        let mut txns_data = Vec::new();
+
+        // TODO: pass TxnData to QuorumStore to save extra serialization.
+        let mut pulled_txns_cloned = pulled_txns.clone();
+        for txn in pulled_txns {
+            let bytes = to_bytes(&txn).unwrap();
+            if self.bytes_in_progress + bytes.len() > self.max_batch_size {
+                end_batch = true;
+                break;
+            } else {
+                self.batch_in_progress.push(TransactionSummary {
+                    sender: txn.sender(),
+                    sequence_number: txn.sequence_number(),
+                });
+                self.bytes_in_progress = self.bytes_in_progress + bytes.len();
+                let mut hasher = DefaultHasher::new(b"TxnData");
+                hasher.update(&bytes);
+                txns_data.push(TxnData {
+                    txn_bytes: bytes,
+                    hash: hasher.finish(),
+                })
+            }
+        }
+
+        let txns = pulled_txns_cloned.drain(0..txns_data.len()).collect();
+        // TODO: also some timer if there are not enough txns (Rati)
+        if !end_batch {
             self.quorum_store_sender
-                .send(QuorumStoreCommand::AppendToBatch(pulled_txns))
+                .send(QuorumStoreCommand::AppendToBatch(txns))
                 .await
                 .expect("could not send to QuorumStore");
             None
@@ -119,17 +143,15 @@ impl QuorumStoreWrapper {
             );
             self.quorum_store_sender
                 .send(QuorumStoreCommand::EndBatch(
-                    pulled_txns,
+                    txns,
                     logical_time.clone(),
-                    digest_tx,
+                    digest_tx, // TODO (on boarding task for Rati:)): consider getting rid of this channel and maintaining batch id and fragment id here.
                     proof_tx,
                 ))
                 .await
                 .expect("could not send to QuorumStore");
             match digest_rx.await {
                 Ok(ret) => {
-                    // TODO build data structures
-
                     match ret {
                         Ok(digest) => {
                             let last_batch = self.batch_in_progress.drain(..).collect();
@@ -138,8 +160,11 @@ impl QuorumStoreWrapper {
 
                             return Some(proof_rx);
                         }
+                        Err(QuorumStoreError::BatchSizeLimit) => {
+                            todo!()
+                        }
                         Err(_) => {
-                            unreachable!("batch too big (QuorumStore counts in bytes)");
+                            unreachable!();
                         }
                     }
                 }
@@ -182,10 +207,10 @@ impl QuorumStoreWrapper {
             .insert(new_proof.digest().clone(), new_proof);
     }
 
-    async fn handle_consensus_request(&mut self, msg: ConsensusRequest) {
+    async fn handle_consensus_request(&mut self, msg: WrapperCommand) {
         match msg {
             // TODO: check what max_block_size consensus is using
-            ConsensusRequest::GetBlockRequest(max_block_size, filter, callback) => {
+            WrapperCommand::GetBlockRequest(max_block_size, filter, callback) => {
                 // TODO: Pass along to batch_store
                 let excluded_proofs: HashSet<HashValue> = match filter {
                     PayloadFilter::Empty => HashSet::new(),
@@ -211,7 +236,7 @@ impl QuorumStoreWrapper {
                     .expect("BlcokResponse receiver not available");
             }
 
-            ConsensusRequest::CleanRequest(logical_time, digests) => {
+            WrapperCommand::CleanRequest(logical_time, digests) => {
                 self.latest_logical_time = logical_time;
                 for digest in digests {
                     self.batches_to_filter.remove(&digest);

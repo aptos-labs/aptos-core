@@ -54,7 +54,7 @@ use channel::{aptos_channel, message_queues::QueueStyle};
 use consensus_types::{
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,
-    request_response::ConsensusRequest,
+    request_response::WrapperCommand,
 };
 use event_notifications::ReconfigNotificationListener;
 use futures::{
@@ -326,7 +326,7 @@ impl EpochManager {
 
     fn spawn_direct_mempool_quorum_store(
         &mut self,
-        consensus_to_quorum_store_rx: Receiver<ConsensusRequest>,
+        consensus_to_quorum_store_rx: Receiver<WrapperCommand>,
     ) {
         let quorum_store = DirectMempoolQuorumStore::new(
             self.quorum_store_to_mempool_tx.clone(),
@@ -405,7 +405,7 @@ impl EpochManager {
         batch_reader: Arc<BatchReader>,
         max_batch_size: usize,
         network_sender: NetworkSender,
-        consensus_to_quorum_store_receiver: Receiver<ConsensusRequest>,
+        consensus_to_quorum_store_receiver: Receiver<WrapperCommand>,
         wrapper_to_quorum_store_sender: tokio::sync::mpsc::Sender<QuorumStoreCommand>,
     ) {
         let (wrapper_quorum_store_msg_tx, wrapper_quorum_store_msg_rx) =
@@ -564,7 +564,7 @@ impl EpochManager {
                 batch_request_num_peers: 3,
                 batch_request_timeout_ms: 1000,
                 max_execution_round_lag: 20,
-                max_batch_size: 10000,
+                max_batch_size: 200000,
                 memory_quota: 100000000,
                 db_quota: 10000000000,
             };

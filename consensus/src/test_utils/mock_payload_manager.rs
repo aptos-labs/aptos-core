@@ -12,7 +12,7 @@ use aptos_types::{
 use consensus_types::{
     block::block_test_utils::random_payload,
     common::{Payload, PayloadFilter},
-    request_response::ConsensusRequest,
+    request_response::WrapperCommand,
 };
 use futures::{channel::mpsc, future::BoxFuture};
 use rand::Rng;
@@ -23,7 +23,7 @@ pub struct MockPayloadManager {
 }
 
 impl MockPayloadManager {
-    pub fn new(consensus_to_quorum_store_sender: Option<mpsc::Sender<ConsensusRequest>>) -> Self {
+    pub fn new(consensus_to_quorum_store_sender: Option<mpsc::Sender<WrapperCommand>>) -> Self {
         let quorum_store_client =
             consensus_to_quorum_store_sender.map(|s| QuorumStoreClient::new(s, 1, 1));
         Self {
