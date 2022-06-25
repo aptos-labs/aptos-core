@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
+    move_vm_ext::{MoveResolverExt, NativeTransactionContext, SessionExt, SessionId},
     natives::aptos_natives,
 };
 use move_deps::{
@@ -30,6 +30,15 @@ impl MoveVmExt {
     ) -> SessionExt<'r, '_, S> {
         let mut extensions = NativeContextExtensions::default();
         extensions.add(NativeTableContext::new(session_id.as_uuid(), remote));
+
+        if let SessionId::Txn {
+            sender: _,
+            sequence_number: _,
+            script_hash,
+        } = session_id
+        {
+            extensions.add(NativeTransactionContext::new(script_hash));
+        }
 
         SessionExt::new(self.inner.new_session_with_extensions(remote, extensions))
     }

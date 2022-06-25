@@ -30,6 +30,7 @@ module AptosFramework::Voting {
 
     use AptosFramework::Table::{Self, Table};
     use AptosFramework::Timestamp;
+    use AptosFramework::TransactionContext;
     use AptosFramework::TypeInfo::{Self, TypeInfo};
 
     /// Error codes.
@@ -200,7 +201,10 @@ module AptosFramework::Voting {
 
         let execution_hash = proposal.execution_hash;
         if (Option::is_some(&execution_hash)) {
-            assert!(verify_execution_hash(*Option::borrow(&execution_hash)), Errors::invalid_argument(EPROPOSAL_EXECUTION_HASH_NOT_MATCHING));
+            assert!(
+                TransactionContext::get_script_hash() == *Option::borrow(&execution_hash),
+                Errors::invalid_argument(EPROPOSAL_EXECUTION_HASH_NOT_MATCHING),
+            );
         };
 
         proposal.resolved = true;
@@ -269,12 +273,6 @@ module AptosFramework::Voting {
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = Table::borrow_mut(&mut voting_forum.proposals, proposal_id);
         proposal.expiration_secs
-    }
-
-
-    // TODO: Implement native verify_execution_hash.
-    fun verify_execution_hash(_execution_hash: vector<u8>): bool {
-        true
     }
 
     #[test_only]
