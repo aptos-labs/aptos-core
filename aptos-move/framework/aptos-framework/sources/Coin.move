@@ -6,6 +6,7 @@ module AptosFramework::Coin {
     use Std::Option::{Self, Option};
     use Std::Signer;
 
+    use AptosFramework::Aggregator::{Self, Aggregator};
     use AptosFramework::TypeInfo;
 
     //
@@ -67,6 +68,9 @@ module AptosFramework::Coin {
         decimals: u64,
         /// Amount of this coin type in existence.
         supply: Option<u64>,
+        /// Aggregator that would replace the supply. Add it as a separate field for
+        /// now and decided later on how to link it properly.
+        aggregator: Option<Aggregator>,
     }
 
     /// Event emitted when some amount of a coin is deposited into an account.
@@ -155,10 +159,21 @@ module AptosFramework::Coin {
         let Coin { value: amount } = coin;
 
         let coin_addr = TypeInfo::account_address(&TypeInfo::type_of<CoinType>());
-        let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_addr).supply;
-        if (Option::is_some(supply)) {
-            let supply = Option::borrow_mut(supply);
-            *supply = *supply - amount;
+
+        // Commented out for benchmarking.
+
+        // let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_addr).supply;
+        // if (Option::is_some(supply)) {
+        //     let supply = Option::borrow_mut(supply);
+        //     *supply = *supply - amount;
+        // }
+
+        // Instead of calculating the supply, use aggregator. Added purely for
+        // benchmarking purposes.
+        let aggregator = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_addr).aggregator;
+        if (Option::is_some(aggregator)) {
+            let aggregator = Option::borrow_mut(aggregator);
+            Aggregator::add(aggregator, amount);
         }
     }
 
@@ -240,6 +255,7 @@ module AptosFramework::Coin {
             symbol,
             decimals,
             supply: if (monitor_supply) { Option::some(0) } else { Option::none() },
+            aggregator: if (monitor_supply) { Option::some(Aggregator::new()) } else { Option::none() },
         };
         move_to(account, coin_info);
 
@@ -259,13 +275,15 @@ module AptosFramework::Coin {
     public fun mint<CoinType>(
         amount: u64,
         _cap: &MintCapability<CoinType>,
-    ): Coin<CoinType> acquires CoinInfo {
-        let coin_addr = TypeInfo::account_address(&TypeInfo::type_of<CoinType>());
-        let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_addr).supply;
-        if (Option::is_some(supply)) {
-            let supply = Option::borrow_mut(supply);
-            *supply = *supply + amount;
-        };
+    ): Coin<CoinType> {
+        // Commented out for benchmarking. This we only use aggregator/supply in burning.
+    
+        // let coin_addr = TypeInfo::account_address(&TypeInfo::type_of<CoinType>());
+        // let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_addr).supply;
+        // if (Option::is_some(supply)) {
+        //     let supply = Option::borrow_mut(supply);
+        //     *supply = *supply + amount;
+        // };
 
         Coin<CoinType> { value: amount }
     }
@@ -525,7 +543,7 @@ module AptosFramework::Coin {
     #[expected_failure(abort_code = 1543)]
     public fun test_destroy_non_zero(
         source: signer,
-    ) acquires CoinInfo {
+    ) {
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
             ASCII::string(b"Fake money"),
@@ -546,7 +564,7 @@ module AptosFramework::Coin {
     #[test(source = @0x1)]
     public(script) fun test_extract(
         source: signer,
-    ) acquires CoinEvents, CoinInfo, CoinStore {
+    ) acquires CoinEvents, CoinStore {
         let source_addr = Signer::address_of(&source);
 
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
