@@ -16,6 +16,7 @@ pub mod cost {
     pub const APTOS_CREATE_ADDRESS: u64 = 5;
     pub const APTOS_LIB_TYPE_OF: u64 = 10;
     pub const APTOS_SIP_HASH: u64 = 10;
+    pub const APTOS_GET_BUCKET: u64 = 10;
 }
 
 pub mod status {

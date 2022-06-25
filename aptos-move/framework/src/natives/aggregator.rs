@@ -4,11 +4,11 @@
 use aptos_extensions::NativeTransactionContext;
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
+    move_core_types::gas_schedule::GasCost,
     move_vm_runtime::native_functions::NativeContext,
     move_vm_types::{
-        gas_schedule::NativeCostIndex,
         loaded_data::runtime_types::Type,
-        natives::function::{native_gas, NativeResult},
+        natives::function::NativeResult,
         values::Value,
     },
 };
@@ -31,10 +31,7 @@ pub fn native_get_bucket(
     let txn_context = context.extensions().get::<NativeTransactionContext>();
     let index = (txn_context.txn_hash() % NUM_BUCKETS) as u64;
 
-    let cost = native_gas(
-        context.cost_table(),
-        NativeCostIndex::BCS_TO_BYTES,
-        1,
-    );
+    // TODO: Calculate gas cost based on the formula.
+    let cost = GasCost::new(super::cost::APTOS_GET_BUCKET, 1).total();
     Ok(NativeResult::ok(cost, smallvec![Value::u64(index)]))
 }
