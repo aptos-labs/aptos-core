@@ -23,6 +23,7 @@ tracing = "0.1.34"
 
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive" }
+aptos-extensions = { path = "../aptos-extensions" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 aptos-parallel-executor = { path = "../parallel-executor" }

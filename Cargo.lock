@@ -360,6 +360,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-extensions"
+version = "0.1.0"
+dependencies = [
+ "aptos-workspace-hack",
+ "better_any",
+]
+
+[[package]]
 name = "aptos-faucet"
 version = "0.1.0"
 dependencies = [
@@ -1187,6 +1195,7 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-crypto-derive",
+ "aptos-extensions",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-parallel-executor",
@@ -3263,6 +3272,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-extensions",
  "aptos-types",
  "aptos-vm",
  "aptos-workspace-hack",
