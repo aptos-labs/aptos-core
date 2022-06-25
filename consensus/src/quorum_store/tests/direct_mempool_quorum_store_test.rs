@@ -5,7 +5,7 @@ use crate::quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use consensus_types::{
     common::{Payload, PayloadFilter},
-    request_response::{ConsensusRequest, ConsensusResponse},
+    request_response::{ConsensusResponse, WrapperCommand},
 };
 use futures::{
     channel::{mpsc, oneshot},
@@ -29,7 +29,7 @@ async fn test_block_request_no_txns() {
 
     let (consensus_callback, consensus_callback_rcv) = oneshot::channel();
     consensus_to_quorum_store_sender
-        .try_send(ConsensusRequest::GetBlockRequest(
+        .try_send(WrapperCommand::GetBlockRequest(
             100,
             PayloadFilter::DirectMempool(vec![]),
             consensus_callback,

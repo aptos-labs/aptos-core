@@ -53,13 +53,6 @@ impl TxnNotifier for MempoolNotifier {
         compute_results: &StateComputeResult,
     ) -> Result<(), MempoolError> {
         let mut rejected_txns = vec![];
-        // let txns: Vec<_> = match block.payload() {
-        //     Some(payload) => payload,
-        //     None => return Ok(()),
-        // }
-        // .clone()
-        // .into_iter()
-        // .collect();
 
         if txns.is_empty() {
             return Ok(());

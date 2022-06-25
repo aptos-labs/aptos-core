@@ -12,7 +12,17 @@ use consensus_types::proof_of_store::LogicalTime;
 use serde::{Deserialize, Serialize};
 
 pub(crate) type BatchId = u64;
-pub type Data = Vec<SignedTransaction>;
+
+// TODO: deserialize before execution
+// TODO: better name for Data
+pub(crate) type Data = Vec<SignedTransaction>;
+// pub(crate) type Data = Vec<TxnData>;
+
+#[allow(dead_code)]
+pub(crate) struct TxnData {
+    pub(crate) txn_bytes: Vec<u8>,
+    pub(crate) hash: HashValue,
+}
 
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
 pub(crate) struct PersistedValue {
