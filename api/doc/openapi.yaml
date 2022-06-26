@@ -272,6 +272,44 @@ paths:
           $ref: '#/components/responses/415'
         "500":
           $ref: '#/components/responses/500'
+  /transactions/simulate:
+    post:
+      summary: Simulate transaction
+      operationId: simulate_transaction
+      description: |
+        **Submit transaction for simulation result using JSON **
+
+          * Create a SignedTransaction with zero-padded signature
+          * Submit the user transaction request with the zero-padded siganture.
+          * The request header "Content-Type" must set to "application/json".
+
+      tags:
+        - transactions
+      requestBody:
+        description: |
+          User transaction request with transaction sender's signature.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitTransactionRequest'
+      responses:
+        "200":
+          description: Transaction simulation completed.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OnChainTransaction'
+        "400":
+          $ref: '#/components/responses/400'
+        "413":
+          $ref: '#/components/responses/413'
+        "415":
+          $ref: '#/components/responses/415'
+        "500":
+          $ref: '#/components/responses/500'
   /accounts/{address}/transactions:
     get:
       summary: Get account transactions

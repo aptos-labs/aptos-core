@@ -971,7 +971,7 @@ export interface Event {
 export type TransactionSignature = Ed25519Signature | MultiEd25519Signature | MultiAgentSignature;
 
 /**
-* Please refer to https://github.com/aptos-labs/aptos-core/tree/main/specifications/crypto#signature-and-verification for
+* Please refer to https://github.com/aptos-labs/aptos-core/tree/main/documentation/specifications/crypto#signature-and-verification for
 more details.
 */
 export interface Ed25519Signature {
@@ -996,11 +996,13 @@ export interface Ed25519Signature {
 }
 
 /**
- * Multi ed25519 signature, please refer to https://github.com/aptos-labs/aptos-core/tree/main/specifications/crypto#multi-signatures for more details.
+ * Multi ed25519 signature, please refer to https://github.com/aptos-labs/aptos-core/tree/main/documentation/specifications/crypto#multi-signatures for more details.
  */
 export interface MultiEd25519Signature {
   /** @example multi_ed25519_signature */
   type: string;
+
+  /** all public keys of the sender account */
   public_keys: HexEncodedBytes[];
 
   /** signatures created based on the `threshold` */

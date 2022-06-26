@@ -34,6 +34,8 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .or(transactions::get_transaction(context.clone()))
         .or(transactions::get_transactions(context.clone()))
         .or(transactions::get_account_transactions(context.clone()))
+        .or(transactions::simulate_bcs_transactions(context.clone()))
+        .or(transactions::simulate_json_transactions(context.clone()))
         .or(transactions::submit_bcs_transactions(context.clone()))
         .or(transactions::submit_json_transactions(context.clone()))
         .or(transactions::create_signing_message(context.clone()))

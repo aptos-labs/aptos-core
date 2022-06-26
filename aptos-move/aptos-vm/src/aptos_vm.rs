@@ -11,7 +11,7 @@ use crate::{
         charge_global_write_gas_usage, get_transaction_output, AptosVMImpl, AptosVMInternals,
     },
     counters::*,
-    data_cache::StateViewCache,
+    data_cache::{AsMoveResolver, StateViewCache},
     errors::expect_only_successful_execution,
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
@@ -66,6 +66,8 @@ static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 
 #[derive(Clone)]
 pub struct AptosVM(pub(crate) AptosVMImpl);
+
+struct AptosSimulationVM(AptosVM);
 
 impl AptosVM {
     pub fn new<S: StateView>(state: &S) -> Self {
@@ -818,6 +820,43 @@ impl AptosVM {
         BLOCK_TRANSACTION_COUNT.observe(count as f64);
         Ok(res)
     }
+
+    pub fn simulate_signed_transaction(
+        txn: &SignedTransaction,
+        state_view: &impl StateView,
+    ) -> (VMStatus, TransactionOutput) {
+        let vm = AptosVM::new(state_view);
+        let simulation_vm = AptosSimulationVM(vm);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        simulation_vm.simulate_signed_transaction(&state_view.as_move_resolver(), txn, &log_context)
+    }
+
+    fn run_prologue_with_payload<S: MoveResolverExt>(
+        &self,
+        session: &mut SessionExt<S>,
+        payload: &TransactionPayload,
+        txn_data: &TransactionMetadata,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(), VMStatus> {
+        match payload {
+            TransactionPayload::Script(_) => {
+                self.0.check_gas(txn_data, log_context)?;
+                self.0.run_script_prologue(session, txn_data, log_context)
+            }
+            TransactionPayload::ScriptFunction(_) => {
+                // NOTE: Script and ScriptFunction shares the same prologue
+                self.0.check_gas(txn_data, log_context)?;
+                self.0.run_script_prologue(session, txn_data, log_context)
+            }
+            TransactionPayload::ModuleBundle(_module) => {
+                self.0.check_gas(txn_data, log_context)?;
+                self.0.run_module_prologue(session, txn_data, log_context)
+            }
+            TransactionPayload::WriteSet(_cs) => {
+                self.0.run_writeset_prologue(session, txn_data, log_context)
+            }
+        }
+    }
 }
 
 // Executor external API
@@ -906,25 +945,7 @@ impl VMAdapter for AptosVM {
     ) -> Result<(), VMStatus> {
         let txn_data = TransactionMetadata::new(transaction);
         //let account_blob = session.data_cache.get_resource
-        match transaction.payload() {
-            TransactionPayload::Script(_) => {
-                self.0.check_gas(&txn_data, log_context)?;
-                self.0.run_script_prologue(session, &txn_data, log_context)
-            }
-            TransactionPayload::ScriptFunction(_) => {
-                // NOTE: Script and ScriptFunction shares the same prologue
-                self.0.check_gas(&txn_data, log_context)?;
-                self.0.run_script_prologue(session, &txn_data, log_context)
-            }
-            TransactionPayload::ModuleBundle(_module) => {
-                self.0.check_gas(&txn_data, log_context)?;
-                self.0.run_module_prologue(session, &txn_data, log_context)
-            }
-            TransactionPayload::WriteSet(_cs) => {
-                self.0
-                    .run_writeset_prologue(session, &txn_data, log_context)
-            }
-        }
+        self.run_prologue_with_payload(session, transaction.payload(), &txn_data, log_context)
     }
 
     fn should_restart_execution(vm_output: &TransactionOutput) -> bool {
@@ -1001,5 +1022,88 @@ impl AsRef<AptosVMImpl> for AptosVM {
 impl AsMut<AptosVMImpl> for AptosVM {
     fn as_mut(&mut self) -> &mut AptosVMImpl {
         &mut self.0
+    }
+}
+
+impl AptosSimulationVM {
+    fn validate_simulated_transaction<S: MoveResolverExt>(
+        &self,
+        session: &mut SessionExt<S>,
+        transaction: &SignedTransaction,
+        txn_data: &TransactionMetadata,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(), VMStatus> {
+        self.0.check_transaction_format(transaction)?;
+        self.0
+            .run_prologue_with_payload(session, transaction.payload(), txn_data, log_context)
+    }
+
+    /*
+    Executes a SignedTransaction without performing signature verification
+     */
+    fn simulate_signed_transaction<S: MoveResolverExt>(
+        &self,
+        storage: &S,
+        txn: &SignedTransaction,
+        log_context: &AdapterLogSchema,
+    ) -> (VMStatus, TransactionOutput) {
+        // simulation transactions should not carry valid signatures, otherwise malicious fullnodes
+        // may execute them without user's explicit permission.
+        if txn.clone().check_signature().is_ok() {
+            return discard_error_vm_status(VMStatus::Error(StatusCode::INVALID_SIGNATURE));
+        }
+
+        // Revalidate the transaction.
+        let txn_data = TransactionMetadata::new(txn);
+        let mut session = self.0.new_session(storage, SessionId::txn_meta(&txn_data));
+        if let Err(err) =
+            self.validate_simulated_transaction::<S>(&mut session, txn, &txn_data, log_context)
+        {
+            return discard_error_vm_status(err);
+        };
+
+        let gas_schedule = match self.0 .0.get_gas_schedule(log_context) {
+            Err(err) => return discard_error_vm_status(err),
+            Ok(s) => s,
+        };
+        let mut gas_status = GasStatus::new(gas_schedule, txn_data.max_gas_amount());
+
+        let result = match txn.payload() {
+            payload @ TransactionPayload::Script(_)
+            | payload @ TransactionPayload::ScriptFunction(_) => {
+                self.0.execute_script_or_script_function(
+                    session,
+                    &mut gas_status,
+                    &txn_data,
+                    payload,
+                    log_context,
+                )
+            }
+            TransactionPayload::ModuleBundle(m) => {
+                self.0
+                    .execute_modules(session, &mut gas_status, &txn_data, m, log_context)
+            }
+            TransactionPayload::WriteSet(_) => {
+                return discard_error_vm_status(VMStatus::Error(StatusCode::UNREACHABLE));
+            }
+        };
+
+        match result {
+            Ok(output) => output,
+            Err(err) => {
+                let txn_status = TransactionStatus::from(err.clone());
+                if txn_status.is_discarded() {
+                    discard_error_vm_status(err)
+                } else {
+                    self.0.failed_transaction_cleanup_and_keep_vm_status(
+                        err,
+                        &mut gas_status,
+                        &txn_data,
+                        storage,
+                        log_context,
+                    )
+                }
+            }
+        }
     }
 }
