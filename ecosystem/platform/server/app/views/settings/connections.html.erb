@@ -21,7 +21,7 @@
           <% end %>
         <% end %>
       <% else %>
-        <%= form_with url: omniauth_authorize_path(User, provider), data: {turbo: false} do |form| %>
+        <%= form_with url: omniauth_authorize_path(User, provider), data: { turbo: false } do |form| %>
           <%= render ButtonComponent.new(type: :submit, class: 'w-full') do %>
             Connect
           <% end %>

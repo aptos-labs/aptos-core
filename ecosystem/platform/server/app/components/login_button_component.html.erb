@@ -1,4 +1,4 @@
-<%= form_with url: omniauth_authorize_path(User, @provider), data: {turbo: false} do |form| %>
+<%= form_with url: omniauth_authorize_path(User, @provider), data: { turbo: false } do |form| %>
   <%= render ButtonComponent.new(type: :submit, **@rest) do %>
     <%= render IconComponent.new(@provider, size: @size) %>
     <div>

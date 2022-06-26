@@ -9,7 +9,7 @@
     <%= render ButtonComponent.new(href: new_user_session_path, size: :large, scheme: :secondary, class: 'w-full') do %>
       Log in
     <% end %>
-		<%= render @login_dialog do |dialog| %>
+    <%= render @login_dialog do |dialog| %>
       <%= dialog.with_title do %>
         Sign up
       <% end %>

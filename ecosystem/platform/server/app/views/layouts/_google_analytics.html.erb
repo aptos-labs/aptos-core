@@ -5,5 +5,5 @@
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
 
-  gtag('config', "<%= ENV.fetch('GOOGLE_ANALYTICS_ID', '') %>", <%= {debug_mode: !Rails.env.production?}.to_json.html_safe %>);
+  gtag('config', "<%= ENV.fetch('GOOGLE_ANALYTICS_ID', '').to_json %>", <%= { debug_mode: !Rails.env.production? }.to_json.html_safe %>);
 </script>

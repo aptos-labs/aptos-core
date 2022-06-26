@@ -90,6 +90,7 @@ gem 'recaptcha', '~> 5.10'
 # gem "image_processing", "~> 1.2"
 
 # UI components
+gem 'better_html'
 gem 'view_component', '~> 2.54'
 
 # Monitoring
@@ -109,6 +110,7 @@ group :development, :test do
   gem 'debug', platforms: %i[mri mingw x64_mingw]
 
   # linting/formatting
+  gem 'erb_lint', require: false
   gem 'rubocop', require: false
   gem 'rubocop-rails'
   # security lints

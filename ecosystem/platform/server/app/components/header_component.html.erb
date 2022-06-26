@@ -8,7 +8,7 @@
   </button>
   <nav class="hidden open:flex md:flex flex-wrap flex-auto flex-col md:flex-row w-full md:w-auto border-neutral-800 border-b md:border-none mt-2 mb-4 md:m-0 justify-end md:gap-10 font-mono uppercase text-sm md:text-base" data-header-target="nav">
     <% nav_items.each do |item| %>
-      <%= content_tag :a, href: item.url, title: item.title, class: 'border-neutral-800 py-2 border-t md:border-none hover:text-neutral-300', target: item.url.starts_with?('http') ? '_blank' : '' do item.name end %>
+      <%= content_tag :a, item.name, href: item.url, title: item.title, class: 'border-neutral-800 py-2 border-t md:border-none hover:text-neutral-300', target: item.url.starts_with?('http') ? '_blank' : '' %>
     <% end %>
   </nav>
 <% end %>

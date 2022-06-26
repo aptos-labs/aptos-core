@@ -4,7 +4,7 @@
   <% if @user.errors.any? %>
     <div id="error_explanation" class="flex p-4 mb-4 bg-red-100 rounded-lg dark:bg-red-200 lg:w-96" role="alert">
       <div class="ml-3 text-sm font-medium text-red-700 dark:text-red-800">
-        <h2><%= pluralize(@user.errors.count, "error") %> prohibited this from being saved:</h2>
+        <h2><%= pluralize(@user.errors.count, 'error') %> prohibited this from being saved:</h2>
 
         <ul>
           <% @user.errors.each do |error| %>
@@ -16,12 +16,12 @@
   <% end %>
 
   <div class="mb-6">
-    <%= f.label :username, class: "font-mono uppercase block mb-2" %>
+    <%= f.label :username, class: 'font-mono uppercase block mb-2' %>
     <%= f.text_field :username, autofocus: true, spellcheck: false, pattern: '[a-zA-Z0-9]+', minlength: 3, maxlength: 20 %>
   </div>
 
   <div class="mb-6">
-    <%= f.label :email, class: "font-mono uppercase block mb-2" %>
+    <%= f.label :email, class: 'font-mono uppercase block mb-2' %>
     <%= f.email_field :email, autofocus: true, spellcheck: false %>
   </div>
 

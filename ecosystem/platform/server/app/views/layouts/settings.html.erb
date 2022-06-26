@@ -7,16 +7,16 @@
         <ul aria-label="Account settings">
           <% sidebar_items.each do |item| %>
             <%= content_tag :li, class: ['border-b border-neutral-400 last:border-none', current_page?(item.url) ? 'font-normal' : 'font-light'] do %>
-              <%= content_tag :a, item.name, href: item.url, "aria-current": current_page?(item.url) ? true : nil, class: [
-                'block px-4 py-3 hover:bg-neutral-800 focus:bg-neutral-800',
-                current_page?(item.url) ? 'bg-neutral-800' : nil,
-              ] %>
+              <%= content_tag :a, item.name, href: item.url, 'aria-current': current_page?(item.url) ? true : nil, class: [
+                    'block px-4 py-3 hover:bg-neutral-800 focus:bg-neutral-800',
+                    current_page?(item.url) ? 'bg-neutral-800' : nil
+                  ] %>
             <% end %>
           <% end %>
         </ul>
       </nav>
       <div class="flex-1 max-w-prose">
-        <%= render "layouts/flash" %>
+        <%= render 'layouts/flash' %>
         <%= yield %>
       </div>
     </div>

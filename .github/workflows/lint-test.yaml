@@ -66,6 +66,7 @@ jobs:
       - run: bundle exec bundler-audit --update
       - run: bundle exec brakeman -q -w2
       - run: bundle exec rubocop
+      - run: bundle exec erblint --lint-all
       - run: yarn install --frozen-lockfile
       - run: yarn run tsc
 

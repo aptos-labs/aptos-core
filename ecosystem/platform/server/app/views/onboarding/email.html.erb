@@ -1,12 +1,12 @@
 <div class="flex-[2]">
   <h2 class="text-4xl text-teal-400 font-mono mb-16 mt-8">Welcome, <%= @oauth_username || @oauth_email %>!</h2>
 
-  <%= render "layouts/flash" %>
+  <%= render 'layouts/flash' %>
 
   <% if current_user.errors.any? %>
     <div id="error_explanation" class="flex p-4 mb-4 bg-red-100 rounded-lg dark:bg-red-200" role="alert">
       <div class="ml-3 text-sm font-medium text-red-700 dark:text-red-800">
-      <h2><%= pluralize(current_user.errors.count, "error") %> prohibited this user from being saved:</h2>
+      <h2><%= pluralize(current_user.errors.count, 'error') %> prohibited this user from being saved:</h2>
 
       <ul>
         <% current_user.errors.each do |error| %>
@@ -17,21 +17,21 @@
     </div>
   <% end %>
 
-  <%= form_with(model: current_user, url: onboarding_email_path, method: :post, data: {turbo: !@show_recaptcha_v2, controller: 'recaptcha', action: 'recaptcha#validate'}, builder: AptosFormBuilder) do |f| %>
+  <%= form_with(model: current_user, url: onboarding_email_path, method: :post, data: { turbo: !@show_recaptcha_v2, controller: 'recaptcha', action: 'recaptcha#validate' }, builder: AptosFormBuilder) do |f| %>
     <div class="mb-8">
-      <%= f.email_field :email, autofocus: true, autocomplete: "email", required: true, placeholder: "ENTER YOUR EMAIL ADDRESS", class: 'md:w-96' %>
+      <%= f.email_field :email, autofocus: true, autocomplete: 'email', required: true, placeholder: 'ENTER YOUR EMAIL ADDRESS', class: 'md:w-96' %>
     </div>
 
     <div class="mb-8">
       <% if @show_recaptcha_v2 %>
         <%= recaptcha_tags theme: :dark %>
       <% else %>
-        <%= recaptcha_v3(action: 'onboarding/email', site_key: ENV['RECAPTCHA_V3_SITE_KEY'], turbolinks: true) %>
+        <%= recaptcha_v3(action: 'onboarding/email', site_key: ENV.fetch('RECAPTCHA_V3_SITE_KEY', nil), turbolinks: true) %>
       <% end %>
     </div>
 
     <div class="mb-12">
-      <%= f.submit "Verify email", class: "w-72" %>
+      <%= f.submit 'Verify email', class: 'w-72' %>
     </div>
 
     <div class="text-sm mb-4">

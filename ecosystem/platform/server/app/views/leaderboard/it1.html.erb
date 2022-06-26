@@ -28,7 +28,7 @@
         <% end %>
       </div>
     </div>
-    <%= turbo_frame_tag 'metrics', data: {controller: 'refresh', refresh_interval_value: 1.minute, refresh_src_value: request.path, turbo_action: 'advance'} do %>
+    <%= turbo_frame_tag 'metrics', data: { controller: 'refresh', refresh_interval_value: 1.minute, refresh_src_value: request.path, turbo_action: 'advance' } do %>
       <%= content_tag :div, class: 'overflow-x-auto' do %>
         <%= render TableComponent.new(class: 'w-full table-auto') do |t| %>
           <%= t.with_column(:rank, '#', align: 'right') %>
