@@ -43,6 +43,7 @@ type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
 type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
 type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKey>;
 type StateValueBatch = aptos_jellyfish_merkle::StateValueBatch<StateKey, StateValue>;
+type TreeUpdateBatch = aptos_jellyfish_merkle::TreeUpdateBatch<StateKey>;
 
 pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 
@@ -254,7 +255,7 @@ impl StateStore {
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         version: Version,
         base_version: Option<Version>,
-    ) -> Result<HashValue> {
+    ) -> Result<(HashValue, TreeUpdateBatch)> {
         let (new_root_hash, tree_update_batch) = {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["jmt_update"])
@@ -268,6 +269,20 @@ impl StateStore {
             )
         }?;
 
+        self.version_cache.add_version(
+            version,
+            tree_update_batch
+                .node_batch
+                .iter()
+                .flatten()
+                .cloned()
+                .collect(),
+        );
+
+        Ok((new_root_hash, tree_update_batch))
+    }
+
+    pub fn persist_tree_update_batch(&self, tree_update_batch: TreeUpdateBatch) -> Result<()> {
         let batch = SchemaBatch::new();
         {
             let _timer = OTHER_TIMERS_SECONDS
@@ -295,30 +310,28 @@ impl StateStore {
                 .collect::<Result<Vec<()>>>()?;
         }
 
-        {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["update_node_cache"])
-                .start_timer();
-
-            if let Some(evicted) = self.version_cache.add_version(
-                version,
-                tree_update_batch.node_batch.into_iter().flatten().collect(),
-            ) {
-                evicted
-                    .iter()
-                    .collect::<Vec<_>>()
-                    .into_par_iter()
-                    .with_min_len(100)
-                    .for_each(|(node_key, node)| {
-                        self.lru_cache.put(node_key.clone(), node.clone())
-                    });
-            }
-        }
-
-        // commit jellyfish merkle nodes
+        // commit
         self.state_merkle_db.write_schemas(batch)?;
 
-        Ok(new_root_hash)
+        // release version cache
+        self.version_cache.maybe_evict_version(&self.lru_cache);
+
+        Ok(())
+    }
+
+    pub fn save_snapshot(
+        &self,
+        value_set: Vec<(HashValue, &(HashValue, StateKey))>,
+        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
+        version: Version,
+        base_version: Option<Version>,
+    ) -> Result<HashValue> {
+        let (root_hash, tree_update_batch) =
+            self.merklize_value_set(value_set, node_hashes, version, base_version)?;
+
+        self.persist_tree_update_batch(tree_update_batch)?;
+
+        Ok(root_hash)
     }
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {

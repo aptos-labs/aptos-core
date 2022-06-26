@@ -23,7 +23,7 @@ fn put_value_set(
     let jmt_updates = jmt_updates(&value_set);
 
     let root = state_store
-        .merklize_value_set(
+        .save_snapshot(
             jmt_update_refs(&jmt_updates),
             None,
             version,

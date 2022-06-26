@@ -1261,7 +1261,7 @@ impl DbWriter for AptosDB {
         base_version: Option<Version>,
     ) -> Result<()> {
         gauged_api("save_state_snapshot", || {
-            let root_hash = self.state_store.merklize_value_set(
+            let root_hash = self.state_store.save_snapshot(
                 jmt_update_refs(&jmt_updates),
                 node_hashes,
                 version,
