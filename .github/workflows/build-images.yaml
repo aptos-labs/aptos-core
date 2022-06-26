@@ -1,4 +1,4 @@
-## IMPORTANT NOTE TO EDITORS OF THIS FILE ## 
+## IMPORTANT NOTE TO EDITORS OF THIS FILE ##
 
 ## Note that when you create a PR the jobs in this file are triggered off the `pull_request_target` event instead of `pull_request` event.
 ## This is because the `pull_request` event makes secrets only available to PRs from branches, not from forks, and some of these jobs require secrets.
@@ -47,18 +47,26 @@ permissions:
   issues: write
   pull-requests: write
 
+# Note on the job-level `if` conditions:
+# This workflow is designed such that:
+# 1. Run ALL jobs when a 'push', 'workflow_dispatch' triggered the workflow or on 'pull_request's which have set auto_merge=true or have the label "CICD:run-e2e-tests".
+# 2. Run ONLY the docker image building jobs on PRs with the "CICD:build-images" label.
+# 3. Run NOTHING when neither 1. or 2.'s conditions are satisfied.
 jobs:
-
   permission-check:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'CICD:build-images') || github.event.pull_request.auto_merge != null
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'CICD:build-images') ||
+      contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+      github.event.pull_request.auto_merge != null
     runs-on: ubuntu-latest
-    steps: 
-    - name: Check repository permission for user which triggered job
-      id: permission
-      uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
-      with:
-        required-permission: write
-        comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
+    steps:
+      - name: Check repository permission for user which triggered workflow
+        uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
+        with:
+          required-permission: write
+          comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
 
   rust-images:
     # trigger only for push events (on protected branches as defined above) OR on PR events with the "CICD:build-images" label.
@@ -95,6 +103,11 @@ jobs:
 
   sdk-integration-test:
     needs: rust-images
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+      github.event.pull_request.auto_merge != null
     uses: ./.github/workflows/sdk-integration-test.yaml
     secrets: inherit
     with:
@@ -102,6 +115,11 @@ jobs:
 
   forge-e2e-test:
     needs: rust-images
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+      github.event.pull_request.auto_merge != null
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
@@ -110,7 +128,6 @@ jobs:
 
   community-platform:
     needs: permission-check
-    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'CICD:build-images')
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
