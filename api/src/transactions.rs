@@ -20,7 +20,11 @@ use aptos_types::{
     transaction::{RawTransaction, RawTransactionWithData, SignedTransaction},
 };
 
+use aptos_crypto::HashValue;
+use aptos_vm::AptosVM;
+
 use anyhow::Result;
+use aptos_types::transaction::{ExecutionStatus, TransactionInfo, TransactionStatus};
 use warp::{
     filters::BoxedFilter,
     http::{header::CONTENT_TYPE, StatusCode},
@@ -56,6 +60,38 @@ pub fn get_account_transactions(context: Context) -> BoxedFilter<(impl Reply,)> 
         .and(context.filter())
         .and_then(handle_get_account_transactions)
         .with(metrics("get_account_transactions"))
+        .boxed()
+}
+
+// POST /transactions/simulate with JSON
+pub fn simulate_json_transactions(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("transactions" / "simulate")
+        .and(warp::post())
+        .and(warp::body::content_length_limit(
+            context.content_length_limit(),
+        ))
+        .and(warp::body::json::<UserTransactionRequest>())
+        .and(context.filter())
+        .and_then(handle_simulate_json_transactions)
+        .with(metrics("simulate_json_transactions"))
+        .boxed()
+}
+
+// POST /transactions/simulate with BCS
+pub fn simulate_bcs_transactions(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("transactions" / "simulate")
+        .and(warp::post())
+        .and(warp::body::content_length_limit(
+            context.content_length_limit(),
+        ))
+        .and(warp::header::exact(
+            CONTENT_TYPE.as_str(),
+            BCS_SIGNED_TRANSACTION,
+        ))
+        .and(warp::body::bytes())
+        .and(context.filter())
+        .and_then(handle_simulate_bcs_transactions)
+        .with(metrics("simulate_bcs_transactions"))
         .boxed()
 }
 
@@ -144,6 +180,16 @@ async fn handle_submit_json_transactions(
         .await?)
 }
 
+async fn handle_simulate_json_transactions(
+    body: UserTransactionRequest,
+    context: Context,
+) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_simulate_json_transactions")?;
+    Ok(Transactions::new(context)?
+        .simulate_from_request(body)
+        .await?)
+}
+
 async fn handle_submit_bcs_transactions(
     body: bytes::Bytes,
     context: Context,
@@ -152,6 +198,16 @@ async fn handle_submit_bcs_transactions(
     let txn = bcs::from_bytes(&body)
         .map_err(|err| Error::invalid_request_body(format!("deserialize error: {}", err)))?;
     Ok(Transactions::new(context)?.create(txn).await?)
+}
+
+async fn handle_simulate_bcs_transactions(
+    body: bytes::Bytes,
+    context: Context,
+) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_simulate_bcs_transactions")?;
+    let txn = bcs::from_bytes(&body)
+        .map_err(|err| Error::invalid_request_body(format!("deserialize error: {}", err)))?;
+    Ok(Transactions::new(context)?.simulate(txn).await?)
 }
 
 async fn handle_create_signing_message(
@@ -194,6 +250,24 @@ impl Transactions {
         self.create(txn).await
     }
 
+    pub async fn simulate_from_request(
+        self,
+        req: UserTransactionRequest,
+    ) -> Result<impl Reply, Error> {
+        let txn = self
+            .context
+            .move_resolver()?
+            .as_converter()
+            .try_into_signed_transaction(req, self.context.chain_id())
+            .map_err(|e| {
+                Error::invalid_request_body(format!(
+                    "failed to create SignedTransaction from UserTransactionRequest: {}",
+                    e
+                ))
+            })?;
+        self.simulate(txn).await
+    }
+
     pub async fn create(self, txn: SignedTransaction) -> Result<impl Reply, Error> {
         let (mempool_status, vm_status_opt) = self.context.submit_transaction(txn.clone()).await?;
         match mempool_status.code {
@@ -214,6 +288,40 @@ impl Transactions {
                 mempool_status,
             ))),
         }
+    }
+
+    pub async fn simulate(self, txn: SignedTransaction) -> Result<impl Reply, Error> {
+        if txn.clone().check_signature().is_ok() {
+            return Err(Error::bad_request(
+                "Transaction simulation cannot carry valid signature",
+            ));
+        }
+        let state_view = &*self.context.move_resolver()?;
+        let (status, output) = AptosVM::simulate_signed_transaction(&txn, state_view);
+        let version = self.ledger_info.version();
+        let exe_status = match status.into() {
+            TransactionStatus::Keep(exec_status) => exec_status,
+            _ => ExecutionStatus::MiscellaneousError(None),
+        };
+        let zero_hash = HashValue::zero();
+        let info = TransactionInfo::new(
+            zero_hash,
+            zero_hash,
+            zero_hash,
+            None,
+            output.gas_used(),
+            exe_status,
+        );
+        let simulated_txn = TransactionOnChainData {
+            version,
+            transaction: aptos_types::transaction::Transaction::UserTransaction(txn),
+            info,
+            events: output.events().to_vec(),
+            accumulator_root_hash: HashValue::default(),
+            changes: output.write_set().clone(),
+        };
+
+        self.render_transactions(vec![simulated_txn])
     }
 
     pub fn list(self, page: Page) -> Result<impl Reply, Error> {

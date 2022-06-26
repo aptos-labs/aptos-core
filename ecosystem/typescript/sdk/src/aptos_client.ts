@@ -215,6 +215,18 @@ export class AptosClient {
     return txnBuilder.sign(rawTxn);
   }
 
+  /** Generates a BCS transaction that can be submitted to the chain for simulation. */
+  static generateBCSSimulation(accountFrom: AptosAccount, rawTxn: TxnBuilderTypes.RawTransaction): Uint8Array {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const txnBuilder = new TransactionBuilderEd25519((_signingMessage: TxnBuilderTypes.SigningMessage) => {
+      // @ts-ignore
+      const invalidSigBytes = new Uint8Array(64);
+      return new TxnBuilderTypes.Ed25519Signature(invalidSigBytes);
+    }, accountFrom.pubKey().toUint8Array());
+
+    return txnBuilder.sign(rawTxn);
+  }
+
   /** Generates a transaction request that can be submitted to produce a raw transaction that
    * can be signed, which upon being signed can be submitted to the blockchain
    * @param sender Hex-encoded 16 bytes Aptos account address of transaction sender
@@ -343,6 +355,24 @@ export class AptosClient {
     return response.data;
   }
 
+  /** Submits a transaction with fake signature to the transaction simulation endpoint that takes JSON payload. */
+  async simulateTransaction(
+    accountFrom: AptosAccount,
+    txnRequest: Types.UserTransactionRequest,
+  ): Promise<Types.OnChainTransaction> {
+    const transactionSignature: Types.TransactionSignature = {
+      type: 'ed25519_signature',
+      public_key: accountFrom.pubKey().hex(),
+      // use invalid signature for simulation
+      signature: HexString.fromUint8Array(new Uint8Array(64)).hex(),
+    };
+
+    const request = { signature: transactionSignature, ...txnRequest };
+    const response = await this.transactions.simulateTransaction(request);
+    raiseForStatus(200, response, request);
+    return response.data[0];
+  }
+
   /**
    * Submits a signed transaction to the the endpoint that takes BCS payload
    * @param signedTxn A BCS transaction representation
@@ -363,6 +393,28 @@ export class AptosClient {
 
     raiseForStatus(202, response, signedTxn);
     return response.data;
+  }
+
+  /**
+   * Submits a signed transaction to the the endpoint that takes BCS payload
+   * @param signedTxn output of generateBCSSimulation()
+   * @returns Simulation result in the form of OnChainTransaction
+   */
+  async submitBCSSimulation(bcsBody: Uint8Array): Promise<Types.OnChainTransaction> {
+    // Need to construct a customized post request for transactions in BCS payload
+    const httpClient = this.transactions.http;
+
+    const response = await httpClient.request<Types.OnChainTransaction[], AptosError>({
+      path: '/transactions/simulate',
+      method: 'POST',
+      body: bcsBody,
+      // @ts-ignore
+      type: 'application/x.aptos.signed_transaction+bcs',
+      format: 'json',
+    });
+
+    raiseForStatus(200, response, bcsBody);
+    return response.data[0];
   }
 
   /**

@@ -61,6 +61,23 @@ export class Transactions<SecurityDataType = unknown> {
       ...params,
     });
   /**
+   * @description **Submit transaction for simulation result using JSON ** * Create a SignedTransaction with zero-padded signature * Submit the user transaction request with the zero-padded siganture. * The request header "Content-Type" must set to "application/json".
+   *
+   * @tags transactions
+   * @name SimulateTransaction
+   * @summary Simulate transaction
+   * @request POST:/transactions/simulate
+   */
+  simulateTransaction = (data: SubmitTransactionRequest, params: RequestParams = {}) =>
+    this.http.request<OnChainTransaction[], AptosError>({
+      path: `/transactions/simulate`,
+      method: "POST",
+      body: data,
+      type: ContentType.Json,
+      format: "json",
+      ...params,
+    });
+  /**
    * @description There are two types of transaction identifiers: 1. Transaction hash: included in any transaction JSON respond from server. 2. Transaction version: included in on-chain transaction JSON respond from server. When given transaction hash, server first looks up on-chain transaction by hash; if no on-chain transaction found, then look up transaction by hash in the mempool (pending) transactions. When given a transaction version, server looks up the transaction on-chain by version. To create a transaction hash: 1. Create hash message bytes: "Aptos::Transaction" bytes + BCS bytes of [Transaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/enum.Transaction.html). 2. Apply hash algorithm `SHA3-256` to the hash message bytes. 3. Hex-encode the hash bytes with `0x` prefix.
    *
    * @tags transactions
