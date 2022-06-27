@@ -15,17 +15,23 @@
 
   <div class="mb-6">
     <%= form.label :persona, 'Which of the following best represents you?' %>
-    <%= form.text_field :persona, required: true, autofocus: true %>
+    <%= form.text_field :persona, required: true, autofocus: true, list: 'personas' %>
+    <datalist id="personas">
+      <option value="Node Operator"></option>
+      <option value="Developer"></option>
+      <option value="Academic Researcher"></option>
+      <option value="Community Member"></option>
+    </datalist>
   </div>
 
   <div class="mb-6">
     <%= form.label :participate_reason, 'Why do you want to participate in AIT2?' %>
-    <%= form.text_field :participate_reason, required: true %>
+    <%= form.text_area :participate_reason, required: true %>
   </div>
 
   <div class="mb-6">
     <%= form.label :qualified_reason, 'What makes you a qualified node operator?' %>
-    <%= form.text_field :qualified_reason, required: true %>
+    <%= form.text_area :qualified_reason, required: true %>
   </div>
 
   <div class="mb-6">
@@ -35,7 +41,7 @@
 
   <div class="mb-6">
     <%= form.label :interest_reason, 'What makes you interested in Aptos?' %>
-    <%= form.text_field :interest_reason, required: true %>
+    <%= form.text_area :interest_reason, required: true %>
   </div>
 
   <div>
