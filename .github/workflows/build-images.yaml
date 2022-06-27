@@ -26,7 +26,7 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
 
 # cancel redundant builds
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 env:
