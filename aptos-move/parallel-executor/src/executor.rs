@@ -3,7 +3,6 @@
 
 use crate::{
     errors::*,
-    outcome_array::OutcomeArray,
     scheduler::{Scheduler, SchedulerTask, TaskGuard, TxnIndex, Version},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_last_input_output::{ReadDescriptor, TxnLastInputOutput},
@@ -12,17 +11,7 @@ use aptos_infallible::Mutex;
 use mvhashmap::MVHashMap;
 use num_cpus;
 use once_cell::sync::Lazy;
-use rayon::prelude::*;
-use std::{
-    collections::HashSet,
-    hash::Hash,
-    marker::PhantomData,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-    thread::spawn,
-};
+use std::{collections::HashSet, hash::Hash, marker::PhantomData, sync::Arc, thread::spawn};
 
 static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -305,7 +294,6 @@ where
 
         let num_txns = signature_verified_block.len();
         let versioned_data_cache = MVHashMap::new();
-        let outcomes = OutcomeArray::new(num_txns);
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
@@ -323,25 +311,23 @@ where
             }
         });
 
-        // Extract outputs in parallel.
+        // TODO: for large block sizes and many cores, extract outputs in parallel.
+        let mut maybe_err = None;
+        let mut final_results = Vec::new();
         let num_txns = scheduler.num_txn_to_execute();
-        let valid_results_size = AtomicUsize::new(num_txns);
-        let chunk_size = (num_txns + 4 * self.concurrency_level - 1) / (4 * self.concurrency_level);
-        RAYON_EXEC_POOL.install(|| {
-            (0..num_txns)
-                .collect::<Vec<TxnIndex>>()
-                .par_chunks(chunk_size)
-                .map(|chunk| {
-                    for idx in chunk.iter() {
-                        let res = last_input_output.take_output(*idx);
-                        if matches!(res, ExecutionStatus::SkipRest(_)) {
-                            valid_results_size.fetch_min(*idx + 1, Ordering::SeqCst);
-                        }
-                        outcomes.set_result(*idx, res);
-                    }
-                })
-                .collect::<()>();
-        });
+        for idx in 0..num_txns {
+            match last_input_output.take_output(idx) {
+                ExecutionStatus::Success(t) => final_results.push(t),
+                ExecutionStatus::SkipRest(t) => {
+                    final_results.push(t);
+                    break;
+                }
+                ExecutionStatus::Abort(err) => {
+                    maybe_err = Some(err);
+                    break;
+                }
+            };
+        }
 
         spawn(move || {
             // Explicit async drops.
@@ -350,6 +336,13 @@ where
             drop(versioned_data_cache);
             drop(scheduler);
         });
-        outcomes.get_all_results(valid_results_size.load(Ordering::SeqCst))
+
+        match maybe_err {
+            Some(err) => Err(err),
+            None => {
+                final_results.resize_with(num_txns, E::Output::skip_output);
+                Ok(final_results)
+            }
+        }
     }
 }
