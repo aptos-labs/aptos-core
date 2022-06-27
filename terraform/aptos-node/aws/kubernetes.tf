@@ -115,6 +115,7 @@ locals {
         value  = "validators"
         effect = "NoExecute"
       }]
+      remoteLogAddress = var.enable_logger ? "${local.workspace_name}-log-aptos-logger:5044" : null
     }
     fullnode = {
       storage = {

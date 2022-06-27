@@ -23,11 +23,17 @@ genesis:
     pullPolicy: IfNotPresent
   # Number of validators to include in genesis
   numValidators: 1
-  # Assumes the validators and fullnodes are using the service names from
-  # aptos-node helm chart
+  # Controls whether to use public DNS as created by aptos-node helm chart
+  # If not using public DNS, assumes the validators and fullnodes are using the service names
+  # from aptos-node helm chart
   username_prefix: aptos-node
-  validator_host_suffix: validator-lb
-  fullnode_host_suffix: fullnode-lb
+  domain:
+  validator:
+    use_public_dns: false
+    internal_host_suffix: validator-lb
+  fullnode:
+    use_public_dns: true
+    internal_host_suffix: fullnode-lb
   # The path or move modules in the docker image to pull
   # Defaults to the aptos-framework in the aptoslabs/init docker image
   moveModulesDir: /aptos-framework/move/modules
