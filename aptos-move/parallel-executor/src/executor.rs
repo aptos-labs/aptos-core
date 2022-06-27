@@ -10,9 +10,8 @@ use crate::{
 };
 use aptos_infallible::Mutex;
 use mvhashmap::MVHashMap;
-use num_cpus;
-use once_cell::sync::Lazy;
-use rayon::prelude::*;
+use once_cell::sync::OnceCell;
+use rayon::{prelude::*, ThreadPool};
 use std::{
     collections::HashSet,
     hash::Hash,
@@ -24,12 +23,17 @@ use std::{
     thread::spawn,
 };
 
-static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(num_cpus::get())
-        .build()
-        .unwrap()
-});
+pub static RAYON_EXEC_POOL: OnceCell<ThreadPool> = OnceCell::new();
+
+pub fn maybe_init_rayon_exec_pool(concurrency_level: usize) {
+    RAYON_EXEC_POOL
+        .get_or_try_init(|| {
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(concurrency_level)
+                .build()
+        })
+        .unwrap();
+}
 
 /// A struct that is always used by a single thread performing an execution task. The struct is
 /// passed to the VM and acts as a proxy to resolve reads first in the shared multi-version
@@ -123,11 +127,7 @@ where
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
     pub fn new(concurrency_level: usize) -> Self {
-        assert!(
-            concurrency_level > 1 && concurrency_level <= num_cpus::get(),
-            "Parallel execution concurrency level {} should be between 2 and number of CPUs",
-            concurrency_level
-        );
+        maybe_init_rayon_exec_pool(concurrency_level);
         Self {
             concurrency_level,
             phantom: PhantomData,
@@ -309,39 +309,45 @@ where
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
-        RAYON_EXEC_POOL.scope(|s| {
-            for _ in 0..self.concurrency_level {
-                s.spawn(|_| {
-                    self.work_task_with_scope(
-                        &executor_initial_arguments,
-                        &signature_verified_block,
-                        &last_input_output,
-                        &versioned_data_cache,
-                        &scheduler,
-                    );
-                });
-            }
-        });
+        RAYON_EXEC_POOL
+            .get()
+            .expect("RAYON_EXEC_POOL not initialized.")
+            .scope(|s| {
+                for _ in 0..self.concurrency_level {
+                    s.spawn(|_| {
+                        self.work_task_with_scope(
+                            &executor_initial_arguments,
+                            &signature_verified_block,
+                            &last_input_output,
+                            &versioned_data_cache,
+                            &scheduler,
+                        );
+                    });
+                }
+            });
 
         // Extract outputs in parallel.
         let num_txns = scheduler.num_txn_to_execute();
         let valid_results_size = AtomicUsize::new(num_txns);
         let chunk_size = (num_txns + 4 * self.concurrency_level - 1) / (4 * self.concurrency_level);
-        RAYON_EXEC_POOL.install(|| {
-            (0..num_txns)
-                .collect::<Vec<TxnIndex>>()
-                .par_chunks(chunk_size)
-                .map(|chunk| {
-                    for idx in chunk.iter() {
-                        let res = last_input_output.take_output(*idx);
-                        if matches!(res, ExecutionStatus::SkipRest(_)) {
-                            valid_results_size.fetch_min(*idx + 1, Ordering::SeqCst);
+        RAYON_EXEC_POOL
+            .get()
+            .expect("RAYON_EXEC_POOL not initialized.")
+            .install(|| {
+                (0..num_txns)
+                    .collect::<Vec<TxnIndex>>()
+                    .par_chunks(chunk_size)
+                    .map(|chunk| {
+                        for idx in chunk.iter() {
+                            let res = last_input_output.take_output(*idx);
+                            if matches!(res, ExecutionStatus::SkipRest(_)) {
+                                valid_results_size.fetch_min(*idx + 1, Ordering::SeqCst);
+                            }
+                            outcomes.set_result(*idx, res);
                         }
-                        outcomes.set_result(*idx, res);
-                    }
-                })
-                .collect::<()>();
-        });
+                    })
+                    .collect::<()>();
+            });
 
         spawn(move || {
             // Explicit async drops.
