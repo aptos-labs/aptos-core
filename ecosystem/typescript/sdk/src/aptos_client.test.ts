@@ -270,7 +270,7 @@ test(
       const write = change as WriteResource;
 
       return (
-        write.address === account2.address().hex() &&
+        write.address === account2.address().toShortString() &&
         write.data.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>' &&
         (write.data.data as { coin: { value: string } }).coin.value === '2000'
       );
@@ -341,7 +341,7 @@ test(
       const write = change as WriteResource;
 
       return (
-        write.address === account2.address().hex() &&
+        write.address === account2.address().toShortString() &&
         write.data.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>' &&
         (write.data.data as { coin: { value: string } }).coin.value === '2000'
       );
