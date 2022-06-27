@@ -57,5 +57,6 @@ Rails.application.routes.draw do
   get 'it1', to: 'leaderboard#it1'
   get 'it2', to: 'leaderboard#it2'
 
-  root 'static_page#community'
+  get 'community', to: 'static_page#community'
+  root 'static_page#root'
 end
