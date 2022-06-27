@@ -46,5 +46,5 @@ Rails.application.routes.draw do
   get 'leaderboard/it1', to: redirect('/it1')
 
   get 'it1', to: 'leaderboard#it1'
-  root 'welcome#index'
+  root 'static_page#community'
 end
