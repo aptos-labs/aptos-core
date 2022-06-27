@@ -132,8 +132,10 @@ module AptosFramework::Stake {
         max_lockup_duration_secs: u64,
         // Whether validators are allow to join/leave post genesis.
         allow_validator_set_change: bool,
-        // The maximum rewards (as a % of staked amount) given out every epoch.
-        rewards_rate_percentage: u64,
+        // The maximum rewards given out every epoch. This will be divided by the rewards rate denominator.
+        // For example, 0.001% (0.00001) can be represented as 10 / 1000000.
+        rewards_rate: u64,
+        rewards_rate_denominator: u64,
     }
 
     /// Full ValidatorSet, stored in @CoreResource.
@@ -233,7 +235,8 @@ module AptosFramework::Stake {
         min_lockup_duration_secs: u64,
         max_lockup_duration_secs: u64,
         allow_validator_set_change: bool,
-        rewards_rate_percentage: u64,
+        rewards_rate: u64,
+        rewards_rate_denominator: u64,
     ) {
         SystemAddresses::assert_core_resource(core_resources);
         move_to(core_resources, ValidatorSet {
@@ -248,7 +251,8 @@ module AptosFramework::Stake {
             min_lockup_duration_secs,
             max_lockup_duration_secs,
             allow_validator_set_change,
-            rewards_rate_percentage,
+            rewards_rate,
+            rewards_rate_denominator,
         });
         move_to(core_resources, ValidatorPerformance {
             num_blocks: 0,
@@ -795,8 +799,8 @@ module AptosFramework::Stake {
         // Validators receive rewards based on their performance (number of successful votes) and how long is their
         // remaining lockup time.
         // The total rewards = base rewards * performance multiplier * lockup multiplier.
-        // Here we do multiplication before division to avoid rounding errors.
-        let base_rewards = Coin::value<TestCoin>(stake) * validator_set_config.rewards_rate_percentage / 100;
+        // Here we do multiplication before division to minimize rounding errors.
+        let base_rewards = Coin::value<TestCoin>(stake) * validator_set_config.rewards_rate / validator_set_config.rewards_rate_denominator;
         let rewards_denominator = num_blocks * validator_set_config.max_lockup_duration_secs;
         let rewards_amount = base_rewards * num_successful_votes * remaining_lockup_time / rewards_denominator;
         if (rewards_amount > 0) {
@@ -866,7 +870,7 @@ module AptosFramework::Stake {
 
         Timestamp::set_time_has_started_for_testing(&core_resources);
 
-        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1);
+        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100);
 
         let validator_address = Signer::address_of(&validator);
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
@@ -911,7 +915,7 @@ module AptosFramework::Stake {
 
         Timestamp::set_time_has_started_for_testing(&core_resources);
 
-        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1);
+        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100);
 
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
         let stake = Coin::mint<TestCoin>(100, &mint_cap);
@@ -966,7 +970,7 @@ module AptosFramework::Stake {
         let validator_2_address = Signer::address_of(&validator_2);
         let validator_3_address = Signer::address_of(&validator_3);
 
-        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1);
+        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100);
 
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
         register_mint_stake(&validator_1, &mint_cap);
@@ -1023,7 +1027,7 @@ module AptosFramework::Stake {
         core_resources: signer,
         validator: signer,
     ) acquires OwnerCapability, StakePool, StakePoolEvents, ValidatorConfig, ValidatorSet, ValidatorSetConfiguration {
-        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, false, 1);
+        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, false, 1, 100);
 
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
         register_mint_stake(&validator, &mint_cap);
@@ -1056,7 +1060,7 @@ module AptosFramework::Stake {
         let v5_addr = Signer::address_of(&validator_5);
 
         Timestamp::set_time_has_started_for_testing(&core_resources);
-        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1);
+        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100);
 
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
         register_mint_stake(&validator_1, &mint_cap);
