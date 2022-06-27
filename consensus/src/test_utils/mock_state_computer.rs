@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::data_manager::{DataManager, DummyDataManager};
 use crate::{
     error::StateSyncError,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
@@ -24,6 +25,7 @@ pub struct MockStateComputer {
     commit_callback: mpsc::UnboundedSender<LedgerInfoWithSignatures>,
     consensus_db: Arc<MockStorage>,
     block_cache: Mutex<HashMap<HashValue, Payload>>,
+    data_manager: Arc<dyn DataManager>,
 }
 
 impl MockStateComputer {
@@ -37,6 +39,7 @@ impl MockStateComputer {
             commit_callback,
             consensus_db,
             block_cache: Mutex::new(HashMap::new()),
+            data_manager: Arc::new(DummyDataManager::new()),
         }
     }
 }
@@ -68,14 +71,13 @@ impl StateComputer for MockStateComputer {
         // mock sending commit notif to state sync
         let mut txns = vec![];
         for block in blocks {
-            let mut payload = self
+            let payload = self
                 .block_cache
                 .lock()
                 .remove(&block.id())
-                .ok_or_else(|| format_err!("Cannot find block"))?
-                .into_iter()
-                .collect();
-            txns.append(&mut payload);
+                .ok_or_else(|| format_err!("Cannot find block"))?;
+            let mut payload_txns = self.data_manager.get_data(payload).await?;
+            txns.append(&mut payload_txns);
         }
         // they may fail during shutdown
         let _ = self.state_sync_client.unbounded_send(txns);

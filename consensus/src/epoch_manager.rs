@@ -402,12 +402,11 @@ impl EpochManager {
 
     fn spawn_quorum_wrapper(
         &mut self,
-        batch_reader: Arc<BatchReader>,
-        max_batch_size: usize,
         network_sender: NetworkSender,
-        consensus_to_quorum_store_receiver: Receiver<WrapperCommand>,
-        wrapper_to_quorum_store_sender: tokio::sync::mpsc::Sender<QuorumStoreCommand>,
+        consensus_to_quorum_store_rx: Receiver<WrapperCommand>,
+        wrapper_to_quorum_store_tx: tokio::sync::mpsc::Sender<QuorumStoreCommand>,
     ) {
+        // TODO: make this not use a ConsensusRequest
         let (wrapper_quorum_store_msg_tx, wrapper_quorum_store_msg_rx) =
             aptos_channel::new::<AccountAddress, VerifiedEvent>(
                 QueueStyle::FIFO,
@@ -417,18 +416,25 @@ impl EpochManager {
 
         self.wrapper_quorum_store_msg_tx = Some(wrapper_quorum_store_msg_tx);
 
+        // TODO: need to bring shutdown_tx out of this function and use it in shutdown_current_processor
+        let (shutdown_tx, shutdown_rx) = mpsc::channel(0);
+
         let quorum_store_wrapper = QuorumStoreWrapper::new(
             self.epoch(),
-            wrapper_quorum_store_msg_rx,
-            max_batch_size,
-            batch_reader,
-            consensus_to_quorum_store_receiver,
+            self.data_manager.clone(),
             self.quorum_store_to_mempool_tx.clone(),
-            wrapper_to_quorum_store_sender,
-            network_sender,
+            wrapper_to_quorum_store_tx,
             self.config.mempool_txn_pull_timeout_ms,
+            // TODO
+            100,
+            1000,
         );
-        tokio::spawn(quorum_store_wrapper.start());
+        tokio::spawn(quorum_store_wrapper.start(
+            network_sender,
+            consensus_to_quorum_store_rx,
+            shutdown_rx,
+            wrapper_quorum_store_msg_rx,
+        ));
     }
 
     /// this function spawns the phases and a buffer manager
@@ -582,8 +588,6 @@ impl EpochManager {
                 .new_epoch(data_reader.clone(), consensus_to_quorum_store_tx.clone());
 
             self.spawn_quorum_wrapper(
-                data_reader,
-                config.max_batch_size,
                 network_sender.clone(),
                 consensus_to_quorum_store_rx,
                 wrapper_quorum_store_tx,

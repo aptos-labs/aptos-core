@@ -20,12 +20,8 @@ async fn test_block_request_no_txns() {
         mpsc::channel(1_024);
     let (mut consensus_to_quorum_store_sender, consensus_to_quorum_store_receiver) =
         mpsc::channel(1_024);
-    let quorum_store = DirectMempoolQuorumStore::new(
-        consensus_to_quorum_store_receiver,
-        quorum_store_to_mempool_sender,
-        10_000,
-    );
-    let join_handle = tokio::spawn(quorum_store.start());
+    let quorum_store = DirectMempoolQuorumStore::new(quorum_store_to_mempool_sender, 10_000);
+    let join_handle = tokio::spawn(quorum_store.start(consensus_to_quorum_store_receiver));
 
     let (consensus_callback, consensus_callback_rcv) = oneshot::channel();
     consensus_to_quorum_store_sender
