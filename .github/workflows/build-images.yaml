@@ -18,7 +18,7 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
-      # - main - TODO - this disables main branch image building since we assume it's already being built from the auto branch before merging (due to how bors works), possibly reactivate this if we move away from bors
+      - main
       - auto
       - canary
       - devnet
