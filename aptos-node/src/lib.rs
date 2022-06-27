@@ -51,7 +51,7 @@ use std::{
         Arc,
     },
     thread,
-    time::Instant,
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
 use storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use storage_service_client::{StorageServiceClient, StorageServiceMultiSender};
@@ -115,6 +115,8 @@ pub fn start(config: &NodeConfig, log_file: Option<PathBuf>) {
     }
 }
 
+const EPOCH_LENGTH_SECS: u64 = 60;
+
 pub fn load_test_environment<R>(
     config_path: Option<PathBuf>,
     random_ports: bool,
@@ -161,11 +163,17 @@ pub fn load_test_environment<R>(
         if lazy {
             template.consensus.quorum_store_poll_count = u64::MAX;
         }
-
+        let now_secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         let builder = aptos_genesis::builder::Builder::new(&config_path, genesis_modules)
             .unwrap()
+            .with_allow_new_validators(true)
+            .with_epoch_duration_secs(EPOCH_LENGTH_SECS)
             .with_template(template)
-            .with_randomize_first_validator_ports(random_ports);
+            .with_randomize_first_validator_ports(random_ports)
+            .with_initial_lockup_timestamp(now_secs + EPOCH_LENGTH_SECS);
 
         let (root_key, _genesis, genesis_waypoint, validators) = builder.build(rng).unwrap();
 
