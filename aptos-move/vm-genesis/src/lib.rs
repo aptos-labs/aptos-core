@@ -134,6 +134,12 @@ pub fn encode_genesis_change_set(
     create_and_initialize_validators(&mut session, validators);
     reconfigure(&mut session);
 
+    // TODO: Make on chain governance parameters configurable in the genesis blob.
+    let enable_on_chain_governance = false;
+    if enable_on_chain_governance {
+        initialize_on_chain_governance(&mut session);
+    }
+
     let mut session1_out = session.finish().unwrap();
 
     let state_view = GenesisStateView::new();
@@ -264,6 +270,26 @@ fn create_and_initialize_main_accounts(
     );
 }
 
+/// Create and initialize Association and Core Code accounts.
+fn initialize_on_chain_governance(session: &mut SessionExt<impl MoveResolver>) {
+    // TODO: Make on chain governance parameters configurable in the genesis blob.
+    let min_voting_threshold = 0;
+    let required_proposer_stake = 0;
+    let voting_period_secs = 7 * 24 * 60 * 60; // 1 week.
+
+    exec_function(
+        session,
+        GOVERNANCE_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::U128(min_voting_threshold),
+            MoveValue::U64(required_proposer_stake),
+            MoveValue::U64(voting_period_secs),
+        ]),
+    );
+}
+
 /// Creates and initializes each validator owner and validator operator. This method creates all
 /// the required accounts, sets the validator operators for each validator owner, and sets the
 /// validator config on-chain.
@@ -312,8 +338,9 @@ fn publish_stdlib(session: &mut SessionExt<impl MoveResolver>, stdlib: Modules) 
         .map(|m| {
             let addr = *m.self_id().address();
             if let Some(a) = addr_opt {
-              assert!(
-                  a == addr,
+              assert_eq!(
+                  a,
+                  addr,
                   "All genesis modules must be published under the same address, but found modules under both {} and {}",
                   a.short_str_lossless(),
                   addr.short_str_lossless()
