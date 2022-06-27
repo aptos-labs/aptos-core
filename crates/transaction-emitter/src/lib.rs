@@ -23,7 +23,7 @@ use rand::{
 use rand_core::SeedableRng;
 use std::{
     cmp::{max, min},
-    collections::HashSet,
+    collections::HashMap,
     fmt,
     num::NonZeroU64,
     path::Path,
@@ -61,6 +61,7 @@ const MAX_VASP_ACCOUNT_NUM: usize = 16;
 pub struct EmitThreadParams {
     pub wait_millis: u64,
     pub wait_committed: bool,
+    pub txn_expiration_time_secs: u64,
 }
 
 impl Default for EmitThreadParams {
@@ -68,6 +69,7 @@ impl Default for EmitThreadParams {
         Self {
             wait_millis: 0,
             wait_committed: true,
+            txn_expiration_time_secs: 30,
         }
     }
 }
@@ -141,6 +143,7 @@ impl EmitJobRequest {
             .thread_params(EmitThreadParams {
                 wait_millis: wait_time,
                 wait_committed: true,
+                txn_expiration_time_secs: 30,
             })
             .accounts_per_client(1)
     }
@@ -220,47 +223,8 @@ impl SubmissionWorker {
                 }
             }
             if self.params.wait_committed {
-                if let Err(uncommitted) =
-                    wait_for_accounts_sequence(&self.client, &mut self.accounts).await
-                {
-                    let num_committed = (num_requests - uncommitted.len()) as u64;
-                    // To avoid negative result caused by uncommitted tx occur
-                    // Simplified from:
-                    // end_time * num_committed - (txn_offset_time/num_requests) * num_committed
-                    // to
-                    // (end_time - txn_offset_time / num_requests) * num_committed
-                    let latency = (Instant::now() - start_time).as_millis() as u64
-                        - txn_offset_time / num_requests as u64;
-                    let committed_latency = latency * num_committed as u64;
-                    self.stats
-                        .committed
-                        .fetch_add(num_committed, Ordering::Relaxed);
-                    self.stats
-                        .expired
-                        .fetch_add(uncommitted.len() as u64, Ordering::Relaxed);
-                    self.stats
-                        .latency
-                        .fetch_add(committed_latency, Ordering::Relaxed);
-                    self.stats
-                        .latencies
-                        .record_data_point(latency, num_committed);
-                    info!(
-                        "[{:?}] Transactions were not committed before expiration: {:?}",
-                        self.client, uncommitted
-                    );
-                } else {
-                    let latency = (Instant::now() - start_time).as_millis() as u64
-                        - txn_offset_time / num_requests as u64;
-                    self.stats
-                        .committed
-                        .fetch_add(num_requests as u64, Ordering::Relaxed);
-                    self.stats
-                        .latency
-                        .fetch_add(latency * num_requests as u64, Ordering::Relaxed);
-                    self.stats
-                        .latencies
-                        .record_data_point(latency, num_requests as u64);
-                }
+                self.update_stats(start_time, txn_offset_time, num_requests)
+                    .await
             }
             let now = Instant::now();
             if wait_until > now {
@@ -268,6 +232,69 @@ impl SubmissionWorker {
             }
         }
         self.accounts
+    }
+
+    async fn update_stats(
+        &mut self,
+        start_time: Instant,
+        txn_offset_time: u64,
+        num_requests: usize,
+    ) {
+        match wait_for_accounts_sequence(
+            &self.client,
+            &mut self.accounts,
+            self.params.txn_expiration_time_secs,
+        )
+        .await
+        {
+            Ok(()) => {
+                let latency = (Instant::now() - start_time).as_millis() as u64
+                    - txn_offset_time / num_requests as u64;
+                self.stats
+                    .committed
+                    .fetch_add(num_requests as u64, Ordering::Relaxed);
+                self.stats
+                    .latency
+                    .fetch_add(latency * num_requests as u64, Ordering::Relaxed);
+                self.stats
+                    .latencies
+                    .record_data_point(latency, num_requests as u64);
+            }
+            Err(committed_txn_info) => {
+                let num_committed = committed_txn_info
+                    .values()
+                    .map(|info| info.actual_sequence_number)
+                    .sum();
+                let num_uncommitted = committed_txn_info
+                    .values()
+                    .map(|info| info.uncommitted())
+                    .sum();
+                // To avoid negative result caused by uncommitted tx occur
+                // Simplified from:
+                // end_time * num_committed - (txn_offset_time/num_requests) * num_committed
+                // to
+                // (end_time - txn_offset_time / num_requests) * num_committed
+                let latency = (Instant::now() - start_time).as_millis() as u64
+                    - txn_offset_time / num_requests as u64;
+                let committed_latency = latency * num_committed as u64;
+                self.stats
+                    .committed
+                    .fetch_add(num_committed, Ordering::Relaxed);
+                self.stats
+                    .expired
+                    .fetch_add(num_uncommitted, Ordering::Relaxed);
+                self.stats
+                    .latency
+                    .fetch_add(committed_latency, Ordering::Relaxed);
+                self.stats
+                    .latencies
+                    .record_data_point(latency, num_committed);
+                info!(
+                    "[{:?}] Transactions were not committed before expiration: {:?}",
+                    self.client, committed_txn_info
+                );
+            }
+        }
     }
 
     fn gen_requests(&mut self, gas_price: u64) -> Vec<SignedTransaction> {
@@ -638,7 +665,7 @@ impl<'t> TxnEmitter<'t> {
         emit_job_request: EmitJobRequest,
     ) -> Result<TxnStats> {
         let job = self.start_job(emit_job_request).await?;
-        println!("starting emitting txns for {} secs", duration.as_secs());
+        println!("Starting emitting txns for {} secs", duration.as_secs());
         tokio::time::sleep(duration).await;
         let stats = self.stop_job(job).await;
         Ok(stats)
@@ -715,24 +742,65 @@ pub async fn execute_and_wait_transactions(
     Ok(())
 }
 
+#[derive(Debug)]
+struct CommittedTxnInfo {
+    pub expected_sequence_number: u64,
+    pub actual_sequence_number: u64, // AKA committed.
+}
+
+impl CommittedTxnInfo {
+    pub fn uncommitted(&self) -> u64 {
+        self.expected_sequence_number - self.actual_sequence_number
+    }
+}
+
+/// This function waits for the submitted transactions to be committed, up to
+/// a deadline. If some accounts still have uncommitted transactions when we
+/// hit the deadline, we return a map of account to the info about the number
+/// of committed transactions, based on the delta between the local sequence
+/// number and the actual sequence number returned by the account. Note, this
+/// can return possibly unexpected results if the emitter was emitting more
+/// transactions per account than the mempool limit of the accounts on the node.
+/// As it is now, the sequence number of the local account incrememnts regardless
+/// of whether the transaction is accepted into the node's mempool or not. So the
+/// local sequence number could be much higher than the real sequence number ever
+/// will be, since not all of the submitted transactions were accepted.
+/// TODO, investigate whether this behaviour is desirable.
 async fn wait_for_accounts_sequence(
     client: &RestClient,
     accounts: &mut [LocalAccount],
-) -> Result<(), Vec<AccountAddress>> {
-    let deadline = Instant::now() + Duration::from_secs(TXN_EXPIRATION_SECONDS); //TXN_MAX_WAIT;
+    txn_expiration_time_secs: u64,
+) -> Result<(), HashMap<AccountAddress, CommittedTxnInfo>> {
+    // TXN_EXPIRATION_SECONDS == TXN_MAX_WAIT
+    let wait = Duration::from_secs(min(txn_expiration_time_secs, TXN_EXPIRATION_SECONDS));
+    let deadline = Instant::now() + wait;
     let addresses: Vec<_> = accounts.iter().map(|d| d.address()).collect();
-    let mut uncommitted = addresses.clone().into_iter().collect::<HashSet<_>>();
+    let mut committed_txn_info = HashMap::new();
+    for account in accounts.iter() {
+        committed_txn_info.insert(
+            account.address(),
+            CommittedTxnInfo {
+                expected_sequence_number: account.sequence_number(),
+                actual_sequence_number: 0,
+            },
+        );
+    }
 
     while Instant::now() < deadline {
         match query_sequence_numbers(client, &addresses).await {
             Ok(sequence_numbers) => {
                 for (account, sequence_number) in zip(accounts.iter(), &sequence_numbers) {
                     if account.sequence_number() == *sequence_number {
-                        uncommitted.remove(&account.address());
+                        committed_txn_info.remove(&account.address());
+                    } else {
+                        committed_txn_info
+                            .get_mut(&account.address())
+                            .unwrap()
+                            .actual_sequence_number = *sequence_number;
                     }
                 }
 
-                if uncommitted.is_empty() {
+                if committed_txn_info.is_empty() {
                     return Ok(());
                 }
             }
@@ -747,7 +815,7 @@ async fn wait_for_accounts_sequence(
         time::sleep(Duration::from_millis(500)).await;
     }
 
-    Err(uncommitted.into_iter().collect())
+    Err(committed_txn_info)
 }
 
 pub async fn query_sequence_numbers(
@@ -787,7 +855,7 @@ where
             min(MAX_TXN_BATCH_SIZE, num_new_accounts - i),
         );
         let mut batch = if reuse_account {
-            println!("loading {} accounts if they exist", batch_size);
+            println!("Loading {} accounts if they exist", batch_size);
             gen_reusable_accounts(&client, batch_size, &mut rng).await?
         } else {
             let batch = gen_random_accounts(batch_size, &mut rng);
