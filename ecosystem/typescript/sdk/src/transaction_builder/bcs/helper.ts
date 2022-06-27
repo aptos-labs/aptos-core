@@ -39,3 +39,9 @@ export function bcsSerializeUint64(value: AnyNumber): Bytes {
   serializer.serializeU64(value);
   return serializer.getBytes();
 }
+
+export function bcsSerializeStr(value: string): Bytes {
+  const serializer = new Serializer();
+  serializer.serializeStr(value);
+  return serializer.getBytes();
+}

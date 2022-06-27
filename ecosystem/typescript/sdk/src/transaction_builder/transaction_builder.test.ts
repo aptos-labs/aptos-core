@@ -3,7 +3,7 @@ import * as Nacl from 'tweetnacl';
 import { bcsSerializeUint64, bcsToBytes, Bytes } from './bcs';
 import { HexString } from '../hex_string';
 
-import { TransactionBuilderEd25519 } from './index';
+import { TransactionBuilderEd25519, TransactionBuilder } from './index';
 import {
   AccountAddress,
   ChainId,
@@ -50,6 +50,13 @@ function sign(rawTxn: RawTransaction): Bytes {
 
   return txnBuilder.sign(rawTxn);
 }
+
+test('throws when preparing signing message with invalid payload', () => {
+  expect(() => {
+    // @ts-ignore
+    TransactionBuilder.getSigningMessage('invalid');
+  }).toThrow('Unknown transaction type.');
+});
 
 test('serialize script function payload with no type args', () => {
   const scriptFunctionPayload = new TransactionPayloadScriptFunction(
