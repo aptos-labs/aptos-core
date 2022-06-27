@@ -3,6 +3,7 @@ module AptosFramework::Genesis {
     use Std::Event;
     use Std::Vector;
     use AptosFramework::Account;
+    use AptosFramework::AptosGovernance;
     use AptosFramework::Coin;
     use AptosFramework::ConsensusConfig;
     use AptosFramework::TransactionPublishingOption;
@@ -35,6 +36,10 @@ module AptosFramework::Genesis {
         allow_validator_set_change: bool,
         rewards_rate: u64,
         rewards_rate_denominator: u64,
+        enable_on_chain_governance: bool,
+        min_voting_threshold: u128,
+        required_proposer_stake: u128,
+        voting_period_secs: u64,
     ) {
         initialize_internal(
             &core_resource_account,
@@ -55,6 +60,10 @@ module AptosFramework::Genesis {
             allow_validator_set_change,
             rewards_rate,
             rewards_rate_denominator,
+            enable_on_chain_governance,
+            min_voting_threshold,
+            required_proposer_stake,
+            voting_period_secs,
         )
     }
 
@@ -77,6 +86,10 @@ module AptosFramework::Genesis {
         allow_validator_set_change: bool,
         rewards_rate: u64,
         rewards_rate_denominator: u64,
+        enable_on_chain_governance: bool,
+        min_voting_threshold: u128,
+        required_proposer_stake: u128,
+        voting_period_secs: u64,
     ) {
         // initialize the core resource account
         Account::initialize(
@@ -130,6 +143,16 @@ module AptosFramework::Genesis {
 
         // Give TransactionFee BurnCapability<TestCoin> so it can burn gas.
         TransactionFee::store_test_coin_burn_cap(&core_framework_account, burn_cap);
+
+        // Initialize on-chain governanace, if enabled.
+        if (enable_on_chain_governance) {
+            AptosGovernance::initialize(
+                &core_framework_account,
+                min_voting_threshold,
+                required_proposer_stake,
+                voting_period_secs,
+            )
+        };
 
         // Pad the event counter for the Root account to match DPN. This
         // _MUST_ match the new epoch event counter otherwise all manner of
@@ -220,6 +243,10 @@ module AptosFramework::Genesis {
             true,
             0,
             1,
+            false,
+            0,
+            0,
+            0,
         )
     }
 
