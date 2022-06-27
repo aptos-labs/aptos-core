@@ -89,6 +89,7 @@ async fn emit_tx(cluster: &Cluster, args: &Args) -> Result<()> {
     let thread_params = EmitThreadParams {
         wait_millis: args.wait_millis,
         wait_committed: !args.burst,
+        txn_expiration_time_secs: args.txn_expiration_time_secs,
     };
     let duration = Duration::from_secs(args.duration);
     let client = cluster.random_instance().rest_client();
