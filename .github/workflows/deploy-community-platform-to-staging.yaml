@@ -5,6 +5,7 @@ on:
       - main
     paths:
       - "ecosystem/platform/server/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
