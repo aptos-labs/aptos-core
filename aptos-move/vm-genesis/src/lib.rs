@@ -232,6 +232,12 @@ fn create_and_initialize_main_accounts(
     let rewards_rate_denominator = 1_000_000;
     let rewards_rate_numerator = rewards_rate_per_epoch * rewards_rate_denominator;
 
+    // TODO: Make on chain governance parameters configurable in the genesis blob.
+    let enable_on_chain_governance = false;
+    let min_voting_threshold = 0;
+    let required_proposer_stake = 0;
+    let voting_period_secs = 7 * 24 * 60 * 60; // 1 week.
+
     // Block timestamps are in microseconds and epoch_interval is used to check if a block timestamp
     // has crossed into a new epoch. So epoch_interval also needs to be in micro seconds.
     let epoch_interval_usecs = epoch_duration_secs * MICRO_SECONDS_PER_SECOND;
@@ -259,6 +265,10 @@ fn create_and_initialize_main_accounts(
             MoveValue::Bool(allow_new_validators),
             MoveValue::U64(rewards_rate_numerator),
             MoveValue::U64(rewards_rate_denominator),
+            MoveValue::Bool(enable_on_chain_governance),
+            MoveValue::U128(min_voting_threshold),
+            MoveValue::U128(required_proposer_stake),
+            MoveValue::U64(voting_period_secs),
         ]),
     );
 }
