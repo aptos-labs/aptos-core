@@ -33,7 +33,8 @@ module AptosFramework::Genesis {
         min_lockup_duration_secs: u64,
         max_lockup_duration_secs: u64,
         allow_validator_set_change: bool,
-        rewards_rate_percentage: u64,
+        rewards_rate: u64,
+        rewards_rate_denominator: u64,
     ) {
         initialize_internal(
             &core_resource_account,
@@ -52,7 +53,8 @@ module AptosFramework::Genesis {
             min_lockup_duration_secs,
             max_lockup_duration_secs,
             allow_validator_set_change,
-            rewards_rate_percentage,
+            rewards_rate,
+            rewards_rate_denominator,
         )
     }
 
@@ -73,7 +75,8 @@ module AptosFramework::Genesis {
         min_lockup_duration_secs: u64,
         max_lockup_duration_secs: u64,
         allow_validator_set_change: bool,
-        rewards_rate_percentage: u64,
+        rewards_rate: u64,
+        rewards_rate_denominator: u64,
     ) {
         // initialize the core resource account
         Account::initialize(
@@ -103,7 +106,8 @@ module AptosFramework::Genesis {
             min_lockup_duration_secs,
             max_lockup_duration_secs,
             allow_validator_set_change,
-            rewards_rate_percentage,
+            rewards_rate,
+            rewards_rate_denominator,
         );
 
         VMConfig::initialize(
@@ -212,6 +216,7 @@ module AptosFramework::Genesis {
             0,
             true,
             0,
+            1,
         )
     }
 
