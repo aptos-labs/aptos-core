@@ -1,2 +1,2 @@
 ---
-allow_single_quoted_attributes: false
+allow_single_quoted_attributes: true

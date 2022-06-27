@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class AptosFormBuilder < ActionView::Helpers::FormBuilder
-  TEXT_FIELDS = %i[text_field email_field].freeze
+  TEXT_FIELDS = %i[text_field email_field url_field].freeze
   TEXT_FIELDS.each do |field|
     define_method field do |method, options = {}|
       options[:class] = [
