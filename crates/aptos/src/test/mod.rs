@@ -12,7 +12,7 @@ use crate::{
         init::InitTool,
         types::{
             CliConfig, CliTypedResult, EncodingOptions, PrivateKeyInputOptions, ProfileOptions,
-            PromptOptions, RestOptions, RngArgs, WriteTransactionOptions,
+            PromptOptions, RestOptions, RngArgs, TransactionOptions,
         },
     },
     CliCommand,
@@ -59,13 +59,13 @@ impl CliTestFramework {
         mint_key: &Ed25519PrivateKey,
     ) -> CliTypedResult<String> {
         CreateAccount {
-            encoding_options: Default::default(),
-            write_options: WriteTransactionOptions {
+            txn_options: TransactionOptions {
                 private_key_options: PrivateKeyInputOptions::from_private_key(mint_key)?,
-                rest_options: RestOptions::new(Some(self.endpoint.clone())),
-                max_gas: 1000,
+                encoding_options: Default::default(),
+                profile_options: profile(index),
+                rest_options: self.rest_options(),
+                gas_options: Default::default(),
             },
-            profile_options: profile(index),
             account: Self::account_id(index),
             use_faucet: false,
             faucet_options: Default::default(),
@@ -77,9 +77,7 @@ impl CliTestFramework {
 
     pub async fn create_account_with_faucet(&self, index: usize) -> CliTypedResult<String> {
         CreateAccount {
-            encoding_options: Default::default(),
-            write_options: Default::default(),
-            profile_options: profile(index),
+            txn_options: Default::default(),
             account: Self::account_id(index),
             use_faucet: true,
             faucet_options: Default::default(),
@@ -102,7 +100,7 @@ impl CliTestFramework {
 
     pub async fn list_account(&self, index: usize, query: ListQuery) -> CliTypedResult<Vec<Value>> {
         ListAccount {
-            rest_options: Default::default(),
+            rest_options: self.rest_options(),
             profile_options: profile(index),
             account: Some(Self::account_id(index)),
             query,
@@ -120,9 +118,13 @@ impl CliTestFramework {
         let receiver_account = Self::account_id(receiver_index);
 
         TransferCoins {
-            write_options: Default::default(),
-            encoding_options: Default::default(),
-            profile_options: profile(sender_index),
+            txn_options: TransactionOptions {
+                private_key_options: PrivateKeyInputOptions::default(),
+                encoding_options: Default::default(),
+                profile_options: profile(sender_index),
+                rest_options: self.rest_options(),
+                gas_options: Default::default(),
+            },
             account: receiver_account,
             amount,
         }
@@ -200,6 +202,10 @@ impl CliTestFramework {
         }
 
         result
+    }
+
+    pub fn rest_options(&self) -> RestOptions {
+        RestOptions::new(Some(self.endpoint.clone()))
     }
 
     pub fn account_id(index: usize) -> AccountAddress {

@@ -5,8 +5,9 @@ use crate::{
     common::{
         init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
         utils::{
-            check_if_file_exists, read_from_file, to_common_result, to_common_success_result,
-            write_to_file, write_to_file_with_opts, write_to_user_only_file,
+            chain_id, check_if_file_exists, get_sequence_number, read_from_file, to_common_result,
+            to_common_success_result, write_to_file, write_to_file_with_opts,
+            write_to_user_only_file,
         },
     },
     genesis::git::from_yaml,
@@ -18,7 +19,17 @@ use aptos_crypto::{
 use aptos_keygen::KeyGen;
 use aptos_logger::debug;
 use aptos_rest_client::{aptos_api_types::WriteSetChange, Client, Transaction};
-use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
+use aptos_sdk::{
+    move_types::{
+        ident_str,
+        language_storage::{ModuleId, TypeTag},
+    },
+    transaction_builder::TransactionFactory,
+    types::LocalAccount,
+};
+use aptos_types::transaction::{
+    authenticator::AuthenticationKey, ScriptFunction, TransactionPayload,
+};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
 use hex::FromHexError;
@@ -134,6 +145,12 @@ impl From<hex::FromHexError> for CliError {
 
 impl From<anyhow::Error> for CliError {
     fn from(e: anyhow::Error) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
+impl From<bcs::Error> for CliError {
+    fn from(e: bcs::Error) -> Self {
         CliError::UnexpectedError(e.to_string())
     }
 }
@@ -642,45 +659,6 @@ impl RestOptions {
     }
 }
 
-const DEFAULT_MAX_GAS: u64 = 1000;
-
-/// Options specific to submitting a private key to the Rest endpoint
-#[derive(Debug, Parser)]
-pub struct WriteTransactionOptions {
-    #[clap(flatten)]
-    pub private_key_options: PrivateKeyInputOptions,
-    #[clap(flatten)]
-    pub rest_options: RestOptions,
-    /// Maximum gas to be used to publish the package
-    ///
-    /// Defaults to 1000 gas units
-    #[clap(long, default_value_t = DEFAULT_MAX_GAS)]
-    pub max_gas: u64,
-}
-
-impl Default for WriteTransactionOptions {
-    fn default() -> Self {
-        Self {
-            private_key_options: Default::default(),
-            rest_options: Default::default(),
-            max_gas: DEFAULT_MAX_GAS,
-        }
-    }
-}
-
-impl WriteTransactionOptions {
-    /// Retrieve the chain id from onchain via the Rest API
-    pub async fn chain_id(&self, profile: &str) -> CliTypedResult<ChainId> {
-        let client = Client::new(self.rest_options.url(profile)?);
-        let state = client
-            .get_ledger_information()
-            .await
-            .map_err(|err| CliError::ApiError(err.to_string()))?
-            .into_inner();
-        Ok(ChainId::new(state.chain_id))
-    }
-}
-
 /// Options for compiling a move package dir
 #[derive(Debug, Parser)]
 pub struct MovePackageDir {
@@ -889,5 +867,112 @@ impl FaucetOptions {
                 CliError::UnexpectedError(format!("Failed to parse default faucet URL {}", err))
             })
         }
+    }
+}
+
+pub const DEFAULT_MAX_GAS: u64 = 1000;
+pub const DEFAULT_GAS_UNIT_PRICE: u64 = 1;
+
+/// Gas price options for manipulating how to prioritize transactions
+#[derive(Debug, Eq, Parser, PartialEq)]
+pub struct GasOptions {
+    /// Amount to increase gas bid by for a transaction
+    ///
+    /// Defaults to 1 coin per gas unit
+    #[clap(long, default_value_t = DEFAULT_GAS_UNIT_PRICE)]
+    pub gas_unit_price: u64,
+    /// Maximum gas to be used to send a transaction
+    ///
+    /// Defaults to 1000 gas units
+    #[clap(long, default_value_t = DEFAULT_MAX_GAS)]
+    pub max_gas: u64,
+}
+
+impl Default for GasOptions {
+    fn default() -> Self {
+        GasOptions {
+            gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas: DEFAULT_MAX_GAS,
+        }
+    }
+}
+
+/// Common options for interacting with an account for a validator
+#[derive(Debug, Default, Parser)]
+pub struct TransactionOptions {
+    #[clap(flatten)]
+    pub(crate) private_key_options: PrivateKeyInputOptions,
+    #[clap(flatten)]
+    pub(crate) encoding_options: EncodingOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) gas_options: GasOptions,
+}
+
+impl TransactionOptions {
+    /// Retrieves the private key
+    fn private_key(&self) -> CliTypedResult<Ed25519PrivateKey> {
+        self.private_key_options.extract_private_key(
+            self.encoding_options.encoding,
+            &self.profile_options.profile,
+        )
+    }
+
+    /// Builds a rest client
+    fn rest_client(&self) -> CliTypedResult<Client> {
+        Ok(Client::new(
+            self.rest_options.url(&self.profile_options.profile)?,
+        ))
+    }
+
+    /// Submits a script function based on module name and function inputs
+    pub async fn submit_script_function(
+        &self,
+        address: AccountAddress,
+        module: &'static str,
+        function: &'static str,
+        type_args: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+    ) -> CliTypedResult<Transaction> {
+        let txn = TransactionPayload::ScriptFunction(ScriptFunction::new(
+            ModuleId::new(address, ident_str!(module).to_owned()),
+            ident_str!(function).to_owned(),
+            type_args,
+            args,
+        ));
+        self.submit_transaction(txn).await
+    }
+
+    /// Submit a transaction
+    pub async fn submit_transaction(
+        &self,
+        payload: TransactionPayload,
+    ) -> CliTypedResult<Transaction> {
+        let sender_key = self.private_key()?;
+        let client = self.rest_client()?;
+
+        // Get sender address
+        let sender_address = AuthenticationKey::ed25519(&sender_key.public_key()).derived_address();
+        let sender_address = AccountAddress::new(*sender_address);
+
+        // Get sequence number for account
+        let sequence_number = get_sequence_number(&client, sender_address).await?;
+
+        // Sign and submit transaction
+        let transaction_factory = TransactionFactory::new(chain_id(&client).await?)
+            .with_gas_unit_price(self.gas_options.gas_unit_price)
+            .with_max_gas_amount(self.gas_options.max_gas);
+        let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
+        let transaction =
+            sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
+        let response = client
+            .submit_and_wait(&transaction)
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?;
+
+        Ok(response.into_inner())
     }
 }

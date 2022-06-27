@@ -1,10 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{
-    types::{CliCommand, CliTypedResult, EncodingOptions, ProfileOptions, WriteTransactionOptions},
-    utils::submit_transaction,
-};
+use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions};
 use aptos_rest_client::{aptos_api_types::WriteSetChange, Transaction};
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
@@ -18,13 +15,7 @@ use std::collections::BTreeMap;
 #[derive(Debug, Parser)]
 pub struct TransferCoins {
     #[clap(flatten)]
-    pub(crate) write_options: WriteTransactionOptions,
-
-    #[clap(flatten)]
-    pub(crate) encoding_options: EncodingOptions,
-
-    #[clap(flatten)]
-    pub(crate) profile_options: ProfileOptions,
+    pub(crate) txn_options: TransactionOptions,
 
     /// Address of account you want to send coins to
     #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
@@ -42,24 +33,13 @@ impl CliCommand<TransferSummary> for TransferCoins {
     }
 
     async fn execute(self) -> CliTypedResult<TransferSummary> {
-        let sender_key = self.write_options.private_key_options.extract_private_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )?;
-
-        submit_transaction(
-            self.write_options
-                .rest_options
-                .url(&self.profile_options.profile)?,
-            self.write_options
-                .chain_id(&self.profile_options.profile)
-                .await?,
-            sender_key,
-            aptos_stdlib::encode_test_coin_transfer(self.account, self.amount),
-            self.write_options.max_gas,
-        )
-        .await
-        .map(TransferSummary::from)
+        self.txn_options
+            .submit_transaction(aptos_stdlib::encode_test_coin_transfer(
+                self.account,
+                self.amount,
+            ))
+            .await
+            .map(TransferSummary::from)
     }
 }
 

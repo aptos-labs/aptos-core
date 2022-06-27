@@ -2,11 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::{
-    types::{
-        CliCommand, CliTypedResult, EncodingOptions, FaucetOptions, ProfileOptions,
-        WriteTransactionOptions,
-    },
-    utils::{fund_account, submit_transaction},
+    types::{CliCommand, CliTypedResult, FaucetOptions, TransactionOptions},
+    utils::fund_account,
 };
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
@@ -20,11 +17,7 @@ pub const DEFAULT_FUNDED_COINS: u64 = 10000;
 #[derive(Debug, Parser)]
 pub struct CreateAccount {
     #[clap(flatten)]
-    pub(crate) encoding_options: EncodingOptions,
-    #[clap(flatten)]
-    pub(crate) write_options: WriteTransactionOptions,
-    #[clap(flatten)]
-    pub(crate) profile_options: ProfileOptions,
+    pub(crate) txn_options: TransactionOptions,
     /// Address to create account for
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
@@ -49,7 +42,7 @@ impl CliCommand<String> for CreateAccount {
         if self.use_faucet {
             fund_account(
                 self.faucet_options
-                    .faucet_url(&self.profile_options.profile)?,
+                    .faucet_url(&self.txn_options.profile_options.profile)?,
                 self.initial_coins,
                 self.account,
             )
@@ -63,23 +56,9 @@ impl CliCommand<String> for CreateAccount {
 
 impl CreateAccount {
     async fn create_account_with_key(self, address: AccountAddress) -> CliTypedResult<()> {
-        let sender_key = self.write_options.private_key_options.extract_private_key(
-            self.encoding_options.encoding,
-            &self.profile_options.profile,
-        )?;
-
-        submit_transaction(
-            self.write_options
-                .rest_options
-                .url(&self.profile_options.profile)?,
-            self.write_options
-                .chain_id(&self.profile_options.profile)
-                .await?,
-            sender_key,
-            aptos_stdlib::encode_account_create_account(address),
-            self.write_options.max_gas,
-        )
-        .await?;
+        self.txn_options
+            .submit_transaction(aptos_stdlib::encode_account_create_account(address))
+            .await?;
         Ok(())
     }
 }
