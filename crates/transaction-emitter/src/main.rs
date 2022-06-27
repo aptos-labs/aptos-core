@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use ::aptos_logger::{Level, Logger};
 use anyhow::{bail, format_err, Result};
 use aptos::common::types::EncodingType;
 use aptos_config::{config::DEFAULT_PORT, keys::ConfigKey};
@@ -66,6 +67,8 @@ struct Args {
 
 #[tokio::main]
 pub async fn main() {
+    Logger::builder().level(Level::Info).build();
+
     let args = Args::from_args();
 
     if !args.emit_tx && !args.diag {

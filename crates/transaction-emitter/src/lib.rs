@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use ::aptos_logger::*;
-use anyhow::{format_err, Context, Result};
+use anyhow::{format_err, Result};
 use aptos_rest_client::{Client as RestClient, PendingTransaction, Response};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -385,13 +385,13 @@ impl<'t> TxnEmitter<'t> {
 
     pub async fn get_money_source(&mut self, coins_total: u64) -> Result<&mut LocalAccount> {
         let client = self.client.clone();
-        println!("Creating and minting faucet account");
+        info!("Creating and minting faucet account");
         let faucet_account = &mut self.root_account;
         let balance = client
             .get_account_balance(faucet_account.address())
             .await?
             .into_inner();
-        println!(
+        info!(
             "Root account current balances are {}, requested {} coins",
             balance.get(),
             coins_total
@@ -516,12 +516,12 @@ impl<'t> TxnEmitter<'t> {
         )
         .await
         .map_err(|e| format_err!("Failed to mint seed_accounts: {}", e))?;
-        println!(
+        info!(
             "Completed minting {} seed accounts, each with {} coins",
             seed_accounts.len(),
             coins_per_seed_account
         );
-        println!(
+        info!(
             "Minting additional {} accounts with {} coins each",
             num_accounts, coins_per_account
         );
@@ -553,7 +553,7 @@ impl<'t> TxnEmitter<'t> {
             });
         let mut minted_accounts = try_join_all(account_futures)
             .await
-            .context("Failed to mint accounts")?
+            .map_err(|e| format_err!("Failed to mint accounts: {}", e))?
             .into_iter()
             .flatten()
             .collect();
@@ -565,7 +565,7 @@ impl<'t> TxnEmitter<'t> {
             total_requested_accounts,
             self.accounts.len()
         );
-        println!("Mint is done");
+        info!("Successfully completed mint");
         Ok(())
     }
 
@@ -582,13 +582,13 @@ impl<'t> TxnEmitter<'t> {
             }
         };
         let num_clients = req.rest_clients.len() * workers_per_endpoint;
-        println!(
-            "Will use {} workers per endpoint with total {} endpoint clients",
+        info!(
+            "Will use {} workers per endpoint for a total of {} endpoint clients",
             workers_per_endpoint, num_clients
         );
         let num_accounts = req.accounts_per_client * num_clients;
-        println!(
-            "Will create {} accounts_per_client with total {} accounts",
+        info!(
+            "Will create {} accounts_per_client for a total of {} accounts",
             req.accounts_per_client, num_accounts
         );
         self.mint_accounts(&req, num_accounts).await?;
@@ -622,7 +622,7 @@ impl<'t> TxnEmitter<'t> {
                 workers.push(Worker { join_handle });
             }
         }
-        println!("Tx emitter workers started");
+        info!("Tx emitter workers started");
         Ok(EmitJob {
             workers,
             stop,
@@ -655,7 +655,7 @@ impl<'t> TxnEmitter<'t> {
             let stats = self.peek_job_stats(job);
             let delta = &stats - &prev_stats.unwrap_or_default();
             prev_stats = Some(stats);
-            println!("{}", delta.rate(window));
+            info!("{}", delta.rate(window));
         }
     }
 
@@ -665,7 +665,7 @@ impl<'t> TxnEmitter<'t> {
         emit_job_request: EmitJobRequest,
     ) -> Result<TxnStats> {
         let job = self.start_job(emit_job_request).await?;
-        println!("Starting emitting txns for {} secs", duration.as_secs());
+        info!("Starting emitting txns for {} secs", duration.as_secs());
         tokio::time::sleep(duration).await;
         let stats = self.stop_job(job).await;
         Ok(stats)
@@ -730,7 +730,7 @@ pub async fn execute_and_wait_transactions(
         client
             .wait_for_transaction(&pt.into_inner())
             .await
-            .context("wait for transactions failed")?;
+            .map_err(|e| format_err!("Failed to wait for transactions: {}", e))?;
     }
 
     debug!(
@@ -805,7 +805,7 @@ async fn wait_for_accounts_sequence(
                 }
             }
             Err(e) => {
-                println!(
+                info!(
                     "Failed to query ledger info on accounts {:?} for instance {:?} : {:?}",
                     addresses, client, e
                 );
@@ -825,7 +825,7 @@ pub async fn query_sequence_numbers(
     Ok(
         try_join_all(addresses.iter().map(|address| client.get_account(*address)))
             .await
-            .context("get accounts failed")?
+            .map_err(|e| format_err!("Get accounts failed: {}", e))?
             .into_iter()
             .map(|resp| resp.into_inner().sequence_number)
             .collect(),
@@ -855,7 +855,7 @@ where
             min(MAX_TXN_BATCH_SIZE, num_new_accounts - i),
         );
         let mut batch = if reuse_account {
-            println!("Loading {} accounts if they exist", batch_size);
+            info!("Loading {} accounts if they exist", batch_size);
             gen_reusable_accounts(&client, batch_size, &mut rng).await?
         } else {
             let batch = gen_random_accounts(batch_size, &mut rng);
