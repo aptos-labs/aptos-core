@@ -39,12 +39,31 @@ test(
 
     // Transfer Token from Alice's Account to Bob's Account
     await tokenClient.getCollectionData(alice.address().hex(), collectionName);
-    await tokenClient.getTokenBalance(alice.address().hex(), collectionName, tokenName);
-    await tokenClient.getTokenData(alice.address().hex(), collectionName, tokenName);
+    let aliceBalance = await tokenClient.getTokenBalance(alice.address().hex(), collectionName, tokenName);
+    expect(aliceBalance.value).toBe('1');
+    const tokenData = await tokenClient.getTokenData(alice.address().hex(), collectionName, tokenName);
+    expect(tokenData.collection).toBe('AliceCollection');
+
     await tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName, 1);
+    aliceBalance = await tokenClient.getTokenBalance(alice.address().hex(), collectionName, tokenName);
+    expect(aliceBalance.value).toBe('0');
+
     await tokenClient.cancelTokenOffer(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName);
+    aliceBalance = await tokenClient.getTokenBalance(alice.address().hex(), collectionName, tokenName);
+    expect(aliceBalance.value).toBe('1');
+
     await tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collectionName, tokenName, 1);
+    aliceBalance = await tokenClient.getTokenBalance(alice.address().hex(), collectionName, tokenName);
+    expect(aliceBalance.value).toBe('0');
+
     await tokenClient.claimToken(bob, alice.address().hex(), alice.address().hex(), collectionName, tokenName);
+
+    const bobBalance = await tokenClient.getTokenBalanceForAccount(bob.address().hex(), {
+      creator: alice.address().hex(),
+      collection: collectionName,
+      name: tokenName,
+    });
+    expect(bobBalance.value).toBe('1');
   },
   30 * 1000,
 );

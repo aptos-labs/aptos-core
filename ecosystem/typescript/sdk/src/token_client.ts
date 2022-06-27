@@ -1,7 +1,7 @@
 import { AptosAccount } from './aptos_account';
 import { AptosClient } from './aptos_client';
 import { Types } from './types';
-import { MaybeHexString } from './hex_string';
+import { HexString, MaybeHexString } from './hex_string';
 
 /**
  * Class for creating, minting and managing minting NFT collections and tokens
@@ -261,11 +261,11 @@ export class TokenClient {
     };
 
     const tableItem = await this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
-    return tableItem;
+    return tableItem.data;
   }
 
   /**
-   * Queries specific token from account's TokenStore
+   * Queries token balance for the token creator
    * @param creator Hex-encoded 16 bytes Aptos account address which created a token
    * @param collectionName Name of collection, which holds a token
    * @param tokenName Token name
@@ -278,16 +278,40 @@ export class TokenClient {
    * ```
    */
   async getTokenBalance(creator: MaybeHexString, collectionName: string, tokenName: string): Promise<Types.Token> {
+    return this.getTokenBalanceForAccount(creator, {
+      creator: creator instanceof HexString ? creator.hex() : creator,
+      collection: collectionName,
+      name: tokenName,
+    });
+  }
+
+  /**
+   * Queries specific token from account's TokenStore
+   * @param account Hex-encoded 16 bytes Aptos account address which created a token
+   * @param tokenId token id
+   *
+   * @example
+   * ```
+   * {
+   *   creator: '0x1',
+   *   collection: 'Some collection',
+   *   name: 'Awesome token'
+   * }
+   * ```
+   * @returns Token object in below format
+   * ```
+   * Token {
+   *   id: TokenId;
+   *   value: number;
+   * }
+   * ```
+   */
+  async getTokenBalanceForAccount(account: MaybeHexString, tokenId: Types.TokenId): Promise<Types.Token> {
     const tokenStore: { type: string; data: any } = await this.aptosClient.getAccountResource(
-      creator,
+      account,
       '0x1::Token::TokenStore',
     );
     const { handle } = tokenStore.data.tokens;
-    const tokenId = {
-      creator,
-      collection: collectionName,
-      name: tokenName,
-    };
 
     const getTokenTableItemRequest: Types.TableItemRequest = {
       key_type: '0x1::Token::TokenId',
@@ -296,6 +320,6 @@ export class TokenClient {
     };
 
     const tableItem = await this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
-    return tableItem?.data;
+    return tableItem.data;
   }
 }
