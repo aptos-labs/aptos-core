@@ -453,7 +453,7 @@ module AptosFramework::Stake {
     }
 
     /// This can only called by the operator of the validator/staking pool.
-    public fun join_validator_set(
+    public(script) fun join_validator_set(
         account: &signer,
         pool_address: address,
     ) acquires StakePool, StakePoolEvents, ValidatorConfig, ValidatorSetConfiguration, ValidatorSet {
@@ -587,7 +587,7 @@ module AptosFramework::Stake {
     /// is still operational.
     ///
     /// Can only be called by the operator of the validator/staking pool.
-    public fun leave_validator_set(
+    public(script) fun leave_validator_set(
         account: &signer,
         pool_address: address,
     ) acquires StakePool, StakePoolEvents, ValidatorSet, ValidatorSetConfiguration {

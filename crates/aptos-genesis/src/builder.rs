@@ -351,6 +351,9 @@ fn write_yaml<T: Serialize>(path: &Path, object: &T) -> anyhow::Result<()> {
     Ok(())
 }
 
+const ONE_DAY: u64 = 86400;
+const ONE_YEAR: u64 = 31536000;
+
 /// Builder that builds a network of validator nodes that can run locally
 #[derive(Clone)]
 pub struct Builder {
@@ -360,12 +363,27 @@ pub struct Builder {
     randomize_first_validator_ports: bool,
     template: NodeConfig,
     min_price_per_gas_unit: u64,
+    allow_new_validators: bool,
+    min_stake: u64,
+    max_stake: u64,
+    min_lockup_duration_secs: u64,
+    max_lockup_duration_secs: u64,
+    epoch_duration_secs: u64,
+    initial_lockup_timestamp: u64,
 }
 
 impl Builder {
     pub fn new(config_dir: &Path, move_modules: Vec<Vec<u8>>) -> anyhow::Result<Self> {
         let config_dir: PathBuf = config_dir.into();
         let config_dir = config_dir.canonicalize()?;
+
+        // Default initial validator lockup expiration to now + 1 day.
+        let now_secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let initial_validator_lockup_expiration = now_secs + ONE_DAY;
+
         Ok(Self {
             config_dir,
             move_modules,
@@ -373,6 +391,13 @@ impl Builder {
             randomize_first_validator_ports: true,
             template: NodeConfig::default_for_validator(),
             min_price_per_gas_unit: 1,
+            allow_new_validators: false,
+            min_stake: 0,
+            max_stake: u64::MAX,
+            min_lockup_duration_secs: 0,
+            max_lockup_duration_secs: ONE_YEAR,
+            epoch_duration_secs: ONE_DAY,
+            initial_lockup_timestamp: initial_validator_lockup_expiration,
         })
     }
 
@@ -393,6 +418,41 @@ impl Builder {
 
     pub fn with_min_price_per_gas_unit(mut self, min_price_per_gas_unit: u64) -> Self {
         self.min_price_per_gas_unit = min_price_per_gas_unit;
+        self
+    }
+
+    pub fn with_allow_new_validators(mut self, allow_new_validators: bool) -> Self {
+        self.allow_new_validators = allow_new_validators;
+        self
+    }
+
+    pub fn with_min_stake(mut self, min_stake: u64) -> Self {
+        self.min_stake = min_stake;
+        self
+    }
+
+    pub fn with_max_stake(mut self, max_stake: u64) -> Self {
+        self.max_stake = max_stake;
+        self
+    }
+
+    pub fn with_min_lockup_duration_secs(mut self, min_lockup_duration_secs: u64) -> Self {
+        self.min_lockup_duration_secs = min_lockup_duration_secs;
+        self
+    }
+
+    pub fn with_max_lockup_duration_secs(mut self, max_lockup_duration_secs: u64) -> Self {
+        self.max_lockup_duration_secs = max_lockup_duration_secs;
+        self
+    }
+
+    pub fn with_epoch_duration_secs(mut self, epoch_duration_secs: u64) -> Self {
+        self.epoch_duration_secs = epoch_duration_secs;
+        self
+    }
+
+    pub fn with_initial_lockup_timestamp(mut self, initial_lockup_timestamp: u64) -> Self {
+        self.initial_lockup_timestamp = initial_lockup_timestamp;
         self
     }
 
@@ -499,13 +559,6 @@ impl Builder {
             configs.push(validator.try_into()?);
         }
 
-        // Default initial validator lockup expiration to now + 1 day.
-        let now_secs = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        let initial_validator_lockup_expiration = now_secs + 86400;
-
         // Build genesis & waypoint
         let mut genesis_info = GenesisInfo::new(
             ChainId::test(),
@@ -513,13 +566,13 @@ impl Builder {
             configs,
             self.move_modules.clone(),
             self.min_price_per_gas_unit,
-            false,
-            0,
-            u64::MAX,
-            0,        // 1 day
-            31536000, // 1 year
-            86400,    // 1 day
-            initial_validator_lockup_expiration,
+            self.allow_new_validators,
+            self.min_stake,
+            self.max_stake,
+            self.min_lockup_duration_secs,
+            self.max_lockup_duration_secs,
+            self.epoch_duration_secs,
+            self.initial_lockup_timestamp,
         )?;
         let waypoint = genesis_info.generate_waypoint()?;
         let genesis = genesis_info.get_genesis();

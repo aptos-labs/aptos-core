@@ -320,6 +320,18 @@ pub struct ProfileOptions {
     pub profile: String,
 }
 
+impl ProfileOptions {
+    pub fn account_address(&self) -> CliTypedResult<AccountAddress> {
+        if let Some(profile) = CliConfig::load_profile(&self.profile)? {
+            if let Some(account) = profile.account {
+                return Ok(account);
+            }
+        }
+
+        Err(CliError::ConfigNotFoundError(self.profile.clone()))
+    }
+}
+
 impl Default for ProfileOptions {
     fn default() -> Self {
         Self {
