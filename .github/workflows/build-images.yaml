@@ -14,7 +14,7 @@ name: "Build+Push Images"
 on: # build on main branch OR when a PR is labeled with `CICD:build-images`
   # Allow us to run this specific workflow without a PR
   workflow_dispatch:
-  pull_request_target:
+  pull_request:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
@@ -68,6 +68,37 @@ jobs:
           required-permission: write
           comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
 
+  cache-images:
+    # trigger only for push events (on protected branches as defined above) OR on PR events with the "CICD:build-images" label.
+    # needs: permission-check
+
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ env.GIT_SHA }}
+
+      - uses: ./.github/actions/gar-auth
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - uses: ./.github/actions/docker-buildx-setup
+
+      # - uses: ./.github/actions/rust-setup
+
+      - name: Build and push
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: docker/rust-all.Dockerfile
+          push: true
+          tags: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/forge-gha-cache:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          target: faucet
+          build-args: IMAGE_TARGET=test
+
   rust-images:
     # trigger only for push events (on protected branches as defined above) OR on PR events with the "CICD:build-images" label.
     needs: permission-check
@@ -96,7 +127,7 @@ jobs:
       - uses: ./.github/actions/docker-buildx-setup
 
       - name: Build and Push Rust images
-        run: docker/docker-bake-rust-all.sh
+        run: docker/docker-bake-rust-all.sh --push
         env:
           IMAGE_TARGET: ${{ matrix.IMAGE_TARGET }}
           GIT_BRANCH: ${{ github.head_ref }}

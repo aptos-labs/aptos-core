@@ -3,6 +3,14 @@
 # Check https://crazymax.dev/docker-allhands2-buildx-bake and https://docs.docker.com/engine/reference/commandline/buildx_bake/#file-definition for an intro.
 
 variable "BUILD_DATE" {}
+variable "CI" {
+  # whether this build runs in aptos-labs' CI environment which makes certain assumptions about certain registries being available to push
+  # to and 
+  default = "true"
+}
+
+
+foo bar
 
 variable "GITHUB_SHA" {}
 // this is the full GIT_SHA - let's use that as primary identifier going forward
@@ -20,12 +28,9 @@ variable "GCP_DOCKER_ARTIFACT_REPO" {}
 
 variable "AWS_ECR_ACCOUNT_NUM" {}
 
+
 variable "ecr_base" {
   default = "${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.us-west-2.amazonaws.com/aptos"
-}
-
-variable "gh_image_cache" {
-  default = "ghcr.io/aptos-labs/aptos-core"
 }
 
 variable "normalized_git_branch" {
@@ -149,22 +154,27 @@ target "forge" {
 
 function "generate_cache_from" {
   params = [target]
-  result = [
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-main",
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-auto",
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${normalized_git_branch}"
-  ]
+  result = CI == "true" ? [
+    // "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-main",
+    // "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-auto",
+    // "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${normalized_git_branch}",
+    "type=gha"
+  ] : []
 }
 
 function "generate_cache_to" {
   params = [target]
-  result = ["type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${normalized_git_branch},mode=max"]
+  result = CI == "true" ? [
+    "type=gha,mode=max"
+    // "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${normalized_git_branch},mode=max"
+  ] : []
 }
 
 function "generate_tags" {
   params = [target]
-  result = [
+  result = CI == "true" ? [
+
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${GIT_SHA}",
     "${ecr_base}/${target}:${GIT_SHA}", // only tag with full GIT_SHA unless it turns out we really need any of the other variations
-  ]
+  ] : ["aptos-core/${target}:${GIT_SHA}"]
 }
