@@ -65,12 +65,15 @@ impl ValidatorSetStream {
             .set(mismatch);
     }
 
-    fn extract_updates(&mut self, payload: OnChainConfigPayload) -> PeerSet {
+    fn extract_updates(
+        &mut self,
+        payload: OnChainConfigPayload,
+    ) -> Result<PeerSet, DiscoveryError> {
         let _process_timer = EVENT_PROCESSING_LOOP_BUSY_DURATION_S.start_timer();
 
-        let node_set: ValidatorSet = payload
-            .get()
-            .expect("failed to get ValidatorSet from payload");
+        let node_set: ValidatorSet = payload.get().map_err(|err| {
+            DiscoveryError::Parsing(format!("Failed to get ValidatorSet from payload {}", err))
+        })?;
 
         let peer_set = extract_validator_set_updates(self.network_context, node_set);
         // Ensure that the public key matches what's onchain for this peer
@@ -87,7 +90,7 @@ impl ValidatorSetStream {
             peer_set.len() as u64,
         );
 
-        peer_set
+        Ok(peer_set)
     }
 }
 
@@ -99,7 +102,7 @@ impl Stream for ValidatorSetStream {
             .poll_next(cx)
             .map(|maybe_notification| {
                 maybe_notification
-                    .map(|notification| Ok(self.extract_updates(notification.on_chain_configs)))
+                    .map(|notification| self.extract_updates(notification.on_chain_configs))
             })
     }
 }
@@ -117,6 +120,11 @@ fn extract_validator_set_updates(
         .map(|info| {
             let peer_id = *info.account_address();
             let config = info.into_config();
+            let peer_role = if is_validator {
+                PeerRole::Validator
+            } else {
+                PeerRole::ValidatorFullNode
+            };
 
             let addrs = if is_validator {
                 config
@@ -132,18 +140,15 @@ fn extract_validator_set_updates(
 
                 warn!(
                     NetworkSchema::new(&network_context),
-                    "OnChainDiscovery: Failed to parse any network address: peer: {}, err: {}",
+                    "OnChainDiscovery: Failed to parse any network address: role: {:?} peer: {}, err: {}",
+                    peer_role,
                     peer_id,
                     err
                 )
             })
             .unwrap_or_default();
 
-            let peer_role = if is_validator {
-                PeerRole::Validator
-            } else {
-                PeerRole::ValidatorFullNode
-            };
+
             (peer_id, Peer::from_addrs(peer_role, addrs))
         })
         .collect()
