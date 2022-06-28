@@ -112,7 +112,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(count by (failure_domain_beta_kubernetes_io_region\n) (count by (owner, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\"}))) / ignoring(failure_domain_beta_kubernetes_io_region) group_left count(count by (owner, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\"}))",
+          "expr": "(count by (failure_domain_beta_kubernetes_io_region\n) (count by (kubernetes_pod_name, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\"}))) / ignoring(failure_domain_beta_kubernetes_io_region) group_left count(count by (kubernetes_pod_name, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\"}))",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -230,7 +230,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})) / (count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})))",
+          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})))",
           "hide": false,
           "instant": false,
           "interval": "",
@@ -238,7 +238,7 @@
           "refId": "A"
         },
         {
-          "expr": "count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})) / (count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})))",
+          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})))",
           "hide": false,
           "instant": false,
           "interval": "",
@@ -246,7 +246,7 @@
           "refId": "B"
         },
         {
-          "expr": "count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})) / (count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})))",
+          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})))",
           "hide": false,
           "instant": false,
           "interval": "",
@@ -254,7 +254,7 @@
           "refId": "C"
         },
         {
-          "expr": "count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})) / (count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})))",
+          "expr": "count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})) / (count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})) + count(count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})))",
           "hide": false,
           "instant": false,
           "interval": "",
@@ -372,7 +372,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "count by (beta_kubernetes_io_instance_type\n) (count by (owner, beta_kubernetes_io_instance_type\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\"}))",
+          "expr": "count by (beta_kubernetes_io_instance_type\n) (count by (kubernetes_pod_name, beta_kubernetes_io_instance_type\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\"}))",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -490,11 +490,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "count by (owner, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\"})",
+          "expr": "count by (kubernetes_pod_name, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\"})",
           "format": "time_series",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{owner}}-{{failure_domain_beta_kubernetes_io_region}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{failure_domain_beta_kubernetes_io_region}}",
           "refId": "A"
         }
       ],
@@ -608,35 +608,35 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})",
+          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})",
           "hide": false,
           "instant": false,
           "interval": "",
-          "legendFormat": "{{owner}}-AWS",
+          "legendFormat": "{{kubernetes_pod_name}}-AWS",
           "refId": "A"
         },
         {
-          "expr": "count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})",
+          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})",
           "hide": false,
           "instant": false,
           "interval": "",
-          "legendFormat": "{{owner}}-Azure",
+          "legendFormat": "{{kubernetes_pod_name}}-Azure",
           "refId": "B"
         },
         {
-          "expr": "count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})",
+          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})",
           "hide": false,
           "instant": false,
           "interval": "",
-          "legendFormat": "{{owner}}-GCP",
+          "legendFormat": "{{kubernetes_pod_name}}-GCP",
           "refId": "C"
         },
         {
-          "expr": "count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})",
+          "expr": "count by (kubernetes_pod_name) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})",
           "hide": false,
           "instant": false,
           "interval": "",
-          "legendFormat": "{{owner}}-Scaleway",
+          "legendFormat": "{{kubernetes_pod_name}}-Scaleway",
           "refId": "D"
         }
       ],
@@ -733,9 +733,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(kubernetes_build_info{chain_name=~\"$chain_name\"}) by (owner, git_version)",
+          "expr": "sum(kubernetes_build_info{chain_name=~\"$chain_name\"}) by (kubernetes_pod_name, git_version)",
           "interval": "",
-          "legendFormat": "{{owner}}-{{git_version}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{git_version}}",
           "refId": "A"
         }
       ],

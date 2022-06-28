@@ -133,8 +133,8 @@
             "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", type=\"synced\"}",
-          "legendFormat": "{{owner}}-{{role}}",
+          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"synced\"}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "range": true,
           "refId": "A"
         }
@@ -199,8 +199,8 @@
             "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", type=\"synced\"}",
-          "legendFormat": "{{owner}}-{{role}}",
+          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"synced\"}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "range": true,
           "refId": "A"
         }
@@ -265,9 +265,9 @@
             "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "clamp_min(aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", data_type=\"transactions\"} - on(owner,role) aptos_state_sync_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", type=\"synced\"}, 0)",
+          "expr": "clamp_min(aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", data_type=\"transactions\"} - on(kubernetes_pod_name,role) aptos_state_sync_version{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"synced\"}, 0)",
           "hide": false,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "range": true,
           "refId": "A"
         }
@@ -356,8 +356,8 @@
             "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "rate(aptos_state_sync_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\",type=\"synced\"}[$interval])",
-          "legendFormat": "{{owner}}-{{role}}-{{type}}",
+          "expr": "rate(aptos_state_sync_version{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\",type=\"synced\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{type}}",
           "range": true,
           "refId": "A"
         }
@@ -447,9 +447,9 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", type=\"synced_epoch\"}",
+          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\", type=\"synced_epoch\"}",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}-{{type}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{type}}",
           "range": true,
           "refId": "A"
         }
@@ -538,8 +538,8 @@
             "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
-          "legendFormat": "{{owner}}-{{role}}-{{type}}",
+          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{type}}",
           "range": true,
           "refId": "A"
         }
@@ -628,8 +628,8 @@
             "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "rate(aptos_state_sync_driver_counters{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{owner}}-{{role}}-{{label}}",
+          "expr": "rate(aptos_state_sync_driver_counters{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{label}}",
           "range": true,
           "refId": "A"
         }
@@ -718,8 +718,8 @@
             "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "aptos_state_sync_storage_synchronizer_gauges{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
-          "legendFormat": "{{owner}}-{{role}}-{{label}}",
+          "expr": "aptos_state_sync_storage_synchronizer_gauges{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{label}}",
           "range": true,
           "refId": "A"
         }
@@ -808,8 +808,8 @@
             "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "rate(aptos_state_sync_bootstrapper_errors{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{owner}}-{{role}}-{{error_label}}",
+          "expr": "rate(aptos_state_sync_bootstrapper_errors{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{error_label}}",
           "range": true,
           "refId": "A"
         }
@@ -898,8 +898,8 @@
             "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "rate(aptos_state_sync_continuous_syncer_errors{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{owner}}-{{role}}-{{error_label}}",
+          "expr": "rate(aptos_state_sync_continuous_syncer_errors{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{error_label}}",
           "range": true,
           "refId": "A"
         }
@@ -1013,8 +1013,8 @@
             "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "rate(aptos_state_sync_storage_synchronizer_errors{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{owner}}-{{role}}-{{error_label}}",
+          "expr": "rate(aptos_state_sync_storage_synchronizer_errors{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{error_label}}",
           "range": true,
           "refId": "A"
         }
@@ -1138,8 +1138,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(aptos_data_streaming_service_create_data_stream{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{owner}}-{{role}}-{{request_type}}",
+              "expr": "rate(aptos_data_streaming_service_create_data_stream{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{request_type}}",
               "range": true,
               "refId": "A"
             }
@@ -1228,8 +1228,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(aptos_data_streaming_service_terminate_data_stream{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{owner}}-{{role}}-{{feedback_type}}",
+              "expr": "rate(aptos_data_streaming_service_terminate_data_stream{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{feedback_type}}",
               "range": true,
               "refId": "A"
             }
@@ -1318,8 +1318,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(aptos_data_streaming_service_sent_data_requests{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{owner}}-{{role}}-{{request_type}}",
+              "expr": "rate(aptos_data_streaming_service_sent_data_requests{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{request_type}}",
               "range": true,
               "refId": "A"
             }
@@ -1408,8 +1408,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(aptos_data_streaming_service_received_data_response{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{owner}}-{{role}}-{{response_type}}",
+              "expr": "rate(aptos_data_streaming_service_received_data_response{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{response_type}}",
               "range": true,
               "refId": "A"
             }
@@ -1500,8 +1500,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "aptos_data_streaming_service_data_request_processing_latency_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}/aptos_data_streaming_service_data_request_processing_latency_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
-              "legendFormat": "{{owner}}-{{role}}-{{request_type}}",
+              "expr": "aptos_data_streaming_service_data_request_processing_latency_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}/aptos_data_streaming_service_data_request_processing_latency_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{request_type}}",
               "range": true,
               "refId": "A"
             }
@@ -1617,7 +1617,7 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.99, sum(rate(aptos_data_streaming_service_data_request_processing_latency_bucket{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(aptos_data_streaming_service_data_request_processing_latency_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$__rate_interval])) by (le))",
               "legendFormat": "{{request_type}}",
               "range": true,
               "refId": "A"
@@ -1707,8 +1707,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(aptos_data_streaming_service_check_progress_error{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{owner}}-{{role}}-{{error_type}}",
+              "expr": "rate(aptos_data_streaming_service_check_progress_error{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{error_type}}",
               "range": true,
               "refId": "A"
             }
@@ -1797,8 +1797,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(aptos_data_streaming_service_global_summary_error{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{owner}}-{{role}}-{{error_type}}",
+              "expr": "rate(aptos_data_streaming_service_global_summary_error{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{error_type}}",
               "range": true,
               "refId": "A"
             }
@@ -1887,8 +1887,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(aptos_data_streaming_service_received_response_error{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{owner}}-{{role}}-{{error_type}}",
+              "expr": "rate(aptos_data_streaming_service_received_response_error{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{error_type}}",
               "range": true,
               "refId": "A"
             }
@@ -1991,8 +1991,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(aptos_data_client_sent_requests{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{owner}}-{{role}}-{{request_types}}",
+              "expr": "rate(aptos_data_client_sent_requests{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{request_types}}",
               "range": true,
               "refId": "A"
             }
@@ -2081,8 +2081,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(aptos_data_client_error_responses{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{owner}}-{{role}}-{{response_type}}",
+              "expr": "rate(aptos_data_client_error_responses{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{response_type}}",
               "range": true,
               "refId": "A"
             }
@@ -2198,8 +2198,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.99, sum(rate(aptos_data_client_request_latencies_bucket{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role\"}[$__rate_interval])) by (le))",
-              "legendFormat": "{{owner}}-{{role}-{{request_type}}",
+              "expr": "histogram_quantile(0.99, sum(rate(aptos_data_client_request_latencies_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$__rate_interval])) by (le))",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}-{{request_type}}",
               "range": true,
               "refId": "A"
             }
@@ -2290,8 +2290,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "aptos_data_client_request_latencies_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}/aptos_data_client_request_latencies_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
-              "legendFormat": "{{owner}}-{{role}}-{{request_type}}",
+              "expr": "aptos_data_client_request_latencies_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}/aptos_data_client_request_latencies_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{request_type}}",
               "range": true,
               "refId": "A"
             }
@@ -2380,8 +2380,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(aptos_data_client_success_responses{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{owner}}-{{role}}-{{response_type}}",
+              "expr": "rate(aptos_data_client_success_responses{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{response_type}}",
               "range": true,
               "refId": "A"
             }
@@ -2471,8 +2471,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "aptos_data_client_optimal_chunk_sizes{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
-              "legendFormat": "{{owner}}-{{role}}-{{data_type}}",
+              "expr": "aptos_data_client_optimal_chunk_sizes{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{data_type}}",
               "range": true,
               "refId": "A"
             }
@@ -2537,8 +2537,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\",data_type=\"transactions\"}",
-              "legendFormat": "{{owner}}-{{role}}",
+              "expr": "aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\",data_type=\"transactions\"}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
               "range": true,
               "refId": "A"
             }
@@ -2628,8 +2628,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
-              "legendFormat": "{{owner}}-{{role}}-{{data_type}}",
+              "expr": "aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{data_type}}",
               "range": true,
               "refId": "A"
             }
@@ -2694,8 +2694,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "aptos_data_client_lowest_advertised_data{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\",data_type=\"transactions\"}",
-              "legendFormat": "{{owner}}-{{role}}",
+              "expr": "aptos_data_client_lowest_advertised_data{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\",data_type=\"transactions\"}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
               "range": true,
               "refId": "A"
             }
@@ -2785,8 +2785,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "aptos_data_client_lowest_advertised_data{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
-              "legendFormat": "{{owner}}-{{role}}-{{data_type}}",
+              "expr": "aptos_data_client_lowest_advertised_data{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{data_type}}",
               "range": true,
               "refId": "A"
             }
@@ -2889,8 +2889,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(aptos_storage_service_server_requests_received{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{owner}}-{{role}}-{{request_type}}",
+              "expr": "rate(aptos_storage_service_server_requests_received{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{request_type}}",
               "range": true,
               "refId": "A"
             }
@@ -2979,8 +2979,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(aptos_storage_service_server_errors{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{owner}}-{{role}}-{{error_type}}",
+              "expr": "rate(aptos_storage_service_server_errors{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{error_type}}",
               "range": true,
               "refId": "A"
             }
@@ -3071,7 +3071,7 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.99, sum(rate(aptos_storage_service_server_request_latency_bucket{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(aptos_storage_service_server_request_latency_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$__rate_interval])) by (le))",
               "legendFormat": "{{request_type}}",
               "range": true,
               "refId": "A"
@@ -3163,8 +3163,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "aptos_storage_service_server_request_latency_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}/aptos_storage_service_server_request_latency_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
-              "legendFormat": "{{owner}}-{{role}}-{{request_type}}",
+              "expr": "aptos_storage_service_server_request_latency_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}/aptos_storage_service_server_request_latency_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{request_type}}",
               "range": true,
               "refId": "A"
             }
@@ -3253,8 +3253,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(aptos_storage_service_server_responses_sent{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{owner}}-{{role}}-{{response_type}}",
+              "expr": "rate(aptos_storage_service_server_responses_sent{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{response_type}}",
               "range": true,
               "refId": "A"
             }
@@ -3343,8 +3343,8 @@
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(aptos_storage_service_server_pending_network_events{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
-              "legendFormat": "{{owner}}-{{role}}-{{state}}",
+              "expr": "rate(aptos_storage_service_server_pending_network_events{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{state}}",
               "range": true,
               "refId": "A"
             }
@@ -3435,9 +3435,9 @@
               },
               "editorMode": "code",
               "exemplar": true,
-              "expr": "sum by (owner, role) (aptos_storage_service_server_lru_cache{event=\"lru_cache_hit\"}) / sum by (owner, role) (aptos_storage_service_server_lru_cache{event=\"lru_cache_probe\"}) * 100\n",
+              "expr": "sum by (kubernetes_pod_name, role) (aptos_storage_service_server_lru_cache{event=\"lru_cache_hit\"}) / sum by (kubernetes_pod_name, role) (aptos_storage_service_server_lru_cache{event=\"lru_cache_probe\"}) * 100\n",
               "interval": "",
-              "legendFormat": "{{owner}}-{{role}}-{{state}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{state}}",
               "range": true,
               "refId": "A"
             }
@@ -3518,15 +3518,15 @@
           "type": "prometheus",
           "uid": "${Datasource}"
         },
-        "definition": "label_values(owner)",
+        "definition": "label_values(kubernetes_pod_name)",
         "hide": 0,
         "includeAll": true,
         "multi": true,
-        "name": "owner",
+        "name": "kubernetes_pod_name",
         "options": [],
         "query": {
-          "query": "label_values(owner)",
-          "refId": "Prometheus-owner-Variable-Query"
+          "query": "label_values(kubernetes_pod_name)",
+          "refId": "Prometheus-kubernetes_pod_name-Variable-Query"
         },
         "refresh": 1,
         "regex": "",
