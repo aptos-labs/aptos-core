@@ -14,7 +14,7 @@ name: "Build+Push Images"
 on: # build on main branch OR when a PR is labeled with `CICD:build-images`
   # Allow us to run this specific workflow without a PR
   workflow_dispatch:
-  pull_request_target:
+  pull_request:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
@@ -74,9 +74,19 @@ jobs:
           required-permission: write
           comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
 
+  determine-last-green-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: talentpair/last-green-commit-action@d95cfa836b22ef047dd0a8ddb1e6d9567982d702
+        id: last-green-commit
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      lastGreenCommit: ${{ steps.last-green-commit.outputs.result  }}
+
   rust-images:
     # trigger only for push events (on protected branches as defined above) OR on PR events with the "CICD:build-images" label.
-    needs: permission-check
+    needs: [permission-check, determine-last-green-commit]
     strategy:
       matrix:
         IMAGE_TARGET: [release, test]
@@ -105,6 +115,7 @@ jobs:
         run: docker/docker-bake-rust-all.sh
         env:
           IMAGE_TARGET: ${{ matrix.IMAGE_TARGET }}
+          LAST_GREEN_COMMIT: ${{ needs.determine-last-green-commit.outputs.lastGreenCommit }}
 
   sdk-integration-test:
     needs: rust-images
@@ -132,7 +143,7 @@ jobs:
       merge_or_canary: ${{ github.event.pull_request.auto_merge != null && 'merge' || 'canary' }}
 
   community-platform:
-    needs: permission-check
+    needs: [permission-check]
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
@@ -159,7 +170,7 @@ jobs:
           docker buildx bake --progress=plain --push -f ./docker-bake.hcl
 
   indexer-server:
-    needs: permission-check
+    needs: [permission-check]
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
