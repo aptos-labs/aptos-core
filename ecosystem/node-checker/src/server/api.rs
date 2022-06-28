@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    configuration::NodeAddress,
+    configuration::{NodeAddress, NodeConfiguration},
     evaluator::EvaluationSummary,
     metric_collector::{MetricCollector, ReqwestMetricCollector},
     runner::Runner,
@@ -146,6 +146,28 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
                 anyhow!(e),
             ))),
         }
+    }
+
+    #[oai(path = "/get_configurations", method = "get")]
+    async fn get_configurations(&self) -> Json<Vec<NodeConfiguration>> {
+        Json(
+            self.configurations_manager
+                .configurations
+                .values()
+                .map(|n| n.node_configuration.clone())
+                .collect(),
+        )
+    }
+
+    #[oai(path = "/get_configuration_keys", method = "get")]
+    async fn get_configuration_keys(&self) -> Json<Vec<String>> {
+        Json(
+            self.configurations_manager
+                .configurations
+                .keys()
+                .cloned()
+                .collect(),
+        )
     }
 }
 
