@@ -79,12 +79,11 @@ pub async fn run(args: Run) -> Result<()> {
         allow_preconfigured_test_node_only: args.allow_preconfigured_test_node_only,
     };
 
-    let api_endpoint = format!("/{}", args.server_args.api_endpoint);
+    let api_endpoint = format!("/{}", args.server_args.api_path);
     let api_service = build_openapi_service(
         api,
         args.server_args.listen_address.clone(),
-        args.server_args.listen_port,
-        &args.server_args.api_endpoint,
+        &args.server_args.api_path,
     );
     let ui = api_service.swagger_ui();
     let spec_json = api_service.spec_endpoint();
@@ -100,7 +99,7 @@ pub async fn run(args: Run) -> Result<()> {
                     args.server_args.listen_address
                 )
             })?,
-        args.server_args.listen_port,
+        args.server_args.listen_address.port().unwrap(),
     )))
     .run(
         Route::new()

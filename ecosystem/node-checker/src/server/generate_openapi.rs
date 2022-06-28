@@ -40,8 +40,7 @@ pub async fn generate_openapi(args: GenerateOpenapi) -> Result<()> {
     let api_service = build_openapi_service(
         api,
         args.server_args.listen_address.clone(),
-        args.server_args.listen_port,
-        &args.server_args.api_endpoint,
+        &args.server_args.api_path,
     );
 
     let spec = match args.output_args.format {
