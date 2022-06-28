@@ -1,4 +1,5 @@
 import { AxiosRequestConfig, AxiosResponse } from 'axios';
+import { MemoizeExpiring } from 'typescript-memoize';
 import { Accounts } from './api/Accounts';
 import { Events } from './api/Events';
 import { Transactions } from './api/Transactions';
@@ -521,6 +522,7 @@ export class AptosClient {
    * @param params Request params
    * @returns Current chain id
    */
+  @MemoizeExpiring(5 * 60 * 1000) // cache result for 5 minutes
   async getChainId(params: RequestParams = {}): Promise<number> {
     const result = await this.getLedgerInfo(params);
     return result.chain_id;
