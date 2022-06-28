@@ -42,10 +42,20 @@ impl Default for ConsensusConfig {
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
             round_initial_timeout_ms: 1000,
-            proposer_type: ConsensusProposerType::LeaderReputation(LeaderReputationConfig {
-                active_weights: 99,
-                inactive_weights: 1,
-            }),
+            proposer_type: ConsensusProposerType::LeaderReputation(
+                LeaderReputationType::ProposerAndVoter(ProposerAndVoterConfig {
+                    active_weight: 1000,
+                    inactive_weight: 10,
+                    failed_weight: 1,
+                    failure_threshold_percent: 10, // = 10%
+                    // In each round we get stastics for the single proposer
+                    // and large number of validators. So the window for
+                    // the proposers needs to be significantly larger
+                    // to have enough useful statistics.
+                    proposer_window_num_validators_multiplier: 10,
+                    voter_window_num_validators_multiplier: 1,
+                }),
+            ),
             safety_rules: SafetyRulesConfig::default(),
             sync_only: false,
             channel_size: 30, // hard-coded
@@ -65,23 +75,67 @@ impl ConsensusConfig {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case", tag = "type")]
+#[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work.
 pub enum ConsensusProposerType {
     // Choose the smallest PeerId as the proposer
     FixedProposer,
     // Round robin rotation of proposers
     RotatingProposer,
     // Committed history based proposer election
-    LeaderReputation(LeaderReputationConfig),
+    LeaderReputation(LeaderReputationType),
     // Pre-specified proposers for each round,
     // or default proposer if round proposer not
     // specified
     RoundProposer(HashMap<Round, AccountAddress>),
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case", tag = "type")]
+pub enum LeaderReputationType {
+    // Proposer election based on whether nodes were active
+    ActiveInactive(ActiveInactiveConfig),
+    // Proposer election based on whether nodes succeeded or failed
+    // their proposer election rounds, and whether they voted.
+    ProposerAndVoter(ProposerAndVoterConfig),
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct LeaderReputationConfig {
-    pub active_weights: u64,
-    pub inactive_weights: u64,
+pub struct ActiveInactiveConfig {
+    pub active_weight: u64,
+    pub inactive_weight: u64,
+    pub window_num_validators_multiplier: usize,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProposerAndVoterConfig {
+    // Selection weight for active validators with proposer failures below threshold
+    pub active_weight: u64,
+    // Selection weight for inactive validators with proposer failures below threshold
+    pub inactive_weight: u64,
+    // Selection weight for validators with proposer failures above threshold
+    pub failed_weight: u64,
+    // Thresholed of failures in the rounds validator was selected to be proposer
+    // integer values representing percentages, i.e. 12 is 12%.
+    pub failure_threshold_percent: u32,
+    // Window into history considered for proposer statistics, multiplier
+    // on top of number of validators
+    pub proposer_window_num_validators_multiplier: usize,
+    // Window into history considered for votre statistics, multiplier
+    // on top of number of validators
+    pub voter_window_num_validators_multiplier: usize,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_config_serialization() {
+        let config = ConsensusConfig::default();
+        let s = serde_yaml::to_string(&config).unwrap();
+
+        serde_yaml::from_str::<ConsensusConfig>(&s).unwrap();
+    }
 }
