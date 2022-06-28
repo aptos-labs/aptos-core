@@ -144,8 +144,8 @@ impl TryFrom<ValidatorConfiguration> for Validator {
             address: derived_address,
             consensus_pubkey: config.consensus_public_key.to_bytes().to_vec(),
             operator_address: auth_key.derived_address(),
-            network_address: bcs::to_bytes(&validator_addresses).unwrap(),
-            full_node_network_address: bcs::to_bytes(&full_node_addresses).unwrap(),
+            network_addresses: bcs::to_bytes(&validator_addresses).unwrap(),
+            full_node_network_addresses: bcs::to_bytes(&full_node_addresses).unwrap(),
             stake_amount: config.stake_amount,
         })
     }

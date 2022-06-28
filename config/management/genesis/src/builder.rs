@@ -129,8 +129,8 @@ impl<S: KVStorage> GenesisBuilder<S> {
                 address,
                 consensus_pubkey,
                 operator_address,
-                network_address,
-                full_node_network_address,
+                network_addresses: network_address,
+                full_node_network_addresses: full_node_network_address,
                 stake_amount: 1,
             })
         }
