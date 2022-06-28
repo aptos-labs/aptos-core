@@ -9,10 +9,12 @@ use serde::{Deserialize, Serialize};
 /// Struct that represents a NewBlockEvent.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewBlockEvent {
+    epoch: u64,
     round: u64,
+    previous_block_votes: Vec<bool>,
     proposer: AccountAddress,
-    previous_block_votes: Vec<AccountAddress>,
-    time_micro_seconds: u64,
+    failed_proposer_indices: Vec<u64>,
+    timestamp: u64,
 }
 
 impl NewBlockEvent {
@@ -25,7 +27,7 @@ impl NewBlockEvent {
     }
 
     pub fn proposed_time(&self) -> u64 {
-        self.time_micro_seconds
+        self.timestamp
     }
 
     pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
@@ -34,16 +36,20 @@ impl NewBlockEvent {
 
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new(
+        epoch: u64,
         round: u64,
+        previous_block_votes: Vec<bool>,
         proposer: AccountAddress,
-        previous_block_votes: Vec<AccountAddress>,
-        time_micro_seconds: u64,
+        failed_proposer_indices: Vec<u64>,
+        timestamp: u64,
     ) -> Self {
         Self {
+            epoch,
             round,
-            proposer,
             previous_block_votes,
-            time_micro_seconds,
+            proposer,
+            failed_proposer_indices,
+            timestamp,
         }
     }
 }

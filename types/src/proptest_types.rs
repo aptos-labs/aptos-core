@@ -907,13 +907,30 @@ impl Arbitrary for BlockMetadata {
             any::<HashValue>(),
             any::<u64>(),
             any::<u64>(),
-            prop::collection::vec(any::<bool>(), num_validators_range),
+            prop::collection::vec(any::<bool>(), num_validators_range.clone()),
             any::<AccountAddress>(),
+            prop::collection::vec(any::<u32>(), num_validators_range),
             any::<u64>(),
         )
             .prop_map(
-                |(id, epoch, round, previous_block_votes, proposer, timestamp)| {
-                    BlockMetadata::new(id, epoch, round, previous_block_votes, proposer, timestamp)
+                |(
+                    id,
+                    epoch,
+                    round,
+                    previous_block_votes,
+                    proposer,
+                    failed_proposer_indices,
+                    timestamp,
+                )| {
+                    BlockMetadata::new(
+                        id,
+                        epoch,
+                        round,
+                        previous_block_votes,
+                        proposer,
+                        failed_proposer_indices,
+                        timestamp,
+                    )
                 },
             )
             .boxed()

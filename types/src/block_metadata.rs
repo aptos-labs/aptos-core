@@ -33,6 +33,7 @@ pub struct BlockMetadata {
     round: u64,
     previous_block_votes: Vec<bool>,
     proposer: AccountAddress,
+    failed_proposer_indices: Vec<u32>,
     timestamp_usecs: u64,
 }
 
@@ -43,6 +44,7 @@ impl BlockMetadata {
         round: u64,
         previous_block_votes: Vec<bool>,
         proposer: AccountAddress,
+        failed_proposer_indices: Vec<u32>,
         timestamp_usecs: u64,
     ) -> Self {
         Self {
@@ -51,6 +53,7 @@ impl BlockMetadata {
             round,
             previous_block_votes,
             proposer,
+            failed_proposer_indices,
             timestamp_usecs,
         }
     }
@@ -59,13 +62,14 @@ impl BlockMetadata {
         self.id
     }
 
-    pub fn into_inner(self) -> (u64, u64, u64, Vec<bool>, AccountAddress) {
+    pub fn into_inner(self) -> (u64, u64, u64, Vec<bool>, AccountAddress, Vec<u32>) {
         (
             self.epoch,
             self.round,
             self.timestamp_usecs,
             self.previous_block_votes.clone(),
             self.proposer,
+            self.failed_proposer_indices,
         )
     }
 
@@ -131,6 +135,7 @@ pub struct NewBlockEvent {
     round: u64,
     previous_block_votes: Vec<bool>,
     proposer: AccountAddress,
+    failed_proposer_indices: Vec<u64>,
     timestamp: u64,
 }
 
@@ -140,6 +145,7 @@ impl NewBlockEvent {
         round: u64,
         previous_block_votes: Vec<bool>,
         proposer: AccountAddress,
+        failed_proposer_indices: Vec<u64>,
         timestamp: u64,
     ) -> Self {
         Self {
@@ -147,6 +153,7 @@ impl NewBlockEvent {
             round,
             previous_block_votes,
             proposer,
+            failed_proposer_indices,
             timestamp,
         }
     }
@@ -165,5 +172,12 @@ impl NewBlockEvent {
 
     pub fn proposer(&self) -> AccountAddress {
         self.proposer
+    }
+
+    /// The list of indices in the validators list,
+    /// of consecutive proposers from the immediately preceeding
+    /// rounds that didn't produce a successful block
+    pub fn failed_proposer_indices(&self) -> &Vec<u64> {
+        &self.failed_proposer_indices
     }
 }
