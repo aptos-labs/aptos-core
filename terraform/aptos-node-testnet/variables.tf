@@ -108,6 +108,12 @@ variable "monitoring_helm_values" {
   default     = {}
 }
 
+variable "testnet_addons_helm_values" {
+  description = "Map of values to pass to testnet-addons helm chart"
+  type        = any
+  default     = {}
+}
+
 
 ### EKS nodegroups
 
