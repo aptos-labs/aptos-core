@@ -7,8 +7,7 @@ use thiserror::Error as ThisError;
 
 use crate::{
     metric_collector::{MetricCollector, MetricCollectorError},
-    metric_evaluator::MetricsEvaluatorError,
-    public_types::EvaluationSummary,
+    metric_evaluator::{EvaluationSummary, MetricsEvaluatorError},
 };
 
 #[derive(Debug, ThisError)]
@@ -25,9 +24,6 @@ pub enum RunnerError {
     /// an evaluator, this is an actual failure in the evaluation process.
     #[error("Failed to evaluate metrics")]
     MetricEvaluatorError(MetricsEvaluatorError),
-
-    #[error("Encountered an unknown error")]
-    UnknownError(Error),
 }
 
 // This runner doesn't block in the multithreading sense, but from the user

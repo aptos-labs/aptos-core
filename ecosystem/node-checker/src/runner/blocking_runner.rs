@@ -1,24 +1,25 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::Duration;
+
 use super::{Runner, RunnerError};
 use crate::{
-    metric_collector::{self, MetricCollector},
-    metric_evaluator::{parse_metrics, MetricsEvaluator},
-    public_types::EvaluationSummary,
+    metric_collector::MetricCollector,
+    metric_evaluator::{parse_metrics, EvaluationSummary, MetricsEvaluator},
 };
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use clap::Parser;
-use humantime::parse_duration;
 use log::debug;
+use poem_openapi::Object as PoemObject;
 use prometheus_parse::Scrape as PrometheusScrape;
-use std::time::Duration;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
 pub struct BlockingRunnerArgs {
-    #[clap(long, parse(try_from_str = parse_duration), default_value = "5 seconds")]
-    pub metrics_fetch_delay: Duration,
+    #[clap(long, default_value = "5")]
+    pub metrics_fetch_delay_secs: u64,
 }
 
 #[derive(Debug)]
@@ -81,7 +82,7 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
         let first_baseline_metrics = self.parse_response(first_baseline_metrics)?;
         let first_target_metrics = self.parse_response(first_target_metrics)?;
 
-        tokio::time::sleep(self.args.metrics_fetch_delay).await;
+        tokio::time::sleep(Duration::from_secs(self.args.metrics_fetch_delay_secs)).await;
 
         debug!("Collecting second round of baseline metrics");
         let second_baseline_metrics =

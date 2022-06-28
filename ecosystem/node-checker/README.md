@@ -6,6 +6,29 @@ The Aptos Node Health Checker (NHC) is the reference implementation of a node he
 
 In this README we describe how to run NHC in each of the above configuration.
 
+## Running NHC
+For now, the best way to run NHC is to build and run it locally.
+
+First, check out the repo and navigate here.
+```
+git clone git@github.com:aptos-labs/aptos-core.git
+cd aptos-core/ecosystem/node-checker
+```
+
+Next, generate a baseline configuration. In this example we generate a configuration for a FullNode on the devnet, running on a machien in the local network:
+```
+cargo run -- -d configuration create --configuration-name "My Server Devnet Fullnode" --url http://192.168.86.2 --evaluators state_sync -o /tmp/my_server_devnet_fullnode.yaml
+```
+The output should look like this: https://gist.github.com/banool/c16f8747eabf818f2e0fc701f054ee9d.
+
+Finally, run NHC:
+```
+cargo run -- -d server run --baseline-node-config-paths /tmp/my_server_devnet_fullnode.yaml
+```
+Where `--baseline-node-url` is the node that will be used as the baseline against which NHC will compare the test node (the node under investigation).
+
+Instructions for running the tool using Docker / Terraform are coming soon.
+
 ## Developing
 To develop this app, you should first run two nodes of the same type. See [this wiki](https://aptos.dev/tutorials/full-node/run-a-fullnode) for guidance on how to do this. You may also target a known existing FullNode with its metrics port open.
 

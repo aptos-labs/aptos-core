@@ -1,12 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{common::get_metric_value, MetricsEvaluator, MetricsEvaluatorError};
-use crate::public_types::EvaluationResult;
+use super::{
+    common::get_metric_value, types::EvaluationResult, MetricsEvaluator, MetricsEvaluatorError,
+};
 use anyhow::Result;
 use clap::Parser;
 use log::debug;
-use prometheus_parse::{Scrape as PrometheusScrape, Value as PrometheusValue};
+use poem_openapi::Object as PoemObject;
+use prometheus_parse::Scrape as PrometheusScrape;
+use serde::{Deserialize, Serialize};
 
 pub const NAME: &str = "state_sync";
 
@@ -15,7 +18,7 @@ pub const NAME: &str = "state_sync";
 // at compile time.
 const STATE_SYNC_METRIC: &str = "aptos_state_sync_version";
 
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
 pub struct StateSyncMetricsEvaluatorArgs {
     #[clap(long, default_value = "5000")]
     pub version_delta_tolerance: u64,
@@ -41,12 +44,13 @@ impl StateSyncMetricsEvaluator {
         metrics_round: &str,
     ) -> Option<EvaluationResult> {
         match version {
-            Some(v) => None,
+            Some(_v) => None,
             None => Some(EvaluationResult {
                 headline: "State sync version metric missing".to_string(),
                 score: 0,
                 explanation: format!("The {} set of metrics from the target node is missing the state sync metric: {}", metrics_round, STATE_SYNC_METRIC),
                 source: self.get_name(),
+                links: vec![],
             }),
         }
     }
@@ -62,10 +66,11 @@ impl StateSyncMetricsEvaluator {
         match target_progress {
             target_progress if (target_progress == 0) => {
                 EvaluationResult {
-                  headline: "State sync version is not progressing".to_string(),
-                  score: 50,
-                  explanation: "Successfully pulled metrics from target node twice, but the metrics aren't progressing.".to_string(),
-                  source: self.get_name(),
+                    headline: "State sync version is not progressing".to_string(),
+                    score: 50,
+                    explanation: "Successfully pulled metrics from target node twice, but the metrics aren't progressing.".to_string(),
+                    source: self.get_name(),
+                    links: vec![],
               }
             }
             target_progress if (target_progress < 0) => {
@@ -74,9 +79,10 @@ impl StateSyncMetricsEvaluator {
                     score: 0,
                     explanation: "Successfully pulled metrics from target node twice, but the second time the state sync version went backwards!".to_string(),
                     source: self.get_name(),
+                    links: vec![],
                 }
             }
-            wildcard => {
+            _wildcard => {
                 // We convert to i64 to avoid potential overflow if the target is ahead of the baseline.
                 let delta_from_baseline = latest_baseline_version as i64 - latest_target_version as i64;
                 if delta_from_baseline > self.args.version_delta_tolerance as i64 {
@@ -90,6 +96,7 @@ impl StateSyncMetricsEvaluator {
                             delta_from_baseline, latest_target_version, latest_baseline_version, self.args.version_delta_tolerance
                         ),
                         source: self.get_name(),
+                        links: vec![],
                     }
                 } else {
                     EvaluationResult {
@@ -105,6 +112,7 @@ impl StateSyncMetricsEvaluator {
                             self.args.version_delta_tolerance
                         ),
                         source: self.get_name(),
+                        links: vec![],
                     }
                 }
             }
@@ -117,7 +125,7 @@ impl MetricsEvaluator for StateSyncMetricsEvaluator {
     /// and that we're within tolerance of the baseline node's latest version.
     fn evaluate_metrics(
         &self,
-        previous_baseline_metrics: &PrometheusScrape,
+        _previous_baseline_metrics: &PrometheusScrape,
         previous_target_metrics: &PrometheusScrape,
         latest_baseline_metrics: &PrometheusScrape,
         latest_target_metrics: &PrometheusScrape,

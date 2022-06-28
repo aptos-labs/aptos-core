@@ -805,13 +805,15 @@ dependencies = [
  "clap 3.1.18",
  "env_logger 0.8.4",
  "futures",
- "humantime 2.1.0",
  "log",
  "once_cell",
  "poem",
  "poem-openapi",
  "prometheus-parse",
  "reqwest",
+ "serde 1.0.137",
+ "serde_json",
+ "serde_yaml",
  "thiserror",
  "tokio",
  "url",
@@ -1274,6 +1276,7 @@ dependencies = [
  "cc",
  "chrono",
  "clap 2.34.0",
+ "clap 3.1.18",
  "crossbeam-channel",
  "crossbeam-deque",
  "crossbeam-queue",
@@ -1310,12 +1313,14 @@ dependencies = [
  "standback",
  "subtle",
  "syn 1.0.95",
+ "textwrap 0.15.0",
  "tokio",
  "tokio-util 0.6.10",
  "tokio-util 0.7.2",
  "toml",
  "tracing",
  "tracing-core",
+ "url",
  "warp",
 ]
 
@@ -2792,7 +2797,7 @@ dependencies = [
  "diesel_derives",
  "num-bigint 0.2.6",
  "num-integer",
- "num-traits 0.2.15",
+ "num-traits 0.1.43",
  "pq-sys",
  "r2d2",
  "serde_json",
@@ -6412,6 +6417,7 @@ dependencies = [
  "serde_yaml",
  "thiserror",
  "tokio",
+ "url",
 ]
 
 [[package]]
@@ -9190,6 +9196,7 @@ dependencies = [
  "idna",
  "matches",
  "percent-encoding",
+ "serde 1.0.137",
 ]
 
 [[package]]
