@@ -54,7 +54,11 @@ module Users
 
         assert_difference('User.count') do
           follow_redirect!
-          assert_redirected_to onboarding_email_url
+          if provider.to_s == 'google'
+            assert_redirected_to it2_url
+          else
+            assert_redirected_to onboarding_email_url
+          end
         end
 
         user = User.last
