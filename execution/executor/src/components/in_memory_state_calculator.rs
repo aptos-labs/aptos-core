@@ -13,7 +13,7 @@ use aptos_types::{
     on_chain_config,
     proof::{accumulator::InMemoryAccumulator, definition::LeafCount},
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{Transaction, TransactionPayload, Version, PRE_GENESIS_VERSION},
+    transaction::{Transaction, TransactionPayload, Version},
     write_set::{WriteOp, WriteSet},
 };
 use executor_types::{ExecutedTrees, ProofReader};
@@ -41,62 +41,65 @@ impl IntoLedgerView for TreeState {
             self.state_checkpoint_hash,
             self.state_checkpoint_version,
         );
-        let checkpoint_next_version = state_checkpoint_next_version(self.state_checkpoint_version);
-        ensure!(
-            checkpoint_next_version <= self.num_transactions,
-            "checkpoint is after latest version. checkpoint_next_version: {}, num_transactions: {}",
-            checkpoint_next_version,
-            self.num_transactions,
-        );
-
-        let state = if self.num_transactions == checkpoint_next_version {
-            checkpoint_state
-        } else {
+        if let Some(checkpoint_next_version) =
+            state_checkpoint_next_version(self.state_checkpoint_version)
+        {
             ensure!(
+                checkpoint_next_version <= self.num_transactions,
+                "checkpoint is after latest version. checkpoint_next_version: {}, num_transactions: {}",
+                checkpoint_next_version,
+                self.num_transactions,
+            );
+
+            let state = if self.num_transactions == checkpoint_next_version {
+                checkpoint_state
+            } else {
+                ensure!(
                 self.num_transactions - checkpoint_next_version <= MAX_WRITE_SETS_AFTER_CHECKPOINT,
                 "Too many versions after state checkpoint. checkpoint_next_version: {}, num_transactions: {}",
                 checkpoint_next_version,
                 self.num_transactions,
             );
-            let checkpoint_state_view = CachedStateView::new(
-                StateViewId::Miscellaneous,
-                db.clone(),
+                let checkpoint_state_view = CachedStateView::new(
+                    StateViewId::Miscellaneous,
+                    db.clone(),
+                    self.num_transactions,
+                    checkpoint_state.checkpoint.clone(),
+                    Arc::new(SyncProofFetcher::new(db.clone())),
+                )?;
+                let write_sets =
+                    db.get_write_sets(checkpoint_next_version, self.num_transactions)?;
+                checkpoint_state_view.prime_cache_by_write_set(&write_sets)?;
+                let state_cache = checkpoint_state_view.into_state_cache();
+                let calculator = InMemoryStateCalculator::new(
+                    &checkpoint_state,
+                    state_cache,
+                    checkpoint_next_version,
+                );
+                calculator.calculate_for_write_sets_after_checkpoint(&write_sets)?
+            };
+
+            let transaction_accumulator = Arc::new(InMemoryAccumulator::new(
+                self.ledger_frozen_subtree_hashes,
                 self.num_transactions,
-                checkpoint_state.checkpoint.clone(),
-                Arc::new(SyncProofFetcher::new(db.clone())),
-            )?;
-            let write_sets = db.get_write_sets(checkpoint_next_version, self.num_transactions)?;
-            checkpoint_state_view.prime_cache_by_write_set(&write_sets)?;
-            let state_cache = checkpoint_state_view.into_state_cache();
-            let calculator = InMemoryStateCalculator::new(
-                &checkpoint_state,
-                state_cache,
-                checkpoint_next_version,
-            );
-            calculator.calculate_for_write_sets_after_checkpoint(&write_sets)?
-        };
+            )?);
 
-        let transaction_accumulator = Arc::new(InMemoryAccumulator::new(
-            self.ledger_frozen_subtree_hashes,
-            self.num_transactions,
-        )?);
-
-        Ok(ExecutedTrees::new(state, transaction_accumulator))
+            Ok(ExecutedTrees::new(state, transaction_accumulator))
+        } else {
+            Err(anyhow!(
+                    "state_checkpoint_next_version is None due to overflow. Current state_checkpoint_version: {:?}",
+                    self.state_checkpoint_version,
+                ))
+        }
     }
 }
 
 const MAX_WRITE_SETS_AFTER_CHECKPOINT: LeafCount = 200_000;
 
-fn state_checkpoint_next_version(checkpoint_version: Option<Version>) -> Version {
+fn state_checkpoint_next_version(checkpoint_version: Option<Version>) -> Option<Version> {
     match checkpoint_version {
-        None => 0,
-        Some(v) => {
-            if v == PRE_GENESIS_VERSION {
-                0
-            } else {
-                v + 1
-            }
-        }
+        None => Some(0),
+        Some(v) => v.checked_add(1),
     }
 }
 

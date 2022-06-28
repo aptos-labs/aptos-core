@@ -238,6 +238,7 @@ fn restore_state_to_db(
 }
 
 #[test]
+/// Pre genesis state should be empty. This test makes sure that if there is anything in the DB before genesis, an error will be returned.
 fn test_pre_genesis() {
     let genesis = vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_key = &vm_genesis::GENESIS_KEYPAIR.0;
@@ -312,22 +313,9 @@ fn test_pre_genesis() {
         )],
     )));
 
-    // Bootstrap DB on top of pre-genesis state.
-    let waypoint = generate_waypoint::<AptosVM>(&db_rw, &genesis_txn).unwrap();
-    assert!(maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint).unwrap());
-
-    let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
-    let state_proof = db_rw
-        .reader
-        .get_state_proof(trusted_state.version())
-        .unwrap();
-    let trusted_state_change = trusted_state.verify_and_ratchet(&state_proof).unwrap();
-    assert!(trusted_state_change.is_epoch_change());
-
-    // Effect of bootstrapping reflected.
-    assert_eq!(get_balance(&account1, &db_rw), 1000);
-    // Pre-genesis state accessible.
-    assert_eq!(get_balance(&account2, &db_rw), 2000);
+    // Bootstrap DB on top of pre-genesis state failed.
+    assert!(generate_waypoint::<AptosVM>(&db_rw, &genesis_txn).is_err());
+    assert!(maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint).is_err());
 }
 
 #[test]
