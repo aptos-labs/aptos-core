@@ -65,6 +65,7 @@ members = [
     "crates/proxy",
     "crates/short-hex-str",
     "crates/transaction-emitter",
+    "crates/transaction-emitter-lib",
     "devtools/x",
     "devtools/x-core",
     "devtools/x-lint",
