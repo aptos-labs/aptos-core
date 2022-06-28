@@ -13,7 +13,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::definition::LeafCount,
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{Transaction, TransactionInfo, Version, PRE_GENESIS_VERSION},
+    transaction::{Transaction, TransactionInfo, Version},
 };
 use schemadb::DB;
 use std::sync::Arc;
@@ -106,10 +106,7 @@ impl RestoreHandler {
             .ledger_store
             .get_frozen_subtree_hashes(num_transactions)?;
         let state_root_hash = match version {
-            None => self
-                .state_store
-                .get_root_hash_option(PRE_GENESIS_VERSION)?
-                .unwrap_or(*SPARSE_MERKLE_PLACEHOLDER_HASH),
+            None => *SPARSE_MERKLE_PLACEHOLDER_HASH,
             Some(ver) => self.state_store.get_root_hash(ver)?,
         };
         Ok(TreeState::new_at_state_checkpoint(

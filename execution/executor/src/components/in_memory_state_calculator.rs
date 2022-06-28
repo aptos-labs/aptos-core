@@ -13,7 +13,7 @@ use aptos_types::{
     on_chain_config,
     proof::{accumulator::InMemoryAccumulator, definition::LeafCount},
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{Transaction, TransactionPayload, Version, PRE_GENESIS_VERSION},
+    transaction::{Transaction, TransactionPayload, Version},
     write_set::{WriteOp, WriteSet},
 };
 use executor_types::{ExecutedTrees, ProofReader};
@@ -41,7 +41,8 @@ impl IntoLedgerView for TreeState {
             self.state_checkpoint_hash,
             self.state_checkpoint_version,
         );
-        let checkpoint_next_version = state_checkpoint_next_version(self.state_checkpoint_version);
+        let checkpoint_next_version = self.state_checkpoint_version.map_or(0, |v| v + 1);
+
         ensure!(
             checkpoint_next_version <= self.num_transactions,
             "checkpoint is after latest version. checkpoint_next_version: {}, num_transactions: {}",
@@ -86,19 +87,6 @@ impl IntoLedgerView for TreeState {
 }
 
 const MAX_WRITE_SETS_AFTER_CHECKPOINT: LeafCount = 200_000;
-
-fn state_checkpoint_next_version(checkpoint_version: Option<Version>) -> Version {
-    match checkpoint_version {
-        None => 0,
-        Some(v) => {
-            if v == PRE_GENESIS_VERSION {
-                0
-            } else {
-                v + 1
-            }
-        }
-    }
-}
 
 pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);
 
