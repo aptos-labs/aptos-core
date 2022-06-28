@@ -24,6 +24,7 @@ module AptosFramework::Stake {
     use Std::Vector;
     use AptosFramework::Coin::{Self, Coin, MintCapability};
     use AptosFramework::Comparator;
+    use AptosFramework::Signature;
     use AptosFramework::SystemAddresses;
     use AptosFramework::Timestamp;
     use AptosFramework::TestCoin::TestCoin;
@@ -61,6 +62,8 @@ module AptosFramework::Stake {
     /// Lockup period is longer than allowed.
     const ELOCK_TIME_TOO_LONG: u64 = 14;
     const ENO_POST_GENESIS_VALIDATOR_SET_CHANGE_ALLOWED: u64 = 15;
+    /// Invalid consensus public key
+    const EINVALID_PUBLIC_KEY: u64 = 16;
 
     /// Capability that represents ownership and can be used to control the validator and the associated stake pool.
     /// Having this be separate from the signer for the account that the validator resources are hosted at allows
@@ -272,6 +275,7 @@ module AptosFramework::Stake {
     ) {
         let account_address = Signer::address_of(account);
         assert!(!exists<StakePool>(account_address), Errors::invalid_argument(EALREADY_REGISTERED));
+        assert!(Signature::ed25519_validate_pubkey(consensus_pubkey), Errors::invalid_argument(EINVALID_PUBLIC_KEY));
 
         move_to(account, StakePool {
             active: Coin::zero<TestCoin>(),
@@ -403,6 +407,7 @@ module AptosFramework::Stake {
         assert!(exists<ValidatorConfig>(pool_address), Errors::not_published(EVALIDATOR_CONFIG));
         let validator_info = borrow_global_mut<ValidatorConfig>(pool_address);
         let old_consensus_pubkey = validator_info.consensus_pubkey;
+        assert!(Signature::ed25519_validate_pubkey(new_consensus_pubkey), Errors::invalid_argument(EINVALID_PUBLIC_KEY));
         validator_info.consensus_pubkey = new_consensus_pubkey;
 
         let stake_pool_events = borrow_global_mut<StakePoolEvents>(pool_address);
