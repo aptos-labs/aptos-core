@@ -45,7 +45,7 @@ spec:
     port: 80
     targetPort: 8180
   {{- end }}
-  type: {{ $.Values.service.external.type }}
+  type: {{ $.Values.service.validator.external.type }}
   externalTrafficPolicy: Local
   {{- with $.Values.service.validator.loadBalancerSourceRanges }}
   loadBalancerSourceRanges:
@@ -90,7 +90,7 @@ spec:
     targetPort: {{ add 8443 $index }}
   {{- end }}
   {{- end }}
-  type: {{ $.Values.service.external.type }}
+  type: {{ $.Values.service.fullnode.external.type }}
   externalTrafficPolicy: Local
   {{- with (index $.Values.service $config.name).loadBalancerSourceRanges }}
   loadBalancerSourceRanges:

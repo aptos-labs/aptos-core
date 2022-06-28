@@ -88,14 +88,16 @@ haproxy:
 
 service:
   domain:
-  external:
-    type: LoadBalancer
   validator:
+    external: 
+      type: LoadBalancer
     loadBalancerSourceRanges:
     enableRestApi: false
     enableMetricsPort: false
   # NOTE: these values apply for all fullnode groups
   fullnode:
+    external: 
+      type: LoadBalancer
     loadBalancerSourceRanges:
     enableRestApi: true
     enableMetricsPort: false
