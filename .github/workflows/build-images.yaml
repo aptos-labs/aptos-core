@@ -14,7 +14,7 @@ name: "Build+Push Images"
 on: # build on main branch OR when a PR is labeled with `CICD:build-images`
   # Allow us to run this specific workflow without a PR
   workflow_dispatch:
-  pull_request:
+  pull_request_target:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
@@ -26,7 +26,9 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
 
 # cancel redundant builds
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  # for push and workflow_dispatch events we use `github.sha` in the concurrency group and don't really cancel each other out/limit concurrency
+  # for pull_request events newer jobs cancel earlier jobs to save on CI etc.
+  group: ${{ github.workflow }}-${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.sha || github.head_ref || github.ref }}
   cancel-in-progress: true
 
 env:
