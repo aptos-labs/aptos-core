@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::service::TelemetryEvent;
+use crate::{service::TelemetryEvent, utils};
 use prometheus::core::Collector;
 use std::collections::BTreeMap;
 
@@ -10,7 +10,11 @@ const APTOS_NODE_NETWORK_METRICS: &str = "APTOS_NODE_NETWORK_METRICS";
 
 /// Network metric keys
 const NETWORK_INBOUND_CONNECTIONS: &str = "network_inbound_connections";
+const NETWORK_INBOUND_MESSAGE_SUM: &str = "network_inbound_message_sum";
+const NETWORK_INBOUND_TRAFFIC_SUM: &str = "network_inbound_traffic_sum";
 const NETWORK_OUTBOUND_CONNECTIONS: &str = "network_outbound_connections";
+const NETWORK_OUTBOUND_MESSAGE_SUM: &str = "network_outbound_message_sum";
+const NETWORK_OUTBOUND_TRAFFIC_SUM: &str = "network_outbound_traffic_sum";
 
 /// Collects and sends the build information via telemetry
 pub(crate) async fn create_network_metric_telemetry_event() -> TelemetryEvent {
@@ -34,6 +38,7 @@ pub fn get_network_metrics() -> BTreeMap<String, String> {
 /// Collects the network metrics and appends them to the given map
 fn collect_network_metrics(network_metrics: &mut BTreeMap<String, String>) {
     collect_connection_metrics(network_metrics);
+    collect_message_and_traffic_metrics(network_metrics);
 }
 
 /// Collects the connection metrics and appends them to the given map
@@ -64,5 +69,36 @@ fn collect_connection_metrics(network_metrics: &mut BTreeMap<String, String>) {
     network_metrics.insert(
         NETWORK_OUTBOUND_CONNECTIONS.into(),
         outbound_connection_count.to_string(),
+    );
+}
+
+/// Collects the message and traffic metrics and appends them to the given map
+fn collect_message_and_traffic_metrics(network_metrics: &mut BTreeMap<String, String>) {
+    // Calculate the inbound messages and traffic
+    let inbound_metric_families = network::counters::NETWORK_APPLICATION_INBOUND_METRIC.collect();
+    let network_inbound_message_sum = utils::sum_all_histogram_counts(&inbound_metric_families);
+    let network_inbound_traffic_sum = utils::sum_all_histogram_sums(&inbound_metric_families);
+
+    // Calculate the outbound messages and traffic
+    let outbound_metric_families = network::counters::NETWORK_APPLICATION_OUTBOUND_METRIC.collect();
+    let network_outbound_message_sum = utils::sum_all_histogram_counts(&outbound_metric_families);
+    let network_outbound_traffic_sum = utils::sum_all_histogram_sums(&outbound_metric_families);
+
+    // Update the metrics
+    network_metrics.insert(
+        NETWORK_INBOUND_MESSAGE_SUM.into(),
+        network_inbound_message_sum.to_string(),
+    );
+    network_metrics.insert(
+        NETWORK_INBOUND_TRAFFIC_SUM.into(),
+        network_inbound_traffic_sum.to_string(),
+    );
+    network_metrics.insert(
+        NETWORK_OUTBOUND_MESSAGE_SUM.into(),
+        network_outbound_message_sum.to_string(),
+    );
+    network_metrics.insert(
+        NETWORK_OUTBOUND_TRAFFIC_SUM.into(),
+        network_outbound_traffic_sum.to_string(),
     );
 }
