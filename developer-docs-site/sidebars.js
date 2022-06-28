@@ -134,6 +134,32 @@ const sidebars = {
         },
       ],
     },
+    {
+      type: "category",
+      label: "SDKs",
+      collapsible: true,
+      collapsed: true,
+      items: [
+        {
+          type: "link",
+          label: "Typescript SDK",
+          href: "https://aptos-labs.github.io/ts-sdk-doc/",
+        },
+      ],
+    },
+    {
+      type: "category",
+      label: "APIs",
+      collapsible: true,
+      collapsed: true,
+      items: [
+        {
+          type: "link",
+          label: "REST API",
+          href: "/rest-api",
+        },
+      ],
+    },
     "reference/telemetry",
     "reference/glossary",
   ],
