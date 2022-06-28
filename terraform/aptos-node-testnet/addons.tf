@@ -25,6 +25,11 @@ resource "helm_release" "metrics-server" {
       }
     })
   ]
+
+  set {
+    name  = "timestamp"
+    value = timestamp()
+  }
 }
 
 
@@ -137,6 +142,11 @@ resource "helm_release" "chaos-mesh" {
       }
     })
   ]
+
+  set {
+    name  = "timestamp"
+    value = timestamp()
+  }
 }
 
 resource "helm_release" "testnet-addons" {
@@ -147,7 +157,6 @@ resource "helm_release" "testnet-addons" {
 
   values = [
     jsonencode({
-      a = "b"
       aws = {
         region       = var.region
         cluster_name = module.validator.aws_eks_cluster.name
@@ -160,11 +169,11 @@ resource "helm_release" "testnet-addons" {
         username_prefix = local.aptos_node_helm_prefix
       }
       service = {
-        domain = local.domain
+        domain   = local.domain
         aws_tags = local.aws_tags
       }
       ingress = {
-        acm_certificate          = aws_acm_certificate.ingress[0].arn
+        acm_certificate          = length(aws_acm_certificate.ingress) > 0 ? aws_acm_certificate.ingress[0].arn : null
         loadBalancerSourceRanges = var.client_sources_ipv4
       }
     })

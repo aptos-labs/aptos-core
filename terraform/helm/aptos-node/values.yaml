@@ -96,7 +96,7 @@ service:
   # NOTE: these values apply for all fullnode groups
   fullnode:
     loadBalancerSourceRanges:
-    enableRestApi: false
+    enableRestApi: true
     enableMetricsPort: false
 
 serviceAccount:

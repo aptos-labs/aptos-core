@@ -447,6 +447,7 @@ impl FakeExecutor {
             0,
             vec![false; validator_set.payload().count()],
             *validator_set.payload().next().unwrap().account_address(),
+            vec![],
             self.block_time,
         );
         let output = self

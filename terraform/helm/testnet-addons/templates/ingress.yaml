@@ -27,8 +27,10 @@ metadata:
     {{- end }}
 spec:
   rules:
-  - host: fullnode.{{ .Values.service.domain }}
-    http:
+  - http:
+    {{- if .Values.service.domain }}
+    host: fullnode.{{ .Values.service.domain }}
+    {{- end }}
       paths:
       - path: /*
         pathType: Prefix

@@ -621,7 +621,8 @@ impl AptosVM {
             .0
             .new_session(storage, SessionId::block_meta(&block_metadata));
 
-        let (epoch, round, timestamp, previous_vote, proposer) = block_metadata.into_inner();
+        let (epoch, round, timestamp, previous_vote, proposer, failed_proposer_indices) =
+            block_metadata.into_inner();
         // Convert the previous vote bitmask (true if the validator at that index voted)
         // into a list of validator indices who missed the votes (previous vote = false).
         let missed_votes = previous_vote
@@ -643,6 +644,13 @@ impl AptosVM {
             MoveValue::Vector(previous_vote.into_iter().map(MoveValue::Bool).collect()),
             MoveValue::Vector(missed_votes.into_iter().map(MoveValue::U64).collect()),
             MoveValue::Address(proposer),
+            MoveValue::Vector(
+                failed_proposer_indices
+                    .into_iter()
+                    .map(u64::from)
+                    .map(MoveValue::U64)
+                    .collect(),
+            ),
             MoveValue::U64(timestamp),
         ]);
         session

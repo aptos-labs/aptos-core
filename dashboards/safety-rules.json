@@ -102,9 +102,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", owner=~\"$owner\", result=\"error\"}[$interval])",
+          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", result=\"error\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}_{{method}}",
+          "legendFormat": "{{kubernetes_pod_name}}_{{method}}",
           "refId": "A"
         }
       ],
@@ -202,9 +202,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"epoch\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"epoch\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "interval": "",
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
@@ -291,9 +291,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"last_voted_round\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"last_voted_round\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "interval": "",
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -374,9 +374,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"preferred_round\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"preferred_round\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "interval": "",
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -457,9 +457,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"waypoint_version\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"waypoint_version\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "interval": "",
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -557,9 +557,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", method=\"initialize\", owner=~\"$owner\"}[$interval])",
+          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", method=\"initialize\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}_{{result}}",
+          "legendFormat": "{{kubernetes_pod_name}}_{{result}}",
           "refId": "A"
         }
       ],
@@ -641,9 +641,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", owner=~\"$owner\", method=\"consensus_state\"}[$interval])",
+          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", method=\"consensus_state\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}_{{result}}",
+          "legendFormat": "{{kubernetes_pod_name}}_{{result}}",
           "refId": "A"
         }
       ],
@@ -724,9 +724,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", owner=~\"$owner\", method=\"construct_and_sign_vote\"}[$interval])",
+          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", method=\"construct_and_sign_vote\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}_{{result}}",
+          "legendFormat": "{{kubernetes_pod_name}}_{{result}}",
           "refId": "A"
         }
       ],
@@ -807,9 +807,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", owner=~\"$owner\", method=\"sign_proposal\"}[$interval])",
+          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", method=\"sign_proposal\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}_{{result}}",
+          "legendFormat": "{{kubernetes_pod_name}}_{{result}}",
           "refId": "A"
         }
       ],
@@ -890,9 +890,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", owner=~\"$owner\", method=\"sign_timeout\"}[$interval])",
+          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", method=\"sign_timeout\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}_{{result}}",
+          "legendFormat": "{{kubernetes_pod_name}}_{{result}}",
           "refId": "A"
         }
       ],
@@ -995,15 +995,15 @@
           "uid": "${Datasource}",
           "type": "prometheus"
         },
-        "definition": "label_values(owner)",
+        "definition": "label_values(kubernetes_pod_name)",
         "hide": 0,
         "includeAll": true,
         "multi": true,
-        "name": "owner",
+        "name": "kubernetes_pod_name",
         "options": [],
         "query": {
-          "query": "label_values(owner)",
-          "refId": "Prometheus-owner-Variable-Query"
+          "query": "label_values(kubernetes_pod_name)",
+          "refId": "Prometheus-kubernetes_pod_name-Variable-Query"
         },
         "refresh": 1,
         "regex": "",

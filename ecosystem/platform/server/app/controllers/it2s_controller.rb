@@ -14,6 +14,7 @@ class It2sController < ApplicationController
     @it2_registration_closed = Flipper.enabled?(:it2_registration_closed, current_user)
     @steps = [
       connect_discord_step,
+      survey_step,
       node_registration_step,
       identity_verification_step
     ].map do |h|
@@ -34,6 +35,16 @@ class It2sController < ApplicationController
       name: :connect_discord,
       completed:,
       dialog: completed ? nil : DialogComponent.new
+    }
+  end
+
+  def survey_step
+    completed = !current_user.it2_survey.nil?
+    {
+      name: :survey,
+      disabled: Flipper.enabled?(:it2_node_registration_disabled, current_user),
+      completed:,
+      href: completed ? edit_it2_survey_path(current_user.it2_survey) : new_it2_survey_path
     }
   end
 

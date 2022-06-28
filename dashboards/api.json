@@ -101,7 +101,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum by (status) (rate(aptos_api_response_status_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\", status=~\"$status\"}[$interval]))",
+          "expr": "sum by (status) (rate(aptos_api_response_status_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", status=~\"$status\"}[$interval]))",
           "interval": "",
           "legendFormat": "{{status}}",
           "refId": "A"
@@ -186,7 +186,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum by (operation_id) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\", operation_id=~\"$endpoint\", status=~\"$status\"}[$interval]))",
+          "expr": "sum by (operation_id) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", operation_id=~\"$endpoint\", status=~\"$status\"}[$interval]))",
           "instant": false,
           "interval": "",
           "legendFormat": "{{operation_id}}",
@@ -374,7 +374,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum by (operation_id) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\", operation_id=~\"$endpoint\", status=\"500\"}[$interval]))",
+          "expr": "sum by (operation_id) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", operation_id=~\"$endpoint\", status=\"500\"}[$interval]))",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -519,17 +519,17 @@
           "uid": "${Datasource}",
           "type": "prometheus"
         },
-        "definition": "label_values(owner)",
+        "definition": "label_values(kubernetes_pod_name)",
         "description": null,
         "error": null,
         "hide": 0,
         "includeAll": true,
         "label": null,
         "multi": true,
-        "name": "owner",
+        "name": "kubernetes_pod_name",
         "options": [],
         "query": {
-          "query": "label_values(owner)",
+          "query": "label_values(kubernetes_pod_name)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,

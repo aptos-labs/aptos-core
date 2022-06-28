@@ -106,11 +106,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\"})\n",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})\n",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
       ],
@@ -196,9 +196,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\"})",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"})",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
       ],
@@ -285,9 +285,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"outbound\"})",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"})",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
       ],
@@ -367,9 +367,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id) (aptos_network_key_mismatch{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\"})",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_network_key_mismatch{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
         }
       ],
@@ -474,9 +474,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", metric=\"allowed\", direction=\"inbound\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", metric=\"allowed\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -564,9 +564,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", metric=\"allowed\", direction=\"outbound\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", metric=\"allowed\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -654,9 +654,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", metric=\"throttled\", direction=\"inbound\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", metric=\"throttled\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -744,9 +744,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", metric=\"throttled\", direction=\"outbound\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", metric=\"throttled\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -839,9 +839,9 @@
             "uid": "PBFA97CFB590B2093"
           },
           "exemplar": true,
-          "expr": "rate(aptos_network_app_inbound_traffic_sum{role_type=~\"$role_type\", network_id=~\"$network_id\", owner=~\"$owner\"}[1m])",
+          "expr": "rate(aptos_network_app_inbound_traffic_sum{role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
           "interval": "",
-          "legendFormat": "{{role}}-{{owner}}-{{network_id}}-{{protocol_id}}",
+          "legendFormat": "{{role}}-{{kubernetes_pod_name}}-{{network_id}}-{{protocol_id}}",
           "refId": "A"
         }
       ],
@@ -934,9 +934,9 @@
             "uid": "PBFA97CFB590B2093"
           },
           "exemplar": true,
-          "expr": "rate(aptos_network_app_outbound_traffic_sum{role_type=~\"$role_type\", network_id=~\"$network_id\", owner=~\"$owner\"}[1m])",
+          "expr": "rate(aptos_network_app_outbound_traffic_sum{role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
           "interval": "",
-          "legendFormat": "{{role}}-{{owner}}-{{network_id}}-{{protocol_id}}",
+          "legendFormat": "{{role}}-{{kubernetes_pod_name}}-{{network_id}}-{{protocol_id}}",
           "refId": "A"
         }
       ],
@@ -1029,9 +1029,9 @@
             "uid": "PBFA97CFB590B2093"
           },
           "exemplar": true,
-          "expr": "rate(aptos_network_app_inbound_traffic_count{role_type=~\"$role_type\", network_id=~\"$network_id\", owner=~\"$owner\"}[1m])",
+          "expr": "rate(aptos_network_app_inbound_traffic_count{role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
           "interval": "",
-          "legendFormat": "{{role}}-{{owner}}-{{network_id}}-{{protocol_id}}",
+          "legendFormat": "{{role}}-{{kubernetes_pod_name}}-{{network_id}}-{{protocol_id}}",
           "refId": "A"
         }
       ],
@@ -1126,9 +1126,9 @@
             "uid": "PBFA97CFB590B2093"
           },
           "exemplar": true,
-          "expr": "rate(aptos_network_app_outbound_traffic_count{role_type=~\"$role_type\", network_id=~\"$network_id\", owner=~\"$owner\"}[1m])",
+          "expr": "rate(aptos_network_app_outbound_traffic_count{role_type=~\"$role_type\", network_id=~\"$network_id\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1m])",
           "interval": "",
-          "legendFormat": "{{role}}-{{owner}}-{{network_id}}-{{protocol_id}}",
+          "legendFormat": "{{role}}-{{kubernetes_pod_name}}-{{network_id}}-{{protocol_id}}",
           "refId": "A"
         }
       ],
@@ -1234,9 +1234,9 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, role)(aptos_network_pending_network_notifications{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (owner, role)(aptos_network_pending_network_notifications{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role_type\",state=\"dequeued\"})",
+              "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_network_notifications{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_network_notifications{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
               "interval": "",
-              "legendFormat": "{{owner}}-{{role}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
               "refId": "A"
             }
           ],
@@ -1326,9 +1326,9 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, role)(aptos_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (owner, role)(aptos_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role_type\",state=\"dequeued\"})",
+              "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
               "interval": "",
-              "legendFormat": "{{owner}}-{{role}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
               "refId": "B"
             }
           ],
@@ -1418,9 +1418,9 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, role)(aptos_network_pending_requests{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (owner, role)(aptos_network_pending_requests{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role_type\",state=\"dequeued\"})",
+              "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_requests{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_requests{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
               "interval": "",
-              "legendFormat": "{{owner}}-{{role}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
               "refId": "A"
             }
           ],
@@ -1510,9 +1510,9 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, role)(aptos_network_pending_health_check_events{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (owner, role)(aptos_network_pending_health_check_events{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role_type\",state=\"dequeued\"})",
+              "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_health_check_events{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_health_check_events{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
               "interval": "",
-              "legendFormat": "{{owner}}-{{role}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
               "refId": "A"
             }
           ],
@@ -1602,9 +1602,9 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(aptos_network_pending_wire_messages{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role_type\"}[$AggInterval])",
+              "expr": "rate(aptos_network_pending_wire_messages{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\"}[$AggInterval])",
               "interval": "",
-              "legendFormat": "{{owner}}-{{role}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
               "refId": "B"
             }
           ],
@@ -1694,9 +1694,9 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(aptos_network_pending_connectivity_manager_requests{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role_type\"}[$AggInterval])",
+              "expr": "rate(aptos_network_pending_connectivity_manager_requests{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\"}[$AggInterval])",
               "interval": "",
-              "legendFormat": "{{owner}}-{{role}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
               "refId": "B"
             }
           ],
@@ -1803,11 +1803,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=~\"(declined|canceled)\"}[$AggInterval])",
+              "expr": "rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=~\"(declined|canceled)\"}[$AggInterval])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "{{owner}}-{{role_type}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}",
               "refId": "A"
             }
           ],
@@ -1914,9 +1914,9 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\" }[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\" }[$AggInterval]))",
               "interval": "",
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -2006,9 +2006,9 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"outbound\" }[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\" }[$AggInterval]))",
               "interval": "",
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -2098,11 +2098,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.50, sum by (owner, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"inbound\",role_type=~\"$role_type\",owner=~\"$owner\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "C"
             }
           ],
@@ -2192,11 +2192,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.50, sum by (owner, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"outbound\",role_type=~\"$role_type\",owner=~\"$owner\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "C"
             }
           ],
@@ -2286,11 +2286,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.90, sum by (owner, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"inbound\",role_type=~\"$role_type\",owner=~\"$owner\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "C"
             }
           ],
@@ -2380,11 +2380,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.90, sum by (owner, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"outbound\",role_type=~\"$role_type\",owner=~\"$owner\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "C"
             }
           ],
@@ -2474,11 +2474,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum by (owner, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"inbound\",role_type=~\"$role_type\",owner=~\"$owner\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "C"
             }
           ],
@@ -2568,11 +2568,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum by (owner, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"outbound\",role_type=~\"$role_type\",owner=~\"$owner\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "C"
             }
           ],
@@ -2679,12 +2679,12 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(network_id, role_type, owner) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\",role_type=~\"$role_type\",owner=~\"$owner\",type=\"request\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, owner) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\",role_type=~\"$role_type\",owner=~\"$owner\",type=\"request\",state=~\"(sent|failed)\"}[$AggInterval]))",
+              "expr": "sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=~\"(sent|failed)\"}[$AggInterval]))",
               "format": "time_series",
               "hide": false,
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "D"
             }
           ],
@@ -2772,12 +2772,12 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(network_id, role_type, owner) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\",role_type=~\"$role_type\",owner=~\"$owner\",type=\"response\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, owner) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\",role_type=~\"$role_type\",owner=~\"$owner\",type=\"request\",state=\"received\"}[$AggInterval]))",
+              "expr": "sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"response\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=\"received\"}[$AggInterval]))",
               "format": "time_series",
               "hide": false,
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -2865,11 +2865,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, role_type, network_id) (rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"sent\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -2958,11 +2958,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -3052,11 +3052,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", type=\"request\",state=\"sent\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", type=\"request\",state=\"sent\"}[$AggInterval]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -3145,11 +3145,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", type=\"request\", state=\"received\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", type=\"request\", state=\"received\"}[$AggInterval]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -3239,11 +3239,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.50, sum by (owner, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",owner=~\"$owner\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -3333,11 +3333,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.50, sum by (owner, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",owner=~\"$owner\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -3427,11 +3427,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.90, sum by (owner, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",owner=~\"$owner\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -3521,11 +3521,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.90, sum by (owner, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",owner=~\"$owner\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -3615,11 +3615,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum by (owner, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",owner=~\"$owner\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -3709,11 +3709,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum by (owner, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",owner=~\"$owner\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -3820,11 +3820,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"sent\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -3913,11 +3913,11 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -4005,9 +4005,9 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"sent\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
               "interval": "",
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -4095,9 +4095,9 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
               "interval": "",
-              "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
             }
           ],
@@ -4272,15 +4272,15 @@
           "type": "prometheus",
           "uid": "${Datasource}"
         },
-        "definition": "label_values(owner)",
+        "definition": "label_values(kubernetes_pod_name)",
         "hide": 0,
         "includeAll": true,
         "multi": true,
-        "name": "owner",
+        "name": "kubernetes_pod_name",
         "options": [],
         "query": {
-          "query": "label_values(owner)",
-          "refId": "Prometheus-owner-Variable-Query"
+          "query": "label_values(kubernetes_pod_name)",
+          "refId": "Prometheus-kubernetes_pod_name-Variable-Query"
         },
         "refresh": 1,
         "regex": "",

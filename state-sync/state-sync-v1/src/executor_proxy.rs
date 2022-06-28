@@ -706,6 +706,7 @@ mod tests {
             index as u64,
             vec![],
             validator_account,
+            vec![],
             (index as u64 + 1) * 100000010,
         ))
     }

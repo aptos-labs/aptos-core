@@ -103,17 +103,17 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "(aptos_state_sync_timestamp{chain_name=~\"$chain_name\", type=\"real\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"} - on(owner, kubernetes_pod_name) aptos_state_sync_timestamp{chain_name=~\"$chain_name\", type=\"synced\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"})",
+          "expr": "(aptos_state_sync_timestamp{chain_name=~\"$chain_name\", type=\"real\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} - on(kubernetes_pod_name, kubernetes_pod_name) aptos_state_sync_timestamp{chain_name=~\"$chain_name\", type=\"synced\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
           "interval": "",
-          "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "(aptos_state_sync_timestamp{chain_name=~\"$chain_name\", type=\"real\", job=~\".*fullnode.*\", owner=~\"$owner\"} - on(owner, job) aptos_state_sync_timestamp{chain_name=~\"$chain_name\", type=\"synced\", job=~\".*fullnode.*\", owner=~\"$owner\"})",
+          "expr": "(aptos_state_sync_timestamp{chain_name=~\"$chain_name\", type=\"real\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} - on(kubernetes_pod_name, job) aptos_state_sync_timestamp{chain_name=~\"$chain_name\", type=\"synced\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
           "hide": false,
           "interval": "",
-          "legendFormat": "{{owner}}-{{job}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{job}}",
           "refId": "B"
         }
       ],
@@ -193,17 +193,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(aptos_state_sync_version{chain_name=~\"$chain_name\", type=\"highest\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"} - on(owner, kubernetes_pod_name) aptos_state_sync_version{chain_name=~\"$chain_name\", type=\"committed\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}) < bool 15",
+          "expr": "(aptos_state_sync_version{chain_name=~\"$chain_name\", type=\"highest\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} - on(kubernetes_pod_name, kubernetes_pod_name) aptos_state_sync_version{chain_name=~\"$chain_name\", type=\"committed\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}) < bool 15",
           "interval": "",
-          "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "(aptos_state_sync_version{chain_name=~\"$chain_name\", type=\"highest\", job=~\".*fullnode.*\", owner=~\"$owner\"} - on(owner, job) aptos_state_sync_version{chain_name=~\"$chain_name\", type=\"committed\", job=~\".*fullnode.*\", owner=~\"$owner\"}) < bool 15",
+          "expr": "(aptos_state_sync_version{chain_name=~\"$chain_name\", type=\"highest\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} - on(kubernetes_pod_name, job) aptos_state_sync_version{chain_name=~\"$chain_name\", type=\"committed\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}) < bool 15",
           "hide": false,
           "interval": "",
-          "legendFormat": "{{owner}}-{{job}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{job}}",
           "refId": "B"
         }
       ],
@@ -285,17 +285,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_version{chain_name=~\"$chain_name\", type=\"synced\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(aptos_state_sync_version{chain_name=~\"$chain_name\", type=\"synced\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "rate(aptos_state_sync_version{chain_name=~\"$chain_name\", type=\"synced\", job=~\".*fullnode.*\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(aptos_state_sync_version{chain_name=~\"$chain_name\", type=\"synced\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
           "hide": false,
           "interval": "",
-          "legendFormat": "{{owner}}-{{job}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{job}}",
           "refId": "B"
         }
       ],
@@ -376,17 +376,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(aptos_state_sync_active_upstream_peers{chain_name=~\"$chain_name\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}) by (kubernetes_pod_name, owner) ",
+          "expr": "sum(aptos_state_sync_active_upstream_peers{chain_name=~\"$chain_name\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}) by (kubernetes_pod_name, kubernetes_pod_name) ",
           "interval": "",
-          "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "sum(aptos_state_sync_active_upstream_peers{chain_name=~\"$chain_name\", job=~\".*fullnode.*\", owner=~\"$owner\"}) by (job, owner) ",
+          "expr": "sum(aptos_state_sync_active_upstream_peers{chain_name=~\"$chain_name\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}) by (job, kubernetes_pod_name) ",
           "hide": false,
           "interval": "",
-          "legendFormat": "{{owner}}-{{job}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{job}}",
           "refId": "B"
         }
       ],
@@ -483,17 +483,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", index=\"system_ttl\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}",
+          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", index=\"system_ttl\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "interval": "",
-          "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", index=\"system_ttl\", job=~\".*fullnode.*\", owner=~\"$owner\"}",
+          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", index=\"system_ttl\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "hide": false,
           "interval": "",
-          "legendFormat": "{{owner}}-{{job}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{job}}",
           "refId": "B"
         }
       ],
@@ -573,17 +573,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "core_mempool_txn_commit_latency_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"} / core_mempool_txn_commit_latency_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}",
+          "expr": "core_mempool_txn_commit_latency_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} / core_mempool_txn_commit_latency_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "interval": "",
-          "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "core_mempool_txn_commit_latency_sum{chain_name=~\"$chain_name\", job=~\".*fullnode.*\", owner=~\"$owner\"} / core_mempool_txn_commit_latency_count{chain_name=~\"$chain_name\", job=~\".*fullnode.*\", owner=~\"$owner\"}",
+          "expr": "core_mempool_txn_commit_latency_sum{chain_name=~\"$chain_name\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} / core_mempool_txn_commit_latency_count{chain_name=~\"$chain_name\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "hide": false,
           "interval": "",
-          "legendFormat": "{{owner}}-{{job}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{job}}",
           "refId": "B"
         }
       ],
@@ -680,9 +680,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner,kubernetes_pod_name)(aptos_connections{chain_name=~\"$chain_name\", direction=\"inbound\",network_id=\"Public\", owner=~\"$owner\"})",
+          "expr": "sum by (kubernetes_pod_name,kubernetes_pod_name)(aptos_connections{chain_name=~\"$chain_name\", direction=\"inbound\",network_id=\"Public\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
           "interval": "",
-          "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -762,9 +762,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, kubernetes_pod_name)(aptos_connections{chain_name=~\"$chain_name\", direction=\"outbound\",network_id=\"Public\", owner=~\"$owner\"})",
+          "expr": "sum by (kubernetes_pod_name, kubernetes_pod_name)(aptos_connections{chain_name=~\"$chain_name\", direction=\"outbound\",network_id=\"Public\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
           "interval": "",
-          "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -843,13 +843,13 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(irate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", pod=~\"$owner.*fullnode.*\"}[$interval])) by (pod)",
+          "expr": "sum(irate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", pod=~\"$kubernetes_pod_name.*fullnode.*\"}[$interval])) by (pod)",
           "interval": "",
           "legendFormat": "{{pod}}",
           "refId": "A"
         },
         {
-          "expr": "sum(irate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", pod=~\"$owner.*fullnode.*\"}[$interval]))",
+          "expr": "sum(irate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", pod=~\"$kubernetes_pod_name.*fullnode.*\"}[$interval]))",
           "interval": "",
           "legendFormat": "total",
           "refId": "B"
@@ -930,13 +930,13 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(irate(container_network_receive_bytes_total{chain_name=~\"$chain_name\", pod=~\"$owner.*fullnode.*\"}[$interval])) by (pod)",
+          "expr": "sum(irate(container_network_receive_bytes_total{chain_name=~\"$chain_name\", pod=~\"$kubernetes_pod_name.*fullnode.*\"}[$interval])) by (pod)",
           "interval": "",
           "legendFormat": "{{pod}}",
           "refId": "A"
         },
         {
-          "expr": "sum(irate(container_network_receive_bytes_total{chain_name=~\"$chain_name\", pod=~\"$owner.*fullnode.*\"}[$interval]))",
+          "expr": "sum(irate(container_network_receive_bytes_total{chain_name=~\"$chain_name\", pod=~\"$kubernetes_pod_name.*fullnode.*\"}[$interval]))",
           "interval": "",
           "legendFormat": "total",
           "refId": "B"
@@ -1035,7 +1035,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "1 - kubelet_volume_stats_available_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\"fn.$owner.*\", owner=~\"$owner\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\"fn.$owner.*\", owner=~\"$owner\"}",
+          "expr": "1 - kubelet_volume_stats_available_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\"fn.$kubernetes_pod_name.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\"fn.$kubernetes_pod_name.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "{{persistentvolumeclaim}}",
@@ -1043,7 +1043,7 @@
         },
         {
           "exemplar": true,
-          "expr": "1 - kubelet_volume_stats_available_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\"$owner.*fullnode.*\", owner!~\"val.*\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\"$owner.*fullnode.*\", owner!~\"val.*\"}",
+          "expr": "1 - kubelet_volume_stats_available_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\"$kubernetes_pod_name.*fullnode.*\", kubernetes_pod_name!~\"val.*\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\"$kubernetes_pod_name.*fullnode.*\", kubernetes_pod_name!~\"val.*\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "{{persistentvolumeclaim}}",
@@ -1126,7 +1126,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "container_memory_working_set_bytes{container=\"fullnode\", pod=~\"$owner.*\", job=\"kubernetes-cadvisor\"}",
+          "expr": "container_memory_working_set_bytes{container=\"fullnode\", pod=~\"$kubernetes_pod_name.*\", job=\"kubernetes-cadvisor\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "{{pod}}",
@@ -1209,10 +1209,10 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "rate(container_cpu_usage_seconds_total{container=\"fullnode\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(container_cpu_usage_seconds_total{container=\"fullnode\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
           "hide": false,
           "interval": "",
-          "legendFormat": "{{owner}}-{{pod}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{pod}}",
           "refId": "A"
         },
         {
@@ -1300,7 +1300,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "time() - container_start_time_seconds{container=\"fullnode\", pod=~\"$owner.*\", job=\"kubernetes-cadvisor\"}",
+          "expr": "time() - container_start_time_seconds{container=\"fullnode\", pod=~\"$kubernetes_pod_name.*\", job=\"kubernetes-cadvisor\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "{{pod}}",
@@ -1454,16 +1454,16 @@
           "uid": "${Datasource}",
           "type": "prometheus"
         },
-        "definition": "label_values(owner)",
+        "definition": "label_values(kubernetes_pod_name)",
         "hide": 0,
         "includeAll": true,
-        "label": "Owner",
+        "label": "kubernetes_pod_name",
         "multi": true,
-        "name": "owner",
+        "name": "kubernetes_pod_name",
         "options": [],
         "query": {
-          "query": "label_values(owner)",
-          "refId": "Prometheus-owner-Variable-Query"
+          "query": "label_values(kubernetes_pod_name)",
+          "refId": "Prometheus-kubernetes_pod_name-Variable-Query"
         },
         "refresh": 1,
         "regex": "",

@@ -97,9 +97,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -107,7 +107,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Logging Rate ($AggInterval) [$owner-$role]",
+      "title": "Logging Rate ($AggInterval) [$kubernetes_pod_name-$role]",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -197,9 +197,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -207,7 +207,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Log Send Process Rate ($AggInterval) [$owner-$role]",
+      "title": "Log Send Process Rate ($AggInterval) [$kubernetes_pod_name-$role]",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -297,9 +297,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -307,7 +307,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Log Written to Logging Pod Rate ($AggInterval) [$owner-$role]",
+      "title": "Log Written to Logging Pod Rate ($AggInterval) [$kubernetes_pod_name-$role]",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -397,9 +397,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -407,7 +407,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Processed Logs / Logs Written ($AggInterval) [$owner-$role]",
+      "title": "Processed Logs / Logs Written ($AggInterval) [$kubernetes_pod_name-$role]",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -497,9 +497,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -507,7 +507,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Logs Sent / Logs Written ($AggInterval) [$owner-$role]",
+      "title": "Logs Sent / Logs Written ($AggInterval) [$kubernetes_pod_name-$role]",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -614,9 +614,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -624,7 +624,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Connect To Logstash Rate ($AggInterval) [$owner-$role]",
+      "title": "Connect To Logstash Rate ($AggInterval) [$kubernetes_pod_name-$role]",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -714,9 +714,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(rate(aptos_struct_log_connect_error_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval]) or 0 * rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])) / rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "(rate(aptos_struct_log_connect_error_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]) or 0 * rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])) / rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -724,7 +724,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Connect Error Rate  ($AggInterval) [$owner-$role]",
+      "title": "Connect Error Rate  ($AggInterval) [$kubernetes_pod_name-$role]",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -831,9 +831,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "1-(rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "1-(rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -841,7 +841,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Logging Total Failure Rate ($AggInterval) [$owner-$role]",
+      "title": "Logging Total Failure Rate ($AggInterval) [$kubernetes_pod_name-$role]",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -931,9 +931,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$AggInterval]) or\n      rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$AggInterval]) * 0) + (rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$AggInterval]) * 0 or rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$AggInterval]))",
+          "expr": "(rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) or\n      rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) * 0) + (rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) * 0 or rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]))",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -941,7 +941,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Total Dropped Logs Rate ($AggInterval) [$owner-$role]",
+      "title": "Total Dropped Logs Rate ($AggInterval) [$kubernetes_pod_name-$role]",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -1031,9 +1031,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role\"}[$AggInterval]) or 0 * rate(aptos_struct_log_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$AggInterval]))/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role\"}[$AggInterval])",
+          "expr": "(rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$AggInterval]) or 0 * rate(aptos_struct_log_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]))/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$AggInterval])",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -1041,7 +1041,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Log Queue Error Rate ($AggInterval) [$owner-$role]",
+      "title": "Log Queue Error Rate ($AggInterval) [$kubernetes_pod_name-$role]",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -1131,9 +1131,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$AggInterval]) or 0 * rate(aptos_struct_log_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$AggInterval]))/rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role\"}[$AggInterval])",
+          "expr": "(rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) or 0 * rate(aptos_struct_log_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]))/rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$AggInterval])",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -1141,7 +1141,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Send To Logstash Error Rate  ($AggInterval) [$owner-$role]",
+      "title": "Send To Logstash Error Rate  ($AggInterval) [$kubernetes_pod_name-$role]",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -1280,14 +1280,14 @@
           "uid": "${Datasource}",
           "type": "prometheus"
         },
-        "definition": "label_values(owner)",
+        "definition": "label_values(kubernetes_pod_name)",
         "hide": 0,
         "includeAll": true,
         "label": null,
         "multi": true,
-        "name": "owner",
+        "name": "kubernetes_pod_name",
         "options": [],
-        "query": "label_values(owner)",
+        "query": "label_values(kubernetes_pod_name)",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,

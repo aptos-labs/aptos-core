@@ -17,59 +17,69 @@
       </h2>
     <% end %>
 
-    <div class="flex flex-wrap flex-col xl:flex-row gap-8" data-controller="shake">
+    <div class="flex flex-wrap flex-col gap-8 max-w-prose" data-controller="shake">
       <% @steps.each_with_index do |step, i| %>
         <div data-action="<%= step.disabled ? 'click->shake#shake' : '' %>" data-target="<%= !step.disabled && !step.completed ? 'shake.content' : '' %>" class="bg-neutral-800 rounded-md flex flex-col flex-1 <%= step.disabled ? 'cursor-not-allowed select-none opacity-25' : '' %>">
-          <h3 class="font-mono uppercase mb-2 bg-neutral-700 text-teal-400 px-4 py-2 rounded-t-md text-sm">Step <%= i + 1 %></h3>
-          <div class="px-8 py-4 flex flex-col flex-1">
-            <h4 class="text-teal-400 font-mono uppercase text-2xl mb-4">
+          <h3 class="font-mono uppercase mb-2 bg-neutral-700 text-teal-400 px-8 lg:px-12 py-2 rounded-t-md text-sm">Step <%= i + 1 %></h3>
+          <div class="px-8 lg:px-12 pt-4 pb-8 flex flex-col lg:flex-row lg:gap-16 items-center flex-1">
+            <div class="w-full flex-1">
+              <h4 class="text-white font-mono uppercase text-2xl mb-4">
+                <% if step.name == :connect_discord %>
+                  Connect Discord
+                <% elsif step.name == :survey %>
+                  Complete Survey
+                <% elsif step.name == :node_registration %>
+                  Node Registration
+                <% elsif step.name == :identity_verification %>
+                  Identity Verification
+                <% end %>
+              </h4>
+
+              <div class="mb-4"><%= render DividerComponent.new %></div>
+
+              <p class="mb-8 lg:mb-0 font-light">
               <% if step.name == :connect_discord %>
-                Connect Discord
+                Sign in to your Discord to continue node verification.
+              <% elsif step.name == :survey %>
+                Please tell us a bit more about yourself and your experience with Aptos.
               <% elsif step.name == :node_registration %>
-                Node Registration
+                Register your node, and automatically verify that it is set up correctly.
               <% elsif step.name == :identity_verification %>
-                Identity Verification
+                Identity must be verified by noon (PST) July 11 to get into the selection process.
               <% end %>
-            </h4>
+              </p>
 
-            <div class="mb-4"><%= render DividerComponent.new %></div>
-
-            <p class="mb-8 font-light">
-            <% if step.name == :connect_discord %>
-              Sign in to your Discord to continue node verification.
-            <% elsif step.name == :node_registration %>
-              Register your node, and automatically verify that it is set up correctly.
-            <% elsif step.name == :identity_verification %>
-              Identity must be verified by noon (PST) July 11 to get into the selection process.
-            <% end %>
-            </p>
-
-            <% if step.dialog %>
-              <%= render step.dialog do |dialog| %>
-                <%= dialog.with_title do %>
-                  <% if step.name == :connect_discord %>
-                    Connect Discord
+              <% if step.dialog %>
+                <%= render step.dialog do |dialog| %>
+                  <%= dialog.with_title do %>
+                    <% if step.name == :connect_discord %>
+                      Connect Discord
+                    <% end %>
                   <% end %>
-                <% end %>
-                <%= dialog.with_body do %>
-                  <% if step.name == :connect_discord %>
-                    <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-96') %>
+                  <%= dialog.with_body do %>
+                    <% if step.name == :connect_discord %>
+                      <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-96') %>
+                    <% end %>
                   <% end %>
                 <% end %>
               <% end %>
-            <% end %>
+            </div>
 
-            <%= render ButtonComponent.new(href: step.disabled ? nil : step.href, dialog: step.dialog, class: step.completed ? 'bg-neutral-700/50 text-teal-600 w-full mt-auto' : 'w-full mt-auto', disabled: step.disabled) do %>
-              <% if step.completed %>
-                <%= render IconComponent.new(:check_circle, size: :medium) %>
-              <% elsif step.name == :connect_discord %>
-                Sign in
-              <% elsif step.name == :node_registration %>
-                Register
-              <% elsif step.name == :identity_verification %>
-                Verify
+            <div class="w-full lg:flex-1">
+              <%= render ButtonComponent.new(href: step.disabled ? nil : step.href, dialog: step.dialog, class: step.completed ? 'bg-neutral-700/50 text-teal-600 w-full mt-auto' : 'w-full mt-auto', disabled: step.disabled) do %>
+                <% if step.completed %>
+                  <%= render IconComponent.new(:check_circle, size: :medium) %>
+                <% elsif step.name == :connect_discord %>
+                  Sign in
+                <% elsif step.name == :survey %>
+                  Continue
+                <% elsif step.name == :node_registration %>
+                  Register
+                <% elsif step.name == :identity_verification %>
+                  Verify
+                <% end %>
               <% end %>
-            <% end %>
+            </div>
           </div>
         </div>
       <% end %>

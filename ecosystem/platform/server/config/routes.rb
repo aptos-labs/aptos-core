@@ -36,6 +36,7 @@ Rails.application.routes.draw do
   get 'health', to: 'health#health'
 
   resources :it2_profiles, except: %i[index destroy]
+  resources :it2_surveys, except: %i[index destroy]
   resource :it2, only: %i[show]
 
   resources :nfts, only: %i[show update]

@@ -275,7 +275,7 @@ impl RoundManager {
 
     /// Process the proposal message:
     /// 1. ensure after processing sync info, we're at the same round as the proposal
-    /// 2. execute and decide whether to vode for the proposal
+    /// 2. execute and decide whether to vote for the proposal
     pub async fn process_proposal_msg(&mut self, proposal_msg: ProposalMsg) -> anyhow::Result<()> {
         fail_point!("consensus::process_proposal_msg", |_| {
             Err(anyhow::anyhow!("Injected error in process_proposal_msg"))

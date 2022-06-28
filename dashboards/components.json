@@ -10,15 +10,22 @@
         "limit": 100,
         "name": "Annotations & Alerts",
         "showIn": 0,
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
         "type": "dashboard"
       }
     ]
   },
-  "description": "A top level dashboard of all components health, selectable by Owner",
+  "description": "A top level dashboard of all components health, selectable by kubernetes_pod_name",
   "editable": true,
-  "gnetId": null,
+  "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "iteration": 1609281350537,
+  "id": 24,
+  "iteration": 1656387614899,
   "links": [
     {
       "asDropdown": true,
@@ -30,392 +37,19 @@
       "type": "dashboards"
     }
   ],
+  "liveNow": false,
   "panels": [
     {
+      "collapsed": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 0
-      },
-      "id": 48,
-      "title": "System",
-      "type": "row"
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "links": []
-        },
-        "overrides": []
-      },
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 1
-      },
-      "hiddenSeries": false,
-      "id": 44,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.2.0",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "repeat": "container",
-      "repeatDirection": "v",
-      "scopedVars": {
-        "container": {
-          "selected": true,
-          "text": "validator",
-          "value": "validator"
-        }
-      },
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "sum by (owner, container) (rate(container_cpu_usage_seconds_total{chain_name=~\"$chain_name\", container=~\"$container\", owner=~\"$owner\"}[$AggInterval]))",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container}}",
-          "refId": "A"
-        },
-        {
-          "expr": "sum by (owner, container_name) (rate(container_cpu_usage_seconds_total{chain_name=~\"$chain_name\", container_name=~\"$container\", owner=~\"$owner\"}[$AggInterval]))",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container_name}}",
-          "refId": "B"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "CPU Usage - $container",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "percentunit",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "links": []
-        },
-        "overrides": []
-      },
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 1
-      },
-      "hiddenSeries": false,
-      "id": 46,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.2.0",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "repeat": "container",
-      "repeatDirection": "v",
-      "scopedVars": {
-        "container": {
-          "selected": true,
-          "text": "validator",
-          "value": "validator"
-        }
-      },
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "container_memory_working_set_bytes{chain_name=~\"$chain_name\", container=~\"$container\", owner=~\"$owner\"} / container_spec_memory_limit_bytes{chain_name=~\"$chain_name\", container=~\"$container\", owner=~\"$owner\"}",
-          "format": "time_series",
-          "hide": false,
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container}}",
-          "refId": "C"
-        },
-        {
-          "expr": "container_memory_working_set_bytes{chain_name=~\"$chain_name\", container_name=~\"$container\", owner=~\"$owner\"} / container_spec_memory_limit_bytes{chain_name=~\"$chain_name\", container_name=~\"$container\", owner=~\"$owner\"}",
-          "format": "time_series",
-          "hide": false,
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container_name}}",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Memory Usage % - $container",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "percentunit",
-          "label": null,
-          "logBase": 1,
-          "max": "1",
-          "min": "0",
-          "show": true
-        },
-        {
-          "format": "decmbytes",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": false
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {},
-          "links": []
-        },
-        "overrides": []
-      },
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 1
-      },
-      "hiddenSeries": false,
-      "id": 42,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null",
-      "options": {
-        "alertThreshold": true
-      },
-      "percentage": false,
-      "pluginVersion": "7.2.0",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "repeat": "container",
-      "repeatDirection": "v",
-      "scopedVars": {
-        "container": {
-          "selected": true,
-          "text": "validator",
-          "value": "validator"
-        }
-      },
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "container_fs_usage_bytes{chain_name=~\"$chain_name\", owner=~\"$owner\", container=~\"$container\"} / container_fs_limit_bytes{chain_name=~\"$chain_name\", owner=~\"$owner\", container=~\"$container\"}",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container}}",
-          "refId": "C"
-        },
-        {
-          "expr": "container_fs_usage_bytes{chain_name=~\"$chain_name\", owner=~\"$owner\", container_name=~\"$container\"} / container_fs_limit_bytes{chain_name=~\"$chain_name\", owner=~\"$owner\", container_name=~\"$container\"}",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container}}",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Disk Usage % - $container",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "percentunit",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": false
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "collapsed": false,
-      "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
-      },
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 9
       },
       "id": 16,
       "panels": [],
@@ -428,13 +62,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "The rate of the committed round number.",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -445,7 +78,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 10
+        "y": 1
       },
       "hiddenSeries": false,
       "id": 4,
@@ -466,7 +99,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -476,16 +109,15 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_last_committed_round{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_consensus_last_committed_round{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [
         {
           "colorMode": "background6",
@@ -496,7 +128,6 @@
           "op": "time"
         }
       ],
-      "timeShift": null,
       "title": "Committed blocks per sec",
       "tooltip": {
         "shared": true,
@@ -505,19 +136,15 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
-          "decimals": null,
           "format": "short",
           "label": "blocks per sec",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
@@ -525,14 +152,11 @@
           "format": "short",
           "label": "",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -541,13 +165,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "Duration between block generation time until the moment it's committed.",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -558,7 +181,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 10
+        "y": 1
       },
       "hiddenSeries": false,
       "id": 8,
@@ -579,7 +202,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -589,18 +212,16 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\", stage=\"committed\"}[$AggInterval])/rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\", stage=\"committed\"}[$AggInterval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", stage=\"committed\"}[$AggInterval])/rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", stage=\"committed\"}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}: QC",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}: QC",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Block creation to commit",
       "tooltip": {
         "shared": true,
@@ -609,9 +230,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -620,22 +239,17 @@
           "format": "s",
           "label": "s",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -644,13 +258,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "The total number of rounds that have timeout certificate.",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -661,7 +274,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 10
+        "y": 1
       },
       "hiddenSeries": false,
       "id": 18,
@@ -682,7 +295,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -692,18 +305,16 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_timeout_rounds_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_consensus_timeout_rounds_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Timeout Rounds Rate",
       "tooltip": {
         "shared": true,
@@ -712,9 +323,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -723,22 +332,17 @@
           "format": "short",
           "label": "count timeout rounds",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -747,13 +351,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "The total number a single node has timeout locally. When 2f+1 nodes have local timeout for the same round, a timeout round is formed.",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -764,7 +367,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 18
+        "y": 9
       },
       "hiddenSeries": false,
       "id": 20,
@@ -785,7 +388,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -795,18 +398,16 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_timeout_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_consensus_timeout_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Local Timeout rate",
       "tooltip": {
         "shared": true,
@@ -815,9 +416,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -826,22 +425,17 @@
           "format": "short",
           "label": "count timeouts",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -850,13 +444,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "The error rate of main loop (timeout is considered as error)",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -867,7 +460,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 18
+        "y": 9
       },
       "hiddenSeries": false,
       "id": 24,
@@ -888,7 +481,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -898,17 +491,15 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_error_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval]) / on (owner) rate(consensus_duration_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\", op='main_loop'}[$AggInterval])",
+          "expr": "rate(aptos_consensus_error_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]) / on (kubernetes_pod_name) rate(consensus_duration_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", op='main_loop'}[$AggInterval])",
           "format": "time_series",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Error rate",
       "tooltip": {
         "shared": true,
@@ -917,9 +508,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -928,35 +517,30 @@
           "format": "percentunit",
           "label": "ms",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 17
       },
       "id": 14,
       "panels": [],
@@ -969,13 +553,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "time spent to execute a block",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -986,7 +569,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 27
+        "y": 18
       },
       "hiddenSeries": false,
       "id": 26,
@@ -1007,7 +590,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1017,19 +600,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (owner, role, le)(rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role, le)(rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Block execution time [P50]",
       "tooltip": {
         "shared": true,
@@ -1038,33 +619,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "s",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -1073,13 +645,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": " time spent to execute a block",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1090,7 +661,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 27
+        "y": 18
       },
       "hiddenSeries": false,
       "id": 76,
@@ -1111,7 +682,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1121,19 +692,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.90, sum by (owner, role, le)(rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role, le)(rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "B"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Block execution time [P90]",
       "tooltip": {
         "shared": true,
@@ -1142,33 +711,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "s",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -1177,13 +737,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "time spent to execute a block",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1194,7 +753,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 27
+        "y": 18
       },
       "hiddenSeries": false,
       "id": 77,
@@ -1215,7 +774,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1225,19 +784,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum by (owner, role, le) (rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role, le) (rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "C"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Block execution time [P99]",
       "tooltip": {
         "shared": true,
@@ -1246,33 +803,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "s",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -1281,13 +829,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "the time spent to commit blocks",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1298,7 +845,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 35
+        "y": 26
       },
       "hiddenSeries": false,
       "id": 28,
@@ -1319,7 +866,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1329,18 +876,16 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.5, sum by (owner, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.5, sum by (kubernetes_pod_name, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "D"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Total time to commit blocks [P50]",
       "tooltip": {
         "shared": true,
@@ -1349,33 +894,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "s",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -1384,13 +920,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "the time spent to commit blocks",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1401,7 +936,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 35
+        "y": 26
       },
       "hiddenSeries": false,
       "id": 78,
@@ -1422,7 +957,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1432,18 +967,16 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.9, sum by (owner, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.9, sum by (kubernetes_pod_name, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "D"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Total time to commit blocks [P90]",
       "tooltip": {
         "shared": true,
@@ -1452,33 +985,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "s",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -1487,13 +1011,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "the time spent to commit blocks",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1504,7 +1027,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 35
+        "y": 26
       },
       "hiddenSeries": false,
       "id": 79,
@@ -1525,7 +1048,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1535,18 +1058,16 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum by (owner, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "D"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Total time to commit blocks [P99]",
       "tooltip": {
         "shared": true,
@@ -1555,46 +1076,37 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "s",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 43
+        "y": 34
       },
       "id": 97,
       "panels": [],
@@ -1607,13 +1119,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "This panel tracks the number of errors encountered by the key manager during execution in the last hour. More specifically, we track two error types: (i) liveness errors; and (ii) unexpected errors.",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1624,7 +1135,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 44
+        "y": 35
       },
       "hiddenSeries": false,
       "id": 98,
@@ -1644,7 +1155,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1654,22 +1165,20 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_key_manager_state{chain_name=~\"$chain_name\", state=\"liveness_error_encountered\", owner=~\"$owner\"}[1h])",
+          "expr": "increase(aptos_key_manager_state{chain_name=~\"$chain_name\", state=\"liveness_error_encountered\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1h])",
           "interval": "",
-          "legendFormat": "{{owner}}_liveness_error",
+          "legendFormat": "{{kubernetes_pod_name}}_liveness_error",
           "refId": "A"
         },
         {
-          "expr": "increase(aptos_key_manager_state{chain_name=~\"$chain_name\", state=\"unexpected_error_encountered\", owner=~\"$owner\"}[1h])",
+          "expr": "increase(aptos_key_manager_state{chain_name=~\"$chain_name\", state=\"unexpected_error_encountered\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1h])",
           "interval": "",
-          "legendFormat": "{{owner}}_unexpected_error",
+          "legendFormat": "{{kubernetes_pod_name}}_unexpected_error",
           "refId": "B"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Errors Encountered (Last Hour)",
       "tooltip": {
         "shared": true,
@@ -1678,9 +1187,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -1689,22 +1196,16 @@
           "format": "short",
           "label": "Number of errors",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -1713,13 +1214,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "This panel tracks the number of times the key manager decides to take no action after checking the keys because the keys are still fresh (in the last hour).",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1730,7 +1230,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 44
+        "y": 35
       },
       "hiddenSeries": false,
       "id": 99,
@@ -1750,7 +1250,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1760,16 +1260,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_key_manager_state{chain_name=~\"$chain_name\", state=\"keys_still_fresh\", owner=~\"$owner\"}[1h])",
+          "expr": "increase(aptos_key_manager_state{chain_name=~\"$chain_name\", state=\"keys_still_fresh\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1h])",
           "interval": "",
-          "legendFormat": "{{owner}}_keys_still_fresh",
+          "legendFormat": "{{kubernetes_pod_name}}_keys_still_fresh",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "No Action Taken (Last Hour)",
       "tooltip": {
         "shared": true,
@@ -1778,9 +1276,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -1789,35 +1285,29 @@
           "format": "short",
           "label": "Number of no actions taken",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 52
+        "y": 43
       },
       "id": 60,
       "panels": [],
@@ -1830,13 +1320,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "Total Inbound connected peers.  There should be at most one peer with 0 inbound connections.",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1847,7 +1336,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 53
+        "y": 44
       },
       "hiddenSeries": false,
       "id": 62,
@@ -1867,7 +1356,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1877,16 +1366,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role=~\"$role\", owner=~\"$owner\", direction=\"inbound\"}",
+          "expr": "aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"}",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Inbound Connected Peers",
       "tooltip": {
         "shared": true,
@@ -1895,33 +1382,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -1930,13 +1408,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "Total Outbound connected peers.  There should be at most one peer with 0 Outbound connections.",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1947,7 +1424,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 53
+        "y": 44
       },
       "hiddenSeries": false,
       "id": 63,
@@ -1967,7 +1444,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1977,16 +1454,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role=~\"$role\", owner=~\"$owner\", direction=\"outbound\"}",
+          "expr": "aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"}",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Outbound Connected Peers",
       "tooltip": {
         "shared": true,
@@ -1995,46 +1470,37 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 61
+        "y": 52
       },
       "id": 10,
       "panels": [],
@@ -2044,17 +1510,15 @@
     {
       "aliasColors": {},
       "bars": false,
-      "cacheTimeout": null,
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "total number of transactions in mempool",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2065,7 +1529,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 62
+        "y": 53
       },
       "hiddenSeries": false,
       "id": 92,
@@ -2086,7 +1550,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2096,20 +1560,18 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", role=~\"$role\",owner=~\"$owner\",index=\"system_ttl\"}",
+          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", role=~\"$role\",kubernetes_pod_name=~\"$kubernetes_pod_name\",index=\"system_ttl\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "B"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Mempool size",
       "tooltip": {
         "shared": true,
@@ -2118,33 +1580,25 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -2153,13 +1607,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "rate of transactions broadcasted to other peers",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2170,7 +1623,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 62
+        "y": 53
       },
       "hiddenSeries": false,
       "id": 58,
@@ -2191,7 +1644,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2201,18 +1654,16 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role) (rate(aptos_shared_mempool_transaction_broadcast_sum{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role) (rate(aptos_shared_mempool_transaction_broadcast_sum{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Outgoing Txns Rate (Broadcasted)",
       "tooltip": {
         "shared": true,
@@ -2221,9 +1672,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -2232,35 +1681,30 @@
           "format": "short",
           "label": "txns/s",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 70
+        "y": 61
       },
       "id": 12,
       "panels": [],
@@ -2270,17 +1714,15 @@
     {
       "aliasColors": {},
       "bars": false,
-      "cacheTimeout": null,
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "This panel displays the error counts encountered by safety rules queries within the last aggregation interval.",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2291,7 +1733,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 71
+        "y": 62
       },
       "hiddenSeries": false,
       "id": 50,
@@ -2312,7 +1754,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2322,20 +1764,18 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", owner=~\"$owner\", result=\"error\"}[$AggInterval])",
+          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", result=\"error\"}[$AggInterval])",
           "format": "time_series",
           "hide": false,
           "instant": false,
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}_{{method}}",
+          "legendFormat": "{{kubernetes_pod_name}}_{{method}}",
           "refId": "B"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Error Counts of Queries",
       "tooltip": {
         "shared": true,
@@ -2344,9 +1784,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -2355,38 +1793,31 @@
           "format": "short",
           "label": "Error Count (last aggregation interval)",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "aliasColors": {},
       "bars": false,
-      "cacheTimeout": null,
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "The most recent epoch processed by safety rules",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2397,7 +1828,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 71
+        "y": 62
       },
       "hiddenSeries": false,
       "id": 93,
@@ -2418,7 +1849,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2428,20 +1859,18 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"epoch\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"epoch\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "B"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Current Epoch",
       "tooltip": {
         "shared": true,
@@ -2450,9 +1879,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -2461,38 +1888,31 @@
           "format": "short",
           "label": "Epoch Number",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "aliasColors": {},
       "bars": false,
-      "cacheTimeout": null,
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "The last round that the validator submitted a vote",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2503,7 +1923,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 79
+        "y": 70
       },
       "hiddenSeries": false,
       "id": 95,
@@ -2524,7 +1944,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2534,20 +1954,18 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"last_voted_round\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"last_voted_round\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "B"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Last Voted Round",
       "tooltip": {
         "shared": true,
@@ -2556,9 +1974,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -2567,38 +1983,31 @@
           "format": "short",
           "label": "Round Number",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "aliasColors": {},
       "bars": false,
-      "cacheTimeout": null,
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "The highest parent round from any incoming quorum certificate",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2609,7 +2018,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 79
+        "y": 70
       },
       "hiddenSeries": false,
       "id": 94,
@@ -2630,7 +2039,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2640,20 +2049,18 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"preferred_round\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"preferred_round\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "B"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Preferred Round",
       "tooltip": {
         "shared": true,
@@ -2662,9 +2069,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -2673,35 +2078,30 @@
           "format": "short",
           "label": "Round Number",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 87
+        "y": 78
       },
       "id": 6,
       "panels": [],
@@ -2714,13 +2114,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2731,7 +2130,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 88
+        "y": 79
       },
       "hiddenSeries": false,
       "id": 40,
@@ -2752,7 +2151,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2764,16 +2163,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_schemadb_get_latency_seconds_sum{chain_name=~\"$chain_name\", role=~\"$role\",owner=~\"$owner\"}[$AggInterval])/rate(aptos_schemadb_get_latency_seconds_count{chain_name=~\"$chain_name\", role=~\"$role\",owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_schemadb_get_latency_seconds_sum{chain_name=~\"$chain_name\", role=~\"$role\",kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_schemadb_get_latency_seconds_count{chain_name=~\"$chain_name\", role=~\"$role\",kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "SchemaDB get() Latency",
       "tooltip": {
         "shared": true,
@@ -2782,46 +2179,37 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "s",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 95
+        "y": 86
       },
       "id": 36,
       "panels": [],
@@ -2834,12 +2222,11 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2850,7 +2237,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 96
+        "y": 87
       },
       "hiddenSeries": false,
       "id": 88,
@@ -2871,7 +2258,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2881,18 +2268,16 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_user_transactions_executed{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role\",status=\"success\"}[1m])",
+          "expr": "rate(aptos_vm_user_transactions_executed{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\",status=\"success\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "User Transactions (Successful)",
       "tooltip": {
         "shared": true,
@@ -2901,9 +2286,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -2912,22 +2295,17 @@
           "format": "short",
           "label": "/s",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -2936,12 +2314,11 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2952,7 +2329,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 96
+        "y": 87
       },
       "hiddenSeries": false,
       "id": 89,
@@ -2973,7 +2350,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2983,18 +2360,16 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_system_transactions_executed{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role\"}[1m])",
+          "expr": "rate(aptos_vm_system_transactions_executed{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "System Transactions",
       "tooltip": {
         "shared": true,
@@ -3003,9 +2378,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -3014,22 +2387,17 @@
           "format": "short",
           "label": "/s",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -3038,12 +2406,11 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -3054,7 +2421,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 96
+        "y": 87
       },
       "hiddenSeries": false,
       "id": 91,
@@ -3075,7 +2442,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3085,18 +2452,16 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_txn_total_seconds_sum{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role\"}[1m])/rate(aptos_vm_txn_total_seconds_count{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role\"}[1m])",
+          "expr": "rate(aptos_vm_txn_total_seconds_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[1m])/rate(aptos_vm_txn_total_seconds_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Avg Txn Total Time",
       "tooltip": {
         "shared": true,
@@ -3105,9 +2470,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -3116,35 +2479,30 @@
           "format": "s",
           "label": "",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 104
+        "y": 95
       },
       "id": 34,
       "panels": [],
@@ -3157,13 +2515,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "RPC endpoint level request count.",
       "fieldConfig": {
         "defaults": {
-          "custom": {}
+          "links": []
         },
         "overrides": []
       },
@@ -3173,7 +2531,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 105
+        "y": 96
       },
       "hiddenSeries": false,
       "id": 73,
@@ -3190,11 +2548,10 @@
       "linewidth": 1,
       "nullPointMode": "null as zero",
       "options": {
-        "alertThreshold": true,
-        "dataLinks": []
+        "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3204,16 +2561,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, type) (rate(aptos_client_service_rpc_requests_count{chain_name=~\"$chain_name\", role=~\"$role\", type=~\"$requesttype\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role, type) (rate(aptos_client_service_rpc_requests_count{chain_name=~\"$chain_name\", role=~\"$role\", type=~\"$requesttype\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}-{{type}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{type}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "JSON-RPC Request Count",
       "tooltip": {
         "shared": true,
@@ -3222,9 +2577,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -3233,22 +2586,17 @@
           "format": "short",
           "label": "requests/s",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
           "label": "",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -3257,13 +2605,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "Internal error rate, likely a bug if there is data show up.",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -3274,7 +2621,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 105
+        "y": 96
       },
       "hiddenSeries": false,
       "id": 86,
@@ -3295,11 +2642,10 @@
       "linewidth": 1,
       "nullPointMode": "null as zero",
       "options": {
-        "alertThreshold": true,
-        "dataLinks": []
+        "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3309,16 +2655,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, method, errorcode) (rate(aptos_client_service_internal_error_count{chain_name=~\"$chain_name\", role=~\"$role\", type=~\"$requesttype\", method=~\"$method\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role, method, errorcode) (rate(aptos_client_service_internal_error_count{chain_name=~\"$chain_name\", role=~\"$role\", type=~\"$requesttype\", method=~\"$method\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}-{{method}} {{errortype}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{method}} {{errortype}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "JSON-RPC method internal errors",
       "tooltip": {
         "shared": true,
@@ -3327,9 +2671,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -3338,22 +2680,17 @@
           "format": "short",
           "label": "/s",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -3362,13 +2699,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "The rate of invalid requests, all client side errors. ",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -3379,7 +2715,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 105
+        "y": 96
       },
       "hiddenSeries": false,
       "id": 85,
@@ -3400,11 +2736,10 @@
       "linewidth": 1,
       "nullPointMode": "null as zero",
       "options": {
-        "alertThreshold": true,
-        "dataLinks": []
+        "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3414,16 +2749,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, method, errortype) (rate(aptos_client_service_invalid_requests_count{chain_name=~\"$chain_name\", role=~\"$role\", type=~\"$requesttype\", method=~\"$method\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role, method, errortype) (rate(aptos_client_service_invalid_requests_count{chain_name=~\"$chain_name\", role=~\"$role\", type=~\"$requesttype\", method=~\"$method\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}-{{method}} {{errortype}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{method}} {{errortype}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "JSON-RPC method invalid requests",
       "tooltip": {
         "shared": true,
@@ -3432,9 +2765,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -3443,22 +2774,17 @@
           "format": "short",
           "label": "/s",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -3467,29 +2793,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "This latency is recorded at JSON-RPC handler level without knowing what method is called. There are 2 types, batch and single requests.  \nBatch request is total time for all methods call finished.",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "align": null
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
+          "links": []
         },
         "overrides": []
       },
@@ -3499,7 +2809,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 113
+        "y": 104
       },
       "hiddenSeries": false,
       "id": 81,
@@ -3516,11 +2826,10 @@
       "linewidth": 1,
       "nullPointMode": "null as zero",
       "options": {
-        "alertThreshold": true,
-        "dataLinks": []
+        "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3530,17 +2839,15 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum  by (owner, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\",type=~\"$requesttype\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.50, sum  by (kubernetes_pod_name, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\",type=~\"$requesttype\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "JSON-RPC Request Latency [P50]",
       "tooltip": {
         "shared": true,
@@ -3549,33 +2856,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "s",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -3584,29 +2882,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "This latency is recorded at JSON-RPC handler level without knowing what method is called. There are 2 types, batch and single requests.  \nBatch request is total time for all methods call finished.",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "align": null
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
+          "links": []
         },
         "overrides": []
       },
@@ -3616,7 +2898,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 113
+        "y": 104
       },
       "hiddenSeries": false,
       "id": 82,
@@ -3633,11 +2915,10 @@
       "linewidth": 1,
       "nullPointMode": "null as zero",
       "options": {
-        "alertThreshold": true,
-        "dataLinks": []
+        "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3647,17 +2928,15 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.90, sum  by (owner, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\",type=~\"$requesttype\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.90, sum  by (kubernetes_pod_name, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\",type=~\"$requesttype\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "JSON-RPC Request Latency [P90]",
       "tooltip": {
         "shared": true,
@@ -3666,33 +2945,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "s",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -3701,29 +2971,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "This latency is recorded at JSON-RPC handler level without knowing what method is called. There are 2 types, batch and single requests.  \nBatch request is total time for all methods call finished.",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "align": null
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
+          "links": []
         },
         "overrides": []
       },
@@ -3733,7 +2987,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 113
+        "y": 104
       },
       "hiddenSeries": false,
       "id": 83,
@@ -3750,11 +3004,10 @@
       "linewidth": 1,
       "nullPointMode": "null as zero",
       "options": {
-        "alertThreshold": true,
-        "dataLinks": []
+        "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3764,17 +3017,15 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum  by (owner, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\",type=~\"$requesttype\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.99, sum  by (kubernetes_pod_name, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\",type=~\"$requesttype\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "JSON-RPC Request Latency [P99]",
       "tooltip": {
         "shared": true,
@@ -3783,46 +3034,37 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "s",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 121
+        "y": 112
       },
       "id": 65,
       "panels": [],
@@ -3835,13 +3077,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "The rate of logs written via the code.  This is a superset of logs written through to the end log storage system.",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -3852,7 +3093,7 @@
         "h": 11,
         "w": 8,
         "x": 0,
-        "y": 122
+        "y": 113
       },
       "hiddenSeries": false,
       "id": 69,
@@ -3872,7 +3113,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3882,17 +3123,15 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
-      "title": "Logging Rate ($AggInterval) [$owner-$role]",
+      "title": "Logging Rate ($AggInterval) [$kubernetes_pod_name-$role]",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -3900,9 +3139,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -3911,22 +3148,16 @@
           "format": "none",
           "label": "logs/s",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -3935,13 +3166,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "The end to end rate of logs being submitted, to actually being sent to Logstash.  If this value rises above 0, see the corresponding error graphs to determine the issue.",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -3952,7 +3182,7 @@
         "h": 11,
         "w": 8,
         "x": 8,
-        "y": 122
+        "y": 113
       },
       "hiddenSeries": false,
       "id": 67,
@@ -3972,7 +3202,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3982,17 +3212,15 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "1-(rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "1-(rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
-      "title": "Logging Total Failure Rate ($AggInterval) [$owner-$role]",
+      "title": "Logging Total Failure Rate ($AggInterval) [$kubernetes_pod_name-$role]",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -4000,9 +3228,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -4017,16 +3243,12 @@
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -4035,13 +3257,12 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": {
-        "uid": "${Datasource}",
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${Datasource}"
       },
       "description": "Percentage of connections that fail to connect to the logging pod.  Extended or high percentage e.g. 100% connections points to a dead logging pod.",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -4052,7 +3273,7 @@
         "h": 11,
         "w": 8,
         "x": 16,
-        "y": 122
+        "y": 113
       },
       "hiddenSeries": false,
       "id": 71,
@@ -4072,7 +3293,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "8.4.4",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -4082,17 +3303,15 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(rate(aptos_struct_log_connect_error_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval]) or 0 * rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])) / rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "(rate(aptos_struct_log_connect_error_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]) or 0 * rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])) / rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
-      "title": "Connect Error Rate  ($AggInterval) [$owner-$role]",
+      "title": "Connect Error Rate  ($AggInterval) [$kubernetes_pod_name-$role]",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -4100,9 +3319,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -4117,26 +3334,27 @@
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     }
   ],
   "refresh": false,
-  "schemaVersion": 26,
+  "schemaVersion": 35,
   "style": "dark",
   "tags": [],
   "templating": {
     "list": [
       {
+        "current": {
+          "selected": false,
+          "text": "Prometheus",
+          "value": "Prometheus"
+        },
         "hide": 0,
         "includeAll": false,
         "multi": false,
@@ -4151,13 +3369,10 @@
       },
       {
         "current": {
+          "isNone": true,
           "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "None",
+          "value": ""
         },
         "datasource": {
           "type": "prometheus",
@@ -4184,7 +3399,6 @@
         "useTags": false
       },
       {
-        "allValue": null,
         "current": {
           "selected": true,
           "text": [
@@ -4195,41 +3409,42 @@
           ]
         },
         "datasource": {
-          "uid": "${Datasource}",
-          "type": "prometheus"
+          "type": "prometheus",
+          "uid": "${Datasource}"
         },
-        "definition": "label_values(owner)",
+        "definition": "label_values(kubernetes_pod_name)",
         "hide": 0,
         "includeAll": true,
         "label": "",
         "multi": true,
-        "name": "owner",
+        "name": "kubernetes_pod_name",
         "options": [],
-        "query": "label_values(owner)",
+        "query": {
+          "query": "label_values(kubernetes_pod_name)",
+          "refId": "Prometheus-kubernetes_pod_name-Variable-Query"
+        },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 0,
         "tagValuesQuery": "",
-        "tags": [],
         "tagsQuery": "",
         "type": "query",
         "useTags": false
       },
       {
-        "allValue": null,
         "current": {
           "selected": true,
           "text": [
-            "validator"
+            "All"
           ],
           "value": [
-            "validator"
+            "$__all"
           ]
         },
         "datasource": {
-          "uid": "${Datasource}",
-          "type": "prometheus"
+          "type": "prometheus",
+          "uid": "${Datasource}"
         },
         "definition": "label_values(role)",
         "hide": 0,
@@ -4238,85 +3453,86 @@
         "multi": true,
         "name": "role",
         "options": [],
-        "query": "label_values(role)",
+        "query": {
+          "query": "label_values(role)",
+          "refId": "Prometheus-role-Variable-Query"
+        },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 0,
         "tagValuesQuery": "",
-        "tags": [],
         "tagsQuery": "",
         "type": "query",
         "useTags": false
       },
       {
-        "allValue": null,
         "current": {
           "selected": true,
           "text": [
-            "validator"
+            "All"
           ],
           "value": [
-            "validator"
+            "$__all"
           ]
         },
         "datasource": {
-          "uid": "${Datasource}",
-          "type": "prometheus"
+          "type": "prometheus",
+          "uid": "${Datasource}"
         },
         "definition": "label_values(container)",
         "hide": 0,
         "includeAll": true,
-        "label": null,
         "multi": true,
         "name": "container",
         "options": [],
-        "query": "label_values(container)",
+        "query": {
+          "query": "label_values(container)",
+          "refId": "Prometheus-container-Variable-Query"
+        },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 0,
         "tagValuesQuery": "",
-        "tags": [],
         "tagsQuery": "",
         "type": "query",
         "useTags": false
       },
       {
-        "allValue": null,
         "current": {
           "selected": true,
           "text": [
-            "Validator"
+            "All"
           ],
           "value": [
-            "Validator"
+            "$__all"
           ]
         },
         "datasource": {
-          "uid": "${Datasource}",
-          "type": "prometheus"
+          "type": "prometheus",
+          "uid": "${Datasource}"
         },
         "definition": "label_values(network_id)",
         "hide": 0,
         "includeAll": true,
-        "label": null,
         "multi": true,
         "name": "network_id",
         "options": [],
-        "query": "label_values(network_id)",
+        "query": {
+          "query": "label_values(network_id)",
+          "refId": "Prometheus-network_id-Variable-Query"
+        },
         "refresh": 1,
         "regex": "Public|Validator|vfn",
         "skipUrlSync": false,
         "sort": 0,
         "tagValuesQuery": "",
-        "tags": [],
         "tagsQuery": "",
         "type": "query",
         "useTags": false
       },
       {
-        "allValue": null,
         "current": {
           "selected": false,
           "text": [
@@ -4354,7 +3570,6 @@
         "type": "custom"
       },
       {
-        "allValue": null,
         "current": {
           "selected": false,
           "text": [
@@ -4498,12 +3713,11 @@
       },
       {
         "datasource": {
-          "uid": "${Datasource}",
-          "type": "prometheus"
+          "type": "prometheus",
+          "uid": "${Datasource}"
         },
         "filters": [],
         "hide": 0,
-        "label": null,
         "name": "Filters",
         "skipUrlSync": false,
         "type": "adhoc"
@@ -4523,6 +3737,7 @@
   },
   "timezone": "",
   "title": "Component Health Dashboard",
-  "uid": "component-health",
-  "version": 1
+  "uid": "component-health-test",
+  "version": 1,
+  "weekStart": ""
 }

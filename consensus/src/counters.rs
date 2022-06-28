@@ -90,6 +90,15 @@ pub static COMMITTED_PROPOSALS_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Failed proposals from this validator when using LeaderReputation as the ProposerElection
+pub static FAILED_PROPOSALS_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_failed_proposals_in_window",
+        "Total number of this validator's committed proposals in the current reputation window"
+    )
+    .unwrap()
+});
+
 /// Committed votes from this validator when using LeaderReputation as the ProposerElection
 pub static COMMITTED_VOTES_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
@@ -100,9 +109,9 @@ pub static COMMITTED_VOTES_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
 });
 
 /// The number of block events the LeaderReputation uses
-pub static LEADER_REPUTATION_WINDOW_SIZE: Lazy<IntGauge> = Lazy::new(|| {
+pub static LEADER_REPUTATION_HISTORY_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "aptos_leader_reputation_window_size",
+        "aptos_leader_reputation_history_size",
         "Total number of new block events in the current reputation window"
     )
     .unwrap()
