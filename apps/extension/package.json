@@ -1,5 +1,5 @@
 {
-  "name": "web-wallet",
+  "name": "@aptos-wallet/extension",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
@@ -30,6 +30,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "dev": "react-scripts start",
     "lint": "eslint ./src",
     "lint:fix": "eslint ./src --fix",
     "tauri": "tauri",
@@ -65,25 +66,12 @@
     ]
   },
   "devDependencies": {
+    "@aptos-wallet/eslint-config": "*",
     "@babel/preset-react": "^7.17.12",
     "@tauri-apps/cli": "^1.0.0-rc.13",
     "@types/chrome": "^0.0.183",
     "@types/react": "^18.0.6",
     "@types/webextension-polyfill": "^0.8.3",
-    "@typescript-eslint/eslint-plugin": "^5.20.0",
-    "@typescript-eslint/parser": "^5.20.0",
-    "eslint": "^8.13.0",
-    "eslint-config-airbnb": "^19.0.4",
-    "eslint-config-airbnb-typescript": "^17.0.0",
-    "eslint-config-standard": "^17.0.0",
-    "eslint-plugin-import": "^2.26.0",
-    "eslint-plugin-n": "^15.1.0",
-    "eslint-plugin-promise": "^6.0.0",
-    "eslint-plugin-react": "^7.29.4",
-    "eslint-plugin-sort-class-members": "^1.14.1",
-    "eslint-plugin-sort-destructure-keys": "^1.4.0",
-    "eslint-plugin-sort-keys-fix": "^1.1.2",
-    "eslint-plugin-typescript-sort-keys": "^2.1.0",
     "npm-run-all": "^4.1.5",
     "ts-loader": "^9.3.0",
     "tsconfig-paths-webpack-plugin": "^3.5.2",

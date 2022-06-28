@@ -1,5 +1,5 @@
 {
-  "name": "wallet",
+  "name": "@aptos-wallet/mobile",
   "version": "0.0.1",
   "private": true,
   "scripts": {

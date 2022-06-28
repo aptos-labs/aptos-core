@@ -45,12 +45,17 @@ export const secondaryDividerColor = {
   light: 'gray.200',
 };
 
+interface FormValues {
+  toAddress: string;
+  transferAmount: string;
+}
+
 function TransferDrawer() {
   const { colorMode } = useColorMode();
   const { aptosAccount, aptosNetwork } = useWalletState();
   const {
     formState: { errors }, handleSubmit, register, setError, watch,
-  } = useForm();
+  } = useForm<FormValues>();
   const addressInputRef = useRef<HTMLInputElement>();
   const { isOpen, onClose, onOpen } = useDisclosure();
   const {

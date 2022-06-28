@@ -35,13 +35,17 @@ export const secondaryTextColor = {
   light: 'gray.500',
 };
 
+interface FormValues {
+  privateKey: string;
+}
+
 function Login() {
   const { colorMode } = useColorMode();
   const { aptosNetwork, updateWalletState } = useWalletState();
   const navigate = useNavigate();
   const {
     formState: { errors }, handleSubmit, register, setError, watch,
-  } = useForm();
+  } = useForm<FormValues>();
   const key: string = watch('privateKey');
 
   const onSubmit: SubmitHandler<Record<string, any>> = async (data, event) => {

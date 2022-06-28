@@ -61,3 +61,7 @@ mobile/*.jsbundle
 # Ruby / CocoaPods
 mobile/ios/Pods/
 mobile/vendor/bundle/
+
+# Turborepo
+.turbo
+.next/**

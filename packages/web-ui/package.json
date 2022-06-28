@@ -1,0 +1,22 @@
+{
+  "name": "@aptos-wallet/web-ui",
+  "version": "0.0.0",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup src/index.tsx --format esm,cjs --dts --external react",
+    "dev": "tsup src/index.tsx --format esm,cjs --watch --dts --external react",
+    "lint": "eslint ./src"
+  },
+  "devDependencies": {
+    "@aptos-wallet/eslint-config": "*",
+    "@aptos-wallet/tsconfig": "*",
+    "@types/react": "^17.0.37",
+    "@types/react-dom": "^17.0.11",
+    "eslint": "^7.32.0",
+    "react": "^17.0.2",
+    "tsup": "^6.1.2",
+    "typescript": "^4.6.3"
+  }
+}

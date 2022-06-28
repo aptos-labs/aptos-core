@@ -1,0 +1,16 @@
+[36m@aptos-wallet/web-ui:build[0m: cache hit, replaying output [2m03c713f9a38ba68b[0m
+[36m@aptos-wallet/web-ui:build: [0mwarning package.json: No license field
+[36m@aptos-wallet/web-ui:build: [0m$ tsup src/index.tsx --format esm,cjs --dts --external react
+[36m@aptos-wallet/web-ui:build: [0mCLI Building entry: src/index.tsx
+[36m@aptos-wallet/web-ui:build: [0mCLI Using tsconfig: tsconfig.json
+[36m@aptos-wallet/web-ui:build: [0mCLI tsup v6.1.2
+[36m@aptos-wallet/web-ui:build: [0mCLI Target: node14
+[36m@aptos-wallet/web-ui:build: [0mCJS Build start
+[36m@aptos-wallet/web-ui:build: [0mESM Build start
+[36m@aptos-wallet/web-ui:build: [0mESM ⚡️ Build success in 20ms
+[36m@aptos-wallet/web-ui:build: [0mCJS ⚡️ Build success in 29ms
+[36m@aptos-wallet/web-ui:build: [0mESM dist/index.mjs 193.00 B
+[36m@aptos-wallet/web-ui:build: [0mCJS dist/index.js 1.50 KB
+[36m@aptos-wallet/web-ui:build: [0mDTS Build start
+[36m@aptos-wallet/web-ui:build: [0mDTS ⚡️ Build success in 1091ms
+[36m@aptos-wallet/web-ui:build: [0mDTS dist/index.d.ts 60.00 B
