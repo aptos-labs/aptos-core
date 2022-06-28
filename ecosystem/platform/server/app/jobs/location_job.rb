@@ -22,7 +22,7 @@ class LocationJob < ApplicationJob
 
     new_ip = node_verifier.ip.ip.to_s
     if new_ip != it2_profile.validator_ip
-      Rails.logger.warn "IP does not match one in profile for it2_profile ##{it2_profile.id} - "\
+      Rails.logger.warn "IP does not match one in profile for it2_profile ##{it2_profile.id} - " \
                         "#{it2_profile.validator_address}: was #{it2_profile.validator_ip}, got #{new_ip}"
     end
 

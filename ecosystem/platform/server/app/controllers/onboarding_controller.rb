@@ -33,7 +33,11 @@ class OnboardingController < ApplicationController
     email_params = params.require(:user).permit(:email, :username, :terms_accepted)
     if current_user.update(email_params)
       log current_user, 'email updated'
-      redirect_to onboarding_email_success_path
+      if forum_sso?
+        redirect_to discourse_sso_path
+      else
+        redirect_to onboarding_email_success_path
+      end
     else
       render :email, status: :unprocessable_entity
     end
@@ -84,8 +88,8 @@ class OnboardingController < ApplicationController
       redirect_to it2_path, notice: 'Identity Verification completed successfully!'
     rescue KYCCompleteJobError => e
       Sentry.capture_exception(e)
-      redirect_to it2_path, error: 'Error; If you completed Identity Verification,'\
-                                   " it may take some time to reflect. Error: #{e}"
+      redirect_to it2_path, error: 'Error; If you completed Identity Verification, ' \
+                                   "it may take some time to reflect. Error: #{e}"
     end
   end
 

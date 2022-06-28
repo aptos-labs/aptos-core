@@ -8,7 +8,7 @@ class AptosFormBuilder < ActionView::Helpers::FormBuilder
   TEXT_FIELDS.each do |field|
     define_method field do |method, options = {}|
       options[:class] = [
-        'font-mono text-neutral-300 placeholder:text-white text-lg bg-neutral-800 appearance-none border '\
+        'font-mono text-neutral-300 placeholder:text-white text-lg bg-neutral-800 appearance-none border ' \
         'border-neutral-400 rounded-lg w-full py-2 px-4 focus:ring-0 focus:border-teal-400',
         { 'border-red-500': @object.errors[method].present? },
         options[:class]
@@ -19,7 +19,7 @@ class AptosFormBuilder < ActionView::Helpers::FormBuilder
 
   def check_box(method, options = {})
     options[:class] = [
-      'bg-transparent border-teal-400 checked:bg-teal-400 hover:checked:bg-teal-400 focus:checked:bg-teal-400 '\
+      'bg-transparent border-teal-400 checked:bg-teal-400 hover:checked:bg-teal-400 focus:checked:bg-teal-400 ' \
       'rounded focus:ring-0 outline-none',
       options[:class]
     ]

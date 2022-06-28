@@ -104,7 +104,7 @@ m = Module.new do
       return
     end
 
-    warn "Activating bundler (#{bundler_requirement}) failed:\n#{gem_error.message}\n\nTo install the version of "\
+    warn "Activating bundler (#{bundler_requirement}) failed:\n#{gem_error.message}\n\nTo install the version of " \
          "bundler this project requires, run `gem install bundler -v '#{bundler_requirement}'`"
     exit 42
   end
