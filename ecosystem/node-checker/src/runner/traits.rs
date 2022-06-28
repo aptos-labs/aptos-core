@@ -14,7 +14,7 @@ use crate::{
 #[derive(Debug, ThisError)]
 pub enum RunnerError {
     /// We failed to collect metrics for some reason.
-    #[error("Failed to collect metrics")]
+    #[error("Failed to collect metrics: {0}")]
     MetricCollectorError(MetricCollectorError),
 
     /// We couldn't parse the metrics.

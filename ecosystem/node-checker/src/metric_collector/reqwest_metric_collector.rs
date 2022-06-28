@@ -71,6 +71,7 @@ impl MetricCollector for ReqwestMetricCollector {
             .get(url.clone())
             .send()
             .await
+            // TODO: This context doesn't make it through to the client, fix that.
             .with_context(|| format!("Failed to get data from {}", url))
             .map_err(|e| MetricCollectorError::GetDataError(anyhow!(e)))?;
         let body = response
