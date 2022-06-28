@@ -18,6 +18,9 @@ use crate::{
 use aptos_config::config::NodeConfig;
 use aptos_logger::prelude::*;
 use futures::StreamExt;
+use once_cell::sync::Lazy;
+use rand::Rng;
+use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -32,7 +35,17 @@ use tokio_stream::wrappers::IntervalStream;
 use uuid::Uuid;
 
 const IP_ADDRESS_KEY: &str = "IP_ADDRESS"; // The IP address key
+const TELEMETRY_TOKEN_KEY: &str = "TELEMETRY_TOKEN"; // The telemetry token key
 const UNKNOWN_METRIC_VALUE: &str = "UNKNOWN"; // The default for unknown metric values
+
+/// The random token presented by the node to connect all
+/// telemetry events.
+/// TODO(joshlind): leverage real authentication!
+static TELEMETRY_TOKEN: Lazy<String> = Lazy::new(|| {
+    let mut rng = OsRng;
+    let token = rng.gen::<u32>();
+    format!("TOKEN_{:?}", token)
+});
 
 /// Returns true iff telemetry is disabled
 fn telemetry_is_disabled() -> bool {
@@ -137,14 +150,16 @@ async fn send_system_information(peer_id: String) {
 }
 
 /// Fetches the IP address and sends the given telemetry event
-/// along with the IP address.
+/// along with the IP address. Also sends a randomly generated
+/// token to help correlate metrics across events.
 pub(crate) async fn send_telemetry_event_with_ip(
     peer_id: String,
     telemetry_event: TelemetryEvent,
 ) -> JoinHandle<()> {
-    // Fetch the IP address and update the telemetry event
+    // Update the telemetry event with the ip address and random token
     let TelemetryEvent { name, mut params } = telemetry_event;
     params.insert(IP_ADDRESS_KEY.to_string(), get_origin_ip().await);
+    params.insert(TELEMETRY_TOKEN_KEY.to_string(), TELEMETRY_TOKEN.clone());
     let telemetry_event = TelemetryEvent { name, params };
 
     // Send the telemetry event
