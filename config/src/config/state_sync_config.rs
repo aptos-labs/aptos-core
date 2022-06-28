@@ -64,13 +64,36 @@ pub enum BootstrappingMode {
     ExecuteTransactionsFromGenesis,     // Executes transactions (starting at genesis)
 }
 
+impl BootstrappingMode {
+    pub fn to_label(&self) -> &'static str {
+        match self {
+            BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
+                "apply_transaction_outputs_from_genesis"
+            }
+            BootstrappingMode::DownloadLatestAccountStates => "download_latest_account_states",
+            BootstrappingMode::ExecuteTransactionsFromGenesis => {
+                "execute_transactions_from_genesis"
+            }
+        }
+    }
+}
+
 /// The continuous syncing mode determines how the node will stay up-to-date
 /// once it has bootstrapped and the blockchain continues to grow, e.g.,
 /// continuously executing all transactions.
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum ContinuousSyncingMode {
-    ExecuteTransactions,     // Executes transactions to stay up-to-date
     ApplyTransactionOutputs, // Applies transaction outputs to stay up-to-date
+    ExecuteTransactions,     // Executes transactions to stay up-to-date
+}
+
+impl ContinuousSyncingMode {
+    pub fn to_label(&self) -> &'static str {
+        match self {
+            ContinuousSyncingMode::ApplyTransactionOutputs => "apply_transaction_outputs",
+            ContinuousSyncingMode::ExecuteTransactions => "execute_transactions",
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]

@@ -1074,6 +1074,7 @@ dependencies = [
 name = "aptos-telemetry"
 version = "0.1.0"
 dependencies = [
+ "aptos-api",
  "aptos-config",
  "aptos-infallible",
  "aptos-logger",
