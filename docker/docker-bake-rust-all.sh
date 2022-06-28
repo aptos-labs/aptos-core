@@ -11,5 +11,5 @@ set -ex
 export GIT_REV=$(git rev-parse --short=8 HEAD)
 export GIT_SHA=$(git rev-parse HEAD)
 export BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-export GIT_BRANCH="${GIT_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
+export TARGET_CACHE_ID="${CACHE_SUFFIX:-from-local}"
 docker buildx bake --push --progress=plain --file docker/docker-bake-rust-all.hcl $IMAGE_TARGET
