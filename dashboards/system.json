@@ -91,19 +91,19 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(container_cpu_usage_seconds_total{container=~\"$container\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(container_cpu_usage_seconds_total{container=~\"$container\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container}}",
+          "legendFormat": "{{pod}}-{{container}}",
           "refId": "A"
         },
         {
-          "expr": "rate(container_cpu_usage_seconds_total{container_name=~\"$container\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(container_cpu_usage_seconds_total{container_name=~\"$container\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container_name}}",
+          "legendFormat": "{{pod}}-{{container_name}}",
           "refId": "B"
         }
       ],
@@ -190,19 +190,19 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{container=~\"$container\", owner=~\"$owner\"}",
+          "expr": "container_memory_working_set_bytes{container=~\"$container\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container}}",
+          "legendFormat": "{{pod}}-{{container}}",
           "refId": "A"
         },
         {
-          "expr": "container_memory_working_set_bytes{container_name=~\"$container\", owner=~\"$owner\"}",
+          "expr": "container_memory_working_set_bytes{container_name=~\"$container\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container_name}}",
+          "legendFormat": "{{pod}}-{{container_name}}",
           "refId": "B"
         }
       ],
@@ -289,19 +289,19 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{container=~\"$container\", owner=~\"$owner\"} / container_spec_memory_limit_bytes{container=~\"$container\", owner=~\"$owner\"}",
+          "expr": "container_memory_working_set_bytes{container=~\"$container\"} / container_spec_memory_limit_bytes{container=~\"$container\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container}}",
+          "legendFormat": "{{pod}}-{{container}}",
           "refId": "A"
         },
         {
-          "expr": "container_memory_working_set_bytes{container_name=~\"$container\", owner=~\"$owner\"} / container_spec_memory_limit_bytes{container_name=~\"$container\", owner=~\"$owner\"}",
+          "expr": "container_memory_working_set_bytes{container_name=~\"$container\"} / container_spec_memory_limit_bytes{container_name=~\"$container\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{container_name}}",
+          "legendFormat": "{{pod}}-{{container_name}}",
           "refId": "B"
         }
       ],
@@ -388,11 +388,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\".*-($container)-e.*\", owner=~\"$owner\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\".*-($container)-e.*\", owner=~\"$owner\"}",
+          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\".*-($container)-e.*\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{persistentvolumeclaim}}",
+          "legendFormat": "{{pod}}-{{persistentvolumeclaim}}",
           "refId": "A"
         }
       ],
@@ -479,12 +479,12 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\".*($container)-e.*\", owner=~\"$owner\"}",
+          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\".*($container)-e.*\"}",
           "format": "time_series",
           "hide": false,
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{persistentvolumeclaim}}",
+          "legendFormat": "{{pod}}-{{persistentvolumeclaim}}",
           "refId": "A"
         }
       ],
@@ -571,19 +571,19 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(container_network_receive_bytes_total{chain_name=~\"$chain_name\", owner=~\"$owner\", pod=~\".+$container(-e[0-9]+)?-0\"}[$interval]) + rate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", owner=~\"$owner\", pod=~\".+$container(-e[0-9]+)?-0\"}[$interval])",
+          "expr": "rate(container_network_receive_bytes_total{chain_name=~\"$chain_name\", pod=~\".+$container(-e[0-9]+)?-0\"}[$interval]) + rate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", pod=~\".+$container(-e[0-9]+)?-0\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{pod}}",
+          "legendFormat": "{{pod}}-{{pod}}",
           "refId": "A"
         },
         {
-          "expr": "rate(container_network_receive_bytes_total{chain_name=~\"$chain_name\", owner=~\"$owner\", pod_name=~\".+$container(-e[0-9]+)?-0\"}[$interval]) + rate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", owner=~\"$owner\", pod_name=~\".+$container(-e[0-9]+)?-0\"}[$interval])",
+          "expr": "rate(container_network_receive_bytes_total{chain_name=~\"$chain_name\", pod_name=~\".+$container(-e[0-9]+)?-0\"}[$interval]) + rate(container_network_transmit_bytes_total{chain_name=~\"$chain_name\", pod_name=~\".+$container(-e[0-9]+)?-0\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{pod_name}}",
+          "legendFormat": "{{pod}}-{{pod_name}}",
           "refId": "B"
         }
       ],
@@ -671,19 +671,19 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(container_fs_reads_total{container=~\"$container\", owner=~\"$owner\"}[$interval]) + rate(container_fs_writes_total{container=~\"$container\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(container_fs_reads_total{container=~\"$container\"}[$interval]) + rate(container_fs_writes_total{container=~\"$container\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{pod}}:{{container}}:{{device}}",
+          "legendFormat": "{{pod}}-{{pod}}:{{container}}:{{device}}",
           "refId": "A"
         },
         {
-          "expr": "rate(container_fs_reads_total{container_name=~\"$container\", owner=~\"$owner\"}[$interval]) + rate(container_fs_writes_total{container_name=~\"$container\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(container_fs_reads_total{container_name=~\"$container\"}[$interval]) + rate(container_fs_writes_total{container_name=~\"$container\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{pod_name}}:{{container_name}}:{{device}}",
+          "legendFormat": "{{pod}}-{{pod_name}}:{{container_name}}:{{device}}",
           "refId": "B"
         }
       ],
@@ -819,15 +819,15 @@
           "uid": "${Datasource}",
           "type": "prometheus"
         },
-        "definition": "label_values(owner)",
+        "definition": "label_values(pod)",
         "hide": 0,
         "includeAll": true,
         "multi": true,
-        "name": "owner",
+        "name": "pod",
         "options": [],
         "query": {
-          "query": "label_values(owner)",
-          "refId": "Prometheus-owner-Variable-Query"
+          "query": "label_values(pod)",
+          "refId": "Prometheus-pod-Variable-Query"
         },
         "refresh": 1,
         "regex": "",

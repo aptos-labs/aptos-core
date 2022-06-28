@@ -191,7 +191,7 @@
               "__name__": 1,
               "instance": 2,
               "job": 4,
-              "owner": 3
+              "kubernetes_pod_name": 3
             },
             "renameByName": {}
           }
@@ -250,10 +250,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "up{owner=~\"$owner\", job=~\"$job\"}",
+          "expr": "up{kubernetes_pod_name=~\"$kubernetes_pod_name\", job=~\"$job\"}",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{owner}}-{{job}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{job}}",
           "refId": "A"
         }
       ],
@@ -352,15 +352,15 @@
           "uid": "${Datasource}",
           "type": "prometheus"
         },
-        "definition": "label_values(owner)",
+        "definition": "label_values(kubernetes_pod_name)",
         "hide": 0,
         "includeAll": true,
         "multi": false,
-        "name": "owner",
+        "name": "kubernetes_pod_name",
         "options": [],
         "query": {
-          "query": "label_values(owner)",
-          "refId": "Prometheus-owner-Variable-Query"
+          "query": "label_values(kubernetes_pod_name)",
+          "refId": "Prometheus-kubernetes_pod_name-Variable-Query"
         },
         "refresh": 1,
         "regex": "",

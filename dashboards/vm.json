@@ -108,11 +108,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_user_transactions_executed{chain_name=~\"$chain_name\", status=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_user_transactions_executed{chain_name=~\"$chain_name\", status=\"success\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -200,11 +200,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_system_transactions_executed{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_system_transactions_executed{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -292,11 +292,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_transactions_validated{chain_name=~\"$chain_name\", status=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_transactions_validated{chain_name=~\"$chain_name\", status=\"success\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -384,11 +384,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_num_txns_per_block_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_vm_num_txns_per_block_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_num_txns_per_block_sum{kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_vm_num_txns_per_block_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -493,11 +493,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_txn_gas_usage_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_vm_txn_gas_usage_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_txn_gas_usage_sum{kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_vm_txn_gas_usage_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -602,11 +602,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_txn_total_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_vm_txn_total_seconds_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_txn_total_seconds_sum{kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_vm_txn_total_seconds_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -693,11 +693,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_txn_validation_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(aptos_vm_txn_validation_seconds_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_txn_validation_seconds_sum{kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])/rate(aptos_vm_txn_validation_seconds_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -784,11 +784,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_txn_total_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(aptos_vm_txn_total_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])/(rate(aptos_vm_txn_gas_usage_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(aptos_vm_txn_gas_usage_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]))",
+          "expr": "rate(aptos_vm_txn_total_seconds_sum{kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])/rate(aptos_vm_txn_total_seconds_count{kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])/(rate(aptos_vm_txn_gas_usage_sum{kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])/rate(aptos_vm_txn_gas_usage_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}-{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
         }
       ],
@@ -891,15 +891,15 @@
           "uid": "${Datasource}",
           "type": "prometheus"
         },
-        "definition": "label_values(owner)",
+        "definition": "label_values(kubernetes_pod_name)",
         "hide": 0,
         "includeAll": true,
         "multi": true,
-        "name": "owner",
+        "name": "kubernetes_pod_name",
         "options": [],
         "query": {
-          "query": "label_values(owner)",
-          "refId": "Prometheus-owner-Variable-Query"
+          "query": "label_values(kubernetes_pod_name)",
+          "refId": "Prometheus-kubernetes_pod_name-Variable-Query"
         },
         "refresh": 1,
         "regex": "",

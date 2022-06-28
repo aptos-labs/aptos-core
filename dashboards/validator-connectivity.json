@@ -413,11 +413,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\", owner=~\"$owner\"})\n",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})\n",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -503,9 +503,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\", owner=~\"$owner\", direction=\"inbound\"})",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"})",
           "interval": "",
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -592,9 +592,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\", owner=~\"$owner\", direction=\"outbound\"})",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"})",
           "interval": "",
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -650,7 +650,7 @@
         "uid": "${Datasource}",
         "type": "prometheus"
       },
-      "description": "An adjacency matrix showing each (validator -> remote validator) connection. Each row shows the \"owner\" node's view of its own connections to each other validator.\n\nA green \"1\" means there is currently a connection, while a red \"0\" means the nodes are not currently connected. An empty square means there is no reported metric for this (owner_i, owner_j) pair, which is expected for (owner_i, owner_i) since we don't allow self-connections.",
+      "description": "An adjacency matrix showing each (validator -> remote validator) connection. Each row shows the \"kubernetes_pod_name\" node's view of its own connections to each other validator.\n\nA green \"1\" means there is currently a connection, while a red \"0\" means the nodes are not currently connected. An empty square means there is no reported metric for this (kubernetes_pod_name_i, kubernetes_pod_name_j) pair, which is expected for (kubernetes_pod_name_i, kubernetes_pod_name_i) since we don't allow self-connections.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -734,14 +734,14 @@
         "sortBy": [
           {
             "desc": false,
-            "displayName": "owner"
+            "displayName": "kubernetes_pod_name"
           }
         ]
       },
       "pluginVersion": "v1.0",
       "targets": [
         {
-          "expr": "# Filter out extraneous fields.\nsum by (owner, remote_owner) (\n  (\n    aptos_network_peer_connected{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\"}\n\n  # Do a left join on a table containing labels [\"remote_peer_id\", \"remote_owner\"]\n  # to join in \"remote_owner\" for each \"remote_peer_id\".\n  ) + on(remote_peer_id) group_left(remote_owner) (\n\n    # We can only left join with certain bin-ops, so we force all values to zero\n    # here so we can add without messing up the connection values.\n    clamp_max(\n      # Filter out extraneous fields.\n      sum by (remote_owner, remote_peer_id) (\n        sum without (direction) (\n          # Rename \"peer_id\" -> \"remote_peer_id\" and \"owner\" -> \"remote_owner\" so\n          # these fields don't conflict with those from peer_connected.\n          label_replace(\n            label_replace(\n              aptos_connections{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\"},\n              \"remote_peer_id\", \"$1\",\n              \"peer_id\", \"(.*)\"\n            ),\n            \"remote_owner\", \"$1\",\n            \"owner\", \"(.*)\"\n          )\n        )\n      ),\n      0\n    )\n  )\n)",
+          "expr": "# Filter out extraneous fields.\nsum by (kubernetes_pod_name, remote_kubernetes_pod_name) (\n  (\n    aptos_network_peer_connected{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\"}\n\n  # Do a left join on a table containing labels [\"remote_peer_id\", \"remote_kubernetes_pod_name\"]\n  # to join in \"remote_kubernetes_pod_name\" for each \"remote_peer_id\".\n  ) + on(remote_peer_id) group_left(remote_kubernetes_pod_name) (\n\n    # We can only left join with certain bin-ops, so we force all values to zero\n    # here so we can add without messing up the connection values.\n    clamp_max(\n      # Filter out extraneous fields.\n      sum by (remote_kubernetes_pod_name, remote_peer_id) (\n        sum without (direction) (\n          # Rename \"peer_id\" -> \"remote_peer_id\" and \"kubernetes_pod_name\" -> \"remote_kubernetes_pod_name\" so\n          # these fields don't conflict with those from peer_connected.\n          label_replace(\n            label_replace(\n              aptos_connections{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\"},\n              \"remote_peer_id\", \"$1\",\n              \"peer_id\", \"(.*)\"\n            ),\n            \"remote_kubernetes_pod_name\", \"$1\",\n            \"kubernetes_pod_name\", \"(.*)\"\n          )\n        )\n      ),\n      0\n    )\n  )\n)",
           "format": "time_series",
           "instant": true,
           "interval": "",
@@ -754,7 +754,7 @@
         {
           "id": "labelsToFields",
           "options": {
-            "valueLabel": "remote_owner"
+            "valueLabel": "remote_kubernetes_pod_name"
           }
         },
         {
@@ -784,7 +784,7 @@
               "lyft": 14,
               "mercycorps": 15,
               "novi": 16,
-              "owner": 1,
+              "kubernetes_pod_name": 1,
               "paradigm": 17,
               "payu": 18,
               "ribbit": 19,
@@ -872,15 +872,15 @@
           "uid": "${Datasource}",
           "type": "prometheus"
         },
-        "definition": "label_values(aptos_network_peer_connected, owner)",
+        "definition": "label_values(aptos_network_peer_connected, kubernetes_pod_name)",
         "hide": 0,
         "includeAll": true,
         "multi": true,
-        "name": "owner",
+        "name": "kubernetes_pod_name",
         "options": [],
         "query": {
-          "query": "label_values(aptos_network_peer_connected, owner)",
-          "refId": "Prometheus-owner-Variable-Query"
+          "query": "label_values(aptos_network_peer_connected, kubernetes_pod_name)",
+          "refId": "Prometheus-kubernetes_pod_name-Variable-Query"
         },
         "refresh": 1,
         "regex": "",

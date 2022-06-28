@@ -101,13 +101,13 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", index=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", index=\"system_ttl\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "B"
         }
       ],
@@ -206,11 +206,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, status) (rate(aptos_shared_mempool_transactions_processed{chain_name=~\"$chain_name\", status=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval]))",
+          "expr": "sum by (kubernetes_pod_name, role, status) (rate(aptos_shared_mempool_transactions_processed{chain_name=~\"$chain_name\", status=\"success\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}:{{role}} - {{status}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} - {{status}}",
           "refId": "A"
         }
       ],
@@ -308,9 +308,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(core_mempool_removed_txns_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(core_mempool_removed_txns_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -408,9 +408,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, network) (mempool_active_upstream_peers_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"})",
+          "expr": "sum by (kubernetes_pod_name, role, network) (mempool_active_upstream_peers_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}  ({{network}} network)",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}  ({{network}} network)",
           "refId": "A"
         }
       ],
@@ -508,9 +508,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, network, sender) (rate(aptos_shared_mempool_transactions_processed{chain_name=~\"$chain_name\", status=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval]))",
+          "expr": "sum by (kubernetes_pod_name, role, network, sender) (rate(aptos_shared_mempool_transactions_processed{chain_name=~\"$chain_name\", status=\"vm_validation\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} <- ({{network}} network:{{sender}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} <- ({{network}} network:{{sender}})",
           "refId": "A"
         }
       ],
@@ -625,9 +625,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_service_latency_ms_count{chain_name=~\"$chain_name\", result=\"fail\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_service_latency_ms_count{chain_name=~\"$chain_name\", result=\"fail\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} - {{type}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} - {{type}}",
           "refId": "A"
         }
       ],
@@ -725,9 +725,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_db_error_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_db_error_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -825,9 +825,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_json_rpc_callback_fail_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_json_rpc_callback_fail_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -925,9 +925,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_network_send_fail_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_network_send_fail_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -1025,9 +1025,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_vm_reconfig_update_fail_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_vm_reconfig_update_fail_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -1125,9 +1125,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_core_mempool_invariant_violated_count{chain_name=~\"$chain_name\", owner=\"$owner\", role=\"$role\"}[$interval])",
+          "expr": "rate(mempool_core_mempool_invariant_violated_count{chain_name=~\"$chain_name\", kubernetes_pod_name=\"$kubernetes_pod_name\", role=\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -1225,9 +1225,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_unexpected_network_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_unexpected_network_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} <- {{network}}:{{peer}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} <- {{network}}:{{peer}}",
           "refId": "A"
         }
       ],
@@ -1342,9 +1342,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(core_mempool_gc_latency_count{chain_name=~\"$chain_name\", type=\"client_expiration\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(core_mempool_gc_latency_count{chain_name=~\"$chain_name\", type=\"client_expiration\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} : {{status}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} : {{status}}",
           "refId": "A"
         }
       ],
@@ -1442,9 +1442,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(core_mempool_gc_latency_count{chain_name=~\"$chain_name\", type=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(core_mempool_gc_latency_count{chain_name=~\"$chain_name\", type=\"system_ttl\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} : {{status}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} : {{status}}",
           "refId": "A"
         }
       ],
@@ -1542,9 +1542,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", index=\"parking_lot\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", index=\"parking_lot\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -1642,9 +1642,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", index=\"timeline\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", index=\"timeline\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -1742,9 +1742,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", index=\"priority\", role=\"validator\", owner=~\"$owner\"}",
+          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", index=\"priority\", role=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "interval": "",
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -1842,9 +1842,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_transactions_processed{chain_name=~\"$chain_name\", status!=\"success\", status!=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_transactions_processed{chain_name=~\"$chain_name\", status!=\"success\", status!=\"vm_validation\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} <- ({{network}} network:{{sender}}) -  {{status}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} <- ({{network}} network:{{sender}}) -  {{status}}",
           "refId": "A"
         }
       ],
@@ -1942,9 +1942,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(core_mempool_gc_event_count{chain_name=~\"$chain_name\", type=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(core_mempool_gc_event_count{chain_name=~\"$chain_name\", type=\"system_ttl\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -2042,9 +2042,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(core_mempool_gc_latency_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(core_mempool_gc_latency_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(core_mempool_gc_latency_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])/rate(core_mempool_gc_latency_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -2160,11 +2160,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_service_transactions_sum{chain_name=~\"$chain_name\", type=\"commit_accepted\", owner=~\"$owner\", role=~\"$role\"}[$interval])\n",
+          "expr": "rate(mempool_service_transactions_sum{chain_name=~\"$chain_name\", type=\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])\n",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -2264,11 +2264,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_service_latency_ms_sum{chain_name=~\"$chain_name\", type=\"commit_accepted\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(mempool_service_latency_ms_count{chain_name=~\"$chain_name\", type=\"commit_accepted\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_service_latency_ms_sum{chain_name=~\"$chain_name\", type=\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(mempool_service_latency_ms_count{chain_name=~\"$chain_name\", type=\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -2366,9 +2366,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_service_transactions_sum{chain_name=~\"$chain_name\", type=\"commit_rejected\", owner=~\"$owner\", role=~\"$role\"}[$interval])\n",
+          "expr": "rate(mempool_service_transactions_sum{chain_name=~\"$chain_name\", type=\"commit_rejected\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])\n",
           "interval": "",
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -2466,9 +2466,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_service_latency_ms_sum{chain_name=~\"$chain_name\", type=\"commit_rejected\", owner=~\"$owner\"}[$interval])/rate(mempool_service_latency_ms_count{chain_name=~\"$chain_name\", type=\"commit_rejected\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(mempool_service_latency_ms_sum{chain_name=~\"$chain_name\", type=\"commit_rejected\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])/rate(mempool_service_latency_ms_count{chain_name=~\"$chain_name\", type=\"commit_rejected\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -2567,11 +2567,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_service_transactions_sum{chain_name=~\"$chain_name\", type=\"get_block\", owner=~\"$owner\"}[$interval]) / rate(mempool_service_transactions_count{chain_name=~\"$chain_name\", type=\"get_block\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(mempool_service_transactions_sum{chain_name=~\"$chain_name\", type=\"get_block\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval]) / rate(mempool_service_transactions_count{chain_name=~\"$chain_name\", type=\"get_block\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -2670,11 +2670,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_service_latency_ms_sum{chain_name=~\"$chain_name\", type=\"get_block\", owner=~\"$owner\"}[$interval]) / rate(mempool_service_latency_ms_count{chain_name=~\"$chain_name\", type=\"get_block\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(mempool_service_latency_ms_sum{chain_name=~\"$chain_name\", type=\"get_block\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval]) / rate(mempool_service_latency_ms_count{chain_name=~\"$chain_name\", type=\"get_block\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}",
+          "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
         }
       ],
@@ -2790,11 +2790,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_events{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_events{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}:{{role}} - {{event}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} - {{event}}",
           "refId": "A"
         }
       ],
@@ -2892,9 +2892,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_bounded_executor_spawn_latency_sum{chain_name=~\"$chain_name\", stage=\"start\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(mempool_bounded_executor_spawn_latency_count{chain_name=~\"$chain_name\", stage=\"start\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_bounded_executor_spawn_latency_sum{chain_name=~\"$chain_name\", stage=\"start\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(mempool_bounded_executor_spawn_latency_count{chain_name=~\"$chain_name\", stage=\"start\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} - {{task}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} - {{task}}",
           "refId": "A"
         }
       ],
@@ -3010,11 +3010,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, network, sender) (rate(aptos_shared_mempool_transactions_processed{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]))",
+          "expr": "sum by (kubernetes_pod_name, role, network, sender) (rate(aptos_shared_mempool_transactions_processed{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}:{{role}} <- ({{network}} network, {{sender}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} <- ({{network}} network, {{sender}})",
           "refId": "A"
         }
       ],
@@ -3113,11 +3113,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, network, sender) (rate(aptos_shared_mempool_transactions_processed{chain_name=~\"$chain_name\", status!=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval]))",
+          "expr": "sum by (kubernetes_pod_name, role, network, sender) (rate(aptos_shared_mempool_transactions_processed{chain_name=~\"$chain_name\", status!=\"vm_validation\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}:{{role}} <- ({{network}} network:{{sender}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} <- ({{network}} network:{{sender}})",
           "refId": "A"
         }
       ],
@@ -3216,9 +3216,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_request_latency_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_shared_mempool_request_latency_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_request_latency_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_shared_mempool_request_latency_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} <- ({{network}} network:{{sender}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} <- ({{network}} network:{{sender}})",
           "refId": "A"
         }
       ],
@@ -3316,9 +3316,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_process_txn_breakdown_latency_sum{chain_name=~\"$chain_name\", portion=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(mempool_process_txn_breakdown_latency_count{chain_name=~\"$chain_name\", portion=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_process_txn_breakdown_latency_sum{chain_name=~\"$chain_name\", portion=\"vm_validation\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(mempool_process_txn_breakdown_latency_count{chain_name=~\"$chain_name\", portion=\"vm_validation\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -3416,9 +3416,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_process_txn_breakdown_latency_sum{chain_name=~\"$chain_name\", portion=\"storage_fetch\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(mempool_process_txn_breakdown_latency_count{chain_name=~\"$chain_name\", portion=\"storage_fetch\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_process_txn_breakdown_latency_sum{chain_name=~\"$chain_name\", portion=\"storage_fetch\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(mempool_process_txn_breakdown_latency_count{chain_name=~\"$chain_name\", portion=\"storage_fetch\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -3533,9 +3533,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_transaction_broadcast_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_shared_mempool_transaction_broadcast_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_transaction_broadcast_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_shared_mempool_transaction_broadcast_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} -> ({{network}} network:{{recipient}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}} network:{{recipient}})",
           "refId": "A"
         }
       ],
@@ -3634,11 +3634,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_transaction_broadcast_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_transaction_broadcast_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{owner}}:{{role}} -> ({{network}} network:{{recipient}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}} network:{{recipient}})",
           "refId": "A"
         }
       ],
@@ -3736,9 +3736,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_broadcast_latency_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_broadcast_latency_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} -> ({{network}} network:{{recipient}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}} network:{{recipient}})",
           "refId": "A"
         }
       ],
@@ -3836,9 +3836,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_broadcast_latency_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_broadcast_latency_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_broadcast_latency_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_broadcast_latency_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} -> ({{network}} network,{{recipient}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}} network,{{recipient}})",
           "refId": "A"
         }
       ],
@@ -3936,9 +3936,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_broadcast_roundtrip_latency_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_shared_mempool_broadcast_roundtrip_latency_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_broadcast_roundtrip_latency_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_shared_mempool_broadcast_roundtrip_latency_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} -> ({{network}} network:{{recipient}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}} network:{{recipient}})",
           "refId": "A"
         }
       ],
@@ -4036,9 +4036,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_shared_mempool_pending_broadcasts_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_shared_mempool_pending_broadcasts_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} -> ({{network}}:{{recipient}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}}:{{recipient}})",
           "refId": "A"
         }
       ],
@@ -4136,9 +4136,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_rebroadcast_count{chain_name=~\"$chain_name\", type=\"expired\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_rebroadcast_count{chain_name=~\"$chain_name\", type=\"expired\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} -> {{network}}:{{recipient}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> {{network}}:{{recipient}}",
           "refId": "A"
         }
       ],
@@ -4236,9 +4236,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_rebroadcast_count{chain_name=~\"$chain_name\", type=\"retry\", owner=~\"$owner\", role=~\"role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_rebroadcast_count{chain_name=~\"$chain_name\", type=\"retry\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} -> ({{network}}:{{recipient}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}}:{{recipient}})",
           "refId": "A"
         }
       ],
@@ -4336,9 +4336,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_rebroadcast_count{chain_name=~\"$chain_name\", type=\"backpressure\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_rebroadcast_count{chain_name=~\"$chain_name\", type=\"backpressure\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} -> {{network}}:{{recipient}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> {{network}}:{{recipient}}",
           "refId": "A"
         }
       ],
@@ -4453,9 +4453,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_shared_mempool_ack_count{chain_name=~\"$chain_name\", direction=\"sent\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_shared_mempool_ack_count{chain_name=~\"$chain_name\", direction=\"sent\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} -> {{network}}:{{recipient}} - {{type}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> {{network}}:{{recipient}} - {{type}}",
           "refId": "A"
         }
       ],
@@ -4553,9 +4553,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_ack_count{chain_name=~\"$chain_name\", direction=\"received\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_ack_count{chain_name=~\"$chain_name\", direction=\"received\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}} <- {{network}}:{{recipient}} - {{type}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} <- {{network}}:{{recipient}} - {{type}}",
           "refId": "A"
         }
       ],
@@ -4670,9 +4670,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "mempool_pending_network_events{chain_name=~\"$chain_name\", state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "mempool_pending_network_events{chain_name=~\"$chain_name\", state=\"dropped\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -4770,9 +4770,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_pending_network_events{chain_name=~\"$chain_name\", state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_pending_network_events{chain_name=~\"$chain_name\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -4870,9 +4870,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_pending_network_events{chain_name=~\"$chain_name\", state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_pending_network_events{chain_name=~\"$chain_name\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -4970,9 +4970,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role) (mempool_pending_network_events{chain_name=~\"$chain_name\", state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"}) - sum by (owner, role)  (mempool_pending_network_events{chain_name=~\"$chain_name\", state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"})",
+          "expr": "sum by (kubernetes_pod_name, role) (mempool_pending_network_events{chain_name=~\"$chain_name\", state=\"enqueued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}) - sum by (kubernetes_pod_name, role)  (mempool_pending_network_events{chain_name=~\"$chain_name\", state=\"dequeued\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
           "interval": "",
-          "legendFormat": "{{owner}}:{{role}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}}",
           "refId": "A"
         }
       ],
@@ -5086,14 +5086,14 @@
           "uid": "${Datasource}",
           "type": "prometheus"
         },
-        "definition": "label_values(owner)",
+        "definition": "label_values(kubernetes_pod_name)",
         "hide": 0,
         "includeAll": true,
         "label": null,
         "multi": true,
-        "name": "owner",
+        "name": "kubernetes_pod_name",
         "options": [],
-        "query": "label_values(owner)",
+        "query": "label_values(kubernetes_pod_name)",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
