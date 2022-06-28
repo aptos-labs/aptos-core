@@ -21,6 +21,7 @@ class User < ApplicationRecord
 
   has_many :authorizations, dependent: :destroy
   has_one :it2_profile
+  has_one :it2_survey
   has_many :nfts
 
   def self.from_omniauth(auth, current_user = nil)
