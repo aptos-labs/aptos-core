@@ -266,16 +266,7 @@ export class TokenClient {
 
   /**
    * Queries token balance for the token creator
-   * @param creator Hex-encoded 16 bytes Aptos account address which created a token
-   * @param collectionName Name of collection, which holds a token
-   * @param tokenName Token name
-   * @returns Token object in below format
-   * ```
-   * Token {
-   *   id: TokenId;
-   *   value: number;
-   * }
-   * ```
+   * @deprecated Use getTokenBalanceForAccount instead
    */
   async getTokenBalance(creator: MaybeHexString, collectionName: string, tokenName: string): Promise<Types.Token> {
     return this.getTokenBalanceForAccount(creator, {
@@ -286,7 +277,7 @@ export class TokenClient {
   }
 
   /**
-   * Queries specific token from account's TokenStore
+   * Queries token balance for a token account
    * @param account Hex-encoded 16 bytes Aptos account address which created a token
    * @param tokenId token id
    *
