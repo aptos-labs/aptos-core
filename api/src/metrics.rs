@@ -15,7 +15,7 @@ static HISTOGRAM: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-static RESPONSE_STATUS: Lazy<HistogramVec> = Lazy::new(|| {
+pub static RESPONSE_STATUS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_api_response_status",
         "API requests latency grouped by status code only",
