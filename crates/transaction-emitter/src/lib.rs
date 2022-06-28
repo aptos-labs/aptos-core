@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use ::aptos_logger::*;
-use anyhow::{format_err, Context, Result};
+use anyhow::{format_err, Result};
 use aptos_rest_client::{Client as RestClient, PendingTransaction, Response};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -23,7 +23,7 @@ use rand::{
 use rand_core::SeedableRng;
 use std::{
     cmp::{max, min},
-    collections::HashMap,
+    collections::HashSet,
     fmt,
     num::NonZeroU64,
     path::Path,
@@ -234,6 +234,9 @@ impl SubmissionWorker {
         self.accounts
     }
 
+    /// This function assumes that num_requests == num_accounts, which is
+    /// precisely how gen_requests works. If this changes, this code will
+    /// need to be fixed.
     async fn update_stats(
         &mut self,
         start_time: Instant,
@@ -260,15 +263,9 @@ impl SubmissionWorker {
                     .latencies
                     .record_data_point(latency, num_requests as u64);
             }
-            Err(committed_txn_info) => {
-                let num_committed = committed_txn_info
-                    .values()
-                    .map(|info| info.actual_sequence_number)
-                    .sum();
-                let num_uncommitted = committed_txn_info
-                    .values()
-                    .map(|info| info.uncommitted())
-                    .sum();
+            Err(uncommitted) => {
+                let num_uncommitted = uncommitted.len() as u64;
+                let num_committed = num_requests as u64 - num_uncommitted;
                 // To avoid negative result caused by uncommitted tx occur
                 // Simplified from:
                 // end_time * num_committed - (txn_offset_time/num_requests) * num_committed
@@ -291,7 +288,7 @@ impl SubmissionWorker {
                     .record_data_point(latency, num_committed);
                 info!(
                     "[{:?}] Transactions were not committed before expiration: {:?}",
-                    self.client, committed_txn_info
+                    self.client, uncommitted
                 );
             }
         }
@@ -385,13 +382,13 @@ impl<'t> TxnEmitter<'t> {
 
     pub async fn get_money_source(&mut self, coins_total: u64) -> Result<&mut LocalAccount> {
         let client = self.client.clone();
-        println!("Creating and minting faucet account");
+        info!("Creating and minting faucet account");
         let faucet_account = &mut self.root_account;
         let balance = client
             .get_account_balance(faucet_account.address())
             .await?
             .into_inner();
-        println!(
+        info!(
             "Root account current balances are {}, requested {} coins",
             balance.get(),
             coins_total
@@ -516,12 +513,12 @@ impl<'t> TxnEmitter<'t> {
         )
         .await
         .map_err(|e| format_err!("Failed to mint seed_accounts: {}", e))?;
-        println!(
+        info!(
             "Completed minting {} seed accounts, each with {} coins",
             seed_accounts.len(),
             coins_per_seed_account
         );
-        println!(
+        info!(
             "Minting additional {} accounts with {} coins each",
             num_accounts, coins_per_account
         );
@@ -553,7 +550,7 @@ impl<'t> TxnEmitter<'t> {
             });
         let mut minted_accounts = try_join_all(account_futures)
             .await
-            .context("Failed to mint accounts")?
+            .map_err(|e| format_err!("Failed to mint accounts: {}", e))?
             .into_iter()
             .flatten()
             .collect();
@@ -565,7 +562,7 @@ impl<'t> TxnEmitter<'t> {
             total_requested_accounts,
             self.accounts.len()
         );
-        println!("Mint is done");
+        info!("Successfully completed mint");
         Ok(())
     }
 
@@ -582,13 +579,13 @@ impl<'t> TxnEmitter<'t> {
             }
         };
         let num_clients = req.rest_clients.len() * workers_per_endpoint;
-        println!(
-            "Will use {} workers per endpoint with total {} endpoint clients",
+        info!(
+            "Will use {} workers per endpoint for a total of {} endpoint clients",
             workers_per_endpoint, num_clients
         );
         let num_accounts = req.accounts_per_client * num_clients;
-        println!(
-            "Will create {} accounts_per_client with total {} accounts",
+        info!(
+            "Will create {} accounts_per_client for a total of {} accounts",
             req.accounts_per_client, num_accounts
         );
         self.mint_accounts(&req, num_accounts).await?;
@@ -622,7 +619,7 @@ impl<'t> TxnEmitter<'t> {
                 workers.push(Worker { join_handle });
             }
         }
-        println!("Tx emitter workers started");
+        info!("Tx emitter workers started");
         Ok(EmitJob {
             workers,
             stop,
@@ -655,7 +652,7 @@ impl<'t> TxnEmitter<'t> {
             let stats = self.peek_job_stats(job);
             let delta = &stats - &prev_stats.unwrap_or_default();
             prev_stats = Some(stats);
-            println!("{}", delta.rate(window));
+            info!("{}", delta.rate(window));
         }
     }
 
@@ -665,7 +662,7 @@ impl<'t> TxnEmitter<'t> {
         emit_job_request: EmitJobRequest,
     ) -> Result<TxnStats> {
         let job = self.start_job(emit_job_request).await?;
-        println!("Starting emitting txns for {} secs", duration.as_secs());
+        info!("Starting emitting txns for {} secs", duration.as_secs());
         tokio::time::sleep(duration).await;
         let stats = self.stop_job(job).await;
         Ok(stats)
@@ -730,7 +727,7 @@ pub async fn execute_and_wait_transactions(
         client
             .wait_for_transaction(&pt.into_inner())
             .await
-            .context("wait for transactions failed")?;
+            .map_err(|e| format_err!("Failed to wait for transactions: {}", e))?;
     }
 
     debug!(
@@ -740,18 +737,6 @@ pub async fn execute_and_wait_transactions(
         account.sequence_number()
     );
     Ok(())
-}
-
-#[derive(Debug)]
-struct CommittedTxnInfo {
-    pub expected_sequence_number: u64,
-    pub actual_sequence_number: u64, // AKA committed.
-}
-
-impl CommittedTxnInfo {
-    pub fn uncommitted(&self) -> u64 {
-        self.expected_sequence_number - self.actual_sequence_number
-    }
 }
 
 /// This function waits for the submitted transactions to be committed, up to
@@ -770,42 +755,28 @@ async fn wait_for_accounts_sequence(
     client: &RestClient,
     accounts: &mut [LocalAccount],
     txn_expiration_time_secs: u64,
-) -> Result<(), HashMap<AccountAddress, CommittedTxnInfo>> {
+) -> Result<(), HashSet<AccountAddress>> {
     // TXN_EXPIRATION_SECONDS == TXN_MAX_WAIT
     let wait = Duration::from_secs(min(txn_expiration_time_secs, TXN_EXPIRATION_SECONDS));
     let deadline = Instant::now() + wait;
     let addresses: Vec<_> = accounts.iter().map(|d| d.address()).collect();
-    let mut committed_txn_info = HashMap::new();
-    for account in accounts.iter() {
-        committed_txn_info.insert(
-            account.address(),
-            CommittedTxnInfo {
-                expected_sequence_number: account.sequence_number(),
-                actual_sequence_number: 0,
-            },
-        );
-    }
+    let mut uncommitted = addresses.clone().into_iter().collect::<HashSet<_>>();
 
     while Instant::now() < deadline {
         match query_sequence_numbers(client, &addresses).await {
             Ok(sequence_numbers) => {
                 for (account, sequence_number) in zip(accounts.iter(), &sequence_numbers) {
                     if account.sequence_number() == *sequence_number {
-                        committed_txn_info.remove(&account.address());
-                    } else {
-                        committed_txn_info
-                            .get_mut(&account.address())
-                            .unwrap()
-                            .actual_sequence_number = *sequence_number;
+                        uncommitted.remove(&account.address());
                     }
                 }
 
-                if committed_txn_info.is_empty() {
+                if uncommitted.is_empty() {
                     return Ok(());
                 }
             }
             Err(e) => {
-                println!(
+                info!(
                     "Failed to query ledger info on accounts {:?} for instance {:?} : {:?}",
                     addresses, client, e
                 );
@@ -815,7 +786,7 @@ async fn wait_for_accounts_sequence(
         time::sleep(Duration::from_millis(500)).await;
     }
 
-    Err(committed_txn_info)
+    Err(uncommitted)
 }
 
 pub async fn query_sequence_numbers(
@@ -825,7 +796,7 @@ pub async fn query_sequence_numbers(
     Ok(
         try_join_all(addresses.iter().map(|address| client.get_account(*address)))
             .await
-            .context("get accounts failed")?
+            .map_err(|e| format_err!("Get accounts failed: {}", e))?
             .into_iter()
             .map(|resp| resp.into_inner().sequence_number)
             .collect(),
@@ -855,7 +826,7 @@ where
             min(MAX_TXN_BATCH_SIZE, num_new_accounts - i),
         );
         let mut batch = if reuse_account {
-            println!("Loading {} accounts if they exist", batch_size);
+            info!("Loading {} accounts if they exist", batch_size);
             gen_reusable_accounts(&client, batch_size, &mut rng).await?
         } else {
             let batch = gen_random_accounts(batch_size, &mut rng);
