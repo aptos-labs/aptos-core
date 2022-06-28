@@ -16,6 +16,7 @@ variable "GIT_REV" {
   default = substr("${GIT_SHA}", 0, 8)
 }
 
+variable "LAST_GREEN_COMMIT" {}
 
 variable "GCP_DOCKER_ARTIFACT_REPO" {}
 
@@ -153,13 +154,16 @@ function "generate_cache_from" {
   result = [
     "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-main",
     "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-auto",
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${normalized_target_cache_id}"
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${normalized_target_cache_id}",
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:${LAST_GREEN_COMMIT}",
   ]
 }
 
 function "generate_cache_to" {
   params = [target]
-  result = ["type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${normalized_target_cache_id},mode=max"]
+  result = [
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${normalized_target_cache_id},mode=max",
+  ]
 }
 
 function "generate_tags" {
