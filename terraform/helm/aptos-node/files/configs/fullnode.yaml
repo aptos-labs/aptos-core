@@ -36,7 +36,7 @@ full_node_networks:
   {{- if $.Values.haproxy.config.send_proxy_protocol }}
   enable_proxy_protocol: true
   {{- end }}
-  max_inbound_connections: {{- $.Values.fullnode.config.max_inbound_connections }}
+  max_inbound_connections: {{ $.Values.fullnode.config.max_inbound_connections }}
   {{- if $.Values.fullnode.identity }}
   {{- end }}
   seeds:
