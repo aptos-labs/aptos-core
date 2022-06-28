@@ -92,8 +92,8 @@ fn collect_mempool_metrics(core_metrics: &mut BTreeMap<String, String>) {
 
 /// Collects the REST metrics and appends it to the given map
 fn collect_rest_metrics(core_metrics: &mut BTreeMap<String, String>) {
-    let rest_response_count =
-        sum_all_histogram_counts(aptos_api::metrics::RESPONSE_STATUS.collect());
+    let rest_response_metrics = aptos_api::metrics::RESPONSE_STATUS.collect();
+    let rest_response_count = sum_all_histogram_counts(&rest_response_metrics);
     core_metrics.insert(REST_RESPONSE_COUNT.into(), rest_response_count.to_string());
 }
 
@@ -181,15 +181,15 @@ fn collect_storage_metrics(core_metrics: &mut BTreeMap<String, String>) {
 
 /// Collects the telemetry metrics and appends it to the given map
 fn collect_telemetry_metrics(core_metrics: &mut BTreeMap<String, String>) {
-    let telemetry_failure_count =
-        utils::sum_all_gauges(crate::metrics::APTOS_TELEMETRY_FAILURE.collect());
+    let telemetry_failure_metrics = crate::metrics::APTOS_TELEMETRY_FAILURE.collect();
+    let telemetry_failure_count = utils::sum_all_gauges(&telemetry_failure_metrics);
     core_metrics.insert(
         TELEMETRY_FAILURE_COUNT.into(),
         telemetry_failure_count.to_string(),
     );
 
-    let telemetry_success_count =
-        utils::sum_all_gauges(crate::metrics::APTOS_TELEMETRY_SUCCESS.collect());
+    let telemetry_success_metrics = crate::metrics::APTOS_TELEMETRY_SUCCESS.collect();
+    let telemetry_success_count = utils::sum_all_gauges(&telemetry_success_metrics);
     core_metrics.insert(
         TELEMETRY_SUCCESS_COUNT.into(),
         telemetry_success_count.to_string(),

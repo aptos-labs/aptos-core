@@ -27,7 +27,7 @@ pub(crate) fn insert_optional_value(
 }
 
 /// Sums all gauge counts in the given set of metric families
-pub fn sum_all_gauges(metric_families: Vec<MetricFamily>) -> f64 {
+pub fn sum_all_gauges(metric_families: &Vec<MetricFamily>) -> f64 {
     let mut gauge_sum = 0.0;
     for metric_family in metric_families {
         for metric in metric_family.get_metric() {
@@ -38,11 +38,22 @@ pub fn sum_all_gauges(metric_families: Vec<MetricFamily>) -> f64 {
 }
 
 /// Sums all histogram sample counts in the given set of metric families
-pub fn sum_all_histogram_counts(metric_families: Vec<MetricFamily>) -> f64 {
+pub fn sum_all_histogram_counts(metric_families: &Vec<MetricFamily>) -> f64 {
     let mut count_sum = 0.0;
     for metric_family in metric_families {
         for metric in metric_family.get_metric() {
             count_sum += metric.get_histogram().get_sample_count() as f64
+        }
+    }
+    count_sum
+}
+
+/// Sums all histogram sample sums in the given set of metric families
+pub fn sum_all_histogram_sums(metric_families: &Vec<MetricFamily>) -> f64 {
+    let mut count_sum = 0.0;
+    for metric_family in metric_families {
+        for metric in metric_family.get_metric() {
+            count_sum += metric.get_histogram().get_sample_sum() as f64
         }
     }
     count_sum
