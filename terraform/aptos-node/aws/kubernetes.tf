@@ -205,6 +205,9 @@ resource "helm_release" "monitoring" {
       validator = {
         name = var.validator_name
       }
+      service = {
+        domain   = local.domain
+      }
       monitoring = {
         prometheus = {
           storage = {
