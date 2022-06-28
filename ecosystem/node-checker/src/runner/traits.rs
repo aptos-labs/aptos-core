@@ -35,30 +35,19 @@ pub enum RunnerError {
     SystemInformationEvaluatorError(SystemInformationEvaluatorError),
 }
 
-// This runner doesn't block in the multithreading sense, but from the user
-// perspective. To run the health check, we pull metrics once, wait, and then
-// pull the metrics again. It does not support continually running beyond this
-// point. You can imagine smarter versions of this where you store the last seen
-// set of metrics, then compare against that, or perhaps even multiple previously
-// seen sets of metrics and do more complex analysis. Additionally we could leverage
-// things like long polling +/ sticky routing to make it that the client request
-// doesn't just hang waiting for the run to complete.
-
-// todo update the below confirming that it does need to be send and sync to live
-// inside Api, whichw will be shared across threads.
-
-/// todo describe the trait
-/// todo assert these trait constraints are necessary
-/// todo consider whether we need Clone if we need to spawn multiple handlers ourselves.
+/// This trait describes a Runner, something that can take in instances of other
+/// necessary traits, such as a metric collector for the baseline node, and then,
+/// upon a `run` call, drive a node evaluation end to end. This is the top level
+/// entrypoint to the core functionality of NHC, it should be hooked up fairly
+/// directly to the API endpoint handlers.
 ///
-/// Note:
-///  - Sync + Send is required because this will be a member of the todo which needs
-///      to be used across async boundaries
-///
-///  - 'static is required because this will be stored on the todo which needs to be 'static
+/// Note on trait bounds:
+///  - Sync + Send is required because this will be a member of the Api which
+///    needs to be used across thread boundaries.
+///  - The 'static lifetime is required because this will be stored on the Api
+///    which needs to be 'static.
 #[async_trait]
 pub trait Runner: Sync + Send + 'static {
-    // TODO: add proper result type.
     async fn run<M: MetricCollector>(
         &self,
         target_collector: &M,
