@@ -28,9 +28,12 @@ pub struct GenerateOpenapi {
     #[clap(long, default_value = "20121")]
     pub listen_port: u16,
 
+    /// By default, the spec is written to stdout. If this is provided, the
+    /// tool will instead write the spec to the provided path.
     #[clap(short, long)]
     output_path: Option<PathBuf>,
 
+    /// What format to output the spec in.
     #[clap(short, long, arg_enum, default_value = "yaml")]
     format: OutputFormat,
 }
@@ -50,14 +53,14 @@ pub async fn generate_openapi(args: GenerateOpenapi) -> Result<()> {
     let api_service =
         build_openapi_service(api, args.listen_address.clone(), args.listen_port, None);
 
-    let s = match args.format {
+    let spec = match args.format {
         OutputFormat::Json => api_service.spec(),
         OutputFormat::Yaml => api_service.spec_yaml(),
     };
 
     match args.output_path {
-        Some(path) => std::fs::write(path, s)?,
-        None => println!("{}", s),
+        Some(path) => std::fs::write(path, spec)?,
+        None => println!("{}", spec),
     }
 
     Ok(())
