@@ -62,6 +62,7 @@ aptos-config = { path = "../config", features = ["fuzzing"] }
 aptos-mempool = { path = "../mempool", features = ["fuzzing"] }
 consensus-types = { path = "consensus-types", default-features = false, features = ["fuzzing"] }
 executor-test-helpers = { path = "../execution/executor-test-helpers" }
+move-deps = { path = "../aptos-move/move-deps", features = ["address32"] }
 network = { path = "../network", features = ["fuzzing"] }
 safety-rules = { path = "safety-rules", features = ["testing"] }
 vm-validator = { path = "../vm-validator" }

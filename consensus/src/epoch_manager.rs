@@ -76,6 +76,9 @@ use std::{
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
 const PROPSER_ELECTION_CACHING_WINDOW_ADDITION: usize = 3;
+/// Number of rounds we expect storage to be ahead of the proposer round,
+/// used for fetching data from DB.
+const PROPSER_ROUND_BEHIND_STORAGE_BUFFER: usize = 10;
 
 #[allow(clippy::large_enum_variant)]
 pub enum LivenessStorageData {
@@ -241,7 +244,9 @@ impl EpochManager {
                 let backend = Box::new(AptosDBBackend::new(
                     epoch_state.epoch,
                     window_size,
-                    onchain_config.leader_reputation_exclude_round() + 10,
+                    onchain_config.leader_reputation_exclude_round() as usize
+                        + self.config.max_failed_authors_to_store
+                        + PROPSER_ROUND_BEHIND_STORAGE_BUFFER,
                     self.storage.aptos_db(),
                 ));
                 let proposer_election = Box::new(LeaderReputation::new(
