@@ -3,6 +3,7 @@
 
 use std::path::PathBuf;
 
+use super::common::ServerArgs;
 use crate::{
     configuration::{DEFAULT_API_PORT_STR, DEFAULT_METRICS_PORT_STR, DEFAULT_NOISE_PORT_STR},
     metric_collector::ReqwestMetricCollector,
@@ -10,7 +11,7 @@ use crate::{
 use anyhow::{Context, Result};
 use clap::Parser;
 use log::info;
-use poem::{handler, listener::TcpListener, Route, Server};
+use poem::{listener::TcpListener, Route, Server};
 use url::Url;
 
 use super::{
@@ -20,13 +21,8 @@ use super::{
 
 #[derive(Clone, Debug, Parser)]
 pub struct Run {
-    /// What address to listen on.
-    #[clap(long, default_value = "http://0.0.0.0")]
-    pub listen_address: Url,
-
-    /// What port to listen on.
-    #[clap(long, default_value = "20121")]
-    pub listen_port: u16,
+    #[clap(flatten)]
+    server_args: ServerArgs,
 
     /// File paths leading to baseline node configurations.
     #[structopt(long, parse(from_os_str), required = true, min_values = 1)]
@@ -83,31 +79,36 @@ pub async fn run(args: Run) -> Result<()> {
         allow_preconfigured_test_node_only: args.allow_preconfigured_test_node_only,
     };
 
-    let api_service =
-        build_openapi_service(api, args.listen_address.clone(), args.listen_port, None);
+    let api_endpoint = format!("/{}", args.server_args.api_endpoint);
+    let api_service = build_openapi_service(
+        api,
+        args.server_args.listen_address.clone(),
+        args.server_args.listen_port,
+        &args.server_args.api_endpoint,
+    );
     let ui = api_service.swagger_ui();
     let spec_json = api_service.spec_endpoint();
     let spec_yaml = api_service.spec_endpoint_yaml();
 
     Server::new(TcpListener::bind((
-        args.listen_address
+        args.server_args
+            .listen_address
             .host_str()
-            .with_context(|| format!("Failed to pull host from {}", args.listen_address))?,
-        args.listen_port,
+            .with_context(|| {
+                format!(
+                    "Failed to pull host from {}",
+                    args.server_args.listen_address
+                )
+            })?,
+        args.server_args.listen_port,
     )))
     .run(
         Route::new()
-            .nest("/", root)
-            .nest("/api", api_service)
+            .nest(api_endpoint, api_service)
             .nest("/docs", ui)
             .at("/spec_json", spec_json)
             .at("/spec_yaml", spec_yaml),
     )
     .await
     .map_err(anyhow::Error::msg)
-}
-
-#[handler]
-fn root() -> String {
-    "Hello World!".to_string()
 }
