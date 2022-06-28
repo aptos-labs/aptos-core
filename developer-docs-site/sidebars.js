@@ -106,6 +106,7 @@ const sidebars = {
           ],
         },
         "nodes/run-a-local-testnet",
+        "nodes/staking/staking-on-aptos",
       ],
     },
     {

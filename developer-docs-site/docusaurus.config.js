@@ -153,6 +153,11 @@ const config = {
                 type: "doc",
                 docId: "nodes/run-a-local-testnet",
               },
+              {
+                label: "Staking",
+                type: "doc",
+                docId: "nodes/staking/staking-on-aptos",
+              },
             ],
           },
           {
