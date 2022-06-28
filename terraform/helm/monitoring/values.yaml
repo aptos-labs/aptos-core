@@ -72,6 +72,11 @@ monitoring:
       requests:
         cpu: 0.2
         memory: 128Mi
+    googleAuth:
+    config:
+    env:
+      GF_AUTH_ANONYMOUS_ENABLED: true
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Editor
   nodeSelector: {}
   tolerations: []
   affinity: {}

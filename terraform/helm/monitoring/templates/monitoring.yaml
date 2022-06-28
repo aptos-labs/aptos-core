@@ -246,6 +246,11 @@ spec:
       - name: grafana
         image: {{ .grafana.image.repo }}:{{ .grafana.image.tag }}
         imagePullPolicy: {{ .grafana.image.pullPolicy }}
+        env:
+        {{- range $k, $v := .grafana.env }}
+        - name: {{ quote $k }}
+          value: {{ quote $v }}
+        {{- end }}
         command: ["/bin/sh", "-c"]
         args: ["cp /dashboards/* /etc/grafana/dashboards/aptos && gunzip -f /etc/grafana/dashboards/aptos/*.json.gz && exec /run.sh"]
         resources:
@@ -262,6 +267,8 @@ spec:
             path: /api/health
             port: 3000
         volumeMounts:
+        - name: grafana-config
+          mountPath: /etc/grafana
         - name: grafana-provisioning
           mountPath: /etc/grafana/provisioning
         - name: grafana-dashboards-archive
@@ -270,11 +277,6 @@ spec:
           mountPath: /etc/grafana/dashboards/aptos
         - name: grafana-data
           mountPath: /var/lib/grafana
-        env:
-        - name: GF_AUTH_ANONYMOUS_ENABLED
-          value: "true"
-        - name: GF_AUTH_ANONYMOUS_ORG_ROLE
-          value: "Editor"
         securityContext:
           readOnlyRootFilesystem: true
           runAsUser: 472
@@ -300,6 +302,12 @@ spec:
         fsGroup: 65534
       {{- end }}
       volumes:
+      - name: grafana-config
+        configMap:
+          name: {{ include "aptos-monitoring.fullname" . }}-grafana
+          items:
+          - key: grafana.ini
+            path: grafana.ini
       - name: grafana-provisioning
         configMap:
           name: {{ include "aptos-monitoring.fullname" . }}-grafana
