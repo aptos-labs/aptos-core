@@ -34,6 +34,7 @@ validator:
     provide_genesis: true
     sync_only: false
     concurrency_level: 4
+    enable_state_sync_v2: true
     mempool_poll_count:
     round_initial_timeout_ms:
     ledger_prune_window: 10000000

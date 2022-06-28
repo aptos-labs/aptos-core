@@ -27,6 +27,10 @@ consensus:
   max_block_size: {{ $.Values.validator.config.max_block_size}}
   {{- end }}
 
+state_sync:
+  state_sync_driver:
+    enable_state_sync_v2: {{ $.Values.validator.config.enable_state_sync_v2 }}
+
 storage:
   storage_pruner_config:
     ledger_prune_window: {{ int $.Values.validator.config.ledger_prune_window }}
