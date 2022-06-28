@@ -261,11 +261,13 @@ const config = {
           },
           {
             to: "/nodes/validator-node/validators",
-            from: ["/tutorials/validator-node/run-validator-node-using-gcp", 
-            "/tutorials/validator-node/run-validator-node-using-aws", 
-            "/tutorials/validator-node/run-validator-node-using-azure",
-            "/tutorials/validator-node/run-validator-node-using-docker",
-            "/tutorials/validator-node/run-validator-node-using-source"]
+            from: [
+              "/tutorials/validator-node/run-validator-node-using-gcp",
+              "/tutorials/validator-node/run-validator-node-using-aws",
+              "/tutorials/validator-node/run-validator-node-using-azure",
+              "/tutorials/validator-node/run-validator-node-using-docker",
+              "/tutorials/validator-node/run-validator-node-using-source",
+            ],
           },
           {
             to: "/nodes/ait/connect-to-testnet",
