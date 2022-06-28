@@ -6,6 +6,10 @@ base:
 execution:
   genesis_file_location: /opt/aptos/genesis/genesis.blob
 
+state_sync:
+  state_sync_driver:
+    enable_state_sync_v2: {{ $.Values.validator.config.enable_state_sync_v2 }}
+
 storage:
   backup_service_address: "0.0.0.0:6186"
   storage_pruner_config:
@@ -32,7 +36,7 @@ full_node_networks:
   {{- if $.Values.haproxy.config.send_proxy_protocol }}
   enable_proxy_protocol: true
   {{- end }}
-  max_inbound_connections: 100
+  max_inbound_connections: {{- $.Values.fullnode.config.max_inbound_connections }}
   {{- if $.Values.fullnode.identity }}
   {{- end }}
   seeds:
