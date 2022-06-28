@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use ::aptos_logger::{Level, Logger};
 use anyhow::{bail, format_err, Result};
 use aptos::common::types::EncodingType;
 use aptos_config::{config::DEFAULT_PORT, keys::ConfigKey};
@@ -66,6 +67,8 @@ struct Args {
 
 #[tokio::main]
 pub async fn main() {
+    Logger::builder().level(Level::Info).build();
+
     let args = Args::from_args();
 
     if !args.emit_tx && !args.diag {
@@ -89,6 +92,7 @@ async fn emit_tx(cluster: &Cluster, args: &Args) -> Result<()> {
     let thread_params = EmitThreadParams {
         wait_millis: args.wait_millis,
         wait_committed: !args.burst,
+        txn_expiration_time_secs: args.txn_expiration_time_secs,
     };
     let duration = Duration::from_secs(args.duration);
     let client = cluster.random_instance().rest_client();
