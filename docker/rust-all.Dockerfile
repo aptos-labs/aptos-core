@@ -16,10 +16,10 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
 ENV PATH "$PATH:/root/.cargo/bin"
 
 WORKDIR /aptos
-COPY --link rust-toolchain /aptos/rust-toolchain
+COPY rust-toolchain /aptos/rust-toolchain
 RUN rustup install $(cat rust-toolchain)
 
-COPY --link . /aptos
+COPY . /aptos
 
 # must be: release|test depending on the target - required
 ARG IMAGE_TARGET
@@ -38,10 +38,10 @@ RUN apt-get update && apt-get install -y linux-tools-4.19 sudo procps
 RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-create-home --uid 6180 aptos
 
 RUN mkdir -p /opt/aptos/bin /opt/aptos/etc
-COPY --link --from=builder /aptos/target/release/aptos-node /opt/aptos/bin/
-COPY --link --from=builder /aptos/target/release/db-backup /opt/aptos/bin/
-COPY --link --from=builder /aptos/target/release/db-bootstrapper /opt/aptos/bin/
-COPY --link --from=builder /aptos/target/release/db-restore /opt/aptos/bin/
+# COPY --from=builder /aptos/target/release/aptos-node /opt/aptos/bin/
+COPY --from=builder /aptos/target/release/db-backup /opt/aptos/bin/
+COPY --from=builder /aptos/target/release/db-bootstrapper /opt/aptos/bin/
+COPY --from=builder /aptos/target/release/db-restore /opt/aptos/bin/
 
 # Admission control
 EXPOSE 8000
@@ -75,7 +75,7 @@ RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcp
 && apt-get clean && rm -r /var/lib/apt/lists/*
 
 RUN mkdir -p /opt/aptos/bin
-COPY --from=builder /aptos/target/release/aptos-node-checker /usr/local/bin/
+# COPY --from=builder /aptos/target/release/aptos-node-checker /usr/local/bin/
 
 ### Safety Rules Image ###
 
@@ -151,7 +151,7 @@ RUN rm -rf /aptos-framework/move/build
 
 
 
-### Transaction Emitter Image ###
+## Transaction Emitter Image ###
 FROM debian-base AS txn-emitter
 
 RUN apt-get update && apt-get -y install libssl1.1 ca-certificates wget busybox gettext-base && apt-get clean && rm -r /var/lib/apt/lists/*
@@ -173,6 +173,8 @@ COPY --from=builder /aptos/target/release/aptos-faucet /opt/aptos/bin/
 
 #install needed tools
 RUN apt-get update && apt-get install -y procps
+
+RUN crashthisthing
 
 # Mint proxy listening address
 EXPOSE 8000

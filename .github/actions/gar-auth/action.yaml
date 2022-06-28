@@ -13,7 +13,7 @@ runs:
       name: "Authenticate to Google Cloud"
       uses: "google-github-actions/auth@v0"
       with:
-        create_credentials_file: false
+        create_credentials_file: true
         token_format: "access_token"
         workload_identity_provider: ${{ inputs.GCP_WORKLOAD_IDENTITY_PROVIDER }}
         service_account: ${{ inputs.GCP_SERVICE_ACCOUNT_EMAIL }}
