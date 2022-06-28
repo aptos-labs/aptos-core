@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod api;
+mod common;
 mod configurations_manager;
 mod generate_openapi;
 mod run;
