@@ -26,9 +26,9 @@ pub struct NodeConfigurationWrapper<M: MetricCollector, R: Runner> {
     pub runner: R,
 }
 
-// In this function we finally build our trait objects with concrete implementaitons.
+// In this function we finally build our trait objects with concrete implementations.
 // We've piped trait bounds throughout our code but here we're finally facing the
-// music and actually choosing some concrete types).
+// music and actually choosing some concrete types.
 fn build_node_configuration_wrapper_with_blocking_runner_and_reqwest_metric_collector(
     node_configuration: NodeConfiguration,
 ) -> Result<NodeConfigurationWrapper<ReqwestMetricCollector, BlockingRunner<ReqwestMetricCollector>>>
@@ -50,14 +50,14 @@ fn build_node_configuration_wrapper_with_blocking_runner_and_reqwest_metric_coll
         evaluators,
     );
 
-    let w = NodeConfigurationWrapper {
+    let wrapper = NodeConfigurationWrapper {
         node_configuration,
         // TODO: Consider just fetching this from the runner instead.
         baseline_metric_collector,
         runner,
     };
 
-    Ok(w)
+    Ok(wrapper)
 }
 
 pub async fn build_server_with_blocking_runner_and_reqwest_metric_collector(
