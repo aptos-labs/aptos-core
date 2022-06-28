@@ -147,6 +147,9 @@ module AptosFramework::Genesis {
     /// public key in `consensus_pubkeys`.
     /// Finally, each validator must specify the network address
     /// (see types/src/network_address/mod.rs) for itself and its full nodes.
+    ///
+    /// Network address fields are a vector per account, where each entry is a vector of addresses
+    /// encoded in a single BCS byte array.
     public(script) fun create_initialize_validators(
         core_resource_account: signer,
         owners: vector<address>,
@@ -169,14 +172,14 @@ module AptosFramework::Genesis {
             let owner_account = Account::create_account_internal(*owner);
 
             // use the operator account set up the validator config
-            let validator_network_address = *Vector::borrow(&validator_network_addresses, i);
-            let full_node_network_address = *Vector::borrow(&full_node_network_addresses, i);
+            let cur_validator_network_addresses = *Vector::borrow(&validator_network_addresses, i);
+            let cur_full_node_network_addresses = *Vector::borrow(&full_node_network_addresses, i);
             let consensus_pubkey = *Vector::borrow(&consensus_pubkeys, i);
             Stake::register_validator_candidate(
                 &owner_account,
                 consensus_pubkey,
-                validator_network_address,
-                full_node_network_address,
+                cur_validator_network_addresses,
+                cur_full_node_network_addresses,
             );
             Stake::increase_lockup(&owner_account, 100000);
             let amount = *Vector::borrow(&staking_distribution, i);

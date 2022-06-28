@@ -274,8 +274,9 @@ fn create_and_initialize_validators(
     for v in validators {
         owners.push(MoveValue::Address(v.address));
         consensus_pubkeys.push(MoveValue::vector_u8(v.consensus_pubkey.clone()));
-        validator_network_addresses.push(MoveValue::vector_u8(v.network_address.clone()));
-        full_node_network_addresses.push(MoveValue::vector_u8(v.full_node_network_address.clone()));
+        validator_network_addresses.push(MoveValue::vector_u8(v.network_addresses.clone()));
+        full_node_network_addresses
+            .push(MoveValue::vector_u8(v.full_node_network_addresses.clone()));
         staking_distribution.push(MoveValue::U64(v.stake_amount));
     }
     exec_function(
@@ -392,9 +393,9 @@ pub struct Validator {
     /// its own operator)
     pub operator_address: AccountAddress,
     /// `NetworkAddress` for the validator
-    pub network_address: Vec<u8>,
+    pub network_addresses: Vec<u8>,
     /// `NetworkAddress` for the validator's full node
-    pub full_node_network_address: Vec<u8>,
+    pub full_node_network_addresses: Vec<u8>,
     /// Amount to stake for consensus
     pub stake_amount: u64,
 }
@@ -424,8 +425,8 @@ impl TestValidator {
             address,
             consensus_pubkey,
             operator_address: address,
-            network_address,
-            full_node_network_address,
+            network_addresses: network_address,
+            full_node_network_addresses: full_node_network_address,
             stake_amount: 1,
         };
         Self { key, data }

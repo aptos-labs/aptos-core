@@ -99,9 +99,9 @@ module AptosFramework::Stake {
     /// Validator info stored in validator address.
     struct ValidatorConfig has key, copy, store, drop {
         consensus_pubkey: vector<u8>,
-        network_address: vector<u8>,
+        network_addresses: vector<u8>,
         // to make it compatible with previous definition, remove later
-        fullnode_address: vector<u8>,
+        fullnode_addresses: vector<u8>,
         // Index in the active set if the validator corresponding to this stake pool is active.
         validator_index: u64,
     }
@@ -267,8 +267,8 @@ module AptosFramework::Stake {
     public(script) fun register_validator_candidate(
         account: &signer,
         consensus_pubkey: vector<u8>,
-        network_address: vector<u8>,
-        fullnode_address: vector<u8>,
+        network_addresses: vector<u8>,
+        fullnode_addresses: vector<u8>,
     ) {
         let account_address = Signer::address_of(account);
         assert!(!exists<StakePool>(account_address), Errors::invalid_argument(EALREADY_REGISTERED));
@@ -295,8 +295,8 @@ module AptosFramework::Stake {
         });
         move_to(account, ValidatorConfig {
             consensus_pubkey,
-            network_address,
-            fullnode_address,
+            network_addresses,
+            fullnode_addresses,
             validator_index: 0,
         });
         move_to(account, OwnerCapability {
