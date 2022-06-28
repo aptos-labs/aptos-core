@@ -62,6 +62,7 @@ pub struct EmitThreadParams {
     pub wait_millis: u64,
     pub wait_committed: bool,
     pub txn_expiration_time_secs: u64,
+    pub check_stats_at_end: bool,
 }
 
 impl Default for EmitThreadParams {
@@ -70,6 +71,7 @@ impl Default for EmitThreadParams {
             wait_millis: 0,
             wait_committed: true,
             txn_expiration_time_secs: 30,
+            check_stats_at_end: false,
         }
     }
 }
@@ -144,6 +146,7 @@ impl EmitJobRequest {
                 wait_millis: wait_time,
                 wait_committed: true,
                 txn_expiration_time_secs: 30,
+                check_stats_at_end: false,
             })
             .accounts_per_client(1)
     }
@@ -203,19 +206,27 @@ struct SubmissionWorker {
     rng: ::rand::rngs::StdRng,
 }
 
+// Note, there is an edge case that can occur if the transaction emitter
+// bursts the target node too fast, and the emitter doesn't handle it
+// very well, instead waiting up until the timeout for the target seqnum
+// to progress, even though it never will. See more here:
+// https://github.com/aptos-labs/aptos-core/issues/1565
 impl SubmissionWorker {
     #[allow(clippy::collapsible_if)]
     async fn run(mut self, gas_price: u64) -> Vec<LocalAccount> {
         let wait_duration = Duration::from_millis(self.params.wait_millis);
+        let total_start_time = Instant::now();
+        let mut total_num_requests = 0;
         while !self.stop.load(Ordering::Relaxed) {
             let requests = self.gen_requests(gas_price);
             let num_requests = requests.len();
-            let start_time = Instant::now();
-            let wait_until = start_time + wait_duration;
+            total_num_requests += num_requests;
+            let loop_start_time = Instant::now();
+            let wait_until = loop_start_time + wait_duration;
             let mut txn_offset_time = 0u64;
             for request in requests {
                 let cur_time = Instant::now();
-                txn_offset_time += (cur_time - start_time).as_millis() as u64;
+                txn_offset_time += (cur_time - loop_start_time).as_millis() as u64;
                 self.stats.submitted.fetch_add(1, Ordering::Relaxed);
                 let resp = self.client.submit(&request).await;
                 if let Err(e) = resp {
@@ -223,7 +234,7 @@ impl SubmissionWorker {
                 }
             }
             if self.params.wait_committed {
-                self.update_stats(start_time, txn_offset_time, num_requests)
+                self.update_stats(loop_start_time, txn_offset_time, num_requests)
                     .await
             }
             let now = Instant::now();
@@ -231,12 +242,21 @@ impl SubmissionWorker {
                 time::sleep(wait_until - now).await;
             }
         }
+        if self.params.check_stats_at_end {
+            debug!("Checking stats for final time at the end");
+            self.update_stats(total_start_time, 0, total_num_requests)
+                .await
+        }
         self.accounts
     }
 
     /// This function assumes that num_requests == num_accounts, which is
     /// precisely how gen_requests works. If this changes, this code will
     /// need to be fixed.
+    ///
+    /// Note, the latency values are not accurate if --check-stats-at-end
+    /// is used. There is no easy way around this accurately. As such, we
+    /// don't update latency at all if that flag is set.
     async fn update_stats(
         &mut self,
         start_time: Instant,
@@ -247,6 +267,7 @@ impl SubmissionWorker {
             &self.client,
             &mut self.accounts,
             self.params.txn_expiration_time_secs,
+            self.params.check_stats_at_end,
         )
         .await
         {
@@ -256,12 +277,14 @@ impl SubmissionWorker {
                 self.stats
                     .committed
                     .fetch_add(num_requests as u64, Ordering::Relaxed);
-                self.stats
-                    .latency
-                    .fetch_add(latency * num_requests as u64, Ordering::Relaxed);
-                self.stats
-                    .latencies
-                    .record_data_point(latency, num_requests as u64);
+                if !self.params.check_stats_at_end {
+                    self.stats
+                        .latency
+                        .fetch_add(latency * num_requests as u64, Ordering::Relaxed);
+                    self.stats
+                        .latencies
+                        .record_data_point(latency, num_requests as u64);
+                }
             }
             Err(uncommitted) => {
                 let num_uncommitted = uncommitted.len() as u64;
@@ -280,12 +303,14 @@ impl SubmissionWorker {
                 self.stats
                     .expired
                     .fetch_add(num_uncommitted, Ordering::Relaxed);
-                self.stats
-                    .latency
-                    .fetch_add(committed_latency, Ordering::Relaxed);
-                self.stats
-                    .latencies
-                    .record_data_point(latency, num_committed);
+                if !self.params.check_stats_at_end {
+                    self.stats
+                        .latency
+                        .fetch_add(committed_latency, Ordering::Relaxed);
+                    self.stats
+                        .latencies
+                        .record_data_point(latency, num_committed);
+                }
                 info!(
                     "[{:?}] Transactions were not committed before expiration: {:?}",
                     self.client, uncommitted
@@ -755,14 +780,21 @@ async fn wait_for_accounts_sequence(
     client: &RestClient,
     accounts: &mut [LocalAccount],
     txn_expiration_time_secs: u64,
+    check_for_stats_at_end: bool,
 ) -> Result<(), HashSet<AccountAddress>> {
-    // TXN_EXPIRATION_SECONDS == TXN_MAX_WAIT
-    let wait = Duration::from_secs(min(txn_expiration_time_secs, TXN_EXPIRATION_SECONDS));
+    let wait = match check_for_stats_at_end {
+        // If we're checking for stats at the end of burst mode, we don't want
+        // to give the node any more time than necessary to process additional
+        // transactions. This helps gives us a more accurate reading.
+        true => Duration::from_millis(500),
+        // TXN_EXPIRATION_SECONDS == TXN_MAX_WAIT
+        false => Duration::from_secs(min(txn_expiration_time_secs, TXN_EXPIRATION_SECONDS)),
+    };
     let deadline = Instant::now() + wait;
     let addresses: Vec<_> = accounts.iter().map(|d| d.address()).collect();
     let mut uncommitted = addresses.clone().into_iter().collect::<HashSet<_>>();
 
-    while Instant::now() < deadline {
+    while Instant::now() <= deadline {
         match query_sequence_numbers(client, &addresses).await {
             Ok(sequence_numbers) => {
                 for (account, sequence_number) in zip(accounts.iter(), &sequence_numbers) {
@@ -783,7 +815,7 @@ async fn wait_for_accounts_sequence(
             }
         }
 
-        time::sleep(Duration::from_millis(500)).await;
+        time::sleep(Duration::from_millis(250)).await;
     }
 
     Err(uncommitted)
@@ -1070,6 +1102,9 @@ impl Distribution<InvalidTransactionType> for Standard {
 
 fn gen_rng_for_reusable_account(count: usize) -> Vec<StdRng> {
     // use same seed for reuse account creation and reuse
+    // TODO: Investigate why we use the same seed and then consider changing
+    // this so that we don't do this, since it causes conflicts between
+    // runs of the emitter.
     let mut seed = [
         0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0,
         0, 0,
