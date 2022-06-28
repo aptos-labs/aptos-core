@@ -191,14 +191,13 @@ pub fn build_openapi_service<M: MetricCollector, R: Runner>(
     api: Api<M, R>,
     listen_address: Url,
     listen_port: u16,
-    endpoint_override: Option<&str>,
+    endpoint: &str,
 ) -> OpenApiService<Api<M, R>, ()> {
     let version = std::env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.1.0".to_string());
     // TODO: Ensure we have a scheme on listen address.
     let host = listen_address
         .host_str()
         .expect("Failed to find host in listen address");
-    let endpoint = endpoint_override.unwrap_or("api");
     let api_service = OpenApiService::new(api, "Aptos Node Checker", version).server(format!(
         "{}://{}:{}/{}",
         listen_address.scheme(),

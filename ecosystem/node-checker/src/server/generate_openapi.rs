@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::common::ServerArgs;
 use crate::{
     common_args::{OutputArgs, OutputFormat},
     metric_collector::ReqwestMetricCollector,
@@ -9,7 +10,6 @@ use crate::{
 use anyhow::Result;
 use clap::Parser;
 use std::collections::HashMap;
-use url::Url;
 
 use super::{
     api::{build_openapi_service, Api},
@@ -18,13 +18,8 @@ use super::{
 
 #[derive(Clone, Debug, Parser)]
 pub struct GenerateOpenapi {
-    /// What address to listen on.
-    #[clap(long, default_value = "http://0.0.0.0")]
-    pub listen_address: Url,
-
-    /// What port to listen on.
-    #[clap(long, default_value = "20121")]
-    pub listen_port: u16,
+    #[clap(flatten)]
+    server_args: ServerArgs,
 
     #[clap(flatten)]
     pub output_args: OutputArgs,
@@ -42,8 +37,12 @@ pub async fn generate_openapi(args: GenerateOpenapi) -> Result<()> {
         allow_preconfigured_test_node_only: false,
     };
 
-    let api_service =
-        build_openapi_service(api, args.listen_address.clone(), args.listen_port, None);
+    let api_service = build_openapi_service(
+        api,
+        args.server_args.listen_address.clone(),
+        args.server_args.listen_port,
+        &args.server_args.api_endpoint,
+    );
 
     let spec = match args.output_args.format {
         OutputFormat::Json => api_service.spec(),
