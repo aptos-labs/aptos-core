@@ -41,6 +41,12 @@ env:
   # For more info also see https://github.com/actions/checkout#checkout-pull-request-head-commit-instead-of-merge-commit
   GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
+  # TARGET_CACHE_ID is used as part of the docker tag / cache key inside our bake.hcl docker bake files.
+  # The goal here is to have a branch or PR-local cache such that consecutive pushes to a shared branch or a specific PR can
+  # reuse layers from a previous docker build/commit.
+  # We use `pr-<pr_number>` as cache-id for PRs and simply <branch_name> otherwise.
+  TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
+
 permissions:
   contents: read
   id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
@@ -99,7 +105,6 @@ jobs:
         run: docker/docker-bake-rust-all.sh
         env:
           IMAGE_TARGET: ${{ matrix.IMAGE_TARGET }}
-          GIT_BRANCH: ${{ github.head_ref }}
 
   sdk-integration-test:
     needs: rust-images
@@ -149,8 +154,6 @@ jobs:
       - uses: ./.github/actions/docker-buildx-setup
 
       - name: Build and Push Community Platform image
-        env:
-          GIT_BRANCH: ${{ github.head_ref }}
         run: |
           cd ecosystem/platform/server
           docker buildx bake --progress=plain --push -f ./docker-bake.hcl
@@ -178,8 +181,6 @@ jobs:
       - uses: ./.github/actions/docker-buildx-setup
 
       - name: Build and Push Indexer Server image
-        env:
-          GIT_BRANCH: ${{ github.head_ref }}
         run: |
           cd ecosystem/indexer-server
           docker buildx bake --progress=plain --push -f ./docker-bake.hcl
