@@ -135,7 +135,7 @@ jobs:
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: ./.github/actions/rust-setup
-      - run: cargo xtest --doc --unit --changed-since "origin/main"
+      - run: cargo xtest --doc --unit --changed-since "origin/main" --exclude aptos-node-checker
 
   rust-unit-nextest:
     runs-on: high-perf-docker

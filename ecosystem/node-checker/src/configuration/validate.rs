@@ -17,6 +17,6 @@ pub struct Validate {
 
 pub async fn validate(args: Validate) -> Result<()> {
     let configuration = read_configuration_from_file(args.path)?;
-    debug!("{:#?}", configuration);
+    debug!("Using configuration: {:#?}", configuration);
     Ok(())
 }

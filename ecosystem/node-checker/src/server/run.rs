@@ -39,17 +39,16 @@ pub struct Run {
     #[clap(long)]
     pub target_node_url: Option<Url>,
 
-    // The following 3 arguments are only relevant if the user sets test_node_url.
     /// The metrics port for the target node.
-    #[clap(long, default_value = &DEFAULT_METRICS_PORT_STR)]
+    #[clap(long, requires = "target-node-url", default_value = &DEFAULT_METRICS_PORT_STR)]
     pub target_metrics_port: u16,
 
     /// The API port for the target node.
-    #[clap(long, default_value = &DEFAULT_API_PORT_STR)]
+    #[clap(long, requires = "target-node-url", default_value = &DEFAULT_API_PORT_STR)]
     pub target_api_port: u16,
 
     /// The port over which validator nodes can talk to the target node.
-    #[clap(long, default_value = &DEFAULT_NOISE_PORT_STR)]
+    #[clap(long, requires = "target-node-url", default_value = &DEFAULT_NOISE_PORT_STR)]
     pub target_noise_port: u16,
 
     /// If a test node is preconfigured, you can set this to prevent the server

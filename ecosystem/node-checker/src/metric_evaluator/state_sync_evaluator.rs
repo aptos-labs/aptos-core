@@ -44,7 +44,7 @@ impl StateSyncMetricsEvaluator {
         metrics_round: &str,
     ) -> Option<EvaluationResult> {
         match version {
-            Some(_v) => None,
+            Some(_) => None,
             None => Some(EvaluationResult {
                 headline: "State sync version metric missing".to_string(),
                 score: 0,

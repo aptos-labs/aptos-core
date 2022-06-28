@@ -15,15 +15,14 @@ git clone git@github.com:aptos-labs/aptos-core.git
 cd aptos-core/ecosystem/node-checker
 ```
 
-Next, generate a baseline configuration. In this example we generate a configuration for a FullNode on the devnet, running on a machien in the local network:
+Next, generate a baseline configuration. In this example we generate a configuration for a FullNode on the devnet, running on a machine in the local network:
 ```
-cargo run -- -d configuration create --configuration-name "My Server Devnet Fullnode" --url http://192.168.86.2 --evaluators state_sync -o /tmp/my_server_devnet_fullnode.yaml
+cargo run -- configuration create --configuration-name "My Server Devnet Fullnode" --url http://192.168.86.2 --evaluators state_sync -o /tmp/my_server_devnet_fullnode.yaml
 ```
-The output should look like this: https://gist.github.com/banool/c16f8747eabf818f2e0fc701f054ee9d.
 
 Finally, run NHC:
 ```
-cargo run -- -d server run --baseline-node-config-paths /tmp/my_server_devnet_fullnode.yaml
+cargo run -- server run --baseline-node-config-paths /tmp/my_server_devnet_fullnode.yaml
 ```
 Where `--baseline-node-url` is the node that will be used as the baseline against which NHC will compare the test node (the node under investigation).
 
