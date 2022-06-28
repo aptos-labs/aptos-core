@@ -61,6 +61,9 @@ const config = {
   themeConfig:
     /** @type {import("@docusaurus/preset-classic").ThemeConfig} */
     ({
+      colorMode: {
+        defaultMode: "dark",
+      },
       docs: {
         sidebar: {
           autoCollapseCategories: true,
@@ -88,7 +91,7 @@ const config = {
               {
                 label: "Move on Aptos",
                 type: "doc",
-                docId: "guides/move",
+                docId: "guides/move-guides/move-on-aptos",
               },
               {
                 label: "Your First Move Module",
@@ -114,35 +117,41 @@ const config = {
               },
               {
                 type: "doc",
-                label: "Your First NFT",
-                docId: "tutorials/your-first-nft",
+                label: "Your First Coin",
+                docId: "tutorials/first-coin",
               },
               {
                 type: "doc",
-                label: "Your First Coin",
-                docId: "tutorials/first-coin",
+                label: "Your First NFT",
+                docId: "tutorials/your-first-nft",
               },
             ],
           },
           {
             type: "dropdown",
             label: "Nodes",
+            to: "nodes/nodes-index",
             position: "left",
             items: [
               {
-                label: "Node Tutorials",
-                type: "doc",
-                docId: "tutorials/run-a-local-testnet",
-              },
-              {
                 label: "Aptos Blockchain Deployments",
                 type: "doc",
-                docId: "tutorials/local-testnet-devnet-incentivized-testnet",
+                docId: "nodes/aptos-deployments",
               },
               {
-                label: "Incentivized Testnet",
+                label: "Validators",
                 type: "doc",
-                docId: "tutorials/validator-node/intro",
+                docId: "nodes/validator-node/index",
+              },
+              {
+                label: "FullNodes",
+                type: "doc",
+                docId: "nodes/full-node/index",
+              },
+              {
+                label: "Local Testnet",
+                type: "doc",
+                docId: "nodes/run-a-local-testnet",
               },
             ],
           },
@@ -235,8 +244,36 @@ const config = {
       {
         redirects: [
           {
-            to: "/tutorials/full-node/run-a-fullnode",
+            to: "/nodes/full-node/fullnode-for-devnet",
             from: "/tutorials/run-a-fullnode",
+          },
+          {
+            to: "/nodes/aptos-deployments",
+            from: "/tutorials/local-testnet-devnet-and-incentivized-testnet",
+          },
+          {
+            to: "/nodes/full-node/run-a-fullnode-on-gcp",
+            from: "/tutorials/run-a-fullnode-on-gcp",
+          },
+          {
+            to: "/nodes/ait/node-requirements",
+            from: "/tutorials/validator-node/intro",
+          },
+          {
+            to: "/nodes/validator-node/validators",
+            from: ["/tutorials/validator-node/run-validator-node-using-gcp", 
+            "/tutorials/validator-node/run-validator-node-using-aws", 
+            "/tutorials/validator-node/run-validator-node-using-azure",
+            "/tutorials/validator-node/run-validator-node-using-docker",
+            "/tutorials/validator-node/run-validator-node-using-source"]
+          },
+          {
+            to: "/nodes/ait/connect-to-testnet",
+            from: "/tutorials/validator-node/connect-to-testnet",
+          },
+          {
+            to: "/nodes/ait/node-liveness-criteria",
+            from: "/reference/node-liveness-criteria",
           },
         ],
       },

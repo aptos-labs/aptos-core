@@ -1,10 +1,10 @@
 ---
-title: "Run a FullNode"
-slug: "run-a-fullnode"
+title: "FullNode Using Aptos Source and Docker"
+slug: "fullnode-source-code-and-docker"
 sidebar_position: 10
 ---
 
-# Run a FullNode
+# FullNode Using Aptos Source and Docker
 
 You can run your own [FullNode](/basics/basics-fullnodes) to synchronize with the state of the Aptos Blockchain and stay up-to-date. FullNodes replicate the entire state of the blockchain by querying other Aptos FullNodes or validators.
 

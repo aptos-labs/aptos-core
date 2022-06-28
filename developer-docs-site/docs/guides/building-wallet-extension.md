@@ -1,7 +1,6 @@
 ---
-title: "Wallet Extension"
+title: "Building the Wallet Extension"
 slug: "building-wallet-extension"
-sidebar_position: 12
 ---
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';

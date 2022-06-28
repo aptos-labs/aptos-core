@@ -1,7 +1,6 @@
 ---
 title: "Move on Aptos"
-slug: "move"
-sidebar_position: 2
+slug: "move-on-aptos"
 ---
 
 # Move on Aptos

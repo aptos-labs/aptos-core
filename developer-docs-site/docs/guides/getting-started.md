@@ -3,49 +3,82 @@ title: "Getting Started"
 slug: "getting-started"
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Getting Started
 
-This is a guide to kick-start your journey as a developer in the Aptos ecosystem!
+To kick-start your journey as a developer in the Aptos ecosystem, set up your development environment as described in this section.
 
-## Prepare for Aptos Development
+## Clone the Aptos-core repo
 
-Aptos-core is available on [GitHub](https://github.com/aptos-labs/aptos-core)
+Start by cloning the `aptos-core` GitHub repo from [[GitHub](https://github.com/aptos-labs/aptos-core)](https://github.com/aptos-labs/aptos-core).
 
-```bash
-git clone https://github.com/aptos-labs/aptos-core.git
-cd aptos-core
-./scripts/dev_setup.sh
-source ~/.cargo/env
-git checkout --track origin/devnet
-```
+1. Clone the Aptos repo.
 
-## Explore the tutorials
+      ```
+      git clone https://github.com/aptos-labs/aptos-core.git
+      ```
 
-* [Your first transaction](/tutorials/your-first-transaction)
-* [Your first Move module](/tutorials/your-first-move-module)
-* [Your first NFT](/tutorials/your-first-nft)
-* [Run a local testnet](/tutorials/run-a-local-testnet)
-* [Run a FullNode](/tutorials/full-node/run-a-fullnode)
+2. `cd` into `aptos-core` directory.
 
-## Start Developing Move Modules
+    ```
+    cd aptos-core
+    ```
 
-* Learn more about [Aptos Move](/guides/move) (in [presentation format](https://docs.google.com/presentation/d/1MrsumQgdrLnKCaZnrtWvadT5rhOGka-Fhi0OoYtGQo8/edit?usp=sharing))
-* Read the [Move book](https://diem.github.io/move/)
-* Learn more about [interacting with the Aptos Blockchain](/guides/interacting-with-the-aptos-blockchain)
-* Explore the [Framework documentation](https://github.com/aptos-labs/aptos-core/tree/framework-docs)
-* Start building and publishing your own modules on our public Devnet or on your own Testnet
+3. Run the `scripts/dev_setup.sh` Bash script as shown below. This will prepare your developer environment.
 
-## Tools
+    ```
+    ./scripts/dev_setup.sh
+    ```
 
-* [Typescript SDK](https://www.npmjs.com/package/aptos)
-* [Wallet extension](https://github.com/aptos-labs/aptos-core/releases/tag/wallet-v0.0.1) and [tutorial](/tutorials/building-wallet-extension)
-* [CLI](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v0.1.0-alpha) and [guide](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md)
-* While some of us code move in Vi with no syntax highlighting, others also use [VSCode](https://code.visualstudio.com/download) and [this plugin](https://marketplace.visualstudio.com/items?itemName=damirka.move-syntax)
+4. Update your current shell environment.
 
-## Devnet Details
+    ```
+    source ~/.cargo/env
+    ```
+5. Skip this step if you are not installing an Aptos node.
 
-* Faucet endpoint: [https://faucet.devnet.aptoslabs.com](https://faucet.devnet.aptoslabs.com)
-* REST interface endpoint: [https://fullnode.devnet.aptoslabs.com](https://fullnode.devnet.aptoslabs.com)
-* [Genesis](https://devnet.aptoslabs.com/genesis.blob)
-* [Waypoint](https://devnet.aptoslabs.com/waypoint.txt)
-* [ChainID](https://devnet.aptoslabs.com/chainid.txt)
+    <Tabs>
+    <TabItem value="devnet" label="Devnet" default>
+
+    Checkout the `devnet` branch using:
+
+    ```
+    git checkout --track origin/devnet
+    ```
+    </TabItem>
+    <TabItem value="testnet" label="Testnet" default>
+
+    Checkout the `testnet` branch using:
+
+    ```
+    git checkout --track origin/testnet
+    ```
+    </TabItem>
+    </Tabs>
+
+
+Now your basic Aptos development environment ready.
+
+## Plugins
+
+- A [Move language syntax plugin](https://marketplace.visualstudio.com/items?itemName=damirka.move-syntax) for Visual Studio Code.
+
+## Aptos CLI
+
+- [Aptos CLI releases](https://github.com/aptos-labs/aptos-core/releases).
+- [Aptos CLI README](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md).
+
+## Aptos SDK
+
+- [Aptos Typescript SDK](https://www.npmjs.com/package/aptos).
+
+## Aptos devnet
+
+- [Genesis](https://devnet.aptoslabs.com/genesis.blob).
+- [Waypoint](https://devnet.aptoslabs.com/waypoint.txt).
+- [ChainID](https://devnet.aptoslabs.com/chainid.txt).
+- **The Aptos Faucet:** [https://faucet.devnet.aptoslabs.com](https://faucet.devnet.aptoslabs.com).
+- **REST API URL:** [https://fullnode.devnet.aptoslabs.com](https://fullnode.devnet.aptoslabs.com).
+
