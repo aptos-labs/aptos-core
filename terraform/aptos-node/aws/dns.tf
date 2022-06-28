@@ -15,13 +15,14 @@ data "aws_route53_zone" "aptos" {
 }
 
 locals {
+  dns_prefix = var.workspace_dns ? "${local.workspace_name}." : ""
   record_name = replace(var.record_name, "<workspace>", local.workspace_name)
   # domain name for external-dns, if it is installed
-  domain = var.zone_id != "" ? "${local.workspace_name}.${data.aws_route53_zone.aptos[0].name}" : null
+  domain = var.zone_id != "" ? "${local.dns_prefix}${data.aws_route53_zone.aptos[0].name}" : null
 }
 
 data "kubernetes_service" "validator-lb" {
-  count = var.zone_id != "" ? 1 : 0
+  count   = var.zone_id == "" || !var.create_records ? 0 : 1
   metadata {
     name = "${local.workspace_name}-aptos-node-0-validator-lb"
   }
@@ -29,7 +30,7 @@ data "kubernetes_service" "validator-lb" {
 }
 
 data "kubernetes_service" "fullnode-lb" {
-  count = var.zone_id != "" ? 1 : 0
+  count   = var.zone_id == "" || !var.create_records ? 0 : 1
   metadata {
     name = "${local.workspace_name}-aptos-node-0-fullnode-lb"
   }
@@ -37,7 +38,7 @@ data "kubernetes_service" "fullnode-lb" {
 }
 
 resource "aws_route53_record" "validator" {
-  count   = var.zone_id != "" ? 1 : 0
+  count   = var.zone_id == "" || !var.create_records ? 0 : 1
   zone_id = var.zone_id
   name    = "${random_string.validator-dns.result}.${local.record_name}"
   type    = "CNAME"
@@ -46,7 +47,7 @@ resource "aws_route53_record" "validator" {
 }
 
 resource "aws_route53_record" "fullnode" {
-  count   = var.zone_id != "" ? 1 : 0
+  count   = var.zone_id == "" || !var.create_records ? 0 : 1
   zone_id = var.zone_id
   name    = local.record_name
   type    = "CNAME"

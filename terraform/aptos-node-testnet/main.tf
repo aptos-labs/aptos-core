@@ -17,9 +17,14 @@ locals {
 module "validator" {
   source = "../aptos-node/aws"
 
-  region                      = var.region
-  iam_path                    = var.iam_path
-  zone_id                     = var.zone_id
+  region   = var.region
+  iam_path = var.iam_path
+  zone_id  = var.zone_id
+  # do not create the main fullnode and validator DNS records
+  # instead, rely on external-dns from the testnet-addons
+  create_records = false
+  workspace_dns  = var.workspace_dns
+
   permissions_boundary_policy = var.permissions_boundary_policy
   workspace_name_override     = var.workspace_name_override
 
@@ -34,7 +39,7 @@ module "validator" {
   validator_name = "aptos-node"
 
   num_validators = var.num_validators
-  helm_values = var.aptos_node_helm_values
+  helm_values    = var.aptos_node_helm_values
 
   # allow all nodegroups to surge to 2x their size, in case of total nodes replacement
   validator_instance_num = var.num_validator_instance > 0 ? 2 * var.num_validator_instance : var.num_validators
@@ -86,7 +91,7 @@ resource "helm_release" "genesis" {
       genesis = {
         numValidators   = var.num_validators
         username_prefix = local.aptos_node_helm_prefix
-        domain = local.domain
+        domain          = local.domain
         validator = {
           enable_onchain_discovery = false
         }

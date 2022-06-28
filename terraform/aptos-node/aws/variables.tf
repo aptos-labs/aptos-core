@@ -42,9 +42,19 @@ variable "zone_id" {
   default     = ""
 }
 
+variable "workspace_dns" {
+  description = "Include Terraform workspace name in DNS records"
+  default     = true
+}
+
 variable "record_name" {
   description = "DNS record name to use (<workspace> is replaced with the TF workspace name)"
   default     = "<workspace>.aptos"
+}
+
+variable "create_records" {
+  description = "Creates DNS records in var.zone_id that point to k8s service, as opposed to using external-dns or other means"
+  default     = true
 }
 
 variable "helm_chart" {
