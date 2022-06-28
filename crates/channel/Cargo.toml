@@ -17,6 +17,6 @@ aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 
 [dev-dependencies]
-tokio = { version = "1.18.2", features = ["full"] }
+tokio = { version = "1.18.2", features = ["full","tracing"] }
 
 aptos-types = { path = "../../types" }
