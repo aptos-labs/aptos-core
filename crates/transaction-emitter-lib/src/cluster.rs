@@ -17,8 +17,7 @@ use aptos_sdk::{
     types::{account_config::aptos_root_address, chain_id::ChainId, AccountKey, LocalAccount},
 };
 use rand::seq::SliceRandom;
-use std::convert::TryFrom;
-use std::path::Path;
+use std::{convert::TryFrom, path::Path};
 use url::Url;
 
 #[derive(Debug)]
@@ -132,15 +131,18 @@ impl TryFrom<&ClusterArgs> for Cluster {
             urls.push(url);
         }
 
-        let mint_key = if let Some(ref key) = args.mint_key {
+        let mint_key = if let Some(ref key) = args.mint_args.mint_key {
             key.private_key()
         } else {
             EncodingType::BCS
-                .load_key::<Ed25519PrivateKey>("mint key pair", Path::new(&args.mint_file))
+                .load_key::<Ed25519PrivateKey>(
+                    "mint key pair",
+                    Path::new(&args.mint_args.mint_file),
+                )
                 .unwrap()
         };
 
-        let cluster = Cluster::from_host_port(urls, mint_key, args.chain_id, args.vasp);
+        let cluster = Cluster::from_host_port(urls, mint_key, args.mint_args.chain_id, args.vasp);
 
         Ok(cluster)
     }
