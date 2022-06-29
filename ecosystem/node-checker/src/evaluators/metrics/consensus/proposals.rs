@@ -183,8 +183,7 @@ mod test {
             None => vec![],
         };
 
-        let evaluator =
-            ConsensusProposalsEvaluator::new(ConsensusProposalsEvaluatorArgs {});
+        let evaluator = ConsensusProposalsEvaluator::new(ConsensusProposalsEvaluatorArgs {});
 
         let input = MetricsEvaluatorInput {
             previous_baseline_metrics: parse_metrics(vec![]).unwrap(),
