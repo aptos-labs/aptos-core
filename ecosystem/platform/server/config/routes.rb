@@ -69,5 +69,6 @@ Rails.application.routes.draw do
   get 'privacy', to: 'static_page#privacy'
   get 'developers', to: 'static_page#developers'
   get 'currents', to: 'static_page#currents'
+  get 'careers', to: 'static_page#careers'
   root 'static_page#root'
 end

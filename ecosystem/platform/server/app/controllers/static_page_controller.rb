@@ -27,4 +27,13 @@ class StaticPageController < ApplicationController
     end
     @article_html = @feed.items.first.content_encoded.html_safe
   end
+
+  def careers
+    @job_departments = Rails.cache.fetch(:careers_job_departments, expires_in: 1.hour) do
+      r = HTTParty.get('https://boards-api.greenhouse.io/v1/boards/aptoslabs/jobs?content=true')
+      job_listings = JSON.parse(r.body)
+      job_listings['jobs'].group_by { |job| job['departments'][0]['name'] }
+    end
+  end
+
 end
