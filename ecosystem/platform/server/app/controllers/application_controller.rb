@@ -39,9 +39,7 @@ class ApplicationController < ActionController::Base
   end
 
   def ensure_confirmed!
-    email_confirmed = !!current_user&.confirmed?
-    username_exists = current_user && !current_user.username.nil?
-    redirect_to onboarding_email_path unless email_confirmed && username_exists
+    redirect_to onboarding_email_path unless current_user&.registration_completed?
   end
 
   def append_info_to_payload(payload)
