@@ -35,7 +35,7 @@ groups:
 
     # Mempool alerts
   - alert: Mempool has no active upstream peers
-    expr: (sum by (owner, kubernetes_pod_name) (mempool_active_upstream_peers_count)) == 0
+    expr: (sum by (kubernetes_pod_name) (mempool_active_upstream_peers_count)) == 0
     for: 3m
     labels:
       severity: error
@@ -81,14 +81,14 @@ groups:
       summary: "Less than 20 GB of free space on Validator DB volume."
     annotations:
   - alert: AptosDB API Success Rate
-    expr: sum by(owner, kubernetes_pod_name) (rate(aptos_storage_api_latency_seconds_count{result="Ok"}[1m])) / sum by(owner, kubernetes_pod_name) (rate(aptos_storage_api_latency_seconds_count[1m])) < 0.99  # 99%
+    expr: sum by(kubernetes_pod_name) (rate(aptos_storage_api_latency_seconds_count{result="Ok"}[1m])) / sum by(kubernetes_pod_name) (rate(aptos_storage_api_latency_seconds_count[1m])) < 0.99  # 99%
     for: 5m
     labels:
       severity: error
       summary: "AptosDB API success rate dropped."
     annotations:
   - alert: RocksDB Read Latency
-    expr: sum by (owner, kubernetes_pod_name) (rate(aptos_schemadb_get_latency_seconds_sum[1m])) / sum by (owner, kubernetes_pod_name) (rate(aptos_schemadb_get_latency_seconds_count[1m])) > 0.001  # 1 millisecond
+    expr: sum by (kubernetes_pod_name) (rate(aptos_schemadb_get_latency_seconds_sum[1m])) / sum by (kubernetes_pod_name) (rate(aptos_schemadb_get_latency_seconds_count[1m])) > 0.001  # 1 millisecond
     for: 5m
     labels:
       severity: warning

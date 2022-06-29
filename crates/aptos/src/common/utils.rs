@@ -5,13 +5,8 @@ use crate::{
     common::types::{CliError, CliTypedResult, PromptOptions},
     CliResult,
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
-use aptos_rest_client::{Client, Transaction};
-use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
-use aptos_types::{
-    chain_id::ChainId,
-    transaction::{authenticator::AuthenticationKey, TransactionPayload},
-};
+use aptos_rest_client::Client;
+use aptos_types::chain_id::ChainId;
 use itertools::Itertools;
 use move_deps::move_core_types::account_address::AccountAddress;
 use reqwest::Url;
@@ -198,6 +193,15 @@ pub async fn get_sequence_number(
     Ok(account.sequence_number)
 }
 
+/// Retrieves the chain id from the rest client
+pub async fn chain_id(rest_client: &Client) -> CliTypedResult<ChainId> {
+    let state = rest_client
+        .get_ledger_information()
+        .await
+        .map_err(|err| CliError::ApiError(err.to_string()))?
+        .into_inner();
+    Ok(ChainId::new(state.chain_id))
+}
 /// Error message for parsing a map
 const PARSE_MAP_SYNTAX_MSG: &str = "Invalid syntax for map. Example: Name=Value,Name2=Value";
 
@@ -230,38 +234,6 @@ where
         map.insert(key, value);
     }
     Ok(map)
-}
-
-/// Submits a [`TransactionPayload`] as signed by the `sender_key`
-pub async fn submit_transaction(
-    url: Url,
-    chain_id: ChainId,
-    sender_key: Ed25519PrivateKey,
-    payload: TransactionPayload,
-    max_gas: u64,
-) -> CliTypedResult<Transaction> {
-    let client = Client::new(url);
-
-    // Get sender address
-    let sender_address = AuthenticationKey::ed25519(&sender_key.public_key()).derived_address();
-    let sender_address = AccountAddress::new(*sender_address);
-
-    // Get sequence number for account
-    let sequence_number = get_sequence_number(&client, sender_address).await?;
-
-    // Sign and submit transaction
-    let transaction_factory = TransactionFactory::new(chain_id)
-        .with_gas_unit_price(1)
-        .with_max_gas_amount(max_gas);
-    let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
-    let transaction =
-        sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
-    let response = client
-        .submit_and_wait(&transaction)
-        .await
-        .map_err(|err| CliError::ApiError(err.to_string()))?;
-
-    Ok(response.into_inner())
 }
 
 pub fn current_dir() -> PathBuf {

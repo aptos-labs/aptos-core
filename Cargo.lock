@@ -803,6 +803,7 @@ dependencies = [
  "aptos-workspace-hack",
  "async-trait",
  "clap 3.1.18",
+ "const_format",
  "env_logger 0.8.4",
  "futures",
  "log",
@@ -1202,6 +1203,7 @@ dependencies = [
  "serde 1.0.137",
  "serde_bytes",
  "serde_json",
+ "serde_yaml",
  "thiserror",
  "tiny-keccak",
 ]
@@ -1271,6 +1273,8 @@ dependencies = [
 name = "aptos-workspace-hack"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "backtrace",
  "byteorder",
  "bytes",
  "cc",
@@ -2249,9 +2253,9 @@ checksum = "fbdcdcb6d86f71c5e97409ad45898af11cbc995b4ee8112d59095a28d376c935"
 
 [[package]]
 name = "const_format"
-version = "0.2.23"
+version = "0.2.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0936ffe6d0c8d6a51b3b0a73b2acbe925d786f346cf45bfddc8341d79fb7dc8a"
+checksum = "2906f2480cdc015e998deac388331a0f1c1cd88744948c749513020c83c370bc"
 dependencies = [
  "const_format_proc_macros",
 ]
@@ -2798,7 +2802,7 @@ dependencies = [
  "diesel_derives",
  "num-bigint 0.2.6",
  "num-integer",
- "num-traits 0.1.43",
+ "num-traits 0.2.15",
  "pq-sys",
  "r2d2",
  "serde_json",
@@ -3358,7 +3362,7 @@ dependencies = [
  "tempfile",
  "termcolor",
  "tokio",
- "transaction-emitter",
+ "transaction-emitter-lib",
  "url",
 ]
 
@@ -8924,6 +8928,24 @@ name = "transaction-emitter"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "aptos-logger",
+ "aptos-sdk",
+ "aptos-workspace-hack",
+ "clap 3.1.18",
+ "futures",
+ "itertools",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "termion",
+ "tokio",
+ "transaction-emitter-lib",
+]
+
+[[package]]
+name = "transaction-emitter-lib"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
  "aptos",
  "aptos-config",
  "aptos-crypto",
@@ -8932,14 +8954,15 @@ dependencies = [
  "aptos-sdk",
  "aptos-transaction-builder",
  "aptos-workspace-hack",
+ "clap 3.1.18",
  "futures",
  "itertools",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "reqwest",
- "structopt",
  "termion",
  "tokio",
+ "url",
 ]
 
 [[package]]

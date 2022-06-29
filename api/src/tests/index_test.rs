@@ -5,7 +5,7 @@ use crate::{current_function_name, tests::new_test_context};
 use serde_json::json;
 
 #[tokio::test]
-async fn test_get_ledger_info() {
+async fn test_get_index() {
     let mut context = new_test_context(current_function_name!());
     let resp = context.get("/").await;
     context.check_golden_output(resp);

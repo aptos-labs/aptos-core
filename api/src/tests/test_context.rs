@@ -1,12 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{context::Context, index, tests::pretty};
+use crate::{
+    context::Context,
+    index,
+    tests::{golden_output::GoldenOutputs, pretty},
+};
 use aptos_api_types::{
     mime_types, HexEncodedBytes, TransactionOnChainData, X_APTOS_CHAIN_ID,
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
 };
-use aptos_config::config::ApiConfig;
+use aptos_config::config::NodeConfig;
 use aptos_crypto::{hash::HashValue, SigningKey};
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_sdk::{
@@ -28,16 +32,14 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use bytes::Bytes;
-use executor::db_bootstrapper;
+use executor::{block_executor::BlockExecutor, db_bootstrapper};
 use executor_types::BlockExecutorTrait;
 use hyper::Response;
 use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
 
-use crate::tests::golden_output::GoldenOutputs;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use executor::block_executor::BlockExecutor;
 use rand::SeedableRng;
 use serde_json::{json, Value};
 use std::{boxed::Box, collections::BTreeMap, iter::once, sync::Arc};
@@ -74,7 +76,7 @@ pub fn new_test_context(test_name: &'static str) -> TestContext {
             ChainId::test(),
             db.clone(),
             mempool.ac_client.clone(),
-            ApiConfig::default(),
+            NodeConfig::default(),
         ),
         rng,
         root_key,

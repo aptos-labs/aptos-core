@@ -6,20 +6,28 @@
   <% if current_user.errors.any? %>
     <div id="error_explanation" class="flex p-4 mb-4 bg-red-100 rounded-lg dark:bg-red-200" role="alert">
       <div class="ml-3 text-sm font-medium text-red-700 dark:text-red-800">
-      <h2><%= pluralize(current_user.errors.count, 'error') %> prohibited this user from being saved:</h2>
+        <h2><%= pluralize(current_user.errors.count, 'error') %> prohibited this user from being saved:</h2>
 
-      <ul>
-        <% current_user.errors.each do |error| %>
-          <li><%= error.full_message %></li>
-        <% end %>
-      </ul>
+        <ul>
+          <% current_user.errors.each do |error| %>
+            <li><%= error.full_message %></li>
+          <% end %>
+        </ul>
       </div>
     </div>
   <% end %>
 
   <%= form_with(model: current_user, url: onboarding_email_path, method: :post, data: { turbo: !@show_recaptcha_v2, controller: 'recaptcha', action: 'recaptcha#validate' }, builder: AptosFormBuilder) do |f| %>
-    <div class="mb-8">
-      <%= f.email_field :email, autofocus: true, autocomplete: 'email', required: true, placeholder: 'ENTER YOUR EMAIL ADDRESS', class: 'md:w-96' %>
+    <% if !current_user.email %>
+      <div class="mb-6">
+        <%= f.label :email, class: 'font-mono uppercase block mb-2' %>
+        <%= f.email_field :email, autofocus: true, autocomplete: 'email', spellcheck: false, required: true, value: current_user.unconfirmed_email || @oauth_email, class: 'md:w-96' %>
+      </div>
+    <% end %>
+
+    <div class="mb-6">
+      <%= f.label :username, class: 'font-mono uppercase block mb-2' %>
+      <%= f.text_field :username, autofocus: true, spellcheck: false, pattern: '[a-zA-Z0-9#]+', minlength: 3, maxlength: 20, value: current_user.username || @oauth_username, class: 'md:w-96' %>
     </div>
 
     <div class="mb-8">
@@ -31,7 +39,7 @@
     </div>
 
     <div class="mb-12">
-      <%= f.submit 'Verify email', class: 'w-72' %>
+      <%= f.submit 'Continue', class: 'w-72' %>
     </div>
 
     <div class="text-sm mb-4">
@@ -40,7 +48,7 @@
         <span>I agree to the Aptos <a href="https://aptoslabs.com/terms/" class="font-bold text-teal-400">Terms of Use</a> and <a href="https://aptoslabs.com/privacy/" class="font-bold text-teal-400">Privacy Policy</a>.</span>
       </label>
     </div>
-        <div class="text-xs text-neutral-500">
+    <div class="text-xs text-neutral-500">
       This site is protected by reCAPTCHA and the Google
       <a href="https://policies.google.com/privacy">Privacy Policy</a> and
       <a href="https://policies.google.com/terms">Terms of Service</a> apply.

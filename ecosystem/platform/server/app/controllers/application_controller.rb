@@ -21,10 +21,12 @@ class ApplicationController < ActionController::Base
     stored_location = stored_location_for(user)
     return stored_location if stored_location.present?
 
-    if user.email.nil?
+    if user.email.nil? || user.username.nil?
       onboarding_email_path
-    else
+    elsif Flipper.enabled?(:it2_registration_open)
       it2_path
+    else
+      it1_path
     end
   end
 
@@ -37,7 +39,9 @@ class ApplicationController < ActionController::Base
   end
 
   def ensure_confirmed!
-    redirect_to onboarding_email_path unless current_user&.confirmed?
+    email_confirmed = !!current_user&.confirmed?
+    username_exists = current_user && !current_user.username.nil?
+    redirect_to onboarding_email_path unless email_confirmed && username_exists
   end
 
   def append_info_to_payload(payload)

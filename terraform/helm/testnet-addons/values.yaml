@@ -43,6 +43,11 @@ load_test:
     txn_expiration_time_secs: 30
     use_validators: false
 
+waypoint:
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
 serviceAccount:
   # Specifies whether a service account should be created
   create: true

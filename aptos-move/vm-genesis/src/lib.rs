@@ -43,7 +43,9 @@ const GENESIS_SEED: [u8; 32] = [42; 32];
 
 const GENESIS_MODULE_NAME: &str = "Genesis";
 
+const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
+const FIXED_REWARDS_APY: u64 = 10;
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
     let mut rng = StdRng::from_seed(GENESIS_SEED);
@@ -65,11 +67,7 @@ pub fn encode_genesis_transaction(
     max_lockup_duration_secs: u64,
     allow_new_validators: bool,
 ) -> Transaction {
-    let consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1 {
-        decoupled_execution: true,
-        back_pressure_limit: 10,
-        exclude_round: 20,
-    });
+    let consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1::default());
 
     Transaction::GenesisTransaction(WriteSetPayload::Direct(encode_genesis_change_set(
         &aptos_root_key,
@@ -224,8 +222,15 @@ fn create_and_initialize_main_accounts(
     let consensus_config_bytes =
         bcs::to_bytes(&consensus_config).expect("Failure serializing genesis consensus config");
 
-    // TODO: Make reward rate configurable in the genesis blob.
-    let rewards_rate_percentage = 1;
+    // TODO: Make reward rate numerator/denominator configurable in the genesis blob.
+    // We're aiming for roughly 10% APY.
+    let num_epochs_in_a_year = NUM_SECONDS_PER_YEAR / epoch_duration_secs;
+    let rewards_rate_per_epoch = (FIXED_REWARDS_APY / 100) / num_epochs_in_a_year;
+    // This represents the rewards rate fraction (numerator / denominator).
+    // For an APY=0.1 (10%) and epoch interval = 1 hour, the numerator = 1M * 0.1 / (365 * 24) ~ 11.
+    // Rewards rate = 11 / 1M ~ 0.0011% per 1 hour. This compounds to ~10.12% per year.
+    let rewards_rate_denominator = 1_000_000;
+    let rewards_rate_numerator = rewards_rate_per_epoch * rewards_rate_denominator;
 
     // Block timestamps are in microseconds and epoch_interval is used to check if a block timestamp
     // has crossed into a new epoch. So epoch_interval also needs to be in micro seconds.
@@ -252,7 +257,8 @@ fn create_and_initialize_main_accounts(
             MoveValue::U64(min_lockup_duration_secs),
             MoveValue::U64(max_lockup_duration_secs),
             MoveValue::Bool(allow_new_validators),
-            MoveValue::U64(rewards_rate_percentage),
+            MoveValue::U64(rewards_rate_numerator),
+            MoveValue::U64(rewards_rate_denominator),
         ]),
     );
 }

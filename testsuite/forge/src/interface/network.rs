@@ -3,7 +3,7 @@
 
 use super::Test;
 use crate::{CoreContext, Result, Swarm, TestReport};
-use transaction_emitter::EmitJobRequest;
+use transaction_emitter_lib::EmitJobRequest;
 
 /// The testing interface which defines a test written with full control over an existing network.
 /// Tests written against this interface will have access to both the Root account as well as the

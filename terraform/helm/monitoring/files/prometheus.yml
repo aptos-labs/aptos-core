@@ -64,8 +64,6 @@ scrape_configs:
     regex: (.+)
     target_label: __metrics_path__
     replacement: /api/v1/nodes/${1}/proxy/metrics
-  - target_label: owner
-    replacement: {{ .Values.validator.name }}
 
 - job_name: 'kubernetes-cadvisor'
   scheme: https
@@ -83,8 +81,6 @@ scrape_configs:
     regex: (.+)
     target_label: __metrics_path__
     replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
-  - target_label: owner
-    replacement: {{ .Values.validator.name }}
 
  {{ if not .Values.monitoring.fullKubernetesScrape }}
   metric_relabel_configs:
@@ -97,8 +93,6 @@ scrape_configs:
 - job_name: 'kube-state-metrics'
   static_configs:
   - targets: ['kube-state-metrics.default.svc.cluster.local:8080']
-    labels:
-      owner: {{ .Values.validator.name }}
 {{ end }}
 
 - job_name: "aptos-procs"
@@ -119,8 +113,6 @@ scrape_configs:
   - source_labels: [__meta_kubernetes_pod_name]
     action: replace
     target_label: kubernetes_pod_name
-  - target_label: owner
-    replacement: {{ .Values.validator.name }}
 
 {{ if .Values.monitoring.prometheus.remote_write.enabled }}
 {{ with .Values.monitoring.prometheus.remote_write }}

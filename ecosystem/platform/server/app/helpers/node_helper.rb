@@ -85,37 +85,16 @@ module NodeHelper
       @hostname = hostname
       @metrics_port = metrics_port
       @http_api_port = http_api_port
-      @ip = resolve_ip
+      @ip_resolver = IPResolver.new(hostname)
+      @ip = @ip_resolver.ip
     end
 
     # @return [IPResult] ip
     attr_reader :ip
 
-    # @return IPResult
-    def resolve_ip
-      return IPResult.new(true, @hostname, nil) if @hostname =~ Resolv::IPv4::Regex
-
-      resolved_ip = Resolv::DNS.open do |dns|
-        dns.timeouts = 0.5
-        dns.getaddress @hostname
-      end
-      IPResult.new(true, resolved_ip, nil)
-    rescue StandardError => e
-      IPResult.new(false, nil, "DNS error: #{e}")
-    end
-
     # @return [LocationResult]
     def location
-      return LocationResult(false, "Can not fetch location with no IP: #{@ip.message}", nil) unless @ip.ok
-
-      client = MaxMind::GeoIP2::Client.new(
-        account_id: ENV.fetch('MAXMIND_ACCOUNT_ID'),
-        license_key: ENV.fetch('MAXMIND_LICENSE_KEY')
-      )
-      LocationResult.new(true, nil, client.insights(@ip.ip))
-    rescue StandardError => e
-      Sentry.capture_exception(e)
-      LocationResult.new(false, "Error: #{e}", nil)
+      @ip_resolver.location
     end
 
     # @return MetricsResult
@@ -169,4 +148,104 @@ module NodeHelper
       validations
     end
   end
+
+  class IPResolver
+    attr_reader :ip
+
+    def initialize(hostname)
+      normalize_hostname!(hostname)
+
+      @hostname = hostname
+      @ip = resolve_ip
+    end
+
+    # @return IPResult
+    def resolve_ip
+      return IPResult.new(true, @hostname, nil) if @hostname =~ Resolv::IPv4::Regex
+
+      resolved_ip = Resolv::DNS.open do |dns|
+        dns.timeouts = 0.5
+        dns.getaddress @hostname
+      end
+      IPResult.new(true, resolved_ip, nil)
+    rescue StandardError => e
+      IPResult.new(false, nil, "DNS error: #{e}")
+    end
+
+    # @return LocationResult
+    def location
+      return LocationResult(false, "Can not fetch location with no IP: #{@ip.message}", nil) unless @ip.ok
+
+      client = MaxMind::GeoIP2::Client.new(
+        account_id: ENV.fetch('MAXMIND_ACCOUNT_ID'),
+        license_key: ENV.fetch('MAXMIND_LICENSE_KEY')
+      )
+      LocationResult.new(true, nil, client.insights(@ip.ip))
+    rescue StandardError => e
+      Sentry.capture_exception(e)
+      LocationResult.new(false, "Error: #{e}", nil)
+    end
+  end
+
+  class NodeChecker
+    include Logging::Logs
+
+    # @param [String] node_checker_base_url
+    # @param [String] hostname
+    # @param [Integer] metrics_port
+    # @param [Integer] http_api_port
+    # @param [Integer] noise_port
+    def initialize(node_checker_base_url, hostname, metrics_port, http_api_port, noise_port)
+      normalize_hostname!(hostname)
+
+      @base_url = node_checker_base_url
+      @hostname = hostname
+      @metrics_port = metrics_port
+      @http_api_port = http_api_port
+      @noise_port = noise_port
+      @ip_resolver = IPResolver.new(hostname)
+      @ip = @ip_resolver.ip
+    end
+
+    # @return [IPResult] ip
+    attr_reader :ip
+
+    # @param [String] baseline_configuration_name
+    # @return NodeCheckResult
+    # Ex: NodeHelper::NodeChecker.new("http://13.57.243.124", "fullnode.devnet.aptoslabs.com", 9101, 8080, 6180)
+    #                                                                           .verify('local_devnet_fullnode')
+    def verify(baseline_configuration_name)
+      params = URI.encode_www_form(
+        node_url: "http://#{@hostname}",
+        metrics_port: @metrics_port,
+        api_port: @http_api_port,
+        noise_port: @noise_port
+      )
+      url = URI.join(@base_url, "/check_node?#{params}")
+      url = "#{url}&baseline_configuration_name=#{baseline_configuration_name}" if baseline_configuration_name.present?
+      puts "Calling node healthchecker: #{url}"
+      res = HTTParty.get(url, open_timeout: 3, read_timeout: 7, max_retries: 0)
+      data = JSON.parse(res.body)
+
+      evaluation_results = data['evaluation_results'].map do |er|
+        EvaluationResult.new(er['headline'],
+                             er['score'],
+                             er['explanation'],
+                             er['evaluator_name'],
+                             er['category'],
+                             er['links'])
+      end
+      NodeCheckResult.new(true, evaluation_results, nil)
+    rescue Net::ReadTimeout => e
+      NodeCheckResult.new(false, nil, "NodeChecker Read timeout: #{e}")
+    rescue Net::OpenTimeout => e
+      NodeCheckResult.new(false, nil, "NodeChecker Open timeout: #{e}")
+    rescue StandardError => e
+      log e.to_s
+      NodeCheckResult.new(false, nil, "NodeChecker Error: #{e}")
+    end
+  end
 end
+
+NodeCheckResult = Struct.new(:ok, :evaluation_results, :message)
+EvaluationResult = Struct.new(:headline, :score, :explanation, :evaluator_name, :category, :links)

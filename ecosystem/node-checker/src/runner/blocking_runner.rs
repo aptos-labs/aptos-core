@@ -5,8 +5,9 @@ use std::time::Duration;
 
 use super::{Runner, RunnerError};
 use crate::{
+    evaluator::EvaluationSummary,
     metric_collector::MetricCollector,
-    metric_evaluator::{parse_metrics, EvaluationSummary, MetricsEvaluator},
+    metric_evaluator::{parse_metrics, MetricsEvaluator},
 };
 use anyhow::{Context, Result};
 use async_trait::async_trait;

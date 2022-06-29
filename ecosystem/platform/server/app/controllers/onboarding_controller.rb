@@ -14,13 +14,13 @@ class OnboardingController < ApplicationController
   layout 'it2'
 
   def email
-    redirect_to it2_path if current_user.confirmed?
+    redirect_to it2_path if current_user.confirmed? && !current_user.username.nil?
   end
 
   def email_success; end
 
   def email_update
-    redirect_to it2_path and return if current_user.confirmed?
+    return redirect_to it2_path if current_user.confirmed? && !current_user.username.nil?
 
     recaptcha_v3_success = verify_recaptcha(action: 'onboarding/email', minimum_score: 0.5,
                                             secret_key: ENV.fetch('RECAPTCHA_V3_SECRET_KEY', nil), model: current_user)
@@ -32,9 +32,11 @@ class OnboardingController < ApplicationController
 
     email_params = params.require(:user).permit(:email, :username, :terms_accepted)
     if current_user.update(email_params)
-      log current_user, 'email updated'
+      log current_user, 'email/username updated'
       if forum_sso?
         redirect_to discourse_sso_path
+      elsif current_user.confirmed?
+        redirect_to it2_path
       else
         redirect_to onboarding_email_success_path
       end

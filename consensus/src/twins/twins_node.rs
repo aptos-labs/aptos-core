@@ -12,17 +12,18 @@ use crate::{
     util::time_service::ClockTimeService,
 };
 use aptos_config::{
-    config::{
-        ConsensusProposerType::{self, RoundProposer},
-        NodeConfig, WaypointConfig,
-    },
+    config::{NodeConfig, WaypointConfig},
     generator::{self, ValidatorSwarm},
     network_id::NetworkId,
 };
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{OnChainConfig, OnChainConfigPayload, ValidatorSet},
+    on_chain_config::{
+        ConsensusConfigV1, OnChainConfig, OnChainConfigPayload, OnChainConsensusConfig,
+        ProposerElectionType::{self, RoundProposer},
+        ValidatorSet,
+    },
     transaction::SignedTransaction,
     validator_info::ValidatorInfo,
     waypoint::Waypoint,
@@ -61,6 +62,7 @@ impl SMRNode {
     fn start(
         playground: &mut NetworkPlayground,
         config: NodeConfig,
+        consensus_config: OnChainConsensusConfig,
         storage: Arc<MockStorage>,
         twin_id: TwinId,
     ) -> Self {
@@ -97,7 +99,13 @@ impl SMRNode {
             ValidatorSet::CONFIG_ID,
             bcs::to_bytes(storage.get_validator_set()).unwrap(),
         );
+        configs.insert(
+            OnChainConsensusConfig::CONFIG_ID,
+            // Requires double serialization, check deserialize_into_config for more details
+            bcs::to_bytes(&bcs::to_bytes(&consensus_config).unwrap()).unwrap(),
+        );
         let payload = OnChainConfigPayload::new(1, Arc::new(configs));
+
         reconfig_sender
             .push(
                 (),
@@ -155,7 +163,7 @@ impl SMRNode {
         num_nodes: usize,
         num_twins: usize,
         playground: &mut NetworkPlayground,
-        proposer_type: ConsensusProposerType,
+        proposer_type: ProposerElectionType,
         round_proposers_idx: Option<HashMap<Round, usize>>,
     ) -> Vec<Self> {
         assert!(num_nodes >= num_twins);
@@ -226,7 +234,6 @@ impl SMRNode {
                 .unwrap()
                 .waypoint = Some(waypoint);
             config.base.waypoint = WaypointConfig::FromConfig(waypoint);
-            config.consensus.proposer_type = proposer_type.clone();
             config.consensus.safety_rules.verify_vote_proposal_signature = false;
             // Disable timeout in twins test to avoid flakiness
             config.consensus.round_initial_timeout_ms = 2_000_000;
@@ -235,7 +242,18 @@ impl SMRNode {
 
             let twin_id = TwinId { id: smr_id, author };
 
-            smr_nodes.push(Self::start(playground, config, storage, twin_id));
+            let consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1 {
+                proposer_election_type: proposer_type.clone(),
+                ..ConsensusConfigV1::default()
+            });
+
+            smr_nodes.push(Self::start(
+                playground,
+                config,
+                consensus_config,
+                storage,
+                twin_id,
+            ));
         }
         smr_nodes
     }

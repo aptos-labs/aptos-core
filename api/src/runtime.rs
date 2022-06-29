@@ -29,11 +29,11 @@ pub fn bootstrap(
         .build()
         .expect("[api] failed to create runtime");
 
-    let api_config = config.api.clone();
-    let api = WebServer::from(api_config.clone());
+    let api = WebServer::from(config.api.clone());
+    let node_config = config.clone();
 
     runtime.spawn(async move {
-        let context = Context::new(chain_id, db, mp_sender, api_config);
+        let context = Context::new(chain_id, db, mp_sender, node_config);
         let routes = index::routes(context);
         api.serve(routes).await;
     });

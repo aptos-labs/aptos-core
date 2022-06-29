@@ -22,6 +22,9 @@ Style/Documentation:
 Metrics/AbcSize:
   Max: 100
 
+Metrics/ClassLength:
+  Max: 200
+
 Style/Copyright:
   Enabled: true
   Notice: '^# Copyright \(c\) Aptos'

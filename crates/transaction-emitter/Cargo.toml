@@ -11,20 +11,15 @@ edition = "2018"
 
 [dependencies]
 anyhow = { version = "1.0.57", features = ["backtrace"] }
+clap = "3.1.17"
 futures = "0.3.21"
 itertools = "0.10.3"
 rand = "0.7.3"
 rand_core = "0.5.1"
-reqwest = { version = "0.11.10", features = ["blocking", "json"] }
-structopt = "0.3.21"
 termion = "1.5.6"
 tokio = { version = "1.18.2", features = ["full"] }
 
-aptos = { path = "../aptos" }
-aptos-config = { path = "../../config" }
-aptos-crypto = { path = "../aptos-crypto" }
 aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-rest-client = { path = "../aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-workspace-hack = { path = "../aptos-workspace-hack" }
+transaction-emitter-lib = { path = "../../crates/transaction-emitter-lib" }

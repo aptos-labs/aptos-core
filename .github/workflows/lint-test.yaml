@@ -15,7 +15,8 @@ env:
 
 # cancel redundant builds
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # cancel redundant builds on PRs (only on PR, not on branches)
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
   cancel-in-progress: true
 
 jobs:

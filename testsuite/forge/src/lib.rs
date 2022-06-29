@@ -14,7 +14,7 @@ pub use runner::*;
 mod backend;
 pub use backend::*;
 
-pub use transaction_emitter::*;
+pub use transaction_emitter_lib::*;
 
 mod report;
 pub use report::*;
