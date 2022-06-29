@@ -1,7 +1,6 @@
 ---
 title: "Network Identity For FullNode"
 slug: "network-identity-fullnode"
-sidebar_position: 12
 ---
 
 # Network Identity For FullNode

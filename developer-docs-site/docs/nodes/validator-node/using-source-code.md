@@ -1,5 +1,5 @@
 ---
-title: "Run Validator Node Using Source Code"
+title: "Using Source Code"
 slug: "run-validator-node-using-source"
 sidebar_position: 13
 ---

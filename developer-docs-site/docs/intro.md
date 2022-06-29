@@ -12,9 +12,9 @@ Welcome! Aptos is building a Layer 1 for everyone. Here in our documentation you
 
 ## Want to dive in?
 
-- Start with the basics, such as [Transactions and States](basics/basics-txns-states) and how [Accounts](/basics/basics-accounts) work. 
+- Start with the basics, such as [Transactions and States](/concepts/basics-txns-states.md) and how [Accounts](/concepts/basics-accounts.md) work. 
 
-- Want something a bit more interactive? You can dive right into our [tutorials](/guides/getting-started).
+- Want something a bit more interactive? You can dive right into [Aptos Quickstarts](/tutorials/index.md).
 
 Or you can go straight to the [aptos-core source](https://github.com/aptos-labs/aptos-core) and help us build the Layer 1 for everyone.
 
