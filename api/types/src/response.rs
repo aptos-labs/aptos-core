@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Error, LedgerInfo};
-
 use anyhow::Result;
 use serde::Serialize;
 use warp::http::header::{HeaderValue, CONTENT_TYPE};
