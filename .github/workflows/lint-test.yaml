@@ -146,7 +146,7 @@ jobs:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: ./.github/actions/rust-setup
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo nextest --nextest-profile ci --test-threads 16 --retries 2 --unit --exclude backup-cli --changed-since "origin/main"
+      - run: cargo nextest --nextest-profile ci --test-threads 16 --retries 2 --unit --exclude backup-cli
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 
