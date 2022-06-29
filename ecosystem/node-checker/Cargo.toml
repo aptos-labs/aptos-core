@@ -13,6 +13,7 @@ publish = false
 anyhow = "1.0.57"
 async-trait = "0.1.53"
 clap = { version = "3.1.17", features = ["derive"] }
+const_format = "0.2.25"
 env_logger = "0.8.4"
 futures = "0.3.21"
 log = "0.4"

@@ -3,8 +3,8 @@
 
 use crate::{
     configuration::NodeAddress,
+    evaluator::EvaluationSummary,
     metric_collector::{MetricCollector, ReqwestMetricCollector},
-    metric_evaluator::EvaluationSummary,
     runner::Runner,
 };
 use anyhow::anyhow;

@@ -2,11 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    common::get_metric_value, types::EvaluationResult, MetricsEvaluator, MetricsEvaluatorError,
+    common::{get_metric, GetMetricResult, Label},
+    MetricsEvaluator, MetricsEvaluatorError,
 };
+use crate::evaluator::EvaluationResult;
 use anyhow::Result;
 use clap::Parser;
 use log::debug;
+use once_cell::sync::Lazy;
 use poem_openapi::Object as PoemObject;
 use prometheus_parse::Scrape as PrometheusScrape;
 use serde::{Deserialize, Serialize};
@@ -17,6 +20,11 @@ pub const NAME: &str = "state_sync";
 // As it is now, this metric name could change and we'd never catch it here
 // at compile time.
 const STATE_SYNC_METRIC: &str = "aptos_state_sync_version";
+
+pub static SYNC_VERSION_METRIC_LABEL: Lazy<Label> = Lazy::new(|| Label {
+    key: "type",
+    value: "synced",
+});
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
 pub struct StateSyncMetricsEvaluatorArgs {
@@ -34,25 +42,23 @@ impl StateSyncMetricsEvaluator {
         Self { args }
     }
 
-    fn get_sync_version(&self, metrics: &PrometheusScrape) -> Option<u64> {
-        get_metric_value(metrics, STATE_SYNC_METRIC, "type", "synced")
-    }
-
-    fn evaluate_version_presence(
-        &self,
-        version: &Option<u64>,
-        metrics_round: &str,
-    ) -> Option<EvaluationResult> {
-        match version {
-            Some(_) => None,
-            None => Some(EvaluationResult {
-                headline: "State sync version metric missing".to_string(),
-                score: 0,
-                explanation: format!("The {} set of metrics from the target node is missing the state sync metric: {}", metrics_round, STATE_SYNC_METRIC),
-                source: self.get_name(),
-                links: vec![],
-            }),
-        }
+    fn get_sync_version(&self, metrics: &PrometheusScrape, metrics_round: &str) -> GetMetricResult {
+        let evaluation_on_missing_fn = || EvaluationResult {
+            headline: "State sync version metric missing".to_string(),
+            score: 0,
+            explanation: format!(
+                "The {} set of metrics from the target node is missing the state sync metric: {}",
+                metrics_round, STATE_SYNC_METRIC
+            ),
+            source: self.get_name(),
+            links: vec![],
+        };
+        get_metric(
+            metrics,
+            STATE_SYNC_METRIC,
+            Some(&SYNC_VERSION_METRIC_LABEL),
+            evaluation_on_missing_fn,
+        )
     }
 
     fn build_state_sync_version_evaluation(
@@ -130,37 +136,46 @@ impl MetricsEvaluator for StateSyncMetricsEvaluator {
         latest_baseline_metrics: &PrometheusScrape,
         latest_target_metrics: &PrometheusScrape,
     ) -> Result<Vec<EvaluationResult>, MetricsEvaluatorError> {
-        let mut evaluations = vec![];
+        let mut evaluation_results = vec![];
 
         // Get previous version from the target node.
-        let previous_target_version = self.get_sync_version(previous_target_metrics);
-
-        if let Some(evaluation) = self.evaluate_version_presence(&previous_target_version, "first")
+        let previous_target_version = match self.get_sync_version(previous_target_metrics, "first")
         {
-            evaluations.push(evaluation);
-        }
+            GetMetricResult::Present(metric) => Some(metric),
+            GetMetricResult::Missing(evaluation_result) => {
+                evaluation_results.push(evaluation_result);
+                None
+            }
+        };
 
         // Get the latest version from the target node.
-        let latest_target_version = self.get_sync_version(latest_target_metrics);
+        let latest_target_version = match self.get_sync_version(latest_target_metrics, "second") {
+            GetMetricResult::Present(metric) => Some(metric),
+            GetMetricResult::Missing(evaluation_result) => {
+                evaluation_results.push(evaluation_result);
+                None
+            }
+        };
 
-        if let Some(evaluation) = self.evaluate_version_presence(&latest_target_version, "second") {
-            evaluations.push(evaluation);
-        }
-
-        // Get the latest state sync version from the baseline node.
-        let latest_baseline_version =
-            self.get_sync_version(latest_baseline_metrics)
-                .ok_or_else(|| {
-                    MetricsEvaluatorError::MissingBaselineMetric(
+        // Get the latest version from the baseline node. In this case, if we
+        // cannot find the value, we return an error instead of a negative evalution,
+        // since this implies some issue with the baseline node / this code.
+        let latest_baseline_version = match self.get_sync_version(latest_baseline_metrics, "second")
+        {
+            GetMetricResult::Present(metric) => metric,
+            GetMetricResult::Missing(_) => {
+                return
+                    Err(MetricsEvaluatorError::MissingBaselineMetric(
                         STATE_SYNC_METRIC.to_string(),
                         "The latest set of metrics from the baseline node did not contain the necessary key"
                             .to_string(),
-                    )
-                })?;
+                    ));
+            }
+        };
 
         match (previous_target_version, latest_target_version) {
             (Some(previous), Some(latest)) => {
-                evaluations.push(self.build_state_sync_version_evaluation(
+                evaluation_results.push(self.build_state_sync_version_evaluation(
                     previous,
                     latest,
                     latest_baseline_version,
@@ -171,7 +186,7 @@ impl MetricsEvaluator for StateSyncMetricsEvaluator {
             }
         };
 
-        Ok(evaluations)
+        Ok(evaluation_results)
     }
 
     fn get_name(&self) -> String {
