@@ -68,5 +68,6 @@ Rails.application.routes.draw do
   get 'terms-testnet', to: 'static_page#terms_testnet'
   get 'privacy', to: 'static_page#privacy'
   get 'developers', to: 'static_page#developers'
+  get 'currents', to: 'static_page#currents'
   root 'static_page#root'
 end
