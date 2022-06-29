@@ -12,6 +12,40 @@ locals {
   workspace  = var.workspace_name_override != "" ? var.workspace_name_override : terraform.workspace
   aws_tags   = "Terraform=testnet,Workspace=${local.workspace}"
   chain_name = var.chain_name != "" ? var.chain_name : "${local.workspace}net"
+
+  # Forge assumes the chain_id is 4
+  chain_id = var.enable_forge ? 4 : var.chain_id
+
+  # use this map to programatically set helm values
+  aptos_node_helm_values_computed = {
+    service = {
+      validator = {
+        external = {
+          type = var.enable_forge ? "NodePort" : null
+        }
+        enableRestApi     = var.enable_forge
+        enableMetricsPort = var.enable_forge
+      }
+      fullnode = {
+        external = {
+          type = var.enable_forge ? "NodePort" : null
+        }
+        enableRestApi     = var.enable_forge
+        enableMetricsPort = var.enable_forge
+      }
+    }
+  }
+}
+
+# merge the operator-provided helm values via TF var
+# with the computed helm values
+module "aptos-node-helm-values-deepmerge" {
+  # https://registry.terraform.io/modules/Invicton-Labs/deepmerge/null/0.1.5
+  source = "Invicton-Labs/deepmerge/null"
+  maps = [
+    local.aptos_node_helm_values_computed,
+    var.aptos_node_helm_values,
+  ]
 }
 
 module "validator" {
@@ -32,14 +66,14 @@ module "validator" {
   k8s_admin_roles = var.k8s_admin_roles
   k8s_admins      = var.k8s_admins
 
-  chain_id       = var.chain_id
+  chain_id       = local.chain_id
   era            = var.era
   chain_name     = local.chain_name
   image_tag      = var.image_tag
   validator_name = "aptos-node"
 
   num_validators = var.num_validators
-  helm_values    = var.aptos_node_helm_values
+  helm_values    = module.aptos-node-helm-values-deepmerge.merged
 
   # allow all nodegroups to surge to 2x their size, in case of total nodes replacement
   validator_instance_num = var.num_validator_instance > 0 ? 2 * var.num_validator_instance : var.num_validators
@@ -85,7 +119,7 @@ resource "helm_release" "genesis" {
       chain = {
         name     = local.chain_name
         era      = var.era
-        chain_id = var.chain_id
+        chain_id = local.chain_id
       }
       imageTag = var.image_tag
       genesis = {

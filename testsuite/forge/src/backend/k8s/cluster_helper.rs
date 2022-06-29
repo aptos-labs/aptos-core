@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{get_validators, k8s_wait_genesis_strategy, nodes_healthcheck, Result};
+use crate::{
+    get_validators, k8s_wait_genesis_strategy, nodes_healthcheck, Result, DEFAULT_ROOT_KEY,
+};
 use anyhow::bail;
 use k8s_openapi::api::{
     apps::v1::{Deployment, StatefulSet},
@@ -70,9 +72,11 @@ async fn delete_k8s_collection<T: Clone + DeserializeOwned + Meta>(
     api: Api<T>,
     name: &'static str,
 ) -> Result<()> {
-    println!("gonna match");
     match api
-        .delete_collection(&DeleteParams::default(), &ListParams::default())
+        .delete_collection(
+            &DeleteParams::default(),
+            &ListParams::default().labels("app.kubernetes.io/part-of=aptos-node"),
+        )
         .await?
     {
         either::Left(list) => {
@@ -208,6 +212,9 @@ pub async fn reinstall_testnet_resources(
         format!("chain.era={}", &new_era),
         "--set".to_string(),
         format!("genesis.numValidators={}", base_num_validators),
+        "--set".to_string(),
+        // NOTE: remember to prepend 0x to the key
+        format!("chain.rootKey=0x{}", DEFAULT_ROOT_KEY),
         "--set".to_string(),
         format!("imageTag={}", &base_genesis_image_tag),
     ];

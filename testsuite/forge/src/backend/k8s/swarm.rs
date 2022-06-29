@@ -11,10 +11,7 @@ use aptos_config::config::NodeConfig;
 use aptos_retrier::ExponentWithLimitDelay;
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
-    types::{
-        chain_id::{ChainId, NamedChain},
-        AccountKey, LocalAccount, PeerId,
-    },
+    types::{chain_id::ChainId, AccountKey, LocalAccount, PeerId},
 };
 use k8s_openapi::api::core::v1::Service;
 use kube::{
@@ -78,7 +75,7 @@ impl K8sSwarm {
             fullnodes,
             root_account,
             kube_client,
-            chain_id: ChainId::new(NamedChain::DEVNET.id()),
+            chain_id: ChainId::new(4),
             helm_repo: helm_repo.to_string(),
             versions: Arc::new(versions),
         })
@@ -204,7 +201,7 @@ impl Swarm for K8sSwarm {
 
 /// Amount of time to wait for genesis to complete
 pub fn k8s_wait_genesis_strategy() -> impl Iterator<Item = Duration> {
-    ExponentWithLimitDelay::new(1000, 10 * 1000, 60 * 1000)
+    ExponentWithLimitDelay::new(1000, 10 * 1000, 3 * 60 * 1000)
 }
 
 /// Amount of time to wait for nodes to respond on the REST API

@@ -23,12 +23,16 @@ pub struct K8sFactory {
     base_image_tag: String,
 }
 
-const DEFAULT_ROOT_KEY: &str = "5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956";
+// These are test keys for forge ephemeral networks. Do not use these elsewhere!
+pub const DEFAULT_ROOT_KEY: &str =
+    "48136DF3174A3DE92AFDB375FFE116908B69FF6FAB9B1410E548A33FEA1D159D";
+const DEFAULT_ROOT_PRIV_KEY: &str =
+    "E25708D90C72A53B400B27FC7602C4D546C7B7469FA6E12544F0EBFB2F16AE19";
 
 impl K8sFactory {
     pub fn new(helm_repo: String, image_tag: String, base_image_tag: String) -> Result<K8sFactory> {
         let root_key: [u8; ED25519_PRIVATE_KEY_LENGTH] =
-            hex::decode(DEFAULT_ROOT_KEY)?.try_into().unwrap();
+            hex::decode(DEFAULT_ROOT_PRIV_KEY)?.try_into().unwrap();
 
         Ok(Self {
             root_key,
