@@ -224,7 +224,7 @@ module NodeHelper
       url = URI.join(@base_url, "/check_node?#{params}")
       url = "#{url}&baseline_configuration_name=#{baseline_configuration_name}" if baseline_configuration_name.present?
       puts "Calling node healthchecker: #{url}"
-      res = HTTParty.get(url, open_timeout: 3, read_timeout: 7, max_retries: 0)
+      res = HTTParty.get(url, open_timeout: 3, read_timeout: 10, max_retries: 0)
       data = JSON.parse(res.body)
 
       evaluation_results = data['evaluation_results'].map do |er|

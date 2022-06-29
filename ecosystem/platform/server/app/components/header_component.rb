@@ -9,6 +9,7 @@ class HeaderComponent < ViewComponent::Base
     NavItem.new('/it1', 'Validator Status', 'AIT1 Validator Status'),
     NavItem.new('https://aptos.dev/', 'Docs', 'Aptos Docs'),
     NavItem.new('https://explorer.devnet.aptos.dev/', 'Explorer', 'Aptos Explorer'),
+    NavItem.new(DiscourseHelper.base_url, 'Forum', 'Community Forum'),
     NavItem.new('/settings', 'Settings', 'Settings')
   ].freeze
 
@@ -26,4 +27,5 @@ class HeaderComponent < ViewComponent::Base
   def nav_items
     NAV_ITEMS
   end
+
 end

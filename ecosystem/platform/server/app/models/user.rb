@@ -115,6 +115,10 @@ class User < ApplicationRecord
     authorizations.build(auth)
   end
 
+  def registration_completed?
+    confirmed? && username.present?
+  end
+
   private
 
   # This is to allow username instead of email login in devise (for aptos admins)

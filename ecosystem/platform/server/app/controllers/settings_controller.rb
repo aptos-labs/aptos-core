@@ -27,19 +27,15 @@ class SettingsController < ApplicationController
 
   def connections
     store_location_for(current_user, request.path)
-    @authorizations = @user.authorizations.to_h do |authorization|
-      [authorization.provider, authorization]
-    end
+    @authorizations = @user.authorizations.group_by(&:provider)
   end
 
   def connections_delete
     store_location_for(current_user, request.path)
-    @authorizations = @user.authorizations.to_h do |authorization|
-      [authorization.provider, authorization]
-    end
+    @authorizations = @user.authorizations
 
-    provider = params.fetch(:authorization, {}).require(:provider)
-    authorization = @authorizations[provider]
+    auth_id = params.fetch(:authorization, {}).require(:id)
+    authorization = @authorizations.select { |auth| auth.id == auth_id }.first
 
     if authorization.nil?
       flash[:alert] = 'Connection not found.'
