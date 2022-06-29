@@ -38,17 +38,16 @@ impl ProofBuilder {
         signed_digest: SignedDigest,
         validator_verifier: &ValidatorVerifier,
         tx: ProofReturnChannel,
-    ) {
+    ) -> Result<(), SignedDigestError> {
         let info = signed_digest.info.clone();
 
         self.timeouts.add_digest(info.digest, self.proof_timeout_ms);
         self.digest_to_proof
             .insert(info.digest, (ProofOfStore::new(info), tx));
 
-        if let Err(_) = self.add_signature(signed_digest, &validator_verifier) {
-            //TODO: do something
-        }
+        self.add_signature(signed_digest, &validator_verifier)?;
         self.expire();
+        Ok(())
     }
 
     fn add_signature(
@@ -97,7 +96,10 @@ impl ProofBuilder {
         while let Some(command) = network_rx.recv().await {
             match command {
                 ProofBuilderCommand::InitProof(signed_digest, tx) => {
-                    self.init_proof(signed_digest, &validator_verifier, tx);
+                    if let Err(_) = self.init_proof(signed_digest, &validator_verifier, tx) {
+                        // Shouldn't happen can check peer_id and abort.
+                        // Either we got signed digest from sb else or wrong signature.
+                    }
                 }
                 ProofBuilderCommand::AppendSignature(signed_digest) => {
                     if let Err(_) = self.add_signature(signed_digest, &validator_verifier) {

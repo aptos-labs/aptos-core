@@ -45,7 +45,6 @@ mod util;
 pub mod consensus_provider;
 /// AptosNet interface.
 pub mod network_interface;
-mod proof_of_store;
 
 #[cfg(feature = "fuzzing")]
 pub use round_manager::round_manager_fuzzing;

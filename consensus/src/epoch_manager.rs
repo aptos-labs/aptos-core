@@ -332,6 +332,7 @@ impl EpochManager {
             self.quorum_store_to_mempool_tx.clone(),
             self.config.mempool_txn_pull_timeout_ms,
         );
+        // TODO: do we need to destroy the async thread with explicit shutdown?
         tokio::spawn(quorum_store.start(consensus_to_quorum_store_rx));
     }
 
@@ -393,11 +394,9 @@ impl EpochManager {
             wrapper_command_rx,
         );
 
+        // TODO: do we need to destroy the async thread with explicit shutdown?
         tokio::spawn(quorum_store.start());
         batch_reader
-
-        //TODO: how do we drop these tokio spawns?
-        //TODO: return (quorum_store_msg_tx, batch_reader)
     }
 
     fn spawn_quorum_wrapper(
