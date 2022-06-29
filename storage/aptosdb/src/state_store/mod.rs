@@ -28,7 +28,7 @@ use aptos_types::{
         state_key_prefix::StateKeyPrefix,
         state_value::{StateValue, StateValueChunkWithProof},
     },
-    transaction::{Version, PRE_GENESIS_VERSION},
+    transaction::Version,
 };
 use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::{collections::HashMap, sync::Arc};
@@ -85,12 +85,6 @@ impl DbReader for StateStore {
         iter.next()
             .transpose()?
             .map(|(_, state_value)| Ok(state_value))
-            // A hack to deal with PRE_GENESIS_VERSION
-            .or_else(|| {
-                self.ledger_db
-                    .get::<StateValueSchema>(&(state_key.clone(), PRE_GENESIS_VERSION))
-                    .transpose()
-            })
             .transpose()
     }
 
@@ -114,10 +108,6 @@ impl StateStore {
     }
 
     fn get_state_snapshot_version_before(&self, next_version: Version) -> Result<Option<Version>> {
-        ensure!(
-            next_version != PRE_GENESIS_VERSION,
-            "Nothing before pre-genesis"
-        );
         if next_version > 0 {
             let max_possible_version = next_version - 1;
             let mut iter = self
@@ -130,11 +120,8 @@ impl StateStore {
                 return Ok(Some(key.version()));
             }
         }
-        // try PRE_GENESIS
-        Ok(self
-            .state_merkle_db
-            .get::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(PRE_GENESIS_VERSION))?
-            .map(|_pre_genesis_root| PRE_GENESIS_VERSION))
+        // No version before genesis.
+        Ok(None)
     }
 
     /// Returns the key, value pairs for a particular state key prefix at at desired version. This
