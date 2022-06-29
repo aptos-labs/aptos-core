@@ -1,6 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+// TODO: Sometimes build_commit_hash is an empty string (so far I've noticed
+// this happens when targeting a node running from a container). Figure out
+// what to do in this case.
+
 use super::{
     get_value, GetValueResult, SystemInformationEvaluator, SystemInformationEvaluatorError,
     EVALUATOR_SOURCE,
@@ -33,7 +37,7 @@ impl BuildVersionEvaluator {
 
     fn get_build_commit_hash(&self, system_information: &SystemInformation) -> GetValueResult {
         let evaluation_on_missing_fn = || EvaluationResult {
-            headline: "State sync version metric missing".to_string(),
+            headline: "Build commit hash value missing".to_string(),
             score: 0,
             explanation: format!(
                 "The build information from the node is missing: {}",
@@ -59,7 +63,6 @@ impl SystemInformationEvaluator for BuildVersionEvaluator {
     ) -> Result<Vec<EvaluationResult>, SystemInformationEvaluatorError> {
         let mut evaluation_results = vec![];
 
-        // Get previous proposals count from the target node.
         let baseline_build_commit_hash = match self
             .get_build_commit_hash(baseline_system_information)
         {

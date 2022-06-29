@@ -99,13 +99,13 @@ impl NodeConfiguration {
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
 pub struct EvaluatorArgs {
     #[clap(flatten)]
-    pub state_sync_evaluator_args: StateSyncMetricsEvaluatorArgs,
+    pub build_version_evaluator_args: BuildVersionEvaluatorArgs,
 
     #[clap(flatten)]
     pub consensus_evaluator_args: ConsensusMetricsEvaluatorArgs,
 
     #[clap(flatten)]
-    pub build_version_evaluator_args: BuildVersionEvaluatorArgs,
+    pub state_sync_evaluator_args: StateSyncMetricsEvaluatorArgs,
 }
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
