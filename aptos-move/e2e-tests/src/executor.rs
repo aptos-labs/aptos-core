@@ -21,8 +21,8 @@ use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{AccountResource, CoinStoreResource, CORE_CODE_ADDRESS},
-    block_metadata::{new_block_event_key, BlockMetadata, NewBlockEvent},
+    account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
+    block_metadata::{new_block_event_key, BlockMetadata},
     on_chain_config::{OnChainConfig, VMPublishingOption, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{

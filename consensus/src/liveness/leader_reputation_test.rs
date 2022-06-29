@@ -14,8 +14,8 @@ use crate::liveness::{
 use aptos_infallible::Mutex;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config,
-    block_metadata::{new_block_event_key, NewBlockEvent},
+    account_config::NewBlockEvent,
+    block_metadata::new_block_event_key,
     contract_event::{ContractEvent, EventWithVersion},
     event::EventKey,
     transaction::Version,
@@ -525,8 +525,8 @@ impl MockDbReader {
             ContractEvent::new(
                 new_block_event_key(),
                 *idx,
-                TypeTag::Struct(account_config::NewBlockEvent::struct_tag()),
-                bcs::to_bytes(&account_config::NewBlockEvent::new(
+                TypeTag::Struct(NewBlockEvent::struct_tag()),
+                bcs::to_bytes(&NewBlockEvent::new(
                     epoch,
                     round,
                     vec![],
