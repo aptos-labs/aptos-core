@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module provides APIs for private keys and public keys used in BLS multi-signatures
-//! implemented on top of BLS12-381 elliptic curves (https://github.com/supranational/blst).
+//! This module provides APIs for private keys and public keys used in Boneh-Lynn-Shacham (BLS)
+//! aggregate signatures (including individual signatures and multisignatures) implemented on top of
+//! Barreto-Lynn-Scott BLS12-381 elliptic curves (https://github.com/supranational/blst).
 //!
 //! The `PublicKey` struct is used to represent both the public key of an individual signer
 //! as well as the aggregate public key of several signers. Before passing this struct as an
@@ -20,7 +21,7 @@
 //! their PoPs verified.
 
 use crate::{
-    bls12381, bls12381::DST_BLS_MULTISIG_IN_G2_WITH_POP, hash::CryptoHash, signing_message, traits,
+    bls12381, bls12381::DST_BLS_SIG_IN_G2_WITH_POP, hash::CryptoHash, signing_message, traits,
     CryptoMaterialError, Length, Uniform, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
     VerifyingKey,
 };
@@ -58,7 +59,8 @@ impl PublicKey {
     }
 
     /// Group-checks the public key (i.e., verifies the public key is a valid group element).
-    /// WARNING: This function is called implicitly when verifying the proof-of-possession (PoP) for
+    ///
+    /// WARNING: Group-checking is done implicitly when verifying the proof-of-possession (PoP) for
     /// this public key  in `ProofOfPossession::verify`, so this function should not be called
     /// separately for most use-cases. We leave it here just in case.
     pub fn group_check(&self) -> Result<()> {
@@ -67,6 +69,7 @@ impl PublicKey {
 
     /// Aggregates the public keys of several signers into an aggregate public key, which can be later
     /// used to verify a multisig aggregated from those signers.
+    ///
     /// WARNING: This function assumes all public keys have had their proofs-of-possession verified
     /// and have thus been group-checked.
     pub fn aggregate(pubkeys: Vec<&Self>) -> Result<PublicKey> {
@@ -107,20 +110,16 @@ impl traits::SigningKey for PrivateKey {
 
     fn sign<T: CryptoHash + Serialize>(&self, message: &T) -> bls12381::Signature {
         bls12381::Signature {
-            sig: self.privkey.sign(
-                &signing_message(message),
-                DST_BLS_MULTISIG_IN_G2_WITH_POP,
-                &[],
-            ),
+            sig: self
+                .privkey
+                .sign(&signing_message(message), DST_BLS_SIG_IN_G2_WITH_POP, &[]),
         }
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
     fn sign_arbitrary_message(&self, message: &[u8]) -> bls12381::Signature {
         bls12381::Signature {
-            sig: self
-                .privkey
-                .sign(message, DST_BLS_MULTISIG_IN_G2_WITH_POP, &[]),
+            sig: self.privkey.sign(message, DST_BLS_SIG_IN_G2_WITH_POP, &[]),
         }
     }
 }
@@ -154,8 +153,9 @@ impl Uniform for PrivateKey {
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
-        // CRYPTONOTE(Alin): This "initial key material (IKM)?" is the randomness used inside key_gen below
-        // to pseudo-randomly derive the secret key via an HKDF (see https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature#section-2.3)
+        // CRYPTONOTE(Alin): This "initial key material (IKM)" is the randomness used inside key_gen
+        // below to pseudo-randomly derive the secret key via an HKDF
+        // (see https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature#section-2.3)
         let mut ikm = [0u8; 32];
         rng.fill_bytes(&mut ikm);
         let privkey =
@@ -201,6 +201,7 @@ impl TryFrom<&[u8]> for PublicKey {
     type Error = CryptoMaterialError;
 
     /// Deserializes a PublicKey from a sequence of bytes.
+    ///
     /// WARNING: Does NOT group-check the public key! Instead, the caller is responsible for
     /// verifying the public key's proof-of-possession (PoP) via `ProofOfPossession::verify`,
     /// which implicitly group checks the public key.

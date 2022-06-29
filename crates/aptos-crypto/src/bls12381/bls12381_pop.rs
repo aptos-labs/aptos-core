@@ -1,11 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module provides APIs for proofs-of-possesion (PoPs) used in BLS multi-signatures
-//! implemented on top of BLS12-381 elliptic curves (https://github.com/supranational/blst).
+//! This module provides APIs for _proofs-of-possesion (PoPs)_ used to prevent _rogue-key attacks_,
+//! both for multisignatures and aggregate signatures.
 //!
-//! PoPs were first introduced by Ristenpart and Yilek [^RY07].
+//! Rogue-key attacks were first introduced by Micali, Ohta and Reyzin [^MOR01] and PoPs were first
+//! introduced by Ristenpart and Yilek [^RY07].
 //!
+//! [^MOR01]: Accountable-Subgroup Multisignatures: Extended Abstract; by Micali, Silvio and Ohta, Kazuo and Reyzin, Leonid; in Proceedings of the 8th ACM Conference on Computer and Communications Security; 2001;
 //! [^RY07]: The Power of Proofs-of-Possession: Securing Multiparty Signatures against Rogue-Key Attacks; by Ristenpart, Thomas and Yilek, Scott; in Advances in Cryptology - EUROCRYPT 2007; 2007
 
 use crate::{
@@ -39,14 +41,15 @@ impl ProofOfPossession {
     }
 
     /// Group-check the PoP (i.e., verifies the PoP is a valid group element).
-    /// WARNING: This function is called implicitly in `verify`, so this function need not be called
+    ///
+    /// WARNING: Group-checking is done implicitly in `verify` below, so this function need not be called
     /// separately for most use-cases, as it incurs a performance penalty. We leave it here just in case.
     pub fn group_check(&self) -> Result<()> {
         self.pop.validate(true).map_err(|e| anyhow!("{:?}", e))
     }
 
     /// Verifies the proof-of-possesion (PoP) of the private key corresponding to the specified
-    /// BLS12-381 public key. Implicitly, group checks the PoP and the specified public key, so
+    /// BLS public key. Implicitly, group checks the PoP and the specified public key, so
     /// the caller is not responsible for doing it manually.
     pub fn verify(&self, pk: &PublicKey) -> Result<()> {
         // CRYPTONOTE(Alin): We call the signature verification function with pk_validate set to true
@@ -70,7 +73,7 @@ impl ProofOfPossession {
         }
     }
 
-    /// Creates a proof-of-possesion (PoP) of the specified BLS12-381 private key. This function
+    /// Creates a proof-of-possesion (PoP) of the specified BLS private key. This function
     /// inefficiently recomputes the public key from the private key. To avoid this, the caller can
     /// use `create_with_pubkey` instead, which accepts the public key as a second input.
     pub fn create(sk: &PrivateKey) -> ProofOfPossession {
@@ -82,9 +85,10 @@ impl ProofOfPossession {
         ProofOfPossession::create_with_pubkey(sk, &pk)
     }
 
-    /// Creates a proof-of-possesion (PoP) of the specified BLS12-381 private key. Takes the
+    /// Creates a proof-of-possesion (PoP) of the specified BLS private key. Takes the
     /// corresponding public key as input, to avoid inefficiently recomputing it from the
     /// private key.
+    ///
     /// WARNING: Does not group-check the PK, since this function will be typically called on
     /// a freshly-generated key-pair or on a correctly-deserialized keypair.
     pub fn create_with_pubkey(sk: &PrivateKey, pk: &PublicKey) -> ProofOfPossession {
@@ -117,6 +121,7 @@ impl TryFrom<&[u8]> for ProofOfPossession {
     type Error = CryptoMaterialError;
 
     /// Deserializes a BLS PoP from a sequence of bytes.
+    ///
     /// WARNING: Does NOT group-check the PoP! This is done implicitly when verifying the PoP in
     /// `ProofOfPossession::verify`
     fn try_from(bytes: &[u8]) -> std::result::Result<ProofOfPossession, CryptoMaterialError> {
