@@ -1272,6 +1272,8 @@ dependencies = [
 name = "aptos-workspace-hack"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "backtrace",
  "byteorder",
  "bytes",
  "cc",
@@ -2799,7 +2801,7 @@ dependencies = [
  "diesel_derives",
  "num-bigint 0.2.6",
  "num-integer",
- "num-traits 0.1.43",
+ "num-traits 0.2.15",
  "pq-sys",
  "r2d2",
  "serde_json",
@@ -8925,22 +8927,17 @@ name = "transaction-emitter"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "aptos",
- "aptos-config",
- "aptos-crypto",
  "aptos-logger",
- "aptos-rest-client",
  "aptos-sdk",
- "aptos-transaction-builder",
  "aptos-workspace-hack",
+ "clap 3.1.18",
  "futures",
  "itertools",
  "rand 0.7.3",
  "rand_core 0.5.1",
- "reqwest",
- "structopt",
  "termion",
  "tokio",
+ "transaction-emitter-lib",
 ]
 
 [[package]]

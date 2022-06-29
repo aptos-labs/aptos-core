@@ -23,7 +23,7 @@ use rand::{
 use rand_core::SeedableRng;
 use std::{
     cmp::{max, min},
-    collections::HashMap,
+    collections::HashSet,
     fmt,
     num::NonZeroU64,
     path::Path,
@@ -58,7 +58,7 @@ pub struct EmitThreadParams {
     pub wait_millis: u64,
     pub wait_committed: bool,
     pub txn_expiration_time_secs: u64,
-    pub check_stats_at_end: bool,
+    pub do_not_check_stats_at_end: bool,
 }
 
 impl Default for EmitThreadParams {
@@ -67,7 +67,7 @@ impl Default for EmitThreadParams {
             wait_millis: 0,
             wait_committed: true,
             txn_expiration_time_secs: 30,
-            check_stats_at_end: false,
+            do_not_check_stats_at_end: false,
         }
     }
 }
@@ -80,7 +80,6 @@ pub struct EmitJobRequest {
     thread_params: EmitThreadParams,
     gas_price: u64,
     invalid_transaction_ratio: usize,
-    max_tps: u64,
     vasp: bool,
 }
 
@@ -93,7 +92,6 @@ impl Default for EmitJobRequest {
             thread_params: EmitThreadParams::default(),
             gas_price: 0,
             invalid_transaction_ratio: 0,
-            max_tps: 100000,
             vasp: false,
         }
     }
@@ -134,11 +132,6 @@ impl EmitJobRequest {
         self
     }
 
-    pub fn max_tps(mut self, max_tps: u64) -> Self {
-        self.max_tps = max_tps;
-        self
-    }
-
     pub fn fixed_tps(self, target_tps: NonZeroU64) -> Self {
         let clients_count = self.rest_clients.len() as u64;
         let num_workers = target_tps.get() / clients_count + 1;
@@ -149,7 +142,7 @@ impl EmitJobRequest {
                 wait_millis: wait_time,
                 wait_committed: true,
                 txn_expiration_time_secs: 30,
-                check_stats_at_end: false,
+                do_not_check_stats_at_end: false,
             })
             .accounts_per_client(1)
     }
@@ -208,31 +201,37 @@ struct SubmissionWorker {
     stats: Arc<StatsAccumulator>,
     txn_factory: TransactionFactory,
     invalid_transaction_ratio: usize,
-    max_tps: u64,
     rng: ::rand::rngs::StdRng,
 }
 
+// Note, there is an edge case that can occur if the transaction emitter
+// bursts the target node too fast, and the emitter doesn't handle it
+// very well, instead waiting up until the timeout for the target seqnum
+// to progress, even though it never will. See more here:
+// https://github.com/aptos-labs/aptos-core/issues/1565
 impl SubmissionWorker {
     #[allow(clippy::collapsible_if)]
     async fn run(mut self, gas_price: u64) -> Vec<LocalAccount> {
+        let check_stats_at_end =
+            !self.params.wait_committed && !self.params.do_not_check_stats_at_end;
+        let wait_for_accounts_sequence_timeout = Duration::from_secs(min(
+            self.params.txn_expiration_time_secs,
+            TXN_EXPIRATION_SECONDS,
+        ));
+
         let wait_duration = Duration::from_millis(self.params.wait_millis);
-        let total_start_time = Instant::now();
+
+        let start_time = Instant::now();
         let mut total_num_requests = 0;
-        let mut second_start = Instant::now();
-        let mut submitted_this_second = 0;
+
         while !self.stop.load(Ordering::Relaxed) {
             let requests = self.gen_requests(gas_price);
             let num_requests = requests.len();
-            // TODO: Consider doing this and related tracking only on transaction submit success.
             total_num_requests += num_requests;
             let loop_start_time = Instant::now();
             let wait_until = loop_start_time + wait_duration;
             let mut txn_offset_time = 0u64;
             for request in requests {
-                if Instant::now().duration_since(second_start) >= Duration::from_secs(1) {
-                    second_start = Instant::now();
-                    submitted_this_second = 0;
-                }
                 let cur_time = Instant::now();
                 txn_offset_time += (cur_time - loop_start_time).as_millis() as u64;
                 self.stats.submitted.fetch_add(1, Ordering::Relaxed);
@@ -240,79 +239,107 @@ impl SubmissionWorker {
                 if let Err(e) = resp {
                     warn!("[{:?}] Failed to submit request: {:?}", self.client, e);
                 }
-                submitted_this_second += 1;
-                if submitted_this_second >= self.max_tps {
-                    debug!(
-                        "Hit TPS limit of {} (per worker), sleeping until next second",
-                        self.max_tps
-                    );
-                    time::sleep_until(tokio::time::Instant::from(
-                        second_start + Duration::from_secs(1),
-                    ))
-                    .await;
-                }
             }
             if self.params.wait_committed {
-                self.update_stats(loop_start_time, txn_offset_time, num_requests)
-                    .await
+                self.update_stats(
+                    loop_start_time,
+                    txn_offset_time,
+                    num_requests,
+                    false,
+                    wait_for_accounts_sequence_timeout,
+                )
+                .await
             }
             let now = Instant::now();
             if wait_until > now {
                 time::sleep(wait_until - now).await;
             }
         }
-        if self.params.check_stats_at_end {
+
+        // If this was a burst mode run and the user didn't specifically opt
+        // out of it, update the stats for the whole run.
+        if check_stats_at_end {
             debug!("Checking stats for final time at the end");
-            self.update_stats(total_start_time, 0, total_num_requests)
-                .await
+            self.update_stats(
+                start_time,
+                0,
+                total_num_requests,
+                true,
+                Duration::from_millis(500),
+            )
+            .await
         }
+
         self.accounts
     }
 
+    /// This function assumes that num_requests == num_accounts, which is
+    /// precisely how gen_requests works. If this changes, this code will
+    /// need to be fixed.
+    ///
+    /// Note, the latency values are not accurate if --check-stats-at-end
+    /// is used. There is no easy way around this accurately. As such, we
+    /// don't update latency at all if that flag is set.
     async fn update_stats(
         &mut self,
         start_time: Instant,
         txn_offset_time: u64,
         num_requests: usize,
+        skip_latency_stats: bool,
+        wait_for_accounts_sequence_timeout: Duration,
     ) {
-        let num_committed = match wait_for_accounts_sequence(
+        match wait_for_accounts_sequence(
             &self.client,
             &mut self.accounts,
-            self.params.txn_expiration_time_secs,
-            self.params.check_stats_at_end,
+            wait_for_accounts_sequence_timeout,
         )
         .await
         {
-            Ok(()) => num_requests as u64,
-            Err(committed_txn_info) => {
-                let num_committed = committed_txn_info
-                    .values()
-                    .map(|info| info.actual_sequence_number)
-                    .sum();
-                let num_uncommitted = committed_txn_info
-                    .values()
-                    .map(|info| info.uncommitted())
-                    .sum();
+            Ok(()) => {
+                let latency = (Instant::now() - start_time).as_millis() as u64
+                    - txn_offset_time / num_requests as u64;
+                self.stats
+                    .committed
+                    .fetch_add(num_requests as u64, Ordering::Relaxed);
+                if !skip_latency_stats {
+                    self.stats
+                        .latency
+                        .fetch_add(latency * num_requests as u64, Ordering::Relaxed);
+                    self.stats
+                        .latencies
+                        .record_data_point(latency, num_requests as u64);
+                }
+            }
+            Err(uncommitted) => {
+                let num_uncommitted = uncommitted.len() as u64;
+                let num_committed = num_requests as u64 - num_uncommitted;
+                // To avoid negative result caused by uncommitted tx occur
+                // Simplified from:
+                // end_time * num_committed - (txn_offset_time/num_requests) * num_committed
+                // to
+                // (end_time - txn_offset_time / num_requests) * num_committed
+                let latency = (Instant::now() - start_time).as_millis() as u64
+                    - txn_offset_time / num_requests as u64;
+                let committed_latency = latency * num_committed as u64;
+                self.stats
+                    .committed
+                    .fetch_add(num_committed, Ordering::Relaxed);
                 self.stats
                     .expired
                     .fetch_add(num_uncommitted, Ordering::Relaxed);
+                if !skip_latency_stats {
+                    self.stats
+                        .latency
+                        .fetch_add(committed_latency, Ordering::Relaxed);
+                    self.stats
+                        .latencies
+                        .record_data_point(latency, num_committed);
+                }
                 info!(
                     "[{:?}] Transactions were not committed before expiration: {:?}",
-                    self.client, committed_txn_info
+                    self.client, uncommitted
                 );
-                num_committed
             }
-        };
-        self.stats
-            .committed
-            .fetch_add(num_committed, Ordering::Relaxed);
-        // We don't divide this by num_committed since TxnStats.rate does that later down the line.
-        let latency = (Instant::now() - start_time).as_millis() as u64 - txn_offset_time;
-        self.stats.latency.fetch_add(latency, Ordering::Relaxed);
-        if !self.params.check_stats_at_end {
-            self.stats
-                .latencies
-                .record_data_point(latency, num_requests as u64);
         }
     }
 
@@ -635,7 +662,6 @@ impl<'t> TxnEmitter<'t> {
                     stats,
                     txn_factory: self.txn_factory.clone(),
                     invalid_transaction_ratio: req.invalid_transaction_ratio,
-                    max_tps: req.max_tps / workers_per_endpoint as u64,
                     rng: self.from_rng(),
                 };
                 let join_handle = tokio_handle.spawn(worker.run(req.gas_price).boxed());
@@ -762,18 +788,6 @@ pub async fn execute_and_wait_transactions(
     Ok(())
 }
 
-#[derive(Debug)]
-struct CommittedTxnInfo {
-    pub expected_sequence_number: u64,
-    pub actual_sequence_number: u64, // AKA committed.
-}
-
-impl CommittedTxnInfo {
-    pub fn uncommitted(&self) -> u64 {
-        self.expected_sequence_number - self.actual_sequence_number
-    }
-}
-
 /// This function waits for the submitted transactions to be committed, up to
 /// a deadline. If some accounts still have uncommitted transactions when we
 /// hit the deadline, we return a map of account to the info about the number
@@ -789,45 +803,22 @@ impl CommittedTxnInfo {
 async fn wait_for_accounts_sequence(
     client: &RestClient,
     accounts: &mut [LocalAccount],
-    txn_expiration_time_secs: u64,
-    check_for_stats_at_end: bool,
-) -> Result<(), HashMap<AccountAddress, CommittedTxnInfo>> {
-    let wait = match check_for_stats_at_end {
-        // If we're checking for stats at the end of burst mode, we don't want
-        // to give the node any more time than necessary to process additional
-        // transactions. This helps gives us a more accurate reading.
-        true => Duration::from_millis(500),
-        // TXN_EXPIRATION_SECONDS == TXN_MAX_WAIT
-        false => Duration::from_secs(min(txn_expiration_time_secs, TXN_EXPIRATION_SECONDS)),
-    };
-    let deadline = Instant::now() + wait;
+    wait_timeout: Duration,
+) -> Result<(), HashSet<AccountAddress>> {
+    let deadline = Instant::now() + wait_timeout;
     let addresses: Vec<_> = accounts.iter().map(|d| d.address()).collect();
-    let mut committed_txn_info = HashMap::new();
-    for account in accounts.iter() {
-        committed_txn_info.insert(
-            account.address(),
-            CommittedTxnInfo {
-                expected_sequence_number: account.sequence_number(),
-                actual_sequence_number: 0,
-            },
-        );
-    }
+    let mut uncommitted = addresses.clone().into_iter().collect::<HashSet<_>>();
 
     while Instant::now() <= deadline {
         match query_sequence_numbers(client, &addresses).await {
             Ok(sequence_numbers) => {
                 for (account, sequence_number) in zip(accounts.iter(), &sequence_numbers) {
                     if account.sequence_number() == *sequence_number {
-                        committed_txn_info.remove(&account.address());
-                    } else {
-                        committed_txn_info
-                            .get_mut(&account.address())
-                            .unwrap()
-                            .actual_sequence_number = *sequence_number;
+                        uncommitted.remove(&account.address());
                     }
                 }
 
-                if committed_txn_info.is_empty() {
+                if uncommitted.is_empty() {
                     return Ok(());
                 }
             }
@@ -842,7 +833,7 @@ async fn wait_for_accounts_sequence(
         time::sleep(Duration::from_millis(250)).await;
     }
 
-    Err(committed_txn_info)
+    Err(uncommitted)
 }
 
 pub async fn query_sequence_numbers(
