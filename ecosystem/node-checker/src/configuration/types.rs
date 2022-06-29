@@ -3,7 +3,7 @@
 
 use crate::{
     evaluators::{
-        direct::{get_node_identity, NodeIdentityEvaluatorArgs},
+        direct::{get_node_identity, NodeIdentityEvaluatorArgs, TpsEvaluatorArgs},
         metrics::{ConsensusProposalsEvaluatorArgs, StateSyncVersionEvaluatorArgs},
         system_information::SystemInformationBuildVersionEvaluatorArgs,
     },
@@ -133,6 +133,10 @@ pub struct EvaluatorArgs {
 
     #[clap(flatten)]
     pub system_information_build_version_args: SystemInformationBuildVersionEvaluatorArgs,
+
+    #[clap(flatten)]
+    #[oai(skip)]
+    pub tps_args: TpsEvaluatorArgs,
 }
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]

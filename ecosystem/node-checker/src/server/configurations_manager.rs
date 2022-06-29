@@ -52,7 +52,7 @@ fn build_node_configuration_wrapper_with_blocking_runner(
     .context("Failed to build evaluators")?;
 
     let node_identity_evaluator =
-        NodeIdentityEvaluator::from_evaluator_args(&node_configuration.evaluator_args);
+        NodeIdentityEvaluator::from_evaluator_args(&node_configuration.evaluator_args)?;
 
     let runner = BlockingRunner::new(
         node_configuration.runner_args.blocking_runner_args.clone(),

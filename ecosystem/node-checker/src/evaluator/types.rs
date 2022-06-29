@@ -42,9 +42,12 @@ impl From<Vec<EvaluationResult>> for EvaluationSummary {
     fn from(evaluation_results: Vec<EvaluationResult>) -> Self {
         let summary_score = match evaluation_results.len() {
             0 => 0,
-            _ => {
-                evaluation_results.iter().map(|e| e.score).sum::<u8>()
-                    / evaluation_results.len() as u8
+            len => {
+                (evaluation_results
+                    .iter()
+                    .map(|e| e.score as u32)
+                    .sum::<u32>()
+                    / len as u32) as u8
             }
         };
         let summary_explanation = match summary_score {
