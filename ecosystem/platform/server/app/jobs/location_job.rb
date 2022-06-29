@@ -13,21 +13,20 @@ class LocationJob < ApplicationJob
     sentry_scope.set_context(:job_info, { validator_address: it2_profile.validator_address })
 
     # pass zeroes as a hack here: we only need the validator address
-    node_verifier = NodeHelper::NodeVerifier.new(it2_profile.validator_address, 0, 0)
+    ip_resolver = NodeHelper::IPResolver.new(it2_profile.validator_address)
 
-    unless node_verifier.ip.ok
+    unless ip_resolver.ip.ok
       raise LocationFetchError,
-            "Error fetching IP for #{it2_profile.validator_address}: #{node_verifier.ip.message}"
+            "Error fetching IP for #{it2_profile.validator_address}: #{ip_resolver.ip.message}"
     end
 
-    new_ip = node_verifier.ip.ip.to_s
+    new_ip = ip_resolver.ip.ip.to_s
     if new_ip != it2_profile.validator_ip
       Rails.logger.warn "IP does not match one in profile for it2_profile ##{it2_profile.id} - " \
                         "#{it2_profile.validator_address}: was #{it2_profile.validator_ip}, got #{new_ip}"
     end
 
-    location_res = node_verifier.location
-
+    location_res = ip_resolver.location
     unless location_res.ok
       # TODO: DO SOMETHING (SENTRY? THROW?) IF THIS IS NOT OK
       raise LocationFetchError, "Error fetching location for '#{it2_profile.validator_ip}': #{location_res.message}"
