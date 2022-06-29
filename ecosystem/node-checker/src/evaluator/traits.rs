@@ -46,7 +46,7 @@ pub trait Evaluator: Debug + Sync + Send {
 
     /// We require this function to ensure we can build all evaluators
     /// from the top level evaluator args.
-    fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Self
+    fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> anyhow::Result<Self>
     where
         Self: Sized;
 }

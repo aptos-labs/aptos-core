@@ -140,8 +140,10 @@ impl Evaluator for SystemInformationBuildVersionEvaluator {
         format!("{}_build_commit_hash", CATEGORY)
     }
 
-    fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Self {
-        Self::new(evaluator_args.system_information_build_version_args.clone())
+    fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {
+        Ok(Self::new(
+            evaluator_args.system_information_build_version_args.clone(),
+        ))
     }
 }
 

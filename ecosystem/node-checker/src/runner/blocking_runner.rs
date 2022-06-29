@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::Duration;
-
 use super::{Runner, RunnerError};
 use crate::{
     configuration::NodeAddress,
@@ -23,6 +21,7 @@ use log::debug;
 use poem_openapi::Object as PoemObject;
 use prometheus_parse::Scrape as PrometheusScrape;
 use serde::{Deserialize, Serialize};
+use tokio::time::{Duration, Instant};
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
 pub struct BlockingRunnerArgs {
@@ -132,7 +131,39 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
         let first_baseline_metrics = self.parse_response(first_baseline_metrics)?;
         let first_target_metrics = self.parse_response(first_target_metrics)?;
 
-        tokio::time::sleep(Duration::from_secs(self.args.metrics_fetch_delay_secs)).await;
+        let mut evaluation_results = node_identity_evaluations;
+
+        // If the TPS evaluator was specified, run it here because it takes time
+        // to run. This is a bit messy right now, since the TPS evaluator, if
+        // configured differently, could theoretically run longer than the
+        // metrics_fetch_delay. TODO: Change it to metrics_fetch_delay_minimum
+        // and make each evaluator handle the fact that the delay could be longer.
+        // If the specific amount of time matters to a future evaluator, pass it
+        // in to that evaluator and it can slice up the delta as necessary.
+
+        // TODO: We could also get some slight speed wins if we awaited this
+        // evaluator and all the metric collection futures together.
+
+        let metrics_fetch_delay_time =
+            Instant::now() + Duration::from_secs(self.args.metrics_fetch_delay_secs);
+
+        let tps_evaluator = self.evaluators.iter().find_map(|e| match e {
+            EvaluatorType::Tps(evaluator) => Some(evaluator),
+            _ => None,
+        });
+
+        if let Some(tps_evaluator) = tps_evaluator {
+            debug!("Starting TPS evaluator");
+            evaluation_results.append(
+                &mut tps_evaluator
+                    .evaluate(&direct_evaluator_input)
+                    .await
+                    .map_err(RunnerError::TpsEvaluatorError)?,
+            );
+            debug!("TPS evaluator done");
+        }
+
+        tokio::time::sleep_until(metrics_fetch_delay_time).await;
 
         debug!("Collecting second round of baseline metrics");
         let second_baseline_metrics =
@@ -143,8 +174,6 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
 
         let second_baseline_metrics = self.parse_response(second_baseline_metrics)?;
         let second_target_metrics = self.parse_response(second_target_metrics)?;
-
-        let mut evaluation_results = node_identity_evaluations;
 
         let metrics_evaluator_input = MetricsEvaluatorInput {
             previous_baseline_metrics: first_baseline_metrics,
@@ -168,6 +197,8 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
                     .evaluate(&system_information_evaluator_input)
                     .await
                     .map_err(RunnerError::SystemInformationEvaluatorError)?,
+                // The TPS evaluator has already been used above.
+                EvaluatorType::Tps(_) => vec![],
             };
             evaluation_results.append(&mut local_evaluation_results);
         }

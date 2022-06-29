@@ -36,6 +36,7 @@ aptos-metrics = { path = "../../crates/aptos-metrics" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+transaction-emitter-lib = { path = "../../crates/transaction-emitter-lib", features = ["serde_derive_args"] }
 
 [[bin]]
 name = "aptos-node-checker"

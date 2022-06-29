@@ -820,6 +820,7 @@ dependencies = [
  "serde_yaml",
  "thiserror",
  "tokio",
+ "transaction-emitter-lib",
  "url",
 ]
 
@@ -8963,6 +8964,7 @@ dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
  "reqwest",
+ "serde 1.0.137",
  "termion",
  "tokio",
  "url",
