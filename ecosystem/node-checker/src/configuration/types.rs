@@ -104,7 +104,7 @@ pub struct EvaluatorArgs {
     pub consensus_proposals_args: ConsensusProposalsEvaluatorArgs,
 
     #[clap(flatten)]
-    pub state_sync_evaluator_args: StateSyncVersionEvaluatorArgs,
+    pub state_sync_version_args: StateSyncVersionEvaluatorArgs,
 
     #[clap(flatten)]
     pub system_information_build_version_args: SystemInformationBuildVersionEvaluatorArgs,
