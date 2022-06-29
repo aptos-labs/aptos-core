@@ -17,4 +17,6 @@ class StaticPageController < ApplicationController
   def terms_testnet; end
 
   def privacy; end
+
+  def developers; end
 end
