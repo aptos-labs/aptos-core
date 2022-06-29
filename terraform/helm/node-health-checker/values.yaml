@@ -1,0 +1,37 @@
+rust_log: info
+
+image:
+  repo: aptoslabs/node-health-checker
+  tag: latest
+  pullPolicy: IfNotPresent
+
+resources:
+  limits:
+    cpu: 4
+    memory: 8Gi
+  requests:
+    cpu: 4
+    memory: 8Gi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+service:
+  # Change this to LoadBalancer to expose the REST API, aptosnet endpoint externally
+  # Change this to ClusterIP to do the opposite.
+  type: LoadBalancer
+  externalTrafficPolicy:
+  loadBalancerSourceRanges: []
+  annotations: {}
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
+  annotations: {}
+
+# TODO: Consider having a configs allowlist + denylist here that curates the list
+# of configs that ultimately get passed to NHC.

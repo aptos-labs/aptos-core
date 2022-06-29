@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "aptos-node-health-checker.fullname" . }}
+  labels:
+    {{- include "aptos-node-health-checker.labels" . | nindent 4 }}
+    app.kubernetes.io/name: node_health_checker
+spec:
+  serviceName: {{ include "aptos-node-health-checker.fullname" . }}
+  replicas: 1  # TODO: Should this be configurable via values, or does that not make sense?
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "aptos-node-health-checker.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: node-health-checker
+  template:
+    metadata:
+      labels:
+        {{- include "aptos-node-health-checker.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: node-health-checker
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: runtime/default
+    spec:
+      terminationGracePeriodSeconds: 0  # TODO: Should this be higher?
+      containers:
+      - name: node_health_checker
+        image: {{ .Values.image.repo }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        # TODO: Fix this glob, I just want it to list out the different configs.
+        command: ["/opt/aptos/bin/aptos-node-health-checker", "--baseline-node-config-paths", {{ .Files.Glob "configs/*.yaml" }}]
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        env:
+        - name: RUST_LOG
+          value: {{ .Values.rust_log }}
+        - name: RUST_LOG_REMOTE
+          value: {{ .Values.rust_log_remote }}
+        - name: RUST_BACKTRACE
+          value: "0"
+        volumeMounts:
+        - name: configurations
+          mountPath: /opt/nhc/configurations
+        ports:
+        - containerPort: 80
+        livenessProbe:
+          tcpSocket:
+            port: 80
+          initialDelaySeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: 80
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 80
+        runAsGroup: 80
+        fsGroup: 80
+      volumes:
+      - name: configurations
+        configMap:
+          name: {{ include "aptos-node-health-checker.fullname" . }}
+      serviceAccountName: {{ include "aptos-node-health-checker.serviceAccountName" . }}

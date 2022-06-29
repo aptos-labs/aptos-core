@@ -1,0 +1,5 @@
+# TODO: Should this be apiVersion v3? What about appVersion?
+apiVersion: v2
+name: aptos-node-health-checker
+appVersion: 0.1.1
+version: 0.1.1

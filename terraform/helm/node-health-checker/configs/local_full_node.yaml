@@ -1,0 +1,26 @@
+# Generated using this command:
+#   nhc configuration create --configuration-name local_fullnode --configuration-name-pretty "Local FullNode" --url http://localhost --evaluators state_sync_version,system_information_build_commit_hash
+# From this commit hash:
+#   7b8c711
+
+---
+node_address:
+  url: "http://localhost/"
+  metrics_port: 9101
+  api_port: 8080
+  noise_port: 6180
+configuration_name: local_testnet
+configuration_name_pretty: Local Testnet
+chain_id: ~
+role_type: ~
+evaluators:
+  - state_sync_version
+  - system_information_build_commit_hash
+evaluator_args:
+  state_sync_version_args:
+    version_delta_tolerance: 5000
+  system_information_build_version_args: {}
+runner_args:
+  blocking_runner_args:
+    metrics_fetch_delay_secs: 5
+
