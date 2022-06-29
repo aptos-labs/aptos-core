@@ -1,3 +1,0 @@
-bucket = "terraform.aptos"
-key    = "state/k8s-testnet"
-region = "us-west-2"
