@@ -40,6 +40,8 @@ pub enum ApiError {
     HistoricBalancesUnsupported,
     #[error("node is offline")]
     NodeIsOffline,
+    #[error("block incomplete")]
+    BlockIncomplete,
 }
 
 impl ApiError {
@@ -60,6 +62,7 @@ impl ApiError {
             BadSignatureCount,
             HistoricBalancesUnsupported,
             NodeIsOffline,
+            BlockIncomplete,
         ]
     }
 
@@ -80,17 +83,19 @@ impl ApiError {
             BadSignatureCount => 160,
             HistoricBalancesUnsupported => 170,
             NodeIsOffline => 180,
+            BlockIncomplete => 181,
         }
     }
 
     pub fn retriable(&self) -> bool {
-        matches!(self, ApiError::AccountNotFound)
+        matches!(self, ApiError::AccountNotFound | ApiError::BlockIncomplete)
     }
 
     pub fn status_code(&self) -> StatusCode {
         use ApiError::*;
         match self {
             AccountNotFound => StatusCode::NOT_FOUND,
+            BlockIncomplete => StatusCode::PRECONDITION_FAILED,
             _ => StatusCode::BAD_REQUEST,
         }
     }
