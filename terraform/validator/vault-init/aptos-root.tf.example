@@ -1,6 +1,0 @@
-resource "vault_transit_secret_backend_key" "aptos_root" {
-    backend    = var.transit_mount
-    name       = "${var.namespace}__aptos_root"
-    type       = "ed25519"
-    depends_on = [null_resource.mounts_created]
-}

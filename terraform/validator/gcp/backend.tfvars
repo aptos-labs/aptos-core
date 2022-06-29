@@ -1,2 +1,0 @@
-bucket = ""
-prefix = "state/validator"
