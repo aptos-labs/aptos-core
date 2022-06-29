@@ -15,7 +15,7 @@ Rails.application.routes.draw do
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   namespace :user do
-    root to: redirect('/it1') # creates user_root_path, where users go after confirming email
+    root to: redirect('/it2') # creates user_root_path, where users go after confirming email
   end
 
   # Settings
