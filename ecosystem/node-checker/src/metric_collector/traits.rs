@@ -33,7 +33,7 @@ pub enum MetricCollectorError {
 ///  - 'static is required because this will be stored on the todo which needs to be 'static
 #[async_trait]
 pub trait MetricCollector: Sync + Send + 'static {
-    /// Hit the metrics endpoint of the metrics port and return the repsonse as lines.
+    /// Hit the metrics endpoint of the metrics port and return the response as lines.
     async fn collect_metrics(&self) -> Result<Vec<String>, MetricCollectorError>;
 
     /// Hit the system_information endpoint of the metrics port and return the response
