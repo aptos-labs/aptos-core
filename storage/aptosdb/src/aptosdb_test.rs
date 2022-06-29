@@ -14,7 +14,7 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     proof::SparseMerkleLeafNode,
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{ExecutionStatus, TransactionInfo, PRE_GENESIS_VERSION},
+    transaction::{ExecutionStatus, TransactionInfo},
 };
 use proptest::prelude::*;
 use std::{sync::Arc, time::Duration};
@@ -122,19 +122,10 @@ fn test_get_latest_tree_state() {
     let empty = db.get_latest_tree_state().unwrap();
     assert_eq!(empty, TreeState::new_empty(),);
 
-    // unbootstrapped db with pre-genesis state
+    // bootstrapped db (any transaction info is in)
     let key = StateKey::Raw(String::from("test_key").into_bytes());
     let value = StateValue::from(String::from("test_val").into_bytes());
-
-    put_as_state_root(&db, PRE_GENESIS_VERSION, key.clone(), value.clone());
     let hash = SparseMerkleLeafNode::new(key.hash(), value.hash()).hash();
-    let pre_genesis = db.get_latest_tree_state().unwrap();
-    assert_eq!(
-        pre_genesis,
-        TreeState::new(0, vec![], hash, Some(PRE_GENESIS_VERSION))
-    );
-
-    // bootstrapped db (any transaction info is in)
     put_as_state_root(&db, 0, key, value);
     let txn_info = TransactionInfo::new(
         HashValue::random(),
