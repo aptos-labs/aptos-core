@@ -8,7 +8,8 @@ class HeaderComponent < ViewComponent::Base
   NAV_ITEMS = [
     NavItem.new('/it1', 'Validator Status', 'AIT1 Validator Status'),
     NavItem.new('https://aptos.dev/', 'Docs', 'Aptos Docs'),
-    NavItem.new('https://explorer.devnet.aptos.dev/', 'Explorer', 'Aptos Explorer')
+    NavItem.new('https://explorer.devnet.aptos.dev/', 'Explorer', 'Aptos Explorer'),
+    NavItem.new('/settings', 'Settings', 'Settings')
   ].freeze
 
   def initialize(**rest)
