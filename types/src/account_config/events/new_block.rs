@@ -7,7 +7,7 @@ use move_deps::move_core_types::{ident_str, identifier::IdentStr, move_resource:
 use serde::{Deserialize, Serialize};
 
 /// Struct that represents a NewBlockEvent.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NewBlockEvent {
     epoch: u64,
     round: u64,
@@ -18,12 +18,27 @@ pub struct NewBlockEvent {
 }
 
 impl NewBlockEvent {
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
     pub fn round(&self) -> u64 {
         self.round
     }
 
+    pub fn previous_block_votes(&self) -> &Vec<bool> {
+        &self.previous_block_votes
+    }
+
     pub fn proposer(&self) -> AccountAddress {
         self.proposer
+    }
+
+    /// The list of indices in the validators list,
+    /// of consecutive proposers from the immediately preceeding
+    /// rounds that didn't produce a successful block
+    pub fn failed_proposer_indices(&self) -> &Vec<u64> {
+        &self.failed_proposer_indices
     }
 
     pub fn proposed_time(&self) -> u64 {
