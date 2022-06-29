@@ -7,6 +7,7 @@ use crate::{
     RosettaContext,
 };
 use aptos_crypto::ValidCryptoMaterial;
+use aptos_logger::debug;
 use aptos_rest_client::{aptos::Balance, Account, Response, Transaction};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
@@ -26,7 +27,8 @@ pub fn check_network(
     server_context: &RosettaContext,
 ) -> ApiResult<()> {
     if network_identifier.blockchain == BLOCKCHAIN
-        || ChainId::from_str(network_identifier.network.trim())? == server_context.chain_id
+        || ChainId::from_str(network_identifier.network.trim()).map_err(|_| ApiError::BadNetwork)?
+            == server_context.chain_id
     {
         Ok(())
     } else {
@@ -60,16 +62,23 @@ where
     F: FnOnce(Req, RosettaContext) -> R + Clone + Copy + Send + 'static,
     R: Future<Output = Result<Resp, ApiError>> + Send,
     Req: Deserialize<'a> + Send + 'static,
-    Resp: Serialize,
+    Resp: std::fmt::Debug + Serialize,
 {
     move |request, options| {
         let fut = async move {
             match handler(request, options).await {
-                Ok(response) => Ok(warp::reply::with_status(
-                    warp::reply::json(&response),
-                    warp::http::StatusCode::OK,
-                )),
+                Ok(response) => {
+                    debug!(
+                        "Response: {}",
+                        serde_json::to_string_pretty(&response).unwrap()
+                    );
+                    Ok(warp::reply::with_status(
+                        warp::reply::json(&response),
+                        warp::http::StatusCode::OK,
+                    ))
+                }
                 Err(api_error) => {
+                    debug!("Error: {:?}", api_error);
                     let status = api_error.status_code();
                     Ok(warp::reply::with_status(
                         warp::reply::json(&api_error.into_error()),

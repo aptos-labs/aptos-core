@@ -67,7 +67,7 @@ impl From<&TransactionInfo> for BlockIdentifier {
     fn from(info: &TransactionInfo) -> Self {
         BlockIdentifier {
             index: info.version.0,
-            hash: info.hash.to_string(),
+            hash: info.accumulator_root_hash.to_string(),
         }
     }
 }

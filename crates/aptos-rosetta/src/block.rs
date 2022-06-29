@@ -35,7 +35,7 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
     trace!(
         request = ?request,
         server_context = ?server_context,
-        "block",
+        "/block",
     );
 
     check_network(request.network_identifier, &server_context)?;
@@ -109,8 +109,12 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
     let transactions = vec![transaction_info.into()];
 
     // note: timestamps are in microseconds, so we convert to milliseconds
-    let timestamp = transaction.timestamp() / 1000;
+    let mut timestamp = transaction.timestamp() / 1000;
 
+    // Rosetta doesn't like timestamps before 2000
+    if timestamp == 0 {
+        timestamp = 946713600000;
+    }
     let block = Block {
         block_identifier: transaction_info.into(),
         parent_block_identifier: parent_transaction.transaction_info()?.into(),

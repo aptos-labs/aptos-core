@@ -40,7 +40,7 @@ pub fn logger() -> Log<impl Fn(Info) + Copy> {
 }
 
 #[derive(Schema)]
-struct HttpRequestLog<'a> {
+pub struct HttpRequestLog<'a> {
     #[schema(display)]
     remote_addr: Option<std::net::SocketAddr>,
     method: String,

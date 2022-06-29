@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{types, types::ErrorDetails};
+use crate::types;
 use hex::FromHexError;
 use move_deps::move_core_types::account_address::AccountAddressParseError;
 use serde::{Deserialize, Serialize};
@@ -101,29 +101,12 @@ impl ApiError {
         parts[0].to_string()
     }
 
-    pub(crate) fn details(&self) -> ErrorDetails {
-        let error = format!("{:?}", self);
-        ErrorDetails { error }
-    }
-
     pub fn deserialization_failed(type_: &str) -> ApiError {
         ApiError::DeserializationFailed(type_.to_string())
     }
 
     pub fn into_error(self) -> types::Error {
-        self.into()
-    }
-}
-
-impl From<ApiError> for types::Error {
-    fn from(error: ApiError) -> Self {
-        types::Error {
-            message: error.message(),
-            code: error.code(),
-            retriable: error.retriable(),
-            details: Some(error.details()),
-            description: None,
-        }
+        (&self).into()
     }
 }
 
@@ -133,7 +116,7 @@ impl From<&ApiError> for types::Error {
             message: error.message(),
             code: error.code(),
             retriable: error.retriable(),
-            details: Some(error.details()),
+            details: None,
             description: None,
         }
     }
