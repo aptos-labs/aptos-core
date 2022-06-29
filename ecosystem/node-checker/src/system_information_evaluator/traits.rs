@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-#![allow(dead_code)]
-
 use crate::{evaluator::EvaluationResult, metric_collector::SystemInformation};
 use anyhow::Result;
 use thiserror::Error as ThisError;

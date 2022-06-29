@@ -1,6 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+// TODO: Sometimes build_commit_hash is an empty string (so far I've noticed
+// this happens when targeting a node running from a container). Figure out
+// what to do in this case.
+
 use super::{
     get_value, GetValueResult, SystemInformationEvaluator, SystemInformationEvaluatorError,
     EVALUATOR_SOURCE,
