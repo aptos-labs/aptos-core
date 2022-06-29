@@ -863,6 +863,9 @@ module AptosFramework::Stake {
     use AptosFramework::TestCoin;
 
     #[test_only]
+    const CONSENSUS_KEY_BYTES: vector<u8> = b"0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3";
+
+    #[test_only]
     const MAXIMUM_LOCK_UP_SECS: u64 = 1000;
 
     #[test(core_framework = @0x1, core_resources = @CoreResources, validator = @0x123)]
@@ -871,8 +874,6 @@ module AptosFramework::Stake {
         core_resources: signer,
         validator: signer,
     ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
-        use AptosFramework::TestCoin;
-
         Timestamp::set_time_has_started_for_testing(&core_resources);
 
         initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100);
@@ -916,8 +917,6 @@ module AptosFramework::Stake {
         core_resources: signer,
         validator: signer,
     ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
-        use AptosFramework::TestCoin;
-
         Timestamp::set_time_has_started_for_testing(&core_resources);
 
         initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100);
@@ -926,11 +925,11 @@ module AptosFramework::Stake {
         let stake = Coin::mint<TestCoin>(100, &mint_cap);
         store_test_coin_mint_cap(&core_resources, mint_cap);
 
-        register_validator_candidate(&validator, Vector::empty(), Vector::empty(), Vector::empty());
+        let pool_address = Signer::address_of(&validator);
+        register_validator_candidate(&validator, CONSENSUS_KEY_BYTES, Vector::empty(), Vector::empty());
         let owner_cap = extract_owner_cap(&validator);
 
         // Add stake when the validator is not yet activated.
-        let pool_address = Signer::address_of(&validator);
         add_stake_with_cap(pool_address, &owner_cap, stake);
         increase_lockup_with_cap(pool_address, &owner_cap, MAXIMUM_LOCK_UP_SECS);
         assert_validator_state(pool_address, 100, 0, 0, 0, 0);
@@ -968,8 +967,6 @@ module AptosFramework::Stake {
         validator_2: signer,
         validator_3: signer
     ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
-        use AptosFramework::TestCoin;
-
         Timestamp::set_time_has_started_for_testing(&core_resources);
         let validator_1_address = Signer::address_of(&validator_1);
         let validator_2_address = Signer::address_of(&validator_2);
@@ -1114,8 +1111,9 @@ module AptosFramework::Stake {
         mint_cap: &MintCapability<TestCoin>,
     ) acquires OwnerCapability, StakePool, StakePoolEvents, ValidatorConfig, ValidatorSet, ValidatorSetConfiguration {
         Coin::register<TestCoin>(account);
-        Coin::deposit<TestCoin>(Signer::address_of(account), Coin::mint<TestCoin>(1000, mint_cap));
-        register_validator_candidate(account, Vector::empty(), Vector::empty(), Vector::empty());
+        let address = Signer::address_of(account);
+        Coin::deposit<TestCoin>(address, Coin::mint<TestCoin>(1000, mint_cap));
+        register_validator_candidate(account, CONSENSUS_KEY_BYTES, Vector::empty(), Vector::empty());
         add_stake(account, 100);
         increase_lockup(account, Timestamp::now_seconds() + MAXIMUM_LOCK_UP_SECS);
         assert_validator_state(Signer::address_of(account), 100, 0, 0, 0, 0);
