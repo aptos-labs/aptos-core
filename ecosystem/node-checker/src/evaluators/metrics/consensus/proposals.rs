@@ -79,29 +79,23 @@ impl ConsensusProposalsEvaluator {
         latest_proposals_count: u64,
     ) -> EvaluationResult {
         if latest_proposals_count < previous_proposals_count {
-            EvaluationResult {
-                headline: "Proposals count went backwards!".to_string(),
-                score: 0,
-                explanation: "Successfully pulled metrics from target node twice, but the second time the proposals count went backwards!".to_string(),
-                source: CONSENSUS_EVALUATOR_SOURCE.to_string(),
-                links: vec![],
-            }
+            self.build_evaluation_result(
+                "Proposals count went backwards!".to_string(),
+                0,
+                "Successfully pulled metrics from target node twice, but the second time the proposals count went backwards!".to_string(),
+            )
         } else if latest_proposals_count == previous_proposals_count {
-            EvaluationResult {
-                headline: "Proposals count is not progressing".to_string(),
-                score: 50,
-                explanation: "Successfully pulled metrics from target node twice, but the proposal count isn't progressing.".to_string(),
-                source: CONSENSUS_EVALUATOR_SOURCE.to_string(),
-                links: vec![],
-            }
+            self.build_evaluation_result(
+                "Proposals count is not progressing".to_string(),
+                 50,
+                "Successfully pulled metrics from target node twice, but the proposal count isn't progressing.".to_string(),
+            )
         } else {
-            EvaluationResult {
-                headline: "Proposals count is increasing".to_string(),
-                score: 100,
-                explanation: "Successfully pulled metrics from target node twice and saw that proposals count is increasing".to_string(),
-                source: CONSENSUS_EVALUATOR_SOURCE.to_string(),
-                links: vec![],
-            }
+            self.build_evaluation_result(
+                 "Proposals count is increasing".to_string(),
+                 100,
+                 "Successfully pulled metrics from target node twice and saw that proposals count is increasing".to_string(),
+            )
         }
     }
 }
@@ -186,8 +180,7 @@ mod test {
             None => vec![],
         };
 
-        let evaluator =
-            ConsensusProposalsEvaluator::new(ConsensusProposalsEvaluatorArgs {});
+        let evaluator = ConsensusProposalsEvaluator::new(ConsensusProposalsEvaluatorArgs {});
 
         let input = MetricsEvaluatorInput {
             previous_baseline_metrics: parse_metrics(vec![]).unwrap(),
