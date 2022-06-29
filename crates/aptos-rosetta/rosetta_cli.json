@@ -1,0 +1,69 @@
+{
+    "network": {
+        "blockchain": "aptos",
+        "network": "TESTING"
+    },
+    "online_url": "http://192.168.1.126:8082",
+    "data_directory": "",
+    "http_timeout": 30,
+    "max_retries": 5,
+    "retry_elapsed_time": 0,
+    "max_online_connections": 500,
+    "max_sync_concurrency": 64,
+    "tip_delay": 120,
+    "max_reorg_depth": 100,
+    "log_configuration": false,
+    "compression_disabled": false,
+    "memory_limit_disabled": false,
+    "error_stack_trace_disabled": false,
+    "coin_supported": false,
+    "construction": {
+        "offline_url": "http://192.168.1.126:8083",
+        "max_offline_connections": 500,
+        "stale_depth": 100000,
+        "broadcast_limit": 5,
+        "ignore_broadcast_failures": false,
+        "clear_broadcasts": false,
+        "broadcast_behind_tip": false,
+        "block_broadcast_limit": 1,
+        "rebroadcast_all": false,
+        "constructor_dsl_file": "aptos.ros",
+        "status_port": 9090,
+        "end_conditions": {
+            "create_account": 10,
+            "transfer": 20
+        }
+    },
+    "data": {
+        "active_reconciliation_concurrency": 16,
+        "inactive_reconciliation_concurrency": 4,
+        "inactive_reconciliation_frequency": 250,
+        "log_blocks": false,
+        "log_transactions": false,
+        "log_balance_changes": false,
+        "log_reconciliations": false,
+        "ignore_reconciliation_error": false,
+        "historical_balance_disabled": true,
+        "exempt_accounts": "",
+        "bootstrap_balances": "",
+        "interesting_accounts": "",
+        "reconciliation_disabled": false,
+        "reconciliation_drain_disabled": false,
+        "inactive_discrepancy_search_disabled": false,
+        "balance_tracking_disabled": false,
+        "coin_tracking_disabled": false,
+        "status_port": 9090,
+        "results_output_file": "",
+        "pruning_disabled": false,
+        "initial_balance_fetch_disabled": false,
+        "end_conditions": {
+            "tip": true,
+            "reconciliation_coverage": {
+                "coverage": 0.95,
+                "from_tip": true,
+                "tip": true
+            }
+        }
+    },
+    "perf": null
+}

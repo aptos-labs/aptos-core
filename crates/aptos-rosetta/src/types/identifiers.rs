@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    block::version_to_block_index,
     common::{strip_hex_prefix, BLOCKCHAIN},
     error::{ApiError, ApiResult},
 };
@@ -63,40 +64,19 @@ pub struct BlockIdentifier {
     pub hash: String,
 }
 
-impl From<&TransactionInfo> for BlockIdentifier {
-    fn from(info: &TransactionInfo) -> Self {
+impl BlockIdentifier {
+    pub fn from_transaction_info(block_size: u64, info: &TransactionInfo) -> BlockIdentifier {
         BlockIdentifier {
-            index: info.version.0,
+            index: version_to_block_index(block_size, info.version.0),
             hash: info.accumulator_root_hash.to_string(),
         }
     }
-}
 
-impl TryFrom<Transaction> for BlockIdentifier {
-    type Error = ApiError;
-
-    fn try_from(txn: Transaction) -> Result<Self, Self::Error> {
+    pub fn from_transaction(block_size: u64, txn: &Transaction) -> ApiResult<BlockIdentifier> {
         let txn_info = txn
             .transaction_info()
             .map_err(|err| ApiError::AptosError(err.to_string()))?;
-        Ok(BlockIdentifier::from(txn_info))
-    }
-}
-
-impl TryFrom<&PartialBlockIdentifier> for BlockIdentifier {
-    type Error = ApiError;
-
-    fn try_from(block: &PartialBlockIdentifier) -> Result<Self, Self::Error> {
-        if block.index.is_none() || block.hash.is_none() {
-            return Err(ApiError::AptosError(
-                "Can't convert partial block identifier to block identifier".to_string(),
-            ));
-        }
-
-        Ok(BlockIdentifier {
-            index: block.index.unwrap(),
-            hash: block.hash.as_ref().unwrap().clone(),
-        })
+        Ok(Self::from_transaction_info(block_size, txn_info))
     }
 }
 
@@ -188,15 +168,6 @@ impl PartialBlockIdentifier {
     }
 }
 
-impl From<&BlockIdentifier> for PartialBlockIdentifier {
-    fn from(block: &BlockIdentifier) -> Self {
-        PartialBlockIdentifier {
-            index: Some(block.index),
-            hash: Some(block.hash.clone()),
-        }
-    }
-}
-
 /// Sub account identifier if there are sub accounts
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/SubAccountIdentifier.html)
@@ -224,7 +195,7 @@ pub struct TransactionIdentifier {
 impl From<&TransactionInfo> for TransactionIdentifier {
     fn from(txn: &TransactionInfo) -> Self {
         TransactionIdentifier {
-            hash: txn.hash.to_string(),
+            hash: txn.accumulator_root_hash.to_string(),
         }
     }
 }

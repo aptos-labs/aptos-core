@@ -42,6 +42,8 @@ pub struct RosettaContext {
     rest_client: Option<aptos_rest_client::Client>,
     /// ChainId of the chain to connect to
     pub chain_id: ChainId,
+
+    pub block_size: u64,
 }
 
 impl RosettaContext {
@@ -56,6 +58,7 @@ impl RosettaContext {
 
 /// Creates HTTP server (warp-based) for Rosetta
 pub fn bootstrap(
+    block_size: u64,
     chain_id: ChainId,
     api_config: ApiConfig,
     rest_client: Option<aptos_rest_client::Client>,
@@ -71,6 +74,7 @@ pub fn bootstrap(
 
     runtime.spawn(async move {
         let context = RosettaContext {
+            block_size,
             rest_client,
             chain_id,
         };
@@ -88,6 +92,7 @@ pub async fn bootstrap_async(
     let api = WebServer::from(api_config);
     let handle = tokio::spawn(async move {
         let context = RosettaContext {
+            block_size: 1000,
             rest_client,
             chain_id,
         };

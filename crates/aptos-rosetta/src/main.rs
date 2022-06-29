@@ -21,8 +21,13 @@ async fn main() {
     let args: CommandArgs = CommandArgs::parse();
 
     // Ensure runtime for Rosetta is up and running
-    let _runtime = bootstrap(args.chain_id(), args.api_config(), args.rest_client())
-        .expect("Should bootstrap");
+    let _runtime = bootstrap(
+        args.block_size(),
+        args.chain_id(),
+        args.api_config(),
+        args.rest_client(),
+    )
+    .expect("Should bootstrap");
 
     // Run until there is an interrupt
     let term = Arc::new(AtomicBool::new(false));
@@ -41,6 +46,8 @@ trait ServerArgs {
 
     /// Retrieve the chain id
     fn chain_id(&self) -> ChainId;
+
+    fn block_size(&self) -> u64;
 }
 
 /// Aptos Rosetta API Server
@@ -76,6 +83,13 @@ impl ServerArgs for CommandArgs {
             CommandArgs::Offline(args) => args.chain_id(),
         }
     }
+
+    fn block_size(&self) -> u64 {
+        match self {
+            CommandArgs::Online(args) => args.block_size(),
+            CommandArgs::Offline(args) => args.block_size(),
+        }
+    }
 }
 
 #[derive(Debug, Parser)]
@@ -95,6 +109,9 @@ pub struct OfflineArgs {
     /// ChainId to be used for the server e.g. TESTNET
     #[clap(long, default_value = "TESTING")]
     chain_id: ChainId,
+    /// Block size to emulate blocks
+    #[clap(long, default_value_t = 1000)]
+    block_size: u64,
 }
 
 impl ServerArgs for OfflineArgs {
@@ -114,6 +131,10 @@ impl ServerArgs for OfflineArgs {
 
     fn chain_id(&self) -> ChainId {
         self.chain_id
+    }
+
+    fn block_size(&self) -> u64 {
+        self.block_size
     }
 }
 
@@ -137,5 +158,9 @@ impl ServerArgs for OnlineArgs {
 
     fn chain_id(&self) -> ChainId {
         self.offline_args.chain_id
+    }
+
+    fn block_size(&self) -> u64 {
+        self.offline_args.block_size
     }
 }
