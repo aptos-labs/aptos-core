@@ -7,6 +7,7 @@ monitoring:
   fullKubernetesScrape: true
   useKubeStateMetrics: false
   prometheus:
+    deleteWal: false
     remote_write:
       enabled: false
       url:

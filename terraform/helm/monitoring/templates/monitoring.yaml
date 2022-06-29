@@ -182,9 +182,14 @@ spec:
       - name: prometheus
         image: {{ .prometheus.image.repo }}:{{ .prometheus.image.tag }}
         imagePullPolicy: {{ .prometheus.image.pullPolicy }}
-        args:
-        - "--web.enable-lifecycle"
-        - "--config.file=/etc/prometheus/prometheus.yml"
+        command:
+         - sh
+         - -c
+         - |
+           {{- if .prometheus.deleteWal }}
+           rm -r /prometheus/data/wal/*
+           {{- end }}
+           prometheus --web.enable-lifecycle --config.file=/etc/prometheus/prometheus.yml
         resources:
           {{- toYaml .prometheus.resources | nindent 10 }}
         ports:
