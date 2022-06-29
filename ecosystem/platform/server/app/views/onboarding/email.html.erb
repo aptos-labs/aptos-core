@@ -21,13 +21,13 @@
     <% if !current_user.email %>
       <div class="mb-6">
         <%= f.label :email, class: 'font-mono uppercase block mb-2' %>
-        <%= f.email_field :email, autofocus: true, autocomplete: 'email', spellcheck: false, required: true, value: current_user.unconfirmed_email || @oauth_email, class: 'md:w-96' %>
+        <%= f.email_field :email, placeholder: 'ENTER YOUR EMAIL ADDRESS', autofocus: true, autocomplete: 'email', spellcheck: false, required: true, value: current_user.unconfirmed_email || @oauth_email, class: 'md:w-96' %>
       </div>
     <% end %>
 
     <div class="mb-6">
       <%= f.label :username, class: 'font-mono uppercase block mb-2' %>
-      <%= f.text_field :username, autofocus: true, spellcheck: false, pattern: '[a-zA-Z0-9#]+', minlength: 3, maxlength: 20, value: current_user.username || @oauth_username, class: 'md:w-96' %>
+      <%= f.text_field :username, placeholder: 'CREATE YOUR USERNAME', autofocus: true, spellcheck: false, pattern: '[a-zA-Z0-9\-_]+', minlength: 3, maxlength: 20, value: current_user.username || @oauth_username, class: 'md:w-96' %>
     </div>
 
     <div class="mb-8">
