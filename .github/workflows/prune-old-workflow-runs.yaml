@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   prune:
+    if: github.repository == 'aptos-labs/aptos-core'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
