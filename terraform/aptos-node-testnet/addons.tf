@@ -167,6 +167,8 @@ resource "helm_release" "testnet-addons" {
       genesis = {
         era             = var.era
         username_prefix = local.aptos_node_helm_prefix
+        chain_id        = var.chain_id
+        numValidators   = var.num_validators
       }
       service = {
         domain   = local.domain
