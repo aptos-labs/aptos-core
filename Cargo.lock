@@ -797,9 +797,13 @@ name = "aptos-node-checker"
 version = "0.1.1"
 dependencies = [
  "anyhow",
+ "aptos-api",
+ "aptos-config",
+ "aptos-crypto",
  "aptos-logger",
  "aptos-metrics",
  "aptos-rest-client",
+ "aptos-sdk",
  "aptos-workspace-hack",
  "async-trait",
  "clap 3.1.18",

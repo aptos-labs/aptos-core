@@ -6,15 +6,21 @@ use async_trait::async_trait;
 use thiserror::Error as ThisError;
 
 use crate::{
+    configuration::NodeAddress,
     evaluator::EvaluationSummary,
     evaluators::{
-        metrics::MetricsEvaluatorError, system_information::SystemInformationEvaluatorError,
+        direct::NodeIdentityEvaluatorError, metrics::MetricsEvaluatorError,
+        system_information::SystemInformationEvaluatorError,
     },
     metric_collector::{MetricCollector, MetricCollectorError},
 };
 
 #[derive(Debug, ThisError)]
 pub enum RunnerError {
+    /// We failed to get the
+    #[error("Failed to check identity of node: {0}")]
+    NodeIdentityEvaluatorError(NodeIdentityEvaluatorError),
+
     /// We failed to collect metrics for some reason.
     #[error("Failed to collect metrics: {0}")]
     MetricCollectorError(MetricCollectorError),
@@ -50,6 +56,7 @@ pub enum RunnerError {
 pub trait Runner: Sync + Send + 'static {
     async fn run<M: MetricCollector>(
         &self,
-        target_collector: &M,
+        target_node_address: &NodeAddress,
+        target_metric_collector: &M,
     ) -> Result<EvaluationSummary, RunnerError>;
 }

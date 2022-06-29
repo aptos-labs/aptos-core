@@ -28,12 +28,12 @@ pub struct GenerateOpenapi {
 pub async fn generate_openapi(args: GenerateOpenapi) -> Result<()> {
     let configurations: HashMap<
         _,
-        NodeConfigurationWrapper<ReqwestMetricCollector, BlockingRunner<ReqwestMetricCollector>>,
+        NodeConfigurationWrapper<BlockingRunner<ReqwestMetricCollector>>,
     > = HashMap::new();
 
-    let api = Api {
+    let api: Api<ReqwestMetricCollector, _> = Api {
         configurations_manager: ConfigurationsManager { configurations },
-        target_metric_collector: None,
+        preconfigured_test_node: None,
         allow_preconfigured_test_node_only: false,
     };
 

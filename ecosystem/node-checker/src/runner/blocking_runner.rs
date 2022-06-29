@@ -5,13 +5,16 @@ use std::time::Duration;
 
 use super::{Runner, RunnerError};
 use crate::{
-    evaluator::EvaluationSummary,
+    configuration::NodeAddress,
+    evaluator::{EvaluationSummary, Evaluator},
     evaluators::{
+        direct::{DirectEvaluatorInput, NodeIdentityEvaluator},
         metrics::{parse_metrics, MetricsEvaluatorInput},
         system_information::SystemInformationEvaluatorInput,
         EvaluatorType,
     },
     metric_collector::MetricCollector,
+    server::NodeInformation,
 };
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -30,19 +33,25 @@ pub struct BlockingRunnerArgs {
 #[derive(Debug)]
 pub struct BlockingRunner<M: MetricCollector> {
     args: BlockingRunnerArgs,
+    baseline_node_information: NodeInformation,
     baseline_metric_collector: M,
+    node_identity_evaluator: NodeIdentityEvaluator,
     evaluators: Vec<EvaluatorType>,
 }
 
 impl<M: MetricCollector> BlockingRunner<M> {
     pub fn new(
         args: BlockingRunnerArgs,
+        baseline_node_information: NodeInformation,
         baseline_metric_collector: M,
+        node_identity_evaluator: NodeIdentityEvaluator,
         evaluators: Vec<EvaluatorType>,
     ) -> Self {
         Self {
             args,
+            baseline_node_information,
             baseline_metric_collector,
+            node_identity_evaluator,
             evaluators,
         }
     }
@@ -75,8 +84,26 @@ impl<M: MetricCollector> BlockingRunner<M> {
 impl<M: MetricCollector> Runner for BlockingRunner<M> {
     async fn run<T: MetricCollector>(
         &self,
-        target_collector: &T,
+        target_node_address: &NodeAddress,
+        target_metric_collector: &T,
     ) -> Result<EvaluationSummary, RunnerError> {
+        let direct_evaluator_input = DirectEvaluatorInput {
+            baseline_node_information: self.baseline_node_information.clone(),
+            target_node_address: target_node_address.clone(),
+        };
+
+        debug!("Confirming node identity matches");
+        let node_identity_evaluations = self
+            .node_identity_evaluator
+            .evaluate(&direct_evaluator_input)
+            .await
+            .map_err(RunnerError::NodeIdentityEvaluatorError)?;
+
+        // Exit early if the node identity evaluation returned a non-passing result.
+        if node_identity_evaluations[0].score != 100 {
+            return Ok(EvaluationSummary::from(node_identity_evaluations));
+        }
+
         debug!("Collecting system information from baseline node");
         let baseline_system_information = self
             .baseline_metric_collector
@@ -86,7 +113,7 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
         debug!("{:?}", baseline_system_information);
 
         debug!("Collecting system information from target node");
-        let target_system_information = target_collector
+        let target_system_information = target_metric_collector
             .collect_system_information()
             .await
             .map_err(RunnerError::MetricCollectorError)?;
@@ -100,7 +127,7 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
             .map_err(RunnerError::MetricCollectorError)?;
 
         debug!("Collecting first round of target metrics");
-        let first_target_metrics = Self::collect_metrics(target_collector).await?;
+        let first_target_metrics = Self::collect_metrics(target_metric_collector).await?;
 
         let first_baseline_metrics = self.parse_response(first_baseline_metrics)?;
         let first_target_metrics = self.parse_response(first_target_metrics)?;
@@ -112,12 +139,12 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
             Self::collect_metrics(&self.baseline_metric_collector).await?;
 
         debug!("Collecting second round of target metrics");
-        let second_target_metrics = Self::collect_metrics(target_collector).await?;
+        let second_target_metrics = Self::collect_metrics(target_metric_collector).await?;
 
         let second_baseline_metrics = self.parse_response(second_baseline_metrics)?;
         let second_target_metrics = self.parse_response(second_target_metrics)?;
 
-        let mut evaluation_results = Vec::new();
+        let mut evaluation_results = node_identity_evaluations;
 
         let metrics_evaluator_input = MetricsEvaluatorInput {
             previous_baseline_metrics: first_baseline_metrics,
