@@ -15,7 +15,8 @@
     "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts'",
     "fmt": "yarn _fmt --write",
     "fmt:check": "yarn _fmt --check",
-    "cov:clean": "rm -rf coverage"
+    "cov:clean": "rm -rf coverage",
+    "changelog": "standard-version --skip.bump --skip.commit --skip.tag"
   },
   "repository": {
     "type": "git",
@@ -42,6 +43,7 @@
     "eslint-plugin-import": "^2.25.4",
     "jest": "^27.5.1",
     "prettier": "^2.6.2",
+    "standard-version": "^9.5.0",
     "ts-jest": "^27.1.4",
     "ts-loader": "^9.2.8",
     "ts-node": "^10.7.0",
