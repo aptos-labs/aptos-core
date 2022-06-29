@@ -199,6 +199,10 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
                     .map_err(RunnerError::SystemInformationEvaluatorError)?,
                 // The TPS evaluator has already been used above.
                 EvaluatorType::Tps(_) => vec![],
+                EvaluatorType::Latency(evaluator) => evaluator
+                    .evaluate(&direct_evaluator_input)
+                    .await
+                    .map_err(RunnerError::LatencyEvaluatorError)?,
             };
             evaluation_results.append(&mut local_evaluation_results);
         }
