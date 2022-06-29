@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
-
 use std::{
     fmt::Debug,
     ops::Sub,
@@ -12,6 +10,7 @@ use std::{
 const DEFAULT_HISTOGRAM_CAPACITY: usize = 1024;
 const DEFAULT_HISTOGRAM_STEP_WIDTH: u64 = 50;
 
+#[derive(Debug)]
 pub struct AtomicHistogramAccumulator {
     capacity: usize,
     step_width: u64,
@@ -117,7 +116,7 @@ impl AtomicHistogramSnapshot {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::TxnStats;
+    use crate::emit::TxnStats;
 
     #[test]
     pub fn test_default_atomic_histogram() {

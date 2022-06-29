@@ -6,7 +6,6 @@ use aptos_rest_client::Client as RestClient;
 use reqwest::Url;
 use std::{
     fmt,
-    str::FromStr,
     time::{Duration, Instant},
 };
 use tokio::time;
@@ -14,22 +13,15 @@ use tokio::time;
 #[derive(Clone)]
 pub struct Instance {
     peer_name: String,
-    ip: String,
-    ac_port: u32,
+    url: Url,
     debug_interface_port: Option<u32>,
 }
 
 impl Instance {
-    pub fn new(
-        peer_name: String,
-        ip: String,
-        ac_port: u32,
-        debug_interface_port: Option<u32>,
-    ) -> Instance {
+    pub fn new(peer_name: String, url: Url, debug_interface_port: Option<u32>) -> Instance {
         Instance {
             peer_name,
-            ip,
-            ac_port,
+            url,
             debug_interface_port,
         }
     }
@@ -48,16 +40,8 @@ impl Instance {
         &self.peer_name
     }
 
-    pub fn ip(&self) -> &String {
-        &self.ip
-    }
-
-    pub fn ac_port(&self) -> u32 {
-        self.ac_port
-    }
-
     pub fn api_url(&self) -> Url {
-        Url::from_str(&format!("http://{}:{}", self.ip(), self.ac_port())).expect("Invalid URL.")
+        self.url.clone()
     }
 
     pub fn debug_interface_port(&self) -> Option<u32> {
@@ -71,7 +55,7 @@ impl Instance {
 
 impl fmt::Display for Instance {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}({})", self.peer_name, self.ip)
+        write!(f, "{}({})", self.peer_name, self.api_url())
     }
 }
 

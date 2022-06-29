@@ -1,10 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
-
-use crate::{instance::Instance, query_sequence_numbers};
-use anyhow::{format_err, Result};
+use crate::{emit::query_sequence_numbers, instance::Instance, ClusterArgs};
+use anyhow::{bail, format_err, Result};
+use aptos::common::types::EncodingType;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
@@ -16,8 +15,10 @@ use aptos_sdk::{
     types::{account_config::aptos_root_address, chain_id::ChainId, AccountKey, LocalAccount},
 };
 use rand::seq::SliceRandom;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, path::Path};
+use url::Url;
 
+#[derive(Debug)]
 pub struct Cluster {
     instances: Vec<Instance>,
     mint_key_pair: KeyPair<Ed25519PrivateKey, Ed25519PublicKey>,
@@ -30,20 +31,21 @@ fn clone(key: &Ed25519PrivateKey) -> Ed25519PrivateKey {
 }
 
 impl Cluster {
+    /// We assume the URLs have been validated at this point, specifically to
+    /// confirm that they have a host and port set.
     pub fn from_host_port(
-        peers: Vec<(String, u32, Option<u32>)>,
+        peers: Vec<Url>,
         mint_key: Ed25519PrivateKey,
         chain_id: ChainId,
         vasp: bool,
     ) -> Self {
         let instances: Vec<Instance> = peers
             .into_iter()
-            .map(|host_port| {
+            .map(|url| {
                 Instance::new(
-                    format!("{}:{}", &host_port.0, host_port.1), /* short_hash */
-                    host_port.0,
-                    host_port.1,
-                    host_port.2,
+                    format!("{}:{}", url.host().unwrap(), url.port().unwrap()), /* short_hash */
+                    url,
+                    None,
                 )
             })
             .collect();
@@ -107,6 +109,40 @@ impl Cluster {
 
     pub fn all_instances(&self) -> impl Iterator<Item = &Instance> {
         self.instances.iter()
+    }
+}
+
+impl TryFrom<&ClusterArgs> for Cluster {
+    type Error = anyhow::Error;
+
+    fn try_from(args: &ClusterArgs) -> Result<Self, Self::Error> {
+        let mut urls = Vec::new();
+        for url in &args.targets {
+            if !url.has_host() {
+                bail!("No host found in URL: {}", url);
+            }
+            let mut url = url.clone();
+            if url.port().is_none() {
+                url.set_port(Some(8080))
+                    .map_err(|_| format_err!("Failed to set port unexpectedly"))?;
+            }
+            urls.push(url);
+        }
+
+        let mint_key = if let Some(ref key) = args.mint_args.mint_key {
+            key.private_key()
+        } else {
+            EncodingType::BCS
+                .load_key::<Ed25519PrivateKey>(
+                    "mint key pair",
+                    Path::new(&args.mint_args.mint_file),
+                )
+                .unwrap()
+        };
+
+        let cluster = Cluster::from_host_port(urls, mint_key, args.mint_args.chain_id, args.vasp);
+
+        Ok(cluster)
     }
 }
 

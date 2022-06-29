@@ -35,17 +35,13 @@ use std::{
 };
 use tokio::{runtime::Handle, task::JoinHandle, time};
 
-pub mod atomic_histogram;
-pub mod cluster;
-pub mod instance;
-
+use crate::atomic_histogram::*;
 use aptos::common::types::EncodingType;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_sdk::{
     transaction_builder::aptos_stdlib,
     types::{transaction::authenticator::AuthenticationKeyPreimage, AccountKey},
 };
-use atomic_histogram::*;
 use rand::rngs::StdRng;
 
 /// Max transactions per account in mempool
@@ -57,12 +53,12 @@ const TXN_MAX_WAIT: Duration = Duration::from_secs(TXN_EXPIRATION_SECONDS as u64
 const MAX_CHILD_VASP_NUM: usize = 65536;
 const MAX_VASP_ACCOUNT_NUM: usize = 16;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EmitThreadParams {
     pub wait_millis: u64,
     pub wait_committed: bool,
     pub txn_expiration_time_secs: u64,
-    pub do_not_check_stats_at_end: bool,
+    pub check_stats_at_end: bool,
 }
 
 impl Default for EmitThreadParams {
@@ -71,12 +67,12 @@ impl Default for EmitThreadParams {
             wait_millis: 0,
             wait_committed: true,
             txn_expiration_time_secs: 30,
-            do_not_check_stats_at_end: false,
+            check_stats_at_end: true,
         }
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EmitJobRequest {
     rest_clients: Vec<RestClient>,
     accounts_per_client: usize,
@@ -146,7 +142,7 @@ impl EmitJobRequest {
                 wait_millis: wait_time,
                 wait_committed: true,
                 txn_expiration_time_secs: 30,
-                do_not_check_stats_at_end: false,
+                check_stats_at_end: true,
             })
             .accounts_per_client(1)
     }
@@ -175,7 +171,7 @@ pub struct TxnStatsRate {
     pub p99_latency: u64,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct StatsAccumulator {
     submitted: AtomicU64,
     committed: AtomicU64,
@@ -184,10 +180,12 @@ struct StatsAccumulator {
     latencies: Arc<AtomicHistogramAccumulator>,
 }
 
+#[derive(Debug)]
 struct Worker {
     join_handle: JoinHandle<Vec<LocalAccount>>,
 }
 
+#[derive(Debug)]
 pub struct EmitJob {
     workers: Vec<Worker>,
     stop: Arc<AtomicBool>,
@@ -214,8 +212,7 @@ struct SubmissionWorker {
 impl SubmissionWorker {
     #[allow(clippy::collapsible_if)]
     async fn run(mut self, gas_price: u64) -> Vec<LocalAccount> {
-        let check_stats_at_end =
-            !self.params.wait_committed && !self.params.do_not_check_stats_at_end;
+        let check_stats_at_end = self.params.check_stats_at_end && !self.params.wait_committed;
         let wait_for_accounts_sequence_timeout = Duration::from_secs(min(
             self.params.txn_expiration_time_secs,
             TXN_EXPIRATION_SECONDS,

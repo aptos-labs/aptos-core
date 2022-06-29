@@ -11,6 +11,8 @@ edition = "2018"
 
 ### BEGIN HAKARI SECTION
 [dependencies]
+anyhow = { version = "1.0.57", features = ["backtrace", "std"] }
+backtrace = { version = "0.3.65", features = ["serde", "std"] }
 byteorder = { version = "1.4.3", features = ["std"] }
 bytes = { version = "1.1.0", features = ["serde", "std"] }
 chrono = { version = "0.4.19", features = ["clock", "libc", "oldtime", "serde", "std", "time", "winapi"] }
@@ -60,6 +62,8 @@ url = { version = "2.2.2", default-features = false, features = ["serde"] }
 warp = { version = "0.3.2", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
 
 [build-dependencies]
+anyhow = { version = "1.0.57", features = ["backtrace", "std"] }
+backtrace = { version = "0.3.65", features = ["serde", "std"] }
 byteorder = { version = "1.4.3", features = ["std"] }
 bytes = { version = "1.1.0", features = ["serde", "std"] }
 cc = { version = "1.0.73", default-features = false, features = ["jobserver", "parallel"] }
