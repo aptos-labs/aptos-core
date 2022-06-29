@@ -48,8 +48,9 @@ impl ConsensusProposalsEvaluator {
                 "Consensus proposals metric missing".to_string(),
                 0,
                 format!(
-                "The {} set of metrics from the target node is missing the proposals metric: {}",
-                metrics_round, PROPOSALS_METRIC
+                    "The {} set of metrics from the target node is missing the proposals metric: {}",
+                    metrics_round, PROPOSALS_METRIC
+                )
             )
         };
         get_metric(metrics, PROPOSALS_METRIC, None, evaluation_on_missing_fn)
@@ -192,7 +193,7 @@ mod test {
             latest_target_metrics: parse_metrics(latest_target_metrics).unwrap(),
         };
 
-        let evaluations = evaluator 
+        let evaluations = evaluator
             .evaluate(&input)
             .await
             .expect("Failed to evaluate metrics");

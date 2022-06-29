@@ -1,22 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{metric_collector::ReqwestMetricCollector, runner::BlockingRunner};
+use crate::{
+    common_args::{OutputArgs, OutputFormat},
+    metric_collector::ReqwestMetricCollector,
+    runner::BlockingRunner,
+};
 use anyhow::Result;
-use clap::{ArgEnum, Parser};
-use std::{collections::HashMap, path::PathBuf};
+use clap::Parser;
+use std::collections::HashMap;
 use url::Url;
 
 use super::{
     api::{build_openapi_service, Api},
     configurations_manager::{ConfigurationsManager, NodeConfigurationWrapper},
 };
-
-#[derive(ArgEnum, Clone, Debug)]
-enum OutputFormat {
-    Json,
-    Yaml,
-}
 
 #[derive(Clone, Debug, Parser)]
 pub struct GenerateOpenapi {
@@ -28,14 +26,8 @@ pub struct GenerateOpenapi {
     #[clap(long, default_value = "20121")]
     pub listen_port: u16,
 
-    /// By default, the spec is written to stdout. If this is provided, the
-    /// tool will instead write the spec to the provided path.
-    #[clap(short, long)]
-    output_path: Option<PathBuf>,
-
-    /// What format to output the spec in.
-    #[clap(short, long, arg_enum, default_value = "yaml")]
-    format: OutputFormat,
+    #[clap(flatten)]
+    pub output_args: OutputArgs,
 }
 
 pub async fn generate_openapi(args: GenerateOpenapi) -> Result<()> {
@@ -53,15 +45,9 @@ pub async fn generate_openapi(args: GenerateOpenapi) -> Result<()> {
     let api_service =
         build_openapi_service(api, args.listen_address.clone(), args.listen_port, None);
 
-    let spec = match args.format {
+    let spec = match args.output_args.format {
         OutputFormat::Json => api_service.spec(),
         OutputFormat::Yaml => api_service.spec_yaml(),
     };
-
-    match args.output_path {
-        Some(path) => std::fs::write(path, spec)?,
-        None => println!("{}", spec),
-    }
-
-    Ok(())
+    args.output_args.write(&spec)
 }

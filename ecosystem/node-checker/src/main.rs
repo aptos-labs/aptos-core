@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+mod common_args;
 mod configuration;
 mod evaluator;
 mod evaluators;
