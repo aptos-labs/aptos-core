@@ -3361,7 +3361,7 @@ dependencies = [
  "tempfile",
  "termcolor",
  "tokio",
- "transaction-emitter",
+ "transaction-emitter-lib",
  "url",
 ]
 

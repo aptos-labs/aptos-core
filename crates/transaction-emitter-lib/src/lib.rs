@@ -12,7 +12,7 @@ mod instance;
 mod wrappers;
 
 // These are the top level things you should need to run the emitter.
-pub use args::{ClusterArgs, EmitArgs};
+pub use args::{ClusterArgs, EmitArgs, MintArgs};
 pub use emit::{TxnStats, TxnStatsRate};
 pub use wrappers::emit_transactions;
 

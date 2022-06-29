@@ -12,7 +12,7 @@ use url::Url;
 
 const DEFAULT_API_PORT: u16 = 8080;
 
-#[derive(Parser, Debug)]
+#[derive(Clone, Debug, Parser)]
 pub struct MintArgs {
     /// Ed25519PrivateKey for minting coins
     #[clap(long, parse(try_from_str = ConfigKey::from_encoded_string))]
@@ -25,7 +25,7 @@ pub struct MintArgs {
     pub chain_id: ChainId,
 }
 
-#[derive(Parser, Debug)]
+#[derive(Clone, Debug, Parser)]
 pub struct ClusterArgs {
     /// Nodes the cluster should connect to, e.g. http://node.mysite.com:8080
     /// If the port is not provided, it is assumed to be 8080.
@@ -40,7 +40,7 @@ pub struct ClusterArgs {
     pub mint_args: MintArgs,
 }
 
-#[derive(Parser, Debug)]
+#[derive(Clone, Debug, Parser)]
 pub struct EmitArgs {
     #[clap(long, default_value = "15")]
     pub accounts_per_client: usize,

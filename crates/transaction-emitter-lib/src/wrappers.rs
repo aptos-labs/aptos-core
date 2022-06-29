@@ -30,7 +30,7 @@ pub async fn emit_transactions_with_cluster(
         wait_millis: args.wait_millis,
         wait_committed: !args.burst,
         txn_expiration_time_secs: args.txn_expiration_time_secs,
-        do_not_check_stats_at_end: args.do_not_check_stats_at_end,
+        check_stats_at_end: !args.do_not_check_stats_at_end,
     };
     let duration = Duration::from_secs(args.duration);
     let client = cluster.random_instance().rest_client();

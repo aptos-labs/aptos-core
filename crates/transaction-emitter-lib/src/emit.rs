@@ -58,7 +58,7 @@ pub struct EmitThreadParams {
     pub wait_millis: u64,
     pub wait_committed: bool,
     pub txn_expiration_time_secs: u64,
-    pub do_not_check_stats_at_end: bool,
+    pub check_stats_at_end: bool,
 }
 
 impl Default for EmitThreadParams {
@@ -67,7 +67,7 @@ impl Default for EmitThreadParams {
             wait_millis: 0,
             wait_committed: true,
             txn_expiration_time_secs: 30,
-            do_not_check_stats_at_end: false,
+            check_stats_at_end: true,
         }
     }
 }
@@ -142,7 +142,7 @@ impl EmitJobRequest {
                 wait_millis: wait_time,
                 wait_committed: true,
                 txn_expiration_time_secs: 30,
-                do_not_check_stats_at_end: false,
+                check_stats_at_end: true,
             })
             .accounts_per_client(1)
     }
@@ -212,8 +212,7 @@ struct SubmissionWorker {
 impl SubmissionWorker {
     #[allow(clippy::collapsible_if)]
     async fn run(mut self, gas_price: u64) -> Vec<LocalAccount> {
-        let check_stats_at_end =
-            !self.params.wait_committed && !self.params.do_not_check_stats_at_end;
+        let check_stats_at_end = self.params.check_stats_at_end && !self.params.wait_committed;
         let wait_for_accounts_sequence_timeout = Duration::from_secs(min(
             self.params.txn_expiration_time_secs,
             TXN_EXPIRATION_SECONDS,
@@ -1121,7 +1120,7 @@ fn gen_rng_for_reusable_account(count: usize) -> Vec<StdRng> {
     // this so that we don't do this, since it causes conflicts between
     // runs of the emitter.
     let mut seed = [
-        0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0,
         0, 0,
     ];
     let mut rngs = vec![];
