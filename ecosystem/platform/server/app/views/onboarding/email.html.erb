@@ -19,7 +19,7 @@
 
   <%= form_with(model: current_user, url: onboarding_email_path, method: :post, data: { turbo: !@show_recaptcha_v2, controller: 'recaptcha', action: 'recaptcha#validate' }, builder: AptosFormBuilder) do |f| %>
     <div class="mb-8">
-      <%= f.email_field :email, autofocus: true, autocomplete: 'email', required: true, placeholder: 'ENTER YOUR EMAIL ADDRESS', class: 'md:w-96' %>
+      <%= f.email_field :email, autofocus: true, autocomplete: 'email', required: true, placeholder: 'ENTER YOUR EMAIL ADDRESS', value: current_user.unconfirmed_email || current_user.email || @oauth_email, class: 'md:w-96' %>
     </div>
 
     <div class="mb-8">

@@ -104,7 +104,11 @@ class User < ApplicationRecord
                           username: "#{raw_info['username'].downcase}##{raw_info['discriminator']}"
                         })
     when 'google'
-      # No additional data from Google.
+      # No additional data from Google. But we can trust the email!
+      if !confirmed? && !User.exists?(email: auth[:email])
+        self.email = auth[:email]
+        confirm
+      end
     else
       raise 'Unknown Provider!'
     end
