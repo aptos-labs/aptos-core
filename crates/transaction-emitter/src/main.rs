@@ -46,6 +46,13 @@ struct Args {
     wait_millis: u64,
     #[structopt(long)]
     burst: bool,
+
+    /// This can only be set in conjunction with --burst. By default, when burst
+    /// is enabled, we check stats once at the end of the emitter run. If you
+    /// would like to opt out of that, you can use this flag.
+    #[structopt(long, requires = "burst")]
+    do_not_check_stats_at_end: bool,
+
     #[structopt(long, default_value = "30")]
     txn_expiration_time_secs: u64,
     #[structopt(long, default_value = "mint.key")]
@@ -93,6 +100,7 @@ async fn emit_tx(cluster: &Cluster, args: &Args) -> Result<()> {
         wait_millis: args.wait_millis,
         wait_committed: !args.burst,
         txn_expiration_time_secs: args.txn_expiration_time_secs,
+        do_not_check_stats_at_end: args.do_not_check_stats_at_end,
     };
     let duration = Duration::from_secs(args.duration);
     let client = cluster.random_instance().rest_client();
@@ -118,7 +126,7 @@ async fn emit_tx(cluster: &Cluster, args: &Args) -> Result<()> {
         emit_job_request = emit_job_request.vasp();
     }
     let stats = emitter
-        .emit_txn_for_with_stats(duration, emit_job_request, 10)
+        .emit_txn_for_with_stats(duration, emit_job_request, min(10, args.duration / 5))
         .await?;
     println!("Total stats: {}", stats);
     println!("Average rate: {}", stats.rate(duration));
