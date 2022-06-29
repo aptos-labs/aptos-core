@@ -93,7 +93,10 @@ async fn network_options(
         .into_iter()
         .map(|op| op.to_string())
         .collect();
-    let errors = ApiError::all().into_iter().map(|err| err.into()).collect();
+    let errors = ApiError::all()
+        .into_iter()
+        .map(|err| err.into_error())
+        .collect();
 
     let allow = Allow {
         operation_statuses,

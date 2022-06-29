@@ -111,6 +111,7 @@ pub fn routes(
                 .allow_methods(vec![Method::GET, Method::POST])
                 .allow_headers(vec![warp::http::header::CONTENT_TYPE]),
         )
+        .with(aptos_api::log::logger())
         .recover(handle_rejection)
     // TODO Logger?
     // TODO metrics?
@@ -120,6 +121,8 @@ pub fn routes(
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
     let code;
     let body;
+
+    debug!("Failed with: {:?}", err);
 
     if err.is_not_found() {
         code = StatusCode::NOT_FOUND;

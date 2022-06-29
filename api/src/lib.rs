@@ -6,7 +6,7 @@ pub mod context;
 mod events;
 mod health_check;
 mod index;
-pub(crate) mod log;
+pub mod log;
 pub mod metrics;
 mod page;
 pub mod param;
