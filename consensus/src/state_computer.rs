@@ -166,8 +166,8 @@ impl StateComputer for ExecutionProxy {
         monitor!(
             "commit_block",
             self.executor
-                .commit_blocks(block_ids, finality_proof.clone())?
-        );
+                .commit_blocks(block_ids, finality_proof.clone())
+        )?;
 
         let blocks = blocks.to_vec();
         let wrapped_callback = move || {
