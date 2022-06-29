@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
-
 use crate::{emit::query_sequence_numbers, instance::Instance, ClusterArgs};
 use anyhow::{bail, format_err, Result};
 use aptos::common::types::EncodingType;

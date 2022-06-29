@@ -1121,7 +1121,7 @@ fn gen_rng_for_reusable_account(count: usize) -> Vec<StdRng> {
     // this so that we don't do this, since it causes conflicts between
     // runs of the emitter.
     let mut seed = [
-        0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0,
         0, 0,
     ];
     let mut rngs = vec![];
