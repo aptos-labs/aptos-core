@@ -3,6 +3,7 @@
 
 mod build_evaluators;
 mod common;
+mod consensus;
 mod state_sync_evaluator;
 mod traits;
 
@@ -12,3 +13,5 @@ pub use state_sync_evaluator::{
     StateSyncMetricsEvaluator, StateSyncMetricsEvaluatorArgs, NAME as STATE_SYNC_EVALUATOR_NAME,
 };
 pub use traits::{MetricsEvaluator, MetricsEvaluatorError};
+
+pub use consensus::*;
