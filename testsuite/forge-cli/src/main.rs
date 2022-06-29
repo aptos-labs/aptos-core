@@ -145,7 +145,7 @@ fn main() -> Result<()> {
             wait_millis: args.wait_millis,
             wait_committed: !args.burst,
             txn_expiration_time_secs: 30,
-            check_stats_at_end: false,
+            do_not_check_stats_at_end: true,
         });
     if let Some(workers_per_endpoint) = args.workers_per_ac {
         global_emit_job_request =

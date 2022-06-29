@@ -48,10 +48,10 @@ struct Args {
     burst: bool,
 
     /// This can only be set in conjunction with --burst. By default, when burst
-    /// is enabled, we do not ever check the transaction stats. If this is set,
-    /// we will check the stats once at the end.
+    /// is enabled, we check stats once at the end of the emitter run. If you
+    /// would like to opt out of that, you can use this flag.
     #[structopt(long, requires = "burst")]
-    check_stats_at_end: bool,
+    do_not_check_stats_at_end: bool,
 
     #[structopt(long, default_value = "30")]
     txn_expiration_time_secs: u64,
@@ -100,7 +100,7 @@ async fn emit_tx(cluster: &Cluster, args: &Args) -> Result<()> {
         wait_millis: args.wait_millis,
         wait_committed: !args.burst,
         txn_expiration_time_secs: args.txn_expiration_time_secs,
-        check_stats_at_end: args.check_stats_at_end,
+        do_not_check_stats_at_end: args.do_not_check_stats_at_end,
     };
     let duration = Duration::from_secs(args.duration);
     let client = cluster.random_instance().rest_client();

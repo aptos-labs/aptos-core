@@ -62,7 +62,7 @@ pub struct EmitThreadParams {
     pub wait_millis: u64,
     pub wait_committed: bool,
     pub txn_expiration_time_secs: u64,
-    pub check_stats_at_end: bool,
+    pub do_not_check_stats_at_end: bool,
 }
 
 impl Default for EmitThreadParams {
@@ -71,7 +71,7 @@ impl Default for EmitThreadParams {
             wait_millis: 0,
             wait_committed: true,
             txn_expiration_time_secs: 30,
-            check_stats_at_end: false,
+            do_not_check_stats_at_end: false,
         }
     }
 }
@@ -146,7 +146,7 @@ impl EmitJobRequest {
                 wait_millis: wait_time,
                 wait_committed: true,
                 txn_expiration_time_secs: 30,
-                check_stats_at_end: false,
+                do_not_check_stats_at_end: false,
             })
             .accounts_per_client(1)
     }
@@ -214,9 +214,18 @@ struct SubmissionWorker {
 impl SubmissionWorker {
     #[allow(clippy::collapsible_if)]
     async fn run(mut self, gas_price: u64) -> Vec<LocalAccount> {
+        let check_stats_at_end =
+            !self.params.wait_committed && !self.params.do_not_check_stats_at_end;
+        let wait_for_accounts_sequence_timeout = Duration::from_secs(min(
+            self.params.txn_expiration_time_secs,
+            TXN_EXPIRATION_SECONDS,
+        ));
+
         let wait_duration = Duration::from_millis(self.params.wait_millis);
-        let total_start_time = Instant::now();
+
+        let start_time = Instant::now();
         let mut total_num_requests = 0;
+
         while !self.stop.load(Ordering::Relaxed) {
             let requests = self.gen_requests(gas_price);
             let num_requests = requests.len();
@@ -234,19 +243,35 @@ impl SubmissionWorker {
                 }
             }
             if self.params.wait_committed {
-                self.update_stats(loop_start_time, txn_offset_time, num_requests)
-                    .await
+                self.update_stats(
+                    loop_start_time,
+                    txn_offset_time,
+                    num_requests,
+                    false,
+                    wait_for_accounts_sequence_timeout,
+                )
+                .await
             }
             let now = Instant::now();
             if wait_until > now {
                 time::sleep(wait_until - now).await;
             }
         }
-        if self.params.check_stats_at_end {
+
+        // If this was a burst mode run and the user didn't specifically opt
+        // out of it, update the stats for the whole run.
+        if check_stats_at_end {
             debug!("Checking stats for final time at the end");
-            self.update_stats(total_start_time, 0, total_num_requests)
-                .await
+            self.update_stats(
+                start_time,
+                0,
+                total_num_requests,
+                true,
+                Duration::from_millis(500),
+            )
+            .await
         }
+
         self.accounts
     }
 
@@ -262,12 +287,13 @@ impl SubmissionWorker {
         start_time: Instant,
         txn_offset_time: u64,
         num_requests: usize,
+        skip_latency_stats: bool,
+        wait_for_accounts_sequence_timeout: Duration,
     ) {
         match wait_for_accounts_sequence(
             &self.client,
             &mut self.accounts,
-            self.params.txn_expiration_time_secs,
-            self.params.check_stats_at_end,
+            wait_for_accounts_sequence_timeout,
         )
         .await
         {
@@ -277,7 +303,7 @@ impl SubmissionWorker {
                 self.stats
                     .committed
                     .fetch_add(num_requests as u64, Ordering::Relaxed);
-                if !self.params.check_stats_at_end {
+                if !skip_latency_stats {
                     self.stats
                         .latency
                         .fetch_add(latency * num_requests as u64, Ordering::Relaxed);
@@ -303,7 +329,7 @@ impl SubmissionWorker {
                 self.stats
                     .expired
                     .fetch_add(num_uncommitted, Ordering::Relaxed);
-                if !self.params.check_stats_at_end {
+                if !skip_latency_stats {
                     self.stats
                         .latency
                         .fetch_add(committed_latency, Ordering::Relaxed);
@@ -779,18 +805,9 @@ pub async fn execute_and_wait_transactions(
 async fn wait_for_accounts_sequence(
     client: &RestClient,
     accounts: &mut [LocalAccount],
-    txn_expiration_time_secs: u64,
-    check_for_stats_at_end: bool,
+    wait_timeout: Duration,
 ) -> Result<(), HashSet<AccountAddress>> {
-    let wait = match check_for_stats_at_end {
-        // If we're checking for stats at the end of burst mode, we don't want
-        // to give the node any more time than necessary to process additional
-        // transactions. This helps gives us a more accurate reading.
-        true => Duration::from_millis(500),
-        // TXN_EXPIRATION_SECONDS == TXN_MAX_WAIT
-        false => Duration::from_secs(min(txn_expiration_time_secs, TXN_EXPIRATION_SECONDS)),
-    };
-    let deadline = Instant::now() + wait;
+    let deadline = Instant::now() + wait_timeout;
     let addresses: Vec<_> = accounts.iter().map(|d| d.address()).collect();
     let mut uncommitted = addresses.clone().into_iter().collect::<HashSet<_>>();
 
