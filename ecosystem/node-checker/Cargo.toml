@@ -28,9 +28,13 @@ thiserror = "1.0.31"
 tokio = { version = "1.18.2", features = ["full"] }
 url = { version = "2.2.2", features = ["serde"] }
 
+aptos-api = { path = "../../api" }
+aptos-config = { path = "../../config" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics = { path = "../../crates/aptos-metrics" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
+aptos-sdk = { path = "../../sdk" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 
 [[bin]]

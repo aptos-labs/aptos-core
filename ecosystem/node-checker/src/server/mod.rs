@@ -5,13 +5,15 @@ mod api;
 mod common;
 mod configurations_manager;
 mod generate_openapi;
+mod node_information;
 mod run;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-
 use generate_openapi::{generate_openapi, GenerateOpenapi};
 use run::{run, Run};
+
+pub use node_information::NodeInformation;
 
 #[derive(Clone, Debug, Parser)]
 pub struct Server {
