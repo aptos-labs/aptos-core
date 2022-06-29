@@ -92,18 +92,9 @@ impl MetricCollector for ReqwestMetricCollector {
     /// use here to deseralize. TODO for that.
     async fn collect_system_information(&self) -> Result<SystemInformation, MetricCollectorError> {
         let body = self.get_data_from_node("system_information").await?;
-        let raw_map: HashMap<String, serde_json::Value> = serde_json::from_str(&body)
-            .context("Failed to process response body as JSON")
+        let data: HashMap<String, String> = serde_json::from_str(&body)
+            .context("Failed to process response body as valid JSON with string key/values")
             .map_err(|e| MetricCollectorError::ResponseParseError(anyhow!(e)))?;
-        let mut out = HashMap::new();
-        for (key, value) in raw_map.into_iter() {
-            let string_value = value
-                .as_str()
-                .with_context(|| format!("Failed to convert value to String: {}", value))
-                .map_err(|e| MetricCollectorError::ResponseParseError(anyhow!(e)))?
-                .to_owned();
-            out.insert(key, string_value);
-        }
-        Ok(SystemInformation(out))
+        Ok(SystemInformation(data))
     }
 }
