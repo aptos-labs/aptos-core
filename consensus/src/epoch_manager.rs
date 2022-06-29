@@ -631,8 +631,8 @@ impl EpochManager {
                 } else {
                     monitor!(
                         "process_different_epoch_consensus_msg",
-                        self.process_different_epoch(event.epoch(), peer_id).await?
-                    );
+                        self.process_different_epoch(event.epoch(), peer_id).await
+                    )?;
                 }
             }
             ConsensusMsg::EpochChangeProof(proof) => {
@@ -644,10 +644,7 @@ impl EpochManager {
                     "Proof from epoch {}", msg_epoch,
                 );
                 if msg_epoch == self.epoch() {
-                    monitor!(
-                        "process_epoch_proof",
-                        self.initiate_new_epoch(*proof).await?
-                    );
+                    monitor!("process_epoch_proof", self.initiate_new_epoch(*proof).await)?;
                 } else {
                     bail!(
                         "[EpochManager] Unexpected epoch proof from epoch {}, local epoch {}",
@@ -663,8 +660,8 @@ impl EpochManager {
                 );
                 monitor!(
                     "process_epoch_retrieval",
-                    self.process_epoch_retrieval(*request, peer_id).await?
-                );
+                    self.process_epoch_retrieval(*request, peer_id).await
+                )?;
             }
             _ => {
                 bail!("[EpochManager] Unexpected messages: {:?}", msg);
