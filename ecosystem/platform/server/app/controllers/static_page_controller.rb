@@ -11,4 +11,10 @@ class StaticPageController < ApplicationController
   def community
     @login_dialog = DialogComponent.new(id: 'login_dialog')
   end
+
+  def terms; end
+
+  def terms_testnet; end
+
+  def privacy; end
 end

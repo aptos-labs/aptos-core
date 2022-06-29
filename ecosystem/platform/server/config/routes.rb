@@ -58,5 +58,8 @@ Rails.application.routes.draw do
   get 'it2', to: 'leaderboard#it2'
 
   get 'community', to: 'static_page#community'
+  get 'terms', to: 'static_page#terms'
+  get 'terms-testnet', to: 'static_page#terms_testnet'
+  get 'privacy', to: 'static_page#privacy'
   root 'static_page#root'
 end
