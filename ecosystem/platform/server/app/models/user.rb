@@ -12,7 +12,7 @@ class User < ApplicationRecord
                         authentication_keys: [:username]
 
   validates :username, uniqueness: { case_sensitive: false }, length: { minimum: 3, maximum: 20 },
-                       format: { with: /\A[a-zA-Z0-9#]+\z/ }, allow_nil: true
+                       format: { with: /\A[a-zA-Z0-9\-_]+\z/ }, allow_nil: true
   validates :email, uniqueness: { case_sensitive: false }, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_nil: true
 
   validate_aptos_address :mainnet_address
