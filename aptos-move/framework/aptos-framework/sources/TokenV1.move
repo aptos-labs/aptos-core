@@ -7,13 +7,14 @@ module AptosFramework::TokenV1 {
     use Std::Vector;
 
     use AptosFramework::Table::{Self, Table};
-    use AptosFramework::PropertyList::{Self, PropertyList};
+    use AptosFramework::PropertyMap::{Self, PropertyMap};
 
     const TOKEN_MAX_MUTABLE_IND: u64 = 0;
     const TOKEN_URI_MUTABLE_IND: u64 = 1;
     const TOKEN_DESCRIPTION_MUTABLE_IND: u64 = 2;
     const TOKEN_ROYALTY_MUTABLE_IND: u64 = 3;
     const TOKEN_PROPERTY_MUTABLE_IND: u64 = 4;
+    const TOKEN_PROPERTY_VALUE_MUTABLE_IND: u64 = 5;
 
     const COLLECTION_DESCRIPTION_MUTABLE_IND: u64 = 0;
     const COLLECTION_URI_MUTABLE_IND: u64 = 1;
@@ -41,64 +42,34 @@ module AptosFramework::TokenV1 {
 
     struct Token has store {
         id: TokenId,
+        // the amount of tokens
         value: u64,
     }
 
+    /// global unique identifier of a token
     struct TokenId has store, copy, drop {
-        tokendata_id: TokenDataId,
-        serial_number: u64
+        // the id to the common token data shared by token with different serial number
+        token_data_id: TokenDataId,
     }
 
+    /// globally unique identifier of tokendata
     struct TokenDataId has copy, drop, store {
         // The creator of this token
         creator: address,
         // The collection or set of related tokens within the creator's account
         collection: String,
-        // Unique name within a collection within the creator's account
+        // the name of this token
         name: String,
     }
 
-    /// The royalty of a token
-    struct Royalty has copy, drop, store {
-        royalty_points_nominator: u64,
-        royalty_points_denominator: u64,
-        // if the token is jointly owned by multiple creators,
-        // the group of creators should create a shared account.
-        // the creator_account will be the shared account address.
-        resource_account: address,
-    }
-
-    // This config specifies whether fields in the Collection are mutable
-    struct CollectionMutabilityConfig has copy, store, drop {
-        description: bool,
-        // URL for additional information /media
-        uri: bool,
-        // Optional maximum number of tokens allowed within this collections
-        maximum: bool,
-    }
-
-    // This config specifies whether fields in the TokenData are mutable
-    struct TokenMutabilityConfig has copy, store, drop {
-        maximum: bool,
-        uri: bool,
-        royalty: bool,
-        description: bool,
-        default_property_list: bool,
-    }
-
-    struct PropertyValue has store, copy, drop {
-        type: String,
-        value: vector<vector<u8>>,
-    }
-
-    /// The data associated with the Tokens
+    /// The shared TokenData by tokens with different serial_number
     struct TokenData has store {
+        // id of this token data
         id: TokenDataId,
+        // the maxium of tokens can be minted from this token
         maximum: u64,
-        // Total number of this type of Token
+        // Total number of tokens minted for this TokenData
         supply: u64,
-        // The max serial number we should have for the token
-        largest_serial_number: u64,
         // URL for additional information / media
         uri: String,
         // the royalty of the token
@@ -107,46 +78,52 @@ module AptosFramework::TokenV1 {
         name: String,
         // Describes this Token
         description: String,
-        // the properties can be used to hold any custom attributes
-        default_property_list: PropertyList,
+        // store customized properties and their default values for tokens with different serial numbers
+        properties: PropertyMap,
+        //control the TokenData field mutability
         mutability_config: TokenMutabilityConfig,
+    }
+
+    /// The royalty of a token
+    struct Royalty has copy, drop, store {
+        royalty_points_nominator: u64,
+        royalty_points_denominator: u64,
+        // if the token is jointly owned by multiple creators, the group of creators should create a shared account.
+        // the payee_address will be the shared account address.
+        payee_address: address,
+    }
+
+    /// This config specifies which fields in the TokenData are mutable
+    struct TokenMutabilityConfig has copy, store, drop {
+        // control if the token maximum is mutable
+        maximum: bool,
+        // control if the token uri is mutable
+        uri: bool,
+        // control if the token royalty is mutable
+        royalty: bool,
+        // control if the token description is mutable
+        description: bool,
+        // control if the default token property list are mutable
+        properties: bool,
     }
 
     /// Represents token resources owned by token owner
     struct TokenStore has key {
+        // the tokens owned by a token owner
         tokens: Table<TokenId, Token>,
-        token_data: Table<TokenId, PropertyList>,
         deposit_events: EventHandle<DepositEvent>,
         withdraw_events: EventHandle<WithdrawEvent>,
     }
 
-    /// Set of data sent to the event stream during a receive
-    struct DepositEvent has drop, store {
-        id: TokenId,
-        amount: u64,
+    /// This config specifies which fields in the Collection are mutable
+    struct CollectionMutabilityConfig has copy, store, drop {
+        // control if description is mutable
+        description: bool,
+        // control if uri is mutable
+        uri: bool,
+        // control if collection maxium is mutable
+        maximum: bool,
     }
-
-    /// Set of data sent to the event stream during a withdrawal
-    struct WithdrawEvent has drop, store {
-        id: TokenId,
-        amount: u64,
-    }
-
-    /// token creation event id of token created
-    struct CreateTokenEvent has copy, store, drop {
-        id: TokenId,
-        initial_balance: u64,
-    }
-
-    /// mint token event. This event triggered when creator adds more supply to existing token
-    struct MintTokenEvent has drop, store {
-        id: TokenId,
-        amount: u64,
-    }
-
-    //
-    // Core data structures for creating and maintaining tokens
-    //
 
     /// Represent collection and token metadata for a creator
     struct Collections has key {
@@ -167,11 +144,36 @@ module AptosFramework::TokenV1 {
         name: String,
         // URL for additional information /media
         uri: String,
-        // Total number of distinct Tokens tracked by the collection
+        // Total number of distinct TokenData tracked by the collection
         count: u64,
-        // Optional maximum number of tokens allowed within this collections
+        // maximum number of TokenData allowed within this collections
         maximum: u64,
+        // control which collection field is mutable
         mutability_config: CollectionMutabilityConfig,
+    }
+
+    /// Set of data sent to the event stream during a receive
+    struct DepositEvent has drop, store {
+        id: TokenId,
+        amount: u64,
+    }
+
+    /// Set of data sent to the event stream during a withdrawal
+    struct WithdrawEvent has drop, store {
+        id: TokenId,
+        amount: u64,
+    }
+
+    /// token creation event id of token created
+    struct CreateTokenEvent has drop, store {
+        id: TokenId,
+        initial_balance: u64,
+    }
+
+    /// mint token event. This event triggered when creator adds more supply to existing token
+    struct MintTokenEvent has drop, store {
+        id: TokenId,
+        amount: u64,
     }
 
     /// create collection event with creator address and collection name
@@ -180,7 +182,7 @@ module AptosFramework::TokenV1 {
         collection_name: String,
         uri: String,
         description: String,
-        maximum:u64,
+        maximum: u64,
     }
 
     /// Capability required to mint tokens.
@@ -203,9 +205,8 @@ module AptosFramework::TokenV1 {
         description: vector<u8>,
         uri: vector<u8>,
         maximum: u64,
-        mutate_setting: vector<bool>
+        mutate_setting: vector<bool>,
     ) acquires Collections {
-
         create_collection(
             creator,
             ASCII::string(name),
@@ -224,13 +225,13 @@ module AptosFramework::TokenV1 {
         balance: u64,
         maximum: u64,
         uri: vector<u8>,
-        royalty_resource_account: address,
+        royalty_payee_address: address,
         royalty_points_denominator: u64,
         royalty_points_nominator: u64,
         token_mutate_setting: vector<bool>,
         property_keys: vector<String>,
         property_values: vector<vector<u8>>,
-        property_types: vector<String>
+        property_types: vector<String>,
     ) acquires Collections, TokenStore {
         create_token(
             creator,
@@ -240,7 +241,7 @@ module AptosFramework::TokenV1 {
             balance,
             maximum,
             ASCII::string(uri),
-            royalty_resource_account,
+            royalty_payee_address,
             royalty_points_denominator,
             royalty_points_nominator,
             token_mutate_setting,
@@ -256,11 +257,7 @@ module AptosFramework::TokenV1 {
         collection: vector<u8>,
         name: vector<u8>,
         amount: u64,
-        property_keys: vector<String>,
-        property_values: vector<vector<u8>>,
-        property_types: vector<String>
     ) acquires Collections, TokenStore {
-
         /*
             TODO: signer and capability checking
         */
@@ -268,9 +265,6 @@ module AptosFramework::TokenV1 {
             account,
             create_token_data_id(token_data_address, ASCII::string(collection), ASCII::string(name)),
             amount,
-            property_keys,
-            property_values,
-            property_types
         );
     }
 
@@ -284,10 +278,9 @@ module AptosFramework::TokenV1 {
         creators_address: address,
         collection: vector<u8>,
         name: vector<u8>,
-        edition: u64,
         amount: u64,
     ) acquires TokenStore {
-        let token_id = create_token_id_raw(creators_address, collection, name, edition);
+        let token_id = create_token_id_raw(creators_address, collection, name);
         direct_transfer(sender, receiver, token_id, amount);
     }
 
@@ -300,10 +293,7 @@ module AptosFramework::TokenV1 {
     //
 
     /// Deposit the token balance into the owner's account and emit an event.
-    public fun deposit_token(
-        account: &signer,
-        token: Token
-    ) acquires TokenStore {
+    public fun deposit_token(account: &signer, token: Token) acquires TokenStore {
         let account_addr = Signer::address_of(account);
         initialize_token_store(account);
         let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
@@ -315,7 +305,7 @@ module AptosFramework::TokenV1 {
     }
 
     /// Deposit the token balance into the recipients account and emit an event.
-    public fun  direct_deposit(account_addr: address, token: Token) acquires TokenStore {
+    public fun direct_deposit(account_addr: address, token: Token) acquires TokenStore {
         let token_store = borrow_global_mut<TokenStore>(account_addr);
 
         Event::emit_event<DepositEvent>(
@@ -365,7 +355,7 @@ module AptosFramework::TokenV1 {
             !Table::contains(tokens, token_id),
             Errors::already_published(EALREADY_HAS_BALANCE),
         );
-        Table::add(tokens, token_id, Token { value : 0, id: token_id });
+        Table::add(tokens, token_id, Token { value: 0, id: token_id });
     }
 
     public fun initialize_token_store(account: &signer) {
@@ -374,7 +364,6 @@ module AptosFramework::TokenV1 {
                 account,
                 TokenStore {
                     tokens: Table::new(),
-                    token_data: Table::new(),
                     deposit_events: Event::new_event_handle<DepositEvent>(account),
                     withdraw_events: Event::new_event_handle<WithdrawEvent>(account),
                 },
@@ -399,9 +388,8 @@ module AptosFramework::TokenV1 {
         to: address,
         amount: u64,
     ) acquires TokenStore {
-        let token = withdraw_token(from, id ,amount);
+        let token = withdraw_token(from, id, amount);
         direct_deposit(to, token);
-        transfer_token_properties(Signer::address_of(from), to, id);
     }
 
     public fun withdraw_token(
@@ -418,11 +406,10 @@ module AptosFramework::TokenV1 {
         withdraw_without_event_internal(account_addr, id, amount)
     }
 
-
     fun withdraw_without_event_internal(
         account_addr: address,
         id: TokenId,
-        amount: u64
+        amount: u64,
     ): Token acquires TokenStore {
         assert!(
             exists<TokenStore>(account_addr),
@@ -436,8 +423,7 @@ module AptosFramework::TokenV1 {
         let balance = &mut Table::borrow_mut(tokens, id).value;
         *balance = *balance - amount;
 
-
-        Token { id, value: amount}
+        Token{ id, value: amount }
     }
 
     //
@@ -457,12 +443,12 @@ module AptosFramework::TokenV1 {
         if (!exists<Collections>(account_addr)) {
             move_to(
                 creator,
-                Collections {
+                Collections{
                     collections: Table::new(),
                     token_data: Table::new(),
                     burn_capabilities: Table::new(),
                     mint_capabilities: Table::new(),
-                    create_collection_events:  Event::new_event_handle<CreateCollectionEvent>(creator),
+                    create_collection_events: Event::new_event_handle<CreateCollectionEvent>(creator),
                     create_token_events: Event::new_event_handle<CreateTokenEvent>(creator),
                     mint_token_events: Event::new_event_handle<MintTokenEvent>(creator),
                 },
@@ -477,7 +463,7 @@ module AptosFramework::TokenV1 {
         );
 
         let mutability_config = create_collection_mutability_config(&mutate_setting);
-        let collection = Collection {
+        let collection = Collection{
             description,
             name: *&name,
             uri,
@@ -487,7 +473,7 @@ module AptosFramework::TokenV1 {
         };
 
         Table::add(collections, name, collection);
-        let collection_handle =  borrow_global_mut<Collections>(account_addr);
+        let collection_handle = borrow_global_mut<Collections>(account_addr);
         Event::emit_event<CreateCollectionEvent>(
             &mut collection_handle.create_collection_events,
             CreateCollectionEvent {
@@ -496,7 +482,6 @@ module AptosFramework::TokenV1 {
                 uri,
                 description,
                 maximum,
-
             }
         );
     }
@@ -509,7 +494,7 @@ module AptosFramework::TokenV1 {
         amount: u64,
         maximum: u64,
         uri: String,
-        royalty_resource_account: address,
+        royalty_payee_address: address,
         royalty_points_denominator: u64,
         royalty_points_nominator: u64,
         token_mutate_config: TokenMutabilityConfig,
@@ -537,29 +522,30 @@ module AptosFramework::TokenV1 {
 
         let collection = Table::borrow_mut(&mut collections.collections, token_data_id.collection);
         collection.count = collection.count + 1;
-
         assert!(
             collection.maximum >= collection.count,
             ECREATE_WOULD_EXCEED_MAXIMUM,
         );
 
         let supply = amount;
-
+        assert!(
+            maximum >= supply,
+            ECREATE_WOULD_EXCEED_MAXIMUM,
+        );
 
         let token_data = TokenData {
             id: token_data_id,
             maximum,
             supply,
-            largest_serial_number: 0,
             uri,
-            royalty: Royalty {
+            royalty: Royalty{
                 royalty_points_denominator,
                 royalty_points_nominator,
-                resource_account: royalty_resource_account,
+                payee_address: royalty_payee_address,
             },
             name,
             description,
-            default_property_list: PropertyList::new(&property_keys, &property_values, &property_types),
+            properties: PropertyMap::new(property_keys, property_values, property_types),
             mutability_config: token_mutate_config,
         };
 
@@ -568,26 +554,22 @@ module AptosFramework::TokenV1 {
     }
 
     public fun create_token_mutability_config(mutate_setting: &vector<bool>): TokenMutabilityConfig {
-        TokenMutabilityConfig {
+        TokenMutabilityConfig{
             maximum: *Vector::borrow(mutate_setting, TOKEN_MAX_MUTABLE_IND),
             uri: *Vector::borrow(mutate_setting, TOKEN_URI_MUTABLE_IND),
             royalty: *Vector::borrow(mutate_setting, TOKEN_ROYALTY_MUTABLE_IND),
             description: *Vector::borrow(mutate_setting, TOKEN_DESCRIPTION_MUTABLE_IND),
-            default_property_list: *Vector::borrow(mutate_setting, TOKEN_PROPERTY_MUTABLE_IND)
+            properties: *Vector::borrow(mutate_setting, TOKEN_PROPERTY_MUTABLE_IND),
         }
     }
 
     public fun create_collection_mutability_config(mutate_setting: &vector<bool>): CollectionMutabilityConfig {
-        CollectionMutabilityConfig {
+        CollectionMutabilityConfig{
             description: *Vector::borrow(mutate_setting, COLLECTION_DESCRIPTION_MUTABLE_IND),
             uri: *Vector::borrow(mutate_setting, COLLECTION_URI_MUTABLE_IND),
             maximum: *Vector::borrow(mutate_setting, COLLECTION_MAX_MUTABLE_IND),
         }
     }
-
-    //create new edition with new metadata
-    //create new edition without new metadata
-    //mint new for existing edition [don't support this]
 
     public fun create_token(
         account: &signer,
@@ -597,7 +579,7 @@ module AptosFramework::TokenV1 {
         balance: u64,
         maximum: u64,
         uri: String,
-        royalty_resource_account: address,
+        royalty_payee_address: address,
         royalty_points_denominator: u64,
         royalty_points_nominator: u64,
         mutate_setting: vector<bool>,
@@ -605,7 +587,6 @@ module AptosFramework::TokenV1 {
         property_values: vector<vector<u8>>,
         property_types: vector<String>
     ): TokenId acquires Collections, TokenStore {
-
         /*
             TODO: capability and signer check
        */
@@ -619,7 +600,7 @@ module AptosFramework::TokenV1 {
             0, // haven't minted token yet
             maximum,
             uri,
-            royalty_resource_account,
+            royalty_payee_address,
             royalty_points_denominator,
             royalty_points_nominator,
             token_mut_config,
@@ -632,9 +613,6 @@ module AptosFramework::TokenV1 {
             account,
             tokendata_id,
             balance,
-            Vector::empty<String>(),
-            Vector::empty<vector<u8>>(),
-            Vector::empty<String>()
         );
 
         token_id
@@ -645,19 +623,19 @@ module AptosFramework::TokenV1 {
         keys: &vector<String>,
         values: &vector<vector<u8>>,
         types: &vector<String>
-    ): PropertyList {
-
+    ): PropertyMap {
         let res_keys = Vector::empty<String>();
         let res_vals = Vector::empty<vector<u8>>();
         let res_types = Vector::empty<String>();
-        let default_properties = &token_data.default_property_list;
+        let default_properties = &token_data.properties;
         let i = 0;
-        while (i < Vector::length(keys)){
+        while (i < Vector::length(keys)) {
             let k = Vector::borrow(keys, i);
             let v = Vector::borrow(values, i);
             let t = Vector::borrow(types, i);
-            if (PropertyList::contains(default_properties, k) ) {
-                if ( PropertyList::get_type(default_properties, k) == *t && PropertyList::get_value(default_properties, k) != *v ) {
+            if (PropertyMap::contains_key(default_properties, k) ) {
+                if ( PropertyMap::borrow_type(PropertyMap::borrow(default_properties, k)) == *t &&
+                     PropertyMap::borrow_value(PropertyMap::borrow(default_properties, k)) != *v ) {
                     Vector::push_back(&mut res_keys, *k);
                     Vector::push_back(&mut res_vals, *v);
                     Vector::push_back(&mut res_types, *t);
@@ -665,23 +643,17 @@ module AptosFramework::TokenV1 {
             };
             i = i + 1;
         };
-        PropertyList::new(&res_keys, &res_vals, &res_types)
+        PropertyMap::new(res_keys, res_vals, res_types)
     }
 
     public fun mint_token(
         account: &signer,
         token_data_id: TokenDataId,
         amount: u64,
-        keys: vector<String>,
-        values: vector<vector<u8>>,
-        types:  vector<String>
     ): TokenId acquires Collections, TokenStore {
-
-       /*
-       TODO: capability and signer check
-       */
-        assert!(Vector::length(&keys) == Vector::length(&values), 1);
-        assert!(Vector::length(&types) == Vector::length(&values), 1);
+        /*
+        TODO: capability and signer check
+        */
 
         let creator_addr = token_data_id.creator;
         let all_token_data = &mut borrow_global_mut<Collections>(creator_addr).token_data;
@@ -690,54 +662,24 @@ module AptosFramework::TokenV1 {
         assert!(token_data.supply + amount <= token_data.maximum, 1);
 
         token_data.supply = token_data.supply + amount;
-        token_data.largest_serial_number = token_data.largest_serial_number + 1;
-        let largest_serial_number = token_data.largest_serial_number;
 
-
-        let token_id = create_token_id(token_data_id, largest_serial_number);
+        let token_id = create_token_id(token_data_id);
         deposit_token(account,
-            Token {
+            Token{
                 id: token_id,
                 value: amount
             }
         );
 
-        let property_list  = get_properties_to_be_updated(token_data, &keys, &values, &types);
-        add_token_properties(account, token_id, property_list);
-
         token_id
     }
 
-    public fun add_token_properties(
-        account: &signer,
-        id: TokenId,
-        token_properties: PropertyList
-    ) acquires TokenStore{
-        assert!(exists<TokenStore>(Signer::address_of(account)), 1);
-        let property_table = &mut borrow_global_mut<TokenStore>(
-            Signer::address_of(account)).token_data;
-        assert!(!Table::contains(property_table, id), 1);
-        Table::add(property_table, id, token_properties);
-    }
-
-    fun transfer_token_properties(from: address, to: address, id: TokenId) acquires TokenStore{
-        assert!(exists<TokenStore>(from), 1);
-        assert!(exists<TokenStore>(to), 1);
-
-        let source = borrow_global_mut<TokenStore>(from);
-        let properites = Table::remove(&mut source.token_data, id);
-
-        let dst = borrow_global_mut<TokenStore>(to);
-        Table::add(&mut dst.token_data, id, properites);
-    }
-
-
-    public fun create_token_id (tokendata_id: TokenDataId, serial_number: u64): TokenId {
-        TokenId {
-            tokendata_id,
-            serial_number
+    public fun create_token_id(token_data_id: TokenDataId): TokenId {
+        TokenId{
+            token_data_id
         }
     }
+
     public fun create_token_data_id(
         creator: address,
         collection: String,
@@ -749,17 +691,15 @@ module AptosFramework::TokenV1 {
     public fun create_token_id_raw(
         creator: address,
         collection: vector<u8>,
-        name: vector<u8>,
-        serial_number: u64
+        name: vector<u8>
     ): TokenId {
-        TokenId {
-            tokendata_id: create_token_data_id(creator, ASCII::string(collection), ASCII::string(name)),
-            serial_number
+        TokenId{
+            token_data_id: create_token_data_id(creator, ASCII::string(collection), ASCII::string(name)),
         }
     }
 
 
-    public fun balance_of(owner: address, id: TokenId): u64 acquires  TokenStore {
+    public fun balance_of(owner: address, id: TokenId): u64 acquires TokenStore {
         let token_store = borrow_global<TokenStore>(owner);
         if (Table::contains(&token_store.tokens, id)) {
             Table::borrow(&token_store.tokens, id).value
@@ -774,7 +714,7 @@ module AptosFramework::TokenV1 {
     #[test(creator = @0x1, owner = @0x2)]
     public fun create_withdraw_deposit_token(
         creator: signer,
-        owner: signer,
+        owner: signer
     ) acquires Collections, TokenStore {
         let token_id = create_collection_and_token(&creator, 1, 1, 1);
 
@@ -785,7 +725,7 @@ module AptosFramework::TokenV1 {
     #[test(creator = @0xCC, owner = @0xCB)]
     public fun create_withdraw_deposit(
         creator: signer,
-        owner: signer,
+        owner: signer
     ) acquires Collections, TokenStore {
         let token_id = create_collection_and_token(&creator, 2, 5, 5);
 
@@ -801,14 +741,18 @@ module AptosFramework::TokenV1 {
     #[expected_failure] // (abort_code = 5)]
     public fun test_collection_maximum(creator: signer) acquires Collections, TokenStore {
         let token_id = create_collection_and_token(&creator, 2, 2, 1);
-        let default_keys = vector<String>[ASCII::string(b"attack"), ASCII::string(b"num_of_use")];
-        let default_vals = vector<vector<u8>>[b"10", b"5"];
-        let default_types = vector<String>[ASCII::string(b"integer"), ASCII::string(b"integer")];
-        let mutate_setting = vector<bool>[false, false, false, false, false];
+        let default_keys = vector<String>
+        [ ASCII::string(b"attack"), ASCII::string(b"num_of_use") ];
+        let default_vals = vector<vector<u8>>
+        [ b"10", b"5" ];
+        let default_types = vector<String>
+        [ ASCII::string(b"integer"), ASCII::string(b"integer") ];
+        let mutate_setting = vector<bool>
+        [ false, false, false, false, false, false ];
 
         create_token(
             &creator,
-            token_id.tokendata_id.collection,
+            token_id.token_data_id.collection,
             ASCII::string(b"Token"),
             ASCII::string(b"Hello, Token"),
             100,
@@ -822,7 +766,6 @@ module AptosFramework::TokenV1 {
             default_vals,
             default_types,
         );
-
     }
 
     #[test(creator = @0x1, owner = @0x2)]
@@ -851,9 +794,8 @@ module AptosFramework::TokenV1 {
         creator: &signer,
         amount: u64,
         collection_max: u64,
-        token_max: u64,
+        token_max: u64
     ): TokenId acquires Collections, TokenStore {
-
         let mutate_setting = vector<bool>[false, false, false];
 
         create_collection(
@@ -868,7 +810,7 @@ module AptosFramework::TokenV1 {
         let default_keys = vector<String>[ASCII::string(b"attack"), ASCII::string(b"num_of_use")];
         let default_vals = vector<vector<u8>>[b"10", b"5"];
         let default_types = vector<String>[ASCII::string(b"integer"), ASCII::string(b"integer")];
-        let mutate_setting = vector<bool>[false, false, false, false, false];
+        let mutate_setting = vector<bool>[false, false, false, false, false, false];
         create_token(
             creator,
             get_collection_name(),
@@ -884,7 +826,6 @@ module AptosFramework::TokenV1 {
             default_keys,
             default_vals,
             default_types,
-
         )
     }
 
@@ -896,40 +837,22 @@ module AptosFramework::TokenV1 {
         // TODO assert!(Event::get_event_handle_counter(&collections.create_token_events) == 1, 1);
     }
 
-    #[test(creator = @0xAF, owner= @0xBB)]
+    #[test(creator = @0xAF, owner = @0xBB)]
     fun test_create_token_from_tokendata(creator: &signer, owner: &signer) acquires Collections, TokenStore {
-
         create_collection_and_token(creator, 2, 4, 4);
         let token_data_id = create_token_data_id(
             Signer::address_of(creator),
             get_collection_name(),
             get_token_name());
 
-        let new_keys = vector<String>[
-            ASCII::string(b"attack"), ASCII::string(b"num_of_use"),  ASCII::string(b"wrong_name")];
-        let new_vals = vector<vector<u8>>[
-            b"1", b"1", b"wrong_val"];
-        let new_types = vector<String>[
-            ASCII::string(b"integer"), ASCII::string(b"integer"),  ASCII::string(b"string")];
-
-        let token_id = mint_token(
+        let _token_id = mint_token(
             owner,
             token_data_id,
             1,
-            new_keys,
-            new_vals,
-            new_types
         );
 
         let token_store = borrow_global_mut<TokenStore>(Signer::address_of(owner));
 
-        assert!(token_id.serial_number == 2, 1);
         assert!(Table::length(&token_store.tokens) == 1, 1);
-
-        //
-        let properties = Table::borrow(&token_store.token_data, token_id);
-        assert!(PropertyList::size(properties) == 2, 1);
-        assert!(PropertyList::get_value(properties, & ASCII::string(b"attack")) == b"1", 1);
-        assert!(PropertyList::get_value(properties, & ASCII::string(b"num_of_use")) == b"1", 1);
     }
 }
