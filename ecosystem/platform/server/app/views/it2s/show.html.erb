@@ -58,7 +58,7 @@
                   <% end %>
                   <%= dialog.with_body do %>
                     <% if step.name == :connect_discord %>
-                      <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-96') %>
+                      <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-full') %>
                     <% end %>
                   <% end %>
                 <% end %>
