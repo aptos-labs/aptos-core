@@ -68,11 +68,7 @@ impl IntoLedgerView for TreeState {
             let write_sets = db.get_write_sets(checkpoint_next_version, self.num_transactions)?;
             checkpoint_state_view.prime_cache_by_write_set(&write_sets)?;
             let state_cache = checkpoint_state_view.into_state_cache();
-            let calculator = InMemoryStateCalculator::new(
-                &checkpoint_state,
-                state_cache,
-                checkpoint_next_version,
-            );
+            let calculator = InMemoryStateCalculator::new(&checkpoint_state, state_cache);
             calculator.calculate_for_write_sets_after_checkpoint(&write_sets)?
         };
 
@@ -135,7 +131,7 @@ pub(crate) struct InMemoryStateCalculator {
 }
 
 impl InMemoryStateCalculator {
-    pub fn new(base: &InMemoryState, state_cache: StateCache, next_version: Version) -> Self {
+    pub fn new(base: &InMemoryState, state_cache: StateCache) -> Self {
         let StateCache {
             frozen_base,
             state_cache,
@@ -145,6 +141,7 @@ impl InMemoryStateCalculator {
             checkpoint,
             checkpoint_version,
             current,
+            current_version,
             updated_since_checkpoint,
         } = base.clone();
 
@@ -155,7 +152,7 @@ impl InMemoryStateCalculator {
             checkpoint,
             checkpoint_version,
             latest: current.freeze(),
-            next_version,
+            next_version: state_checkpoint_next_version(current_version),
             updated_between_checkpoint_and_latest: updated_since_checkpoint,
             updated_after_latest: HashSet::new(),
         }
@@ -326,6 +323,7 @@ impl InMemoryStateCalculator {
             self.checkpoint,
             self.checkpoint_version,
             latest.unfreeze(),
+            self.next_version.checked_sub(1),
             updated_since_checkpoint,
         );
 

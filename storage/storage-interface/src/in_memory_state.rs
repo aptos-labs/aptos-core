@@ -21,6 +21,7 @@ pub struct InMemoryState {
     pub checkpoint: SparseMerkleTree<StateValue>,
     pub checkpoint_version: Option<Version>,
     pub current: SparseMerkleTree<StateValue>,
+    pub current_version: Option<Version>,
     pub updated_since_checkpoint: HashSet<StateKey>,
 }
 
@@ -29,24 +30,32 @@ impl InMemoryState {
         checkpoint: SparseMerkleTree<StateValue>,
         checkpoint_version: Option<Version>,
         current: SparseMerkleTree<StateValue>,
+        current_version: Option<Version>,
         updated_since_checkpoint: HashSet<StateKey>,
     ) -> Self {
         Self {
             checkpoint,
             checkpoint_version,
             current,
+            current_version,
             updated_since_checkpoint,
         }
     }
 
     pub fn new_empty() -> Self {
         let smt = SparseMerkleTree::new_empty();
-        Self::new(smt.clone(), None, smt, HashSet::new())
+        Self::new(smt.clone(), None, smt, None, HashSet::new())
     }
 
     pub fn new_at_checkpoint(root_hash: HashValue, checkpoint_version: Option<Version>) -> Self {
         let smt = SparseMerkleTree::new(root_hash);
-        Self::new(smt.clone(), checkpoint_version, smt, HashSet::new())
+        Self::new(
+            smt.clone(),
+            checkpoint_version,
+            smt,
+            checkpoint_version,
+            HashSet::new(),
+        )
     }
 
     pub fn checkpoint_root_hash(&self) -> HashValue {
