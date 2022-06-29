@@ -10,8 +10,9 @@ use crate::{
     metrics::{metrics, status_metrics},
     state, transactions,
 };
-use aptos_api_types::{Error, Response};
-
+use aptos_api_types::{Error, LedgerInfo, Response};
+use aptos_config::config::RoleType;
+use serde::Serialize;
 use std::convert::Infallible;
 use warp::{
     body::BodyDeserializeError,
@@ -24,6 +25,25 @@ use warp::{
 
 const OPEN_API_HTML: &str = include_str!("../doc/spec.html");
 const OPEN_API_SPEC: &str = include_str!("../doc/openapi.yaml");
+
+/// The struct holding all data returned to the client by the
+/// index endpoint (i.e., GET "/"). The data is flattened into
+/// a single JSON map to offer easier parsing for clients.
+#[derive(Serialize)]
+pub struct IndexResponse {
+    #[serde(flatten)]
+    ledger_info: LedgerInfo,
+    node_role: RoleType,
+}
+
+impl IndexResponse {
+    pub fn new(ledger_info: LedgerInfo, node_role: RoleType) -> IndexResponse {
+        Self {
+            ledger_info,
+            node_role,
+        }
+    }
+}
 
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
     index(context.clone())
@@ -84,8 +104,10 @@ pub fn index(context: Context) -> BoxedFilter<(impl Reply,)> {
 
 pub async fn handle_index(context: Context) -> Result<impl Reply, Rejection> {
     fail_point("endpoint_index")?;
-    let info = context.get_latest_ledger_info()?;
-    Ok(Response::new(info.clone(), &info)?)
+    let ledger_info = context.get_latest_ledger_info()?;
+    let node_role = context.node_role();
+    let index_response = IndexResponse::new(ledger_info.clone(), node_role);
+    Ok(Response::new(ledger_info, &index_response)?)
 }
 
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
