@@ -13,12 +13,17 @@ use poem_openapi::{
     param::Query, payload::Json, types::Example, Object as PoemObject, OpenApi, OpenApiService,
 };
 use url::Url;
-
+use super::NodeInformation;
 use super::configurations_manager::{ConfigurationsManager, NodeConfigurationWrapper};
+
+pub struct PreconfiguredNode<M: MetricCollector> {
+    node_information: NodeInformation,
+    metric_collector: M,
+}
 
 pub struct Api<M: MetricCollector, R: Runner> {
     pub configurations_manager: ConfigurationsManager<M, R>,
-    pub target_metric_collector: Option<M>,
+    pub preconfigured_test_node: Option<PreconfiguredNode<M>>,
     pub allow_preconfigured_test_node_only: bool,
 }
 
@@ -76,14 +81,15 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
         #[oai(default = "NodeAddress::default_api_port")] api_port: Query<u16>,
         #[oai(default = "NodeAddress::default_noise_port")] noise_port: Query<u16>,
     ) -> PoemResult<Json<EvaluationSummary>> {
+        let target_node_address = NodeAddress {
+            url: node_url.0,
+            metrics_port: metrics_port.0,
+            api_port: api_port.0,
+            noise_port: noise_port.0,
+        };
         let request = CheckNodeRequest {
             baseline_configuration_name: baseline_configuration_name.0,
-            target_node: NodeAddress {
-                url: node_url.0,
-                metrics_port: metrics_port.0,
-                api_port: api_port.0,
-                noise_port: noise_port.0,
-            },
+            target_node: target_node_address.clone(),
         };
         if self.allow_preconfigured_test_node_only {
             return Err(PoemError::from((
@@ -103,7 +109,7 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
 
         let complete_evaluation_result = baseline_node_configuration
             .runner
-            .run(&target_metric_collector)
+            .run(&target_node_information, &target_metric_collector)
             .await;
 
         match complete_evaluation_result {
@@ -121,7 +127,7 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
         &self,
         baseline_configuration_name: Query<Option<String>>,
     ) -> PoemResult<Json<EvaluationSummary>> {
-        if self.target_metric_collector.is_none() {
+        if self.preconfigured_test_node.is_none() {
             return Err(PoemError::from((
                 StatusCode::METHOD_NOT_ALLOWED,
                 anyhow!(
@@ -129,13 +135,17 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
                 ),
             )));
         }
+        let preconfigured_test_node = self.preconfigured_test_node.as_ref().unwrap();
 
         let baseline_node_configuration =
             self.get_baseline_node_configuration(&baseline_configuration_name)?;
 
         let complete_evaluation_result = baseline_node_configuration
             .runner
-            .run(self.target_metric_collector.as_ref().unwrap())
+            .run(
+                &preconfigured_test_node.node_information,
+                &preconfigured_test_node.metric_collector,
+            )
             .await;
 
         match complete_evaluation_result {
@@ -148,6 +158,10 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
         }
     }
 
+    /// Get the different baseline configurations the instance of NHC is
+    /// configured with. This method is best effort, it is infeasible to
+    /// derive (or even represent) some fields of the spec via OpenAPI,
+    /// so note that some fields will be missing from the response.
     #[oai(path = "/get_configurations", method = "get")]
     async fn get_configurations(&self) -> Json<Vec<NodeConfiguration>> {
         Json(
@@ -159,6 +173,8 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
         )
     }
 
+    /// Get just the keys for the configurations, i.e. the configuration_name
+    /// field.
     #[oai(path = "/get_configuration_keys", method = "get")]
     async fn get_configuration_keys(&self) -> Json<Vec<String>> {
         Json(

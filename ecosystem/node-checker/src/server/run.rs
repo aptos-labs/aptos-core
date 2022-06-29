@@ -4,9 +4,12 @@
 use std::path::PathBuf;
 
 use super::common::ServerArgs;
+use super::NodeInformation;
 use crate::{
-    configuration::{DEFAULT_API_PORT_STR, DEFAULT_METRICS_PORT_STR, DEFAULT_NOISE_PORT_STR},
-    metric_collector::ReqwestMetricCollector,
+    configuration::{
+        NodeAddress, DEFAULT_API_PORT_STR, DEFAULT_METRICS_PORT_STR, DEFAULT_NOISE_PORT_STR,
+    },
+    metric_collector::ReqwestMetricCollector, server::{node_information, api::PreconfiguredNode},
 };
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -65,17 +68,30 @@ pub async fn run(args: Run) -> Result<()> {
         configurations_manager.configurations
     );
 
-    let target_metric_collector = match args.target_node_url {
-        Some(ref url) => Some(ReqwestMetricCollector::new(
-            url.clone(),
-            args.target_metrics_port,
-        )),
+    let preconfigured_test_node = match args.target_node_url {
+        Some(ref url) => {
+            let node_address = NodeAddress {
+                url: url.clone(),
+                api_port: args.target_api_port,
+                metrics_port: args.target_metrics_port,
+                noise_port: args.target_noise_port,
+            };
+            let metric_collector =
+                ReqwestMetricCollector::new(url.clone(), args.target_metrics_port);
+            let node_information = NodeInformation {
+                node_address,
+            };
+            Some(PreconfiguredNode {
+                node_information,
+                metric_collector,
+            })
+        }
         None => None,
     };
 
     let api = Api {
         configurations_manager,
-        target_metric_collector,
+        preconfigured_test_node,
         allow_preconfigured_test_node_only: args.allow_preconfigured_test_node_only,
     };
 

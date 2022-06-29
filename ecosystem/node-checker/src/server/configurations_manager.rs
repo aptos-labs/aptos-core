@@ -11,6 +11,8 @@ use crate::{
 };
 use anyhow::{Context, Result};
 
+use super::NodeInformation;
+
 /// This struct is a wrapper to help with all the different baseline
 /// node configurations.
 #[derive(Debug)]
@@ -33,6 +35,12 @@ fn build_node_configuration_wrapper_with_blocking_runner_and_reqwest_metric_coll
     node_configuration: NodeConfiguration,
 ) -> Result<NodeConfigurationWrapper<ReqwestMetricCollector, BlockingRunner<ReqwestMetricCollector>>>
 {
+    let baseline_node_information = NodeInformation {
+        node_address: node_configuration.node_address,
+        chain_id: node_configuration.get_chain_id(),
+        role_type: node_configuration.get_role_type(),
+    };
+
     let baseline_metric_collector = ReqwestMetricCollector::new(
         node_configuration.node_address.url.clone(),
         node_configuration.node_address.metrics_port,
@@ -46,7 +54,8 @@ fn build_node_configuration_wrapper_with_blocking_runner_and_reqwest_metric_coll
 
     let runner = BlockingRunner::new(
         node_configuration.runner_args.blocking_runner_args.clone(),
-        baseline_metric_collector.clone(),
+        baseline_node_information,
+        baseline_metric_collector,
         evaluators,
     );
 

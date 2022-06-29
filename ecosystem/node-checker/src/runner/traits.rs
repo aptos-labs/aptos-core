@@ -6,11 +6,12 @@ use async_trait::async_trait;
 use thiserror::Error as ThisError;
 
 use crate::{
+    configuration::NodeAddress,
     evaluator::EvaluationSummary,
     evaluators::{
         metrics::MetricsEvaluatorError, system_information::SystemInformationEvaluatorError,
     },
-    metric_collector::{MetricCollector, MetricCollectorError},
+    metric_collector::{MetricCollector, MetricCollectorError}, server::NodeInformation,
 };
 
 #[derive(Debug, ThisError)]
@@ -50,6 +51,7 @@ pub enum RunnerError {
 pub trait Runner: Sync + Send + 'static {
     async fn run<M: MetricCollector>(
         &self,
-        target_collector: &M,
+        target_node_tools: &NodeInformation,
+        target_metric_collector: &M,
     ) -> Result<EvaluationSummary, RunnerError>;
 }

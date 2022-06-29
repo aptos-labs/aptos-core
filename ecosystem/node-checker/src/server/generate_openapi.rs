@@ -33,7 +33,7 @@ pub async fn generate_openapi(args: GenerateOpenapi) -> Result<()> {
 
     let api = Api {
         configurations_manager: ConfigurationsManager { configurations },
-        target_metric_collector: None,
+        preconfigured_test_node: None,
         allow_preconfigured_test_node_only: false,
     };
 
