@@ -16,7 +16,7 @@ module AptosFramework::PropertyList {
     const EKEY_COUNT_NOT_MATCH_TYPE_COUNT: u64 = 5;
 
     struct PropertyList has store {
-       map: SimpleMap<String, PropertyValue>
+        map: SimpleMap<String, PropertyValue>
     }
 
     struct PropertyValue has store, copy, drop {
@@ -31,20 +31,21 @@ module AptosFramework::PropertyList {
     ): PropertyList {
         assert!(Vector::length(default_keys) == Vector::length(default_values), EKEY_COUNT_NOT_MATCH_VALUE_COUNT);
         assert!(Vector::length(default_keys) == Vector::length(default_types), EKEY_COUNT_NOT_MATCH_TYPE_COUNT);
-        let properties = PropertyList {
-           map: SimpleMap::create<String, PropertyValue>()
+        let properties = PropertyList{
+            map: SimpleMap::create<String, PropertyValue>()
         };
         let i = 0;
         while (i < Vector::length(default_keys)) {
             SimpleMap::add(
                 &mut properties.map,
                 *Vector::borrow(default_keys, i),
-                PropertyValue {value: *Vector::borrow(default_values, i), type: *Vector::borrow(default_types, i)}
+                PropertyValue{ value: *Vector::borrow(default_values, i), type: *Vector::borrow(default_types, i) }
             );
-            i  = i + 1;
+            i = i + 1;
         };
         properties
     }
+
     public fun contains(list: &PropertyList, key: &String): bool {
         SimpleMap::contains_key(&list.map, key)
     }
@@ -53,33 +54,34 @@ module AptosFramework::PropertyList {
         assert!(! SimpleMap::contains_key(&list.map, &key), EKEY_AREADY_EXIST_IN_PROPERTY_MAP);
         assert!(SimpleMap::length<String, PropertyValue>(&list.map) <= MAX_PROPERTY_MAP_SIZE, EPROPERTY_NUMBER_EXCEED_LIMIT);
         SimpleMap::add(&mut list.map, key, value);
-
     }
 
     public fun size(list: &PropertyList): u64 {
         SimpleMap::length(&list.map)
     }
 
-    public fun borrow(list: &PropertyList, key: &String,): &PropertyValue {
+    public fun borrow(list: &PropertyList, key: &String): &PropertyValue {
         let found = contains(list, key);
         assert!(found, EPROPERTY_NOT_EXIST);
         SimpleMap::borrow(&list.map, key)
     }
 
-    public fun get_value(list: &PropertyList, key: &String,): vector<u8> {
+    public fun get_value(list: &PropertyList, key: &String): vector<u8> {
         let found = contains(list, key);
         assert!(found, EPROPERTY_NOT_EXIST);
         SimpleMap::borrow(&list.map, key).value
     }
 
-    public fun get_type(list: &PropertyList, key: &String,): String {
+    public fun get_type(list: &PropertyList, key: &String, ): String {
         let found = contains(list, key);
         assert!(found, EPROPERTY_NOT_EXIST);
         SimpleMap::borrow(&list.map, key).type
     }
 
     public fun get_property_values(
-        list: &PropertyList, keys: vector<String>): vector<PropertyValue> {
+        list: &PropertyList,
+        keys: vector<String>
+    ): vector<PropertyValue> {
         let res: vector<PropertyValue> = Vector::empty<PropertyValue>();
         let i = 0;
         while (i < Vector::length(&keys)) {
@@ -94,7 +96,8 @@ module AptosFramework::PropertyList {
     public fun update_property_value(
         list: &mut PropertyList,
         key: &String,
-        value: PropertyValue ) {
+        value: PropertyValue
+    ) {
         let found = contains(list, key);
         assert!(found, EPROPERTY_NOT_EXIST);
         let property_val = SimpleMap::borrow_mut(&mut list.map, key);
@@ -112,7 +115,10 @@ module AptosFramework::PropertyList {
     }
 
     public fun update_property_values(
-        list: &mut PropertyList, keys: &vector<String>, values: vector<PropertyValue>){
+        list: &mut PropertyList,
+        keys: &vector<String>,
+        values: vector<PropertyValue>
+    ) {
         let i = 0;
         while (i < Vector::length(keys)) {
             let key = Vector::borrow(keys, i);
@@ -123,12 +129,13 @@ module AptosFramework::PropertyList {
     }
 
     #[test_only]
-    fun create_property_list(): PropertyList{
+    fun create_property_list(): PropertyList {
         use Std::ASCII::string;
-        let keys = vector<String>[
-            string(b"attack"),
-            string(b"durability"),
-            string(b"type"),
+        let keys = vector<String>
+        [
+        string(b"attack"),
+        string(b"durability"),
+        string(b"type"),
         ];
         let values = vector<vector<u8>>[ b"10", b"5", b"weapon" ];
         let types = vector<String>[ string(b"integer"), string(b"integer"), string(b"String") ];
@@ -136,26 +143,26 @@ module AptosFramework::PropertyList {
     }
 
     #[test]
-    fun test_add_property(): PropertyList{
+    fun test_add_property(): PropertyList {
         use Std::ASCII::string;
         let properties = create_property_list();
         add(
             &mut properties, string(b"level"),
-            PropertyValue {
+            PropertyValue{
                 value: b"1",
                 type: string(b"integer")
             });
         assert!(
             borrow(&properties, &string(b"level")).value == b"1",
-            EPROPERTY_NOT_EXIST );
+            EPROPERTY_NOT_EXIST);
         properties
     }
 
     #[test]
-    fun test_update_property(): PropertyList{
+    fun test_update_property(): PropertyList {
         use Std::ASCII::string;
         let properties = create_property_list();
-        update_property_value(&mut properties, &string(b"attack"), PropertyValue { value: b"7", type: string(b"integer")});
+        update_property_value(&mut properties, &string(b"attack"), PropertyValue{ value: b"7", type: string(b"integer") });
         assert!(
             borrow(&properties, &string(b"attack")).value == b"7",
             1
@@ -164,7 +171,7 @@ module AptosFramework::PropertyList {
     }
 
     #[test]
-    fun test_remove_property(): PropertyList{
+    fun test_remove_property(): PropertyList {
         use Std::ASCII::string;
         let properties = create_property_list();
         assert!(size(&mut properties) == 3, 1);
