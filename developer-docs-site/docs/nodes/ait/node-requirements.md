@@ -7,11 +7,13 @@ slug: "node-requirements"
 
 Follow the requirements specified in this document to make your AIT-2 Validator and FullNode deployment hassle-free. 
 
-## Use separate machines
+## Validator and FullNode
 
-- For the AIT-2, we recommend that every node operator run both a Validator and a FullNode. If you follow the installation instructions then both the nodes will be installed by default. 
-- We strongly recommend that you run the Validator and the FullNode on two separate and independent machines. Make sure that these machines are well-provisioned and isolated from each other. Guaranteeing the resource isolation between the Validator and the FullNode will help ensure smooth deployment of these nodes.
+- For the AIT-2, we require that you run the Validator. We recommend that optionally you run a FullNode also. However, a FullNode is not required. 
+- If you run FullNode also, then we strongly recommend that you run the Validator and the FullNode on two separate and independent machines. Make sure that these machines are well-provisioned and isolated from each other. Guaranteeing the resource isolation between the Validator and the FullNode will help ensure smooth deployment of these nodes.
 - For best availability and stability, **we recommend that you deploy your node on the cloud**. We have provided Terraform support for deploying the node on three cloud providers: GCP, AWS and Azure. See [Validators](/nodes/validator-node/validators).
+- Make sure that you open the network ports prior to July 12, before the AIT-2 goes live. See [Networking configuration requirements](#networking-configuration-requirements).
+- Make sure that you close these ports after either being accepted or rejected for the AIT-2.
 
 ## Validator node in test mode 
 
