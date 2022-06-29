@@ -850,6 +850,10 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
                         "Bytes".into()
                     }
                 }
+                Bool => "Vec<bool>".into(),
+                U64 => "Vec<u64>".into(),
+                U128 => "Vec<u128>".into(),
+                Address => "Vec<AccountAddress>".into(),
                 Vector(type_tag) if type_tag.as_ref() == &U8 => "VecBytes".into(),
                 _ => common::type_not_allowed(type_tag),
             },
@@ -868,6 +872,7 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
             Bool | U8 | U64 | U128 | Address => {}
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => {}
+                Bool | U64 | U128 | Address => {}
                 Vector(type_tag) => {
                     if type_tag.as_ref() != &U8 {
                         common::type_not_allowed(type_tag)
