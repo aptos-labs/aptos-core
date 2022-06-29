@@ -17,7 +17,12 @@
 
   <div class="mb-6">
     <%= f.label :username, class: 'font-mono uppercase block mb-2' %>
-    <%= f.text_field :username, autofocus: true, spellcheck: false, pattern: '[a-zA-Z0-9\-_]+', minlength: 3, maxlength: 20 %>
+    <ul class="font-mono text-xs mb-2">
+      <li>Allowed Characters: a-z, A-Z, 0-9, _, -</li>
+      <li>Must begin and end alphanumerically</li>
+      <li>May not have two consecutive _ or -</li>
+    </ul>
+    <%= f.text_field :username, autofocus: true, spellcheck: false, pattern: User::USERNAME_REGEX_JS, minlength: 3, maxlength: 20 %>
   </div>
 
   <div class="mb-6">

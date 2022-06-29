@@ -11,8 +11,11 @@ class User < ApplicationRecord
          :omniauthable, omniauth_providers: %i[discord github google],
                         authentication_keys: [:username]
 
+  USERNAME_REGEX = /\A(?!\A[\-_])(?!.*[\-_]{2,})(?!.*[\-_]\Z)[a-zA-Z0-9\-_]+\Z/
+  USERNAME_REGEX_JS = USERNAME_REGEX.inspect[1..-2].gsub('\\A', '^').gsub('\\Z', '$')
+
   validates :username, uniqueness: { case_sensitive: false }, length: { minimum: 3, maximum: 20 },
-                       format: { with: /\A[a-zA-Z0-9\-_]+\z/ }, allow_nil: true
+                       format: { with: User::USERNAME_REGEX }, allow_nil: true
   validates :email, uniqueness: { case_sensitive: false }, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_nil: true
 
   validate_aptos_address :mainnet_address
@@ -113,6 +116,10 @@ class User < ApplicationRecord
       raise 'Unknown Provider!'
     end
     authorizations.build(auth)
+  end
+
+  def registration_completed?
+    confirmed? && username.present?
   end
 
   private

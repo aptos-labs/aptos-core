@@ -16,6 +16,7 @@ class SettingsControllerTest < ActionDispatch::IntegrationTest
     follow_redirect!
     @user = User.last
     sign_in @user
+    assert_equal 1, @user.authorizations.count
   end
 
   test 'profile settings page' do
@@ -43,14 +44,14 @@ class SettingsControllerTest < ActionDispatch::IntegrationTest
     follow_redirect!
     assert_equal 2, @user.authorizations.count
     authorization = @user.authorizations.first
-    delete settings_connections_url(authorization), params: { authorization: { provider: authorization.provider } }
+    delete settings_connections_url(authorization), params: { authorization: { id: authorization.id } }
     assert_equal 1, @user.authorizations.count
   end
 
   test 'remove last connection fails' do
     assert_equal 1, @user.authorizations.count
     authorization = @user.authorizations.first
-    delete settings_connections_url(authorization), params: { authorization: { provider: authorization.provider } }
+    delete settings_connections_url(authorization), params: { authorization: { id: authorization.id } }
     assert_equal 1, @user.authorizations.count
   end
 end
