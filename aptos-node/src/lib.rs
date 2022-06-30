@@ -445,7 +445,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
             &node_config.storage.dir(),
             false, /* readonly */
             node_config.storage.storage_pruner_config,
-            node_config.storage.rocksdb_config,
+            node_config.storage.rocksdb_configs,
         )
         .expect("DB should open."),
     );

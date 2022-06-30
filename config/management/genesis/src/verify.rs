@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
+use aptos_config::config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OPERATOR_ACCOUNT, OPERATOR_KEY, OWNER_ACCOUNT, OWNER_KEY,
     SAFETY_DATA, VALIDATOR_NETWORK_KEY, WAYPOINT,
@@ -213,7 +213,7 @@ fn compute_genesis(
         db_path,
         false,
         NO_OP_STORAGE_PRUNER_CONFIG,
-        RocksdbConfig::default(),
+        RocksdbConfigs::default(),
     )
     .map_err(|e| Error::UnexpectedError(e.to_string()))?;
     let db_rw = DbReaderWriter::new(aptosdb);

@@ -11,7 +11,7 @@ pub(crate) mod stream;
 pub mod test_utils;
 
 use anyhow::{anyhow, Result};
-use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
+use aptos_config::config::{RocksdbConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{
@@ -46,20 +46,32 @@ pub struct GlobalBackupOpt {
 
 #[derive(Clone, StructOpt)]
 pub struct RocksdbOpt {
-    // using a smaller value than a node since we don't care much about reading performance
-    // in this tool.
-    #[structopt(long, default_value = "1000")]
-    max_open_files: i32,
+    // using the same default with a node.
+    #[structopt(long, default_value = "5000")]
+    ledger_db_max_open_files: i32,
     // using the same default with a node (1GB).
     #[structopt(long, default_value = "1073741824")]
-    max_total_wal_size: u64,
+    ledger_db_max_total_wal_size: u64,
+    // using a smaller value than a node since we don't care much about reading performance
+    // in this tool.
+    #[structopt(long, default_value = "5000")]
+    state_merkle_db_max_open_files: i32,
+    // using the same default with a node (1GB).
+    #[structopt(long, default_value = "1073741824")]
+    state_merkle_db_max_total_wal_size: u64,
 }
 
-impl From<RocksdbOpt> for RocksdbConfig {
+impl From<RocksdbOpt> for RocksdbConfigs {
     fn from(opt: RocksdbOpt) -> Self {
         Self {
-            max_open_files: opt.max_open_files,
-            max_total_wal_size: opt.max_total_wal_size,
+            ledger_db_config: RocksdbConfig {
+                max_open_files: opt.ledger_db_max_open_files,
+                max_total_wal_size: opt.ledger_db_max_total_wal_size,
+            },
+            state_merkle_db_config: RocksdbConfig {
+                max_open_files: opt.state_merkle_db_max_open_files,
+                max_total_wal_size: opt.state_merkle_db_max_total_wal_size,
+            },
         }
     }
 }
