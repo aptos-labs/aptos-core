@@ -23,7 +23,7 @@ This guide will show you how to:
 
 ## Before you proceed
 
-Before you proceed, make sure that you already know how to start your local FullNode. See [Run a FullNode](run-a-fullnode) for detailed documentation.
+Before you proceed, make sure that you already know how to start your local FullNode. See [Run a FullNode](/nodes/full-node/index.md) for detailed documentation.
 
 :::caution Docker support only on Linux
 
