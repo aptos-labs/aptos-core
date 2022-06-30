@@ -1,10 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-#![allow(dead_code)]
-#![allow(unused_variables)]
-#![allow(unused_mut)]
-
 use crate::{
     configuration::EvaluatorArgs,
     evaluator::Evaluator,
@@ -14,8 +10,7 @@ use crate::{
             StateSyncVersionEvaluator,
         },
         system_information::{
-            SystemInformationBuildVersionEvaluator, SystemInformationEvaluatorError,
-            SystemInformationEvaluatorInput,
+            BuildVersionEvaluator, SystemInformationEvaluatorError, SystemInformationEvaluatorInput,
         },
     },
 };
@@ -57,7 +52,7 @@ pub fn build_evaluators(
 
     let name = ConsensusProposalsEvaluator::get_name();
     match evaluator_names.take(&name) {
-        Some(name) => {
+        Some(_) => {
             evaluators.push(EvaluatorType::Metrics(Box::new(
                 ConsensusProposalsEvaluator::from_evaluator_args(evaluator_args),
             )));
@@ -67,7 +62,7 @@ pub fn build_evaluators(
 
     let name = StateSyncVersionEvaluator::get_name();
     match evaluator_names.take(&name) {
-        Some(name) => {
+        Some(_) => {
             evaluators.push(EvaluatorType::Metrics(Box::new(
                 StateSyncVersionEvaluator::from_evaluator_args(evaluator_args),
             )));
@@ -75,11 +70,11 @@ pub fn build_evaluators(
         None => log_did_not_build(&name),
     }
 
-    let name = SystemInformationBuildVersionEvaluator::get_name();
+    let name = BuildVersionEvaluator::get_name();
     match evaluator_names.take(&name) {
-        Some(name) => {
+        Some(_) => {
             evaluators.push(EvaluatorType::SystemInformation(Box::new(
-                SystemInformationBuildVersionEvaluator::from_evaluator_args(evaluator_args),
+                BuildVersionEvaluator::from_evaluator_args(evaluator_args),
             )));
         }
         None => log_did_not_build(&name),

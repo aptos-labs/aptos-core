@@ -50,8 +50,3 @@ pub trait Evaluator: Debug + Sync + Send {
     where
         Self: Sized;
 }
-
-/*
-/// todo: explain that this function is not on the trait because it makes the
-/// trait not object safe
-*/
