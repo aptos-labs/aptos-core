@@ -6,7 +6,7 @@ sidebar_position: 10
 
 # FullNode Using Aptos Source and Docker
 
-You can run your own [FullNode](/basics/basics-fullnodes) to synchronize with the state of the Aptos Blockchain and stay up-to-date. FullNodes replicate the entire state of the blockchain by querying other Aptos FullNodes or validators.
+You can run your own [FullNode](/concepts/basics-fullnodes) to synchronize with the state of the Aptos Blockchain and stay up-to-date. FullNodes replicate the entire state of the blockchain by querying other Aptos FullNodes or validators.
 
 Alternatively, you can use the FullNodes provided by Aptos Labs. However, such Aptos Labs-provided FullNodes have rate limits, which can impede your development. By running your own FullNode you can directly synchronize with the Aptos Blockchain and avoid such rate limits.
 
@@ -22,9 +22,9 @@ Your public FullNode will be connected to the Aptos devnet with a REST endpoint 
 
 Before you get started with this tutorial, read the following sections:
 
-* [Validator node concepts](/basics/basics-validator-nodes).
-* [FullNode concepts](/basics/basics-fullnodes).
-* [REST specifications][rest_spec].
+* [Validator node concepts](/concepts/basics-validator-nodes).
+* [FullNode concepts](/concepts/basics-fullnodes).
+* [REST specifications](/rest-api).
 
 :::caution Docker support only on Linux
 
@@ -288,6 +288,5 @@ full_node_networks:
 ...            
 ```
 
-[rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
 [devnet_genesis]: https://devnet.aptoslabs.com/genesis.blob
 [devnet_waypoint]: https://devnet.aptoslabs.com/waypoint.txt
