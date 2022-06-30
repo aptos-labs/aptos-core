@@ -2,11 +2,11 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Aptos Node Checker",
-    "version": "0.1.0"
+    "version": "0.1.1"
   },
   "servers": [
     {
-      "url": "http://0.0.0.0:20121/api"
+      "url": "http://0.0.0.0:20121/"
     }
   ],
   "tags": [],
@@ -111,17 +111,71 @@
           }
         }
       }
+    },
+    "/get_configurations": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NodeConfiguration"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_configuration_keys": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "BlockingRunnerArgs": {
+        "type": "object",
+        "required": [
+          "metrics_fetch_delay_secs"
+        ],
+        "properties": {
+          "metrics_fetch_delay_secs": {
+            "type": "integer",
+            "format": "uint64"
+          }
+        }
+      },
+      "ConsensusProposalsEvaluatorArgs": {
+        "type": "object"
+      },
       "EvaluationResult": {
         "type": "object",
         "required": [
           "headline",
           "score",
           "explanation",
-          "source",
+          "evaluator_name",
+          "category",
           "links"
         ],
         "properties": {
@@ -138,9 +192,13 @@
             "type": "string",
             "description": "Explanation of the evaluation."
           },
-          "source": {
+          "evaluator_name": {
             "type": "string",
-            "description": "Name of the evaluator where the evaluation came from, e.g. state_sync."
+            "description": "Name of the evaluator where the evaluation came from, e.g. state_sync_version."
+          },
+          "category": {
+            "type": "string",
+            "description": "Category of the evaluator where the evaluation came from, e.g. state_sync."
           },
           "links": {
             "type": "array",
@@ -176,6 +234,134 @@
             "description": "An overall explanation of the results."
           }
         }
+      },
+      "EvaluatorArgs": {
+        "type": "object",
+        "required": [
+          "state_sync_version_args",
+          "consensus_proposals_args",
+          "system_information_build_version_args"
+        ],
+        "properties": {
+          "state_sync_version_args": {
+            "$ref": "#/components/schemas/StateSyncVersionEvaluatorArgs"
+          },
+          "consensus_proposals_args": {
+            "$ref": "#/components/schemas/ConsensusProposalsEvaluatorArgs"
+          },
+          "system_information_build_version_args": {
+            "$ref": "#/components/schemas/SystemInformationBuildVersionEvaluatorArgs"
+          }
+        }
+      },
+      "NodeAddress": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "url",
+            "description": "Target URL. This should include a scheme (e.g. http://). If there is\nno scheme, we will prepend http://."
+          },
+          "metrics_port": {
+            "type": "integer",
+            "format": "uint16",
+            "description": "Metrics port.",
+            "default": 9101
+          },
+          "api_port": {
+            "type": "integer",
+            "format": "uint16",
+            "description": "API port.",
+            "default": 8080
+          },
+          "noise_port": {
+            "type": "integer",
+            "format": "uint16",
+            "description": "Validator communication port.",
+            "default": 6180
+          }
+        },
+        "example": {
+          "url": "http://mynode.mysite.com/",
+          "metrics_port": 9101,
+          "api_port": 8080,
+          "noise_port": 6180
+        }
+      },
+      "NodeConfiguration": {
+        "type": "object",
+        "required": [
+          "node_address",
+          "configuration_name",
+          "configuration_name_pretty",
+          "evaluators",
+          "evaluator_args",
+          "runner_args"
+        ],
+        "properties": {
+          "node_address": {
+            "$ref": "#/components/schemas/NodeAddress"
+          },
+          "configuration_name": {
+            "type": "string",
+            "description": "This is the name we expect clients to send over the wire to select\nwhich configuration they want to use. e.g. devnet_fullnode"
+          },
+          "configuration_name_pretty": {
+            "type": "string",
+            "description": "This is the name we will show for this configuration to users.\nFor example, if someone opens the NHC frontend, they will see this name\nin a dropdown list of configurations they can test their node against.\ne.g. \"Devnet FullNode\", \"Testnet Validator Node\", etc."
+          },
+          "chain_id": {
+            "type": "integer",
+            "format": "uint16",
+            "description": "The chain ID we expect to find when we speak to the node.\nIf not given, we will just assume the value we find is correct.\nIf given, we will check that the value is correct, exiting if not."
+          },
+          "role_type": {
+            "type": "string",
+            "description": "The role type we expect to find when we speak to the node.\nIf not given, we will just assume the value we find is correct.\nIf given, we will check that the value is correct, exiting if not.\ne.g. \"full_node\", \"validator_node\", etc."
+          },
+          "evaluators": {
+            "type": "array",
+            "description": "The (metric) evaluators to use, e.g. state_sync, api, etc.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evaluator_args": {
+            "$ref": "#/components/schemas/EvaluatorArgs"
+          },
+          "runner_args": {
+            "$ref": "#/components/schemas/RunnerArgs"
+          }
+        }
+      },
+      "RunnerArgs": {
+        "type": "object",
+        "required": [
+          "blocking_runner_args"
+        ],
+        "properties": {
+          "blocking_runner_args": {
+            "$ref": "#/components/schemas/BlockingRunnerArgs"
+          }
+        }
+      },
+      "StateSyncVersionEvaluatorArgs": {
+        "type": "object",
+        "required": [
+          "version_delta_tolerance"
+        ],
+        "properties": {
+          "version_delta_tolerance": {
+            "type": "integer",
+            "format": "uint64"
+          }
+        }
+      },
+      "SystemInformationBuildVersionEvaluatorArgs": {
+        "type": "object"
       }
     }
   }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    configuration::NodeAddress,
+    configuration::{NodeAddress, NodeConfiguration},
     evaluator::EvaluationSummary,
     metric_collector::{MetricCollector, ReqwestMetricCollector},
     runner::Runner,
@@ -147,6 +147,28 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
             ))),
         }
     }
+
+    #[oai(path = "/get_configurations", method = "get")]
+    async fn get_configurations(&self) -> Json<Vec<NodeConfiguration>> {
+        Json(
+            self.configurations_manager
+                .configurations
+                .values()
+                .map(|n| n.node_configuration.clone())
+                .collect(),
+        )
+    }
+
+    #[oai(path = "/get_configuration_keys", method = "get")]
+    async fn get_configuration_keys(&self) -> Json<Vec<String>> {
+        Json(
+            self.configurations_manager
+                .configurations
+                .keys()
+                .cloned()
+                .collect(),
+        )
+    }
 }
 
 #[derive(Clone, Debug, PoemObject)]
@@ -167,22 +189,17 @@ impl Example for CheckNodeRequest {
 
 pub fn build_openapi_service<M: MetricCollector, R: Runner>(
     api: Api<M, R>,
-    listen_address: Url,
-    listen_port: u16,
-    endpoint_override: Option<&str>,
+    mut listen_address: Url,
+    api_path: &str,
 ) -> OpenApiService<Api<M, R>, ()> {
     let version = std::env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.1.0".to_string());
-    // TODO: Ensure we have a scheme on listen address.
-    let host = listen_address
-        .host_str()
-        .expect("Failed to find host in listen address");
-    let endpoint = endpoint_override.unwrap_or("api");
-    let api_service = OpenApiService::new(api, "Aptos Node Checker", version).server(format!(
-        "{}://{}:{}/{}",
-        listen_address.scheme(),
-        host,
-        listen_port,
-        endpoint
-    ));
-    api_service
+    // These should have already been validated at this point, so we panic.
+    if !listen_address.has_host() {
+        panic!("No host in listen address");
+    }
+    if listen_address.port().is_none() {
+        panic!("No port in listen address");
+    }
+    listen_address.set_path(api_path);
+    OpenApiService::new(api, "Aptos Node Checker", version).server(listen_address)
 }
