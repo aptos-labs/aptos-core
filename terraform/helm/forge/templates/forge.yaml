@@ -47,7 +47,9 @@ spec:
           {{- toYaml .Values.forge.resources | nindent 10 }}
         env:
         - name: RUST_BACKTRACE
-          value: "1"
+          value: "full"
+        - name: RUST_LOG
+          value: "debug"
         volumeMounts:
         - name: forge-scripts
           mountPath: /etc/forge/scripts

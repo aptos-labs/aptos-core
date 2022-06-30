@@ -62,7 +62,7 @@ variable "k8s_admins" {
 ### Testnet config
 
 variable "chain_id" {
-  description = "Aptos chain ID"
+  description = "Aptos chain ID. If var.enable_forge set, defaults to 4"
   default     = 4
 }
 

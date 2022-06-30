@@ -200,3 +200,8 @@ variable "monitoring_helm_values" {
   type        = any
   default     = {}
 }
+
+variable "helm_release_name_override" {
+  description = "If set, overrides the name of the aptos-node helm chart"
+  default     = ""
+}

@@ -139,11 +139,14 @@ locals {
       domain = local.domain
     }
   })
+
+  # override the helm release name if an override exists, otherwise adopt the workspace name
+  helm_release_name = var.helm_release_name_override != "" ? var.helm_release_name_override : local.workspace_name
 }
 
 resource "helm_release" "validator" {
   count       = var.helm_enable_validator ? 1 : 0
-  name        = local.workspace_name
+  name        = local.helm_release_name
   chart       = var.helm_chart != "" ? var.helm_chart : "${path.module}/../../helm/aptos-node"
   max_history = 5
   wait        = false
@@ -162,7 +165,7 @@ resource "helm_release" "validator" {
 
 resource "helm_release" "logger" {
   count       = var.enable_logger ? 1 : 0
-  name        = "${local.workspace_name}-log"
+  name        = "${local.helm_release_name}-log"
   chart       = "${path.module}/../../helm/logger"
   max_history = 5
   wait        = false
@@ -178,7 +181,7 @@ resource "helm_release" "logger" {
       serviceAccount = {
         create = false
         # this name must match the serviceaccount created by the aptos-node helm chart
-        name = "${local.workspace_name}-aptos-node-validator"
+        name = "${local.helm_release_name}-aptos-node-validator"
       }
     }),
     jsonencode(var.logger_helm_values),
@@ -192,7 +195,7 @@ resource "helm_release" "logger" {
 
 resource "helm_release" "monitoring" {
   count       = var.enable_monitoring ? 1 : 0
-  name        = "${local.workspace_name}-mon"
+  name        = "${local.helm_release_name}-mon"
   chart       = "${path.module}/../../helm/monitoring"
   max_history = 5
   wait        = false

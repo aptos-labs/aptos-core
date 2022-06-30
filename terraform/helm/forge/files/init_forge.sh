@@ -5,6 +5,7 @@
 
 # set up internal helm repo, naming it testnet-internal
 echo "Setting up repo s3://{{ .Values.forge.helmBucket }}/charts"
-helm plugin install https://github.com/C123R/helm-blob.git
+# use helm-s3 plugin for now, as the auth works with serviceaccount
+helm plugin install https://github.com/hypnoglow/helm-s3.git
 helm repo add testnet-internal s3://{{ .Values.forge.helmBucket }}/charts
 helm search repo testnet-internal --versions
