@@ -52,23 +52,35 @@ impl From<AccountAddress> for AccountIdentifier {
     }
 }
 
-/// Identifier for a "block".  In aptos, we use a transaction model, so the version
-/// represents a single transaction that we use for this.
+/// Identifier for a "block".  In aptos, we use a transaction model, so the index
+/// represents multiple transactions in a "block" grouping of transactions
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/BlockIdentifier.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockIdentifier {
-    /// Version number usually known as height, and specifies one transaction
+    /// Block index, which points to a txn at the beginning of a "block"
     pub index: u64,
-    /// Transaction hash
+    /// Accumulator hash at the beginning of the block
     pub hash: String,
 }
 
 impl BlockIdentifier {
-    pub fn from_transaction_info(block_size: u64, info: &TransactionInfo) -> BlockIdentifier {
+    pub fn genesis_txn() -> BlockIdentifier {
+        // TODO: We may possibly get the real hash, but this works for now
+        // It must be unique,
         BlockIdentifier {
-            index: version_to_block_index(block_size, info.version.0),
-            hash: info.accumulator_root_hash.to_string(),
+            index: 0,
+            hash: "0xGenesis".to_string(),
+        }
+    }
+    pub fn from_transaction_info(block_size: u64, info: &TransactionInfo) -> BlockIdentifier {
+        if info.version.0 == 0 {
+            BlockIdentifier::genesis_txn()
+        } else {
+            BlockIdentifier {
+                index: version_to_block_index(block_size, info.version.0),
+                hash: info.accumulator_root_hash.to_string(),
+            }
         }
     }
 
