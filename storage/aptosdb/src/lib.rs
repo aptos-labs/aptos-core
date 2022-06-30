@@ -77,7 +77,7 @@ use aptos_types::{
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
         TransactionOutput, TransactionOutputListWithProof, TransactionToCommit,
-        TransactionWithProof, Version, PRE_GENESIS_VERSION,
+        TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
@@ -1167,8 +1167,7 @@ impl DbReader for AptosDB {
 
     fn get_latest_state_checkpoint(&self) -> Result<Option<(Version, HashValue)>> {
         gauged_api("get_latest_state_checkpoint_version", || {
-            self.state_store
-                .get_state_snapshot_before(PRE_GENESIS_VERSION - 1)
+            self.state_store.get_state_snapshot_before(Version::MAX)
         })
     }
 
