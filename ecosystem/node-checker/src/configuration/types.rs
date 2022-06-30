@@ -3,7 +3,7 @@
 
 use crate::{
     evaluators::{
-        direct::{get_node_identity, NodeIdentityEvaluatorArgs},
+        direct::{get_node_identity, NodeIdentityEvaluatorArgs, TpsEvaluatorArgs},
         metrics::{ConsensusProposalsEvaluatorArgs, StateSyncVersionEvaluatorArgs},
         system_information::BuildVersionEvaluatorArgs,
     },
@@ -76,7 +76,7 @@ pub struct NodeConfiguration {
     pub runner_args: RunnerArgs,
 }
 
-// TODO: Having comments like "only call this after X" is obviously not great.
+// TODO: Having comments like "only call this after X" is obviously a bad sign.
 // It'd be better to have an enum with two variants, e.g. unfetched and fetched.
 impl NodeConfiguration {
     /// Only call this after fetch_additional_configuration has been called.
@@ -123,6 +123,9 @@ impl NodeConfiguration {
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
 pub struct EvaluatorArgs {
     #[clap(flatten)]
+    pub build_version_args: BuildVersionEvaluatorArgs,
+
+    #[clap(flatten)]
     pub consensus_proposals_args: ConsensusProposalsEvaluatorArgs,
 
     #[clap(flatten)]
@@ -132,7 +135,8 @@ pub struct EvaluatorArgs {
     pub state_sync_version_args: StateSyncVersionEvaluatorArgs,
 
     #[clap(flatten)]
-    pub build_version_args: BuildVersionEvaluatorArgs,
+    #[oai(skip)]
+    pub tps_args: TpsEvaluatorArgs,
 }
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]

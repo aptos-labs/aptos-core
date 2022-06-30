@@ -5,6 +5,7 @@ use crate::{
     configuration::EvaluatorArgs,
     evaluator::Evaluator,
     evaluators::{
+        direct::{DirectEvaluatorInput, TpsEvaluator, TpsEvaluatorError},
         metrics::{
             ConsensusProposalsEvaluator, MetricsEvaluatorError, MetricsEvaluatorInput,
             StateSyncVersionEvaluator,
@@ -41,6 +42,7 @@ pub enum EvaluatorType {
             >,
         >,
     ),
+    Tps(Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = TpsEvaluatorError>>),
 }
 
 pub fn build_evaluators(
@@ -54,7 +56,7 @@ pub fn build_evaluators(
     match evaluator_names.take(&name) {
         Some(_) => {
             evaluators.push(EvaluatorType::Metrics(Box::new(
-                ConsensusProposalsEvaluator::from_evaluator_args(evaluator_args),
+                ConsensusProposalsEvaluator::from_evaluator_args(evaluator_args)?,
             )));
         }
         None => log_did_not_build(&name),
@@ -64,7 +66,7 @@ pub fn build_evaluators(
     match evaluator_names.take(&name) {
         Some(_) => {
             evaluators.push(EvaluatorType::Metrics(Box::new(
-                StateSyncVersionEvaluator::from_evaluator_args(evaluator_args),
+                StateSyncVersionEvaluator::from_evaluator_args(evaluator_args)?,
             )));
         }
         None => log_did_not_build(&name),
@@ -74,7 +76,17 @@ pub fn build_evaluators(
     match evaluator_names.take(&name) {
         Some(_) => {
             evaluators.push(EvaluatorType::SystemInformation(Box::new(
-                BuildVersionEvaluator::from_evaluator_args(evaluator_args),
+                BuildVersionEvaluator::from_evaluator_args(evaluator_args)?,
+            )));
+        }
+        None => log_did_not_build(&name),
+    }
+
+    let name = TpsEvaluator::get_name();
+    match evaluator_names.take(&name) {
+        Some(_) => {
+            evaluators.push(EvaluatorType::Tps(Box::new(
+                TpsEvaluator::from_evaluator_args(evaluator_args)?,
             )));
         }
         None => log_did_not_build(&name),
