@@ -708,33 +708,35 @@ pub struct StateSnapshotRestore<K, V> {
 }
 
 impl<K: crate::Key + CryptoHash + Hash + Eq, V: crate::Value> StateSnapshotRestore<K, V> {
-    pub fn new<D: 'static + TreeReader<K> + TreeWriter<K> + StateValueWriter<K, V>>(
-        store: Arc<D>,
+    pub fn new<T: 'static + TreeReader<K> + TreeWriter<K>, S: 'static + StateValueWriter<K, V>>(
+        tree_store: &Arc<T>,
+        value_store: &Arc<S>,
         version: Version,
         expected_root_hash: HashValue,
     ) -> Result<Self> {
         Ok(Self {
             tree_restore: JellyfishMerkleRestore::new(
-                Arc::clone(&store),
+                Arc::clone(tree_store),
                 version,
                 expected_root_hash,
             )?,
-            kv_restore: StateValueRestore::new(store, version),
+            kv_restore: StateValueRestore::new(Arc::clone(value_store), version),
         })
     }
 
-    pub fn new_overwrite<D: 'static + TreeWriter<K> + StateValueWriter<K, V>>(
-        store: Arc<D>,
+    pub fn new_overwrite<T: 'static + TreeWriter<K>, S: 'static + StateValueWriter<K, V>>(
+        tree_store: &Arc<T>,
+        value_store: &Arc<S>,
         version: Version,
         expected_root_hash: HashValue,
     ) -> Result<Self> {
         Ok(Self {
             tree_restore: JellyfishMerkleRestore::new_overwrite(
-                Arc::clone(&store),
+                Arc::clone(tree_store),
                 version,
                 expected_root_hash,
             )?,
-            kv_restore: StateValueRestore::new(store, version),
+            kv_restore: StateValueRestore::new(Arc::clone(value_store), version),
         })
     }
 }

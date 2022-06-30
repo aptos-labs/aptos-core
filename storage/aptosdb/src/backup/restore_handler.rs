@@ -55,7 +55,8 @@ impl RestoreHandler {
         expected_root_hash: HashValue,
     ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
         StateSnapshotRestore::new_overwrite(
-            Arc::clone(&self.state_store),
+            &self.state_store.state_merkle_db,
+            &self.state_store,
             version,
             expected_root_hash,
         )
