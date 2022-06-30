@@ -101,7 +101,7 @@ class It2ProfilesController < ApplicationController
   # @param [NodeHelper::NodeChecker] node_verifier
   # @return [Array<VerifyResult>]
   def validate_node(node_verifier, do_location: false)
-    return validate_node_nhc(node_verifier, do_location:) if Flipper.enabled?(:node_health_checker)
+    return validate_node_nhc(node_verifier, do_location:) if node_verifier.is_a? NodeHelper::NodeChecker
 
     results = node_verifier.verify
 
