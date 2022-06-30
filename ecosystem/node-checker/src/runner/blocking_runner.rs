@@ -63,11 +63,14 @@ impl<M: MetricCollector> BlockingRunner<M> {
     }
 }
 
-// todo, we need to collect the target metrics first and then collect the baseline metrics
-// because we need to know what kind of node we're talking to. To this end, the metric
-// collector should probably take in a map of all the baseline retrievers. There needs to
-// be a key construction function, probs just network+node_type.
-
+/// This runner doesn't block in the multithreading sense, but from the user
+/// perspective. To run the health check, we pull metrics once, wait, and then
+/// pull the metrics again. It does not support continually running beyond this
+/// point. You can imagine smarter versions of this where you store the last seen
+/// set of metrics, then compare against that, or perhaps even multiple previously
+/// seen sets of metrics and do more complex analysis. Additionally we could leverage
+/// things like long polling +/ sticky routing to make it that the client request
+/// doesn't just hang waiting for the run to complete.
 #[async_trait]
 impl<M: MetricCollector> Runner for BlockingRunner<M> {
     async fn run<T: MetricCollector>(

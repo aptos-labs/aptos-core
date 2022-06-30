@@ -25,16 +25,16 @@ use serde::{Deserialize, Serialize};
 const BUILD_COMMIT_HASH_KEY: &str = "build_commit_hash";
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
-pub struct SystemInformationBuildVersionEvaluatorArgs {}
+pub struct BuildVersionEvaluatorArgs {}
 
 #[allow(dead_code)]
 #[derive(Debug)]
-pub struct SystemInformationBuildVersionEvaluator {
-    args: SystemInformationBuildVersionEvaluatorArgs,
+pub struct BuildVersionEvaluator {
+    args: BuildVersionEvaluatorArgs,
 }
 
-impl SystemInformationBuildVersionEvaluator {
-    pub fn new(args: SystemInformationBuildVersionEvaluatorArgs) -> Self {
+impl BuildVersionEvaluator {
+    pub fn new(args: BuildVersionEvaluatorArgs) -> Self {
         Self { args }
     }
 
@@ -74,7 +74,7 @@ impl SystemInformationBuildVersionEvaluator {
 }
 
 #[async_trait::async_trait]
-impl Evaluator for SystemInformationBuildVersionEvaluator {
+impl Evaluator for BuildVersionEvaluator {
     type Input = SystemInformationEvaluatorInput;
     type Error = SystemInformationEvaluatorError;
 
@@ -141,7 +141,7 @@ impl Evaluator for SystemInformationBuildVersionEvaluator {
     }
 
     fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Self {
-        Self::new(evaluator_args.system_information_build_version_args.clone())
+        Self::new(evaluator_args.build_version_args.clone())
     }
 }
 
@@ -174,9 +174,7 @@ mod test {
             None => SystemInformation(HashMap::new()),
         };
 
-        let evaluator = SystemInformationBuildVersionEvaluator::new(
-            SystemInformationBuildVersionEvaluatorArgs {},
-        );
+        let evaluator = BuildVersionEvaluator::new(BuildVersionEvaluatorArgs {});
 
         let system_information_evaluator_input = SystemInformationEvaluatorInput {
             baseline_system_information,

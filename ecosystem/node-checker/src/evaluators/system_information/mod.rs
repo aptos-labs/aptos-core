@@ -5,9 +5,7 @@ mod build_version;
 mod common;
 mod types;
 
-pub use build_version::{
-    SystemInformationBuildVersionEvaluator, SystemInformationBuildVersionEvaluatorArgs,
-};
+pub use build_version::{BuildVersionEvaluator, BuildVersionEvaluatorArgs};
 pub use types::*;
 
 pub const CATEGORY: &str = "system_information";
