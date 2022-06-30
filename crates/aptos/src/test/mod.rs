@@ -141,6 +141,7 @@ impl CliTestFramework {
             profile_options: profile(index),
             prompt_options: PromptOptions::yes(),
             encoding_options: EncodingOptions::default(),
+            skip_faucet: false,
         }
         .execute()
         .await

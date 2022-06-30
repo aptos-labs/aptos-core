@@ -1,6 +1,6 @@
 [package]
 name = "aptos"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos tool for management of nodes and interacting with the blockchain"
 repository = "https://github.com/aptos-labs/aptos-core"
