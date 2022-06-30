@@ -3,7 +3,6 @@
 
 use crate::{emit::query_sequence_numbers, instance::Instance, ClusterArgs};
 use anyhow::{bail, format_err, Result};
-use aptos::common::types::EncodingType;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
@@ -15,7 +14,7 @@ use aptos_sdk::{
     types::{account_config::aptos_root_address, chain_id::ChainId, AccountKey, LocalAccount},
 };
 use rand::seq::SliceRandom;
-use std::{convert::TryFrom, path::Path};
+use std::convert::TryFrom;
 use url::Url;
 
 #[derive(Debug)]
@@ -129,18 +128,9 @@ impl TryFrom<&ClusterArgs> for Cluster {
             urls.push(url);
         }
 
-        let mint_key = if let Some(ref key) = args.mint_args.mint_key {
-            key.private_key()
-        } else {
-            EncodingType::BCS
-                .load_key::<Ed25519PrivateKey>(
-                    "mint key pair",
-                    Path::new(&args.mint_args.mint_file),
-                )
-                .unwrap()
-        };
+        let mint_key = args.mint_args.get_mint_key()?;
 
-        let cluster = Cluster::from_host_port(urls, mint_key, args.mint_args.chain_id, args.vasp);
+        let cluster = Cluster::from_host_port(urls, mint_key, args.chain_id, args.vasp);
 
         Ok(cluster)
     }

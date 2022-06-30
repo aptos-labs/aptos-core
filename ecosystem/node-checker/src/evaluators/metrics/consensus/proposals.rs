@@ -149,8 +149,8 @@ impl Evaluator for ConsensusProposalsEvaluator {
         format!("{}_proposals", CATEGORY)
     }
 
-    fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Self {
-        Self::new(evaluator_args.consensus_proposals_args.clone())
+    fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {
+        Ok(Self::new(evaluator_args.consensus_proposals_args.clone()))
     }
 }
 

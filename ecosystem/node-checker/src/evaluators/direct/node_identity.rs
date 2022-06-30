@@ -154,7 +154,7 @@ impl Evaluator for NodeIdentityEvaluator {
         CATEGORY.to_string()
     }
 
-    fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Self {
-        Self::new(evaluator_args.node_identity_args.clone())
+    fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {
+        Ok(Self::new(evaluator_args.node_identity_args.clone()))
     }
 }

@@ -9,7 +9,8 @@ use crate::{
     configuration::NodeAddress,
     evaluator::EvaluationSummary,
     evaluators::{
-        direct::NodeIdentityEvaluatorError, metrics::MetricsEvaluatorError,
+        direct::{NodeIdentityEvaluatorError, TpsEvaluatorError},
+        metrics::MetricsEvaluatorError,
         system_information::SystemInformationEvaluatorError,
     },
     metric_collector::{MetricCollector, MetricCollectorError},
@@ -26,19 +27,24 @@ pub enum RunnerError {
     MetricCollectorError(MetricCollectorError),
 
     /// We couldn't parse the metrics.
-    #[error("Failed to parse metrics")]
+    #[error("Failed to parse metrics: {0}")]
     ParseMetricsError(Error),
 
     /// One of the metrics evaluators failed. This is not the same as a poor score from
     /// an evaluator, this is an actual failure in the evaluation process.
-    #[error("Failed to evaluate metrics")]
+    #[error("Failed to evaluate metrics: {0}")]
     MetricEvaluatorError(MetricsEvaluatorError),
 
     /// One of the system information evaluators failed. This is not the same
     /// as a poor score from an evaluator, this is an actual failure in the
     /// evaluation process.
-    #[error("Failed to evaluate system information")]
+    #[error("Failed to evaluate system information: {0}")]
     SystemInformationEvaluatorError(SystemInformationEvaluatorError),
+
+    /// The TPS evaluator failed. This is not the same as a poor score from an
+    /// evaluator, this is an actual failure in the evaluation process.
+    #[error("Failed to evaluate TPS: {0}")]
+    TpsEvaluatorError(TpsEvaluatorError),
 }
 
 /// This trait describes a Runner, something that can take in instances of other
