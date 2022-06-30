@@ -309,7 +309,7 @@ test(
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString('0x1::TestCoin::TestCoin'));
     const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natual(
+      TxnBuilderTypes.ScriptFunction.natural(
         '0x1::Coin',
         'transfer',
         [token],
@@ -399,7 +399,7 @@ test(
     expect(aliceBalance.value).toBe('1');
 
     const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natual(
+      TxnBuilderTypes.ScriptFunction.natural(
         '0x1::Token',
         'direct_transfer_script',
         [],
