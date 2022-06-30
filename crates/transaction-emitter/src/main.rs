@@ -7,7 +7,7 @@ use ::aptos_logger::{Level, Logger};
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use diag::diag;
-use std::{convert::TryFrom, time::Duration};
+use std::time::Duration;
 use transaction_emitter_lib::{emit_transactions, Cluster, ClusterArgs, EmitArgs};
 
 #[derive(Parser, Debug)]
@@ -63,8 +63,9 @@ pub async fn main() -> Result<()> {
             Ok(())
         }
         TxnEmitterCommand::Diag(args) => {
-            let cluster =
-                Cluster::try_from(&args.cluster_args).context("Failed to build cluster")?;
+            let cluster = Cluster::try_from_cluster_args(&args.cluster_args)
+                .await
+                .context("Failed to build cluster")?;
             diag(&cluster).await.context("Diag failed")?;
             Ok(())
         }

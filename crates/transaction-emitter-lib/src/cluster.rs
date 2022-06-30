@@ -8,13 +8,12 @@ use aptos_crypto::{
     test_utils::KeyPair,
     Uniform,
 };
-use aptos_logger::info;
+use aptos_logger::{info, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     types::{account_config::aptos_root_address, chain_id::ChainId, AccountKey, LocalAccount},
 };
-use futures::executor::block_on;
 use rand::seq::SliceRandom;
 use std::convert::TryFrom;
 use url::Url;
@@ -34,29 +33,51 @@ fn clone(key: &Ed25519PrivateKey) -> Ed25519PrivateKey {
 impl Cluster {
     /// We assume the URLs have been validated at this point, specifically to
     /// confirm that they have a host and port set.
-    pub fn from_host_port(
+    pub async fn from_host_port(
         peers: Vec<Url>,
         mint_key: Ed25519PrivateKey,
         chain_id: ChainId,
         vasp: bool,
     ) -> Result<Self> {
-        let instances: Vec<Instance> = peers
-            .into_iter()
-            .map(|url| {
-                Instance::new(
-                    format!("{}:{}", url.host().unwrap(), url.port().unwrap()), /* short_hash */
-                    url,
-                    None,
-                )
-            })
-            .filter(|instance| block_on(instance.rest_client().get_ledger_information()).is_ok())
-            .collect();
+        let num_peers = peers.len();
 
-        if instances.is_empty() {
-            return Err(anyhow!("None of the rest endpoints provided are reachable"));
+        let mut instances = Vec::new();
+        let mut errors = Vec::new();
+        for url in &peers {
+            let instance = Instance::new(
+                format!(
+                    "{}:{}",
+                    url.host().unwrap(),
+                    url.port_or_known_default().unwrap()
+                ), /* short_hash */
+                url.clone(),
+                None,
+            );
+            match instance.rest_client().get_ledger_information().await {
+                Ok(_) => instances.push(instance),
+                Err(err) => errors.push(err),
+            }
         }
 
-        info!("Creating the cluster with {} end points", instances.len());
+        if !errors.is_empty() {
+            warn!(
+                "Failed to build some endpoints for the cluster: {:?}",
+                errors
+            );
+        }
+
+        if instances.is_empty() {
+            return Err(anyhow!(
+                "None of the rest endpoints provided are reachable: {:?}",
+                errors
+            ));
+        }
+
+        info!(
+            "Creating the cluster with {}/{} end points",
+            instances.len(),
+            num_peers
+        );
 
         let mint_key_pair = if vasp {
             dummy_key_pair()
@@ -69,6 +90,29 @@ impl Cluster {
             mint_key_pair,
             chain_id,
         })
+    }
+
+    pub async fn try_from_cluster_args(args: &ClusterArgs) -> Result<Self> {
+        let mut urls = Vec::new();
+        for url in &args.targets {
+            if !url.has_host() {
+                bail!("No host found in URL: {}", url);
+            }
+            let mut url = url.clone();
+            if url.port_or_known_default().is_none() {
+                url.set_port(Some(8080))
+                    .map_err(|_| format_err!("Failed to set port unexpectedly"))?;
+            }
+            urls.push(url);
+        }
+
+        let mint_key = args.mint_args.get_mint_key()?;
+
+        let cluster = Cluster::from_host_port(urls, mint_key, args.chain_id, args.vasp)
+            .await
+            .map_err(|e| format_err!("failed to create a cluster from host and port: {}", e))?;
+
+        Ok(cluster)
     }
 
     fn account_key(&self) -> AccountKey {
@@ -117,32 +161,6 @@ impl Cluster {
 
     pub fn all_instances(&self) -> impl Iterator<Item = &Instance> {
         self.instances.iter()
-    }
-}
-
-impl TryFrom<&ClusterArgs> for Cluster {
-    type Error = anyhow::Error;
-
-    fn try_from(args: &ClusterArgs) -> Result<Self, Self::Error> {
-        let mut urls = Vec::new();
-        for url in &args.targets {
-            if !url.has_host() {
-                bail!("No host found in URL: {}", url);
-            }
-            let mut url = url.clone();
-            if url.port().is_none() {
-                url.set_port(Some(8080))
-                    .map_err(|_| format_err!("Failed to set port unexpectedly"))?;
-            }
-            urls.push(url);
-        }
-
-        let mint_key = args.mint_args.get_mint_key()?;
-
-        let cluster = Cluster::from_host_port(urls, mint_key, args.chain_id, args.vasp)
-            .map_err(|e| format_err!("failed to create a cluster from host and port: {}", e))?;
-
-        Ok(cluster)
     }
 }
 

@@ -32,6 +32,10 @@ pub struct RootArgs {
 async fn main() -> Result<()> {
     let root_args = RootArgs::parse();
 
+    env_logger::Builder::new()
+        .filter_level(log::LevelFilter::Info)
+        .init();
+
     let command = root_args.command;
     let result: Result<()> = match command {
         Command::Server(args) => server::run_cmd(args).await,

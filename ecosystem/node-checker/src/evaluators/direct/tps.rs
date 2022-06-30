@@ -8,7 +8,7 @@ use crate::{
 use anyhow::{Context, Result};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, time::Duration};
+use std::time::Duration;
 use thiserror::Error as ThisError;
 use transaction_emitter_lib::{
     emit_transactions_with_cluster, Cluster, ClusterArgs, EmitArgs, MintArgs,
@@ -60,6 +60,11 @@ pub struct TpsEvaluatorArgs {
     /// The minimum TPS required to pass the test.
     #[clap(long, default_value_t = 1000)]
     pub minimum_tps: u64,
+
+    /// The number of times to repeat the target. This influences thread
+    /// count and rest client count.
+    #[clap(long, default_value_t = 1)]
+    pub repeat_target_count: usize,
 }
 
 #[allow(dead_code)]
@@ -103,14 +108,19 @@ impl Evaluator for TpsEvaluator {
     /// This test runs a TPS (transactions per second) evaluation on the target
     /// node, in which it passes if it meets some preconfigured minimum.
     async fn evaluate(&self, input: &Self::Input) -> Result<Vec<EvaluationResult>, Self::Error> {
+        let mut target_url = input.target_node_address.url.clone();
+        target_url
+            .set_port(Some(input.target_node_address.api_port))
+            .unwrap();
+
         let cluster_args = ClusterArgs {
-            targets: vec![input.target_node_address.url.clone()],
+            targets: vec![target_url; self.args.repeat_target_count],
             vasp: false,
             mint_args: self.args.mint_args.clone(),
             chain_id: input.baseline_node_information.chain_id,
         };
-        let cluster = Cluster::try_from(&cluster_args)
-            .context("Failed to build cluster")
+        let cluster = Cluster::try_from_cluster_args(&cluster_args)
+            .await
             .map_err(TpsEvaluatorError::BuildClusterError)?;
 
         let stats = emit_transactions_with_cluster(&cluster, &self.args.emit_args, false)

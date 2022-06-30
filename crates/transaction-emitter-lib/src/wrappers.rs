@@ -11,13 +11,15 @@ use anyhow::{Context, Result};
 use aptos_sdk::transaction_builder::TransactionFactory;
 use rand::{rngs::StdRng, Rng};
 use rand_core::{OsRng, SeedableRng};
-use std::{cmp::min, convert::TryFrom, time::Duration};
+use std::{cmp::min, time::Duration};
 
 pub async fn emit_transactions(
     cluster_args: &ClusterArgs,
     emit_args: &EmitArgs,
 ) -> Result<TxnStats> {
-    let cluster = Cluster::try_from(cluster_args).context("Failed to build cluster")?;
+    let cluster = Cluster::try_from_cluster_args(cluster_args)
+        .await
+        .context("Failed to build cluster")?;
     emit_transactions_with_cluster(&cluster, emit_args, cluster_args.vasp).await
 }
 
