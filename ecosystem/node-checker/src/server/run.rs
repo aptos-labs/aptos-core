@@ -92,26 +92,14 @@ pub async fn run(args: Run) -> Result<()> {
     };
 
     let api_endpoint = format!("/{}", args.server_args.api_path);
-    let api_service = build_openapi_service(
-        api,
-        args.server_args.listen_address.clone(),
-        &args.server_args.api_path,
-    );
+    let api_service = build_openapi_service(api, args.server_args.clone());
     let ui = api_service.swagger_ui();
     let spec_json = api_service.spec_endpoint();
     let spec_yaml = api_service.spec_endpoint_yaml();
 
     Server::new(TcpListener::bind((
-        args.server_args
-            .listen_address
-            .host_str()
-            .with_context(|| {
-                format!(
-                    "Failed to pull host from {}",
-                    args.server_args.listen_address
-                )
-            })?,
-        args.server_args.listen_address.port().unwrap(),
+        args.server_args.listen_address,
+        args.server_args.listen_port,
     )))
     .run(
         Route::new()
