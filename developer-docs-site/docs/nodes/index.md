@@ -23,7 +23,7 @@ This section contains the guides for the Aptos nodes. Topics covered include how
     <div class="card h-100" >
     <div class="card-body d-flex flex-column" >
     <h2 class="card-title">Validator for the Aptos devnet </h2>
-    <p class="card-text"><a href="../ait/node-requirements" class="card-link"><strong>Make sure to first check the Node Requirements.</strong></a> Pick your preferred installation method from below:</p>
+    <p class="card-text"><a href="ait/node-requirements" class="card-link"><strong>Make sure to first check the Node Requirements.</strong></a> Pick your preferred installation method from below:</p>
         <ul class="list-group list-group-flush">
           <li class="list-group-item"><a href="validator-node/run-validator-node-using-source/" class="card-link">Using Aptos source</a></li>
           <li class="list-group-item"><a href="validator-node/run-validator-node-using-aws" class="card-link">Using AWS</a></li>
