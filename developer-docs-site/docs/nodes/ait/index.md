@@ -144,11 +144,11 @@ Participants in the AIT-2 program must demonstrate the ability to configure and 
         <p class="card-text"><a href="node-requirements" class="card-link"><strong>Make sure to first check the Node Requirements.</strong></a></p>
         <p class="card-text">Pick your preferred installation method from below:</p>
         <ul class="list-group list-group-flush">
-          <li class="list-group-item"><a href="../validator-node/run-validator-node-using-source/" class="card-link">Using Aptos source</a></li>
-          <li class="list-group-item"><a href="../validator-node/run-validator-node-using-aws" class="card-link">Using AWS</a></li>
-          <li class="list-group-item"><a href="../validator-node/run-validator-node-using-gcp" class="card-link">Using GCP</a></li>
-          <li class="list-group-item"><a href="../validator-node/run-validator-node-using-docker" class="card-link">Using Docker</a></li>
-          <li class="list-group-item"><a href="../validator-node/run-validator-node-using-azure" class="card-link">Using Azure</a></li>
+          <li class="list-group-item"><a href="/nodes/validator-node/run-validator-node-using-source/" class="card-link">Using Aptos source</a></li>
+          <li class="list-group-item"><a href="/nodes/validator-node/run-validator-node-using-aws" class="card-link">Using AWS</a></li>
+          <li class="list-group-item"><a href="/nodes/validator-node/run-validator-node-using-gcp" class="card-link">Using GCP</a></li>
+          <li class="list-group-item"><a href="/nodes/validator-node/run-validator-node-using-docker" class="card-link">Using Docker</a></li>
+          <li class="list-group-item"><a href="/nodes/validator-node/run-validator-node-using-azure" class="card-link">Using Azure</a></li>
         </ul>
       </div>
     </div>
