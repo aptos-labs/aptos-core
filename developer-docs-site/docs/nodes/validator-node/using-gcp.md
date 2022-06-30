@@ -122,8 +122,8 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
     ```
     aptos genesis set-validator-configuration \
         --keys-dir ~/$WORKSPACE \
-        --local-repository-dir ~/$WORKSPACE \ 
-        --username <pick a username for your node> \ 
+        --local-repository-dir ~/$WORKSPACE \
+        --username <pick a username for your node> \
         --validator-host $VALIDATOR_ADDRESS:6180 \
         --full-node-host $FULLNODE_ADDRESS:6182
 
