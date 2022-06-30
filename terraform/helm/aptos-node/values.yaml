@@ -92,7 +92,7 @@ service:
     external: 
       type: LoadBalancer
     loadBalancerSourceRanges:
-    enableRestApi: false
+    enableRestApi: true
     enableMetricsPort: true
   # NOTE: these values apply for all fullnode groups
   fullnode:
