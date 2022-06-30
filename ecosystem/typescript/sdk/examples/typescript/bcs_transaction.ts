@@ -46,7 +46,7 @@ const {
   // TS SDK support 3 types of transaction payloads: `ScriptFunction`, `Script` and `Module`.
   // See https://aptos-labs.github.io/ts-sdk-doc/ for the details.
   const scriptFunctionPayload = new TransactionPayloadScriptFunction(
-    ScriptFunction.natual(
+    ScriptFunction.natural(
       // Fully qualified module name, `AccountAddress::ModuleName`
       '0x1::Coin',
       // Module function
