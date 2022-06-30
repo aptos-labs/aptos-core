@@ -136,6 +136,13 @@ With your development environment ready, now you can start to setup your Validat
     mv aptos-framework/releases/artifacts/current/build/**/bytecode_modules/dependencies/**/*.mv ~/$WORKSPACE/framework/
     ```
 
+    Alternatively, you can download the Aptos Framework from the release page: https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v0.2.0
+
+    ```
+    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.2.0/framework.zip
+    unzip framework.zip
+    ```
+
     You will now have a folder called `framework`, which contains Move bytecode with the format `.mv`.
 
 11. Compile genesis blob and waypoint.
