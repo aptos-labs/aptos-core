@@ -17,7 +17,7 @@ use crate::{
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use clap::Parser;
-use log::debug;
+use log::{debug, info};
 use poem_openapi::Object as PoemObject;
 use prometheus_parse::Scrape as PrometheusScrape;
 use serde::{Deserialize, Serialize};
@@ -86,6 +86,8 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
         target_node_address: &NodeAddress,
         target_metric_collector: &T,
     ) -> Result<EvaluationSummary, RunnerError> {
+        info!("Running evaluation for {}", target_node_address.url);
+
         let direct_evaluator_input = DirectEvaluatorInput {
             baseline_node_information: self.baseline_node_information.clone(),
             target_node_address: target_node_address.clone(),
