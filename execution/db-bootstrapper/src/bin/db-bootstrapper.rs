@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{ensure, format_err, Context, Result};
-use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
+use aptos_config::config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::AptosVM;
@@ -52,7 +52,7 @@ fn main() -> Result<()> {
             &opt.db_dir,
             false,
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-            RocksdbConfig::default(),
+            RocksdbConfigs::default(),
         )
     } else {
         // When not committing, we open the DB as secondary so the tool is usable along side a
@@ -62,7 +62,7 @@ fn main() -> Result<()> {
             opt.db_dir.as_path(),
             &tmpdir.as_ref().to_path_buf().join(LEDGER_DB_NAME),
             &tmpdir.as_ref().to_path_buf().join(STATE_MERKLE_DB_NAME),
-            RocksdbConfig::default(),
+            RocksdbConfigs::default(),
         )
     }
     .with_context(|| format_err!("Failed to open DB."))?;
