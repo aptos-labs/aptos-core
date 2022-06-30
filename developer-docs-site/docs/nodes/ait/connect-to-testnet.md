@@ -6,38 +6,91 @@ sidebar_position: 14
 
 # Connecting to Aptos Incentivized Testnet
 
-Only do this if you got confirmation email from Aptos team for your eligibility. Nodes not selected will not be included in the genesis, thus not be able to connect to incentivized testnet as a validator node. You can still run public fullnode in this case if you want.
+Only do this if you got confirmation email from Aptos team for your eligibility. Nodes not selected will not have enough tokens to join the testnet. You can still run public fullnode in this case if you want.
 
-## Using source code
+## Boostrapping validator node
+
+Before joining the testnet, you need to bootstrap your node with the genesis blob and waypoint provided by Aptos Labs team. This will convert your node from test mode to prod mode.
+
+### Using source code
 
 - Stop your node and remove the data directory.
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- Pull the latest changes on `testnet` branch, make sure you're at commit `317f80bb`
+- Pull the latest changes on `testnet` branch, make sure you're at commit `3b53225b5a1effcce5dee9597a129216510dc424`
 - Restarting the node
 
-## Using Docker
+### Using Docker
 
-- Stop your node and remove the data volumes, `docker-compose down --volumes`
+- Stop your node and remove the data volumes, `docker compose down --volumes`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- Update your docker image to use tag `testnet_317f80bb`. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_317f80bb/images/sha256-5184f637f15a9c071475c5bfb3050777c04aa410e9d43c7ff5e7c4a99a55a252?context=explore)
-- Restarting the node: `docker-compose up`
+- Update your docker image to use tag `testnet_3b53225b5a1effcce5dee9597a129216510dc424`. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_3b53225b5a1effcce5dee9597a129216510dc424/images/sha256-1625f70457a6060ae2e64e699274e1ddca02cb7856406a40d1891b6bf84ae072?context=explore)
+- Restarting the node: `docker compose up`
 
-## Using Terraform
+### Using Terraform
 
 - Increase `era` number in your Terraform config, this will wipe the data once applied.
-- Update your docker image to use tag `testnet_317f80bb` in the Terraform config. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_317f80bb/images/sha256-5184f637f15a9c071475c5bfb3050777c04aa410e9d43c7ff5e7c4a99a55a252?context=explore)
+- Update your docker image to use tag `testnet_3b53225b5a1effcce5dee9597a129216510dc424` in the Terraform config. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_3b53225b5a1effcce5dee9597a129216510dc424/images/sha256-1625f70457a6060ae2e64e699274e1ddca02cb7856406a40d1891b6bf84ae072?context=explore)
 - Apply Terraform: `terraform apply`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- Recreate the secrets, make sure the secret name matches your `era` number, e.g. if you have `era = 3`, you should replace the secret name to be `${WORKSPACE}-aptos-node-genesis-e3`
+- Recreate the secrets, make sure the secret name matches your `era` number, e.g. if you have `era = 3`, you should replace the secret name to be `${WORKSPACE}-aptos-node-0-genesis-e3`
     ```
     export WORKSPACE=<your workspace name>
 
-    kubectl create secret generic ${WORKSPACE}-aptos-node-genesis-e2 \
+    kubectl create secret generic ${WORKSPACE}-aptos-node-0-genesis-e2 \
         --from-file=genesis.blob=genesis.blob \
         --from-file=waypoint.txt=waypoint.txt \
         --from-file=validator-identity.yaml=validator-identity.yaml \
         --from-file=validator-full-node-identity.yaml=validator-full-node-identity.yaml
     ```
+
+## Joining Validator Set
+
+All the selected validator node will be receiving sufficient amount of test token (101,000,000) airdrop from Aptos Labs team to stake their node.
+
+1. Initialize Aptos CLI
+
+    ```
+    aptos init --profile ait2 \
+    --private-key <account-private-key> \
+    --rest-url http://ait2.aptosdev.com \
+    --faucet-url http://ait2.aptosdev.com \
+    --assume-yes
+    ```
+
+2. Register validator candidate on chain
+
+    ```
+    aptos node register-validator-candidate \
+    --profile ait2 \
+    --validator-config-file aptosbot.yaml
+    ```
+
+    Replace `aptosbot.yaml` with your validator node config file.
+
+3. Add stake to your validator node
+
+    ```
+    aptos node add-stake --amount 100000000 --profile ait2
+    ```
+
+    Please don't add too much stake to make sure you still have sufficient token to pay gas fee.
+
+4. Set lockup time for your stake, minimal of 72 hours is required to join validator set.
+
+    ```
+    aptos node increase-lockup \
+    --profile ait2 \
+    --lockup-duration 75h
+    ```
+
+5. Join validator set
+
+    ```
+    aptos -- node join-validator-set --profile ait2
+    ```
+
+    ValidatorSet will be updated at every epoch change, which is **once every hour**. You will only see your node joining the validator set in next epoch. Both Validator and fullnode will start syncing once your validator is in the validator set.
+
 
 ## Verify node connections
 
