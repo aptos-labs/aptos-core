@@ -8,8 +8,8 @@ use crate::{
     },
     genesis::git::from_yaml,
 };
-use aptos_crypto::{ed25519::Ed25519PublicKey, x25519, PrivateKey, ValidCryptoMaterialStringExt};
-use aptos_genesis::{config::HostAndPort, keys::PrivateIdentity};
+use aptos_crypto::{ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
+use aptos_genesis::config::{HostAndPort, ValidatorConfiguration};
 use aptos_rest_client::Transaction;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
@@ -174,15 +174,15 @@ impl CliCommand<Transaction> for IncreaseLockup {
 pub struct RegisterValidatorCandidate {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-    /// Private keys file, created from the `genesis keys` command
+    /// Validator Configuration file, created from the `genesis set-validator-configuration` command
     #[clap(long)]
-    pub(crate) private_keys_file: Option<PathBuf>,
+    pub(crate) validator_config_file: Option<PathBuf>,
     /// Hex encoded Consensus public key
     #[clap(long, parse(try_from_str = Ed25519PublicKey::from_encoded_string))]
     pub(crate) consensus_public_key: Option<Ed25519PublicKey>,
     /// Host and port pair for the validator e.g. 127.0.0.1:6180
     #[clap(long)]
-    pub(crate) validator_host: HostAndPort,
+    pub(crate) validator_host: Option<HostAndPort>,
     /// Validator x25519 public network key
     #[clap(long, parse(try_from_str = x25519::PublicKey::from_encoded_string))]
     pub(crate) validator_network_public_key: Option<x25519::PublicKey>,
@@ -195,48 +195,84 @@ pub struct RegisterValidatorCandidate {
 }
 
 impl RegisterValidatorCandidate {
-    fn consensus_public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
-        if let Some(ref consensus_public_key) = self.consensus_public_key {
-            Ok(consensus_public_key.clone())
-        } else if let Some(ref file) = self.private_keys_file {
-            let identity: PrivateIdentity =
-                from_yaml(&String::from_utf8(read_from_file(file)?).map_err(CliError::from)?)?;
-            Ok(identity.consensus_private_key.public_key())
-        } else {
-            Err(CliError::CommandArgumentError(
-                "Must provide either --validator-identity-file or --consensus-public-key"
-                    .to_string(),
-            ))
-        }
-    }
+    fn process_inputs(
+        &self,
+    ) -> CliTypedResult<(
+        Ed25519PublicKey,
+        x25519::PublicKey,
+        Option<x25519::PublicKey>,
+        HostAndPort,
+        Option<HostAndPort>,
+    )> {
+        let validator_config = self.read_validator_config()?;
 
-    fn network_keys(&self) -> CliTypedResult<(x25519::PublicKey, Option<x25519::PublicKey>)> {
-        let identity: Option<PrivateIdentity> = if let Some(ref file) = self.private_keys_file {
-            from_yaml(&String::from_utf8(read_from_file(file)?).map_err(CliError::from)?)?
+        let consensus_public_key = if let Some(ref consensus_public_key) = self.consensus_public_key
+        {
+            consensus_public_key.clone()
+        } else if let Some(ref validator_config) = validator_config {
+            validator_config.consensus_public_key.clone()
         } else {
-            None
+            return Err(CliError::CommandArgumentError(
+                "Must provide either --validator-config-file or --consensus-public-key".to_string(),
+            ));
         };
 
         let validator_network_public_key =
             if let Some(public_key) = self.validator_network_public_key {
-                Ok(public_key)
-            } else if let Some(ref identity) = identity {
-                Ok(identity.validator_network_private_key.public_key())
+                public_key
+            } else if let Some(ref validator_config) = validator_config {
+                validator_config.validator_network_public_key
             } else {
-                Err(CliError::CommandArgumentError(
-                    "Must provide either --validator-identity-file or --consensus-public-key"
+                return Err(CliError::CommandArgumentError(
+                    "Must provide either --validator-config-file or --validator-network-public-key"
                         .to_string(),
-                ))
-            }?;
+                ));
+            };
 
         let full_node_network_public_key =
             if let Some(public_key) = self.full_node_network_public_key {
                 Some(public_key)
+            } else if let Some(ref validator_config) = validator_config {
+                validator_config.full_node_network_public_key
             } else {
-                identity.map(|identity| identity.full_node_network_private_key.public_key())
+                None
             };
 
-        Ok((validator_network_public_key, full_node_network_public_key))
+        let validator_host = if let Some(ref host) = self.validator_host {
+            host.clone()
+        } else if let Some(ref validator_config) = validator_config {
+            validator_config.validator_host.clone()
+        } else {
+            return Err(CliError::CommandArgumentError(
+                "Must provide either --validator-config-file or --validator-host".to_string(),
+            ));
+        };
+
+        let full_node_host = if let Some(ref host) = self.full_node_host {
+            Some(host.clone())
+        } else if let Some(ref validator_config) = validator_config {
+            validator_config.full_node_host.clone()
+        } else {
+            None
+        };
+
+        Ok((
+            consensus_public_key,
+            validator_network_public_key,
+            full_node_network_public_key,
+            validator_host,
+            full_node_host,
+        ))
+    }
+
+    fn read_validator_config(&self) -> CliTypedResult<Option<ValidatorConfiguration>> {
+        if let Some(ref file) = self.validator_config_file {
+            Ok(from_yaml(
+                &String::from_utf8(read_from_file(file)?).map_err(CliError::from)?,
+            )?)
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -247,13 +283,17 @@ impl CliCommand<Transaction> for RegisterValidatorCandidate {
     }
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
-        let consensus_public_key = self.consensus_public_key()?;
-        let (validator_network_public_key, full_node_network_public_key) = self.network_keys()?;
-        let validator_network_addresses = vec![self
-            .validator_host
-            .as_network_address(validator_network_public_key)?];
+        let (
+            consensus_public_key,
+            validator_network_public_key,
+            full_node_network_public_key,
+            validator_host,
+            full_node_host,
+        ) = self.process_inputs()?;
+        let validator_network_addresses =
+            vec![validator_host.as_network_address(validator_network_public_key)?];
         let full_node_network_addresses =
-            match (self.full_node_host.as_ref(), full_node_network_public_key) {
+            match (full_node_host.as_ref(), full_node_network_public_key) {
                 (Some(host), Some(public_key)) => vec![host.as_network_address(public_key)?],
                 _ => vec![],
             };
