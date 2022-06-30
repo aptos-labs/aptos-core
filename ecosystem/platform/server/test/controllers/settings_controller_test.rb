@@ -54,4 +54,18 @@ class SettingsControllerTest < ActionDispatch::IntegrationTest
     delete settings_connections_url(authorization), params: { authorization: { id: authorization.id } }
     assert_equal 1, @user.authorizations.count
   end
+
+  test 'deletes account successfully' do
+    delete settings_delete_account_url,
+           params: { user: { verification_text: 'delete my account 55555', verification_number: 55_555 } }
+    follow_redirect!
+    refute User.where(id: @user.id).exists?
+  end
+
+  test 'delete account enforces verification' do
+    delete settings_delete_account_url,
+           params: { user: { verification_text: 'delete my account 55555', verification_number: 333 } }
+    assert_response 422
+    assert User.where(id: @user.id).exists?
+  end
 end

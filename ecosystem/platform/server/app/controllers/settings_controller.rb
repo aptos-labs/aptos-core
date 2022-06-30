@@ -36,7 +36,7 @@ class SettingsController < ApplicationController
     @authorizations = authorizations.group_by(&:provider)
 
     auth_id = params.fetch(:authorization, {}).require(:id).to_i
-    authorization = authorizations.select { |auth| auth.id == auth_id }.first
+    authorization = authorizations.find { |auth| auth.id == auth_id }
 
     if authorization.nil?
       flash[:alert] = 'Connection not found'
@@ -49,6 +49,19 @@ class SettingsController < ApplicationController
     else
       flash[:alert] = 'Unable to remove connection'
       render :connections, status: :unprocessable_entity
+    end
+  end
+
+  def delete_account
+    verif_num = params.fetch(:user).require(:verification_number)
+    verif_text = params.fetch(:user).require(:verification_text).to_s.downcase
+    expected = "delete my account #{verif_num}".downcase
+    if verif_text == expected
+      current_user.destroy!
+      redirect_to root_path, notice: 'Account deleted'
+    else
+      flash[:alert] = 'Account deletion confirmation text entered incorrectly'
+      render :profile, status: :unprocessable_entity
     end
   end
 

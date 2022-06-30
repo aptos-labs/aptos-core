@@ -23,9 +23,9 @@ class User < ApplicationRecord
   validates :terms_accepted, acceptance: true
 
   has_many :authorizations, dependent: :destroy
-  has_one :it2_profile
-  has_one :it2_survey
-  has_many :nfts
+  has_one :it2_profile, dependent: :destroy
+  has_one :it2_survey, dependent: :destroy
+  has_many :nfts, dependent: :destroy
 
   def self.from_omniauth(auth, current_user = nil)
     # find an existing user or create a user and authorizations
