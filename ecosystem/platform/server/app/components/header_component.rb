@@ -10,7 +10,6 @@ class HeaderComponent < ViewComponent::Base
     NavItem.new('/it2', 'AIT2', 'Incentivized Testnet 2'),
     NavItem.new('https://aptos.dev/', 'Docs', 'Aptos Docs'),
     NavItem.new('https://explorer.devnet.aptos.dev/', 'Explorer', 'Aptos Explorer'),
-    NavItem.new(DiscourseHelper.base_url, 'Forum', 'Community Forum'),
     NavItem.new('/settings', 'Settings', 'Settings')
   ].freeze
 
