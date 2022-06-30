@@ -54,7 +54,7 @@ Participants in the AIT-2 program must demonstrate the ability to configure and 
     </div>
     <div>
         <div class="step-title">Create an account with Discord at the Aptos community site</div>
-        <div class="step-caption">First time users, sign up using Discord option and join the <a href="https://discord.gg/aptoslabs"> Aptos Discord server.</a> Then log in using Discord option on the <a class="reference external" href="https://community.aptoslabs.com/">Aptos Community page.</a> <strong>IMPORTANT</strong>: You must use the Discord option to login for AIT-2. Return to this page after you sign up or sign in.</div> 
+        <div class="step-caption">First time users, sign up using Discord option on the <a class="reference external" href="https://community.aptoslabs.com/">Aptos Community page</a> and join the <a href="https://discord.gg/aptoslabs"> Aptos Discord server.</a> Then log in using Discord option on the <a class="reference external" href="https://community.aptoslabs.com/">Aptos Community page.</a> <strong>IMPORTANT</strong>: You must use the Discord option to login for AIT-2. Return to this page after you sign up or sign in.</div> 
     </div>
 </div>
 <div class="step">
@@ -116,7 +116,7 @@ Participants in the AIT-2 program must demonstrate the ability to configure and 
         <div class="circle">8</div>
     </div>
     <div>
-        <div class="step-title">At the conclusion of AIT-2, follow the procedure to leave the validator set and shutdown your node</div>
+        <div class="step-title">At the conclusion of AIT-2, follow the procedure to leave the Validator set and shutdown your node</div>
         <div class="step-caption">Steps to properly leave the validator set and shutdown your node are detailed HERE. </div>
     </div>
 </div>
