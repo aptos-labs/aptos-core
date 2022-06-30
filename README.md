@@ -7,19 +7,19 @@ This monorepo uses turborepo. We use [Yarn](https://classic.yarnpkg.com/lang/en/
 
 1. Clone the repo
 2. run `yarn install` from the root directory
-3. `yarn run dev or start` in the sub-directory of your choice
+3. `yarn start` or `yarn dev` in the sub-directory of your choice
 
 
 ### Apps and Packages
 
 #### Apps
 - `dapp-example`: a Dapp example that interacts with our wallet
-- `extension`: Our wallet extension
+- `extension`: Our wallet browser extension
 - `mobile`: Our mobile react-native wallet
 - [coming soon] `website`: Our wallet website
 
 #### Packages
-- `ui`: a stub React component library shared by both `extension` and `mobile` applications
+- `ui`: a stub React component library shared by `extension`, `website`, and `mobile` applications
 - `eslint-config`: `eslint` configurations
 - `tsconfig`: `tsconfig.json`s used throughout the monorepo
 - [coming soon] `utils`: shared logic for CRUD operations with accounts, transactions, and more
@@ -33,14 +33,14 @@ To build all apps and packages, run the following command:
 
 ```
 cd <ROOT_DIR>
-yarn run build
+yarn build
 ```
 
 ### Lint
 To lint all apps and packages, run the following command:
 ```
 cd <ROOT_DIR>
-yarn run lint
+yarn lint
 ```
 
 ### Develop
@@ -49,7 +49,7 @@ To develop all apps and packages, run the following command:
 
 ```
 cd <ROOT_DIR>
-yarn run dev
+yarn dev
 ```
 
 ### Remote Caching

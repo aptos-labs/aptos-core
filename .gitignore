@@ -65,3 +65,4 @@ mobile/vendor/bundle/
 # Turborepo
 .turbo
 .next/**
+*.log

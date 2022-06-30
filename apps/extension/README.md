@@ -1,4 +1,4 @@
-# Aptos Web Wallet
+# Aptos Wallet - Browser Extension
 
 ## Setup
 
@@ -6,15 +6,15 @@
 1. `yarn build`
 2. In Chrome, go to [chrome://extensions/](chrome://extensions/)
 3. Enable developer mode
-4. Hit `Load Unpacked` and point to new `build` folder in `web-wallet` directory
+4. Hit `Load Unpacked` and point to new `build` folder in this directory
 
-*todo: Add a release build folder so you don't have to yarn build*
+Alternatively, you can download the latest release build from our [core repo](https://github.com/aptos-labs/aptos-core/releases).
 
 **B. Webpage**
-1. `yarn run`
+1. `yarn start`
 
 ## Linting
 ```bash
 # Autofix all linting issues
-npm run lint -- --fix
+yarn lint --fix
 ```
