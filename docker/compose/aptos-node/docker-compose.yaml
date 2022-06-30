@@ -34,6 +34,7 @@ services:
       - 6180
       - 6181
       - 9101
+      - 8080
 
 networks:
   shared:

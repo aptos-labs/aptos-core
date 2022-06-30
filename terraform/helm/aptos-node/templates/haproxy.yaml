@@ -44,6 +44,9 @@ spec:
   - name: api
     port: 80
     targetPort: 8180
+  - name: api-8080
+    port: 8080
+    targetPort: 8180
   {{- end }}
   type: {{ $.Values.service.validator.external.type }}
   externalTrafficPolicy: Local

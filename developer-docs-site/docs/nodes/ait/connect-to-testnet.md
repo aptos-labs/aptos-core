@@ -40,6 +40,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
         helm_values = {
             service = {
             validator = {
+                enableRestApi = false
                 enableMetricsPort = false
               }
             }
