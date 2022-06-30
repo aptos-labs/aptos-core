@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use clap::Parser;
 use std::{
     path::PathBuf,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 /// Tool for manipulating nodes
@@ -144,8 +144,10 @@ pub struct IncreaseLockup {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     /// Number of seconds to increase the lockup period by
-    #[clap(long)]
-    pub(crate) lockup_timestamp_secs: u64,
+    ///
+    /// Examples: '1d', '5 days', '1 month'
+    #[clap(long, parse(try_from_str=parse_duration::parse))]
+    pub(crate) lockup_duration: Duration,
 }
 
 #[async_trait]
@@ -155,16 +157,17 @@ impl CliCommand<Transaction> for IncreaseLockup {
     }
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
-        if self.lockup_timestamp_secs
-            <= SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
-        {
+        if self.lockup_duration.is_zero() {
             return Err(CliError::CommandArgumentError(
-                "--lockup-timestamp-secs is in the past".to_string(),
+                "Must provide a non-zero lockup duration".to_string(),
             ));
         }
+
+        let lockup_timestamp_secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            .saturating_add(self.lockup_duration.as_secs());
 
         self.txn_options
             .submit_script_function(
@@ -172,7 +175,7 @@ impl CliCommand<Transaction> for IncreaseLockup {
                 "Stake",
                 "increase_lockup",
                 vec![],
-                vec![bcs::to_bytes(&self.lockup_timestamp_secs)?],
+                vec![bcs::to_bytes(&lockup_timestamp_secs)?],
             )
             .await
     }
