@@ -12,7 +12,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 All transactions executed on the Aptos Blockchain must be signed. This requirement is enforced by the chain for security reasons.
 
-You can use the [Aptos REST API](https://fullnode.devnet.aptoslabs.com/spec.html) for this purpose. The Aptos server will generate the signing message, the transaction signature and will submit the signed transaction to the Aptos Blockchain. Also see the tutorial [Your First Transaction](../tutorials/first-transaction.md).
+You can use the [Aptos REST API](/rest-api) for this purpose. The Aptos server will generate the signing message, the transaction signature and will submit the signed transaction to the Aptos Blockchain. Also see the tutorial [Your First Transaction](../tutorials/first-transaction.md).
 
 However, you may prefer instead that your client application, for example, a hardware security module (HSM), be responsible for generating the signed transaction. Before submitting transactions, a client must:
 
@@ -100,7 +100,7 @@ A signed transaction consists of:
 * A raw transaction, and
 * An authenticator. The authenticator contains a client's public key and the signature of the raw transaction.
 
-This signed transaction is further BCS-serialized (not shown in the diagram in [Overview](#overview) section), after which the signed transaction is ready for submission to the [Aptos REST interface](https://fullnode.devnet.aptoslabs.com/spec.html).
+This signed transaction is further BCS-serialized (not shown in the diagram in [Overview](#overview) section), after which the signed transaction is ready for submission to the [Aptos REST interface](/rest-api).
 
 ### Multisignature transactions
 
@@ -296,7 +296,7 @@ To submit a signed transaction in the BCS format, the client must pass in a spec
 curl -X POST -H "Content-Type: application/x.aptos.signed_transaction+bcs" --data-binary "@path/to/file_contains_bcs_bytes_of_signed_txn" https://some_domain/transactions
 ```
 
-[account]: /basics/basics-accounts
+[account]: /concepts/basics-accounts
 [bcs]: https://docs.rs/bcs/latest/bcs/
 [sha3]: https://en.wikipedia.org/wiki/SHA-3
 [Ed25519]: https://ed25519.cr.yp.to/
