@@ -22,6 +22,7 @@ impl Test for Indexer {
 
 pub fn wipe_database(conn: &PgPoolConnection) {
     for table in [
+        "metadatas",
         "tokens",
         "token_activities",
         "collections",
@@ -112,7 +113,7 @@ impl AptosTest for Indexer {
             assert_eq!(tx1.type_, "block_metadata_transaction");
             assert!(ut1.is_none());
             assert!(bmt1.is_some());
-            assert!(events1.is_empty());
+            assert!(!events1.is_empty());
             assert!(!wsc1.is_empty());
 
             // This is the genesis transaction
