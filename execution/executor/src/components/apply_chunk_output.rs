@@ -50,12 +50,8 @@ impl ApplyChunkOutput {
             state_checkpoint_hashes,
             result_state,
             next_epoch_state,
-        ) = InMemoryStateCalculator::new(
-            base_view.state(),
-            state_cache,
-            base_view.txn_accumulator().num_leaves(),
-        )
-        .calculate_for_transaction_chunk(&to_keep, new_epoch)?;
+        ) = InMemoryStateCalculator::new(base_view.state(), state_cache)
+            .calculate_for_transaction_chunk(&to_keep, new_epoch)?;
 
         // Calculate TransactionData and TransactionInfo, i.e. the ledger history diff.
         let (to_commit, transaction_info_hashes) = Self::assemble_ledger_diff(
