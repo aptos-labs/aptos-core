@@ -3,7 +3,10 @@
 
 use crate::{
     common::{
-        types::{CliCommand, CliError, CliResult, CliTypedResult, TransactionOptions},
+        types::{
+            CliCommand, CliError, CliResult, CliTypedResult, ProfileOptions, RestOptions,
+            TransactionOptions,
+        },
         utils::read_from_file,
     },
     genesis::git::from_yaml,
@@ -11,7 +14,7 @@ use crate::{
 use aptos_crypto::{ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
 use aptos_genesis::config::{HostAndPort, ValidatorConfiguration};
 use aptos_rest_client::Transaction;
-use aptos_types::account_address::AccountAddress;
+use aptos_types::{account_address::AccountAddress, account_config::aptos_root_address};
 use async_trait::async_trait;
 use clap::Parser;
 use std::{
@@ -30,6 +33,9 @@ pub enum NodeTool {
     RegisterValidatorCandidate(RegisterValidatorCandidate),
     JoinValidatorSet(JoinValidatorSet),
     LeaveValidatorSet(LeaveValidatorSet),
+    ShowValidatorConfig(ShowValidatorConfig),
+    ShowValidatorSet(ShowValidatorSet),
+    ShowValidatorStake(ShowValidatorStake),
 }
 
 impl NodeTool {
@@ -43,6 +49,9 @@ impl NodeTool {
             RegisterValidatorCandidate(tool) => tool.execute_serialized().await,
             JoinValidatorSet(tool) => tool.execute_serialized().await,
             LeaveValidatorSet(tool) => tool.execute_serialized().await,
+            ShowValidatorSet(tool) => tool.execute_serialized().await,
+            ShowValidatorStake(tool) => tool.execute_serialized().await,
+            ShowValidatorConfig(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -323,6 +332,16 @@ pub struct OperatorArgs {
     pub(crate) pool_address: Option<AccountAddress>,
 }
 
+impl OperatorArgs {
+    fn address(&self, profile_options: &ProfileOptions) -> CliTypedResult<AccountAddress> {
+        if let Some(address) = self.pool_address {
+            Ok(address)
+        } else {
+            profile_options.account_address()
+        }
+    }
+}
+
 /// Join the validator set after meeting staking requirements
 #[derive(Parser)]
 pub struct JoinValidatorSet {
@@ -339,11 +358,9 @@ impl CliCommand<Transaction> for JoinValidatorSet {
     }
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
-        let address = if let Some(address) = self.operator_args.pool_address {
-            address
-        } else {
-            self.txn_options.profile_options.account_address()?
-        };
+        let address = self
+            .operator_args
+            .address(&self.txn_options.profile_options)?;
 
         self.txn_options
             .submit_script_function(
@@ -373,11 +390,9 @@ impl CliCommand<Transaction> for LeaveValidatorSet {
     }
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
-        let address = if let Some(address) = self.operator_args.pool_address {
-            address
-        } else {
-            self.txn_options.profile_options.account_address()?
-        };
+        let address = self
+            .operator_args
+            .address(&self.txn_options.profile_options)?;
 
         self.txn_options
             .submit_script_function(
@@ -388,5 +403,83 @@ impl CliCommand<Transaction> for LeaveValidatorSet {
                 vec![bcs::to_bytes(&address)?],
             )
             .await
+    }
+}
+
+/// Show validator details of the current validator
+#[derive(Parser)]
+pub struct ShowValidatorStake {
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) operator_args: OperatorArgs,
+}
+
+#[async_trait]
+impl CliCommand<serde_json::Value> for ShowValidatorStake {
+    fn command_name(&self) -> &'static str {
+        "ShowValidatorStake"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<serde_json::Value> {
+        let client = self.rest_options.client(&self.profile_options.profile)?;
+        let address = self.operator_args.address(&self.profile_options)?;
+        let response = client
+            .get_resource(address, "0x1::Stake::StakePool")
+            .await?;
+        Ok(response.into_inner())
+    }
+}
+
+/// Show validator details of the current validator
+#[derive(Parser)]
+pub struct ShowValidatorConfig {
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) operator_args: OperatorArgs,
+}
+
+#[async_trait]
+impl CliCommand<serde_json::Value> for ShowValidatorConfig {
+    fn command_name(&self) -> &'static str {
+        "ShowValidatorConfig"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<serde_json::Value> {
+        let client = self.rest_options.client(&self.profile_options.profile)?;
+        let address = self.operator_args.address(&self.profile_options)?;
+        let response = client
+            .get_resource(address, "0x1::Stake::ValidatorConfig")
+            .await?;
+        Ok(response.into_inner())
+    }
+}
+
+/// Show validator details of the validator set
+#[derive(Parser)]
+pub struct ShowValidatorSet {
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+}
+
+#[async_trait]
+impl CliCommand<serde_json::Value> for ShowValidatorSet {
+    fn command_name(&self) -> &'static str {
+        "ShowValidatorSet"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<serde_json::Value> {
+        let client = self.rest_options.client(&self.profile_options.profile)?;
+        let response = client
+            .get_resource(aptos_root_address(), "0x1::Stake::ValidatorSet")
+            .await?;
+        Ok(response.into_inner())
     }
 }
