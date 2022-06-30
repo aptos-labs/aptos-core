@@ -9,11 +9,11 @@ import tempfile
 import time
 
 FORGE_K8S_CLUSTERS = [
-    "rustie-test"
+    "forge-0",
 ]
 
 WORKSPACE_CHART_BUCKETS = {
-    "rustie-test": "aptos-testnet-rustie-test-helm-0066a343"
+    "forge-0": "aptos-testnet-forge-0-helm-38891543",
 }
 
 AWS_ACCOUNT = (

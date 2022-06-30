@@ -11,10 +11,7 @@ use aptos_config::config::NodeConfig;
 use aptos_retrier::ExponentWithLimitDelay;
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
-    types::{
-        chain_id::{ChainId, NamedChain},
-        AccountKey, LocalAccount, PeerId,
-    },
+    types::{chain_id::ChainId, AccountKey, LocalAccount, PeerId},
 };
 use k8s_openapi::api::core::v1::Service;
 use kube::{
@@ -78,7 +75,7 @@ impl K8sSwarm {
             fullnodes,
             root_account,
             kube_client,
-            chain_id: ChainId::new(NamedChain::DEVNET.id()),
+            chain_id: ChainId::new(4),
             helm_repo: helm_repo.to_string(),
             versions: Arc::new(versions),
         })
@@ -204,7 +201,7 @@ impl Swarm for K8sSwarm {
 
 /// Amount of time to wait for genesis to complete
 pub fn k8s_wait_genesis_strategy() -> impl Iterator<Item = Duration> {
-    ExponentWithLimitDelay::new(1000, 10 * 1000, 60 * 1000)
+    ExponentWithLimitDelay::new(1000, 10 * 1000, 3 * 60 * 1000)
 }
 
 /// Amount of time to wait for nodes to respond on the REST API
@@ -252,9 +249,8 @@ pub(crate) async fn get_validators(
         .map(|s| {
             let node_id = parse_node_id(&s.name).expect("error to parse node id");
             let node = K8sNode {
-                name: format!("val{}", node_id),
-                // TODO(rustielin): get the helm release name. prefix everything with forge?
-                sts_name: format!("rustie-test-aptos-node-{}-validator", node_id),
+                name: format!("aptos-node-{}-validator", node_id),
+                sts_name: parse_node_pod_basename(&s.name).unwrap(),
                 // TODO: fetch this from running node
                 peer_id: PeerId::random(),
                 node_id,
@@ -291,8 +287,8 @@ pub(crate) async fn get_fullnodes(
         .map(|s| {
             let node_id = parse_node_id(&s.name).expect("error to parse node id");
             let node = K8sNode {
-                name: format!("val{}", node_id),
-                sts_name: format!("val{}-aptos-validator-fullnode-e{}", node_id, era),
+                name: format!("aptos-node-{}-fullnode", node_id),
+                sts_name: format!("{}-e{}", parse_node_pod_basename(&s.name).unwrap(), era),
                 // TODO: fetch this from running node
                 peer_id: PeerId::random(),
                 node_id,
@@ -321,6 +317,17 @@ fn parse_node_id(s: &str) -> Result<usize> {
     let v = v[1].split('-').collect::<Vec<&str>>();
     let idx: usize = v[0].parse().unwrap();
     Ok(idx)
+}
+
+// gets the node's underlying STS name based on its associated LB service name
+// assumes the input is named <RELEASE>-aptos-node-<INDEX>-<validator|fullnode>-lb
+fn parse_node_pod_basename(s: &str) -> Result<String> {
+    // first get rid of the prefixes
+    let v = s.split("-lb").collect::<Vec<&str>>();
+    if v.len() < 2 {
+        return Err(format_err!("Failed to parse {:?} sts name format", s));
+    }
+    Ok(v[0].to_string())
 }
 
 fn load_root_key(root_key_bytes: &[u8]) -> Ed25519PrivateKey {

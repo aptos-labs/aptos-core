@@ -32,7 +32,6 @@ futures-io = { version = "0.3.21", features = ["std"] }
 futures-sink = { version = "0.3.21", features = ["alloc", "std"] }
 futures-util = { version = "0.3.21", features = ["alloc", "async-await", "async-await-macro", "channel", "futures-channel", "futures-io", "futures-macro", "futures-sink", "io", "memchr", "sink", "slab", "std"] }
 generic-array = { version = "0.14.5", default-features = false, features = ["more_lengths"] }
-hashbrown = { version = "0.11.2", features = ["ahash", "inline-more", "raw"] }
 hyper = { version = "0.14.18", features = ["client", "full", "h2", "http1", "http2", "runtime", "server", "socket2", "stream", "tcp"] }
 include_dir = { version = "0.7.2", features = ["glob"] }
 itertools = { version = "0.10.3", features = ["use_alloc", "use_std"] }
@@ -85,7 +84,6 @@ futures-io = { version = "0.3.21", features = ["std"] }
 futures-sink = { version = "0.3.21", features = ["alloc", "std"] }
 futures-util = { version = "0.3.21", features = ["alloc", "async-await", "async-await-macro", "channel", "futures-channel", "futures-io", "futures-macro", "futures-sink", "io", "memchr", "sink", "slab", "std"] }
 generic-array = { version = "0.14.5", default-features = false, features = ["more_lengths"] }
-hashbrown = { version = "0.11.2", features = ["ahash", "inline-more", "raw"] }
 hyper = { version = "0.14.18", features = ["client", "full", "h2", "http1", "http2", "runtime", "server", "socket2", "stream", "tcp"] }
 include_dir = { version = "0.7.2", features = ["glob"] }
 itertools = { version = "0.10.3", features = ["use_alloc", "use_std"] }
@@ -117,18 +115,22 @@ url = { version = "2.2.2", default-features = false, features = ["serde"] }
 warp = { version = "0.3.2", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
+hashbrown = { version = "0.11.2", features = ["ahash", "inline-more"] }
 standback = { version = "0.2.17", default-features = false, features = ["std"] }
 tokio-util-3b31131e45eafb45 = { package = "tokio-util", version = "0.6.10", features = ["codec", "io"] }
 
 [target.x86_64-unknown-linux-gnu.build-dependencies]
+hashbrown = { version = "0.11.2", features = ["ahash", "inline-more"] }
 standback = { version = "0.2.17", default-features = false, features = ["std"] }
 tokio-util-3b31131e45eafb45 = { package = "tokio-util", version = "0.6.10", features = ["codec", "io"] }
 
 [target.x86_64-apple-darwin.dependencies]
+hashbrown = { version = "0.11.2", features = ["ahash", "inline-more"] }
 standback = { version = "0.2.17", default-features = false, features = ["std"] }
 tokio-util-3b31131e45eafb45 = { package = "tokio-util", version = "0.6.10", features = ["codec", "io"] }
 
 [target.x86_64-apple-darwin.build-dependencies]
+hashbrown = { version = "0.11.2", features = ["ahash", "inline-more"] }
 standback = { version = "0.2.17", default-features = false, features = ["std"] }
 tokio-util-3b31131e45eafb45 = { package = "tokio-util", version = "0.6.10", features = ["codec", "io"] }
 

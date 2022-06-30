@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{get_validators, k8s_wait_genesis_strategy, nodes_healthcheck, Result};
+use crate::{
+    get_validators, k8s_wait_genesis_strategy, nodes_healthcheck, Result, DEFAULT_ROOT_KEY,
+};
 use anyhow::bail;
 use k8s_openapi::api::{
     apps::v1::{Deployment, StatefulSet},
@@ -23,12 +25,14 @@ use std::{
 const HELM_BIN: &str = "helm";
 const KUBECTL_BIN: &str = "kubectl";
 const MAX_NUM_VALIDATORS: usize = 30;
+const APTOS_NODE_HELM_RELEASE_NAME: &str = "aptos-node";
+const GENESIS_HELM_RELEASE_NAME: &str = "genesis";
 
 async fn wait_genesis_job(kube_client: &K8sClient, era: &str) -> Result<()> {
     aptos_retrier::retry_async(k8s_wait_genesis_strategy(), || {
         let jobs: Api<Job> = Api::namespaced(kube_client.clone(), "default");
         Box::pin(async move {
-            let job_name = format!("genesis-aptos-genesis-e{}", era);
+            let job_name = format!("{}-aptos-genesis-e{}", GENESIS_HELM_RELEASE_NAME, era);
             println!("Checking status of k8s job: {}", &job_name);
             let genesis_job = jobs.get_status(&job_name).await.unwrap();
             println!("Status: {:?}", genesis_job.status);
@@ -70,9 +74,11 @@ async fn delete_k8s_collection<T: Clone + DeserializeOwned + Meta>(
     api: Api<T>,
     name: &'static str,
 ) -> Result<()> {
-    println!("gonna match");
     match api
-        .delete_collection(&DeleteParams::default(), &ListParams::default())
+        .delete_collection(
+            &DeleteParams::default(),
+            &ListParams::default().labels("app.kubernetes.io/part-of=aptos-node"),
+        )
         .await?
     {
         either::Left(list) => {
@@ -152,7 +158,7 @@ fn upgrade_aptos_node_helm(
 // if a new "era" is specified, a new genesis will be created, and old resources will be destroyed
 fn upgrade_genesis_helm(helm_repo: &str, options: &[String]) -> Result<()> {
     upgrade_helm_release(
-        "genesis".to_string(),
+        GENESIS_HELM_RELEASE_NAME.to_string(),
         format!("{}/aptos-genesis", helm_repo),
         options,
     )
@@ -195,7 +201,7 @@ pub async fn reinstall_testnet_resources(
 
     // TODO(rustielin): get the helm releases to be consistent
     upgrade_aptos_node_helm(
-        "rustie-test".to_string(),
+        APTOS_NODE_HELM_RELEASE_NAME.to_string(),
         &helm_repo,
         aptos_node_upgrade_options.as_slice(),
     )?;
@@ -208,6 +214,9 @@ pub async fn reinstall_testnet_resources(
         format!("chain.era={}", &new_era),
         "--set".to_string(),
         format!("genesis.numValidators={}", base_num_validators),
+        "--set".to_string(),
+        // NOTE: remember to prepend 0x to the key
+        format!("chain.rootKey=0x{}", DEFAULT_ROOT_KEY),
         "--set".to_string(),
         format!("imageTag={}", &base_genesis_image_tag),
     ];
