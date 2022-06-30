@@ -25,7 +25,7 @@ Also my sync version does not increase, indicating that I am not syncing.
 You can workaround this by:
 
 1. Checking your network configuration, and
-2. Adding a seed peer to connect to, in your `public_full_node.yaml` file. See this section: [Add upstream seed peers](run-a-fullnode#add-upstream-seed-peers).
+2. Adding a seed peer to connect to, in your `public_full_node.yaml` file. See this section: [Add upstream seed peers](/nodes/full-node/fullnode-source-code-and-docker#add-upstream-seed-peers).
 
 For example, after you add a single peer to the `seeds` section in your `public_full_node.yaml` file like below, restart the `cargo run -p ...` command:
 
