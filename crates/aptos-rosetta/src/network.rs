@@ -4,8 +4,8 @@
 use crate::{
     block::{block_index_to_version, version_to_block_index},
     common::{
-        check_network, get_genesis_transaction, get_timestamp, handle_request, with_context,
-        with_empty_request, EmptyRequest,
+        check_network, get_timestamp, handle_request, with_context, with_empty_request,
+        EmptyRequest,
     },
     error::ApiError,
     types::{
@@ -137,12 +137,9 @@ async fn network_status(
     let block_size = server_context.block_size;
 
     let rest_client = server_context.rest_client()?;
-    let response = get_genesis_transaction(rest_client).await?;
+    let genesis_txn = BlockIdentifier::genesis_txn();
+    let response = rest_client.get_ledger_information().await?;
     let state = response.state();
-    let transaction = response.inner();
-
-    // TODO: Cache the genesis transaction
-    let genesis_txn = BlockIdentifier::from_transaction(block_size, transaction)?;
 
     // Get the last "block"
     let previous_block = version_to_block_index(block_size, state.version) - 1;

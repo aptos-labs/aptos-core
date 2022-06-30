@@ -8,7 +8,7 @@ use crate::{
 };
 use aptos_crypto::ValidCryptoMaterial;
 use aptos_logger::debug;
-use aptos_rest_client::{aptos::Balance, Account, Response, Transaction};
+use aptos_rest_client::{aptos::Balance, Account, Response};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -109,12 +109,6 @@ pub async fn get_account_balance(
         .get_account_balance(address)
         .await
         .map_err(|_| ApiError::AccountNotFound)
-}
-
-pub async fn get_genesis_transaction(
-    rest_client: &aptos_rest_client::Client,
-) -> ApiResult<Response<Transaction>> {
-    Ok(rest_client.get_transaction_by_version(0).await?)
 }
 
 /// Retrieve the timestamp according ot the Rosetta spec (milliseconds)
