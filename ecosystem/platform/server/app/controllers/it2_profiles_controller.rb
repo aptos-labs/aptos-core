@@ -31,11 +31,11 @@ class It2ProfilesController < ApplicationController
 
     return unless check_recaptcha
 
-    v = NodeHelper::NodeChecker.new(ENV.fetch('NODE_CHECKER_BASE_URL'),
-                                    @it2_profile.validator_address,
-                                    @it2_profile.validator_metrics_port,
-                                    @it2_profile.validator_api_port,
-                                    @it2_profile.validator_port)
+    v = create_node_checker(ENV.fetch('NODE_CHECKER_BASE_URL'),
+                            @it2_profile.validator_address,
+                            @it2_profile.validator_metrics_port,
+                            @it2_profile.validator_api_port,
+                            @it2_profile.validator_port)
 
     if v.ip.ok
       @it2_profile.validator_ip = v.ip.ip
@@ -57,11 +57,11 @@ class It2ProfilesController < ApplicationController
 
   # PATCH/PUT /it2_profiles/1 or /it2_profiles/1.json
   def update
-    v = NodeHelper::NodeChecker.new(ENV.fetch('NODE_CHECKER_BASE_URL'),
-                                    it2_profile_params[:validator_address],
-                                    it2_profile_params[:validator_metrics_port],
-                                    it2_profile_params[:validator_api_port],
-                                    it2_profile_params[:validator_port])
+    v = create_node_checker(ENV.fetch('NODE_CHECKER_BASE_URL'),
+                            it2_profile_params[:validator_address],
+                            it2_profile_params[:validator_metrics_port],
+                            it2_profile_params[:validator_api_port],
+                            it2_profile_params[:validator_port])
 
     return unless check_recaptcha
 
@@ -90,9 +90,34 @@ class It2ProfilesController < ApplicationController
 
   private
 
+  def create_node_checker(node_checker_base_url, hostname, metrics_port, http_api_port, noise_port)
+    if Flipper.enabled?(:node_health_checker)
+      NodeHelper::NodeChecker.new(node_checker_base_url, hostname, metrics_port, http_api_port, noise_port)
+    else
+      NodeHelper::NodeVerifier.new(hostname, metrics_port, http_api_port)
+    end
+  end
+
   # @param [NodeHelper::NodeChecker] node_verifier
   # @return [Array<VerifyResult>]
   def validate_node(node_verifier, do_location: false)
+    return validate_node_nhc(node_verifier, do_location:) if Flipper.enabled?(:node_health_checker)
+
+    results = node_verifier.verify
+
+    # Save without validation to avoid needless uniqueness checks
+    is_valid = results.map(&:valid).all?
+    @it2_profile.update_attribute(:validator_verified, is_valid)
+
+    LocationJob.perform_later({ it2_profile_id: @it2_profile.id }) if is_valid && do_location
+
+    results.each do |result|
+      @it2_profile.errors.add :base, result.message unless result.valid
+    end
+    results
+  end
+
+  def validate_node_nhc(node_verifier, do_location: false)
     results = node_verifier.verify(ENV.fetch('NODE_CHECKER_BASELINE_CONFIG'))
 
     unless results.ok
