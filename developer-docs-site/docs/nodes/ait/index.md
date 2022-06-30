@@ -64,7 +64,7 @@ Participants in the AIT-2 program must demonstrate the ability to configure and 
     </div>
     <div>
         <div class="step-title">Read the Node Requirements</div>
-        <div class="step-caption">Before you proceed, make sure that you satisfy the <a href="node-requirements"><strong> Node Requirements</strong></a>.  </div>
+        <div class="step-caption">Before you proceed, make sure that you satisfy the <a href="./node-requirements"><strong> Node Requirements</strong></a>.  </div>
     </div>
 </div>
 <div class="step">
