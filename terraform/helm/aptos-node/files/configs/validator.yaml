@@ -17,14 +17,14 @@ consensus:
           from_file: /opt/aptos/genesis/waypoint.txt
         identity_blob_path: /opt/aptos/genesis/validator-identity.yaml
   sync_only: {{ $.Values.validator.config.sync_only | default false}}
-  {{- if $.Values.validator.config.mempool_poll_count }}
-  mempool_poll_count: {{ $.Values.validator.config.mempool_poll_count }}
-  {{- end }}
   {{- if $.Values.validator.config.round_initial_timeout_ms }}
   round_initial_timeout_ms: {{ $.Values.validator.config.round_initial_timeout_ms }}
   {{- end }}
   {{- if $.Values.validator.config.max_block_size }}
   max_block_size: {{ $.Values.validator.config.max_block_size}}
+  {{- end }}
+  {{- if $.Values.validator.config.quorum_store_poll_count }}
+  quorum_store_poll_count: {{ $.Values.validator.config.quorum_store_poll_count}}
   {{- end }}
 
 state_sync:

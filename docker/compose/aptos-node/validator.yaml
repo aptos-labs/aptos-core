@@ -17,6 +17,7 @@ consensus:
         waypoint:
           from_file: /opt/aptos/genesis/waypoint.txt
         identity_blob_path: /opt/aptos/genesis/validator-identity.yaml
+  quorum_store_poll_count: 1
 
 execution:
   genesis_file_location: "/opt/aptos/genesis/genesis.blob"

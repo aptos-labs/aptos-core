@@ -35,8 +35,8 @@ validator:
     sync_only: false
     concurrency_level: 4
     enable_state_sync_v2: true
-    mempool_poll_count:
     round_initial_timeout_ms:
+    quorum_store_poll_count: 1
     ledger_prune_window: 10000000
     state_store_prune_window: 1000000
     pruning_batch_size: 10000
@@ -93,14 +93,14 @@ service:
       type: LoadBalancer
     loadBalancerSourceRanges:
     enableRestApi: false
-    enableMetricsPort: false
+    enableMetricsPort: true
   # NOTE: these values apply for all fullnode groups
   fullnode:
     external: 
       type: LoadBalancer
     loadBalancerSourceRanges:
     enableRestApi: true
-    enableMetricsPort: false
+    enableMetricsPort: true
 
 serviceAccount:
   # Specifies whether a service account should be created
