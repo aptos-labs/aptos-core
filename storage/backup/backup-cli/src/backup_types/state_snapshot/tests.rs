@@ -14,7 +14,6 @@ use crate::{
     },
 };
 use aptos_temppath::TempPath;
-use aptos_types::transaction::PRE_GENESIS_VERSION;
 use aptosdb::AptosDB;
 use std::{convert::TryInto, sync::Arc};
 use storage_interface::DbReader;
@@ -57,7 +56,7 @@ fn end_to_end() {
         StateSnapshotRestoreController::new(
             StateSnapshotRestoreOpt {
                 manifest_handle,
-                version: PRE_GENESIS_VERSION,
+                version,
             },
             GlobalRestoreOpt {
                 dry_run: false,
@@ -79,9 +78,10 @@ fn end_to_end() {
     let tgt_db = AptosDB::new_for_test(&tgt_db_dir);
     assert_eq!(
         tgt_db
-            .get_latest_tree_state()
+            .get_latest_state_checkpoint()
             .unwrap()
-            .state_checkpoint_hash,
+            .map(|(_, hash)| hash)
+            .unwrap(),
         state_root_hash,
     );
 
