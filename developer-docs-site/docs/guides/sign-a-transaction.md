@@ -12,7 +12,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 All transactions executed on the Aptos Blockchain must be signed. This requirement is enforced by the chain for security reasons.
 
-You can use the [Aptos REST API](https://fullnode.devnet.aptoslabs.com/spec.html) for this purpose. The Aptos server will generate the signing message, the transaction signature and will submit the signed transaction to the Aptos Blockchain. Also see the tutorial [Your First Transaction](../tutorials/first-transaction.md).
+You can use the [Aptos REST API](/rest-api) for this purpose. The Aptos server will generate the signing message, the transaction signature and will submit the signed transaction to the Aptos Blockchain. Also see the tutorial [Your First Transaction](../tutorials/first-transaction.md).
 
 However, you may prefer instead that your client application, for example, a hardware security module (HSM), be responsible for generating the signed transaction. Before submitting transactions, a client must:
 
@@ -106,7 +106,7 @@ A signed transaction consists of:
 * A raw transaction, and
 * An authenticator. The authenticator contains a client's public key and the signature of the raw transaction.
 
-This signed transaction is further BCS-serialized (not shown in the diagram in [Overview](#overview) section), after which the signed transaction is ready for submission to the [Aptos REST interface](https://fullnode.devnet.aptoslabs.com/spec.html).
+This signed transaction is further BCS-serialized (not shown in the diagram in [Overview](#overview) section), after which the signed transaction is ready for submission to the [Aptos REST interface](/rest-api).
 
 ### Multisignature transactions
 
@@ -305,8 +305,8 @@ curl -X POST -H "Content-Type: application/x.aptos.signed_transaction+bcs" --dat
 ```
 
 [first_transaction]: /tutorials/first-transaction
-[account]: /basics/basics-accounts
-[rest_spec]: https://fullnode.devnet.aptoslabs.com/spec.html
+[account]: /concepts/basics-accounts
+[rest_spec]: /rest-api
 [bcs]: https://docs.rs/bcs/latest/bcs/
 [sha3]: https://en.wikipedia.org/wiki/SHA-3
 [ed25519]: https://ed25519.cr.yp.to/
