@@ -73,6 +73,12 @@ pub struct EmitArgs {
     #[structopt(long, requires = "burst")]
     pub do_not_check_stats_at_end: bool,
 
+    /// The transaction emitter will submit no more than this many transactions
+    /// per second. So if max TPS is 1600 and there are 16 workers, each worker
+    /// will submit no more than 100 per second each.
+    #[structopt(long, default_value = "100000")]
+    pub max_tps: u64,
+
     #[clap(long, default_value = "30")]
     pub txn_expiration_time_secs: u64,
 

@@ -80,6 +80,7 @@ pub struct EmitJobRequest {
     thread_params: EmitThreadParams,
     gas_price: u64,
     invalid_transaction_ratio: usize,
+    max_tps: u64,
     vasp: bool,
 }
 
@@ -92,6 +93,7 @@ impl Default for EmitJobRequest {
             thread_params: EmitThreadParams::default(),
             gas_price: 0,
             invalid_transaction_ratio: 0,
+            max_tps: 100000,
             vasp: false,
         }
     }
@@ -129,6 +131,11 @@ impl EmitJobRequest {
 
     pub fn invalid_transaction_ratio(mut self, invalid_transaction_ratio: usize) -> Self {
         self.invalid_transaction_ratio = invalid_transaction_ratio;
+        self
+    }
+
+    pub fn max_tps(mut self, max_tps: u64) -> Self {
+        self.max_tps = max_tps;
         self
     }
 
@@ -201,6 +208,7 @@ struct SubmissionWorker {
     stats: Arc<StatsAccumulator>,
     txn_factory: TransactionFactory,
     invalid_transaction_ratio: usize,
+    max_tps: u64,
     rng: ::rand::rngs::StdRng,
 }
 
@@ -226,6 +234,9 @@ impl SubmissionWorker {
         let start_time = Instant::now();
         let mut total_num_requests = 0;
 
+        let mut second_start = Instant::now();
+        let mut submitted_this_second = 0;
+
         while !self.stop.load(Ordering::Relaxed) {
             let requests = self.gen_requests(gas_price);
             let num_requests = requests.len();
@@ -235,6 +246,11 @@ impl SubmissionWorker {
             let mut txn_offset_time = 0u64;
 
             for request in requests {
+                if Instant::now().duration_since(second_start) >= Duration::from_secs(1) {
+                    second_start = Instant::now();
+                    submitted_this_second = 0;
+                }
+
                 let cur_time = Instant::now();
                 txn_offset_time += (cur_time - loop_start_time).as_millis() as u64;
                 self.stats.submitted.fetch_add(1, Ordering::Relaxed);
@@ -251,6 +267,14 @@ impl SubmissionWorker {
                     // may use a new thread if necessary, to unblock the main loop.
                     let client = self.client.clone();
                     tokio::spawn(async move { Self::submit_request(&client, request).await });
+                }
+
+                submitted_this_second += 1;
+                if submitted_this_second >= self.max_tps {
+                    time::sleep_until(tokio::time::Instant::from(
+                        second_start + Duration::from_secs(1),
+                    ))
+                    .await;
                 }
             }
 
@@ -685,6 +709,7 @@ impl<'t> TxnEmitter<'t> {
                     stats,
                     txn_factory: self.txn_factory.clone(),
                     invalid_transaction_ratio: req.invalid_transaction_ratio,
+                    max_tps: req.max_tps / workers_per_endpoint as u64,
                     rng: self.from_rng(),
                 };
                 let join_handle = tokio_handle.spawn(worker.run(req.gas_price).boxed());
