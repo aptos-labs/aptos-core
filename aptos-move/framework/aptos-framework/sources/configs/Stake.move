@@ -722,10 +722,11 @@ module AptosFramework::Stake {
         let i = 0;
         let len = Vector::length(&active_validators);
         while (i < len) {
-            let validator_info = Vector::borrow(&active_validators, i);
+            let validator_info = Vector::borrow_mut(&mut active_validators, i);
             let pool_address = validator_info.addr;
             let validator_config = borrow_global_mut<ValidatorConfig>(pool_address);
             validator_config.validator_index = i;
+            validator_info.config.validator_index = i;
             i = i + 1;
         };
 
@@ -985,14 +986,21 @@ module AptosFramework::Stake {
         Coin::destroy_burn_cap<TestCoin>(burn_cap);
 
         // Validator 1 and 2 join the validator set.
-        join_validator_set(&validator_1, validator_1_address);
         join_validator_set(&validator_2, validator_2_address);
+        join_validator_set(&validator_1, validator_1_address);
         on_new_epoch();
         assert!(is_current_validator(validator_1_address), 0);
         assert!(is_current_validator(validator_2_address), 1);
         // Validator indices should be ordered by validator addresses. In this case, validator 1 has a smaller address.
         assert_validator_state(validator_1_address, 100, 0, 0, 0, 0);
         assert_validator_state(validator_2_address, 100, 0, 0, 0, 1);
+        let validator_set = borrow_global<ValidatorSet>(@CoreResources);
+        let validator_config_1 = Vector::borrow(&validator_set.active_validators, 0);
+        assert!(validator_config_1.addr == validator_1_address, 2);
+        assert!(validator_config_1.config.validator_index == 0, 3);
+        let validator_config_2 = Vector::borrow(&validator_set.active_validators, 1);
+        assert!(validator_config_2.addr == validator_2_address, 4);
+        assert!(validator_config_2.config.validator_index == 1, 5);
 
         // Validator 1 rotates consensus key. Validator 2 leaves. Validator 3 joins.
         rotate_consensus_key(&validator_1, validator_1_address, CONSENSUS_KEY_2);
