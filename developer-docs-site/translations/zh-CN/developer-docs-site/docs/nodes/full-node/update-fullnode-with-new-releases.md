@@ -27,7 +27,7 @@ When `devnet` is wiped and updated with newer versions, you will need to update 
 
 7. Restart the FullNode.
 
-8. See the [Verify initial synchronization](run-a-fullnode#verify-initial-synchronization) section for checking if the FullNode is syncing again.
+8. See the [Verify initial synchronization](/nodes/full-node/fullnode-source-code-and-docker#verify-initial-synchronization) section for checking if the FullNode is syncing again.
 
 [devnet_genesis]: https://devnet.aptoslabs.com/genesis.blob
 [devnet_waypoint]: https://devnet.aptoslabs.com/waypoint.txt
