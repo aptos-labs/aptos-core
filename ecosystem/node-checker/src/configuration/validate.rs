@@ -1,13 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::path::PathBuf;
-
-use anyhow::Result;
+use super::{common::validate_configuration, read_configuration_from_file};
+use anyhow::{Context, Result};
 use clap::Parser;
 use log::debug;
-
-use super::read_configuration_from_file;
+use std::path::PathBuf;
 
 #[derive(Clone, Debug, Parser)]
 pub struct Validate {
@@ -17,6 +15,7 @@ pub struct Validate {
 
 pub async fn validate(args: Validate) -> Result<()> {
     let configuration = read_configuration_from_file(args.path)?;
-    debug!("Using configuration: {:#?}", configuration);
+    validate_configuration(&configuration).context("Configuration failed validation")?;
+    debug!("Validated configuration: {:#?}", configuration);
     Ok(())
 }

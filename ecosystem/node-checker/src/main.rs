@@ -1,13 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+mod common_args;
 mod configuration;
 mod evaluator;
+mod evaluators;
 mod metric_collector;
-mod metric_evaluator;
 mod runner;
 mod server;
-mod system_information_evaluator;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
