@@ -24,6 +24,7 @@ Rails.application.routes.draw do
   patch 'settings/profile', to: 'settings#profile_update'
   get 'settings/connections'
   delete 'settings/connections', to: 'settings#connections_delete'
+  delete 'settings/delete_account', to: 'settings#delete_account'
 
   # Discourse SSO
   get 'discourse/sso', to: 'discourse#sso'
