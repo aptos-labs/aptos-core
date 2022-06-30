@@ -17,7 +17,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 - Stop your node and remove the data directory.
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
 - Pull the latest changes on `testnet` branch, make sure you're at commit `3b53225b5a1effcce5dee9597a129216510dc424`
-- Close the metrics port `9101` for your validator and fullnode
+- Close the metrics port `9101` and REST API port `80` for your validator and fullnode
 - Restarting the node
 
 ### Using Docker
@@ -25,21 +25,22 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 - Stop your node and remove the data volumes, `docker compose down --volumes`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
 - Update your docker image to use tag `testnet_3b53225b5a1effcce5dee9597a129216510dc424`. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_3b53225b5a1effcce5dee9597a129216510dc424/images/sha256-1625f70457a6060ae2e64e699274e1ddca02cb7856406a40d1891b6bf84ae072?context=explore)
-- Close metrics port on 9101 for your validator and fullnode (remove it from the docker compose file)
+- Close metrics port on 9101 and REST API port `80` for your validator and fullnode (remove it from the docker compose file)
 - Restarting the node: `docker compose up`
 
 ### Using Terraform
 
 - Increase `era` number in your Terraform config, this will wipe the data once applied.
 - Update your docker image to use tag `testnet_3b53225b5a1effcce5dee9597a129216510dc424` in the Terraform config. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_3b53225b5a1effcce5dee9597a129216510dc424/images/sha256-1625f70457a6060ae2e64e699274e1ddca02cb7856406a40d1891b6bf84ae072?context=explore)
-- Close metrics port for validator and fullnode, add the helm values in your `main.tf ` file, for example:
+- Close metrics port and REST API port for validator and fullnode, add the helm values in your `main.tf ` file, for example:
     ```
     module "aptos-node" {
         ...
 
         helm_values = {
             service = {
-            validator = {
+              validator = {
+                enableRestApi = false
                 enableMetricsPort = false
               }
             }
