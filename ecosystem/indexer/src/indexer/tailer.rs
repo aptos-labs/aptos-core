@@ -243,6 +243,11 @@ mod test {
 
     pub fn wipe_database(conn: &PgPoolConnection) {
         for table in [
+            "metadatas",
+            "ownerships",
+            "token_activities",
+            "tokens",
+            "collections",
             "write_set_changes",
             "events",
             "user_transactions",
@@ -502,6 +507,21 @@ mod test {
               ],
               "proposer": "0x68f04222bd9f8846cda028ea5ba3846a806b04a47e1f1a4f0939f350d713b2eb",
               "timestamp": "1649395495746947",
+              "events": [
+                 {
+                    "key": "0x0600000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+                    "sequence_number": "0",
+                    "type": "0x1::Block::NewBlockEvent",
+                    "data": {
+                      "epoch": "1",
+                      "failed_proposer_indices": [],
+                      "previous_block_votes": [false],
+                      "proposer": "0xf7c109be515785bba951fc8c51063515d474f78cad150457d6ebd08c4faf2f3b",
+                      "round": "1",
+                      "time_microseconds": "1656565270489235"
+                    }
+                }
+              ],
               "changes": [
                 {
                   "type": "write_resource",
@@ -552,7 +572,7 @@ mod test {
         assert_eq!(tx1.type_, "block_metadata_transaction");
         assert!(ut1.is_none());
         assert!(bmt1.is_some());
-        assert_eq!(events1.len(), 0);
+        assert_eq!(events1.len(), 1);
         assert_eq!(wsc1.len(), 2);
 
         // This is the genesis transaction

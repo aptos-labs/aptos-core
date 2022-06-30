@@ -63,6 +63,23 @@
     "id": "0x4e9016838657edfae09cb9a71eb219025c4c87a67c4aaa86f20ac0aa792bc121",
     "epoch": "0",
     "round": "1",
+    "events": [
+      {
+        "key": "0x0600000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+        "sequence_number": "0",
+        "type": "0x1::Block::NewBlockEvent",
+        "data": {
+          "epoch": "0",
+          "failed_proposer_indices": [],
+          "previous_block_votes": [
+            false
+          ],
+          "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+          "round": "1",
+          "time_microseconds": "1"
+        }
+      }
+    ],
     "previous_block_votes": [
       false
     ],

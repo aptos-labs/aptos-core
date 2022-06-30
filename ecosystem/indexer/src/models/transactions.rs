@@ -232,7 +232,7 @@ impl Transaction {
                 Some(Either::Right(BlockMetadataTransaction::from_transaction(
                     tx,
                 ))),
-                None,
+                EventModel::from_events(tx.info.hash.to_string(), &tx.events),
                 WriteSetChangeModel::from_write_set_changes(
                     tx.info.hash.to_string(),
                     &tx.info.changes,

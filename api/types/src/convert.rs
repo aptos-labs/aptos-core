@@ -98,7 +98,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 let payload = self.try_into_write_set_payload(write_set)?;
                 (info, payload, events).into()
             }
-            BlockMetadata(txn) => (&txn, info).into(),
+            BlockMetadata(txn) => (&txn, info, events).into(),
             StateCheckpoint => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,
