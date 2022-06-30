@@ -9,7 +9,7 @@ use crate::{
     configuration::NodeAddress,
     evaluator::EvaluationSummary,
     evaluators::{
-        direct::{NodeIdentityEvaluatorError, TpsEvaluatorError},
+        direct::{LatencyEvaluatorError, NodeIdentityEvaluatorError, TpsEvaluatorError},
         metrics::MetricsEvaluatorError,
         system_information::SystemInformationEvaluatorError,
     },
@@ -45,6 +45,9 @@ pub enum RunnerError {
     /// evaluator, this is an actual failure in the evaluation process.
     #[error("Failed to evaluate TPS: {0}")]
     TpsEvaluatorError(TpsEvaluatorError),
+
+    #[error("Failed to evaluate latency: {0}")]
+    LatencyEvaluatorError(LatencyEvaluatorError),
 }
 
 /// This trait describes a Runner, something that can take in instances of other
