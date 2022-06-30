@@ -63,8 +63,8 @@ function getAccountAddress (account, sendResponse) {
 
 async function signAndSubmitTransaction (client, account, transaction, sendResponse) {
   try {
-    const signedTransaction = signTransaction(client, account, transaction)
-    const response = await client.submitTransaction(account, signedTransaction)
+    const signedTransaction = await signTransaction(client, account, transaction)
+    const response = await client.submitTransaction(signedTransaction)
     sendResponse(response)
   } catch (error) {
     sendResponse({ error })
@@ -73,7 +73,7 @@ async function signAndSubmitTransaction (client, account, transaction, sendRespo
 
 async function signTransactionAndSendResponse (client, account, transaction, sendResponse) {
   try {
-    const signedTransaction = signTransaction(client, account, transaction)
+    const signedTransaction = await signTransaction(client, account, transaction);
     sendResponse({ signedTransaction })
   } catch (error) {
     sendResponse({ error })
