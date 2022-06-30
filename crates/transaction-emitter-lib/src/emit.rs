@@ -204,6 +204,9 @@ struct SubmissionWorker {
     rng: ::rand::rngs::StdRng,
 }
 
+/// This function takes ownership of the client and request so that we can
+/// easily spawn this from another task if necessary.
+
 // Note, there is an edge case that can occur if the transaction emitter
 // bursts the target node too fast, and the emitter doesn't handle it
 // very well, instead waiting up until the timeout for the target seqnum
@@ -230,15 +233,27 @@ impl SubmissionWorker {
             let loop_start_time = Instant::now();
             let wait_until = loop_start_time + wait_duration;
             let mut txn_offset_time = 0u64;
+
             for request in requests {
                 let cur_time = Instant::now();
                 txn_offset_time += (cur_time - loop_start_time).as_millis() as u64;
                 self.stats.submitted.fetch_add(1, Ordering::Relaxed);
-                let resp = self.client.submit(&request).await;
-                if let Err(e) = resp {
-                    warn!("[{:?}] Failed to submit request: {:?}", self.client, e);
+
+                if self.params.wait_committed {
+                    // If we're in regular (non burst) mode, submit the request
+                    // and await it as normal, so that we only update the stats
+                    // once we have received the response from the node.
+                    Self::submit_request(&self.client, request).await;
+                } else {
+                    // Otherwise, in burst mode, we don't want to wait for the
+                    // response, we want to submit transactions as fast as
+                    // possible. As such, spawn the future in a new task, which
+                    // may use a new thread if necessary, to unblock the main loop.
+                    let client = self.client.clone();
+                    tokio::spawn(async move { Self::submit_request(&client, request).await });
                 }
             }
+
             if self.params.wait_committed {
                 self.update_stats(
                     loop_start_time,
@@ -249,6 +264,7 @@ impl SubmissionWorker {
                 )
                 .await
             }
+
             let now = Instant::now();
             if wait_until > now {
                 time::sleep(wait_until - now).await;
@@ -270,6 +286,15 @@ impl SubmissionWorker {
         }
 
         self.accounts
+    }
+
+    // This function is separate just to help us spawn it in a separate thread
+    // if necessary.
+    async fn submit_request(client: &RestClient, request: SignedTransaction) {
+        let resp = client.submit(&request).await;
+        if let Err(e) = resp {
+            warn!("[{:?}] Failed to submit request: {:?}", client, e);
+        }
     }
 
     /// This function assumes that num_requests == num_accounts, which is
@@ -635,6 +660,7 @@ impl<'t> TxnEmitter<'t> {
             req.accounts_per_client, num_accounts
         );
         self.mint_accounts(&req, num_accounts).await?;
+        info!("Minting accounts completed");
         let all_accounts = self.accounts.split_off(self.accounts.len() - num_accounts);
         let mut workers = vec![];
         let all_addresses: Vec<_> = all_accounts.iter().map(|d| d.address()).collect();
