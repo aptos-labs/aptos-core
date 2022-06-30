@@ -1,0 +1,35 @@
+{
+  "name": "website",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@aptos-wallet/web-ui": "*",
+    "@chakra-ui/icons": "^2.0.2",
+    "@chakra-ui/react": "^2.2.1",
+    "@emotion/react": "^11",
+    "@emotion/styled": "^11",
+    "@next/eslint-plugin-next": "^12.2.0",
+    "framer-motion": "^6",
+    "next": "12.2.0",
+    "next-seo": "^5.4.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-hook-form": "^7.33.0",
+    "react-icons": "^4.4.0",
+    "react-intersection-observer": "^9.3.4"
+  },
+  "devDependencies": {
+    "@aptos-wallet/eslint-config": "*",
+    "@types/node": "18.0.0",
+    "@types/react": "18.0.14",
+    "@types/react-dom": "18.0.5",
+    "eslint-config-next": "12.2.0",
+    "typescript": "4.7.4"
+  }
+}
