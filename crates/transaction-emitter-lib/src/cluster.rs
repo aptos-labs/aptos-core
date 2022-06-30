@@ -2,17 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{emit::query_sequence_numbers, instance::Instance, ClusterArgs};
-use anyhow::{bail, format_err, Result};
+use anyhow::{anyhow, bail, format_err, Result};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
     Uniform,
 };
+use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     types::{account_config::aptos_root_address, chain_id::ChainId, AccountKey, LocalAccount},
 };
+use futures::executor;
+use futures::executor::block_on;
 use rand::seq::SliceRandom;
 use std::convert::TryFrom;
 use url::Url;
@@ -37,7 +40,7 @@ impl Cluster {
         mint_key: Ed25519PrivateKey,
         chain_id: ChainId,
         vasp: bool,
-    ) -> Self {
+    ) -> Result<Self> {
         let instances: Vec<Instance> = peers
             .into_iter()
             .map(|url| {
@@ -47,7 +50,14 @@ impl Cluster {
                     None,
                 )
             })
+            .filter(|instance| block_on(instance.rest_client().get_ledger_information()).is_ok())
             .collect();
+
+        if instances.is_empty() {
+            return Err(anyhow!("None of the rest endpoints provided are reachable"));
+        }
+
+        info!("Creating the cluster with {} end points", instances.len());
 
         let mint_key_pair = if vasp {
             dummy_key_pair()
@@ -55,11 +65,11 @@ impl Cluster {
             KeyPair::from(mint_key)
         };
 
-        Self {
+        Ok(Self {
             instances,
             mint_key_pair,
             chain_id,
-        }
+        })
     }
 
     fn account_key(&self) -> AccountKey {
@@ -130,7 +140,8 @@ impl TryFrom<&ClusterArgs> for Cluster {
 
         let mint_key = args.mint_args.get_mint_key()?;
 
-        let cluster = Cluster::from_host_port(urls, mint_key, args.chain_id, args.vasp);
+        let cluster = Cluster::from_host_port(urls, mint_key, args.chain_id, args.vasp)
+            .map_err(|e| format_err!("failed to create a cluster from host and port: {}", e))?;
 
         Ok(cluster)
     }
