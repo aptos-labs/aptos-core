@@ -27,7 +27,7 @@ When `devnet` is wiped and updated with newer versions, you will need to update 
 
 7. Restart the FullNode.
 
-8. See the [Verify initial synchronization](run-a-fullnode#verify-initial-synchronization) section for checking if the FullNode is syncing again.
+8. See the [Verify initial synchronization](/nodes/full-node/fullnode-source-code-and-docker#verify-initial-synchronization) section for checking if the FullNode is syncing again.
 
 
 [pfn_config_file]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/public_full_node.yaml
