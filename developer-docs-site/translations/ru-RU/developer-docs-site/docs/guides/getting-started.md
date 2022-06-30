@@ -55,12 +55,27 @@ Now your basic Aptos development environment ready.
 ## Aptos SDK
 
 - [Aptos Typescript SDK](https://www.npmjs.com/package/aptos).
+- [Typescript SDK API](https://aptos-labs.github.io/ts-sdk-doc/).
 
 ## Aptos devnet
 
 - [Genesis](https://devnet.aptoslabs.com/genesis.blob).
 - [Waypoint](https://devnet.aptoslabs.com/waypoint.txt).
-- [ChainID](https://devnet.aptoslabs.com/chainid.txt).
-- **The Aptos Faucet:** [https://faucet.devnet.aptoslabs.com](https://faucet.devnet.aptoslabs.com).
+- [ChainID](http://fullnode.devnet.aptoslabs.com/).
+
+## APIs
+
+- **API server URL for the Aptos devnet Faucet:** [https://faucet.devnet.aptoslabs.com](https://faucet.devnet.aptoslabs.com).
 - **REST API URL:** [https://fullnode.devnet.aptoslabs.com](https://fullnode.devnet.aptoslabs.com).
+
+
+## Aptos explorer
+
+- [Aptos Exporer](https://explorer.devnet.aptos.dev/). Use the top-right drop-down menu to select the network.
+
+## Aptos status
+
+- [Aptos Status](https://community.aptoslabs.com/it1).
+
+
 
