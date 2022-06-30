@@ -8,6 +8,7 @@ use aptos_types::validator_verifier::ValidatorVerifier;
 use consensus_types::proof_of_store::{ProofOfStore, SignedDigest, SignedDigestError};
 use std::collections::HashMap;
 use tokio::sync::mpsc::Receiver;
+use aptos_logger::debug;
 
 #[derive(Debug)]
 pub(crate) enum ProofBuilderCommand {
@@ -102,9 +103,12 @@ impl ProofBuilder {
                     }
                 }
                 ProofBuilderCommand::AppendSignature(signed_digest) => {
-                    if let Err(_) = self.add_signature(signed_digest, &validator_verifier) {
+                    if let Err(e) = self.add_signature(signed_digest, &validator_verifier) {
                         // Can happen if we already garbage collected
+                        debug!("could not add signature {:?}", e);
                         //TODO: do something
+                    } else {
+                        debug!("QS: added signature to prrof");
                     }
                 }
             }

@@ -734,10 +734,6 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     );
     debug!("Mempool started in {} ms", instant.elapsed().as_millis());
 
-    assert!(
-        !node_config.consensus.use_quorum_store,
-        "QuorumStore is not yet implemented"
-    );
     assert_ne!(
         node_config.consensus.use_quorum_store,
         node_config.mempool.shared_mempool_validator_broadcast,

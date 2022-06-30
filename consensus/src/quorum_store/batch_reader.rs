@@ -25,7 +25,9 @@ use std::{
     },
     time::Duration,
 };
+use anyhow::bail;
 use tokio::sync::{mpsc::Sender, oneshot};
+use aptos_logger::debug;
 
 // Make configuration parameter (passed to QuorumStore).
 /// Maximum number of rounds in the future from local prospective to hold batches for.
@@ -43,7 +45,7 @@ pub(crate) enum BatchReaderCommand {
 pub(crate) enum StoreType {
     MemoryCache,
     PersistOnly,
-    LimitedExceed,
+    LimitExceeded,
 }
 
 pub(crate) struct QuotaManger {
@@ -73,7 +75,7 @@ impl QuotaManger {
             self.db_balance = self.db_balance + num_of_bytes;
             StoreType::PersistOnly
         } else {
-            StoreType::LimitedExceed
+            StoreType::LimitExceeded
         }
     }
 
@@ -148,7 +150,8 @@ impl BatchReader {
                 expired_keys.push(digest);
             } else {
                 let ret = self_ob.update_cache(digest, value);
-                assert!(ret);
+                assert!(ret.is_ok());
+                assert!(ret.unwrap().is_none());
             }
         }
 
@@ -160,20 +163,19 @@ impl BatchReader {
     }
 
     // returns true if value needs to be persisted
-    fn update_cache(&self, digest: HashValue, mut value: PersistedValue) -> bool {
+    fn update_cache(&self, digest: HashValue, mut value: PersistedValue) -> anyhow::Result<Option<PersistedValue>> {
         let author = value.author;
         let mut entry = self
             .peer_quota
             .entry(author)
             .or_insert(QuotaManger::new(self.db_quota, self.memory_quota));
-
         match entry.store_type(value.num_bytes) {
             StoreType::MemoryCache => {}
             StoreType::PersistOnly => {
                 value.remove_payload();
             }
-            StoreType::LimitedExceed => {
-                return false;
+            StoreType::LimitExceeded => {
+                bail!("storage quota exceeded ");
             }
         }
 
@@ -181,26 +183,28 @@ impl BatchReader {
             .lock()
             .unwrap()
             .push((Reverse(value.expiration.round()), digest));
-        self.db_cache.insert(digest, value);
-        true
+        Ok(self.db_cache.insert(digest, value))
     }
 
-    pub(crate) fn save(&self, digest: HashValue, value: PersistedValue) -> bool {
+    pub(crate) fn save(&self, digest: HashValue, value: PersistedValue) -> anyhow::Result<bool> {
         if value.expiration.epoch() == self.epoch()
             && value.expiration.round() > self.last_committed_round()
             && value.expiration.round() <= self.last_committed_round() + MAX_BATCH_EXPIRY_ROUND_GAP
         {
             if let Some(prev_value) = self.db_cache.get(&digest) {
-                if prev_value.expiration.round() < value.expiration.round() {
-                    self.remove_value(&digest);
-                } else {
-                    return false;
+                if prev_value.expiration.round() >= value.expiration.round() {
+                    debug!("QS: already have the digest with higher expiration");
+                    return Ok(false);
                 }
             }
-            self.update_cache(digest, value)
+            if let Some(prev_value) = self.update_cache(digest, value)? {
+                self.free_quota(prev_value);
+            }
         } else {
-            false
+            debug!("QS: failed to store to cache, expiration =  {:?}, last round = {}, MAX_BATCH_EXPIRY_ROUND_GAP = {} ", value.expiration, self.last_committed_round(), MAX_BATCH_EXPIRY_ROUND_GAP  );
+            bail!("Wrong expiration");
         }
+        Ok(true)
     }
 
     fn clear_expired_payload(&self, certified_time: LogicalTime) -> Vec<HashValue> {
@@ -222,25 +226,27 @@ impl BatchReader {
             if let Some((Reverse(r), _)) = expirations.peek() {
                 if *r <= expired_round {
                     let (_, h) = expirations.pop().unwrap();
-                    self.remove_value(&h);
+                    let (_, persisted_value) = self.db_cache.remove(&h).unwrap();
+                    self.free_quota(persisted_value);
                     ret.push(h);
+                    continue;
                 }
-            } else {
-                break;
             }
+            break;
         }
         ret
     }
 
-    fn remove_value(&self, digest: &HashValue) {
-        let (_, persisted_value) = self.db_cache.remove(digest).unwrap();
-        let mut quota_manger = self.peer_quota.get_mut(&persisted_value.author).unwrap();
+
+    fn free_quota(&self, persisted_value: PersistedValue) {
+        let mut quota_manager = self.peer_quota.get_mut(&persisted_value.author).unwrap();
         if persisted_value.maybe_payload.is_some() {
-            quota_manger.free_quota(persisted_value.num_bytes, StoreType::MemoryCache);
+            quota_manager.free_quota(persisted_value.num_bytes, StoreType::MemoryCache);
         } else {
-            quota_manger.free_quota(persisted_value.num_bytes, StoreType::PersistOnly);
+            quota_manager.free_quota(persisted_value.num_bytes, StoreType::PersistOnly);
         }
     }
+
 
     // TODO: maybe check the epoch to stop communicating on epoch change.
     // TODO: make sure state-sync also sends the message.

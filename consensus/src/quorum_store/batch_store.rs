@@ -26,6 +26,7 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
 };
+use aptos_logger::debug;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PersistRequest {
@@ -141,24 +142,32 @@ impl BatchStore {
             "Persist Request for a batch with an incorrect epoch"
         );
 
-        if self
+        match self
             .batch_reader
             .save(persist_request.digest, persist_request.value.clone())
         {
-            //TODO: Consider an async call to DB, but it could be a race with clean.
-            self.db
-                .save_batch(persist_request.digest, persist_request.value)
-                .expect("Could not write to DB");
-            Some(SignedDigest::new(
-                self.epoch,
-                self.my_peer_id,
-                persist_request.digest,
-                expiration,
-                self.validator_signer.clone(),
-            ))
-        } else {
-            // Request to store a batch for longer than maximum gap.
-            None
+            Ok(needs_db) => {
+                debug!("QS: stored to cache");
+                if needs_db {
+                    //TODO: Consider an async call to DB, but it could be a race with clean.
+                    self.db
+                        .save_batch(persist_request.digest, persist_request.value)
+                        .expect("Could not write to DB");
+                }
+                Some(SignedDigest::new(
+                    self.epoch,
+                    self.my_peer_id,
+                    persist_request.digest,
+                    expiration,
+                    self.validator_signer.clone(),
+                ))
+            }
+
+            Err(e) => {
+                debug!("QS: failed to store to cache {:?}" ,e);
+                // Request to store a batch for longer than maximum gap.
+                None
+            }
         }
     }
 
@@ -180,9 +189,11 @@ impl BatchStore {
                             ack_tx
                                 .send(signed_digest)
                                 .expect("Failed to send signed digest");
+                            debug!("QS: sent signed digest back to quorum store");
                         } else {
                             let msg = ConsensusMsg::SignedDigestMsg(Box::new(signed_digest));
                             self.network_sender.send(msg, vec![author]).await;
+                            debug!("QS: sent signed digest back to sender");
                         }
                     }
                 }

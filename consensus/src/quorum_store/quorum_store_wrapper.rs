@@ -5,7 +5,7 @@ use crate::data_manager::DataManager;
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
 use crate::quorum_store::quorum_store::QuorumStoreError;
-use crate::quorum_store::types::TxnData;
+use crate::quorum_store::types::{Data, TxnData};
 use crate::quorum_store::utils::MempoolProxy;
 use crate::quorum_store::{counters, quorum_store::QuorumStoreCommand};
 use crate::round_manager::VerifiedEvent;
@@ -37,6 +37,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
+use aptos_logger::debug;
 
 // TODO: Consider storing batches and retrying upon QuorumStoreError:Timeout
 #[allow(dead_code)]
@@ -45,16 +46,20 @@ pub struct QuorumStoreWrapper {
     data_manager: Arc<dyn DataManager>,
     mempool_proxy: MempoolProxy,
     quorum_store_sender: tokio::sync::mpsc::Sender<QuorumStoreCommand>,
-    batches_to_filter: HashMap<HashValue, Vec<TransactionSummary>>, // TODO: batch_in_progress
+    batches_to_filter: HashMap<HashValue, Vec<TransactionSummary>>,
+    // TODO: batch_in_progress
     // TODO: add the expiration priority queue
     batch_in_progress: Vec<TransactionSummary>,
     bytes_in_progress: usize,
     latest_logical_time: LogicalTime,
-    batches_for_consensus: HashMap<HashValue, ProofOfStore>, // TODO: use expiration priority queue as well
+    batches_for_consensus: HashMap<HashValue, ProofOfStore>,
+    // TODO: use expiration priority queue as well
     // TODO: store all ProofOfStore (created locally, and received via broadcast)
     // TODO: need to be notified of ProofOfStore's that were committed
-    mempool_txn_pull_max_count: u64, // TODO: make sure this times max transaction size is smaller than quorumstore max batch size in bytes
+    mempool_txn_pull_max_count: u64,
+    // TODO: make sure this times max transaction size is smaller than quorumstore max batch size in bytes
     quorum_store_max_batch_bytes: u64,
+    last_end_batch_time: Instant,
 }
 
 impl QuorumStoreWrapper {
@@ -78,6 +83,7 @@ impl QuorumStoreWrapper {
             batches_for_consensus: HashMap::new(),
             mempool_txn_pull_max_count,
             quorum_store_max_batch_bytes,
+            last_end_batch_time: Instant::now(),
         }
     }
 
@@ -119,15 +125,28 @@ impl QuorumStoreWrapper {
             }
         }
 
-        let txns = pulled_txns_cloned.drain(0..txns_data.len()).collect();
-        // TODO: also some timer if there are not enough txns (Rati)
+        let txns: Data = pulled_txns_cloned.drain(0..txns_data.len()).collect();
+
+        // TODO: config param for timeout
+        if self.last_end_batch_time.elapsed().as_millis() > 500 {
+            end_batch = true;
+            self.bytes_in_progress = 0;
+            self.last_end_batch_time = Instant::now();
+        }
+
         if !end_batch {
+            if txns.is_empty() {
+                return None;
+            }
             self.quorum_store_sender
                 .send(QuorumStoreCommand::AppendToBatch(txns))
                 .await
                 .expect("could not send to QuorumStore");
             None
         } else {
+            if self.batch_in_progress.is_empty(){
+                return None;
+            }
             let (proof_tx, proof_rx) = oneshot::channel();
             let (digest_tx, digest_rx) = oneshot::channel(); // TODO: consider computing batch digest here
             let logical_time = LogicalTime::new(
@@ -147,6 +166,7 @@ impl QuorumStoreWrapper {
                 Ok(ret) => {
                     match ret {
                         Ok(digest) => {
+                            debug!("QS: got a digest from quorum store {}", digest);
                             let last_batch = self.batch_in_progress.drain(..).collect();
                             self.batches_to_filter.insert(digest, last_batch);
                             // TODO: add to the (expiration, digest) to priority queue
@@ -200,12 +220,14 @@ impl QuorumStoreWrapper {
     ) {
         match msg {
             Ok(proof) => {
+                debug!("QS: got local proof");
                 self.insert_proof(proof.clone()).await;
                 self.broadcast_completed_proof(proof, network_sender).await;
             }
             Err(QuorumStoreError::Timeout(digest)) => {
                 // TODO: even if broadcast fails, we should not remove it?
-                // self.batches_to_filter.remove(&digest);
+                debug!("QS: proof timeout");
+                self.batches_to_filter.remove(&digest);
             }
             Err(_) => {
                 unreachable!();
@@ -218,6 +240,7 @@ impl QuorumStoreWrapper {
             // TODO: check what max_block_size consensus is using
             WrapperCommand::GetBlockRequest(max_block_size, filter, callback) => {
                 // TODO: Pass along to batch_store
+                // debug!("QS: got GetBlockRequest from consensus");
                 let excluded_proofs: HashSet<HashValue> = match filter {
                     PayloadFilter::Empty => HashSet::new(),
                     PayloadFilter::DirectMempool(_) => {
@@ -242,6 +265,7 @@ impl QuorumStoreWrapper {
                     .expect("BlcokResponse receiver not available");
             }
             WrapperCommand::CleanRequest(logical_time, digests) => {
+                debug!("QS: got clean request from execution");
                 self.latest_logical_time = logical_time;
                 for digest in digests {
                     self.batches_to_filter.remove(&digest);
@@ -274,8 +298,8 @@ impl QuorumStoreWrapper {
         loop {
             let _timer = counters::MAIN_LOOP.start_timer();
             // TODO: need an explicit shutdown message, as pulls will continue to schedule
-            ::futures::select! {
-                _backoff = scheduled_pulls.next() => {
+            tokio::select! {
+                Some(_backoff) = scheduled_pulls.next() => {
                     if let Some(proof_rx) = self.handle_scheduled_pull().await {
                         proofs_in_progress.push(Box::pin(proof_rx));
                     }
@@ -284,24 +308,27 @@ impl QuorumStoreWrapper {
                         false
                     ));
                 },
-                next = proofs_in_progress.next() => {
+                Some(next) = proofs_in_progress.next() => {
                     // TODO: handle failures
-                    if let Some(Ok(msg)) = next {
+                    if let Ok(msg) = next {
+                        debug!("QS: got proof");
                         self.handle_local_proof(msg, &mut network_sender).await;
+                    } else{
+                        debug!("QS: channel close");
                     }
                 },
-                msg = consensus_receiver.select_next_some() => {
+                Some(msg) = consensus_receiver.next() => {
                     self.handle_consensus_request(msg).await;
                 },
-                _ = shutdown.select_next_some() => {
+                Some(_s) = shutdown.next() => {
                     break;
-                }
-                msg = network_msg_rx.next() => {
-                   if let Some(VerifiedEvent::ProofOfStoreBroadcast(proof)) = msg{
+                },
+                Some(msg) = network_msg_rx.next() => {
+                   if let VerifiedEvent::ProofOfStoreBroadcast(proof) = msg{
+                        debug!("QS: got proof from peer");
                         self.insert_proof(*proof).await;
                     }
-                }
-                complete => break,
+                },
             }
         }
 

@@ -17,6 +17,7 @@ use futures::StreamExt;
 use std::collections::HashMap;
 use std::sync::mpsc::SyncSender;
 use tokio::sync::mpsc::Sender;
+use aptos_logger::debug;
 
 pub(crate) struct NetworkListener {
     epoch: u64,
@@ -58,6 +59,7 @@ impl NetworkListener {
             .or_insert(BatchAggregator::new(self.max_batch_size));
         if let Some(expiration) = fragment.fragment_info.maybe_expiration() {
             //end batch message
+            debug!("QS: got end batch message");
             if expiration.epoch() == self.epoch {
                 if let Some((num_bytes, payload, digest)) = entry.end_batch(
                     fragment.batch_id(),
@@ -76,6 +78,7 @@ impl NetworkListener {
                 }
             } // Malformed request with an inconsistent expiry epoch.
         } else {
+            debug!("QS: got append_batch message");
             entry.append_transactions(
                 fragment.batch_id(),
                 fragment.fragment_id(),
@@ -92,6 +95,7 @@ impl NetworkListener {
         while let Some(msg) = self.network_msg_rx.next().await {
             match msg {
                 VerifiedEvent::SignedDigest(signed_digest) => {
+                    debug!("QS: got SignedDigest from network");
                     let cmd = ProofBuilderCommand::AppendSignature(*signed_digest);
                     self.proof_builder_tx
                         .send(cmd)

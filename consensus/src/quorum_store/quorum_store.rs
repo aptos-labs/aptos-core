@@ -29,6 +29,7 @@ use futures::{
 use std::collections::HashMap;
 use std::sync::{mpsc::sync_channel, Arc};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
+use aptos_logger::debug;
 
 pub type ProofReturnChannel = oneshot::Sender<Result<ProofOfStore, QuorumStoreError>>;
 pub type DigestReturnChannel = oneshot::Sender<Result<HashValue, QuorumStoreError>>;
@@ -231,10 +232,11 @@ impl QuorumStore {
                             self.fragment_id = self.fragment_id + 1;
                         }
 
-                        QuorumStoreCommand::EndBatch(fragment_payload, logical_time, digest_rx, proof_tx) => {
+                        QuorumStoreCommand::EndBatch(fragment_payload, logical_time, digest_tx, proof_tx) => {
+                            debug!("QS: end batch cmd received");
                             if let
                             Some((batch_store_command, response_rx)) =
-                                self.handle_end_batch(fragment_payload, logical_time, digest_rx, proof_tx){
+                                self.handle_end_batch(fragment_payload, logical_time, digest_tx, proof_tx){
 
                             self.batch_store_tx
                                 .send(batch_store_command)
@@ -251,6 +253,7 @@ impl QuorumStore {
 
                 Some(result) = futures.next() => match result {
                     Ok(signed_digest) => {
+                        debug!("QS: got back local signed digest");
                         let (last_fragment, proof_tx) =
                             self.digest_end_batch.remove(&signed_digest.info.digest).unwrap();
                         self.proof_builder_tx

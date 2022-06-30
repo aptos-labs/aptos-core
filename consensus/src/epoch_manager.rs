@@ -416,7 +416,7 @@ impl EpochManager {
         self.wrapper_quorum_store_msg_tx = Some(wrapper_quorum_store_msg_tx);
 
         // TODO: need to bring shutdown_tx out of this function and use it in shutdown_current_processor
-        let (shutdown_tx, shutdown_rx) = mpsc::channel(0);
+        let (_shutdown_tx, shutdown_rx) = mpsc::channel(0);
 
         let quorum_store_wrapper = QuorumStoreWrapper::new(
             self.epoch(),
@@ -426,7 +426,7 @@ impl EpochManager {
             self.config.mempool_txn_pull_timeout_ms,
             // TODO
             100,
-            1000,
+            1000000,
         );
         tokio::spawn(quorum_store_wrapper.start(
             network_sender,

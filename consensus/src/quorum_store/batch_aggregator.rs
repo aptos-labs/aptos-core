@@ -58,7 +58,7 @@ impl IncrementalBatchState {
 
 /// Aggregates batches and computes digest for a given validator.
 pub struct BatchAggregator {
-    batch_id: BatchId,
+    batch_id: BatchId, // TODO: make it option
     batch_state: Option<IncrementalBatchState>,
     max_batch_bytes: usize,
 }
@@ -89,8 +89,15 @@ impl BatchAggregator {
     }
 
     fn missed_fragment(&self, batch_id: BatchId, fragment_id: usize) -> bool {
-        batch_id > self.batch_id
-            || (batch_id == self.batch_id && fragment_id > self.next_fragment_id())
+
+        // debug!(next_fragment_id = self.next_fragment_id());
+        // debug!("QS: next_fragment_id = {}", self.next_fragment_id());
+
+        if batch_id > self.batch_id {
+            self.batch_state.is_some() || fragment_id > 0
+        } else {
+            batch_id == self.batch_id && fragment_id > self.next_fragment_id()
+        }
     }
 
     /// Appends transactions from a batch fragment, ensuring that the fragment is
@@ -106,7 +113,9 @@ impl BatchAggregator {
     ) -> bool {
         let missed_fragment = self.missed_fragment(batch_id, fragment_id);
         match mode {
-            AggregationMode::AssertMissedFragment => assert!(!missed_fragment),
+            AggregationMode::AssertMissedFragment => {
+                assert!(!missed_fragment, "Missed fragment from self")
+            }
             AggregationMode::IgnoreMissedFragment => {
                 if missed_fragment {
                     // If we started receiving a new batch, allow aggregating it by
@@ -127,7 +136,7 @@ impl BatchAggregator {
                 }
             }
             None => {
-                if fragment_id == 0 && batch_id > self.batch_id {
+                if fragment_id == 0 && (batch_id == 0 || batch_id > self.batch_id){
                     self.batch_id = batch_id;
                     self.batch_state = Some(IncrementalBatchState::from_initial_transactions(
                         transactions,

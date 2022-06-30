@@ -37,7 +37,7 @@ impl Default for MempoolConfig {
             default_failovers: 3,
             system_transaction_timeout_secs: 600,
             system_transaction_gc_interval_ms: 60_000,
-            shared_mempool_validator_broadcast: true,
+            shared_mempool_validator_broadcast: false,
         }
     }
 }
