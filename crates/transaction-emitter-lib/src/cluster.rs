@@ -14,7 +14,6 @@ use aptos_sdk::{
     move_types::account_address::AccountAddress,
     types::{account_config::aptos_root_address, chain_id::ChainId, AccountKey, LocalAccount},
 };
-use futures::executor;
 use futures::executor::block_on;
 use rand::seq::SliceRandom;
 use std::convert::TryFrom;
