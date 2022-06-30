@@ -1,6 +1,4 @@
 <div>
-  <%= render 'shared/captcha_helper' %>
-
   <%= form_with(model: it2_profile, class: 'flex basis-full flex-col md:flex-row md:gap-10 md:justify-between', data: { turbo: !@show_recaptcha_v2, controller: 'recaptcha', action: 'recaptcha#validate' }, builder: AptosFormBuilder) do |f| %>
     <div>
       <% if it2_profile.errors.any? %>
