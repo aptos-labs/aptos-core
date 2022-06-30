@@ -171,7 +171,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
   users:
     - "<username you specified from previous step>"
   chain_id: 40
-  min_stake: 1000
+  min_stake: 0
   max_stake: 100000
   min_lockup_duration_secs: 0
   max_lockup_duration_secs: 2592000
