@@ -54,6 +54,11 @@ class It2Profile < ApplicationRecord
     changed.map { |field| CHANGES_TO_REVALIDATE.include? field }.any?
   end
 
+  def fullnode_network_key=(value)
+    value = nil if value.blank?
+    super(value)
+  end
+
   private
 
   def check_validator_ipv4
