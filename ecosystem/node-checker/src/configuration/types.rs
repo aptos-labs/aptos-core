@@ -3,12 +3,15 @@
 
 use crate::{
     evaluators::{
+        direct::{get_node_identity, NodeIdentityEvaluatorArgs},
         metrics::{ConsensusProposalsEvaluatorArgs, StateSyncVersionEvaluatorArgs},
         system_information::BuildVersionEvaluatorArgs,
     },
     runner::BlockingRunnerArgs,
 };
-use anyhow::Result;
+use anyhow::{bail, format_err, Result};
+use aptos_config::config::RoleType;
+use aptos_sdk::types::chain_id::ChainId;
 use clap::Parser;
 use once_cell::sync::Lazy;
 use poem_openapi::{types::Example, Object as PoemObject};
@@ -53,12 +56,14 @@ pub struct NodeConfiguration {
     /// set here and doesn't match the chain ID returned by the node, we
     /// will exit, signalling a configuration error.
     #[clap(long)]
-    chain_id: Option<u16>,
+    #[oai(skip)]
+    chain_id: Option<ChainId>,
 
     /// This works the same as `chain_id` above, but for role type. Example
     /// values: "full_node", "validator", etc.
     #[clap(long)]
-    role_type: Option<String>,
+    #[oai(skip)]
+    role_type: Option<RoleType>,
 
     /// The evaluators to use, e.g. state_sync_version, consensus_proposals, etc.
     #[clap(long, required = true, min_values = 1, use_value_delimiter = true)]
@@ -71,19 +76,20 @@ pub struct NodeConfiguration {
     pub runner_args: RunnerArgs,
 }
 
+// TODO: Having comments like "only call this after X" is obviously not great.
+// It'd be better to have an enum with two variants, e.g. unfetched and fetched.
 impl NodeConfiguration {
     /// Only call this after fetch_additional_configuration has been called.
     #[allow(dead_code)]
-    pub fn get_chain_id(&self) -> u16 {
+    pub fn get_chain_id(&self) -> ChainId {
         self.chain_id
             .expect("get_chain_id called before fetch_additional_configuration")
     }
 
     /// Only call this after fetch_additional_configuration has been called.
     #[allow(dead_code)]
-    pub fn get_role_type(&self) -> &str {
+    pub fn get_role_type(&self) -> RoleType {
         self.role_type
-            .as_ref()
             .expect("get_role_type called before fetch_additional_configuration")
     }
 
@@ -91,9 +97,25 @@ impl NodeConfiguration {
     /// If chain_id and role_type are already set, we validate that the values
     /// match up. If they're not set, we set them using the values we find.
     pub async fn fetch_additional_configuration(&mut self) -> Result<()> {
-        // TODO: Dummy code prior to https://github.com/aptos-labs/aptos-core/pull/1466.
-        self.chain_id = Some(16);
-        self.role_type = Some("full_node".to_string());
+        let (reported_chain_id, reported_role_type) =
+            get_node_identity(&self.node_address).await.map_err(|e| {
+                format_err!(
+                    "Failed to fetch chain ID and role type for baseline node configuration: {}",
+                    e
+                )
+            })?;
+        if let Some(configured_chain_id) = self.chain_id {
+            if configured_chain_id != reported_chain_id {
+                bail!("Chain ID mismatch: The baseline configuration {} says the chain ID is {} but the node reports chain ID {}", self.configuration_name, configured_chain_id, reported_chain_id);
+            }
+        }
+        if let Some(configured_role_type) = self.role_type {
+            if configured_role_type != reported_role_type {
+                bail!("Role type mismatch: The baseline configuration {} says the role type is {} but the node reports role type {}", self.configuration_name, configured_role_type, reported_role_type);
+            }
+        }
+        self.chain_id = Some(reported_chain_id);
+        self.role_type = Some(reported_role_type);
         Ok(())
     }
 }
@@ -102,6 +124,9 @@ impl NodeConfiguration {
 pub struct EvaluatorArgs {
     #[clap(flatten)]
     pub consensus_proposals_args: ConsensusProposalsEvaluatorArgs,
+
+    #[clap(flatten)]
+    pub node_identity_args: NodeIdentityEvaluatorArgs,
 
     #[clap(flatten)]
     pub state_sync_version_args: StateSyncVersionEvaluatorArgs,

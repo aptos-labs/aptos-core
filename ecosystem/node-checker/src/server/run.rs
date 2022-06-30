@@ -5,8 +5,11 @@ use std::path::PathBuf;
 
 use super::common::ServerArgs;
 use crate::{
-    configuration::{DEFAULT_API_PORT_STR, DEFAULT_METRICS_PORT_STR, DEFAULT_NOISE_PORT_STR},
+    configuration::{
+        NodeAddress, DEFAULT_API_PORT_STR, DEFAULT_METRICS_PORT_STR, DEFAULT_NOISE_PORT_STR,
+    },
     metric_collector::ReqwestMetricCollector,
+    server::api::PreconfiguredNode,
 };
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -16,7 +19,7 @@ use url::Url;
 
 use super::{
     api::{build_openapi_service, Api},
-    configurations_manager::build_server_with_blocking_runner_and_reqwest_metric_collector,
+    configurations_manager::build_server_with_blocking_runner,
 };
 
 #[derive(Clone, Debug, Parser)]
@@ -54,28 +57,37 @@ pub struct Run {
 }
 
 pub async fn run(args: Run) -> Result<()> {
-    let configurations_manager = build_server_with_blocking_runner_and_reqwest_metric_collector(
-        &args.baseline_node_config_paths,
-    )
-    .await
-    .context("Failed to build baseline node configurations")?;
+    let configurations_manager =
+        build_server_with_blocking_runner(&args.baseline_node_config_paths)
+            .await
+            .context("Failed to build baseline node configurations")?;
 
     info!(
         "Running with the following configuration: {:#?}",
         configurations_manager.configurations
     );
 
-    let target_metric_collector = match args.target_node_url {
-        Some(ref url) => Some(ReqwestMetricCollector::new(
-            url.clone(),
-            args.target_metrics_port,
-        )),
+    let preconfigured_test_node = match args.target_node_url {
+        Some(ref url) => {
+            let node_address = NodeAddress {
+                url: url.clone(),
+                api_port: args.target_api_port,
+                metrics_port: args.target_metrics_port,
+                noise_port: args.target_noise_port,
+            };
+            let metric_collector =
+                ReqwestMetricCollector::new(node_address.url.clone(), node_address.metrics_port);
+            Some(PreconfiguredNode {
+                node_address,
+                metric_collector,
+            })
+        }
         None => None,
     };
 
     let api = Api {
         configurations_manager,
-        target_metric_collector,
+        preconfigured_test_node,
         allow_preconfigured_test_node_only: args.allow_preconfigured_test_node_only,
     };
 
