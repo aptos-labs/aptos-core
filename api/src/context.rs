@@ -16,7 +16,7 @@ use aptos_types::{
 };
 use storage_interface::{DbReader, Order};
 
-use anyhow::{ensure, format_err, Result};
+use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix},
@@ -91,9 +91,15 @@ impl Context {
     }
 
     pub fn get_latest_ledger_info(&self) -> Result<LedgerInfo, Error> {
+        let oldest_version = self.db.get_first_txn_version()?;
+
+        if oldest_version.is_none() {
+            return Err(anyhow! {"Failed to retrieve oldest version"}.into());
+        }
         Ok(LedgerInfo::new(
             &self.chain_id(),
             &self.get_latest_ledger_info_with_signatures()?,
+            oldest_version.unwrap(),
         ))
     }
 

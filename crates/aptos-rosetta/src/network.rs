@@ -134,6 +134,7 @@ async fn network_status(
     );
 
     check_network(request.network_identifier, &server_context)?;
+    let block_size = server_context.block_size;
 
     let rest_client = server_context.rest_client()?;
     let response = get_genesis_transaction(rest_client).await?;
@@ -141,18 +142,39 @@ async fn network_status(
     let transaction = response.inner();
 
     // TODO: Cache the genesis transaction
-    let genesis_txn = BlockIdentifier::from_transaction(server_context.block_size, transaction)?;
+    let genesis_txn = BlockIdentifier::from_transaction(block_size, transaction)?;
 
     // Get the last "block"
-    let previous_block = version_to_block_index(server_context.block_size, state.version) - 1;
-    let block_version = block_index_to_version(server_context.block_size, previous_block);
+    let previous_block = version_to_block_index(block_size, state.version) - 1;
+    let block_version = block_index_to_version(block_size, previous_block);
     let response = rest_client
         .get_transaction_by_version(block_version)
         .await?;
     let transaction = response.inner();
-    let latest_txn = BlockIdentifier::from_transaction(server_context.block_size, transaction)?;
+    let latest_txn = BlockIdentifier::from_transaction(block_size, transaction)?;
 
     let current_block_timestamp = get_timestamp(&response);
+
+    let oldest_block_identifier = if let Some(mut version) = state.oldest_ledger_version {
+        // For non-genesis versions we have to ensure that really the next "block" is the oldest
+        if version != 0 {
+            let block_index = version_to_block_index(block_size, version);
+            // If the txn is the first in the block include it, otherwise, return the next block
+            if block_index_to_version(block_size, block_index) != version {
+                version = block_index_to_version(block_size, block_index + 1);
+            }
+        }
+
+        Some(BlockIdentifier::from_transaction(
+            block_size,
+            rest_client
+                .get_transaction_by_version(version)
+                .await?
+                .inner(),
+        )?)
+    } else {
+        None
+    };
 
     // TODO: add peers
     let peers: Vec<Peer> = vec![];
@@ -161,8 +183,7 @@ async fn network_status(
         current_block_identifier: latest_txn,
         current_block_timestamp,
         genesis_block_identifier: genesis_txn,
-        // TODO: Fill in with oldest block not pruned
-        oldest_block_identifier: None,
+        oldest_block_identifier,
         sync_status: None,
         peers,
     };

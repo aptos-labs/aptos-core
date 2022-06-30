@@ -225,6 +225,7 @@ mod tests {
             chain_id: ChainId::test().id(),
             epoch: 1,
             ledger_version: 5.into(),
+            oldest_ledger_version: 0.into(),
             ledger_timestamp: 5.into(),
         };
         Response::new(li, body).unwrap().into_response()

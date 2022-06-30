@@ -74,6 +74,8 @@ impl Client {
             ledger_version: u64,
             #[serde(deserialize_with = "types::deserialize_from_string")]
             ledger_timestamp: u64,
+            #[serde(deserialize_with = "types::deserialize_from_string")]
+            oldest_ledger_version: u64,
         }
 
         let response = self.inner.get(self.base_url.clone()).send().await?;
@@ -83,6 +85,7 @@ impl Client {
             epoch: r.epoch,
             version: r.ledger_version,
             timestamp_usecs: r.ledger_timestamp,
+            oldest_ledger_version: Some(r.oldest_ledger_version),
         });
 
         Ok(response)
