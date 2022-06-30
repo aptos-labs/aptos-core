@@ -3,7 +3,7 @@
 
 use crate::{transaction_generator::TransactionGenerator, Pipeline};
 use aptos_config::{
-    config::{RocksdbConfig, StoragePrunerConfig},
+    config::{RocksdbConfigs, StoragePrunerConfig},
     utils::get_genesis_txn,
 };
 use aptos_jellyfish_merkle::metrics::{
@@ -37,12 +37,14 @@ pub fn run(
 
     let (config, genesis_key) = aptos_genesis::test_utils::test_config();
     // Create executor.
+    let mut rocksdb_configs = RocksdbConfigs::default();
+    rocksdb_configs.state_merkle_db_config.max_open_files = -1;
     let (db, db_rw) = DbReaderWriter::wrap(
         AptosDB::open(
             &db_dir,
             false,                 /* readonly */
             storage_pruner_config, /* pruner */
-            RocksdbConfig::default(),
+            rocksdb_configs,
         )
         .expect("DB should open."),
     );

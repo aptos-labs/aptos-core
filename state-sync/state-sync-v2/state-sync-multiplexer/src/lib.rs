@@ -165,7 +165,7 @@ pub fn state_sync_v1_network_config() -> AppConfig {
 mod tests {
     use crate::StateSyncMultiplexer;
     use aptos_config::{
-        config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG},
+        config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG},
         utils::get_genesis_txn,
     };
     use aptos_crypto::HashValue;
@@ -200,7 +200,7 @@ mod tests {
             &tmp_dir,
             false,
             NO_OP_STORAGE_PRUNER_CONFIG,
-            RocksdbConfig::default(),
+            RocksdbConfigs::default(),
         )
         .unwrap();
         let (_, db_rw) = DbReaderWriter::wrap(db);
