@@ -20,7 +20,7 @@ use crate::{
 };
 use aptos_logger::{debug, trace};
 use aptos_rest_client::{
-    aptos::{Balance, TestCoin},
+    aptos::{AptosCoin, Balance},
     aptos_api_types::U64,
 };
 use aptos_sdk::move_types::language_storage::TypeTag;
@@ -185,7 +185,7 @@ async fn get_balances(
         currency_map.insert(
             native_coin_tag(),
             Balance {
-                coin: TestCoin { value: U64(0) },
+                coin: AptosCoin { value: U64(0) },
             },
         );
         Ok(currency_map)

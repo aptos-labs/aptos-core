@@ -611,7 +611,7 @@ The `aptos` tool supports bootstrapping new blockchains through what is known as
 * A set of validators and their configuration
 * The initial set of Move modules, known as a framework
 * A unique `ChainId` (u8) that distinguishes this from other deployments
-* For test chains, there also exists an account that manages the minting of TestCoin
+* For test chains, there also exists an account that manages the minting of AptosCoib
 
 ## Generating Genesis
 
@@ -638,7 +638,7 @@ source ~/.cargo/env
 ### The `Layout` File
 
 The layout file contains:
-* `root_key`: an Ed25519 public key for TestCoin management.
+* `root_key`: an Ed25519 public key for AptosCoin management.
 * `users`: the set of participants
 * `chain_id`: the `ChainId` or a unique integer that distinguishes this deployment from other Aptos networks
 

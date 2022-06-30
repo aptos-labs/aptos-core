@@ -24,24 +24,24 @@ const {
 
   // Generates key pair for a new account
   const account1 = new AptosAccount();
-  // Creates the account on Aptos chain and fund the account with 5000 TestCoin
+  // Creates the account on Aptos chain and fund the account with 5000 AptosCoin
   await faucetClient.fundAccount(account1.address(), 5000);
   let resources = await client.getAccountResources(account1.address());
-  let accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::test_coin::TestCoin>");
+  let accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
   let balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 5000);
   console.log(`account2 coins: ${balance}. Should be 5000!`);
 
   const account2 = new AptosAccount();
-  // Creates the second account and fund the account with 0 TestCoin
+  // Creates the second account and fund the account with 0 AptosCoin
   await faucetClient.fundAccount(account2.address(), 0);
   resources = await client.getAccountResources(account2.address());
-  accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::test_coin::TestCoin>");
+  accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 0);
   console.log(`account2 coins: ${balance}. Should be 0!`);
 
-  const token = new TypeTagStruct(StructTag.fromString("0x1::test_coin::TestCoin"));
+  const token = new TypeTagStruct(StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
   // TS SDK support 3 types of transaction payloads: `ScriptFunction`, `Script` and `Module`.
   // See https://aptos-labs.github.io/ts-sdk-doc/ for the details.
@@ -87,7 +87,7 @@ const {
   await client.waitForTransaction(transactionRes.hash);
 
   resources = await client.getAccountResources(account2.address());
-  accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::test_coin::TestCoin>");
+  accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 717);
   console.log(`account2 coins: ${balance}. Should be 717!`);

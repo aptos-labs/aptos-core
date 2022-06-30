@@ -5,7 +5,7 @@ import {
   AptosAccount, AptosClient, MaybeHexString, Types,
 } from 'aptos';
 import {
-  type GetTestCoinTokenBalanceFromAccountResourcesProps,
+  type GetAptosCoinTokenBalanceFromAccountResourcesProps,
 } from 'core/queries/account';
 
 export interface SubmitTransactionProps {
@@ -27,24 +27,24 @@ export const submitTransaction = async ({
   return transactionRes.hash;
 };
 
-export interface TestCoinTransferTransactionPayload {
+export interface AptosCoinTransferTransactionPayload {
   amount: string | number;
   toAddress: MaybeHexString;
 }
 
-export type SendTestCoinTransactionProps = Omit<SubmitTransactionProps & TestCoinTransferTransactionPayload, 'payload'>;
+export type SendAptosCoinTransactionProps = Omit<SubmitTransactionProps & AptosCoinTransferTransactionPayload, 'payload'>;
 
-export const sendTestCoinTransaction = async ({
+export const sendAptosCoinTransaction = async ({
   amount,
   fromAccount,
   nodeUrl,
   toAddress,
-}: SendTestCoinTransactionProps) => {
+}: SendAptosCoinTransactionProps) => {
   const payload: Types.TransactionPayload = {
     arguments: [toAddress, `${amount}`],
     function: '0x1::coin::transfer',
     type: 'script_function_payload',
-    type_arguments: ['0x1::test_coin::TestCoin'],
+    type_arguments: ['0x1::aptos_coin::AptosCoin'],
   };
   const txnHash = await submitTransaction({
     fromAccount,
@@ -62,23 +62,23 @@ export const TransferResult = Object.freeze({
   UndefinedAccount: 'Account does not exist',
 } as const);
 
-export type SubmitTestCoinTransferTransactionProps = Omit<
-TestCoinTransferTransactionPayload &
-SendTestCoinTransactionProps &
-GetTestCoinTokenBalanceFromAccountResourcesProps & {
+export type SubmitAptosCoinTransferTransactionProps = Omit<
+AptosCoinTransferTransactionPayload &
+SendAptosCoinTransactionProps &
+GetAptosCoinTokenBalanceFromAccountResourcesProps & {
   onClose: () => void
 },
 'accountResources'
 >;
 
-export const submitTestCoinTransferTransaction = async ({
+export const submitAptosCoinTransferTransaction = async ({
   amount,
   fromAccount,
   nodeUrl,
   onClose,
   toAddress,
-}: SubmitTestCoinTransferTransactionProps) => {
-  const txnHash = await sendTestCoinTransaction({
+}: SubmitAptosCoinTransferTransactionProps) => {
+  const txnHash = await sendAptosCoinTransaction({
     amount,
     fromAccount,
     nodeUrl,

@@ -21,7 +21,7 @@ fn mint_to_new_account() {
         let mint_amount = TXN_RESERVED;
         let output = executor.execute_transaction(
             root.transaction()
-                .payload(aptos_stdlib::encode_test_coin_mint(
+                .payload(aptos_stdlib::encode_aptos_coin_mint(
                     *new_account.address(),
                     mint_amount,
                 ))

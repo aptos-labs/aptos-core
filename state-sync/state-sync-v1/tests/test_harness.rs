@@ -724,7 +724,7 @@ impl MockStorage {
     fn gen_mock_user_txn() -> Transaction {
         let sender = AccountAddress::random();
         let receiver = AuthenticationKey::random();
-        let program = aptos_transaction_builder::aptos_stdlib::encode_test_coin_transfer(
+        let program = aptos_transaction_builder::aptos_stdlib::encode_aptos_coin_transfer(
             receiver.derived_address(),
             1,
         );
