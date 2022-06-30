@@ -16,7 +16,7 @@ use crate::{
     },
     logging::{LogEvent, LogSchema},
     metrics_safety_rules::MetricsSafetyRules,
-    network::{IncomingBlockRetrievalRequest, NetworkSender},
+    network::NetworkSender,
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
@@ -32,7 +32,6 @@ use aptos_types::{
 use channel::aptos_channel;
 use consensus_types::{
     block::Block,
-    block_retrieval::{BlockRetrievalResponse, BlockRetrievalStatus},
     common::{Author, Round},
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proposal_msg::ProposalMsg,
@@ -116,7 +115,6 @@ pub enum VerifiedEvent {
     UnverifiedSyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
-    BlockRetrievalRequest(Box<IncomingBlockRetrievalRequest>),
     // local messages
     LocalTimeout(Round),
     Shutdown(oneshot::Sender<()>),
@@ -736,51 +734,6 @@ impl RoundManager {
         result
     }
 
-    /// Retrieve a n chained blocks from the block store starting from
-    /// an initial parent id, returning with <n (as many as possible) if
-    /// id or its ancestors can not be found.
-    ///
-    /// The current version of the function is not really async, but keeping it this way for
-    /// future possible changes.
-    pub async fn process_block_retrieval(
-        &self,
-        request: IncomingBlockRetrievalRequest,
-    ) -> anyhow::Result<()> {
-        fail_point!("consensus::process_block_retrieval", |_| {
-            Err(anyhow::anyhow!("Injected error in process_block_retrieval"))
-        });
-        let mut blocks = vec![];
-        let mut status = BlockRetrievalStatus::Succeeded;
-        let mut id = request.req.block_id();
-        while (blocks.len() as u64) < request.req.num_blocks() {
-            if let Some(executed_block) = self.block_store.get_block(id) {
-                blocks.push(executed_block.block().clone());
-                if request.req.match_target_id(id) {
-                    status = BlockRetrievalStatus::SucceededWithTarget;
-                    break;
-                }
-                id = executed_block.parent_id();
-            } else {
-                status = BlockRetrievalStatus::NotEnoughBlocks;
-                break;
-            }
-        }
-
-        if blocks.is_empty() {
-            status = BlockRetrievalStatus::IdNotFound;
-        }
-
-        let response = Box::new(BlockRetrievalResponse::new(status, blocks));
-        let response_bytes = request
-            .protocol
-            .to_bytes(&ConsensusMsg::BlockRetrievalResponse(response))?;
-        request
-            .response_sender
-            .send(Ok(response_bytes.into()))
-            .map_err(|e| anyhow::anyhow!("{:?}", e))
-            .context("[RoundManager] Failed to process block retrieval")
-    }
-
     /// To jump start new round with the current certificates we have.
     pub async fn init(&mut self, last_vote_sent: Option<Vote>) {
         let new_round_event = self
@@ -844,12 +797,6 @@ impl RoundManager {
                     monitor!(
                         "process_sync_info",
                         self.process_sync_info_msg(*sync_info, peer_id).await
-                    )
-                }
-                VerifiedEvent::BlockRetrievalRequest(block_retrival) => {
-                    monitor!(
-                        "process_block_retrieval",
-                        self.process_block_retrieval(*block_retrival).await
                     )
                 }
                 VerifiedEvent::LocalTimeout(round) => monitor!(

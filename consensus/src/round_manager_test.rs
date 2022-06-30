@@ -735,7 +735,7 @@ fn response_on_block_retrieval() {
             protocol: ProtocolId::ConsensusRpcBcs,
             response_sender: tx1,
         };
-        node.round_manager
+        node.block_store
             .process_block_retrieval(single_block_request)
             .await
             .unwrap();
@@ -759,7 +759,7 @@ fn response_on_block_retrieval() {
             response_sender: tx2,
         };
 
-        node.round_manager
+        node.block_store
             .process_block_retrieval(missing_block_request)
             .await
             .unwrap();
@@ -782,7 +782,7 @@ fn response_on_block_retrieval() {
             protocol: ProtocolId::ConsensusRpcBcs,
             response_sender: tx3,
         };
-        node.round_manager
+        node.block_store
             .process_block_retrieval(many_block_request)
             .await
             .unwrap();
