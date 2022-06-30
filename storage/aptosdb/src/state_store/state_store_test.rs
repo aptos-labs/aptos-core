@@ -8,7 +8,7 @@ use proptest::{
     prelude::*,
 };
 
-use aptos_jellyfish_merkle::restore::StateSnapshotRestore;
+use aptos_jellyfish_merkle::{restore::StateSnapshotRestore, TreeReader};
 use aptos_temppath::TempPath;
 use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, state_store::state_key::StateKeyTag,
@@ -409,7 +409,7 @@ proptest! {
         let store2 = &db2.state_store;
 
         let mut restore =
-            StateSnapshotRestore::new(Arc::clone(store2), version, expected_root_hash).unwrap();
+            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash).unwrap();
 
         let mut ordered_input: Vec<_> = input
             .into_iter()
@@ -507,7 +507,7 @@ proptest! {
         let store2 = &db2.state_store;
 
         let mut restore =
-            StateSnapshotRestore::new(Arc::clone(store2), version, expected_root_hash).unwrap();
+            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash).unwrap();
 
         let mut ordered_input: Vec<_> = input
             .into_iter()
@@ -525,8 +525,8 @@ proptest! {
 
         restore.add_chunk(batch1, proof_of_batch1).unwrap();
 
-        let expected = store2.get_rightmost_leaf_naive().unwrap();
-        let actual = store2.get_rightmost_leaf().unwrap();
+        let expected = store2.state_merkle_db.get_rightmost_leaf_naive().unwrap();
+        let actual = store2.state_merkle_db.get_rightmost_leaf().unwrap();
         prop_assert_eq!(actual, expected);
     }
 
