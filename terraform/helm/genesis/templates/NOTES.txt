@@ -2,7 +2,7 @@ Your {{ .Chart.Name }} deployment named {{ .Release.Name }} is now deployed.
 
 To check automated genesis ceremony status:
 
-    $ kubectl logs -f job/{{ include "aptos-genesis.fullname" . }}-e{{ .Values.chain.era }}
+    $ kubectl -n {{ .Release.Name }} logs -f job/{{ include "aptos-genesis.fullname" . }}-e{{ .Values.chain.era }}
 
 The resulting genesis ConfigMaps can be mounted by aptos-node, and will be located at:
 

@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Factory, GenesisConfig, Result, Swarm, Version};
-use anyhow::bail;
+use anyhow::{bail, format_err};
 use rand::rngs::StdRng;
-use std::{convert::TryInto, num::NonZeroUsize};
+use std::{convert::TryInto, env, num::NonZeroUsize};
 
 mod cluster_helper;
 mod node;
@@ -21,6 +21,7 @@ pub struct K8sFactory {
     helm_repo: String,
     image_tag: String,
     base_image_tag: String,
+    kube_namespace: String,
 }
 
 // These are test keys for forge ephemeral networks. Do not use these elsewhere!
@@ -34,11 +35,15 @@ impl K8sFactory {
         let root_key: [u8; ED25519_PRIVATE_KEY_LENGTH] =
             hex::decode(DEFAULT_ROOT_PRIV_KEY)?.try_into().unwrap();
 
+        let kube_namespace = env::var("KUBE_NAMESPACE")
+            .map_err(|_| format_err!("Expected environment variable KUBE_NAMESPACE"))?;
+
         Ok(Self {
             root_key,
             helm_repo,
             image_tag,
             base_image_tag,
+            kube_namespace,
         })
     }
 }
@@ -71,8 +76,8 @@ impl Factory for K8sFactory {
             None => None,
         };
 
-        uninstall_testnet_resources().await?;
         let era = reinstall_testnet_resources(
+            self.kube_namespace.clone(),
             self.helm_repo.clone(),
             node_num.get(),
             format!("{}", init_version),

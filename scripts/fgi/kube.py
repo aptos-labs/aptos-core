@@ -29,11 +29,10 @@ AWS_ACCOUNT = (
 
 
 # ================ Kube job ================
-def create_forge_job(context, user, tag, base_tag, timeout_secs, forge_envs, forge_args):
+def create_forge_job(context, job_id, tag, base_tag, timeout_secs, forge_envs, forge_args):
     """Create the Forge K8s Job template"""
-    job_name = f"forge-{user}-{int(time.time())}"
+    job_name = f"forge-{job_id}"
     job_name = job_name.replace("_", "-")  # underscore not allowed in pod name
-    cluster_name = get_cluster_name_from_context(context)
 
     # job template to spin up. Edit this in place
     template = json.loads(
@@ -303,19 +302,21 @@ def get_forge_job_jsonpath(job_name, context, jsonpath):
 
 
 # TODO(rustielin|geekflyer): init at an s3 path matching the forge namespace for full autoscaling
-def helm_s3_init(workspace):
+def helm_s3_init(workspace, path=""):
     """Initializes the S3 bucket used as an internal Helm repo for Forge"""
     bucket_url = WORKSPACE_CHART_BUCKETS[workspace]
+    if path:
+        bucket_url += f"/{path}"
     subprocess.run(
-        ["helm", "plugin", "install", "https://github.com/C123R/helm-blob.git"],
+        ["helm", "plugin", "install", "https://github.com/hypnoglow/helm-s3.git"],
         check=False
     )
     subprocess.run(
-        ["helm", "blob", "init", f"s3://{bucket_url}/charts"],
+        ["helm", "s3", "init", f"s3://{bucket_url}/charts"],
         check=False
     )
     subprocess.run(
-        ["helm", "repo", "add",
+        ["helm", "repo", "add", "--force-update",
             f"testnet-{workspace}", f"s3://{bucket_url}/charts"],
         check=True
     )
@@ -338,18 +339,18 @@ def helm_package_push(chart_path, chart_name, workspace, dir):
         check=True
     )
     subprocess.run(
-        f"helm blob push --force {dir}/{chart_name}-*.tgz testnet-{workspace}",
+        f"helm s3 push --force {dir}/{chart_name}-*.tgz testnet-{workspace}",
         shell=True,
         check=True,
     )
 
 
-def push_helm_charts(workspace):
+def push_helm_charts(workspace, path=""):
     """
     Push all helm charts for usage by Forge
     Run from aptos-core root directory
     """
-    helm_s3_init(workspace)
+    helm_s3_init(workspace, path=path)
     tempdir = tempfile.mkdtemp()
     helm_package_push("terraform/helm/genesis",
                       "aptos-genesis", workspace, tempdir)

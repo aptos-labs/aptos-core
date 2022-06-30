@@ -101,10 +101,15 @@ struct SetValidator {
 }
 
 #[derive(StructOpt, Debug)]
-struct CleanUp {}
+struct CleanUp {
+    #[structopt(long, help = "The kubernetes namespace to clean up")]
+    namespace: String,
+}
 
 #[derive(StructOpt, Debug)]
 struct Resize {
+    #[structopt(long, help = "The kubernetes namespace to resize")]
+    namespace: String,
     #[structopt(long, default_value = "30")]
     num_validators: usize,
     #[structopt(
@@ -187,10 +192,12 @@ fn main() -> Result<()> {
                 set_validator.image_tag,
                 set_validator.helm_repo,
             ),
-            OperatorCommand::CleanUp(_) => runtime.block_on(uninstall_testnet_resources()),
+            OperatorCommand::CleanUp(cleanup) => {
+                runtime.block_on(uninstall_testnet_resources(cleanup.namespace))
+            }
             OperatorCommand::Resize(resize) => {
-                runtime.block_on(uninstall_testnet_resources())?;
                 runtime.block_on(reinstall_testnet_resources(
+                    resize.namespace,
                     resize.helm_repo,
                     resize.num_validators,
                     resize.validator_image_tag,

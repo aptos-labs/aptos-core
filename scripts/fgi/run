@@ -30,6 +30,11 @@ DEFL_TIMEOUT_SECS = 1800  # Default timeout is 30 mins
 USER = getpass.getuser()  # Use the current user for naming
 FORGE_OUTPUT_TEE = os.getenv("FGI_OUTPUT_LOG", tempfile.mkstemp()[1])
 
+# used to identify the forge run in places not limited to:
+#   * kube namespace
+#   * job name
+FORGE_JOB_ID = f"forge-{USER}-{int(time.time())}"
+
 OPENSEARCH_TIME_FMT = '%Y-%m-%dT%H:%M:%S.000Z'
 DEFL_FORGE_REPORT = "forge_report.json"
 
@@ -63,16 +68,21 @@ def build_argparser():
         default=[],
         help="Extra environment variables to pass to Forge",
     )
-    build_group = parser.add_mutually_exclusive_group(required=True)
-    build_group.add_argument(
+    action_group = parser.add_mutually_exclusive_group(required=True)
+    action_group.add_argument(
         "--tag", "-T", help="Image tag to use in kubernetes Forge tests")
-    build_group.add_argument(
+    action_group.add_argument(
         "--pr", "-p", help="PR to build images from for kubernetes Forge tests")
-    build_group.add_argument(
+    action_group.add_argument(
         "--local-swarm",
         "-L",
         action="store_true",
         help="Run Forge tests locally instead of on a kubernetes cluster",
+    )
+    action_group.add_argument(
+        "--push-helm-chart",
+        action="store_true",
+        help="Just push helm charts",
     )
     parser.add_argument(
         "--base-image-tag",
@@ -194,11 +204,17 @@ else:
         sys.exit(1)
 context = get_cluster_context(workspace)
 print(f"Running experiments on cluster: {workspace}")
-push_helm_charts(workspace)
+push_helm_charts(workspace, path=FORGE_JOB_ID)
+if args.push_helm_chart:
+    sys.exit(0)
+
 print()
 
+forge_envs = args.env
+forge_envs.append(f"KUBE_NAMESPACE={FORGE_JOB_ID}")
+
 job_name, template = create_forge_job(
-    context, USER, TAG, BASE_TAG, args.timeout_secs, args.env, forge_args
+    context, USER, TAG, BASE_TAG, args.timeout_secs, forge_envs, forge_args
 )
 if not template:
     print(f"{FAIL}Failed to create forge job template{RESTORE}")
