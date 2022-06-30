@@ -9,7 +9,7 @@
 use crate::{
     common::{check_network, get_account, get_account_balance, handle_request, with_context},
     error::{ApiError, ApiResult},
-    types::{AccountBalanceRequest, AccountBalanceResponse},
+    types::{AccountBalanceRequest, AccountBalanceResponse, BlockIdentifier},
     RosettaContext,
 };
 use aptos_logger::{debug, trace};
@@ -63,15 +63,11 @@ async fn account_balance(
         .first()
         .ok_or_else(|| ApiError::AptosError("Transaction not found".to_string()))?;
 
-    let txn_info = txn
-        .transaction_info()
-        .map_err(|err| ApiError::AptosError(err.to_string()))?;
-
     let response = get_account_balance(rest_client, address).await?;
     let balance = response.into_inner();
 
     let response = AccountBalanceResponse {
-        block_identifier: txn_info.into(),
+        block_identifier: BlockIdentifier::from_transaction(server_context.block_size, txn)?,
         balances: vec![balance.into()],
     };
 

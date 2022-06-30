@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    block::{block_index_to_version, version_to_block_index},
     common::{
         check_network, get_genesis_transaction, get_timestamp, handle_request, with_context,
         with_empty_request, EmptyRequest,
@@ -140,13 +141,16 @@ async fn network_status(
     let transaction = response.inner();
 
     // TODO: Cache the genesis transaction
-    let genesis_txn = BlockIdentifier::from(transaction.transaction_info()?);
+    let genesis_txn = BlockIdentifier::from_transaction(server_context.block_size, transaction)?;
 
+    // Get the last "block"
+    let previous_block = version_to_block_index(server_context.block_size, state.version) - 1;
+    let block_version = block_index_to_version(server_context.block_size, previous_block);
     let response = rest_client
-        .get_transaction_by_version(state.version)
+        .get_transaction_by_version(block_version)
         .await?;
     let transaction = response.inner();
-    let latest_txn = BlockIdentifier::from(transaction.transaction_info()?);
+    let latest_txn = BlockIdentifier::from_transaction(server_context.block_size, transaction)?;
 
     let current_block_timestamp = get_timestamp(&response);
 
