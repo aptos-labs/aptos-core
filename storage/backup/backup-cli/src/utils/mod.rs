@@ -143,11 +143,15 @@ impl RestoreRunMode {
             Self::Restore { restore_handler } => {
                 restore_handler.get_state_restore_receiver(version, expected_root_hash)
             }
-            Self::Verify => StateSnapshotRestore::new_overwrite(
-                Arc::new(MockStore),
-                version,
-                expected_root_hash,
-            ),
+            Self::Verify => {
+                let mock_store = Arc::new(MockStore);
+                StateSnapshotRestore::new_overwrite(
+                    &mock_store,
+                    &mock_store,
+                    version,
+                    expected_root_hash,
+                )
+            }
         }
     }
 }

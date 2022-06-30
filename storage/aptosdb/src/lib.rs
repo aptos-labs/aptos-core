@@ -24,6 +24,7 @@ mod event_store;
 mod ledger_counters;
 mod ledger_store;
 mod pruner;
+mod state_merkle_db;
 mod state_store;
 mod system_store;
 mod transaction_store;
