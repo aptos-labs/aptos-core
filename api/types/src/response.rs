@@ -15,6 +15,7 @@ use warp::{
 pub const X_APTOS_CHAIN_ID: &str = "X-Aptos-Chain-Id";
 pub const X_APTOS_EPOCH: &str = "X-Aptos-Epoch";
 pub const X_APTOS_LEDGER_VERSION: &str = "X-Aptos-Ledger-Version";
+pub const X_APTOS_LEDGER_OLDEST_VERSION: &str = "X-Aptos-Ledger-Oldest-Version";
 pub const X_APTOS_LEDGER_TIMESTAMP: &str = "X-Aptos-Ledger-TimestampUsec";
 
 pub struct Response {
@@ -60,6 +61,10 @@ impl warp::Reply for Response {
         headers.insert(
             X_APTOS_LEDGER_VERSION,
             self.ledger_info.ledger_version.into(),
+        );
+        headers.insert(
+            X_APTOS_LEDGER_OLDEST_VERSION,
+            self.ledger_info.oldest_ledger_version.into(),
         );
         headers.insert(
             X_APTOS_LEDGER_TIMESTAMP,
