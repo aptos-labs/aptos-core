@@ -3,7 +3,9 @@
 
 use crate::{
     evaluators::{
-        direct::{get_node_identity, NodeIdentityEvaluatorArgs, TpsEvaluatorArgs},
+        direct::{
+            get_node_identity, LatencyEvaluatorArgs, NodeIdentityEvaluatorArgs, TpsEvaluatorArgs,
+        },
         metrics::{ConsensusProposalsEvaluatorArgs, StateSyncVersionEvaluatorArgs},
         system_information::BuildVersionEvaluatorArgs,
     },
@@ -127,6 +129,9 @@ pub struct EvaluatorArgs {
 
     #[clap(flatten)]
     pub consensus_proposals_args: ConsensusProposalsEvaluatorArgs,
+
+    #[clap(flatten)]
+    pub latency_args: LatencyEvaluatorArgs,
 
     #[clap(flatten)]
     pub node_identity_args: NodeIdentityEvaluatorArgs,

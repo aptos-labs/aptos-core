@@ -26,7 +26,14 @@ pub async fn create(args: Create) -> Result<()> {
     }
     let output = match args.output_args.format {
         OutputFormat::Json => serde_json::to_string_pretty(&args.node_configuration)?,
-        OutputFormat::Yaml => serde_yaml::to_string(&args.node_configuration)?,
+        OutputFormat::Yaml => {
+            let mut output = format!(
+                "# Base config generated with: {}\n",
+                std::env::args().collect::<Vec<_>>().join(" ")
+            );
+            output.push_str(&serde_yaml::to_string(&args.node_configuration)?);
+            output
+        }
     };
     args.output_args.write(&output)
 }
