@@ -85,14 +85,15 @@ With your development environment ready, now you can start to setup your Validat
     ```
     ---
     account_address: 7410973313fd0b5c69560fd8cd9c4aaeef873f869d292d1bb94b1872e737d64f
-    consensus_key: "0x4e6323a4692866d54316f3b08493f161746fda4daaacb6f0a04ec36b6160fdce"
-    account_key: "0x83f090aee4525052f3b504805c2a0b1d37553d611129289ede2fc9ca5f6aed3c"
-    network_key: "0xa06381a17b090b8db5ffef97c6e861baad94a1b0e3210e6309de84c15337811d"
+    consensus_public_key: "0x4e6323a4692866d54316f3b08493f161746fda4daaacb6f0a04ec36b6160fdce"
+    account_public_key: "0x83f090aee4525052f3b504805c2a0b1d37553d611129289ede2fc9ca5f6aed3c"
+    validator_network_public_key: "0xa06381a17b090b8db5ffef97c6e861baad94a1b0e3210e6309de84c15337811d"
     validator_host:
       host: 35.232.235.205
       port: 6180
+    full_node_network_public_key: "0xd66c403cae9f2939ade811e2f582ce8ad24122f0d961aa76be032ada68124f19"
     full_node_host:
-      host: 34.135.169.144
+      host: 35.232.235.206
       port: 6182
     stake_amount: 1
     ```
@@ -107,13 +108,21 @@ With your development environment ready, now you can start to setup your Validat
 
     ```
     ---
-    root_key: "0x5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956"
+    root_key: "F22409A93D1CD12D2FC92B5F8EB84CDCD24C348E32B3E7A720F3D2E288E63394"
     users:
-      - <username you created in step 8>
-    chain_id: 23
+    - <username you specified for the node in step 11>
+    chain_id: 40
+    min_stake: 1000
+    max_stake: 100000
+    min_lockup_duration_secs: 0
+    max_lockup_duration_secs: 2592000
+    epoch_duration_secs: 86400
+    initial_lockup_timestamp: 1656615600
+    min_price_per_gas_unit: 1
+    allow_new_validators: true
     ```
 
-    You can use the same root key as the example, or generate new one yourself by running `cargo run -p aptos -- key generate --output-file <file name>`.
+    Please make sure you use the same root public key as shown in the example and same chain ID, those config will be used during registration to verify your node.
 
 10. Build AptosFramework Move bytecode and copy into the framework folder.
 
@@ -123,6 +132,8 @@ With your development environment ready, now you can start to setup your Validat
     mkdir ~/$WORKSPACE/framework
 
     mv aptos-framework/releases/artifacts/current/build/**/bytecode_modules/*.mv ~/$WORKSPACE/framework/
+
+    mv aptos-framework/releases/artifacts/current/build/**/bytecode_modules/dependencies/**/*.mv ~/$WORKSPACE/framework/
     ```
 
     You will now have a folder called `framework`, which contains Move bytecode with the format `.mv`.
@@ -162,10 +173,10 @@ With your development environment ready, now you can start to setup your Validat
     cargo run -p aptos-node --release -- -f ~/$WORKSPACE/validator.yaml
     ```
 
-    Run fullnode in another terminal:
+    Run fullnode in another machine:
 
     ```
     cargo run -p aptos-node --release -- -f ~/$WORKSPACE/fullnode.yaml
     ```
 
-Now you have completed setting up your node in test mode. You can continue to our [community](https://community.aptoslabs.com/) website for registration.
+Now you have completed setting up your node in test mode. You can continue to our [Aptos community platform](https://community.aptoslabs.com/) website for registration.

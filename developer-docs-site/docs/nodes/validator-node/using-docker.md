@@ -6,7 +6,7 @@ sidebar_position: 12
 
 # Using Docker
 
-1. Install Docker and Docker-Compose, [Aptos CLI](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md).
+1. Install Docker and Docker-Compose, [Aptos CLI 0.2.0](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md).
 
 :::caution Note on Apple M1
 
@@ -75,15 +75,16 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
     ```
     ---
     account_address: 7410973313fd0b5c69560fd8cd9c4aaeef873f869d292d1bb94b1872e737d64f
-    consensus_key: "0x4e6323a4692866d54316f3b08493f161746fda4daaacb6f0a04ec36b6160fdce"
-    account_key: "0x83f090aee4525052f3b504805c2a0b1d37553d611129289ede2fc9ca5f6aed3c"
-    network_key: "0xa06381a17b090b8db5ffef97c6e861baad94a1b0e3210e6309de84c15337811d"
+    consensus_public_key: "0x4e6323a4692866d54316f3b08493f161746fda4daaacb6f0a04ec36b6160fdce"
+    account_public_key: "0x83f090aee4525052f3b504805c2a0b1d37553d611129289ede2fc9ca5f6aed3c"
+    validator_network_public_key: "0xa06381a17b090b8db5ffef97c6e861baad94a1b0e3210e6309de84c15337811d"
     validator_host:
-        host: 35.232.235.205
-        port: 6180
+      host: 35.232.235.205
+      port: 6180
+    full_node_network_public_key: "0xd66c403cae9f2939ade811e2f582ce8ad24122f0d961aa76be032ada68124f19"
     full_node_host:
-        host: 34.135.169.144
-        port: 6182
+      host: 35.232.235.206
+      port: 6182
     stake_amount: 1
     ```
 
@@ -97,20 +98,28 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
 
     ```
     ---
-    root_key: "0x5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956"
+    root_key: "F22409A93D1CD12D2FC92B5F8EB84CDCD24C348E32B3E7A720F3D2E288E63394"
     users:
-      - <username you specified in step 5>
-    chain_id: 23
+    - <username you specified for the node in step 11>
+    chain_id: 40
+    min_stake: 1000
+    max_stake: 100000
+    min_lockup_duration_secs: 0
+    max_lockup_duration_secs: 2592000
+    epoch_duration_secs: 86400
+    initial_lockup_timestamp: 1656615600
+    min_price_per_gas_unit: 1
+    allow_new_validators: true
     ```
 
-    You can use the same root key as the example, or generate new one yourself by running `aptos key generate --output-file <file name>`.
+    Please make sure you use the same root public key as shown in the example and same chain ID, those config will be used during registration to verify your node.
 
 7. Download AptosFramework Move bytecode.
 
-    Download the Aptos Framework from the release page: https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v0.1.0
+    Download the Aptos Framework from the release page: https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v0.2.0
 
     ```
-    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.1.0/framework.zip
+    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.2.0/framework.zip
     unzip framework.zip
     ```
 
@@ -138,7 +147,7 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
 
 10. Run docker-compose: `docker-compose up`. (or `docker compose up` depends on your version)
 
-Now you have completed setting up your validator node in test mode. You can continue to our [community](https://community.aptoslabs.com/) website for registration. Additionally, you can also setup a fullnode following the instructions below.
+Now you have completed setting up your validator node in test mode. You can continue to our [Aptos community platform](https://community.aptoslabs.com/) website for registration. Additionally, you can also setup a fullnode following the instructions below.
 
 11. [Optional] Now let's setup Fullnode on a different machine. Download the `fullnode.yaml` and `docker-compose-fullnode.yaml` configuration files into the working directory of Fullnode machine.
     ```
@@ -151,4 +160,4 @@ Now you have completed setting up your validator node in test mode. You can cont
 13. [Optional] Copy the `validator-full-node-identity.yaml`, `genesis.blob` and `waypoint.txt` files generated above into the same working directory on Fullnode machine.
 
 14. [Optional] Run docker-compose: `docker-compose up -f docker-compose-fullnode.yaml`.
-Now you have successfully completed setting up your node in test mode. You can now proceed to the [Aptos community](https://community.aptoslabs.com/) website for registration.
+Now you have successfully completed setting up your node in test mode. You can now proceed to the [Aptos community platform](https://community.aptoslabs.com/) website for registration.

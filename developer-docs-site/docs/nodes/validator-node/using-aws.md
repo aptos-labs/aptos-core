@@ -14,8 +14,8 @@ Make sure you complete these pre-requisite steps before you proceed:
 1. Set up your AWS account. 
 2. Make sure the following are installed on your local computer:
 
-   * **Aptos CLI**: https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md
-   * **Terraform 1.1.7**: https://www.terraform.io/downloads.html
+   * **Aptos CLI 0.2.0**: https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md
+   * **Terraform 1.2.4**: https://www.terraform.io/downloads.html
    * **Kubernetes CLI**: https://kubernetes.io/docs/tasks/tools/
    * **AWS CLI**: https://aws.amazon.com/cli/
 
@@ -38,7 +38,7 @@ Make sure you complete these pre-requisite steps before you proceed:
 2. Create an S3 storage bucket for storing the Terraform state on AWS. You can do this on the AWS UI or by the below command: 
 
       ```
-      aws s3api create-bucket --bucket <bucket name> --region <region name>
+      aws s3 mb s3://<bucket name> --region <region name>
       ```
 
 3. Create a Terraform file called `main.tf` in your working directory:
@@ -52,7 +52,7 @@ Make sure you complete these pre-requisite steps before you proceed:
 
     ```
     terraform {
-      required_version = "~> 1.1.0"
+      required_version = "~> 1.2.0"
       backend "s3" {
         bucket = "terraform.aptos-node"
         key    = "state/aptos-node"
@@ -66,11 +66,11 @@ Make sure you complete these pre-requisite steps before you proceed:
 
     module "aptos-node" {
       # Download Terraform module from aptos-labs/aptos-core repo
-      source        = "github.com/aptos-labs/aptos-core.git//terraform/aptos-node/aws?ref=main"
+      source        = "github.com/aptos-labs/aptos-core.git//terraform/aptos-node/aws?ref=testnet"
       region        = <aws region>  # Specify the region
       # zone_id     = "<Route53 zone id>"  # zone id for Route53 if you want to use DNS
       era           = 1              # bump era number to wipe the chain
-      chain_id      = 23
+      chain_id      = 40
       image_tag     = "testnet" # Specify the image tag to use
       validator_name = "<Name of your Validator>"
     }
@@ -112,9 +112,9 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 9. Get your node IP information into your environment:
 
     ```
-    export VALIDATOR_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-node-validator-lb --output jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+    export VALIDATOR_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-node-0-validator-lb --output jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
 
-    export FULLNODE_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-node-fullnode-lb --output jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+    export FULLNODE_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-node-0-fullnode-lb --output jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
     ```
 
 10. Generate the key pairs (node owner key, consensus key and networking key) in your working directory.
@@ -145,12 +145,13 @@ This will download all the Terraform dependencies into the `.terraform` folder i
     ```
     ---
     account_address: 7410973313fd0b5c69560fd8cd9c4aaeef873f869d292d1bb94b1872e737d64f
-    consensus_key: "0x4e6323a4692866d54316f3b08493f161746fda4daaacb6f0a04ec36b6160fdce"
-    account_key: "0x83f090aee4525052f3b504805c2a0b1d37553d611129289ede2fc9ca5f6aed3c"
-    network_key: "0xa06381a17b090b8db5ffef97c6e861baad94a1b0e3210e6309de84c15337811d"
+    consensus_public_key: "0x4e6323a4692866d54316f3b08493f161746fda4daaacb6f0a04ec36b6160fdce"
+    account_public_key: "0x83f090aee4525052f3b504805c2a0b1d37553d611129289ede2fc9ca5f6aed3c"
+    validator_network_public_key: "0xa06381a17b090b8db5ffef97c6e861baad94a1b0e3210e6309de84c15337811d"
     validator_host:
       host: 30247cc34f270cb8.elb.us-west-2.amazonaws.com
       port: 6180
+    full_node_network_public_key: "0xd66c403cae9f2939ade811e2f582ce8ad24122f0d961aa76be032ada68124f19"
     full_node_host:
       host: abc5b9734d4cc418.elb.us-west-2.amazonaws.com
       port: 6182
@@ -168,18 +169,28 @@ For the test mode, it is sufficient to create a genesis blob containing only one
 
   ```
   ---
-  root_key: "0x5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956"
+  root_key: "F22409A93D1CD12D2FC92B5F8EB84CDCD24C348E32B3E7A720F3D2E288E63394"
   users:
-    - <username you specified for the node in step 11>
-  chain_id: 23
+  - <username you specified for the node in step 11>
+  chain_id: 40
+  min_stake: 1000
+  max_stake: 100000
+  min_lockup_duration_secs: 0
+  max_lockup_duration_secs: 2592000
+  epoch_duration_secs: 86400
+  initial_lockup_timestamp: 1656615600
+  min_price_per_gas_unit: 1
+  allow_new_validators: true
   ```
+
+  Please make sure you use the same root public key as shown in the example and same chain ID, those config will be used during registration to verify your node.
 
 13. Download the AptosFramework Move bytecode into a folder named `framework`.
 
-    Download the Aptos Framework zip file from the Aptos release page: https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v0.1.0 and unzip it.
+    Download the Aptos Framework zip file from the Aptos release page: https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v0.2.0 and unzip it.
 
     ```
-    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.1.0/framework.zip
+    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.2.0/framework.zip
     unzip framework.zip
     ```
 
@@ -207,7 +218,7 @@ For the test mode, it is sufficient to create a genesis blob containing only one
 16. Insert `genesis.blob`, `waypoint.txt` and the identity files as secret into k8s cluster.
 
     ```
-    kubectl create secret generic ${WORKSPACE}-aptos-node-genesis-e1 \
+    kubectl create secret generic ${WORKSPACE}-aptos-node-0-genesis-e1 \
         --from-file=genesis.blob=genesis.blob \
         --from-file=waypoint.txt=waypoint.txt \
         --from-file=validator-identity.yaml=validator-identity.yaml \
@@ -227,9 +238,9 @@ For the test mode, it is sufficient to create a genesis blob containing only one
     kubectl get pods
 
     NAME                                        READY   STATUS    RESTARTS   AGE
-    node1-aptos-node-fullnode-e9-0              1/1     Running   0          4h31m
-    node1-aptos-node-haproxy-7cc4c5f74c-l4l6n   1/1     Running   0          4h40m
-    node1-aptos-node-validator-0                1/1     Running   0          4h30m
+    node1-aptos-node-0-fullnode-e9-0              1/1     Running   0          4h31m
+    node1-aptos-node-0-haproxy-7cc4c5f74c-l4l6n   1/1     Running   0          4h40m
+    node1-aptos-node-0-validator-0                1/1     Running   0          4h30m
     ```
 
-Now you have successfully completed setting up your node in test mode. You can now proceed to the [Aptos community](https://community.aptoslabs.com/) website for registration.
+Now you have successfully completed setting up your node in test mode. You can now proceed to the [Aptos community platform](https://community.aptoslabs.com/) website for registration.
