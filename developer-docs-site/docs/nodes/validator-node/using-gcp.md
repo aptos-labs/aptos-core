@@ -181,7 +181,7 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
 
     ```
     aptos genesis generate-genesis \
-        --local-repository-dir ~/$WORKSPACE \ 
+        --local-repository-dir ~/$WORKSPACE \
         --output-dir ~/$WORKSPACE
     ``` 
 
