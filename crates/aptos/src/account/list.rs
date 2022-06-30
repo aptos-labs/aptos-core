@@ -4,7 +4,6 @@
 use crate::common::types::{
     CliCommand, CliConfig, CliError, CliTypedResult, ProfileOptions, RestOptions,
 };
-use aptos_rest_client::Client;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
@@ -85,7 +84,7 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
             ));
         };
 
-        let client = Client::new(self.rest_options.url(&self.profile_options.profile)?);
+        let client = self.rest_options.client(&self.profile_options.profile)?;
         let map_err_func = |err: anyhow::Error| CliError::ApiError(err.to_string());
         let response = match self.query {
             ListQuery::Balance => vec![

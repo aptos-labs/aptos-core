@@ -669,6 +669,10 @@ impl RestOptions {
             })
         }
     }
+
+    pub fn client(&self, profile: &str) -> CliTypedResult<Client> {
+        Ok(Client::new(self.url(profile)?))
+    }
 }
 
 /// Options for compiling a move package dir
@@ -935,9 +939,7 @@ impl TransactionOptions {
 
     /// Builds a rest client
     fn rest_client(&self) -> CliTypedResult<Client> {
-        Ok(Client::new(
-            self.rest_options.url(&self.profile_options.profile)?,
-        ))
+        self.rest_options.client(&self.profile_options.profile)
     }
 
     /// Submits a script function based on module name and function inputs
