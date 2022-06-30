@@ -119,6 +119,7 @@ pub struct EpochManager {
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     >,
     epoch_state: Option<EpochState>,
+    block_store: Option<Arc<BlockStore>>,
 }
 
 impl EpochManager {
@@ -155,6 +156,7 @@ impl EpochManager {
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
             epoch_state: None,
+            block_store: None,
         }
     }
 
@@ -534,7 +536,7 @@ impl EpochManager {
 
         let mut round_manager = RoundManager::new(
             epoch_state,
-            block_store,
+            block_store.clone(),
             round_state,
             proposer_election,
             proposal_generator,
@@ -552,6 +554,7 @@ impl EpochManager {
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
         self.round_manager_tx = Some(round_manager_tx);
+        self.block_store = Some(block_store);
         tokio::spawn(round_manager.start(round_manager_rx));
     }
 
@@ -701,11 +704,15 @@ impl EpochManager {
         }
     }
 
-    fn process_block_retrieval(&mut self, request: IncomingBlockRetrievalRequest) {
-        self.forward_to_round_manager(
-            self.author,
-            VerifiedEvent::BlockRetrievalRequest(Box::new(request)),
-        );
+    async fn process_block_retrieval(
+        &self,
+        request: IncomingBlockRetrievalRequest,
+    ) -> anyhow::Result<()> {
+        if let Some(block_store) = &self.block_store {
+            block_store.process_block_retrieval(request).await
+        } else {
+            Err(anyhow::anyhow!("Round manager not started"))
+        }
     }
 
     fn process_local_timeout(&mut self, round: u64) {
@@ -737,7 +744,9 @@ impl EpochManager {
                     }
                 }
                 Some(request) = network_receivers.block_retrieval.next() => {
-                    self.process_block_retrieval(request);
+                    if let Err(e) = self.process_block_retrieval(request).await {
+                        error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
+                    }
                 }
                 Some(round) = round_timeout_sender_rx.next() => {
                     self.process_local_timeout(round);
