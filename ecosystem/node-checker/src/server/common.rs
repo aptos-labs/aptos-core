@@ -1,24 +1,40 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{format_err, Result};
+use anyhow::Result;
 use clap::Parser;
-use std::convert::TryFrom;
+use std::convert::TryInto;
 use url::Url;
 
 const DEFAULT_LISTEN_PORT: u16 = 20121;
 
 #[derive(Clone, Debug, Parser)]
 pub struct ServerArgs {
-    /// What address to listen on. If port is not given, it is assumed to
-    /// be 20121.
-    #[clap(long, default_value = "http://0.0.0.0:20121", parse(try_from_str = parse_listen_address))]
-    pub listen_address: Url,
+    /// What address to listen on, e.g. localhost or 0.0.0.0
+    #[clap(long, default_value = "0.0.0.0")]
+    pub listen_address: String,
+
+    /// What port to listen on.
+    #[clap(long, default_value_t = DEFAULT_LISTEN_PORT)]
+    pub listen_port: u16,
 
     /// What endpoint to run the API on. e.g. setting this to "api" will result
     /// in you calling an endpoint like http://nhc.mysite.com:20121/api/check_node
     #[clap(long, default_value = "", parse(from_str = parse_api_path))]
     pub api_path: String,
+}
+
+impl TryInto<Url> for ServerArgs {
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<Url> {
+        let mut url = Url::parse(&format!(
+            "http://{}:{}",
+            self.listen_address, self.listen_port
+        ))?;
+        url.set_path(&self.api_path);
+        Ok(url)
+    }
 }
 
 fn parse_api_path(path: &str) -> String {
@@ -31,18 +47,4 @@ fn parse_api_path(path: &str) -> String {
         path
     };
     api_path.to_owned()
-}
-
-fn parse_listen_address(listen_address: &str) -> Result<Url> {
-    let mut url = Url::try_from(listen_address).map_err(|e| {
-        format_err!(
-            "Failed to parse listen address, try adding a scheme, e.g. http://: {}",
-            e
-        )
-    })?;
-    if url.port().is_none() {
-        url.set_port(Some(DEFAULT_LISTEN_PORT))
-            .map_err(|_| anyhow::anyhow!("Failed to set port to default"))?;
-    }
-    Ok(url)
 }

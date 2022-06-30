@@ -37,11 +37,7 @@ pub async fn generate_openapi(args: GenerateOpenapi) -> Result<()> {
         allow_preconfigured_test_node_only: false,
     };
 
-    let api_service = build_openapi_service(
-        api,
-        args.server_args.listen_address.clone(),
-        &args.server_args.api_path,
-    );
+    let api_service = build_openapi_service(api, args.server_args.clone());
 
     let spec = match args.output_args.format {
         OutputFormat::Json => api_service.spec(),

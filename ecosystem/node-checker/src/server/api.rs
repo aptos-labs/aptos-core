@@ -1,7 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::configurations_manager::{ConfigurationsManager, NodeConfigurationWrapper};
+use std::convert::TryInto;
+
+use super::{
+    common::ServerArgs,
+    configurations_manager::{ConfigurationsManager, NodeConfigurationWrapper},
+};
 use crate::{
     configuration::{NodeAddress, NodeConfiguration},
     evaluator::EvaluationSummary,
@@ -204,17 +209,12 @@ impl Example for CheckNodeRequest {
 
 pub fn build_openapi_service<M: MetricCollector, R: Runner>(
     api: Api<M, R>,
-    mut listen_address: Url,
-    api_path: &str,
+    server_args: ServerArgs,
 ) -> OpenApiService<Api<M, R>, ()> {
     let version = std::env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.1.0".to_string());
     // These should have already been validated at this point, so we panic.
-    if !listen_address.has_host() {
-        panic!("No host in listen address");
-    }
-    if listen_address.port().is_none() {
-        panic!("No port in listen address");
-    }
-    listen_address.set_path(api_path);
-    OpenApiService::new(api, "Aptos Node Checker", version).server(listen_address)
+    let url: Url = server_args
+        .try_into()
+        .expect("Failed to parse liten address");
+    OpenApiService::new(api, "Aptos Node Checker", version).server(url)
 }
