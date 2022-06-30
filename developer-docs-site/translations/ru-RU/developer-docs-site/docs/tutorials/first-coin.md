@@ -23,22 +23,21 @@ This tutorial builds on [Your first transaction](/tutorials/your-first-transacti
 
 For this tutorial, will be focusing on `first_coin.py` and re-using the `first_transaction.py` library from the previous tutorial.
 
-You can find the python project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python)
+You can find the python project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python).
 
   </TabItem>
   <TabItem value="rust" label="Rust" default>
 
 For this tutorial, will be focusing on `first_coin.rs` and re-using the `first_transaction.rs` library from the previous tutorial.
 
-You can find the rust project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust)
+You can find the rust project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust).
 
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
 For this tutorial, will be focusing on `first_coin.ts` and re-using the `first_transaction.ts` library from the previous tutorial.
 
-You can find the typescript project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript)
-
+You can find the typescript project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript).
   </TabItem>
 </Tabs>
 
@@ -58,7 +57,7 @@ source ~/.cargo/env
 git checkout origin/devnet
 ```
 
-Install Aptos Commandline tool. Learn more about the [Aptos command line tool](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos)
+Install Aptos Command line tool. Learn more about the [Aptos command line tool](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos).
 ```bash
 cargo install --git https://github.com/aptos-labs/aptos-core.git aptos
 ```
@@ -83,7 +82,7 @@ The code is very simple as we are not adding more functionalities to MoonCoin be
 <TabItem value="python" label="Python" default>
 For Python3:
 
-* Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python)
+* Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python).
 * Open your favorite terminal and navigate to where you downloaded the above example project
 * Install the required libraries: `pip3 install -r requirements.txt`.
 * Execute the example: `python3 first_coin.py MoonCoin.mv`
@@ -92,7 +91,7 @@ For Python3:
 <TabItem value="rust" label="Rust">
 For Rust:
 
-* Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust)
+* Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust).
 * Open your favorite terminal and navigate to where you downloaded the above example project
 * Execute the example: `cargo run --bin first_coin -- MoonCoin.mv`
 
@@ -100,7 +99,7 @@ For Rust:
 <TabItem value="typescript" label="Typescript">
 For Typescript:
 
-* Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript)
+* Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript).
 * Open your favorite terminal and navigate to where you downloaded the above example project
 * Install the required libraries: `yarn install`
 * Execute the example: `yarn first_coin MoonCoin.mv`
@@ -241,8 +240,8 @@ When initializing a new Coin (Step 2), the owning account receives capabilities 
 </Tabs>
 
 The data can be verified by visiting either a REST interface or the explorer:
-* Alice's account via the [REST interface][alice_account_rest]
-* Bob's account on the [explorer][bob_account_explorer]
+* Alice's account via the [REST interface][alice_account_rest].
+* Bob's account on the [explorer][bob_account_explorer].
 
-[alice_account_rest]: https://fullnode.devnet.aptoslabs.com/accounts/a52671f10dc3479b09d0a11ce47694c0/
+[alice_account_rest]: /rest-api/#tag/accounts/a52671f10dc3479b09d0a11ce47694c0/
 [bob_account_explorer]: https://explorer.devnet.aptos.dev/account/ec6ec14e4abe10aaa6ad53b0b63a1806
