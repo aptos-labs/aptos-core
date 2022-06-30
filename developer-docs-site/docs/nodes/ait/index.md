@@ -12,9 +12,10 @@ The Aptos Incentivized Testnet-2 (AIT-2) is a rewards program for any Aptos comm
 :::tip **Key AIT-2 dates:** 
 *All dates and times shown are for Pacific Time, year 2022.*
 - **June 30:** Registration starts. Node and identity verification begins.
-- **July 9:** Node registration locked. Only 48 hours left to complete identity verification.
-- **July 11:** Selection process concludes. Email notifications are sent.
+- **July 7:** Registration ends. Only 48 hours left to complete identity verification.
+- **July 11:** Selection process concludes. Email notifications are sent. If your node is selected, you will have 24 hours to join the AIT-2 Validator set.
 - **July 12:** Aptos Incentivized Testnet 2 goes live at noon. Validator score tracking begins.
+- **July 22:** AIT-2 concludes.
 :::
 
 To participate in the Aptos Incentivized Testnet-2 (AIT-2) program, follow the below steps. Use these steps as a checklist to keep track of your progress. A detailed documentation for each step is provided.
