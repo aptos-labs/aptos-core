@@ -67,7 +67,9 @@ class It2Profile < ApplicationRecord
     end
 
     job = NhcJob.perform_later({ it2_profile_id: id, do_location: })
-    update(nhc_job_id: job.job_id, nhc_output: nil)
+    self.nhc_job_id = job.job_id&.presence || 'default-job-id'
+    self.nhc_output = nil
+    update_columns(nhc_job_id:, nhc_output: nil)
   end
 
   def fullnode_network_key=(value)

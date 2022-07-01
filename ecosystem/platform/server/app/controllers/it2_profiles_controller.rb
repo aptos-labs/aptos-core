@@ -46,7 +46,7 @@ class It2ProfilesController < ApplicationController
       log @it2_profile, 'created'
 
       if Flipper.enabled?(:node_health_checker)
-        @it2_profile.enqueue_nhc_job(ip_changed)
+        @it2_profile.enqueue_nhc_job(true)
       else
         validate_node(v, do_location: true)
       end
