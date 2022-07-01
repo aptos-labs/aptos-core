@@ -5,13 +5,13 @@
 //!
 //! [Rosetta API Spec](https://www.rosetta-api.org/docs/Reference.html)
 
-use crate::error::ApiError;
+use crate::{account::CoinCache, error::ApiError};
 use aptos_api::runtime::WebServer;
 use aptos_config::config::ApiConfig;
 use aptos_logger::debug;
 use aptos_rest_client::aptos_api_types::Error;
 use aptos_types::chain_id::ChainId;
-use std::convert::Infallible;
+use std::{convert::Infallible, sync::Arc};
 use tokio::task::JoinHandle;
 use warp::{
     http::{HeaderValue, Method, StatusCode},
@@ -44,6 +44,7 @@ pub struct RosettaContext {
     pub chain_id: ChainId,
 
     pub block_size: u64,
+    pub coin_cache: Arc<CoinCache>,
 }
 
 impl RosettaContext {
@@ -77,6 +78,7 @@ pub fn bootstrap(
             block_size,
             rest_client,
             chain_id,
+            coin_cache: Arc::new(CoinCache::new()),
         };
         api.serve(routes(context)).await;
     });
@@ -95,6 +97,7 @@ pub async fn bootstrap_async(
             block_size: 1000,
             rest_client,
             chain_id,
+            coin_cache: Arc::new(CoinCache::new()),
         };
         api.serve(routes(context)).await;
     });
