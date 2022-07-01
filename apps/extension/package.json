@@ -13,7 +13,7 @@
     "@types/react-dom": "^18.0.2",
     "@types/react-router-dom": "^5.3.3",
     "@vespaiach/axios-fetch-adapter": "^0.3.0",
-    "aptos": "1.1.0",
+    "aptos": "1.2.0",
     "axios": "^0.27.2",
     "buffer": "^6.0.3",
     "constate": "^3.3.2",

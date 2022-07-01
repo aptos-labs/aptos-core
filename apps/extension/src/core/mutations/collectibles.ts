@@ -15,6 +15,7 @@ interface CreateTokenAndCollectionProps {
   description?: string;
   name?: string;
   nodeUrl: AptosNetwork;
+  royalty_points_per_million?: number;
   supply: number;
   uri?: string;
 }
@@ -64,6 +65,7 @@ export const createTokenAndCollection = async ({
   description,
   name,
   nodeUrl,
+  royalty_points_per_million = 0,
   supply,
   uri,
 }: CreateTokenAndCollectionProps): Promise<void> => {
@@ -98,6 +100,7 @@ export const createTokenAndCollection = async ({
     description,
     supply,
     uri,
+    royalty_points_per_million,
   );
   const tokenTxn: any = await aptosClient.getTransaction(tokenTxnHash);
   vmStatus = tokenTxn.vm_status;
