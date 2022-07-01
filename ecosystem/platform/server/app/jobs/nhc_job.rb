@@ -33,9 +33,14 @@ class NhcJob < ApplicationJob
 
     # Save without validation to avoid needless uniqueness checks
     is_valid = results.evaluation_results.map { |r| r.score == 100 }.all?
-    @it2_profile.update_attribute(:validator_verified, is_valid)
+    @it2_profile.validator_verified = is_valid
 
-    LocationJob.perform_later({ it2_profile_id: @it2_profile.id }) if is_valid && do_location
+    if is_valid
+      write_status('Node validated successfully!')
+      @it2_profile.user.maybe_send_ait2_registration_complete_email
+      LocationJob.perform_later({ it2_profile_id: @it2_profile.id }) if do_location
+      return
+    end
 
     failures = []
     results.evaluation_results.each do |result|
@@ -48,10 +53,7 @@ class NhcJob < ApplicationJob
       failures.push(message)
     end
 
-    result = failures.join("\n\n")
-    result = 'Node validated successfully!' if is_valid
-    write_status(result)
-    @it2_profile.user.maybe_send_ait2_registration_complete_email
+    write_status(failures.join("\n\n"))
   end
 
   def write_status(status)
