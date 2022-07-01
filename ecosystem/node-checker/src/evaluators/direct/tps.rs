@@ -4,6 +4,7 @@
 use crate::{
     configuration::EvaluatorArgs,
     evaluator::{EvaluationResult, Evaluator},
+    evaluators::EvaluatorType,
 };
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -183,5 +184,11 @@ impl Evaluator for TpsEvaluator {
             .get_mint_key()
             .context("Failed to get private key for TPS evaluator")?;
         Ok(Self::new(evaluator_args.tps_args.clone()))
+    }
+
+    fn evaluator_type_from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<EvaluatorType> {
+        Ok(EvaluatorType::Tps(Box::new(Self::from_evaluator_args(
+            evaluator_args,
+        )?)))
     }
 }
