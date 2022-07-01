@@ -31,11 +31,9 @@ class It2ProfilesController < ApplicationController
 
     return unless check_recaptcha
 
-    v = create_node_checker(ENV.fetch('NODE_CHECKER_BASE_URL'),
-                            @it2_profile.validator_address,
-                            @it2_profile.validator_metrics_port,
-                            @it2_profile.validator_api_port,
-                            @it2_profile.validator_port)
+    v = NodeHelper::NodeVerifier.new(@it2_profile.validator_address,
+                                     @it2_profile.validator_metrics_port,
+                                     @it2_profile.validator_api_port)
 
     if v.ip.ok
       @it2_profile.validator_ip = v.ip.ip
@@ -46,7 +44,13 @@ class It2ProfilesController < ApplicationController
 
     if @it2_profile.save
       log @it2_profile, 'created'
-      validate_node(v, do_location: true)
+
+      if Flipper.enabled?(:node_health_checker)
+        @it2_profile.enqueue_nhc_job(ip_changed)
+      else
+        validate_node(v, do_location: true)
+      end
+
       if @it2_profile.validator_verified?
         current_user.maybe_send_ait2_registration_complete_email
         redirect_to it2_path, notice: 'AIT2 application completed successfully: your node is verified!' and return
@@ -57,11 +61,9 @@ class It2ProfilesController < ApplicationController
 
   # PATCH/PUT /it2_profiles/1 or /it2_profiles/1.json
   def update
-    v = create_node_checker(ENV.fetch('NODE_CHECKER_BASE_URL'),
-                            it2_profile_params[:validator_address],
-                            it2_profile_params[:validator_metrics_port],
-                            it2_profile_params[:validator_api_port],
-                            it2_profile_params[:validator_port])
+    v = NodeHelper::NodeVerifier.new(it2_profile_params[:validator_address],
+                                     it2_profile_params[:validator_metrics_port],
+                                     it2_profile_params[:validator_api_port])
 
     return unless check_recaptcha
 
@@ -80,7 +82,12 @@ class It2ProfilesController < ApplicationController
                     notice: 'AIT2 node information updated' and return
       end
 
-      validate_node(v, do_location: ip_changed)
+      if Flipper.enabled?(:node_health_checker)
+        @it2_profile.enqueue_nhc_job(ip_changed)
+      else
+        validate_node(v, do_location: ip_changed)
+      end
+
       if @it2_profile.validator_verified?
         redirect_to it2_path, notice: 'AIT2 node verification completed successfully!' and return
       end
@@ -90,19 +97,9 @@ class It2ProfilesController < ApplicationController
 
   private
 
-  def create_node_checker(node_checker_base_url, hostname, metrics_port, http_api_port, noise_port)
-    if Flipper.enabled?(:node_health_checker)
-      NodeHelper::NodeChecker.new(node_checker_base_url, hostname, metrics_port, http_api_port, noise_port)
-    else
-      NodeHelper::NodeVerifier.new(hostname, metrics_port, http_api_port)
-    end
-  end
-
-  # @param [NodeHelper::NodeChecker] node_verifier
+  # @param [NodeHelper::NodeVerifier] node_verifier
   # @return [Array<VerifyResult>]
   def validate_node(node_verifier, do_location: false)
-    return validate_node_nhc(node_verifier, do_location:) if node_verifier.is_a? NodeHelper::NodeChecker
-
     results = node_verifier.verify
 
     # Save without validation to avoid needless uniqueness checks

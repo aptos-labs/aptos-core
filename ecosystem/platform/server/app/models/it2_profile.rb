@@ -54,6 +54,22 @@ class It2Profile < ApplicationRecord
     changed.map { |field| CHANGES_TO_REVALIDATE.include? field }.any?
   end
 
+  def nhc_job_running?
+    nhc_job_id.present?
+  end
+
+  def enqueue_nhc_job(do_location)
+    return unless id.present?
+
+    if nhc_job_running?
+      errors.add :base, 'Node Health Checker Job already enqueued'
+      return
+    end
+
+    job = NhcJob.perform_later({ it2_profile_id: id, do_location: })
+    update(nhc_job_id: job.job_id, nhc_output: nil)
+  end
+
   def fullnode_network_key=(value)
     value = nil if value.blank?
     super(value)
