@@ -41,7 +41,7 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
 
-      - id: deploy
+      - id: deploy-app
         uses: "google-github-actions/deploy-cloudrun@v0"
         with:
           service: community
@@ -49,7 +49,7 @@ jobs:
           project_id: aptos-community-${{ inputs.aptos_env }}
           region: us-west1
 
-      - id: deploy
+      - id: deploy-worker
         uses: "google-github-actions/deploy-cloudrun@v0"
         with:
           service: community-worker
