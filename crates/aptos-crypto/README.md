@@ -4,7 +4,7 @@ title: Crypto
 custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/crypto/crypto/README.md
 ---
 
-The crypto component hosts all the implementations of cryptographic primitives we use in Aptos: hashing, (multi)signatures, and key derivation/generation.
+The crypto component hosts all the implementations of cryptographic primitives we use in Aptos: hashing, signatures, multisignatures, aggregate signatures, and key derivation/generation.
 
 To enforce type-safety for signature schemes, we rely on traits from  [`traits.rs`](src/traits.rs) and [`validatable.rs`](src/validatable.rs).
 
@@ -20,9 +20,9 @@ Aptos makes use of several cryptographic algorithms:
   + Used to generate keys from a salt (optional), seed, and application-info (optional)
 - **Ed25519** signatures and (naive) multisignatures
   + Based on the [ed25519-dalek](https://docs.rs/ed25519-dalek/) crate with additional security checks (e.g., for malleability)
-- **Boneh-Shacham-Lynn (BLS) multisignatures**
+- **Boneh-Shacham-Lynn (BLS) multisignatures and aggregate signatures**
   + Based on the [blst](https://docs.rs/blst/) crate
-  + Implemented on top of Barreto-Scott-Lynn BLS12-381 elliptic curves
+  + Implemented on top of Barreto-Lynn-Scott BLS12-381 elliptic curves
 - The **[Noise Protocol Framework](http://www.noiseprotocol.org/)**
   - Used to create authenticated and encrypted communications channels between validators
 - **X25519** key exchange
@@ -36,7 +36,7 @@ Before implementing a cryptographic primitive, be sure to read [`traits.rs`](src
 ## How is this module organized?
 ```
     crypto/src
-    ├── bls12-381/          # BLS (multi)signatures over BLS12-381 curves
+    ├── bls12-381/          # Boneh-Lynn-Shacham (BLS) signatures over (Barreto-Lynn-Scott) BLS12-381 curves
     ├── unit_tests/         # Unit tests
     ├── lib.rs
     ├── ed25519.rs          # Ed25519 implementation of the signing/verification API in traits.rs

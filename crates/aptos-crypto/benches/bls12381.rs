@@ -46,6 +46,7 @@ fn bench_group(c: &mut Criterion) {
         aggregate_sigshare(&mut group, size);
         aggregate_pks(&mut group, size);
         verify_multisig(&mut group, size);
+        verify_aggsig(&mut group, size);
         size *= 2;
     }
 
@@ -230,6 +231,49 @@ fn verify_multisig<M: Measurement>(g: &mut BenchmarkGroup<M>, size: usize) {
             );
         },
     );
+}
+
+/// Benchmarks the time to verify an aggregate signature from the perspective of a verifier who
+/// receives an aggregate signature from `n` signers.
+fn verify_aggsig<M: Measurement>(g: &mut BenchmarkGroup<M>, n: usize) {
+    let mut rng = thread_rng();
+
+    // pick `n` random keypairs
+    let mut key_pairs = vec![];
+
+    for _ in 0..n {
+        key_pairs.push(KeyPair::<bls12381::PrivateKey, bls12381::PublicKey>::generate(&mut rng));
+    }
+
+    g.throughput(Throughput::Elements(n as u64));
+    g.bench_with_input(BenchmarkId::new("verify_aggsig", n), &n, |b, &_n| {
+        b.iter_batched(
+            || {
+                // each of the signers computes a signature share on a random message
+                let mut sigshares = vec![];
+                let mut pks = vec![];
+                let mut msgs = vec![];
+
+                for kp in key_pairs.iter() {
+                    msgs.push(random_message(&mut rng));
+                    sigshares.push(kp.private_key.sign(msgs.last().unwrap()));
+                    pks.push(&kp.public_key)
+                }
+
+                let aggsig = bls12381::Signature::aggregate(sigshares).unwrap();
+
+                (msgs, pks, aggsig)
+            },
+            |(msgs, pks, aggsig)| {
+                let msgs_refs = msgs.iter().collect::<Vec<&TestAptosCrypto>>();
+
+                let result = aggsig.verify_aggregate(&msgs_refs, &pks);
+
+                assert!(result.is_ok());
+            },
+            BatchSize::SmallInput,
+        );
+    });
 }
 
 criterion_group!(bls12381_benches, bench_group);

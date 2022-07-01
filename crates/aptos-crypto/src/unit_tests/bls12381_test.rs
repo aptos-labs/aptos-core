@@ -105,6 +105,13 @@ fn random_message_for_signing(rng: &mut OsRng) -> TestAptosCrypto {
     )
 }
 
+/// Returns several 256-character unique strings that can be aggregate-signed by the BLS API.
+fn random_messages_for_signing(rng: &mut OsRng, n: usize) -> Vec<TestAptosCrypto> {
+    (0..n)
+        .map(|_| random_message_for_signing(rng))
+        .collect::<Vec<TestAptosCrypto>>()
+}
+
 /// Tests that a multisignature on a message m aggregated from n/2 out of n signers verifies
 /// correctly on m but fails verification on a different m'.
 #[test]
@@ -137,7 +144,40 @@ fn bls12381_multisig_should_verify() {
     assert!(multisig.verify(&message_wrong, &aggpk).is_err());
 }
 
-/// Tests that a multisig incorrectly aggregated from signature shares on different messages does
+/// Tests that an aggregate signature on `n` different messages verifies correctly.
+#[test]
+fn bls12381_aggsig_should_verify() {
+    let mut rng = OsRng;
+    let num_signers = 1000;
+
+    let messages = random_messages_for_signing(&mut rng, num_signers);
+    let messages_wrong = random_messages_for_signing(&mut rng, num_signers);
+
+    let key_pairs = bls12381_keygen(num_signers, &mut rng);
+
+    let mut signatures = vec![];
+    let mut pubkeys: Vec<&PublicKey> = vec![];
+
+    for i in 0..num_signers {
+        let msg = &messages[i];
+        let key = &key_pairs[i];
+
+        signatures.push(key.private_key.sign(msg));
+        pubkeys.push(&key.public_key);
+    }
+
+    let aggsig = bls12381::Signature::aggregate(signatures).unwrap();
+
+    // aggsig should verify on the correct messages under the correct PKs
+    let msgs_refs = messages.iter().collect::<Vec<&TestAptosCrypto>>();
+    assert!(aggsig.verify_aggregate(&msgs_refs, &pubkeys).is_ok());
+
+    // aggsig should NOT verify on incorrect messages under the correct PKs
+    let msgs_wrong_refs = messages_wrong.iter().collect::<Vec<&TestAptosCrypto>>();
+    assert!(aggsig.verify_aggregate(&msgs_wrong_refs, &pubkeys).is_err());
+}
+
+/// Tests that a multisignature incorrectly aggregated from signature shares on different messages does
 /// NOT verify.
 #[test]
 fn bls12381_multisig_wrong_messages_aggregated() {
