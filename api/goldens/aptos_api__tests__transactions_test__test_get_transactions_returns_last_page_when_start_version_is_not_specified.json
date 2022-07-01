@@ -276,6 +276,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "13"
   },
   {
@@ -555,6 +556,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "14"
   },
   {
@@ -834,6 +836,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "15"
   },
   {
@@ -1113,6 +1116,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "16"
   },
   {
@@ -1392,6 +1396,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "17"
   },
   {
@@ -1671,6 +1676,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "18"
   },
   {
@@ -1950,6 +1956,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "19"
   },
   {
@@ -2229,6 +2236,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "20"
   },
   {

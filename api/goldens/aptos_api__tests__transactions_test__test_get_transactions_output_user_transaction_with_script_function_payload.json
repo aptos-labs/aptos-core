@@ -84,6 +84,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "1"
   },
   {
