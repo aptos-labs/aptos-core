@@ -4,7 +4,7 @@
 use aptos_types::{
     epoch_change::Verifier, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
 };
-use executor_types::ExecutedTrees;
+use storage_interface::ExecutedTrees;
 
 use crate::error::Error;
 

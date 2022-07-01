@@ -9,10 +9,13 @@ use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::transaction::{Transaction, TransactionOutput};
 use aptos_vm::VMExecutor;
-use executor_types::{ExecutedChunk, ExecutedTrees};
+use executor_types::ExecutedChunk;
 use fail::fail_point;
 use std::collections::HashSet;
-use storage_interface::cached_state_view::{CachedStateView, StateCache};
+use storage_interface::{
+    cached_state_view::{CachedStateView, StateCache},
+    ExecutedTrees,
+};
 
 pub struct ChunkOutput {
     /// Input transactions.

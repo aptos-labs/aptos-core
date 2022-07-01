@@ -1,18 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    block_executor::BlockExecutor,
-    chunk_executor::ChunkExecutor,
-    components::chunk_output::ChunkOutput,
-    db_bootstrapper::{generate_waypoint, maybe_bootstrap},
-    mock_vm::{
-        encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
-        MockVM, DISCARD_STATUS, KEEP_STATUS,
-    },
-};
+use std::{collections::BTreeMap, iter::once};
 
-use crate::components::in_memory_state_calculator::IntoLedgerView;
+use proptest::prelude::*;
+
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_state_view::StateViewId;
 use aptos_types::{
@@ -31,10 +23,19 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptosdb::AptosDB;
-use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, ExecutedTrees, TransactionReplayer};
-use proptest::prelude::*;
-use std::{collections::BTreeMap, iter::once};
-use storage_interface::DbReaderWriter;
+use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
+use storage_interface::{DbReaderWriter, ExecutedTrees};
+
+use crate::{
+    block_executor::BlockExecutor,
+    chunk_executor::ChunkExecutor,
+    components::{chunk_output::ChunkOutput, in_memory_state_calculator::IntoLedgerView},
+    db_bootstrapper::{generate_waypoint, maybe_bootstrap},
+    mock_vm::{
+        encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
+        MockVM, DISCARD_STATUS, KEEP_STATUS,
+    },
+};
 
 mod chunk_executor_tests;
 

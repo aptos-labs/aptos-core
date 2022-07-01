@@ -3,18 +3,16 @@
 
 #![forbid(unsafe_code)]
 
-mod error;
-mod executed_chunk;
-
-pub use error::Error;
+use std::{cmp::max, collections::HashMap, sync::Arc};
 
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
+
 use aptos_crypto::{
     ed25519::Ed25519Signature,
     hash::{EventAccumulatorHasher, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_state_view::StateViewId;
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -28,16 +26,12 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use scratchpad::{ProofRead, SparseMerkleTree};
-use serde::{Deserialize, Serialize};
-use std::{cmp::max, collections::HashMap, sync::Arc};
-use storage_interface::DbReader;
-
+pub use error::Error;
 pub use executed_chunk::ExecutedChunk;
-use storage_interface::{
-    cached_state_view::CachedStateView, in_memory_state::InMemoryState,
-    no_proof_fetcher::NoProofFetcher, sync_proof_fetcher::SyncProofFetcher,
-};
+use scratchpad::{ProofRead, SparseMerkleTree};
+
+mod error;
+mod executed_chunk;
 
 type SparseMerkleProof = aptos_types::proof::SparseMerkleProof;
 
@@ -305,109 +299,6 @@ impl StateComputeResult {
 
     pub fn set_signature(&mut self, sig: Ed25519Signature) {
         self.signature = Some(sig);
-    }
-}
-
-/// A wrapper of the in-memory state sparse merkle tree and the transaction accumulator that
-/// represent a specific state collectively. Usually it is a state after executing a block.
-#[derive(Clone, Debug)]
-pub struct ExecutedTrees {
-    /// The in-memory representation of state after execution.
-    state: InMemoryState,
-
-    /// The in-memory Merkle Accumulator representing a blockchain state consistent with the
-    /// `state_tree`.
-    transaction_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
-}
-
-impl ExecutedTrees {
-    pub fn state(&self) -> &InMemoryState {
-        &self.state
-    }
-
-    pub fn txn_accumulator(&self) -> &Arc<InMemoryAccumulator<TransactionAccumulatorHasher>> {
-        &self.transaction_accumulator
-    }
-
-    pub fn version(&self) -> Option<Version> {
-        let num_elements = self.txn_accumulator().num_leaves() as u64;
-        num_elements.checked_sub(1)
-    }
-
-    pub fn state_id(&self) -> HashValue {
-        self.txn_accumulator().root_hash()
-    }
-
-    pub fn new(
-        state: InMemoryState,
-        transaction_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
-    ) -> Self {
-        Self {
-            state,
-            transaction_accumulator,
-        }
-    }
-
-    pub fn new_at_state_checkpoint(
-        state_root_hash: HashValue,
-        frozen_subtrees_in_accumulator: Vec<HashValue>,
-        num_leaves_in_accumulator: u64,
-    ) -> Self {
-        let state = InMemoryState::new_at_checkpoint(
-            state_root_hash,
-            num_leaves_in_accumulator.checked_sub(1),
-        );
-        let transaction_accumulator = Arc::new(
-            InMemoryAccumulator::new(frozen_subtrees_in_accumulator, num_leaves_in_accumulator)
-                .expect("The startup info read from storage should be valid."),
-        );
-
-        Self::new(state, transaction_accumulator)
-    }
-
-    pub fn new_empty() -> Self {
-        Self::new(
-            InMemoryState::new_empty(),
-            Arc::new(InMemoryAccumulator::new_empty()),
-        )
-    }
-
-    pub fn is_same_view(&self, rhs: &Self) -> bool {
-        self.transaction_accumulator.root_hash() == rhs.transaction_accumulator.root_hash()
-    }
-
-    pub fn verified_state_view(
-        &self,
-        id: StateViewId,
-        reader: Arc<dyn DbReader>,
-    ) -> Result<CachedStateView> {
-        CachedStateView::new(
-            id,
-            reader.clone(),
-            self.transaction_accumulator.num_leaves(),
-            self.state.current.clone(),
-            Arc::new(SyncProofFetcher::new(reader)),
-        )
-    }
-
-    pub fn state_view(
-        &self,
-        id: StateViewId,
-        reader: Arc<dyn DbReader>,
-    ) -> Result<CachedStateView> {
-        CachedStateView::new(
-            id,
-            reader.clone(),
-            self.transaction_accumulator.num_leaves(),
-            self.state.current.clone(),
-            Arc::new(NoProofFetcher::new(reader)),
-        )
-    }
-}
-
-impl Default for ExecutedTrees {
-    fn default() -> Self {
-        Self::new_empty()
     }
 }
 

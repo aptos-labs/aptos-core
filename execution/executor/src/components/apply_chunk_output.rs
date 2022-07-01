@@ -24,8 +24,9 @@ use aptos_types::{
     transaction::{Transaction, TransactionInfo, TransactionOutput, TransactionStatus},
     write_set::WriteSet,
 };
-use executor_types::{ExecutedChunk, ExecutedTrees, TransactionData};
+use executor_types::{ExecutedChunk, TransactionData};
 use std::{collections::HashMap, iter::repeat, ops::Deref, sync::Arc};
+use storage_interface::ExecutedTrees;
 
 pub struct ApplyChunkOutput;
 
