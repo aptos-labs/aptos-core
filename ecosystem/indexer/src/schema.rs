@@ -12,6 +12,7 @@ table! {
         inserted_at -> Timestamp,
         epoch -> Int8,
         previous_block_votes_bitmap -> Jsonb,
+        failed_proposer_indices -> Jsonb,
     }
 }
 

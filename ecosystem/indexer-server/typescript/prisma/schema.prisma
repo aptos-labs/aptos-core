@@ -24,6 +24,7 @@ model block_metadata_transactions {
   inserted_at                 DateTime     @default(now()) @db.Timestamp(6)
   epoch                       BigInt
   previous_block_votes_bitmap Json
+  failed_proposer_indices     Json
   transactions                transactions @relation(fields: [hash], references: [hash], onDelete: NoAction, onUpdate: NoAction, map: "fk_transactions")
 }
 

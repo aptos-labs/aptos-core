@@ -498,6 +498,7 @@ mod test {
               "id": "0xeef99391a3fc681f16963a6c03415bc0b1b12b56c00429308fa8bf46ac9eddf0",
               "round": "57600",
               "previous_block_votes": [],
+              "failed_proposer_indices": [],
               "epoch": "1",
               "previous_block_votes_bitmap": [
                 true,
