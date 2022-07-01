@@ -6,3 +6,7 @@
 Delayed.logger = Rails.logger
 
 Delayed.default_log_level = 'debug'
+
+Delayed::Worker.max_run_time = 20.minutes
+
+Delayed::Worker.read_ahead = 1
