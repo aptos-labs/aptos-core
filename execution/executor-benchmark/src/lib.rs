@@ -14,7 +14,7 @@ use crate::{
     transaction_generator::TransactionGenerator,
 };
 use aptos_config::config::{
-    NodeConfig, RocksdbConfig, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG,
+    NodeConfig, RocksdbConfigs, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 
 use crate::{pipeline::Pipeline, state_committer::StateCommitter};
@@ -30,7 +30,7 @@ pub fn init_db_and_executor(config: &NodeConfig) -> (DbReaderWriter, BlockExecut
             &config.storage.dir(),
             false,                       /* readonly */
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-            RocksdbConfig::default(),
+            RocksdbConfigs::default(),
         )
         .expect("DB should open."),
     );
@@ -59,7 +59,7 @@ pub fn run_benchmark(
         &source_dir,
         true,                        /* readonly */
         NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-        RocksdbConfig::default(),
+        RocksdbConfigs::default(),
     )
     .expect("db open failure.")
     .create_checkpoint(checkpoint_dir.as_ref())

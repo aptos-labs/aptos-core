@@ -54,7 +54,7 @@ use crate::{
     transaction_store::TransactionStore,
 };
 use anyhow::{ensure, Result};
-use aptos_config::config::{RocksdbConfig, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
+use aptos_config::config::{RocksdbConfigs, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_crypto::hash::{HashValue, SPARSE_MERKLE_PLACEHOLDER_HASH};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
@@ -304,7 +304,7 @@ impl AptosDB {
         db_root_path: P,
         readonly: bool,
         storage_pruner_config: StoragePrunerConfig,
-        rocksdb_config: RocksdbConfig,
+        rocksdb_configs: RocksdbConfigs,
     ) -> Result<Self> {
         ensure!(
             storage_pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -315,35 +315,31 @@ impl AptosDB {
         let state_merkle_db_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
         let instant = Instant::now();
 
-        let mut db_opts = gen_rocksdb_options(&rocksdb_config);
-
         let (ledger_db, state_merkle_db) = if readonly {
             (
                 DB::open_cf_readonly(
-                    &db_opts,
+                    &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, true),
                     ledger_db_path.clone(),
                     "ledger_db_ro",
                     ledger_db_column_families(),
                 )?,
                 DB::open_cf_readonly(
-                    &db_opts,
+                    &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, true),
                     state_merkle_db_path.clone(),
                     "state_merkle_db_ro",
                     state_merkle_db_column_families(),
                 )?,
             )
         } else {
-            db_opts.create_if_missing(true);
-            db_opts.create_missing_column_families(true);
             (
                 DB::open_cf(
-                    &db_opts,
+                    &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, false),
                     ledger_db_path.clone(),
                     "ledger_db",
                     gen_ledger_cfds(),
                 )?,
                 DB::open_cf(
-                    &db_opts,
+                    &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, false),
                     state_merkle_db_path.clone(),
                     "state_merkle_db",
                     gen_state_merkle_cfds(),
@@ -365,7 +361,7 @@ impl AptosDB {
         db_root_path: P,
         ledger_db_secondary_path: P,
         state_merkle_db_secondary_path: P,
-        mut rocksdb_config: RocksdbConfig,
+        mut rocksdb_configs: RocksdbConfigs,
     ) -> Result<Self> {
         let ledger_db_primary_path = db_root_path.as_ref().join(LEDGER_DB_NAME);
         let ledger_db_secondary_path = ledger_db_secondary_path.as_ref().to_path_buf();
@@ -373,19 +369,19 @@ impl AptosDB {
         let state_merkle_db_secondary_path = state_merkle_db_secondary_path.as_ref().to_path_buf();
 
         // Secondary needs `max_open_files = -1` per https://github.com/facebook/rocksdb/wiki/Secondary-instance
-        rocksdb_config.max_open_files = -1;
-        let db_opts = gen_rocksdb_options(&rocksdb_config);
+        rocksdb_configs.ledger_db_config.max_open_files = -1;
+        rocksdb_configs.state_merkle_db_config.max_open_files = -1;
 
         Ok(Self::new_with_dbs(
             DB::open_cf_as_secondary(
-                &db_opts,
+                &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, false),
                 ledger_db_primary_path,
                 ledger_db_secondary_path,
                 "ledgerdb_sec",
                 ledger_db_column_families(),
             )?,
             DB::open_cf_as_secondary(
-                &db_opts,
+                &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, false),
                 state_merkle_db_primary_path,
                 state_merkle_db_secondary_path,
                 "state_merkle_db_sec",
@@ -402,7 +398,7 @@ impl AptosDB {
             db_root_path,
             false,                       /* readonly */
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-            RocksdbConfig::default(),
+            RocksdbConfigs::default(),
         )
         .expect("Unable to open AptosDB")
     }
