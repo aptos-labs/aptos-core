@@ -6,6 +6,7 @@ use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_types::{
+    account_address::AccountAddress,
     account_config::aptos_root_address,
     account_view::AccountView,
     chain_id::ChainId,
@@ -23,7 +24,7 @@ use std::{
     path::Path,
     sync::{mpsc, Arc},
 };
-use storage_interface::{state_view::LatestDbStateCheckpointView, DbReader};
+use storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 
 const META_FILENAME: &str = "metadata.toml";
 const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
@@ -34,6 +35,17 @@ fn get_progress_bar(num_accounts: usize) -> ProgressBar {
         "[{elapsed_precise} {per_sec}] {bar:100.cyan/blue} {percent}% ETA {eta_precise}",
     ));
     bar
+}
+
+fn get_sequence_number(address: AccountAddress, reader: Arc<dyn DbReader>) -> u64 {
+    let db_state_view = reader.latest_state_checkpoint_view().unwrap();
+
+    let account_state_view = db_state_view.as_account_with_state_view(&address);
+
+    match account_state_view.get_account_resource().unwrap() {
+        Some(account_resource) => account_resource.sequence_number(),
+        None => 0,
+    }
 }
 
 macro_rules! now_fmt {
@@ -63,8 +75,9 @@ pub struct TransactionGenerator {
     /// a single root account.
     seed_accounts_cache: Option<AccountCache>,
 
-    /// Total number of accounts in the DB
-    num_accounts: usize,
+    /// Total # of existing (non-seed) accounts in the DB at the time of TransactionGenerator
+    /// creation.
+    num_existing_accounts: usize,
 
     /// Record the number of txns generated.
     version: Version,
@@ -77,45 +90,27 @@ pub struct TransactionGenerator {
     transaction_factory: TransactionFactory,
 
     /// root account is used across creating and minting.
-    root_account: Option<LocalAccount>,
+    root_account: LocalAccount,
 }
 
 impl TransactionGenerator {
-    pub fn new(genesis_key: Ed25519PrivateKey, num_accounts: usize) -> Self {
-        Self::new_impl(genesis_key, num_accounts, None)
-    }
-
-    pub fn new_with_sender(
-        genesis_key: Ed25519PrivateKey,
-        num_accounts: usize,
-        block_sender: mpsc::SyncSender<Vec<Transaction>>,
-    ) -> Self {
-        Self::new_impl(genesis_key, num_accounts, Some(block_sender))
-    }
-
-    fn new_impl(
-        genesis_key: Ed25519PrivateKey,
-        num_accounts: usize,
-        block_sender: Option<mpsc::SyncSender<Vec<Transaction>>>,
-    ) -> Self {
+    pub fn new(genesis_key: Ed25519PrivateKey) -> Self {
         Self {
             seed_accounts_cache: None,
-            root_account: Some(LocalAccount::new(aptos_root_address(), genesis_key, 0)),
+            root_account: LocalAccount::new(aptos_root_address(), genesis_key, 0),
             accounts_cache: None,
-            num_accounts,
+            num_existing_accounts: 0,
             version: 0,
-            block_sender,
+            block_sender: None,
             transaction_factory: Self::create_transaction_factory(),
         }
     }
 
-    fn gen_account_cache(num_accounts: usize, seed_account: bool) -> AccountCache {
-        let (name, generator) = if seed_account {
-            ("seed", AccountGenerator::new_for_seed_accounts())
-        } else {
-            ("user", AccountGenerator::new_for_user_accounts())
-        };
-
+    fn gen_account_cache(
+        generator: AccountGenerator,
+        num_accounts: usize,
+        name: &str,
+    ) -> AccountCache {
         println!(
             "[{}] Generating cache of {} {} accounts.",
             now_fmt!(),
@@ -129,31 +124,58 @@ impl TransactionGenerator {
             bar.inc(1);
         }
         bar.finish();
-        println!("[{}] done.", now_fmt!());
+        accounts
+    }
 
+    fn gen_user_account_cache(num_accounts: usize) -> AccountCache {
+        Self::gen_account_cache(
+            AccountGenerator::new_for_user_accounts(0),
+            num_accounts,
+            "user",
+        )
+    }
+
+    fn gen_seed_account_cache(reader: Arc<dyn DbReader>, num_accounts: usize) -> AccountCache {
+        let generator = AccountGenerator::new_for_seed_accounts();
+
+        let mut accounts = Self::gen_account_cache(generator, num_accounts, "seed");
+
+        for account in &mut accounts.accounts {
+            *account.sequence_number_mut() = get_sequence_number(account.address(), reader.clone());
+        }
         accounts
     }
 
     pub fn new_with_existing_db<P: AsRef<Path>>(
+        db: DbReaderWriter,
+        genesis_key: Ed25519PrivateKey,
         block_sender: mpsc::SyncSender<Vec<Transaction>>,
         db_dir: P,
         version: Version,
     ) -> Self {
         let path = db_dir.as_ref().join(META_FILENAME);
-        let mut file = File::open(&path).unwrap();
-        let mut contents = vec![];
-        file.read_to_end(&mut contents).unwrap();
-        let test_case: TestCase = toml::from_slice(&contents).expect("Must exist.");
-        let TestCase::P2p(P2pTestCase { num_accounts }) = test_case;
 
-        let num_cached_accounts = std::cmp::min(num_accounts, MAX_ACCOUNTS_INVOLVED_IN_P2P);
-        let accounts_cache = Some(Self::gen_account_cache(num_cached_accounts, false));
+        let num_existing_accounts = File::open(&path).map_or(0, |mut file| {
+            let mut contents = vec![];
+            file.read_to_end(&mut contents).unwrap();
+            let test_case: TestCase = toml::from_slice(&contents).expect("Must exist.");
+            let TestCase::P2p(P2pTestCase { num_accounts }) = test_case;
+            num_accounts
+        });
+
+        let num_cached_accounts =
+            std::cmp::min(num_existing_accounts, MAX_ACCOUNTS_INVOLVED_IN_P2P);
+        let accounts_cache = Some(Self::gen_user_account_cache(num_cached_accounts));
 
         Self {
             seed_accounts_cache: None,
-            root_account: None,
+            root_account: LocalAccount::new(
+                aptos_root_address(),
+                genesis_key,
+                get_sequence_number(aptos_root_address(), db.reader),
+            ),
             accounts_cache,
-            num_accounts,
+            num_existing_accounts,
             version,
             block_sender: Some(block_sender),
             transaction_factory: Self::create_transaction_factory(),
@@ -168,9 +190,9 @@ impl TransactionGenerator {
     }
 
     // Write metadata
-    pub fn write_meta<P: AsRef<Path>>(self, path: &P) {
+    pub fn write_meta<P: AsRef<Path>>(self, path: &P, num_new_accounts: usize) {
         let metadata = TestCase::P2p(P2pTestCase {
-            num_accounts: self.num_accounts,
+            num_accounts: self.num_existing_accounts + num_new_accounts,
         });
         let serialized = toml::to_vec(&metadata).unwrap();
         let meta_file = path.as_ref().join(META_FILENAME);
@@ -178,16 +200,37 @@ impl TransactionGenerator {
         file.write_all(&serialized).unwrap();
     }
 
+    pub fn num_existing_accounts(&self) -> usize {
+        self.num_existing_accounts
+    }
+
     pub fn version(&self) -> Version {
         self.version
     }
 
-    pub fn run_mint(&mut self, init_account_balance: u64, block_size: usize) {
+    pub fn run_mint(
+        &mut self,
+        reader: Arc<dyn DbReader>,
+        num_existing_accounts: usize,
+        num_new_accounts: usize,
+        init_account_balance: u64,
+        block_size: usize,
+    ) {
         assert!(self.block_sender.is_some());
         // Ensure that seed accounts have enough balance to transfer money to at least 1000 account with
         // balance init_account_balance.
-        self.create_seed_accounts(block_size, init_account_balance * 1_000_000_000);
-        self.create_and_fund_accounts(init_account_balance, block_size);
+        self.create_seed_accounts(
+            reader,
+            num_new_accounts,
+            block_size,
+            init_account_balance * 1_000_000_000,
+        );
+        self.create_and_fund_accounts(
+            num_existing_accounts,
+            num_new_accounts,
+            init_account_balance,
+            block_size,
+        );
     }
 
     pub fn run_transfer(&mut self, block_size: usize, num_transfer_blocks: usize) {
@@ -197,13 +240,15 @@ impl TransactionGenerator {
 
     pub fn create_seed_accounts(
         &mut self,
+        reader: Arc<dyn DbReader>,
+        num_new_accounts: usize,
         block_size: usize,
         seed_account_balance: u64,
     ) -> Vec<Vec<Transaction>> {
         let mut txn_block = Vec::new();
 
-        let num_seed_accounts = (self.num_accounts / 1000).max(1).min(1000);
-        let seed_accounts_cache = Self::gen_account_cache(num_seed_accounts, true);
+        let num_seed_accounts = (num_new_accounts / 1000).max(1).min(100000);
+        let seed_accounts_cache = Self::gen_seed_account_cache(reader, num_seed_accounts);
 
         println!(
             "[{}] Generating {} seed account creation txns.",
@@ -221,22 +266,14 @@ impl TransactionGenerator {
             let transactions: Vec<_> = chunk
                 .iter()
                 .flat_map(|account| {
-                    let create = self
-                        .root_account
-                        .as_mut()
-                        .unwrap()
-                        .sign_with_transaction_builder(
-                            self.transaction_factory
-                                .create_user_account(account.public_key()),
-                        );
-                    let mint = self
-                        .root_account
-                        .as_mut()
-                        .unwrap()
-                        .sign_with_transaction_builder(
-                            self.transaction_factory
-                                .mint(account.address(), seed_account_balance),
-                        );
+                    let create = self.root_account.sign_with_transaction_builder(
+                        self.transaction_factory
+                            .create_user_account(account.public_key()),
+                    );
+                    let mint = self.root_account.sign_with_transaction_builder(
+                        self.transaction_factory
+                            .mint(account.address(), seed_account_balance),
+                    );
                     vec![create, mint]
                 })
                 .map(Transaction::UserTransaction)
@@ -260,6 +297,8 @@ impl TransactionGenerator {
     /// Generates transactions that creates a set of accounts and fund them from the seed accounts.
     pub fn create_and_fund_accounts(
         &mut self,
+        num_existing_accounts: usize,
+        num_new_accounts: usize,
         init_account_balance: u64,
         block_size: usize,
     ) -> Vec<Vec<Transaction>> {
@@ -268,12 +307,14 @@ impl TransactionGenerator {
         println!(
             "[{}] Generating {} account creation txns.",
             now_fmt!(),
-            self.num_accounts,
+            num_new_accounts
         );
-        let mut generator = AccountGenerator::new_for_user_accounts();
-        let bar = get_progress_bar(self.num_accounts);
+        let mut generator = AccountGenerator::new_for_user_accounts(num_existing_accounts as u64);
+        println!("Skipped first {} existing accounts.", num_existing_accounts);
 
-        for chunk in &(0..self.num_accounts).chunks(block_size) {
+        let bar = get_progress_bar(num_new_accounts);
+
+        for chunk in &(0..num_new_accounts).chunks(block_size) {
             let transactions: Vec<_> = chunk
                 .map(|_| {
                     self.seed_accounts_cache
