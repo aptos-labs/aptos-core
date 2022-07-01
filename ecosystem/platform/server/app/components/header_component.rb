@@ -13,7 +13,13 @@ class HeaderComponent < ViewComponent::Base
     NavItem.new('https://explorer.devnet.aptos.dev/', 'Explorer', 'Aptos Explorer')
   ].freeze
 
-  def initialize(**rest)
+  USER_NAV_ITEMS = [
+    NavItem.new('/settings', 'Settings', 'Account Settings'),
+    NavItem.new('/users/sign_out', 'Sign Out', 'Sign Out')
+  ].freeze
+
+  def initialize(user: nil, **rest)
+    @user = user
     @rest = rest
     @rest[:class] = [
       'bg-black text-white flex px-4 sm:px-6 items-center sticky top-0 z-10',
@@ -26,5 +32,9 @@ class HeaderComponent < ViewComponent::Base
 
   def nav_items
     NAV_ITEMS
+  end
+
+  def user_nav_items
+    USER_NAV_ITEMS
   end
 end
