@@ -159,7 +159,7 @@ pub enum Case {
 /// Currency represented as atomic units including decimals
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/Currency.html)
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Currency {
     /// Symbol of currency
     pub symbol: String,

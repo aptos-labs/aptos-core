@@ -23,7 +23,11 @@ use aptos_sdk::move_types::{identifier::Identifier, language_storage::TypeTag};
 use aptos_types::account_address::AccountAddress;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, str::FromStr, sync::RwLock};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+    sync::RwLock,
+};
 use warp::Filter;
 
 /// Account routes e.g. balance
@@ -89,6 +93,15 @@ async fn account_balance(
                 currency,
             });
         }
+    }
+
+    // Filter based on requested currencies
+    if let Some(currencies) = request.currencies {
+        let currencies: HashSet<Currency> = currencies.iter().collect();
+        amounts = amounts
+            .into_iter()
+            .filter(|amount| currencies.contains(&amount.currency))
+            .collect()
     }
 
     // Get the block identifier
