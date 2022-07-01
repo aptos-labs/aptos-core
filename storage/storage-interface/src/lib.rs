@@ -145,7 +145,6 @@ impl TreeState {
             num_transactions,
             ledger_frozen_subtree_hashes,
             state_checkpoint_hash: state_root_hash,
-            // Doesn't consider the possibility of PRE_GENESIS exists
             state_checkpoint_version: num_transactions.checked_sub(1),
         }
     }
