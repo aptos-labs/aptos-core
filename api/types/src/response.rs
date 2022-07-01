@@ -4,7 +4,10 @@
 use crate::{Error, LedgerInfo};
 use anyhow::Result;
 use serde::Serialize;
-use warp::http::header::{HeaderValue, CONTENT_TYPE};
+use warp::{
+    http::header::{HeaderValue, CONTENT_TYPE},
+    hyper::StatusCode,
+};
 
 pub const X_APTOS_CHAIN_ID: &str = "X-Aptos-Chain-Id";
 pub const X_APTOS_EPOCH: &str = "X-Aptos-Epoch";
@@ -31,6 +34,43 @@ impl warp::Reply for Response {
         let headers = res.headers_mut();
 
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        headers.insert(X_APTOS_CHAIN_ID, (self.ledger_info.chain_id as u16).into());
+        headers.insert(
+            X_APTOS_LEDGER_VERSION,
+            self.ledger_info.ledger_version.into(),
+        );
+        headers.insert(
+            X_APTOS_LEDGER_TIMESTAMP,
+            self.ledger_info.ledger_timestamp.into(),
+        );
+        headers.insert(X_APTOS_EPOCH, self.ledger_info.epoch.into());
+
+        res
+    }
+}
+
+pub struct ResponseBCS {
+    pub ledger_info: LedgerInfo,
+    pub body: Vec<u8>,
+}
+
+impl ResponseBCS {
+    pub fn new<T: Serialize>(ledger_info: LedgerInfo, body: &T) -> Result<Self, Error> {
+        Ok(Self {
+            ledger_info,
+            body: bcs::to_bytes(body).map_err(|_| {
+                Error::new(StatusCode::INTERNAL_SERVER_ERROR, "decode body".to_string())
+            })?,
+        })
+    }
+}
+
+impl warp::Reply for ResponseBCS {
+    fn into_response(self) -> warp::reply::Response {
+        let mut res = warp::reply::Response::new(self.body.into());
+        let headers = res.headers_mut();
+
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("X-Aptos-bcs"));
         headers.insert(X_APTOS_CHAIN_ID, (self.ledger_info.chain_id as u16).into());
         headers.insert(
             X_APTOS_LEDGER_VERSION,

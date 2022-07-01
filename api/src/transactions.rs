@@ -10,8 +10,8 @@ use crate::{
 };
 
 use aptos_api_types::{
-    mime_types::BCS_SIGNED_TRANSACTION, AsConverter, Error, LedgerInfo, Response, Transaction,
-    TransactionData, TransactionId, TransactionOnChainData, TransactionSigningMessage,
+    mime_types::BCS_SIGNED_TRANSACTION, AsConverter, Error, LedgerInfo, Response, ResponseBCS,
+    Transaction, TransactionData, TransactionId, TransactionOnChainData, TransactionSigningMessage,
     UserCreateSigningMessageRequest, UserTransactionRequest,
 };
 use aptos_crypto::signing_message;
@@ -49,6 +49,17 @@ pub fn get_transactions(context: Context) -> BoxedFilter<(impl Reply,)> {
         .and(context.filter())
         .and_then(handle_get_transactions)
         .with(metrics("get_transactions"))
+        .boxed()
+}
+
+// GET /transactions_bcs?start={u64}&limit={u16}
+pub fn get_transactions_bcs(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("transactions_bcs")
+        .and(warp::get())
+        .and(warp::query::<Page>())
+        .and(context.filter())
+        .and_then(handle_get_transactions_bcs)
+        .with(metrics("get_transactions_bcs"))
         .boxed()
 }
 
@@ -159,6 +170,14 @@ async fn handle_get_transaction(
 async fn handle_get_transactions(page: Page, context: Context) -> Result<impl Reply, Rejection> {
     fail_point("endpoint_get_transactions")?;
     Ok(Transactions::new(context)?.list(page)?)
+}
+
+async fn handle_get_transactions_bcs(
+    page: Page,
+    context: Context,
+) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_get_transactions")?;
+    Ok(Transactions::new(context)?.list_bcs(page)?)
 }
 
 async fn handle_get_account_transactions(
@@ -341,6 +360,23 @@ impl Transactions {
         self.render_transactions(data)
     }
 
+    pub fn list_bcs(self, page: Page) -> Result<impl Reply, Error> {
+        let ledger_version = self.ledger_info.version();
+        let limit = page.limit()?;
+        let last_page_start = if ledger_version > (limit as u64) {
+            ledger_version - (limit as u64)
+        } else {
+            0
+        };
+        let start_version = page.start(last_page_start, ledger_version)?;
+
+        let data = self
+            .context
+            .get_transactions(start_version, limit, ledger_version)?;
+
+        self.render_transactions_bcs(data)
+    }
+
     pub fn list_by_account(self, address: AddressParam, page: Page) -> Result<impl Reply, Error> {
         let data = self.context.get_account_transactions(
             address.parse("account address")?.into(),
@@ -371,6 +407,31 @@ impl Transactions {
             })
             .collect::<Result<_>>()?;
         Response::new(self.ledger_info, &txns)
+    }
+
+    fn render_transactions_bcs(
+        self,
+        data: Vec<TransactionOnChainData>,
+    ) -> Result<impl Reply, Error> {
+        if data.is_empty() {
+            let txns: Vec<Transaction> = vec![];
+            return ResponseBCS::new(self.ledger_info, &txns);
+        }
+        let first_version = data[0].version;
+        let mut timestamp = self.context.get_block_timestamp(first_version)?;
+        let resolver = self.context.move_resolver()?;
+        let converter = resolver.as_converter();
+        let txns: Vec<Transaction> = data
+            .into_iter()
+            .map(|t| {
+                let txn = converter.try_into_onchain_transaction(timestamp, t)?;
+                // update timestamp, when txn is metadata block transaction
+                // new timestamp is used for the following transactions
+                timestamp = txn.timestamp();
+                Ok(txn)
+            })
+            .collect::<Result<_>>()?;
+        ResponseBCS::new(self.ledger_info, &txns)
     }
 
     pub async fn get_transaction(self, id: TransactionId) -> Result<impl Reply, Error> {
