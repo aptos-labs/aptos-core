@@ -4,12 +4,11 @@
 use crate::{
     common::{check_network, handle_request, strip_hex_prefix, with_context},
     error::{ApiError, ApiResult},
-    types::{Block, BlockIdentifier, BlockRequest, BlockResponse},
+    types::{Block, BlockIdentifier, BlockRequest, BlockResponse, Transaction},
     RosettaContext,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, trace};
-use aptos_rest_client::Transaction;
 use std::str::FromStr;
 use warp::Filter;
 
@@ -44,7 +43,10 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
     let rest_client = server_context.rest_client()?;
 
     // Retrieve by block or by hash, both or neither is not allowed
-    let (parent_transaction, transactions): (Transaction, Vec<Transaction>) = match (
+    let (parent_transaction, transactions): (
+        aptos_rest_client::Transaction,
+        Vec<aptos_rest_client::Transaction>,
+    ) = match (
         &request.block_identifier.index,
         &request.block_identifier.hash,
     ) {
@@ -89,10 +91,15 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
     } else {
         return Err(ApiError::BlockIncomplete);
     };
-    let transactions: Vec<_> = transactions
-        .into_iter()
-        .map(|txn| txn.transaction_info().unwrap().into())
-        .collect();
+
+    let mut txns: Vec<Transaction> = Vec::new();
+    for txn in transactions {
+        txns.push(Transaction::from_transaction(
+            server_context.coin_cache.clone(),
+            rest_client,
+            txn,
+        )?)
+    }
 
     let block = Block {
         block_identifier,
@@ -101,7 +108,7 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
             &parent_transaction,
         )?,
         timestamp,
-        transactions,
+        transactions: txns,
     };
 
     let response = BlockResponse {
@@ -116,7 +123,10 @@ async fn get_block_by_index(
     rest_client: &aptos_rest_client::Client,
     block_size: u64,
     block_index: u64,
-) -> ApiResult<(Transaction, Vec<Transaction>)> {
+) -> ApiResult<(
+    aptos_rest_client::Transaction,
+    Vec<aptos_rest_client::Transaction>,
+)> {
     let version = block_index_to_version(block_size, block_index);
 
     // For the genesis block, we populate parent_block_identifier with the
