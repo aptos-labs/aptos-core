@@ -159,5 +159,5 @@ Now you have completed setting up your validator node in test mode. You can cont
 
 13. [Optional] Copy the `validator-full-node-identity.yaml`, `genesis.blob` and `waypoint.txt` files generated above into the same working directory on Fullnode machine.
 
-14. [Optional] Run docker-compose: `docker-compose up -f docker-compose-fullnode.yaml`.
+14. [Optional] Run docker-compose: `docker-compose -f docker-compose-fullnode.yaml up`.
 Now you have successfully completed setting up your node in test mode. You can now proceed to the [Aptos community platform](https://community.aptoslabs.com/) website for registration.
