@@ -25,7 +25,14 @@ pub async fn get_node_identity(node_address: &NodeAddress) -> Result<(ChainId, R
     url.set_port(Some(node_address.api_port))
         .map_err(|_| format_err!("Failed to set port for URL"))?;
 
-    let response = reqwest::get(url)
+    let client = reqwest::ClientBuilder::new()
+        .timeout(std::time::Duration::from_secs(4))
+        .build()
+        .unwrap();
+
+    let response = client
+        .get(url)
+        .send()
         .await
         .map_err(|e| format_err!("Failed to get node identity {}", e))?;
     let response_body = response
