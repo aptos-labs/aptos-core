@@ -103,11 +103,26 @@ enum Command {
         #[structopt(long, parse(from_os_str))]
         checkpoint_dir: PathBuf,
     },
+    AddAccounts {
+        #[structopt(long, parse(from_os_str))]
+        data_dir: PathBuf,
+
+        #[structopt(long, parse(from_os_str))]
+        checkpoint_dir: PathBuf,
+
+        #[structopt(long, default_value = "1000000")]
+        num_new_accounts: usize,
+
+        #[structopt(long, default_value = "1000000")]
+        init_account_balance: u64,
+    },
 }
 
 fn main() {
     let _mp = MetricsPusher::start();
     let opt = Opt::from_args();
+
+    aptos_logger::Logger::new().init();
 
     rayon::ThreadPoolBuilder::new()
         .thread_name(|index| format!("rayon-global-{}", index))
@@ -135,7 +150,6 @@ fn main() {
             data_dir,
             checkpoint_dir,
         } => {
-            aptos_logger::Logger::new().init();
             executor_benchmark::run_benchmark(
                 opt.block_size,
                 blocks,
@@ -143,6 +157,22 @@ fn main() {
                 checkpoint_dir,
                 opt.verify_sequence_numbers,
                 opt.pruner_opt.pruner_config(),
+            );
+        }
+        Command::AddAccounts {
+            data_dir,
+            checkpoint_dir,
+            num_new_accounts,
+            init_account_balance,
+        } => {
+            executor_benchmark::add_accounts(
+                num_new_accounts,
+                init_account_balance,
+                opt.block_size,
+                data_dir,
+                checkpoint_dir,
+                opt.pruner_opt.pruner_config(),
+                opt.verify_sequence_numbers,
             );
         }
     }
