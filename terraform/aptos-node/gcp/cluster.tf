@@ -56,6 +56,10 @@ resource "google_container_cluster" "aptos" {
   pod_security_policy_config {
     enabled = true
   }
+
+  logging_config {
+    enable_components = ["SYSTEM_COMPONENTS", "WORKLOADS"]
+  }
 }
 
 resource "google_container_node_pool" "utilities" {
@@ -71,9 +75,7 @@ resource "google_container_node_pool" "utilities" {
     disk_size_gb    = 20
     service_account = google_service_account.gke.email
     tags            = ["utilities"]
-    oauth_scopes    = [
-      "https://www.googleapis.com/auth/cloud-platform"
-    ]
+    oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
 
     shielded_instance_config {
       enable_secure_boot = true
@@ -98,9 +100,7 @@ resource "google_container_node_pool" "validators" {
     disk_size_gb    = 20
     service_account = google_service_account.gke.email
     tags            = ["validators"]
-    oauth_scopes    = [
-      "https://www.googleapis.com/auth/cloud-platform"
-    ]
+    oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
 
     shielded_instance_config {
       enable_secure_boot = true
