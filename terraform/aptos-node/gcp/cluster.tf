@@ -56,10 +56,6 @@ resource "google_container_cluster" "aptos" {
   pod_security_policy_config {
     enabled = true
   }
-
-  logging_config {
-    enable_components = ["SYSTEM_COMPONENTS", "WORKLOADS"]
-  }
 }
 
 resource "google_container_node_pool" "utilities" {
