@@ -13,6 +13,7 @@ use consensus_types::request_response::WrapperCommand;
 use executor_types::Error;
 use futures::channel::mpsc::Sender;
 use tokio::sync::oneshot;
+use aptos_logger::debug;
 
 /// Notification of execution committed logical time for QuorumStore to clean.
 #[async_trait::async_trait]
@@ -81,13 +82,16 @@ impl DataManager for QuorumStoreDataManager {
     // TODO: handle the case that the data was garbage collected and return error
     async fn get_data(&self, payload: Payload) -> Result<Vec<SignedTransaction>, Error> {
         match payload {
-            Payload::Empty => Ok(Vec::new()),
+            Payload::Empty => {
+                debug!("QSE: empty Payload");
+                Ok(Vec::new())},
             Payload::DirectMempool(_) => {
                 unreachable!("Quorum store should be used.")
             }
             Payload::InQuorumStore(poss) => {
                 let mut receivers = Vec::new();
                 for pos in poss {
+                    debug!("QSE: requesting pos {:?}", pos);
                     let (tx_data, rx_data) = oneshot::channel();
                     self.data_reader
                         .load()
@@ -100,8 +104,11 @@ impl DataManager for QuorumStoreDataManager {
                 let mut ret = Vec::new();
                 for rx in receivers {
                     match rx.await.expect("oneshot was dropped") {
-                        Ok(data) => ret.push(data),
-                        Err(_) => {
+                        Ok(data) => {
+                            debug!("QSHE: data {:?}", data);
+                            ret.push(data)}
+                        Err(e) => {
+                            debug!("QSE: could not get data {:?}", e);
                             return Err(Error::CouldNotGetData);
                         }
                     }

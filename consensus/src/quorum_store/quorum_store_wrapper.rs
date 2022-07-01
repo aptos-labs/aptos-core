@@ -259,17 +259,22 @@ impl QuorumStoreWrapper {
                     }
                     batch.push(proof.clone());
                 }
-                let res = ConsensusResponse::GetBlockResponse(Payload::InQuorumStore(batch));
+                let res = ConsensusResponse::GetBlockResponse(
+                    if batch.is_empty() {Payload::new_empty()}
+                    else {Payload::InQuorumStore(batch)});
                 callback
                     .send(Ok(res))
                     .expect("BlcokResponse receiver not available");
             }
             WrapperCommand::CleanRequest(logical_time, digests) => {
                 debug!("QS: got clean request from execution");
-                self.latest_logical_time = logical_time;
+                self.latest_logical_time = logical_time; // TODO: max
                 for digest in digests {
+                    debug!("QS: removing digest {}, batches_to_filter {}, batches_for_consensus {}", digest, self.batches_to_filter.len() , self.batches_for_consensus.len());
                     self.batches_to_filter.remove(&digest);
                     self.batches_for_consensus.remove(&digest);
+                    debug!("QS: removed digest {}, batches_to_filter {}, batches_for_consensus {}", digest, self.batches_to_filter.len() , self.batches_for_consensus.len());
+
                 }
                 // TODO: remove but make CleanRequest not a ConsensusRequest,
                 // TODO: as notify_commit now calls CleanRequest.

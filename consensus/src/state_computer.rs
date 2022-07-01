@@ -114,6 +114,7 @@ impl StateComputer for ExecutionProxy {
         );
 
         let payload = block.get_payload();
+        debug!("QSE: trying to get data., round {} ", block.round());
         let txns = self.data_manager.get_data(payload).await?;
 
         // TODO: figure out error handling for the prologue txn
@@ -160,6 +161,7 @@ impl StateComputer for ExecutionProxy {
         for block in blocks {
             block_ids.push(block.id());
             let payload = block.get_payload();
+            debug!("QSE: getting data in commit, round {}", block.round());
             let signed_txns = self.data_manager.get_data(payload.clone()).await?;
             payloads.push(payload);
             txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));

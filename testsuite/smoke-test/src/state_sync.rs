@@ -50,6 +50,7 @@ async fn test_basic_state_synchronization() {
     assert_balance(&client_1, &account_0, 90).await;
     assert_balance(&client_1, &account_1, 20).await;
 
+    println!("a");
     // Stop a node
     let node_to_restart = validator_peer_ids[0];
     swarm.validator_mut(node_to_restart).unwrap().stop();
@@ -66,6 +67,7 @@ async fn test_basic_state_synchronization() {
     assert_balance(&client_1, &account_0, 89).await;
     assert_balance(&client_1, &account_1, 21).await;
 
+    println!("b");
     // Restart killed node and wait for all nodes to catchup
     swarm
         .validator_mut(node_to_restart)
@@ -78,11 +80,13 @@ async fn test_basic_state_synchronization() {
         .wait_until_healthy(Instant::now() + Duration::from_secs(10))
         .await
         .unwrap();
+    println!("b.1");
     swarm
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(60))
         .await
         .unwrap();
 
+    println!("c");
     // Connect to the newly recovered node and verify its state
     let client_0 = swarm.validator(node_to_restart).unwrap().rest_client();
     assert_balance(&client_0, &account_0, 89).await;
@@ -90,7 +94,7 @@ async fn test_basic_state_synchronization() {
 
     // Test multiple chunk sync
     swarm.validator_mut(node_to_restart).unwrap().stop();
-
+    println!("d");
     for _ in 0..10 {
         transfer_coins(
             &client_1,
@@ -102,6 +106,7 @@ async fn test_basic_state_synchronization() {
         .await;
     }
 
+    println!("e");
     assert_balance(&client_1, &account_0, 79).await;
     assert_balance(&client_1, &account_1, 31).await;
 
