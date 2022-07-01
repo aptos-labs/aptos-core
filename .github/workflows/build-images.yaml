@@ -67,6 +67,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       contains(github.event.pull_request.labels.*.name, 'CICD:build-images') ||
       contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+      contains(github.event.pull_request.labels.*.name, 'CICD:deploy-community-platform-to-staging') ||
       github.event.pull_request.auto_merge != null
     runs-on: ubuntu-latest
     steps:
