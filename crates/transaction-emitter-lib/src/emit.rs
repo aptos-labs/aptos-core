@@ -14,7 +14,7 @@ use aptos_sdk::{
     },
 };
 use futures::future::{try_join_all, FutureExt};
-use itertools::zip;
+use itertools::{zip, Itertools};
 use rand::{
     distributions::{Distribution, Standard},
     seq::{IteratorRandom, SliceRandom},
@@ -46,6 +46,8 @@ use rand::rngs::StdRng;
 
 /// Max transactions per account in mempool
 const MAX_TXN_BATCH_SIZE: usize = 100;
+const QUERY_SEQ_NUM_CHUNK_SIZE: usize = 64;
+const MAX_CONCURRENT_ACCOUNT_CREATION_BATCHES: usize = 32;
 const MAX_TXNS: u64 = 1_000_000;
 const SEND_AMOUNT: u64 = 1;
 const TXN_EXPIRATION_SECONDS: u64 = 180;
@@ -493,7 +495,7 @@ impl<'t> TxnEmitter<'t> {
         }
         while i < seed_account_num {
             let client = self.pick_mint_client(rest_clients).clone();
-            let batch_size = min(MAX_TXN_BATCH_SIZE, seed_account_num - i);
+            let batch_size = min(MAX_TXN_BATCH_SIZE / 2, seed_account_num - i);
             let mut rng = self.from_rng();
             let mut batch = gen_random_accounts(batch_size, &mut rng);
             let creation_account = &mut self.root_account;
@@ -509,6 +511,7 @@ impl<'t> TxnEmitter<'t> {
                     )
                 })
                 .collect();
+            debug!("Creating {} seed accounts", batch_size);
             execute_and_wait_transactions(&client, creation_account, create_requests).await?;
             i += batch_size;
             seed_accounts.append(&mut batch);
@@ -569,11 +572,10 @@ impl<'t> TxnEmitter<'t> {
             "Minting additional {} accounts with {} coins each",
             num_accounts, coins_per_account
         );
-        // tokio::time::sleep(Duration::from_secs(10)).await;
 
         let seed_rngs = gen_rng_for_reusable_account(actual_num_seed_accounts);
         // For each seed account, create a future and transfer coins from that seed account to new accounts
-        let account_futures = seed_accounts
+        let account_futures: Vec<_> = seed_accounts
             .into_iter()
             .enumerate()
             .map(|(i, seed_account)| {
@@ -594,14 +596,18 @@ impl<'t> TxnEmitter<'t> {
                         self.from_rng()
                     },
                 )
-            });
-
-        let mut minted_accounts = try_join_all(account_futures)
-            .await
-            .map_err(|e| format_err!("Failed to mint accounts: {}", e))?
-            .into_iter()
-            .flatten()
+            })
             .collect();
+
+        let mut minted_accounts = vec![];
+        for chunk in &account_futures.into_iter().chunks(MAX_CONCURRENT_ACCOUNT_CREATION_BATCHES) {
+            minted_accounts.append(&mut try_join_all(chunk)
+                .await
+                .map_err(|e| format_err!("Failed to mint accounts: {}", e))?
+                .into_iter()
+                .flatten()
+                .collect());
+        }
 
         self.accounts.append(&mut minted_accounts);
         assert!(
@@ -678,13 +684,14 @@ impl<'t> TxnEmitter<'t> {
 
     pub async fn stop_job(&mut self, job: EmitJob) -> TxnStats {
         job.stop.store(true, Ordering::Relaxed);
-        for worker in job.workers {
-            let mut accounts = worker
-                .join_handle
+        self.accounts.append(
+            &mut try_join_all(job.workers.into_iter().map(|w| w.join_handle))
                 .await
-                .expect("TxnEmitter worker thread failed");
-            self.accounts.append(&mut accounts);
-        }
+                .expect("TxnEmitter worker thread failed")
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>(),
+        );
         job.stats.accumulate()
     }
 
@@ -695,8 +702,8 @@ impl<'t> TxnEmitter<'t> {
     pub async fn periodic_stat(&mut self, job: &EmitJob, duration: Duration, interval_secs: u64) {
         let deadline = Instant::now() + duration;
         let mut prev_stats: Option<TxnStats> = None;
+        let window = Duration::from_secs(min(interval_secs, 1));
         while Instant::now() < deadline {
-            let window = Duration::from_secs(interval_secs);
             tokio::time::sleep(window).await;
             let stats = self.peek_job_stats(job);
             let delta = &stats - &prev_stats.unwrap_or_default();
@@ -713,7 +720,9 @@ impl<'t> TxnEmitter<'t> {
         let job = self.start_job(emit_job_request).await?;
         info!("Starting emitting txns for {} secs", duration.as_secs());
         tokio::time::sleep(duration).await;
+        info!("Ran for {} secs, stopping job...", duration.as_secs());
         let stats = self.stop_job(job).await;
+        info!("Stopped job");
         Ok(stats)
     }
 
@@ -723,9 +732,12 @@ impl<'t> TxnEmitter<'t> {
         emit_job_request: EmitJobRequest,
         interval_secs: u64,
     ) -> Result<TxnStats> {
+        info!("Starting emitting txns for {} secs", duration.as_secs());
         let job = self.start_job(emit_job_request).await?;
         self.periodic_stat(&job, duration, interval_secs).await;
+        info!("Ran for {} secs, stopping job...", duration.as_secs());
         let stats = self.stop_job(job).await;
+        info!("Stopped job");
         Ok(stats)
     }
 
@@ -855,14 +867,16 @@ pub async fn query_sequence_numbers(
     client: &RestClient,
     addresses: &[AccountAddress],
 ) -> Result<Vec<u64>> {
-    Ok(
-        try_join_all(addresses.iter().map(|address| client.get_account(*address)))
+    let mut out = vec![];
+    for chunk in addresses.chunks(QUERY_SEQ_NUM_CHUNK_SIZE) {
+        out.append(&mut try_join_all(chunk.iter().map(|address| client.get_account(*address)))
             .await
             .map_err(|e| format_err!("Get accounts failed: {}", e))?
             .into_iter()
             .map(|resp| resp.into_inner().sequence_number)
-            .collect(),
-    )
+            .collect());
+    }
+    Ok(out)
 }
 
 /// Create `num_new_accounts` by transferring coins from `source_account`. Return Vec of created
@@ -904,6 +918,7 @@ where
                     )
                 })
                 .collect();
+            debug!("Creating {} new accounts", batch_size);
             execute_and_wait_transactions(&client, &mut source_account, creation_requests).await?;
             batch
         };
@@ -1016,10 +1031,11 @@ impl StatsAccumulator {
 
 impl TxnStats {
     pub fn rate(&self, window: Duration) -> TxnStatsRate {
+        let window_secs = max(window.as_secs(), 1);
         TxnStatsRate {
-            submitted: self.submitted / window.as_secs(),
-            committed: self.committed / window.as_secs(),
-            expired: self.expired / window.as_secs(),
+            submitted: self.submitted / window_secs,
+            committed: self.committed / window_secs,
+            expired: self.expired / window_secs,
             latency: if self.committed == 0 {
                 0u64
             } else {

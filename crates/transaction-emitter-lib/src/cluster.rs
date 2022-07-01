@@ -15,7 +15,7 @@ use aptos_sdk::{
     types::{account_config::aptos_root_address, chain_id::ChainId, AccountKey, LocalAccount},
 };
 use rand::seq::SliceRandom;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, time::Duration};
 use url::Url;
 
 #[derive(Debug)]
@@ -38,6 +38,7 @@ impl Cluster {
         mint_key: Ed25519PrivateKey,
         chain_id: ChainId,
         vasp: bool,
+        rest_client_timeout: Duration,
     ) -> Result<Self> {
         let num_peers = peers.len();
 
@@ -52,6 +53,7 @@ impl Cluster {
                 ), /* short_hash */
                 url.clone(),
                 None,
+                rest_client_timeout,
             );
             match instance.rest_client().get_ledger_information().await {
                 Ok(_) => instances.push(instance),
@@ -108,7 +110,7 @@ impl Cluster {
 
         let mint_key = args.mint_args.get_mint_key()?;
 
-        let cluster = Cluster::from_host_port(urls, mint_key, args.chain_id, args.vasp)
+        let cluster = Cluster::from_host_port(urls, mint_key, args.chain_id, args.vasp, Duration::from_secs(args.rest_client_timeout))
             .await
             .map_err(|e| format_err!("failed to create a cluster from host and port: {}", e))?;
 

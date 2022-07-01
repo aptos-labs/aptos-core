@@ -119,6 +119,7 @@ impl Evaluator for TpsEvaluator {
             vasp: false,
             mint_args: self.args.mint_args.clone(),
             chain_id: input.baseline_node_information.chain_id,
+            rest_client_timeout: 10,
         };
         let cluster = Cluster::try_from_cluster_args(&cluster_args)
             .await

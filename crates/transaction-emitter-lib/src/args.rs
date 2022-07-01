@@ -49,6 +49,10 @@ pub struct ClusterArgs {
     #[clap(long, default_value = "TESTING")]
     pub chain_id: ChainId,
 
+    /// Timeout for the REST client to talk to the node in seconds.
+    #[clap(long, default_value_t = 10)]
+    pub rest_client_timeout: u64,
+
     #[clap(flatten)]
     pub mint_args: MintArgs,
 }
@@ -94,7 +98,7 @@ fn parse_target(target: &str) -> Result<Url> {
     if url.scheme().is_empty() {
         bail!("Scheme must not be empty, try prefixing URL with http://");
     }
-    if url.port().is_none() {
+    if url.port_or_known_default().is_none() {
         url.set_port(Some(DEFAULT_API_PORT)).map_err(|_| {
             anyhow::anyhow!(
                 "Failed to set port to default value, make sure you have set a scheme like http://"

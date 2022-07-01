@@ -4,14 +4,16 @@
 use crate::{
     args::{ClusterArgs, EmitArgs},
     cluster::Cluster,
-    emit::{EmitJobRequest, EmitThreadParams, TxnEmitter, TxnStats},
-    instance::Instance,
+    emit::{EmitJobRequest, EmitThreadParams, TxnEmitter, TxnStats}, instance::Instance,
 };
 use anyhow::{Context, Result};
 use aptos_sdk::transaction_builder::TransactionFactory;
 use rand::{rngs::StdRng, Rng};
 use rand_core::{OsRng, SeedableRng};
-use std::{cmp::min, time::Duration};
+use std::{
+    cmp::{max, min},
+    time::Duration,
+};
 
 pub async fn emit_transactions(
     cluster_args: &ClusterArgs,
@@ -58,7 +60,11 @@ pub async fn emit_transactions_with_cluster(
         emit_job_request = emit_job_request.vasp();
     }
     let stats = emitter
-        .emit_txn_for_with_stats(duration, emit_job_request, min(10, args.duration / 5))
+        .emit_txn_for_with_stats(
+            duration,
+            emit_job_request,
+            min(10, max(args.duration / 5, 1)),
+        )
         .await?;
     Ok(stats)
 }
