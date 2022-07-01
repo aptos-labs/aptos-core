@@ -259,6 +259,21 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn get_account_resources_at_version(
+        &self,
+        address: AccountAddress,
+        version: u64,
+    ) -> Result<Response<Vec<Resource>>> {
+        let url = self.base_url.join(&format!(
+            "accounts/{}/resources?version={}",
+            address, version
+        ))?;
+
+        let response = self.inner.get(url).send().await?;
+
+        self.json(response).await
+    }
+
     pub async fn get_resource<T: DeserializeOwned>(
         &self,
         address: AccountAddress,
@@ -287,6 +302,21 @@ impl Client {
         let url = self
             .base_url
             .join(&format!("accounts/{}/resource/{}", address, resource_type))?;
+
+        let response = self.inner.get(url).send().await?;
+        self.json(response).await
+    }
+
+    pub async fn get_account_resource_at_version(
+        &self,
+        address: AccountAddress,
+        resource_type: &str,
+        version: u64,
+    ) -> Result<Response<Option<Resource>>> {
+        let url = self.base_url.join(&format!(
+            "accounts/{}/resource/{}?version={}",
+            address, resource_type, version
+        ))?;
 
         let response = self.inner.get(url).send().await?;
         self.json(response).await
