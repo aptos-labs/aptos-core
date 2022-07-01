@@ -509,6 +509,7 @@ impl<'t> TxnEmitter<'t> {
                     )
                 })
                 .collect();
+            debug!("Creating {} seed accounts", batch_size);
             execute_and_wait_transactions(&client, creation_account, create_requests).await?;
             i += batch_size;
             seed_accounts.append(&mut batch);
@@ -695,8 +696,8 @@ impl<'t> TxnEmitter<'t> {
     pub async fn periodic_stat(&mut self, job: &EmitJob, duration: Duration, interval_secs: u64) {
         let deadline = Instant::now() + duration;
         let mut prev_stats: Option<TxnStats> = None;
+        let window = Duration::from_secs(min(interval_secs, 1));
         while Instant::now() < deadline {
-            let window = Duration::from_secs(interval_secs);
             tokio::time::sleep(window).await;
             let stats = self.peek_job_stats(job);
             let delta = &stats - &prev_stats.unwrap_or_default();
@@ -713,7 +714,9 @@ impl<'t> TxnEmitter<'t> {
         let job = self.start_job(emit_job_request).await?;
         info!("Starting emitting txns for {} secs", duration.as_secs());
         tokio::time::sleep(duration).await;
+        info!("Ran for {} secs, stopping job...", duration.as_secs());
         let stats = self.stop_job(job).await;
+        info!("Stopped job");
         Ok(stats)
     }
 
@@ -723,9 +726,12 @@ impl<'t> TxnEmitter<'t> {
         emit_job_request: EmitJobRequest,
         interval_secs: u64,
     ) -> Result<TxnStats> {
+        info!("Starting emitting txns for {} secs", duration.as_secs());
         let job = self.start_job(emit_job_request).await?;
         self.periodic_stat(&job, duration, interval_secs).await;
+        info!("Ran for {} secs, stopping job...", duration.as_secs());
         let stats = self.stop_job(job).await;
+        info!("Stopped job");
         Ok(stats)
     }
 
@@ -904,6 +910,7 @@ where
                     )
                 })
                 .collect();
+            debug!("Creating {} new accounts", batch_size);
             execute_and_wait_transactions(&client, &mut source_account, creation_requests).await?;
             batch
         };
@@ -1016,10 +1023,11 @@ impl StatsAccumulator {
 
 impl TxnStats {
     pub fn rate(&self, window: Duration) -> TxnStatsRate {
+        let window_secs = max(window.as_secs(), 1);
         TxnStatsRate {
-            submitted: self.submitted / window.as_secs(),
-            committed: self.committed / window.as_secs(),
-            expired: self.expired / window.as_secs(),
+            submitted: self.submitted / window_secs,
+            committed: self.committed / window_secs,
+            expired: self.expired / window_secs,
             latency: if self.committed == 0 {
                 0u64
             } else {

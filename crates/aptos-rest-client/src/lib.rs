@@ -27,7 +27,7 @@ use crate::aptos::{AptosVersion, Balance};
 pub use types::{Account, Resource, RestError};
 pub mod aptos;
 
-const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
+pub const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
 
 #[derive(Clone, Debug)]
 pub struct Client {
@@ -363,5 +363,11 @@ impl Client {
         }
 
         Ok(())
+    }
+}
+
+impl From<(ReqwestClient, Url)> for Client {
+    fn from((inner, base_url): (ReqwestClient, Url)) -> Self {
+        Client { inner, base_url }
     }
 }
