@@ -467,10 +467,11 @@ impl<'t> TxnEmitter<'t> {
         Ok(LocalAccount::new(address, account_key, sequence_number))
     }
 
-    pub async fn get_seed_accounts(
+    pub async fn create_and_fund_seed_accounts(
         &mut self,
         rest_clients: &[RestClient],
         seed_account_num: usize,
+        coins_per_seed_account: u64,
         vasp: bool,
     ) -> Result<Vec<LocalAccount>> {
         info!("Creating and minting seeds accounts");
@@ -497,14 +498,19 @@ impl<'t> TxnEmitter<'t> {
             let create_requests = batch
                 .iter()
                 .map(|account| {
-                    create_account_request(creation_account, account.public_key(), txn_factory)
+                    create_and_fund_account_request(
+                        creation_account,
+                        coins_per_seed_account,
+                        account.public_key(),
+                        txn_factory,
+                    )
                 })
                 .collect();
             execute_and_wait_transactions(&client, creation_account, create_requests).await?;
             i += batch_size;
             seed_accounts.append(&mut batch);
         }
-        info!("Completed creating seed accounts");
+        info!("Completed creating and funding seed accounts");
 
         Ok(seed_accounts)
     }
@@ -535,32 +541,22 @@ impl<'t> TxnEmitter<'t> {
             };
         let num_accounts = total_requested_accounts - self.accounts.len(); // Only minting extra accounts
         let coins_per_account = SEND_AMOUNT * MAX_TXNS * 10; // extra coins for secure to pay none zero gas price
-        let coins_total = coins_per_account * num_accounts as u64;
         let txn_factory = self.txn_factory.clone();
-        let client = self.pick_mint_client(&req.rest_clients);
 
-        // Create seed accounts with which we can create actual accounts concurrently
+        // Create seed accounts with which we can create actual accounts concurrently. Adding
+        // additional fund for paying gas fees later.
+        let coins_per_seed_account = num_accounts as u64 * coins_per_account * 2;
         let seed_accounts = self
-            .get_seed_accounts(&req.rest_clients, expected_num_seed_accounts, req.vasp)
+            .create_and_fund_seed_accounts(
+                &req.rest_clients,
+                expected_num_seed_accounts,
+                coins_per_seed_account,
+                req.vasp,
+            )
             .await?;
-        let mut rng = self.from_rng();
-        let faucet_account = self.get_money_source(coins_total).await?;
         let actual_num_seed_accounts = seed_accounts.len();
         let num_new_child_accounts =
             (num_accounts + actual_num_seed_accounts - 1) / actual_num_seed_accounts;
-        let coins_per_seed_account = coins_per_account * num_new_child_accounts as u64;
-        fund_new_accounts(
-            faucet_account,
-            &seed_accounts,
-            // * 2 for gas fee
-            coins_per_seed_account * 2,
-            100,
-            client.clone(),
-            &txn_factory,
-            &mut rng,
-        )
-        .await
-        .map_err(|e| format_err!("Failed to mint seed_accounts: {}", e))?;
         info!(
             "Completed minting {} seed accounts, each with {} coins",
             seed_accounts.len(),
@@ -581,7 +577,7 @@ impl<'t> TxnEmitter<'t> {
                 // Spawn new threads
                 let index = i % req.rest_clients.len();
                 let cur_client = req.rest_clients[index].clone();
-                create_new_accounts(
+                create_and_fund_new_accounts(
                     seed_account,
                     num_new_child_accounts,
                     coins_per_account,
@@ -596,6 +592,7 @@ impl<'t> TxnEmitter<'t> {
                     },
                 )
             });
+
         let mut minted_accounts = try_join_all(account_futures)
             .await
             .map_err(|e| format_err!("Failed to mint accounts: {}", e))?
@@ -851,7 +848,7 @@ pub async fn query_sequence_numbers(
 
 /// Create `num_new_accounts` by transferring coins from `source_account`. Return Vec of created
 /// accounts
-async fn create_new_accounts<R>(
+async fn create_and_fund_new_accounts<R>(
     mut source_account: LocalAccount,
     num_new_accounts: usize,
     coins_per_new_account: u64,
@@ -880,20 +877,15 @@ where
                 .as_slice()
                 .iter()
                 .map(|account| {
-                    create_account_request(&mut source_account, account.public_key(), txn_factory)
+                    create_and_fund_account_request(
+                        &mut source_account,
+                        coins_per_new_account,
+                        account.public_key(),
+                        txn_factory,
+                    )
                 })
                 .collect();
             execute_and_wait_transactions(&client, &mut source_account, creation_requests).await?;
-            fund_new_accounts(
-                &mut source_account,
-                batch.as_slice(),
-                coins_per_new_account,
-                100,
-                client.clone(),
-                txn_factory,
-                &mut rng,
-            )
-            .await?;
             batch
         };
 
@@ -903,57 +895,19 @@ where
     Ok(accounts)
 }
 
-/// Transfer `coins_per_new_account` from `minting_account` to each account in `accounts`.
-async fn fund_new_accounts<R>(
-    minting_account: &mut LocalAccount,
-    accounts: &[LocalAccount],
-    coins_per_new_account: u64,
-    max_num_accounts_per_batch: u64,
-    client: RestClient,
-    txn_factory: &TransactionFactory,
-    rng: &mut R,
-) -> Result<()>
-where
-    R: ::rand_core::RngCore + ::rand_core::CryptoRng,
-{
-    let mut left = accounts;
-    let mut i = 0;
-    let num_accounts = accounts.len();
-    while !left.is_empty() {
-        let batch_size = rng.gen::<usize>()
-            % min(
-                max_num_accounts_per_batch as usize,
-                min(MAX_TXN_BATCH_SIZE, num_accounts - i),
-            );
-        let (to_batch, rest) = left.split_at(batch_size + 1);
-        let mint_requests = to_batch
-            .iter()
-            .map(|account| {
-                gen_transfer_txn_request(
-                    minting_account,
-                    &account.address(),
-                    coins_per_new_account,
-                    txn_factory,
-                    1,
-                )
-            })
-            .collect();
-        execute_and_wait_transactions(&client, minting_account, mint_requests).await?;
-        i += to_batch.len();
-        left = rest;
-    }
-    Ok(())
-}
-
-pub fn create_account_request(
+pub fn create_and_fund_account_request(
     creation_account: &mut LocalAccount,
+    amount: u64,
     pubkey: &Ed25519PublicKey,
     txn_factory: &TransactionFactory,
 ) -> SignedTransaction {
     let preimage = AuthenticationKeyPreimage::ed25519(pubkey);
     let auth_key = AuthenticationKey::from_preimage(&preimage);
     creation_account.sign_with_transaction_builder(txn_factory.payload(
-        aptos_stdlib::encode_account_create_account(auth_key.derived_address()),
+        aptos_stdlib::encode_account_utils_create_and_fund_account(
+            auth_key.derived_address(),
+            amount,
+        ),
     ))
 }
 
