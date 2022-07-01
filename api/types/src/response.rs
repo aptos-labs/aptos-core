@@ -4,7 +4,10 @@
 use crate::{Error, LedgerInfo};
 use anyhow::Result;
 use serde::Serialize;
-use warp::http::header::{HeaderValue, CONTENT_TYPE};
+use warp::{
+    http::header::{HeaderValue, CONTENT_TYPE},
+    hyper::StatusCode,
+};
 
 pub const X_APTOS_CHAIN_ID: &str = "X-Aptos-Chain-Id";
 pub const X_APTOS_EPOCH: &str = "X-Aptos-Epoch";
@@ -21,6 +24,18 @@ impl Response {
         Ok(Self {
             ledger_info,
             body: serde_json::to_vec(body)?,
+        })
+    }
+
+    pub fn new_bcs<T: Serialize>(ledger_info: LedgerInfo, body: &T) -> Result<Self, Error> {
+        Ok(Self {
+            ledger_info,
+            body: bcs::to_bytes(body).map_err(|_| {
+                Error::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "data serialization error".to_string(),
+                )
+            })?,
         })
     }
 }
