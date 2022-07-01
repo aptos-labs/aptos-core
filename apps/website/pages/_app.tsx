@@ -1,6 +1,12 @@
 import '../styles/globals.css';
 import type { AppProps } from 'next/app';
-import { ChakraProvider, extendTheme, ThemeConfig } from '@chakra-ui/react';
+import {
+  ChakraProvider,
+  extendTheme,
+  ThemeConfig,
+} from '@chakra-ui/react';
+import { MDXProvider } from '@mdx-js/react';
+import MDXComponents from 'core/components/MDXComponents';
 
 const theme: ThemeConfig = extendTheme({
   initialColorMode: 'light',
@@ -8,7 +14,6 @@ const theme: ThemeConfig = extendTheme({
     global: {
       'html, body': {
         margin: 0,
-        overflow: (process.env.NODE_ENV !== 'development') ? 'hidden' : undefined,
         padding: 0,
       },
     },
@@ -19,7 +24,9 @@ const theme: ThemeConfig = extendTheme({
 function MyApp({ Component, pageProps }: AppProps) {
   return (
     <ChakraProvider theme={theme}>
-      <Component {...pageProps} />
+      <MDXProvider components={MDXComponents}>
+        <Component {...pageProps} />
+      </MDXProvider>
     </ChakraProvider>
   );
 }

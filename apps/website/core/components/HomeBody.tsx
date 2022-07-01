@@ -5,6 +5,7 @@ import {
   Text, VStack,
 } from '@chakra-ui/react';
 import { COMPANY_NAME } from 'core/constants';
+import { ChakraLinkBare } from './ChakraLink';
 import LoginDemo from './LoginDemo';
 
 const HomeBody = () => (
@@ -18,9 +19,11 @@ const HomeBody = () => (
       </Text>
       <Center>
         <HStack>
-          <Button size="md" fontWeight={400} colorScheme="blue" borderRadius="full">
-            Learn more
-          </Button>
+          <ChakraLinkBare href="/docs">
+            <Button as="a" size="md" fontWeight={400} colorScheme="blue" borderRadius="full">
+              Learn more
+            </Button>
+          </ChakraLinkBare>
         </HStack>
       </Center>
     </VStack>

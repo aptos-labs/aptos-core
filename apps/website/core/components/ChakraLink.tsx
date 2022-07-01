@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { chakra, Text } from '@chakra-ui/react';
 
-const ChakraLinkFactoryComponent = chakra(Link);
+export const ChakraLinkFactoryComponent = chakra(Link);
 
-type ChakraLinkType = typeof ChakraLinkFactoryComponent;
+export type ChakraLinkType = typeof ChakraLinkFactoryComponent;
 
 const ChakraLink: ChakraLinkType = ({
   children,
@@ -16,4 +16,21 @@ const ChakraLink: ChakraLinkType = ({
     </Text>
   </ChakraLinkFactoryComponent>
 );
+
+/**
+ * @description To be used with a custom anchor tag
+ * @example
+ * <ChakraLinkBare href="https://google.com">
+ *  <Button as="a" variant="ghost" />
+ * </ChakraLinkBare>
+ */
+export const ChakraLinkBare: ChakraLinkType = ({
+  children,
+  href,
+}) => (
+  <ChakraLinkFactoryComponent href={href} passHref>
+    {children}
+  </ChakraLinkFactoryComponent>
+);
+
 export default ChakraLink;

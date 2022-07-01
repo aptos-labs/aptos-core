@@ -5,7 +5,7 @@ import {
 import { FaDiscord } from 'react-icons/fa';
 import { useMemo } from 'react';
 import { COMPANY_NAME } from 'core/constants';
-import ChakraLink from './ChakraLink';
+import ChakraLink, { ChakraLinkBare } from './ChakraLink';
 
 const Header = () => {
   const { colorMode, setColorMode } = useColorMode();
@@ -27,9 +27,11 @@ const Header = () => {
         </ChakraLink>
       </Center>
       <HStack justifyContent="flex-end" spacing={[2, 4, 4]}>
-        <Button variant="ghost">
-          Docs
-        </Button>
+        <ChakraLinkBare href="/docs" passHref>
+          <Button variant="ghost" as="a">
+            Docs
+          </Button>
+        </ChakraLinkBare>
         <IconButton
           variant="ghost"
           icon={<FaDiscord />}

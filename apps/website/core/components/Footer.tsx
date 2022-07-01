@@ -1,8 +1,15 @@
 import {
   Box,
-  Center, Divider, Flex, Grid, HStack, Text, useColorMode, VStack,
+  Center,
+  Divider,
+  Flex,
+  Grid,
+  HStack,
+  Text,
+  useColorMode,
+  VStack,
 } from '@chakra-ui/react';
-import { COMPANY_NAME } from 'core/constants';
+import { COMPANY_NAME, CURRENT_YEAR } from 'core/constants';
 import ChakraLink from './ChakraLink';
 import { secondaryTextColor } from './LoginDemo';
 
@@ -13,7 +20,6 @@ const secondaryBgColor = {
 
 export default function Footer() {
   const { colorMode } = useColorMode();
-  const year = new Date().getFullYear();
   return (
     <Flex width="100%" bgColor={secondaryBgColor[colorMode]} justifyContent="center" py={8}>
       <VStack as="footer" maxW="800px" width="100%" divider={<Divider />} spacing={4} px={4}>
@@ -24,16 +30,16 @@ export default function Footer() {
             </ChakraLink>
           </Center>
           <HStack justifyContent="flex-end" spacing={[4, 4, 8]}>
-            <ChakraLink color={secondaryTextColor[colorMode]} href="/about">
+            <ChakraLink color={secondaryTextColor[colorMode]} href="/about" target="_blank">
               About
             </ChakraLink>
-            <ChakraLink color={secondaryTextColor[colorMode]} href="/legal">
+            <ChakraLink color={secondaryTextColor[colorMode]} href="/legal" target="_blank">
               Legal
             </ChakraLink>
-            <ChakraLink color={secondaryTextColor[colorMode]} href="/privacy-policy">
+            <ChakraLink color={secondaryTextColor[colorMode]} href="/privacy-policy" target="_blank">
               Privacy policy
             </ChakraLink>
-            <ChakraLink color={secondaryTextColor[colorMode]} href="press-kit">
+            <ChakraLink color={secondaryTextColor[colorMode]} href="/press-kit" target="_blank">
               Press kit
             </ChakraLink>
           </HStack>
@@ -42,14 +48,13 @@ export default function Footer() {
           <Text color={secondaryTextColor[colorMode]}>
             ©
             {' '}
-            {year}
+            {CURRENT_YEAR}
             {' '}
-            <a href="https://aptoslabs.com/" className="hover:underline">{COMPANY_NAME}</a>
+            <ChakraLink href="https://aptoslabs.com/" target="_blank">{COMPANY_NAME}</ChakraLink>
             . All Rights Reserved.
           </Text>
         </Box>
       </VStack>
     </Flex>
-
   );
 }
