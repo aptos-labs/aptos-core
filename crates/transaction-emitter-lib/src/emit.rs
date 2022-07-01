@@ -543,7 +543,8 @@ impl<'t> TxnEmitter<'t> {
         let coins_per_account = SEND_AMOUNT * MAX_TXNS * 10; // extra coins for secure to pay none zero gas price
         let txn_factory = self.txn_factory.clone();
 
-        // Create seed accounts with which we can create actual accounts concurrently
+        // Create seed accounts with which we can create actual accounts concurrently. Adding
+        // additional fund for paying gas fees later.
         let coins_per_seed_account = num_accounts as u64 * coins_per_account * 2;
         let seed_accounts = self
             .create_and_fund_seed_accounts(
