@@ -56,9 +56,6 @@ pub use transaction_argument::{parse_transaction_argument, TransactionArgument, 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
 
-// In StateDB, things readable by the genesis transaction are under this version.
-pub const PRE_GENESIS_VERSION: Version = u64::max_value();
-
 /// RawTransaction is the portion of a transaction that a client signs.
 #[derive(
     Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
