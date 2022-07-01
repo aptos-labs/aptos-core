@@ -53,6 +53,7 @@ pub async fn emit_transactions_with_cluster(
             .accounts_per_client(args.accounts_per_client)
             .thread_params(thread_params)
             .invalid_transaction_ratio(args.invalid_tx)
+            .transaction_type(args.transaction_type)
             .gas_price(1);
     if let Some(workers_per_endpoint) = args.workers_per_ac {
         emit_job_request = emit_job_request.workers_per_endpoint(workers_per_endpoint);

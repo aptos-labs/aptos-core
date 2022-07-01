@@ -81,7 +81,7 @@ impl<TMessage: PartialEq> PartialEq for Event<TMessage> {
 }
 
 /// Configuration needed for AptosNet applications to register with the network
-/// builder. Supports client-only, service-only, and p2p (both) applications.
+/// builder. Supports client-only, service-only, and P2p (both) applications.
 // TODO(philiphayes): separate configs for client & server?
 #[derive(Clone, Default)]
 pub struct AppConfig {
