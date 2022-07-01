@@ -97,7 +97,7 @@ async fn account_balance(
 
     // Filter based on requested currencies
     if let Some(currencies) = request.currencies {
-        let currencies: HashSet<Currency> = currencies.iter().collect();
+        let currencies: HashSet<Currency> = currencies.into_iter().collect();
         amounts = amounts
             .into_iter()
             .filter(|amount| currencies.contains(&amount.currency))

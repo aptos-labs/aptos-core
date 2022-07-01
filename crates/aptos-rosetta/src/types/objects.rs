@@ -5,11 +5,16 @@ use crate::{
     error::ApiResult,
     types::{
         AccountIdentifier, BlockIdentifier, Error, NetworkIdentifier, OperationIdentifier,
-        OperationStatus, OperationType, TransactionIdentifier,
+        OperationStatus, OperationStatusType, OperationType, TransactionIdentifier,
     },
-    ApiError,
+    ApiError, CoinCache,
 };
-use aptos_rest_client::{aptos::Balance, aptos_api_types::TransactionInfo};
+use aptos_logger::info;
+use aptos_rest_client::{
+    aptos::Balance,
+    aptos_api_types::{MoveStructTag, WriteSetChange},
+};
+use aptos_sdk::move_types::{ident_str, identifier::Identifier};
 use aptos_types::account_address::AccountAddress;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -17,7 +22,10 @@ use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
     str::FromStr,
+    sync::Arc,
 };
+use aptos_types::transaction::authenticator::AuthenticationKey;
+use move_deps::move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
 /// A description of all types used by the Rosetta implementation.
 ///
@@ -375,18 +383,189 @@ pub struct Transaction {
     pub related_transactions: Option<Vec<RelatedTransaction>>,
 }
 
-impl From<&TransactionInfo> for Transaction {
-    fn from(txn: &TransactionInfo) -> Self {
-        Transaction {
-            transaction_identifier: txn.into(),
+impl Transaction {
+    pub fn from_transaction(
+        coin_cache: Arc<CoinCache>,
+        rest_client: &aptos_rest_client::Client,
+        txn: aptos_rest_client::Transaction,
+    ) -> ApiResult<Transaction> {
+        use aptos_rest_client::Transaction::*;
+        let (txn_info, events) = match txn {
+            // Pending transactions aren't supported by Rosetta (for now)
+            PendingTransaction(_) => return Err(ApiError::BadBlockRequest),
+            UserTransaction(txn) => (txn.info, txn.events),
+            GenesisTransaction(txn) => (txn.info, txn.events),
+            BlockMetadataTransaction(txn) => (txn.info, txn.events),
+            StateCheckpointTransaction(txn) => (txn.info, vec![]),
+        };
+
+        info!(
+            "TRANSACTION: \n====\nTransaction: {}\n---\n Events: {}",
+            serde_json::to_string_pretty(&txn_info).unwrap(),
+            serde_json::to_string_pretty(&events).unwrap()
+        );
+
+        let mut operations = vec![];
+        let mut operation_index: u64 = 0;
+        let status = if txn_info.success {
+            OperationStatusType::Success
+        } else {
+            OperationStatusType::Failure
+        };
+
+        // TODO: put these somewhere better
+        let account: Identifier = ident_str!("Account").into();
+        let test_coin: Identifier = ident_str!("TestCoin").into();
+        let coin_info: Identifier = ident_str!("CoinInfo").into();
+        let coin: Identifier = ident_str!("Coin").into();
+        let coin_store: Identifier = ident_str!("CoinStore").into();
+        let sequence_number: Identifier = ident_str!("sequence_number").into();
+        let deposit_events: Identifier = ident_str!("deposit_events").into();
+        let withdraw_events: Identifier = ident_str!("withdraw_events").into();
+        let decimals_id: Identifier = ident_str!("decimals").into();
+        let symbol_id: Identifier = ident_str!("symbol").into();
+
+
+        for change in txn_info.changes {
+            let mut operation_type = None;
+            let mut amount = None;
+            // TODO: Handle delete resource ?
+            if let WriteSetChange::WriteResource { address, data, .. } = change {
+                // Determine operation
+                MoveStructTag {
+                    address,
+                    module,
+                    name,
+                    generic_type_params,
+                } = data.typ;
+                let address = *address.inner();
+
+                // Only handle framework events for now
+                if address == AccountAddress::ONE {
+                    if module == account && name == account {
+                        // Account sequence number increase (possibly creation)
+                        let move_struct: AnnotatedMoveStruct = data.data.into();
+
+                        // Find out if it's the 0th sequence number (creation)
+                        let mut op_details = None;
+                        for (id, value) in move_struct.value {
+                            if id == sequence_number {
+                                if let AnnotatedMoveValue::U64(0) = value {
+                                    op_details = Some(OperationDetails::CreateAccount);
+                                    break;
+                                }
+                            }
+                        }
+                        op_details
+                    } else if module == coin && name == coin_info {
+                        // Coin creation
+                        let move_struct: AnnotatedMoveStruct = data.data.into();
+                        let mut decimals: Option<u64> = None;
+                        let mut symbol = None;
+
+                        // Find the coin details
+                        for (id, value) in move_struct.value {
+                            if id == decimals_id {
+                                if let AnnotatedMoveValue::U64(dec) = value {
+                                    decimals = Some(dec);
+                                }
+                            } else if id == symbol_id {
+                                symbol = Some(value.to_string());
+                            }
+                        }
+
+                        // Only if we got all the fields do we use it
+                        if let (Some(decimals), Some(symbol), Some(coin_type)) = (decimals, symbol, generic_type_params.first()) {
+                            Some(OperationDetails::CreateCoin {
+                                coin_type: coin_type.to_string(),
+                                symbol,
+                                decimals
+                            })
+                        } else {
+                            None
+                        }
+                    } else if module == coin && name == coin_store {
+                        // Account balance change
+                        let move_struct: AnnotatedMoveStruct = data.data.into();
+                        let mut withdraw_event = None;
+                        let mut deposit_event = None;
+
+                        // Find the coin details
+                        for (id, value) in move_struct.value {
+                            if id == withdraw_events {
+                                if let AnnotatedMoveValue::U64(dec) = value {
+                                    decimals = Some(dec);
+                                }
+                            } else if id == deposit_events {
+                                symbol = Some(value.to_string());
+                            }
+                        }
+
+                        // Only if we got all the fields do we use it
+                        if let (Some(decimals), Some(symbol), Some(coin_type)) = (decimals, symbol, generic_type_params.first()) {
+                            Some(OperationDetails::CreateCoin {
+                                coin_type: coin_type.to_string(),
+                                symbol,
+                                decimals
+                            })
+                        } else {
+                            None
+                        }
+
+                    }
+                }
+
+            }
+            // Determine amount change this is silly, cause you have to pull it from the events
+
+            operations.push(Operation {
+                operation_identifier: OperationIdentifier {
+                    index: operation_index,
+                    network_index: None,
+                },
+                related_operations: None,
+                operation_type: "".to_string(),
+                status: Some(status.to_string()),
+                account: Some(AccountIdentifier::from(*address.inner())),
+                amount: None,
+            });
+
+            operation_index += 1;
+        }
+
+        // TODO: Convert balance operations
+        //let currency = coin_cache.get_currency(rest_client, "", 0);
+
+        Ok(Transaction {
+            transaction_identifier: (&txn_info).into(),
             operations: vec![],
             related_transactions: None,
-        }
+        })
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub enum InternalOperation {
+pub enum OperationDetails {
+    CreateAccount,
+    CreateCoin {
+        coin_type: String,
+        symbol: String,
+        decimals: u64,
+    },
+    TransferCoin {
+        withdraw_event_key: Option<String>,
+        deposit_event_key: Option<String>,
+    },
+}
+
+pub struct Account {
+        // I don't really need these fields
+        //authentication_key: AuthenticationKey,
+        //self_address: AccountAddress,
+        sequence_number: u64,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub enum InternalOperation {
     Transfer(Transfer),
 }
 

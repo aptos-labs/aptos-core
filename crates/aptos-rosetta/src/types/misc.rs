@@ -79,16 +79,23 @@ pub struct Version {
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum OperationType {
+    CreateCoin,
+    CreateAccount,
     Deposit,
     Withdraw,
 }
 
 impl OperationType {
+    const CREATE_ACCOUNT: &'static str = "create_account";
     const DEPOSIT: &'static str = "deposit";
     const WITHDRAW: &'static str = "withdraw";
 
     pub fn all() -> Vec<OperationType> {
-        vec![OperationType::Deposit, OperationType::Withdraw]
+        vec![
+            OperationType::CreateAccount,
+            OperationType::Deposit,
+            OperationType::Withdraw,
+        ]
     }
 }
 
@@ -97,6 +104,7 @@ impl FromStr for OperationType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().trim() {
+            Self::CREATE_ACCOUNT => Ok(OperationType::CreateAccount),
             Self::DEPOSIT => Ok(OperationType::Deposit),
             Self::WITHDRAW => Ok(OperationType::Withdraw),
             _ => Err(ApiError::DeserializationFailed(format!(
@@ -110,13 +118,14 @@ impl FromStr for OperationType {
 impl Display for OperationType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
+            OperationType::CreateAccount => Self::CREATE_ACCOUNT,
             OperationType::Deposit => Self::DEPOSIT,
             OperationType::Withdraw => Self::WITHDRAW,
         })
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum OperationStatusType {
     Success,
     Failure,
