@@ -9,6 +9,7 @@ mod atomic_histogram;
 mod cluster;
 mod emit;
 mod instance;
+mod transaction_generator;
 mod wrappers;
 
 // These are the top level things you should need to run the emitter.

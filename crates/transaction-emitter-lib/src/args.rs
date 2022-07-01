@@ -1,14 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{convert::TryFrom, path::Path};
+use std::{
+    convert::TryFrom,
+    fmt::{Display, Formatter},
+    path::Path,
+    str::FromStr,
+};
 
 use anyhow::{bail, format_err, Result};
 use aptos::common::types::EncodingType;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_sdk::types::chain_id::ChainId;
-use clap::Parser;
+use clap::{ArgEnum, Parser};
+
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -53,6 +59,40 @@ pub struct ClusterArgs {
     pub mint_args: MintArgs,
 }
 
+#[derive(Debug, Clone, Copy, ArgEnum, Deserialize, Parser, Serialize)]
+pub enum TransactionType {
+    P2P,
+    AccountGeneration,
+}
+
+impl Display for TransactionType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            TransactionType::P2P => "p2p",
+            TransactionType::AccountGeneration => "account_generation",
+        };
+        write!(f, "{}", str)
+    }
+}
+
+impl Default for TransactionType {
+    fn default() -> Self {
+        TransactionType::P2P
+    }
+}
+
+impl FromStr for TransactionType {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "p2p" => Ok(TransactionType::P2P),
+            "account_generation" => Ok(TransactionType::AccountGeneration),
+            _ => Err("Invalid transaction type"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
 pub struct EmitArgs {
     #[clap(long, default_value = "15")]
@@ -82,6 +122,9 @@ pub struct EmitArgs {
 
     #[clap(long, help = "Percentage of invalid txs", default_value = "0")]
     pub invalid_tx: usize,
+
+    #[clap(long, default_value_t = TransactionType::P2P)]
+    pub transaction_type: TransactionType,
 }
 
 fn parse_target(target: &str) -> Result<Url> {

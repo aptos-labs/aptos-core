@@ -13,7 +13,7 @@
 //!
 //! ## Example
 //!
-//! Here is a simple example to show how to create two accounts and do a p2p transfer on testnet:
+//! Here is a simple example to show how to create two accounts and do a P2p transfer on testnet:
 //! todo(davidiw) bring back example using rest
 //!
 

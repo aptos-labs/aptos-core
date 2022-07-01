@@ -1,6 +1,5 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-
 use ::aptos_logger::*;
 use anyhow::{format_err, Result};
 use aptos_rest_client::{Client as RestClient, PendingTransaction, Response};
@@ -8,18 +7,13 @@ use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::TransactionFactory,
     types::{
-        chain_id::ChainId,
         transaction::{authenticator::AuthenticationKey, SignedTransaction},
         LocalAccount,
     },
 };
 use futures::future::{try_join_all, FutureExt};
 use itertools::zip;
-use rand::{
-    distributions::{Distribution, Standard},
-    seq::{IteratorRandom, SliceRandom},
-    Rng, RngCore,
-};
+use rand::seq::{IteratorRandom, SliceRandom};
 use rand_core::SeedableRng;
 use std::{
     cmp::{max, min},
@@ -35,7 +29,14 @@ use std::{
 };
 use tokio::{runtime::Handle, task::JoinHandle, time};
 
-use crate::atomic_histogram::*;
+use crate::{
+    args::TransactionType,
+    atomic_histogram::*,
+    transaction_generator::{
+        account_generator::AccountGenerator, p2p_transaction_generator::P2PTransactionGenerator,
+        TransactionGenerator,
+    },
+};
 use aptos::common::types::EncodingType;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_sdk::{
@@ -81,6 +82,7 @@ pub struct EmitJobRequest {
     gas_price: u64,
     invalid_transaction_ratio: usize,
     vasp: bool,
+    transaction_type: TransactionType,
 }
 
 impl Default for EmitJobRequest {
@@ -93,6 +95,7 @@ impl Default for EmitJobRequest {
             gas_price: 0,
             invalid_transaction_ratio: 0,
             vasp: false,
+            transaction_type: TransactionType::P2P,
         }
     }
 }
@@ -129,6 +132,11 @@ impl EmitJobRequest {
 
     pub fn invalid_transaction_ratio(mut self, invalid_transaction_ratio: usize) -> Self {
         self.invalid_transaction_ratio = invalid_transaction_ratio;
+        self
+    }
+
+    pub fn transaction_type(mut self, transaction_type: TransactionType) -> Self {
+        self.transaction_type = transaction_type;
         self
     }
 
@@ -199,7 +207,7 @@ struct SubmissionWorker {
     stop: Arc<AtomicBool>,
     params: EmitThreadParams,
     stats: Arc<StatsAccumulator>,
-    txn_factory: TransactionFactory,
+    txn_generator: Box<dyn TransactionGenerator>,
     invalid_transaction_ratio: usize,
     rng: ::rand::rngs::StdRng,
 }
@@ -348,42 +356,12 @@ impl SubmissionWorker {
             .accounts
             .iter_mut()
             .choose_multiple(&mut self.rng, batch_size);
-        let mut requests = Vec::with_capacity(accounts.len());
-        let invalid_size = if self.invalid_transaction_ratio != 0 {
-            // if enable mix invalid tx, at least 1 invalid tx per batch
-            max(1, accounts.len() * self.invalid_transaction_ratio / 100)
-        } else {
-            0
-        };
-        let mut num_valid_tx = accounts.len() - invalid_size;
-        for sender in accounts {
-            let receiver = self
-                .all_addresses
-                .choose(&mut self.rng)
-                .expect("all_addresses can't be empty");
-            let request = if num_valid_tx > 0 {
-                num_valid_tx -= 1;
-                gen_transfer_txn_request(
-                    sender,
-                    receiver,
-                    SEND_AMOUNT,
-                    &self.txn_factory,
-                    gas_price,
-                )
-            } else {
-                generate_invalid_transaction(
-                    sender,
-                    receiver,
-                    SEND_AMOUNT,
-                    &self.txn_factory,
-                    gas_price,
-                    &requests,
-                    &mut self.rng,
-                )
-            };
-            requests.push(request);
-        }
-        requests
+        self.txn_generator.generate_transactions(
+            accounts,
+            self.all_addresses.clone(),
+            self.invalid_transaction_ratio,
+            gas_price,
+        )
     }
 }
 
@@ -392,7 +370,7 @@ pub struct TxnEmitter<'t> {
     accounts: Vec<LocalAccount>,
     txn_factory: TransactionFactory,
     client: RestClient,
-    rng: ::rand::rngs::StdRng,
+    rng: StdRng,
     root_account: &'t mut LocalAccount,
 }
 
@@ -401,7 +379,7 @@ impl<'t> TxnEmitter<'t> {
         root_account: &'t mut LocalAccount,
         client: RestClient,
         transaction_factory: TransactionFactory,
-        rng: ::rand::rngs::StdRng,
+        rng: StdRng,
     ) -> Self {
         Self {
             accounts: vec![],
@@ -420,12 +398,12 @@ impl<'t> TxnEmitter<'t> {
         self.accounts.clear();
     }
 
-    pub fn rng(&mut self) -> &mut ::rand::rngs::StdRng {
+    pub fn rng(&mut self) -> &mut StdRng {
         &mut self.rng
     }
 
-    pub fn from_rng(&mut self) -> ::rand::rngs::StdRng {
-        ::rand::rngs::StdRng::from_rng(self.rng()).unwrap()
+    pub fn from_rng(&mut self) -> StdRng {
+        StdRng::from_rng(self.rng()).unwrap()
     }
 
     pub async fn get_money_source(&mut self, coins_total: u64) -> Result<&mut LocalAccount> {
@@ -649,6 +627,17 @@ impl<'t> TxnEmitter<'t> {
                 let stop = stop.clone();
                 let params = req.thread_params.clone();
                 let stats = Arc::clone(&stats);
+                let txn_generator: Box<dyn TransactionGenerator> = match req.transaction_type {
+                    TransactionType::P2P => Box::new(P2PTransactionGenerator::new(
+                        self.from_rng().clone(),
+                        SEND_AMOUNT,
+                        self.txn_factory.clone(),
+                    )),
+                    TransactionType::AccountGeneration => Box::new(AccountGenerator::new(
+                        self.from_rng().clone(),
+                        self.txn_factory.clone(),
+                    )),
+                };
                 let worker = SubmissionWorker {
                     accounts,
                     client: client.clone(),
@@ -656,7 +645,7 @@ impl<'t> TxnEmitter<'t> {
                     stop,
                     params,
                     stats,
-                    txn_factory: self.txn_factory.clone(),
+                    txn_generator,
                     invalid_transaction_ratio: req.invalid_transaction_ratio,
                     rng: self.from_rng(),
                 };
@@ -936,53 +925,6 @@ pub fn gen_transfer_txn_request(
     )
 }
 
-fn generate_invalid_transaction<R>(
-    sender: &mut LocalAccount,
-    receiver: &AccountAddress,
-    num_coins: u64,
-    transaction_factory: &TransactionFactory,
-    gas_price: u64,
-    reqs: &[SignedTransaction],
-    rng: &mut R,
-) -> SignedTransaction
-where
-    R: ::rand_core::RngCore + ::rand_core::CryptoRng,
-{
-    let mut invalid_account = LocalAccount::generate(rng);
-    let invalid_address = invalid_account.address();
-    match Standard.sample(rng) {
-        InvalidTransactionType::ChainId => {
-            let txn_factory = transaction_factory.clone().with_chain_id(ChainId::new(255));
-            gen_transfer_txn_request(sender, receiver, num_coins, &txn_factory, gas_price)
-        }
-        InvalidTransactionType::Sender => gen_transfer_txn_request(
-            &mut invalid_account,
-            receiver,
-            num_coins,
-            transaction_factory,
-            gas_price,
-        ),
-        InvalidTransactionType::Receiver => gen_transfer_txn_request(
-            sender,
-            &invalid_address,
-            num_coins,
-            transaction_factory,
-            gas_price,
-        ),
-        InvalidTransactionType::Duplication => {
-            // if this is the first tx, default to generate invalid tx with wrong chain id
-            // otherwise, make a duplication of an exist valid tx
-            if reqs.is_empty() {
-                let txn_factory = transaction_factory.clone().with_chain_id(ChainId::new(255));
-                gen_transfer_txn_request(sender, receiver, num_coins, &txn_factory, gas_price)
-            } else {
-                let random_index = rng.gen_range(0, reqs.len());
-                reqs[random_index].clone()
-            }
-        }
-    }
-}
-
 impl StatsAccumulator {
     pub fn accumulate(&self) -> TxnStats {
         TxnStats {
@@ -1042,29 +984,6 @@ impl fmt::Display for TxnStatsRate {
             "submitted: {} txn/s, committed: {} txn/s, expired: {} txn/s, latency: {} ms, p99 latency: {} ms",
             self.submitted, self.committed, self.expired, self.latency, self.p99_latency,
         )
-    }
-}
-
-#[derive(Debug)]
-enum InvalidTransactionType {
-    /// invalid tx with wrong chain id
-    ChainId,
-    /// invalid tx with sender not on chain
-    Sender,
-    /// invalid tx with receiver not on chain
-    Receiver,
-    /// duplicate an exist tx
-    Duplication,
-}
-
-impl Distribution<InvalidTransactionType> for Standard {
-    fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> InvalidTransactionType {
-        match rng.gen_range(0, 4) {
-            0 => InvalidTransactionType::ChainId,
-            1 => InvalidTransactionType::Sender,
-            2 => InvalidTransactionType::Receiver,
-            _ => InvalidTransactionType::Duplication,
-        }
     }
 }
 
