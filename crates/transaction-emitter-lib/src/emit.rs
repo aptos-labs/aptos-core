@@ -44,6 +44,8 @@ use aptos_sdk::{
 };
 use rand::rngs::StdRng;
 
+// So the regression msut be from the change to get_accounts_sequence where I build that hashmap.
+
 /// Max transactions per account in mempool
 const MAX_TXN_BATCH_SIZE: usize = 100;
 const MAX_TXNS: u64 = 1_000_000;
@@ -67,7 +69,7 @@ impl Default for EmitThreadParams {
             wait_millis: 0,
             wait_committed: true,
             txn_expiration_time_secs: 30,
-            check_stats_at_end: true,
+            check_stats_at_end: false,
         }
     }
 }
@@ -142,7 +144,7 @@ impl EmitJobRequest {
                 wait_millis: wait_time,
                 wait_committed: true,
                 txn_expiration_time_secs: 30,
-                check_stats_at_end: true,
+                check_stats_at_end: false,
             })
             .accounts_per_client(1)
     }
