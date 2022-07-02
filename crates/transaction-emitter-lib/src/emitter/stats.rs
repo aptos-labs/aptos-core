@@ -2,10 +2,103 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
-    fmt::Debug,
+    fmt,
     ops::Sub,
-    sync::atomic::{AtomicU64, Ordering},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+    time::Duration,
 };
+
+#[derive(Debug, Default)]
+pub struct TxnStats {
+    pub submitted: u64,
+    pub committed: u64,
+    pub expired: u64,
+    pub latency: u64,
+    pub latency_buckets: AtomicHistogramSnapshot,
+}
+
+#[derive(Debug, Default)]
+pub struct TxnStatsRate {
+    pub submitted: u64,
+    pub committed: u64,
+    pub expired: u64,
+    pub latency: u64,
+    pub p99_latency: u64,
+}
+
+impl fmt::Display for TxnStatsRate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "submitted: {} txn/s, committed: {} txn/s, expired: {} txn/s, latency: {} ms, p99 latency: {} ms",
+            self.submitted, self.committed, self.expired, self.latency, self.p99_latency,
+        )
+    }
+}
+
+impl TxnStats {
+    pub fn rate(&self, window: Duration) -> TxnStatsRate {
+        TxnStatsRate {
+            submitted: self.submitted / window.as_secs(),
+            committed: self.committed / window.as_secs(),
+            expired: self.expired / window.as_secs(),
+            latency: if self.committed == 0 {
+                0u64
+            } else {
+                self.latency / self.committed
+            },
+            p99_latency: self.latency_buckets.percentile(99, 100),
+        }
+    }
+}
+
+impl fmt::Display for TxnStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "submitted: {}, committed: {}, expired: {}",
+            self.submitted, self.committed, self.expired,
+        )
+    }
+}
+
+impl Sub for &TxnStats {
+    type Output = TxnStats;
+
+    fn sub(self, other: &TxnStats) -> TxnStats {
+        TxnStats {
+            submitted: self.submitted - other.submitted,
+            committed: self.committed - other.committed,
+            expired: self.expired - other.expired,
+            latency: self.latency - other.latency,
+            latency_buckets: &self.latency_buckets - &other.latency_buckets,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct StatsAccumulator {
+    pub submitted: AtomicU64,
+    pub committed: AtomicU64,
+    pub expired: AtomicU64,
+    pub latency: AtomicU64,
+    pub latencies: Arc<AtomicHistogramAccumulator>,
+}
+
+impl StatsAccumulator {
+    pub fn accumulate(&self) -> TxnStats {
+        TxnStats {
+            submitted: self.submitted.load(Ordering::Relaxed),
+            committed: self.committed.load(Ordering::Relaxed),
+            expired: self.expired.load(Ordering::Relaxed),
+            latency: self.latency.load(Ordering::Relaxed),
+            latency_buckets: self.latencies.snapshot(),
+        }
+    }
+}
 
 const DEFAULT_HISTOGRAM_CAPACITY: usize = 1024;
 const DEFAULT_HISTOGRAM_STEP_WIDTH: u64 = 50;
@@ -115,8 +208,10 @@ impl AtomicHistogramSnapshot {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::emit::TxnStats;
+    use crate::emitter::stats::{
+        AtomicHistogramAccumulator, AtomicHistogramSnapshot, TxnStats, DEFAULT_HISTOGRAM_CAPACITY,
+        DEFAULT_HISTOGRAM_STEP_WIDTH,
+    };
 
     #[test]
     pub fn test_default_atomic_histogram() {
