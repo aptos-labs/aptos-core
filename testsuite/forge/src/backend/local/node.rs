@@ -119,10 +119,8 @@ impl LocalNode {
         self.config.api.address.port()
     }
 
-    pub fn debug_port(&self) -> u16 {
-        self.config
-            .debug_interface
-            .admission_control_node_debug_port
+    pub fn inspection_service_port(&self) -> u16 {
+        self.config.inspection_service.port
     }
 
     pub fn config(&self) -> &NodeConfig {
@@ -167,7 +165,7 @@ impl LocalNode {
             return Err(HealthCheckError::NotRunning(error));
         }
 
-        self.debug_client()
+        self.inspection_client()
             .get_node_metrics()
             .await
             .map(|_| ())
@@ -201,8 +199,12 @@ impl Node for LocalNode {
         Url::from_str(&format!("http://{}:{}", ip, port)).expect("Invalid URL.")
     }
 
-    fn debug_endpoint(&self) -> Url {
-        Url::parse(&format!("http://localhost:{}", self.debug_port())).unwrap()
+    fn inspection_service_endpoint(&self) -> Url {
+        Url::parse(&format!(
+            "http://localhost:{}",
+            self.inspection_service_port()
+        ))
+        .unwrap()
     }
 
     fn config(&self) -> &NodeConfig {

@@ -6,7 +6,7 @@ use anyhow::anyhow;
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
-use debug_interface::AsyncNodeDebugClient;
+use inspection_service::inspection_client::InspectionClient;
 use std::{
     collections::HashMap,
     time::{Duration, Instant},
@@ -44,7 +44,7 @@ pub trait Node: Send + Sync {
     fn rest_api_endpoint(&self) -> Url;
 
     /// Return the URL for the debug-interface for this Node
-    fn debug_endpoint(&self) -> Url;
+    fn inspection_service_endpoint(&self) -> Url;
 
     /// Return a reference to the Config this Node is using
     fn config(&self) -> &NodeConfig;
@@ -129,9 +129,9 @@ pub trait NodeExt: Node {
         RestClient::new(self.rest_api_endpoint())
     }
 
-    /// Return a NodeDebugClient for this Node
-    fn debug_client(&self) -> AsyncNodeDebugClient {
-        AsyncNodeDebugClient::from_url(self.debug_endpoint())
+    /// Return an InspectionClient for this Node
+    fn inspection_client(&self) -> InspectionClient {
+        InspectionClient::from_url(self.inspection_service_endpoint())
     }
 
     /// Restarts this Node by calling Node::Stop followed by Node::Start
@@ -142,7 +142,7 @@ pub trait NodeExt: Node {
 
     /// Query a Metric for from this Node
     async fn get_metric(&self, metric_name: &str) -> Result<Option<i64>> {
-        self.debug_client().get_node_metric(metric_name).await
+        self.inspection_client().get_node_metric(metric_name).await
     }
 
     async fn get_metric_with_fields(
@@ -151,7 +151,7 @@ pub trait NodeExt: Node {
         fields: HashMap<String, String>,
     ) -> Result<Option<i64>> {
         let filtered: Vec<_> = self
-            .debug_client()
+            .inspection_client()
             .get_node_metric_with_name(metric_name)
             .await?
             .into_iter()

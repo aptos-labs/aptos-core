@@ -715,25 +715,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-metrics"
-version = "0.1.0"
-dependencies = [
- "aptos-logger",
- "aptos-metrics-core",
- "aptos-telemetry",
- "aptos-workspace-hack",
- "assert_approx_eq",
- "futures",
- "hyper",
- "once_cell",
- "prometheus",
- "rusty-fork",
- "serde_json",
- "sysinfo",
- "tokio",
-]
-
-[[package]]
 name = "aptos-metrics-core"
 version = "0.1.0"
 dependencies = [
@@ -753,7 +734,6 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-mempool",
- "aptos-metrics",
  "aptos-secure-storage",
  "aptos-state-view",
  "aptos-telemetry",
@@ -770,7 +750,6 @@ dependencies = [
  "consensus-notifications",
  "crash-handler",
  "data-streaming-service",
- "debug-interface",
  "event-notifications",
  "executor",
  "executor-types",
@@ -778,6 +757,7 @@ dependencies = [
  "framework",
  "futures",
  "hex",
+ "inspection-service",
  "jemallocator",
  "mempool-notifications",
  "network",
@@ -802,7 +782,6 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-logger",
- "aptos-metrics",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-workspace-hack",
@@ -2744,22 +2723,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e51694c5f8b91baf933e6429a3df4ff3e9f1160386d150790b97bef73337d1b"
 
 [[package]]
-name = "debug-interface"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-logger",
- "aptos-metrics",
- "aptos-workspace-hack",
- "bytes",
- "reqwest",
- "serde 1.0.137",
- "tokio",
- "warp",
-]
-
-[[package]]
 name = "derive_more"
 version = "0.99.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3345,13 +3308,13 @@ dependencies = [
  "aptos-workspace-hack",
  "async-trait",
  "cached-framework-packages",
- "debug-interface",
  "either",
  "futures",
  "hex",
  "hyper",
  "hyper-proxy",
  "hyper-tls",
+ "inspection-service",
  "k8s-openapi",
  "kube",
  "rand 0.7.3",
@@ -3368,6 +3331,7 @@ dependencies = [
  "tempfile",
  "termcolor",
  "tokio",
+ "transaction-emitter",
  "transaction-emitter-lib",
  "url",
 ]
@@ -4214,6 +4178,29 @@ name = "indoc"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05a0bd019339e5d968b37855180087b7b9d512c5046fbd244cf8c95687927d6e"
+
+[[package]]
+name = "inspection-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-telemetry",
+ "aptos-workspace-hack",
+ "assert_approx_eq",
+ "futures",
+ "hyper",
+ "once_cell",
+ "prometheus",
+ "reqwest",
+ "rusty-fork",
+ "serde_json",
+ "sysinfo",
+ "tokio",
+]
 
 [[package]]
 name = "instant"
@@ -7972,7 +7959,6 @@ dependencies = [
  "base64",
  "bcs",
  "cached-framework-packages",
- "debug-interface",
  "diesel",
  "forge",
  "futures",

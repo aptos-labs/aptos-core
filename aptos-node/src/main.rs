@@ -74,6 +74,6 @@ fn main() {
     } else {
         let config = NodeConfig::load(args.config.unwrap()).expect("Failed to load node config");
         println!("Using node config {:?}", &config);
-        aptos_node::start(&config, None);
+        aptos_node::start(config, None);
     };
 }
