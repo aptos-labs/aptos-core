@@ -215,6 +215,6 @@ pub fn build_openapi_service<M: MetricCollector, R: Runner>(
     // These should have already been validated at this point, so we panic.
     let url: Url = server_args
         .try_into()
-        .expect("Failed to parse listen address");
+        .expect("Failed to parse liten address");
     OpenApiService::new(api, "Aptos Node Checker", version).server(url)
 }

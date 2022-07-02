@@ -23,7 +23,7 @@ use rand::{
 use rand_core::SeedableRng;
 use std::{
     cmp::{max, min},
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fmt,
     num::NonZeroU64,
     path::Path,
@@ -220,9 +220,13 @@ impl SubmissionWorker {
 
         let wait_duration = Duration::from_millis(self.params.wait_millis);
 
+        let start_time = Instant::now();
+        let mut total_num_requests = 0;
+
         while !self.stop.load(Ordering::Relaxed) {
             let requests = self.gen_requests(gas_price);
             let num_requests = requests.len();
+            total_num_requests += num_requests;
             let loop_start_time = Instant::now();
             let wait_until = loop_start_time + wait_duration;
             let mut txn_offset_time = 0u64;
@@ -240,6 +244,7 @@ impl SubmissionWorker {
                     loop_start_time,
                     txn_offset_time,
                     num_requests,
+                    false,
                     wait_for_accounts_sequence_timeout,
                 )
                 .await
@@ -254,9 +259,14 @@ impl SubmissionWorker {
         // out of it, update the stats for the whole run.
         if check_stats_at_end {
             debug!("Checking stats for final time at the end");
-            if let Err(e) = self.set_stats_based_on_actual_sequence_numbers().await {
-                error!("Failed to set stats at end of run: {}", e);
-            }
+            self.update_stats(
+                start_time,
+                0,
+                total_num_requests,
+                true,
+                Duration::from_millis(500),
+            )
+            .await
         }
 
         self.accounts
@@ -265,11 +275,16 @@ impl SubmissionWorker {
     /// This function assumes that num_requests == num_accounts, which is
     /// precisely how gen_requests works. If this changes, this code will
     /// need to be fixed.
+    ///
+    /// Note, the latency values are not accurate if --check-stats-at-end
+    /// is used. There is no easy way around this accurately. As such, we
+    /// don't update latency at all if that flag is set.
     async fn update_stats(
         &mut self,
         start_time: Instant,
         txn_offset_time: u64,
         num_requests: usize,
+        skip_latency_stats: bool,
         wait_for_accounts_sequence_timeout: Duration,
     ) {
         match wait_for_accounts_sequence(
@@ -285,12 +300,14 @@ impl SubmissionWorker {
                 self.stats
                     .committed
                     .fetch_add(num_requests as u64, Ordering::Relaxed);
-                self.stats
-                    .latency
-                    .fetch_add(latency * num_requests as u64, Ordering::Relaxed);
-                self.stats
-                    .latencies
-                    .record_data_point(latency, num_requests as u64);
+                if !skip_latency_stats {
+                    self.stats
+                        .latency
+                        .fetch_add(latency * num_requests as u64, Ordering::Relaxed);
+                    self.stats
+                        .latencies
+                        .record_data_point(latency, num_requests as u64);
+                }
             }
             Err(uncommitted) => {
                 let num_uncommitted = uncommitted.len() as u64;
@@ -309,40 +326,20 @@ impl SubmissionWorker {
                 self.stats
                     .expired
                     .fetch_add(num_uncommitted, Ordering::Relaxed);
-                self.stats
-                    .latency
-                    .fetch_add(committed_latency, Ordering::Relaxed);
-                self.stats
-                    .latencies
-                    .record_data_point(latency, num_committed);
+                if !skip_latency_stats {
+                    self.stats
+                        .latency
+                        .fetch_add(committed_latency, Ordering::Relaxed);
+                    self.stats
+                        .latencies
+                        .record_data_point(latency, num_committed);
+                }
                 info!(
                     "[{:?}] Transactions were not committed before expiration: {:?}",
                     self.client, uncommitted
                 );
             }
         }
-    }
-
-    /// Unlike update_stats, which should be used in each loop where the number
-    /// of requests == the number of accounts, this function should be used to
-    /// just pull the sequence numbers from the accounts and set the values
-    /// based on those directly.
-    async fn set_stats_based_on_actual_sequence_numbers(&mut self) -> Result<()> {
-        let accounts_sequence =
-            get_accounts_sequence(&self.client, &mut self.accounts, Duration::from_millis(500))
-                .await?;
-
-        let committed = accounts_sequence.values().sum();
-
-        let mut uncommitted = 0;
-        for account in &self.accounts {
-            uncommitted += account.sequence_number() - accounts_sequence[&account.address()];
-        }
-
-        self.stats.committed.store(committed, Ordering::Relaxed);
-        self.stats.expired.store(uncommitted, Ordering::Relaxed);
-
-        Ok(())
     }
 
     fn gen_requests(&mut self, gas_price: u64) -> Vec<SignedTransaction> {
@@ -637,7 +634,6 @@ impl<'t> TxnEmitter<'t> {
             req.accounts_per_client, num_accounts
         );
         self.mint_accounts(&req, num_accounts).await?;
-        info!("Minting accounts completed");
         let all_accounts = self.accounts.split_off(self.accounts.len() - num_accounts);
         let mut workers = vec![];
         let all_addresses: Vec<_> = all_accounts.iter().map(|d| d.address()).collect();
@@ -788,21 +784,38 @@ pub async fn execute_and_wait_transactions(
     Ok(())
 }
 
-/// This returns a map of account address to its actual sequence number.
-async fn get_accounts_sequence(
+/// This function waits for the submitted transactions to be committed, up to
+/// a deadline. If some accounts still have uncommitted transactions when we
+/// hit the deadline, we return a map of account to the info about the number
+/// of committed transactions, based on the delta between the local sequence
+/// number and the actual sequence number returned by the account. Note, this
+/// can return possibly unexpected results if the emitter was emitting more
+/// transactions per account than the mempool limit of the accounts on the node.
+/// As it is now, the sequence number of the local account incrememnts regardless
+/// of whether the transaction is accepted into the node's mempool or not. So the
+/// local sequence number could be much higher than the real sequence number ever
+/// will be, since not all of the submitted transactions were accepted.
+/// TODO, investigate whether this behaviour is desirable.
+async fn wait_for_accounts_sequence(
     client: &RestClient,
     accounts: &mut [LocalAccount],
     wait_timeout: Duration,
-) -> Result<HashMap<AccountAddress, u64>> {
+) -> Result<(), HashSet<AccountAddress>> {
     let deadline = Instant::now() + wait_timeout;
     let addresses: Vec<_> = accounts.iter().map(|d| d.address()).collect();
-    let mut out = HashMap::new();
+    let mut uncommitted = addresses.clone().into_iter().collect::<HashSet<_>>();
 
     while Instant::now() <= deadline {
         match query_sequence_numbers(client, &addresses).await {
             Ok(sequence_numbers) => {
                 for (account, sequence_number) in zip(accounts.iter(), &sequence_numbers) {
-                    out.insert(account.address(), *sequence_number);
+                    if account.sequence_number() == *sequence_number {
+                        uncommitted.remove(&account.address());
+                    }
+                }
+
+                if uncommitted.is_empty() {
+                    return Ok(());
                 }
             }
             Err(e) => {
@@ -816,39 +829,7 @@ async fn get_accounts_sequence(
         time::sleep(Duration::from_millis(250)).await;
     }
 
-    Ok(out)
-}
-
-/// This function gets the real sequence number of the accounts and then
-/// returns a set containing the accounts that had uncommitted transactions.
-async fn wait_for_accounts_sequence(
-    client: &RestClient,
-    accounts: &mut [LocalAccount],
-    wait_timeout: Duration,
-) -> Result<(), HashSet<AccountAddress>> {
-    let addresses: Vec<_> = accounts.iter().map(|d| d.address()).collect();
-    let mut uncommitted = addresses.clone().into_iter().collect::<HashSet<_>>();
-
-    let sequence_numbers = match get_accounts_sequence(client, accounts, wait_timeout).await {
-        Ok(sequence_numbers) => sequence_numbers,
-        Err(e) => {
-            error!("Failed to get sequence numbers: {:?}", e);
-            return Err(uncommitted);
-        }
-    };
-
-    for account in accounts {
-        let actual_sequence_number = sequence_numbers[&account.address()];
-        if account.sequence_number() == actual_sequence_number {
-            uncommitted.remove(&account.address());
-        }
-    }
-
-    if uncommitted.is_empty() {
-        Ok(())
-    } else {
-        Err(uncommitted)
-    }
+    Err(uncommitted)
 }
 
 pub async fn query_sequence_numbers(
