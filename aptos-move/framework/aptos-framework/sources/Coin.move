@@ -76,11 +76,13 @@ module AptosFramework::Coin {
 
     /// Event emitted when some amount of a coin is deposited into an account.
     struct DepositEvent has drop, store {
+        type_info: TypeInfo::TypeInfo,
         amount: u64,
     }
 
     /// Event emitted when some amount of a coin is withdrawn from an account.
     struct WithdrawEvent has drop, store {
+        type_info: TypeInfo::TypeInfo,
         amount: u64,
     }
 
@@ -189,7 +191,7 @@ module AptosFramework::Coin {
         let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
         Event::emit_event<DepositEvent>(
             &mut coin_store.deposit_events,
-            DepositEvent { amount: coin.value },
+            DepositEvent { amount: coin.value, type_info: TypeInfo::type_of<CoinType>() },
         );
 
         merge(&mut coin_store.coin, coin);
@@ -343,7 +345,7 @@ module AptosFramework::Coin {
 
         Event::emit_event<WithdrawEvent>(
             &mut coin_store.withdraw_events,
-            WithdrawEvent { amount },
+            WithdrawEvent { amount, type_info: TypeInfo::type_of<CoinType>() },
         );
 
         extract(&mut coin_store.coin, amount)

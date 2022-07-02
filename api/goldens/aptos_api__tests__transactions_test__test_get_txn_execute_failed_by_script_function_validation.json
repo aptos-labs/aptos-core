@@ -4,7 +4,7 @@
   "hash": "",
   "state_root_hash": "",
   "event_root_hash": "",
-  "gas_used": "38",
+  "gas_used": "43",
   "success": false,
   "vm_status": "Move abort by INVALID_ARGUMENT - EINSUFFICIENT_BALANCE\n An argument provided to an operation is invalid. Example: a signing key has the wrong format.\n When there's not enough funds to withdraw from an account or from `Coin` resource.",
   "accumulator_root_hash": "",
