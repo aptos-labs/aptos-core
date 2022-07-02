@@ -56,6 +56,17 @@ impl<M: MetricCollector> BlockingRunner<M> {
         }
     }
 
+    fn collect_metrics_failed(address: &NodeAddress, error: RunnerError) -> EvaluationResult {
+        EvaluationResult {
+            headline: "Failed to collect metrics from target node".to_string(),
+            score: 0,
+            explanation: format!("Failed to collect metrics from your node, make sure your metrics port ({}) is publicly accessible: {}", address.metrics_port, error),
+            category: "metrics".to_string(),
+            evaluator_name: "metrics_port".to_string(),
+            links: vec![],
+        }
+    }
+
     async fn collect_metrics<MC: MetricCollector>(
         metric_collector: &MC,
     ) -> Result<PrometheusScrape, RunnerError> {
@@ -74,6 +85,7 @@ impl<M: MetricCollector> BlockingRunner<M> {
     async fn run_metrics_evaluators<T: MetricCollector>(
         &self,
         target_metric_collector: &T,
+        target_node_address: &NodeAddress,
     ) -> Result<Vec<EvaluationResult>, RunnerError> {
         let evaluators = self.evaluator_set.get_metrics_evaluators();
 
@@ -81,14 +93,20 @@ impl<M: MetricCollector> BlockingRunner<M> {
             return Ok(vec![]);
         }
 
+        let first_target_metrics = match Self::collect_metrics(target_metric_collector).await {
+            Ok(scrape) => scrape,
+            Err(e) => return Ok(vec![Self::collect_metrics_failed(target_node_address, e)]),
+        };
         let first_baseline_metrics = Self::collect_metrics(&self.baseline_metric_collector).await?;
-        let first_target_metrics = Self::collect_metrics(target_metric_collector).await?;
 
         tokio::time::sleep(Duration::from_secs(self.args.metrics_fetch_delay_secs)).await;
 
+        let second_target_metrics = match Self::collect_metrics(target_metric_collector).await {
+            Ok(scrape) => scrape,
+            Err(e) => return Ok(vec![Self::collect_metrics_failed(target_node_address, e)]),
+        };
         let second_baseline_metrics =
             Self::collect_metrics(&self.baseline_metric_collector).await?;
-        let second_target_metrics = Self::collect_metrics(target_metric_collector).await?;
 
         let input = MetricsEvaluatorInput {
             previous_baseline_metrics: first_baseline_metrics,
@@ -108,6 +126,7 @@ impl<M: MetricCollector> BlockingRunner<M> {
     async fn run_system_information_evaluators<T: MetricCollector>(
         &self,
         target_metric_collector: &T,
+        target_node_address: &NodeAddress,
     ) -> Result<Vec<EvaluationResult>, RunnerError> {
         let evaluators = self.evaluator_set.get_system_information_evaluators();
 
@@ -115,10 +134,13 @@ impl<M: MetricCollector> BlockingRunner<M> {
             return Ok(vec![]);
         }
 
+        let target_system_information =
+            match Self::collect_system_information(target_metric_collector).await {
+                Ok(info) => info,
+                Err(e) => return Ok(vec![Self::collect_metrics_failed(target_node_address, e)]),
+            };
         let baseline_system_information =
             Self::collect_system_information(&self.baseline_metric_collector).await?;
-        let target_system_information =
-            Self::collect_system_information(target_metric_collector).await?;
 
         let input = SystemInformationEvaluatorInput {
             baseline_system_information,
@@ -207,8 +229,8 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
         // the information necessary, e.g. fetching metrics, and then run all
         // the evaluators that depend on that information.
         let (mut metrics_results, mut system_information_results, mut direct_results) = try_join!(
-            self.run_metrics_evaluators(target_metric_collector),
-            self.run_system_information_evaluators(target_metric_collector),
+            self.run_metrics_evaluators(target_metric_collector, target_node_address),
+            self.run_system_information_evaluators(target_metric_collector, target_node_address),
             self.run_direct_evaluators(target_node_address)
         )?;
         evaluation_results.append(&mut metrics_results);

@@ -14,11 +14,11 @@ pub struct SystemInformation(pub HashMap<String, String>);
 #[derive(Debug, ThisError)]
 pub enum MetricCollectorError {
     /// We were unable to get data from the node.
-    #[error("Failed to pull data from the node")]
+    #[error("Failed to pull data from the node: {0}")]
     GetDataError(Error),
 
     /// We could not perform basic parsing on the response.
-    #[error("Failed to parse the response from the node")]
+    #[error("Failed to parse the response from the node: {0}")]
     ResponseParseError(Error),
 }
 
