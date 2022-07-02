@@ -14,13 +14,13 @@ class OnboardingController < ApplicationController
   layout 'it2'
 
   def email
-    redirect_to it2_path if current_user.confirmed? && !current_user.username.nil?
+    redirect_to it2_path if current_user.email_confirmed? && !current_user.username.nil?
   end
 
   def email_success; end
 
   def email_update
-    return redirect_to it2_path if current_user.confirmed? && !current_user.username.nil?
+    return redirect_to it2_path if current_user.email_confirmed? && !current_user.username.nil?
 
     recaptcha_v3_success = verify_recaptcha(action: 'onboarding/email', minimum_score: 0.5,
                                             secret_key: ENV.fetch('RECAPTCHA_V3_SECRET_KEY', nil), model: current_user)
@@ -35,7 +35,7 @@ class OnboardingController < ApplicationController
       log current_user, 'email/username updated'
       if forum_sso?
         redirect_to discourse_sso_path
-      elsif current_user.confirmed?
+      elsif current_user.email_confirmed?
         redirect_to it2_path
       else
         redirect_to onboarding_email_success_path
@@ -77,7 +77,7 @@ class OnboardingController < ApplicationController
 
     # we don't have a current user if we're doing personas "complete on another device" thing
     if current_user.present?
-      redirect_to onboarding_email_path and return unless current_user.confirmed?
+      redirect_to onboarding_email_path and return unless current_user.email_confirmed?
       if current_user.external_id != reference_id
         redirect_to onboarding_kyc_redirect_path,
                     status: :unprocessable_entity, error: 'Persona was started with a different user' and return
