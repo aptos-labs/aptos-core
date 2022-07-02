@@ -4,6 +4,7 @@
 use crate::{
     configuration::{EvaluatorArgs, NodeAddress},
     evaluator::{EvaluationResult, Evaluator},
+    evaluators::EvaluatorType,
 };
 use anyhow::{anyhow, format_err, Result};
 use aptos_config::config::RoleType;
@@ -68,10 +69,7 @@ pub async fn get_node_identity(node_address: &NodeAddress) -> Result<(ChainId, R
 }
 
 #[derive(Debug, ThisError)]
-pub enum NodeIdentityEvaluatorError {
-    #[error("Failed to get node identity from node: {0}")]
-    GetNodeIdentityError(anyhow::Error),
-}
+pub enum NodeIdentityEvaluatorError {}
 
 // TODO: Consider taking chain_id and role_type here instead.
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
@@ -86,6 +84,22 @@ pub struct NodeIdentityEvaluator {
 impl NodeIdentityEvaluator {
     pub fn new(args: NodeIdentityEvaluatorArgs) -> Self {
         Self { args }
+    }
+
+    fn build_evaluation(
+        &self,
+        headline: String,
+        score: u8,
+        explanation: String,
+    ) -> EvaluationResult {
+        EvaluationResult {
+            headline,
+            score,
+            explanation,
+            category: CATEGORY.to_string(),
+            evaluator_name: Self::get_name(),
+            links: vec![],
+        }
     }
 
     fn build_evaluation_result<T: Display + PartialEq>(
@@ -119,14 +133,7 @@ impl NodeIdentityEvaluator {
                 ),
             )
         };
-        EvaluationResult {
-            headline,
-            score,
-            explanation,
-            category: CATEGORY.to_string(),
-            evaluator_name: Self::get_name(),
-            links: vec![],
-        }
+        self.build_evaluation(headline, score, explanation)
     }
 }
 
@@ -137,9 +144,22 @@ impl Evaluator for NodeIdentityEvaluator {
 
     /// Assert that the node identity (role type and chain ID) of the two nodes match.
     async fn evaluate(&self, input: &Self::Input) -> Result<Vec<EvaluationResult>, Self::Error> {
-        let (target_chain_id, target_role_type) = get_node_identity(&input.target_node_address)
-            .await
-            .map_err(NodeIdentityEvaluatorError::GetNodeIdentityError)?;
+        let (target_chain_id, target_role_type) =
+            match get_node_identity(&input.target_node_address).await {
+                Ok((chain_id, role_type)) => (chain_id, role_type),
+                Err(e) => {
+                    return Ok(vec![self.build_evaluation(
+                        "Failed to get node identity from target node".to_string(),
+                        0,
+                        format!(
+                            "Failed to get node identity from target node, \
+                        make sure your API port ({}) is open and you're running \
+                        the correct node version: {}",
+                            input.target_node_address.api_port, e
+                        ),
+                    )])
+                }
+            };
 
         let evaluation_results = vec![
             self.build_evaluation_result(
@@ -163,5 +183,9 @@ impl Evaluator for NodeIdentityEvaluator {
 
     fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {
         Ok(Self::new(evaluator_args.node_identity_args.clone()))
+    }
+
+    fn evaluator_type_from_evaluator_args(_: &EvaluatorArgs) -> Result<EvaluatorType> {
+        unreachable!();
     }
 }

@@ -18,11 +18,17 @@ use crate::{
         },
     },
 };
-
-use log::info;
-
 use anyhow::{bail, Result};
 use std::collections::HashSet;
+
+type LatencyEvaluatorType =
+    Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = LatencyEvaluatorError>>;
+type MetricsEvaluatorType =
+    Box<dyn Evaluator<Input = MetricsEvaluatorInput, Error = MetricsEvaluatorError>>;
+type SystemInformationEvaluatorType = Box<
+    dyn Evaluator<Input = SystemInformationEvaluatorInput, Error = SystemInformationEvaluatorError>,
+>;
+type TpsEvaluatorType = Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = TpsEvaluatorError>>;
 
 /// This type is essential to making it possible to represent all
 /// evaluators using a single trait, Evaluator. That trait has two
@@ -36,75 +42,84 @@ use std::collections::HashSet;
 /// see https://doc.rust-lang.org/reference/items/traits.html#object-safety.
 #[derive(Debug)]
 pub enum EvaluatorType {
-    Metrics(Box<dyn Evaluator<Input = MetricsEvaluatorInput, Error = MetricsEvaluatorError>>),
-    SystemInformation(
-        Box<
-            dyn Evaluator<
-                Input = SystemInformationEvaluatorInput,
-                Error = SystemInformationEvaluatorError,
-            >,
-        >,
-    ),
-    Tps(Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = TpsEvaluatorError>>),
-    Latency(Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = LatencyEvaluatorError>>),
+    Latency(LatencyEvaluatorType),
+    Metrics(MetricsEvaluatorType),
+    SystemInformation(SystemInformationEvaluatorType),
+    Tps(TpsEvaluatorType),
+}
+
+#[derive(Debug)]
+pub struct EvaluatorSet {
+    pub evaluators: Vec<EvaluatorType>,
+}
+
+// TODO: Try to think of a smart way to just have `get_evaluators<T>` and it
+// takes in an enum variant. I don't know if that's possible in Rust though,
+// enum variants on their own are not really values and they're definitely
+// not types.
+impl EvaluatorSet {
+    pub fn new(evaluators: Vec<EvaluatorType>) -> Self {
+        Self { evaluators }
+    }
+
+    pub fn get_metrics_evaluators(&self) -> Vec<&MetricsEvaluatorType> {
+        self.evaluators
+            .iter()
+            .filter_map(|evaluator| match evaluator {
+                EvaluatorType::Metrics(evaluator) => Some(evaluator),
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn get_system_information_evaluators(&self) -> Vec<&SystemInformationEvaluatorType> {
+        self.evaluators
+            .iter()
+            .filter_map(|evaluator| match evaluator {
+                EvaluatorType::SystemInformation(evaluator) => Some(evaluator),
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn get_direct_evaluators(&self) -> Vec<&EvaluatorType> {
+        self.evaluators
+            .iter()
+            .filter(|evaluator| {
+                matches!(evaluator, EvaluatorType::Tps(_) | EvaluatorType::Latency(_))
+            })
+            .collect()
+    }
 }
 
 pub fn build_evaluators(
     evaluator_names: &[String],
     evaluator_args: &EvaluatorArgs,
-) -> Result<Vec<EvaluatorType>> {
+) -> Result<EvaluatorSet> {
     let mut evaluator_names: HashSet<String> = evaluator_names.iter().cloned().collect();
     let mut evaluators: Vec<EvaluatorType> = vec![];
 
-    let name = ConsensusProposalsEvaluator::get_name();
-    match evaluator_names.take(&name) {
-        Some(_) => {
-            evaluators.push(EvaluatorType::Metrics(Box::new(
-                ConsensusProposalsEvaluator::from_evaluator_args(evaluator_args)?,
-            )));
-        }
-        None => log_did_not_build(&name),
-    }
-
-    let name = StateSyncVersionEvaluator::get_name();
-    match evaluator_names.take(&name) {
-        Some(_) => {
-            evaluators.push(EvaluatorType::Metrics(Box::new(
-                StateSyncVersionEvaluator::from_evaluator_args(evaluator_args)?,
-            )));
-        }
-        None => log_did_not_build(&name),
-    }
-
-    let name = BuildVersionEvaluator::get_name();
-    match evaluator_names.take(&name) {
-        Some(_) => {
-            evaluators.push(EvaluatorType::SystemInformation(Box::new(
-                BuildVersionEvaluator::from_evaluator_args(evaluator_args)?,
-            )));
-        }
-        None => log_did_not_build(&name),
-    }
-
-    let name = TpsEvaluator::get_name();
-    match evaluator_names.take(&name) {
-        Some(_) => {
-            evaluators.push(EvaluatorType::Tps(Box::new(
-                TpsEvaluator::from_evaluator_args(evaluator_args)?,
-            )));
-        }
-        None => log_did_not_build(&name),
-    }
-
-    let name = LatencyEvaluator::get_name();
-    match evaluator_names.take(&name) {
-        Some(_) => {
-            evaluators.push(EvaluatorType::Latency(Box::new(
-                LatencyEvaluator::from_evaluator_args(evaluator_args)?,
-            )));
-        }
-        None => log_did_not_build(&name),
-    }
+    ConsensusProposalsEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_names,
+        evaluator_args,
+    )?;
+    StateSyncVersionEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_names,
+        evaluator_args,
+    )?;
+    BuildVersionEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_names,
+        evaluator_args,
+    )?;
+    TpsEvaluator::add_from_evaluator_args(&mut evaluators, &mut evaluator_names, evaluator_args)?;
+    LatencyEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_names,
+        evaluator_args,
+    )?;
 
     if !evaluator_names.is_empty() {
         bail!(
@@ -113,9 +128,5 @@ pub fn build_evaluators(
         );
     }
 
-    Ok(evaluators)
-}
-
-fn log_did_not_build(name: &str) {
-    info!("Did not build evaluator {}", name);
+    Ok(EvaluatorSet::new(evaluators))
 }

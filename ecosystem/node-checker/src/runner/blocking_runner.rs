@@ -4,24 +4,25 @@
 use super::{Runner, RunnerError};
 use crate::{
     configuration::NodeAddress,
-    evaluator::{EvaluationSummary, Evaluator},
+    evaluator::{EvaluationResult, EvaluationSummary, Evaluator},
     evaluators::{
         direct::{DirectEvaluatorInput, NodeIdentityEvaluator},
         metrics::{parse_metrics, MetricsEvaluatorInput},
         system_information::SystemInformationEvaluatorInput,
-        EvaluatorType,
+        EvaluatorSet, EvaluatorType,
     },
-    metric_collector::MetricCollector,
+    metric_collector::{MetricCollector, SystemInformation},
     server::NodeInformation,
 };
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use clap::Parser;
+use futures::future::{try_join_all, BoxFuture, TryFutureExt};
 use log::{debug, info};
 use poem_openapi::Object as PoemObject;
 use prometheus_parse::Scrape as PrometheusScrape;
 use serde::{Deserialize, Serialize};
-use tokio::time::{Duration, Instant};
+use tokio::{time::Duration, try_join};
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
 pub struct BlockingRunnerArgs {
@@ -35,7 +36,7 @@ pub struct BlockingRunner<M: MetricCollector> {
     baseline_node_information: NodeInformation,
     baseline_metric_collector: M,
     node_identity_evaluator: NodeIdentityEvaluator,
-    evaluators: Vec<EvaluatorType>,
+    evaluator_set: EvaluatorSet,
 }
 
 impl<M: MetricCollector> BlockingRunner<M> {
@@ -44,30 +45,123 @@ impl<M: MetricCollector> BlockingRunner<M> {
         baseline_node_information: NodeInformation,
         baseline_metric_collector: M,
         node_identity_evaluator: NodeIdentityEvaluator,
-        evaluators: Vec<EvaluatorType>,
+        evaluator_set: EvaluatorSet,
     ) -> Self {
         Self {
             args,
             baseline_node_information,
             baseline_metric_collector,
             node_identity_evaluator,
-            evaluators,
+            evaluator_set,
         }
     }
 
-    fn parse_response(&self, lines: Vec<String>) -> Result<PrometheusScrape, RunnerError> {
+    async fn collect_metrics<MC: MetricCollector>(
+        metric_collector: &MC,
+    ) -> Result<PrometheusScrape, RunnerError> {
+        let lines = metric_collector.collect_metrics().await?;
         parse_metrics(lines)
             .context("Failed to parse metrics response")
             .map_err(RunnerError::ParseMetricsError)
     }
 
-    async fn collect_metrics<MC: MetricCollector>(
+    async fn collect_system_information<MC: MetricCollector>(
         metric_collector: &MC,
-    ) -> Result<Vec<String>, RunnerError> {
-        metric_collector
-            .collect_metrics()
-            .await
-            .map_err(RunnerError::MetricCollectorError)
+    ) -> Result<SystemInformation, RunnerError> {
+        Ok(metric_collector.collect_system_information().await?)
+    }
+
+    async fn run_metrics_evaluators<T: MetricCollector>(
+        &self,
+        target_metric_collector: &T,
+    ) -> Result<Vec<EvaluationResult>, RunnerError> {
+        let evaluators = self.evaluator_set.get_metrics_evaluators();
+
+        if evaluators.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let first_baseline_metrics = Self::collect_metrics(&self.baseline_metric_collector).await?;
+        let first_target_metrics = Self::collect_metrics(target_metric_collector).await?;
+
+        tokio::time::sleep(Duration::from_secs(self.args.metrics_fetch_delay_secs)).await;
+
+        let second_baseline_metrics =
+            Self::collect_metrics(&self.baseline_metric_collector).await?;
+        let second_target_metrics = Self::collect_metrics(target_metric_collector).await?;
+
+        let input = MetricsEvaluatorInput {
+            previous_baseline_metrics: first_baseline_metrics,
+            previous_target_metrics: first_target_metrics,
+            latest_baseline_metrics: second_baseline_metrics,
+            latest_target_metrics: second_target_metrics,
+        };
+
+        let futures: Vec<BoxFuture<_>> = evaluators
+            .iter()
+            .map(|evaluator| evaluator.evaluate(&input))
+            .collect();
+
+        Ok(try_join_all(futures).await?.into_iter().flatten().collect())
+    }
+
+    async fn run_system_information_evaluators<T: MetricCollector>(
+        &self,
+        target_metric_collector: &T,
+    ) -> Result<Vec<EvaluationResult>, RunnerError> {
+        let evaluators = self.evaluator_set.get_system_information_evaluators();
+
+        if evaluators.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let baseline_system_information =
+            Self::collect_system_information(&self.baseline_metric_collector).await?;
+        let target_system_information =
+            Self::collect_system_information(target_metric_collector).await?;
+
+        let input = SystemInformationEvaluatorInput {
+            baseline_system_information,
+            target_system_information,
+        };
+
+        let futures: Vec<BoxFuture<_>> = evaluators
+            .iter()
+            .map(|evaluator| evaluator.evaluate(&input))
+            .collect();
+
+        Ok(try_join_all(futures).await?.into_iter().flatten().collect())
+    }
+
+    async fn run_direct_evaluators(
+        &self,
+        target_node_address: &NodeAddress,
+    ) -> Result<Vec<EvaluationResult>, RunnerError> {
+        let evaluators = self.evaluator_set.get_direct_evaluators();
+
+        let direct_evaluator_input = DirectEvaluatorInput {
+            baseline_node_information: self.baseline_node_information.clone(),
+            target_node_address: target_node_address.clone(),
+        };
+
+        let mut futures: Vec<BoxFuture<_>> = vec![];
+        for evaluator in &evaluators {
+            futures.push(match evaluator {
+                EvaluatorType::Tps(evaluator) => Box::pin(
+                    evaluator
+                        .evaluate(&direct_evaluator_input)
+                        .err_into::<RunnerError>(),
+                ),
+                EvaluatorType::Latency(evaluator) => Box::pin(
+                    evaluator
+                        .evaluate(&direct_evaluator_input)
+                        .err_into::<RunnerError>(),
+                ),
+                _ => continue,
+            });
+        }
+
+        Ok(try_join_all(futures).await?.into_iter().flatten().collect())
     }
 }
 
@@ -106,110 +200,20 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
                 return Ok(EvaluationSummary::from(node_identity_evaluations));
             }
         }
-
-        debug!("Collecting system information from baseline node");
-        let baseline_system_information = self
-            .baseline_metric_collector
-            .collect_system_information()
-            .await
-            .map_err(RunnerError::MetricCollectorError)?;
-        debug!("{:?}", baseline_system_information);
-
-        debug!("Collecting system information from target node");
-        let target_system_information = target_metric_collector
-            .collect_system_information()
-            .await
-            .map_err(RunnerError::MetricCollectorError)?;
-        debug!("{:?}", target_system_information);
-
-        debug!("Collecting first round of baseline metrics");
-        let first_baseline_metrics = self
-            .baseline_metric_collector
-            .collect_metrics()
-            .await
-            .map_err(RunnerError::MetricCollectorError)?;
-
-        debug!("Collecting first round of target metrics");
-        let first_target_metrics = Self::collect_metrics(target_metric_collector).await?;
-
-        let first_baseline_metrics = self.parse_response(first_baseline_metrics)?;
-        let first_target_metrics = self.parse_response(first_target_metrics)?;
-
         let mut evaluation_results = node_identity_evaluations;
 
-        // If the TPS evaluator was specified, run it here because it takes time
-        // to run. This is a bit messy right now, since the TPS evaluator, if
-        // configured differently, could theoretically run longer than the
-        // metrics_fetch_delay. TODO: Change it to metrics_fetch_delay_minimum
-        // and make each evaluator handle the fact that the delay could be longer.
-        // If the specific amount of time matters to a future evaluator, pass it
-        // in to that evaluator and it can slice up the delta as necessary.
-
-        // TODO: We could also get some slight speed wins if we awaited this
-        // evaluator and all the metric collection futures together.
-
-        let metrics_fetch_delay_time =
-            Instant::now() + Duration::from_secs(self.args.metrics_fetch_delay_secs);
-
-        let tps_evaluator = self.evaluators.iter().find_map(|e| match e {
-            EvaluatorType::Tps(evaluator) => Some(evaluator),
-            _ => None,
-        });
-
-        if let Some(tps_evaluator) = tps_evaluator {
-            debug!("Starting TPS evaluator");
-            evaluation_results.append(
-                &mut tps_evaluator
-                    .evaluate(&direct_evaluator_input)
-                    .await
-                    .map_err(RunnerError::TpsEvaluatorError)?,
-            );
-            debug!("TPS evaluator done");
-        }
-
-        tokio::time::sleep_until(metrics_fetch_delay_time).await;
-
-        debug!("Collecting second round of baseline metrics");
-        let second_baseline_metrics =
-            Self::collect_metrics(&self.baseline_metric_collector).await?;
-
-        debug!("Collecting second round of target metrics");
-        let second_target_metrics = Self::collect_metrics(target_metric_collector).await?;
-
-        let second_baseline_metrics = self.parse_response(second_baseline_metrics)?;
-        let second_target_metrics = self.parse_response(second_target_metrics)?;
-
-        let metrics_evaluator_input = MetricsEvaluatorInput {
-            previous_baseline_metrics: first_baseline_metrics,
-            previous_target_metrics: first_target_metrics,
-            latest_baseline_metrics: second_baseline_metrics,
-            latest_target_metrics: second_target_metrics,
-        };
-
-        let system_information_evaluator_input = SystemInformationEvaluatorInput {
-            baseline_system_information,
-            target_system_information,
-        };
-
-        for evaluator in &self.evaluators {
-            let mut local_evaluation_results = match evaluator {
-                EvaluatorType::Metrics(evaluator) => evaluator
-                    .evaluate(&metrics_evaluator_input)
-                    .await
-                    .map_err(RunnerError::MetricEvaluatorError)?,
-                EvaluatorType::SystemInformation(evaluator) => evaluator
-                    .evaluate(&system_information_evaluator_input)
-                    .await
-                    .map_err(RunnerError::SystemInformationEvaluatorError)?,
-                // The TPS evaluator has already been used above.
-                EvaluatorType::Tps(_) => vec![],
-                EvaluatorType::Latency(evaluator) => evaluator
-                    .evaluate(&direct_evaluator_input)
-                    .await
-                    .map_err(RunnerError::LatencyEvaluatorError)?,
-            };
-            evaluation_results.append(&mut local_evaluation_results);
-        }
+        // Run these different classes of evaluator wrappers simultaneously.
+        // By evaluator wrapper I mean, these are functions that collect all
+        // the information necessary, e.g. fetching metrics, and then run all
+        // the evaluators that depend on that information.
+        let (mut metrics_results, mut system_information_results, mut direct_results) = try_join!(
+            self.run_metrics_evaluators(target_metric_collector),
+            self.run_system_information_evaluators(target_metric_collector),
+            self.run_direct_evaluators(target_node_address)
+        )?;
+        evaluation_results.append(&mut metrics_results);
+        evaluation_results.append(&mut system_information_results);
+        evaluation_results.append(&mut direct_results);
 
         let complete_evaluation = EvaluationSummary::from(evaluation_results);
 

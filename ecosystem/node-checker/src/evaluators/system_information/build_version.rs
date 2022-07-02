@@ -13,6 +13,7 @@ use super::{
 use crate::{
     configuration::EvaluatorArgs,
     evaluator::{EvaluationResult, Evaluator},
+    evaluators::EvaluatorType,
     metric_collector::SystemInformation,
 };
 use anyhow::Result;
@@ -142,6 +143,12 @@ impl Evaluator for BuildVersionEvaluator {
 
     fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {
         Ok(Self::new(evaluator_args.build_version_args.clone()))
+    }
+
+    fn evaluator_type_from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<EvaluatorType> {
+        Ok(EvaluatorType::SystemInformation(Box::new(
+            Self::from_evaluator_args(evaluator_args)?,
+        )))
     }
 }
 
