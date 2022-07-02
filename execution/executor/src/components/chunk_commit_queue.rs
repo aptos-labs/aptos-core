@@ -5,8 +5,7 @@
 
 use anyhow::{anyhow, Result};
 
-use crate::components::in_memory_state_calculator::IntoLedgerView;
-use executor_types::ExecutedChunk;
+use executor_types::{in_memory_state_calculator::IntoLedgerView, ExecutedChunk};
 use std::{collections::VecDeque, sync::Arc};
 use storage_interface::{DbReader, ExecutedTrees};
 

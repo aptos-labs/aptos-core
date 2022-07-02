@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::components::{chunk_output::ChunkOutput, in_memory_state_calculator::IntoLedgerView};
+use crate::components::chunk_output::ChunkOutput;
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -20,7 +20,7 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use aptos_vm::VMExecutor;
-use executor_types::ExecutedChunk;
+use executor_types::{in_memory_state_calculator::IntoLedgerView, ExecutedChunk};
 use move_deps::move_core_types::move_resource::MoveResource;
 use std::{collections::btree_map::BTreeMap, sync::Arc};
 use storage_interface::{cached_state_view::CachedStateView, DbReaderWriter, DbWriter, TreeState};

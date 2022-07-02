@@ -50,20 +50,14 @@ pub(crate) struct StateStore {
 // upcasting coercion for now. Should change it to a different trait once upcasting is stablized.
 // ref: https://github.com/rust-lang/rust/issues/65991
 impl DbReader for StateStore {
-    /// Get the state value with proof given the state key and version
-    fn get_state_value_with_proof_by_version(
+    /// Returns the latest state snapshot strictly before `next_version` if any.
+    fn get_state_snapshot_before(
         &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        let (leaf_data, proof) = self.state_merkle_db.get_with_proof(state_key, version)?;
-        Ok((
-            match leaf_data {
-                Some((_, (key, version))) => Some(self.expect_value_by_version(&key, version)?),
-                None => None,
-            },
-            proof,
-        ))
+        next_version: Version,
+    ) -> Result<Option<(Version, HashValue)>> {
+        self.get_state_snapshot_version_before(next_version)?
+            .map(|ver| Ok((ver, self.get_root_hash(ver)?)))
+            .transpose()
     }
 
     /// Get the lastest state value of the given key up to the given version. Only used for testing for now
@@ -85,14 +79,20 @@ impl DbReader for StateStore {
             .transpose()
     }
 
-    /// Returns the latest state snapshot strictly before `next_version` if any.
-    fn get_state_snapshot_before(
+    /// Get the state value with proof given the state key and version
+    fn get_state_value_with_proof_by_version(
         &self,
-        next_version: Version,
-    ) -> Result<Option<(Version, HashValue)>> {
-        self.get_state_snapshot_version_before(next_version)?
-            .map(|ver| Ok((ver, self.get_root_hash(ver)?)))
-            .transpose()
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
+        let (leaf_data, proof) = self.state_merkle_db.get_with_proof(state_key, version)?;
+        Ok((
+            match leaf_data {
+                Some((_, (key, version))) => Some(self.expect_value_by_version(&key, version)?),
+                None => None,
+            },
+            proof,
+        ))
     }
 }
 

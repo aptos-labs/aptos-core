@@ -28,10 +28,13 @@ use aptos_types::{
 };
 pub use error::Error;
 pub use executed_chunk::ExecutedChunk;
+pub use parsed_transaction_output::ParsedTransactionOutput;
 use scratchpad::{ProofRead, SparseMerkleTree};
 
 mod error;
 mod executed_chunk;
+pub mod in_memory_state_calculator;
+mod parsed_transaction_output;
 
 type SparseMerkleProof = aptos_types::proof::SparseMerkleProof;
 
