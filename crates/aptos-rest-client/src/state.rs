@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_api_types::{
-    X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
+    X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_LEDGER_OLDEST_VERSION, X_APTOS_LEDGER_TIMESTAMP,
+    X_APTOS_LEDGER_VERSION,
 };
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -32,9 +33,8 @@ impl State {
             .get(X_APTOS_EPOCH)
             .and_then(|h| h.to_str().ok())
             .and_then(|s| s.parse().ok());
-        // TODO: Why doesn't the constant work?
         let oldest_ledger_version = headers
-            .get("X-Aptos-Ledger-Oldest-Version")
+            .get(X_APTOS_LEDGER_OLDEST_VERSION)
             .and_then(|h| h.to_str().ok())
             .and_then(|s| s.parse().ok());
 
