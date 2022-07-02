@@ -1,14 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{format_err, Result};
 use aptos_rest_client::Client as RestClient;
 use reqwest::Url;
-use std::{
-    fmt,
-    time::{Duration, Instant},
-};
-use tokio::time;
+use std::fmt;
 
 #[derive(Clone)]
 pub struct Instance {
@@ -24,16 +19,6 @@ impl Instance {
             url,
             inspection_service_port,
         }
-    }
-
-    pub async fn wait_server_ready(&self, deadline: Instant) -> Result<()> {
-        while self.rest_client().get_ledger_information().await.is_err() {
-            if Instant::now() > deadline {
-                return Err(format_err!("wait_server_ready for {} timed out", self));
-            }
-            time::sleep(Duration::from_secs(3)).await;
-        }
-        Ok(())
     }
 
     pub fn peer_name(&self) -> &String {
