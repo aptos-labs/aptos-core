@@ -41,10 +41,14 @@ impl fmt::Display for TxnStatsRate {
 
 impl TxnStats {
     pub fn rate(&self, window: Duration) -> TxnStatsRate {
+        let mut window_secs = window.as_secs();
+        if window_secs < 1 {
+            window_secs = 1;
+        }
         TxnStatsRate {
-            submitted: self.submitted / window.as_secs(),
-            committed: self.committed / window.as_secs(),
-            expired: self.expired / window.as_secs(),
+            submitted: self.submitted / window_secs,
+            committed: self.committed / window_secs,
+            expired: self.expired / window_secs,
             latency: if self.committed == 0 {
                 0u64
             } else {

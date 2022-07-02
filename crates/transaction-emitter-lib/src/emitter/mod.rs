@@ -299,8 +299,8 @@ impl<'t> TxnEmitter<'t> {
     pub async fn periodic_stat(&mut self, job: &EmitJob, duration: Duration, interval_secs: u64) {
         let deadline = Instant::now() + duration;
         let mut prev_stats: Option<TxnStats> = None;
+        let window = Duration::from_secs(min(interval_secs, 1));
         while Instant::now() < deadline {
-            let window = Duration::from_secs(interval_secs);
             tokio::time::sleep(window).await;
             let stats = self.peek_job_stats(job);
             let delta = &stats - &prev_stats.unwrap_or_default();
@@ -317,7 +317,9 @@ impl<'t> TxnEmitter<'t> {
         let job = self.start_job(emit_job_request).await?;
         info!("Starting emitting txns for {} secs", duration.as_secs());
         time::sleep(duration).await;
+        info!("Ran for {} secs, stopping job...", duration.as_secs());
         let stats = self.stop_job(job).await;
+        info!("Stopped job");
         Ok(stats)
     }
 
@@ -327,9 +329,12 @@ impl<'t> TxnEmitter<'t> {
         emit_job_request: EmitJobRequest,
         interval_secs: u64,
     ) -> Result<TxnStats> {
+        info!("Starting emitting txns for {} secs", duration.as_secs());
         let job = self.start_job(emit_job_request).await?;
         self.periodic_stat(&job, duration, interval_secs).await;
+        info!("Ran for {} secs, stopping job...", duration.as_secs());
         let stats = self.stop_job(job).await;
+        info!("Stopped job");
         Ok(stats)
     }
 
