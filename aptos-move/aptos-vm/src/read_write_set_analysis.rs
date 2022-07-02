@@ -4,7 +4,6 @@
 use crate::{
     adapter_common::PreprocessedTransaction,
     move_vm_ext::MoveResolverExt,
-    script_to_script_function::remapping,
     system_module_names::{BLOCK_MODULE, BLOCK_PROLOGUE, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME},
 };
 use anyhow::{anyhow, bail, Result};
@@ -19,7 +18,6 @@ use move_deps::{
         identifier::{IdentStr, Identifier},
         language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
         resolver::ModuleResolver,
-        transaction_argument::convert_txn_args,
         value::{serialize_values, MoveValue},
     },
     read_write_set_dynamic::{ConcretizedFormals, NormalizedReadWriteSetAnalysis},
@@ -115,18 +113,7 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
                 concretize,
             ),
             TransactionPayload::Script(s) => {
-                if let Some((module, func_name)) = remapping(s.code()) {
-                    self.get_concretized_keys_script_function(
-                        tx,
-                        module,
-                        func_name,
-                        convert_txn_args(s.args()).as_slice(),
-                        s.ty_args(),
-                        concretize,
-                    )
-                } else {
-                    bail!("Unsupported transaction script type {:?}", s)
-                }
+                bail!("Unsupported transaction script type {:?}", s)
             }
             payload => {
                 // TODO: support tx scripts here. Slightly tricky since we will need to run
