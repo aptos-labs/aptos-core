@@ -2,14 +2,12 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches: [main]
   pull_request:
-    types: [opened, synchronize]
 
 jobs:
   build:
       name: Lint and Build
-      timeout-minutes: 15
       runs-on: ${{ matrix.os }}
       # To use Remote Caching, uncomment the next lines and follow the steps below.
       # env:
@@ -21,9 +19,7 @@ jobs:
 
       steps:
         - name: Check out code
-          uses: actions/checkout@v2
-          with:
-            fetch-depth: 2
+          uses: actions/checkout@v3
 
         - name: Setup Node.js environment
           uses: actions/setup-node@v2
@@ -32,7 +28,7 @@ jobs:
             cache: 'yarn'
 
         - name: Install dependencies
-          run: yarn
+          run: yarn install --frozen-lockfile
 
         - name: Lint
           run: yarn lint
