@@ -27,11 +27,11 @@ use aptos_types::{
 };
 use aptos_vm::VMExecutor;
 use executor_types::{
-    ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, ExecutedTrees, TransactionReplayer,
+    ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, TransactionReplayer,
 };
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
-use storage_interface::{cached_state_view::CachedStateView, DbReaderWriter};
+use storage_interface::{cached_state_view::CachedStateView, DbReaderWriter, ExecutedTrees};
 
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,

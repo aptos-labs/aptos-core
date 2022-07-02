@@ -1,8 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::components::apply_chunk_output::ParsedTransactionOutput;
+use std::{
+    collections::{hash_map, HashMap, HashSet},
+    sync::Arc,
+};
+
 use anyhow::{anyhow, bail, ensure, Result};
+use once_cell::sync::Lazy;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_state_view::{account_with_state_cache::AsAccountWithStateCache, StateViewId};
 use aptos_types::{
@@ -16,20 +23,16 @@ use aptos_types::{
     transaction::{Transaction, TransactionPayload, Version},
     write_set::{WriteOp, WriteSet},
 };
-use executor_types::{ExecutedTrees, ProofReader};
-use once_cell::sync::Lazy;
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use executor_types::ProofReader;
 use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
-use std::{
-    collections::{hash_map, HashMap, HashSet},
-    sync::Arc,
-};
 use storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
     in_memory_state::InMemoryState,
     sync_proof_fetcher::SyncProofFetcher,
-    DbReader, TreeState,
+    DbReader, ExecutedTrees, TreeState,
 };
+
+use crate::components::apply_chunk_output::ParsedTransactionOutput;
 
 pub trait IntoLedgerView {
     fn into_ledger_view(self, db: &Arc<dyn DbReader>) -> Result<ExecutedTrees>;

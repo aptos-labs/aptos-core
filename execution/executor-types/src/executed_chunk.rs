@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{ExecutedTrees, StateComputeResult, TransactionData};
+use crate::{StateComputeResult, TransactionData};
 use anyhow::{bail, ensure, Result};
 use aptos_crypto::hash::{CryptoHash, TransactionAccumulatorHasher};
 use aptos_types::{
@@ -14,6 +14,7 @@ use aptos_types::{
     transaction::{Transaction, TransactionInfo, TransactionStatus, TransactionToCommit},
 };
 use std::sync::Arc;
+use storage_interface::ExecutedTrees;
 
 #[derive(Default)]
 pub struct ExecutedChunk {
@@ -101,7 +102,7 @@ impl ExecutedChunk {
                 if &txn_data.txn_info != expected_txn_info {
                     bail!(
                         "Transaction infos don't match. version: {}, txn_info:{}, expected_txn_info:{}",
-                        self.result_view.transaction_accumulator.version() + 1 + idx as u64
+                        self.result_view.txn_accumulator().version() + 1 + idx as u64
                             - self.to_commit.len() as u64,
                         &txn_data.txn_info,
                         expected_txn_info,

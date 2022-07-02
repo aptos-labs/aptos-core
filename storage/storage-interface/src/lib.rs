@@ -39,6 +39,7 @@ use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
 pub mod cached_state_view;
+mod executed_trees;
 pub mod in_memory_state;
 #[cfg(any(feature = "testing", feature = "fuzzing"))]
 pub mod mock;
@@ -46,6 +47,8 @@ pub mod no_proof_fetcher;
 pub mod proof_fetcher;
 pub mod state_view;
 pub mod sync_proof_fetcher;
+
+pub use executed_trees::ExecutedTrees;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct StartupInfo {

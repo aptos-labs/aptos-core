@@ -35,7 +35,6 @@ use aptos_types::{
 use channel::{aptos_channel, message_queues::QueueStyle};
 use claim::assert_ok;
 use consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
-use executor_types::ExecutedTrees;
 use futures::{executor::block_on, future::FutureExt, StreamExt};
 use memsocket::MemoryListener;
 use netcore::transport::ConnectionOrigin;
@@ -70,6 +69,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use storage_interface::ExecutedTrees;
 use tokio::runtime::Runtime;
 use vm_genesis::GENESIS_KEYPAIR;
 
