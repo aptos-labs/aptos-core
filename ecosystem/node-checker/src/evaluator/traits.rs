@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{configuration::EvaluatorArgs, evaluator::EvaluationResult};
-use std::{error::Error, fmt::Debug};
+use crate::{configuration::EvaluatorArgs, evaluator::EvaluationResult, evaluators::EvaluatorType};
+use log::info;
+use std::{collections::HashSet, error::Error, fmt::Debug};
 
 // You'll notice that a couple of the methods here require Self: Sized.
 // The intent with the Evaluator trait is that a caller will build a vec
@@ -49,4 +50,29 @@ pub trait Evaluator: Debug + Sync + Send {
     fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> anyhow::Result<Self>
     where
         Self: Sized;
+
+    /// This is useful for build_evaluators.
+    fn evaluator_type_from_evaluator_args(
+        evaluator_args: &EvaluatorArgs,
+    ) -> anyhow::Result<EvaluatorType>
+    where
+        Self: Sized;
+
+    /// This is useful for build_evaluators.
+    /// There should be no reason to override the default impl.
+    fn add_from_evaluator_args(
+        evaluators: &mut Vec<EvaluatorType>,
+        evaluator_names: &mut HashSet<String>,
+        evaluator_args: &EvaluatorArgs,
+    ) -> anyhow::Result<()>
+    where
+        Self: Sized,
+    {
+        let name = Self::get_name();
+        match evaluator_names.take(&name) {
+            Some(_) => evaluators.push(Self::evaluator_type_from_evaluator_args(evaluator_args)?),
+            None => info!("Did not build evaluator {}", name),
+        };
+        Ok(())
+    }
 }

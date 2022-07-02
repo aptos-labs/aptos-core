@@ -11,6 +11,7 @@ use super::{
 use crate::{
     configuration::EvaluatorArgs,
     evaluator::{EvaluationResult, Evaluator},
+    evaluators::EvaluatorType,
 };
 use anyhow::Result;
 use clap::Parser;
@@ -207,6 +208,12 @@ impl Evaluator for StateSyncVersionEvaluator {
 
     fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {
         Ok(Self::new(evaluator_args.state_sync_version_args.clone()))
+    }
+
+    fn evaluator_type_from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<EvaluatorType> {
+        Ok(EvaluatorType::Metrics(Box::new(Self::from_evaluator_args(
+            evaluator_args,
+        )?)))
     }
 }
 

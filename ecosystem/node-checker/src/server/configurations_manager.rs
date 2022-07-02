@@ -45,7 +45,7 @@ fn build_node_configuration_wrapper_with_blocking_runner(
         node_configuration.node_address.metrics_port,
     );
 
-    let evaluators = build_evaluators(
+    let evaluator_set = build_evaluators(
         &node_configuration.evaluators,
         &node_configuration.evaluator_args,
     )
@@ -59,7 +59,7 @@ fn build_node_configuration_wrapper_with_blocking_runner(
         baseline_node_information,
         baseline_metric_collector,
         node_identity_evaluator,
-        evaluators,
+        evaluator_set,
     );
 
     let wrapper = NodeConfigurationWrapper {

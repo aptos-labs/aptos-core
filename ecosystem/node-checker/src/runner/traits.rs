@@ -20,11 +20,11 @@ use crate::{
 pub enum RunnerError {
     /// We failed to get the node identity.
     #[error("Failed to check identity of node: {0}")]
-    NodeIdentityEvaluatorError(NodeIdentityEvaluatorError),
+    NodeIdentityEvaluatorError(#[from] NodeIdentityEvaluatorError),
 
     /// We failed to collect metrics for some reason.
     #[error("Failed to collect metrics: {0}")]
-    MetricCollectorError(MetricCollectorError),
+    MetricCollectorError(#[from] MetricCollectorError),
 
     /// We couldn't parse the metrics.
     #[error("Failed to parse metrics: {0}")]
@@ -33,21 +33,21 @@ pub enum RunnerError {
     /// One of the metrics evaluators failed. This is not the same as a poor score from
     /// an evaluator, this is an actual failure in the evaluation process.
     #[error("Failed to evaluate metrics: {0}")]
-    MetricEvaluatorError(MetricsEvaluatorError),
+    MetricEvaluatorError(#[from] MetricsEvaluatorError),
 
     /// One of the system information evaluators failed. This is not the same
     /// as a poor score from an evaluator, this is an actual failure in the
     /// evaluation process.
     #[error("Failed to evaluate system information: {0}")]
-    SystemInformationEvaluatorError(SystemInformationEvaluatorError),
+    SystemInformationEvaluatorError(#[from] SystemInformationEvaluatorError),
 
     /// The TPS evaluator failed. This is not the same as a poor score from an
     /// evaluator, this is an actual failure in the evaluation process.
     #[error("Failed to evaluate TPS: {0}")]
-    TpsEvaluatorError(TpsEvaluatorError),
+    TpsEvaluatorError(#[from] TpsEvaluatorError),
 
     #[error("Failed to evaluate latency: {0}")]
-    LatencyEvaluatorError(LatencyEvaluatorError),
+    LatencyEvaluatorError(#[from] LatencyEvaluatorError),
 }
 
 /// This trait describes a Runner, something that can take in instances of other
