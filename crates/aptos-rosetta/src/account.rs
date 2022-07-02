@@ -18,7 +18,7 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, trace};
-use aptos_rest_client::{aptos::Balance, aptos_api_types::U64};
+use aptos_rest_client::{aptos::Balance, aptos_api_types::U64, v2::client::AptosClient};
 use aptos_sdk::move_types::{identifier::Identifier, language_storage::TypeTag};
 use aptos_types::account_address::AccountAddress;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
@@ -104,7 +104,7 @@ async fn account_balance(
 }
 
 async fn get_block_index_from_request(
-    rest_client: &aptos_rest_client::Client,
+    rest_client: &AptosClient,
     partial_block_identifier: Option<PartialBlockIdentifier>,
     block_size: u64,
 ) -> ApiResult<u64> {
@@ -159,7 +159,7 @@ async fn get_block_index_from_request(
 }
 
 async fn get_balances(
-    rest_client: &aptos_rest_client::Client,
+    rest_client: &AptosClient,
     address: AccountAddress,
     version: u64,
 ) -> ApiResult<HashMap<TypeTag, Balance>> {
@@ -204,7 +204,7 @@ impl CoinCache {
     /// Retrieve a currency and cache it if applicable
     pub async fn get_currency(
         &self,
-        rest_client: &aptos_rest_client::Client,
+        rest_client: &AptosClient,
         coin: TypeTag,
         version: u64,
     ) -> ApiResult<Option<Currency>> {
@@ -228,7 +228,7 @@ impl CoinCache {
     /// Pulls currency information from onchain
     pub async fn get_currency_inner(
         &self,
-        rest_client: &aptos_rest_client::Client,
+        rest_client: &AptosClient,
         coin: TypeTag,
         version: u64,
     ) -> ApiResult<Option<Currency>> {

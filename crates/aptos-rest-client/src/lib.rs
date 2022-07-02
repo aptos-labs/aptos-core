@@ -26,6 +26,7 @@ pub mod types;
 use crate::aptos::{AptosVersion, Balance};
 pub use types::{Account, Resource, RestError};
 pub mod aptos;
+pub mod v2;
 
 pub const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
 

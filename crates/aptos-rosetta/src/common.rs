@@ -8,7 +8,7 @@ use crate::{
 };
 use aptos_crypto::ValidCryptoMaterial;
 use aptos_logger::debug;
-use aptos_rest_client::{aptos::Balance, Account, Response};
+use aptos_rest_client::{aptos::Balance, v2::client::AptosClient, Account, Response};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -92,7 +92,7 @@ where
 }
 
 pub async fn get_account(
-    rest_client: &aptos_rest_client::Client,
+    rest_client: &AptosClient,
     address: AccountAddress,
 ) -> ApiResult<Response<Account>> {
     rest_client
@@ -102,7 +102,7 @@ pub async fn get_account(
 }
 
 pub async fn get_account_balance(
-    rest_client: &aptos_rest_client::Client,
+    rest_client: &AptosClient,
     address: AccountAddress,
 ) -> ApiResult<Response<Balance>> {
     rest_client

@@ -79,7 +79,7 @@ impl BlockIdentifier {
         } else {
             BlockIdentifier {
                 index: version_to_block_index(block_size, info.version.0),
-                hash: info.accumulator_root_hash.to_string(),
+                hash: info.hash.to_string(),
             }
         }
     }

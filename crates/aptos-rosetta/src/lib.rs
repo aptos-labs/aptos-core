@@ -9,7 +9,7 @@ use crate::{account::CoinCache, error::ApiError};
 use aptos_api::runtime::WebServer;
 use aptos_config::config::ApiConfig;
 use aptos_logger::debug;
-use aptos_rest_client::aptos_api_types::Error;
+use aptos_rest_client::{aptos_api_types::Error, v2::client::AptosClient};
 use aptos_types::chain_id::ChainId;
 use std::{convert::Infallible, sync::Arc};
 use tokio::task::JoinHandle;
@@ -39,7 +39,7 @@ pub const ROSETTA_VERSION: &str = "1.4.12";
 #[derive(Clone, Debug)]
 pub struct RosettaContext {
     /// A rest client to connect to a fullnode
-    rest_client: Option<aptos_rest_client::Client>,
+    rest_client: Option<AptosClient>,
     /// ChainId of the chain to connect to
     pub chain_id: ChainId,
 
@@ -48,7 +48,7 @@ pub struct RosettaContext {
 }
 
 impl RosettaContext {
-    fn rest_client(&self) -> Result<&aptos_rest_client::Client, ApiError> {
+    fn rest_client(&self) -> Result<&AptosClient, ApiError> {
         if let Some(ref client) = self.rest_client {
             Ok(client)
         } else {
@@ -62,7 +62,7 @@ pub fn bootstrap(
     block_size: u64,
     chain_id: ChainId,
     api_config: ApiConfig,
-    rest_client: Option<aptos_rest_client::Client>,
+    rest_client: Option<AptosClient>,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .thread_name("rosetta")
@@ -88,7 +88,7 @@ pub fn bootstrap(
 pub async fn bootstrap_async(
     chain_id: ChainId,
     api_config: ApiConfig,
-    rest_client: Option<aptos_rest_client::Client>,
+    rest_client: Option<AptosClient>,
 ) -> anyhow::Result<JoinHandle<()>> {
     debug!("Starting up Rosetta server with {:?}", api_config);
     let api = WebServer::from(api_config);

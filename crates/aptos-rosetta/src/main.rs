@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 use aptos_config::config::ApiConfig;
+use aptos_rest_client::v2::client::{AptosClient, AptosClientBuilder};
 use aptos_rosetta::bootstrap;
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
@@ -42,7 +43,7 @@ trait ServerArgs {
     fn api_config(&self) -> ApiConfig;
 
     /// Retrieve the optional rest client for the local server
-    fn rest_client(&self) -> Option<aptos_rest_client::Client>;
+    fn rest_client(&self) -> Option<AptosClient>;
 
     /// Retrieve the chain id
     fn chain_id(&self) -> ChainId;
@@ -70,7 +71,7 @@ impl ServerArgs for CommandArgs {
         }
     }
 
-    fn rest_client(&self) -> Option<aptos_rest_client::Client> {
+    fn rest_client(&self) -> Option<AptosClient> {
         match self {
             CommandArgs::Online(args) => args.rest_client(),
             CommandArgs::Offline(args) => args.rest_client(),
@@ -125,7 +126,7 @@ impl ServerArgs for OfflineArgs {
         }
     }
 
-    fn rest_client(&self) -> Option<aptos_rest_client::Client> {
+    fn rest_client(&self) -> Option<AptosClient> {
         None
     }
 
@@ -152,8 +153,12 @@ impl ServerArgs for OnlineArgs {
         self.offline_args.api_config()
     }
 
-    fn rest_client(&self) -> Option<aptos_rest_client::Client> {
-        Some(aptos_rest_client::Client::new(self.rest_api_url.clone()))
+    fn rest_client(&self) -> Option<AptosClient> {
+        Some(
+            AptosClientBuilder::new(self.rest_api_url.clone())
+                .build()
+                .unwrap(),
+        )
     }
 
     fn chain_id(&self) -> ChainId {

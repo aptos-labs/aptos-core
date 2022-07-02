@@ -9,7 +9,7 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, trace};
-use aptos_rest_client::Transaction;
+use aptos_rest_client::{v2::client::AptosClient, Transaction};
 use std::str::FromStr;
 use warp::Filter;
 
@@ -55,7 +55,7 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
             // Allow 0x in front of hash
             let hash = HashValue::from_str(strip_hex_prefix(hash))
                 .map_err(|err| ApiError::AptosError(err.to_string()))?;
-            let response = rest_client.get_transaction(hash).await?;
+            let response = rest_client.get_transaction_by_hash(hash).await?;
             let txn = response.into_inner();
             let version = txn.version().unwrap();
             let block_index = version_to_block_index(server_context.block_size, version);
@@ -113,7 +113,7 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
 }
 
 async fn get_block_by_index(
-    rest_client: &aptos_rest_client::Client,
+    rest_client: &AptosClient,
     block_size: u64,
     block_index: u64,
 ) -> ApiResult<(Transaction, Vec<Transaction>)> {

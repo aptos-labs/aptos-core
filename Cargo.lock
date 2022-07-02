@@ -927,6 +927,7 @@ dependencies = [
  "bcs",
  "hex",
  "move-deps",
+ "percent-encoding",
  "reqwest",
  "serde 1.0.137",
  "serde_json",
