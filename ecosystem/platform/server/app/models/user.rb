@@ -108,7 +108,7 @@ class User < ApplicationRecord
                         })
     when 'google'
       # No additional data from Google. But we can trust the email!
-      if !confirmed? && !User.exists?(email: auth[:email])
+      if !email_confirmed? && !User.exists?(email: auth[:email])
         self.email = auth[:email]
         confirm
       end
@@ -119,7 +119,11 @@ class User < ApplicationRecord
   end
 
   def registration_completed?
-    confirmed? && username.present?
+    email_confirmed? && username.present?
+  end
+
+  def email_confirmed?
+    email.present? && confirmed?
   end
 
   private
