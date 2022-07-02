@@ -48,7 +48,7 @@ which aptos
 Command line help is available.  Type `aptos help` or `aptos --help` to see the available command options.
 ```bash
 $ aptos help
-aptos 0.1.0
+aptos 0.2.0
 Aptos Labs <opensource@aptoslabs.com>
 CLI tool for interacting with the Aptos blockchain and nodes
 
@@ -72,7 +72,7 @@ SUBCOMMANDS:
 Command specific help is also available.  For example, type `aptos move --help` to get command-specific help.
 ```bash
 $ aptos move --help
-aptos-move 0.1.0
+aptos-move 0.2.0
 CLI tool for performing Move tasks
 
 USAGE:
@@ -94,7 +94,7 @@ SUBCOMMANDS:
 Help for sub-commands is also available.  For example, type `aptos move compile --help` to get command-specific help.
 ```bash
 $ aptos move compile --help
-aptos-move-compile 0.1.0
+aptos-move-compile 0.2.0
 Compiles a package and returns the [`ModuleId`]s
 
 USAGE:
