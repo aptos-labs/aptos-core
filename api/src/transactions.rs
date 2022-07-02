@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    accept_type::AcceptType,
     context::Context,
     failpoint::fail_point,
     metrics::metrics,
@@ -10,9 +11,10 @@ use crate::{
 };
 
 use aptos_api_types::{
-    mime_types::BCS_SIGNED_TRANSACTION, AsConverter, Error, LedgerInfo, Response, Transaction,
-    TransactionData, TransactionId, TransactionOnChainData, TransactionSigningMessage,
-    UserCreateSigningMessageRequest, UserTransactionRequest,
+    mime_types::{BCS, BCS_SIGNED_TRANSACTION},
+    AsConverter, Error, LedgerInfo, Response, Transaction, TransactionData, TransactionId,
+    TransactionOnChainData, TransactionSigningMessage, UserCreateSigningMessageRequest,
+    UserTransactionRequest,
 };
 use aptos_crypto::signing_message;
 use aptos_types::{
@@ -27,28 +29,62 @@ use anyhow::Result;
 use aptos_types::transaction::{ExecutionStatus, TransactionInfo, TransactionStatus};
 use warp::{
     filters::BoxedFilter,
-    http::{header::CONTENT_TYPE, StatusCode},
+    http::{
+        header::{ACCEPT, CONTENT_TYPE},
+        StatusCode,
+    },
     reply, Filter, Rejection, Reply,
 };
 
 // GET /transactions/{txn-hash / version}
-pub fn get_transaction(context: Context) -> BoxedFilter<(impl Reply,)> {
+pub fn get_json_transaction(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("transactions" / TransactionIdParam)
         .and(warp::get())
         .and(context.filter())
+        .map(|id, context| (id, context, AcceptType::Json))
+        .untuple_one()
         .and_then(handle_get_transaction)
-        .with(metrics("get_transaction"))
+        .with(metrics("get_json_transaction"))
+        .boxed()
+}
+
+// GET /transactions/{txn-hash / version}
+pub fn get_bcs_transaction(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("transactions" / TransactionIdParam)
+        .and(warp::get())
+        .and(warp::header::exact_ignore_case(ACCEPT.as_str(), BCS))
+        .and(context.filter())
+        .map(|id, context| (id, context, AcceptType::Bcs))
+        .untuple_one()
+        .and_then(handle_get_transaction)
+        .with(metrics("get_bcs_transaction"))
         .boxed()
 }
 
 // GET /transactions?start={u64}&limit={u16}
-pub fn get_transactions(context: Context) -> BoxedFilter<(impl Reply,)> {
+pub fn get_json_transactions(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("transactions")
         .and(warp::get())
         .and(warp::query::<Page>())
         .and(context.filter())
+        .map(|page: Page, context: Context| (page, context, AcceptType::Json))
+        .untuple_one()
         .and_then(handle_get_transactions)
-        .with(metrics("get_transactions"))
+        .with(metrics("get_json_transactions"))
+        .boxed()
+}
+
+// GET /transactions?start={u64}&limit={u16}
+pub fn get_bcs_transactions(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("transactions")
+        .and(warp::get())
+        .and(warp::header::exact_ignore_case(ACCEPT.as_str(), BCS))
+        .and(warp::query::<Page>())
+        .and(context.filter())
+        .map(|page: Page, context: Context| (page, context, AcceptType::Bcs))
+        .untuple_one()
+        .and_then(handle_get_transactions)
+        .with(metrics("get_bcs_transactions"))
         .boxed()
 }
 
@@ -149,16 +185,21 @@ pub fn create_signing_message(context: Context) -> BoxedFilter<(impl Reply,)> {
 async fn handle_get_transaction(
     id: TransactionIdParam,
     context: Context,
+    accept_type: AcceptType,
 ) -> Result<impl Reply, Rejection> {
     fail_point("endpoint_get_transaction")?;
     Ok(Transactions::new(context)?
-        .get_transaction(id.parse("transaction hash or version")?)
+        .get_transaction(id.parse("transaction hash or version")?, accept_type)
         .await?)
 }
 
-async fn handle_get_transactions(page: Page, context: Context) -> Result<impl Reply, Rejection> {
+async fn handle_get_transactions(
+    page: Page,
+    context: Context,
+    accept_type: AcceptType,
+) -> Result<impl Reply, Rejection> {
     fail_point("endpoint_get_transactions")?;
-    Ok(Transactions::new(context)?.list(page)?)
+    Ok(Transactions::new(context)?.list(page, accept_type)?)
 }
 
 async fn handle_get_account_transactions(
@@ -321,10 +362,10 @@ impl Transactions {
             changes: output.write_set().clone(),
         };
 
-        self.render_transactions(vec![simulated_txn])
+        self.render_transactions(vec![simulated_txn], AcceptType::Json)
     }
 
-    pub fn list(self, page: Page) -> Result<impl Reply, Error> {
+    pub fn list(self, page: Page, accept_type: AcceptType) -> Result<impl Reply, Error> {
         let ledger_version = self.ledger_info.version();
         let limit = page.limit()?;
         let last_page_start = if ledger_version > (limit as u64) {
@@ -338,7 +379,7 @@ impl Transactions {
             .context
             .get_transactions(start_version, limit, ledger_version)?;
 
-        self.render_transactions(data)
+        self.render_transactions(data, accept_type)
     }
 
     pub fn list_by_account(self, address: AddressParam, page: Page) -> Result<impl Reply, Error> {
@@ -348,10 +389,14 @@ impl Transactions {
             page.limit()?,
             self.ledger_info.version(),
         )?;
-        self.render_transactions(data)
+        self.render_transactions(data, AcceptType::Json)
     }
 
-    fn render_transactions(self, data: Vec<TransactionOnChainData>) -> Result<impl Reply, Error> {
+    fn render_transactions(
+        self,
+        data: Vec<TransactionOnChainData>,
+        accept_type: AcceptType,
+    ) -> Result<impl Reply, Error> {
         if data.is_empty() {
             let txns: Vec<Transaction> = vec![];
             return Response::new(self.ledger_info, &txns);
@@ -370,10 +415,17 @@ impl Transactions {
                 Ok(txn)
             })
             .collect::<Result<_>>()?;
-        Response::new(self.ledger_info, &txns)
+        match accept_type {
+            AcceptType::Json => Response::new(self.ledger_info, &txns),
+            AcceptType::Bcs => Response::new_bcs(self.ledger_info, &txns),
+        }
     }
 
-    pub async fn get_transaction(self, id: TransactionId) -> Result<impl Reply, Error> {
+    pub async fn get_transaction(
+        self,
+        id: TransactionId,
+        accept_type: AcceptType,
+    ) -> Result<impl Reply, Error> {
         let txn_data = match id.clone() {
             TransactionId::Hash(hash) => self.get_by_hash(hash.into()).await?,
             TransactionId::Version(version) => self.get_by_version(version)?,
@@ -393,7 +445,10 @@ impl Transactions {
             }
         };
 
-        Response::new(self.ledger_info, &txn)
+        match accept_type {
+            AcceptType::Json => Response::new(self.ledger_info, &txn),
+            AcceptType::Bcs => Response::new_bcs(self.ledger_info, &txn),
+        }
     }
 
     pub fn signing_message(
