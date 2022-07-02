@@ -107,7 +107,13 @@ BlockType:
                   - U64
                   - TYPENAME: AccountAddress
     1:
-      NilBlock: UNIT
+      NilBlock:
+        STRUCT:
+          - failed_authors:
+              SEQ:
+                TUPLE:
+                  - U64
+                  - TYPENAME: AccountAddress
     2:
       Genesis: UNIT
 ChainId:
