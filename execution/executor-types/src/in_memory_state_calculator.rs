@@ -10,6 +10,7 @@ use anyhow::{anyhow, bail, ensure, Result};
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
+use crate::{ParsedTransactionOutput, ProofReader};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_state_view::{account_with_state_cache::AsAccountWithStateCache, StateViewId};
 use aptos_types::{
@@ -23,7 +24,6 @@ use aptos_types::{
     transaction::{Transaction, TransactionPayload, Version},
     write_set::{WriteOp, WriteSet},
 };
-use executor_types::ProofReader;
 use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
 use storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
@@ -31,8 +31,6 @@ use storage_interface::{
     sync_proof_fetcher::SyncProofFetcher,
     DbReader, ExecutedTrees, TreeState,
 };
-
-use crate::components::apply_chunk_output::ParsedTransactionOutput;
 
 pub trait IntoLedgerView {
     fn into_ledger_view(self, db: &Arc<dyn DbReader>) -> Result<ExecutedTrees>;
@@ -102,7 +100,7 @@ pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_
 ///                                                                          /
 ///                                (creates checkpoint SMT on checkpoint txn)
 ///                                        (creates "latest SMT" on finish())
-pub(crate) struct InMemoryStateCalculator {
+pub struct InMemoryStateCalculator {
     // This makes sure all in-mem nodes seen while proofs were fetched stays in mem during the
     // calculation
     _frozen_base: FrozenSparseMerkleTree<StateValue>,

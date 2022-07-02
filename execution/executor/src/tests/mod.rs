@@ -23,13 +23,16 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptosdb::AptosDB;
-use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
+use executor_types::{
+    in_memory_state_calculator::IntoLedgerView, BlockExecutorTrait, ChunkExecutorTrait,
+    TransactionReplayer,
+};
 use storage_interface::{DbReaderWriter, ExecutedTrees};
 
 use crate::{
     block_executor::BlockExecutor,
     chunk_executor::ChunkExecutor,
-    components::{chunk_output::ChunkOutput, in_memory_state_calculator::IntoLedgerView},
+    components::chunk_output::ChunkOutput,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
     mock_vm::{
         encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,

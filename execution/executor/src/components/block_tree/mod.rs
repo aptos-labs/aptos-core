@@ -6,10 +6,7 @@
 #[cfg(test)]
 mod test;
 
-use crate::{
-    components::in_memory_state_calculator::IntoLedgerView,
-    logging::{LogEntry, LogSchema},
-};
+use crate::logging::{LogEntry, LogSchema};
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
@@ -18,7 +15,7 @@ use aptos_types::{
     ledger_info::LedgerInfo, proof::definition::LeafCount, state_store::state_value::StateValue,
 };
 use consensus_types::block::Block as ConsensusBlock;
-use executor_types::{Error, ExecutedChunk};
+use executor_types::{in_memory_state_calculator::IntoLedgerView, Error, ExecutedChunk};
 use scratchpad::SparseMerkleTree;
 use std::{
     collections::{hash_map::Entry, HashMap},

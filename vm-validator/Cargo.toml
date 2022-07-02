@@ -18,6 +18,7 @@ aptos-types = { path = "../types" }
 aptos-vm = { path = "../aptos-move/aptos-vm" }
 aptos-workspace-hack = { path = "../crates/aptos-workspace-hack" }
 executor = { path = "../execution/executor" }
+executor-types = { path = "../execution/executor-types" }
 storage-interface = { path = "../storage/storage-interface" }
 
 [dev-dependencies]

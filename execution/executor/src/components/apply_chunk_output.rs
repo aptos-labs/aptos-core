@@ -3,13 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{
-    components::{
-        chunk_output::ChunkOutput,
-        in_memory_state_calculator::{InMemoryStateCalculator, NEW_EPOCH_EVENT_KEY},
-    },
-    metrics::APTOS_EXECUTOR_ERRORS,
-};
+use crate::{components::chunk_output::ChunkOutput, metrics::APTOS_EXECUTOR_ERRORS};
 use anyhow::{ensure, Result};
 use aptos_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher},
@@ -17,15 +11,16 @@ use aptos_crypto::{
 };
 use aptos_logger::error;
 use aptos_types::{
-    contract_event::ContractEvent,
     nibble::nibble_path::NibblePath,
     proof::accumulator::InMemoryAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, TransactionOutput, TransactionStatus},
-    write_set::WriteSet,
 };
-use executor_types::{ExecutedChunk, TransactionData};
-use std::{collections::HashMap, iter::repeat, ops::Deref, sync::Arc};
+use executor_types::{
+    in_memory_state_calculator::InMemoryStateCalculator, ExecutedChunk, ParsedTransactionOutput,
+    TransactionData,
+};
+use std::{collections::HashMap, iter::repeat, sync::Arc};
 use storage_interface::ExecutedTrees;
 
 pub struct ApplyChunkOutput;
@@ -215,56 +210,4 @@ pub fn ensure_no_discard(to_discard: Vec<Transaction>) -> Result<()> {
 pub fn ensure_no_retry(to_retry: Vec<Transaction>) -> Result<()> {
     ensure!(to_retry.is_empty(), "Chunk crosses epoch boundary.",);
     Ok(())
-}
-
-pub(crate) struct ParsedTransactionOutput {
-    output: TransactionOutput,
-    reconfig_events: Vec<ContractEvent>,
-}
-
-impl From<TransactionOutput> for ParsedTransactionOutput {
-    fn from(output: TransactionOutput) -> Self {
-        let reconfig_events = output
-            .events()
-            .iter()
-            .filter(|e| *e.key() == *NEW_EPOCH_EVENT_KEY)
-            .cloned()
-            .collect();
-        Self {
-            output,
-            reconfig_events,
-        }
-    }
-}
-
-impl Deref for ParsedTransactionOutput {
-    type Target = TransactionOutput;
-
-    fn deref(&self) -> &Self::Target {
-        &self.output
-    }
-}
-
-impl ParsedTransactionOutput {
-    pub(crate) fn is_reconfig(&self) -> bool {
-        !self.reconfig_events.is_empty()
-    }
-
-    pub fn unpack(
-        self,
-    ) -> (
-        WriteSet,
-        Vec<ContractEvent>,
-        Vec<ContractEvent>,
-        u64,
-        TransactionStatus,
-    ) {
-        let Self {
-            output,
-            reconfig_events,
-        } = self;
-        let (write_set, events, gas_used, status) = output.unpack();
-
-        (write_set, events, reconfig_events, gas_used, status)
-    }
 }

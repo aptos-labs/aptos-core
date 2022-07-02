@@ -29,10 +29,8 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::backup::restore_handler::RestoreHandler;
-use executor::{
-    chunk_executor::ChunkExecutor, components::in_memory_state_calculator::IntoLedgerView,
-};
-use executor_types::TransactionReplayer;
+use executor::chunk_executor::ChunkExecutor;
+use executor_types::{in_memory_state_calculator::IntoLedgerView, TransactionReplayer};
 use futures::{
     future,
     future::TryFutureExt,

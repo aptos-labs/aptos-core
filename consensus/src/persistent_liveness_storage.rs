@@ -12,7 +12,7 @@ use aptos_types::{
 use consensus_types::{
     block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
 };
-use executor::components::in_memory_state_calculator::IntoLedgerView;
+use executor_types::in_memory_state_calculator::IntoLedgerView;
 use std::{cmp::max, collections::HashSet, sync::Arc};
 use storage_interface::DbReader;
 
