@@ -461,7 +461,9 @@ impl RoundManager {
             }
             _ => {
                 // Didn't vote in this round yet, generate a backup vote
-                let nil_block = self.proposal_generator.generate_nil_block(round)?;
+                let nil_block = self
+                    .proposal_generator
+                    .generate_nil_block(round, &mut self.proposer_election)?;
                 info!(
                     self.new_log(LogEvent::VoteNIL),
                     "Planning to vote for a NIL block {}", nil_block
@@ -532,11 +534,13 @@ impl RoundManager {
         let expected_failed_authors = self.proposal_generator.compute_failed_authors(
             proposal.round(),
             proposal.quorum_cert().certified_block().round(),
+            proposal.is_nil_block(),
             &mut self.proposer_election,
         );
         ensure!(
             proposal.block_data().failed_authors().map_or(false, |failed_authors| *failed_authors == expected_failed_authors),
-            "[RoundManager] Proposal for block {} has invalid failed_authors list {:?}, expected {:?}",
+            "[RoundManager] Proposal for {} block {} has invalid failed_authors list {:?}, expected {:?}",
+            if proposal.is_nil_block() {"NIL"} else  {"proposal"},
             proposal.round(),
             proposal.block_data().failed_authors(),
             expected_failed_authors,
