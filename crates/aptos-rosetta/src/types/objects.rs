@@ -12,20 +12,22 @@ use crate::{
 use aptos_logger::info;
 use aptos_rest_client::{
     aptos::Balance,
-    aptos_api_types::{MoveStructTag, WriteSetChange},
+    aptos_api_types::{WriteSetChange, U64},
 };
 use aptos_sdk::move_types::{ident_str, identifier::Identifier};
-use aptos_types::account_address::AccountAddress;
+use aptos_types::{
+    account_address::AccountAddress,
+    account_config::{DepositEvent, WithdrawEvent},
+    event::EventKey,
+};
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
+use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
     str::FromStr,
     sync::Arc,
 };
-use aptos_types::transaction::authenticator::AuthenticationKey;
-use move_deps::move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
 /// A description of all types used by the Rosetta implementation.
 ///
@@ -384,7 +386,7 @@ pub struct Transaction {
 }
 
 impl Transaction {
-    pub fn from_transaction(
+    pub async fn from_transaction(
         coin_cache: Arc<CoinCache>,
         rest_client: &aptos_rest_client::Client,
         txn: aptos_rest_client::Transaction,
@@ -415,7 +417,6 @@ impl Transaction {
 
         // TODO: put these somewhere better
         let account: Identifier = ident_str!("Account").into();
-        let test_coin: Identifier = ident_str!("TestCoin").into();
         let coin_info: Identifier = ident_str!("CoinInfo").into();
         let coin: Identifier = ident_str!("Coin").into();
         let coin_store: Identifier = ident_str!("CoinStore").into();
@@ -425,120 +426,194 @@ impl Transaction {
         let decimals_id: Identifier = ident_str!("decimals").into();
         let symbol_id: Identifier = ident_str!("symbol").into();
 
-
-        for change in txn_info.changes {
-            let mut operation_type = None;
-            let mut amount = None;
+        for change in &txn_info.changes {
             // TODO: Handle delete resource ?
             if let WriteSetChange::WriteResource { address, data, .. } = change {
                 // Determine operation
-                MoveStructTag {
-                    address,
-                    module,
-                    name,
-                    generic_type_params,
-                } = data.typ;
                 let address = *address.inner();
+                let module = data.typ.module.clone();
+                let name = data.typ.name.clone();
+                let generic_type_params = &data.typ.generic_type_params;
 
                 // Only handle framework events for now
-                if address == AccountAddress::ONE {
+                let op_details = if *data.typ.address.inner() == AccountAddress::ONE {
+                    let mut op_details = None;
                     if module == account && name == account {
                         // Account sequence number increase (possibly creation)
-                        let move_struct: AnnotatedMoveStruct = data.data.into();
-
                         // Find out if it's the 0th sequence number (creation)
-                        let mut op_details = None;
-                        for (id, value) in move_struct.value {
-                            if id == sequence_number {
-                                if let AnnotatedMoveValue::U64(0) = value {
+                        for (id, value) in data.data.0.iter() {
+                            if id == &sequence_number {
+                                if let Ok(U64(0)) = serde_json::from_value::<U64>(value.clone()) {
                                     op_details = Some(OperationDetails::CreateAccount);
                                     break;
                                 }
                             }
                         }
-                        op_details
                     } else if module == coin && name == coin_info {
                         // Coin creation
-                        let move_struct: AnnotatedMoveStruct = data.data.into();
                         let mut decimals: Option<u64> = None;
                         let mut symbol = None;
 
                         // Find the coin details
-                        for (id, value) in move_struct.value {
-                            if id == decimals_id {
-                                if let AnnotatedMoveValue::U64(dec) = value {
+                        for (id, value) in data.data.0.iter() {
+                            if id == &decimals_id {
+                                if let Ok(U64(dec)) = serde_json::from_value::<U64>(value.clone()) {
                                     decimals = Some(dec);
                                 }
-                            } else if id == symbol_id {
-                                symbol = Some(value.to_string());
+                            } else if id == &symbol_id {
+                                if let Ok(sym) = serde_json::from_value::<String>(value.clone()) {
+                                    symbol = Some(sym);
+                                }
                             }
                         }
 
                         // Only if we got all the fields do we use it
-                        if let (Some(decimals), Some(symbol), Some(coin_type)) = (decimals, symbol, generic_type_params.first()) {
-                            Some(OperationDetails::CreateCoin {
+                        if let (Some(decimals), Some(symbol), Some(coin_type)) =
+                            (decimals, symbol, generic_type_params.first())
+                        {
+                            op_details = Some(OperationDetails::CreateCoin {
                                 coin_type: coin_type.to_string(),
                                 symbol,
-                                decimals
+                                decimals,
                             })
-                        } else {
-                            None
                         }
                     } else if module == coin && name == coin_store {
-                        // Account balance change
-                        let move_struct: AnnotatedMoveStruct = data.data.into();
-                        let mut withdraw_event = None;
-                        let mut deposit_event = None;
+                        if let Some(Ok(coin)) = generic_type_params
+                            .first()
+                            .map(|err| err.clone().try_into())
+                        {
+                            // Account balance change
+                            let mut withdraw_event = None;
+                            let mut deposit_event = None;
 
-                        // Find the coin details
-                        for (id, value) in move_struct.value {
-                            if id == withdraw_events {
-                                if let AnnotatedMoveValue::U64(dec) = value {
-                                    decimals = Some(dec);
+                            // Find the coin details
+                            for (id, value) in data.data.0.iter() {
+                                if id == &withdraw_events {
+                                    if let Ok(event) =
+                                        serde_json::from_value::<CoinEvent>(value.clone())
+                                    {
+                                        withdraw_event = Some(EventKey::new_from_address(
+                                            &event.guid.guid.addr,
+                                            event.guid.guid.creation_num.0,
+                                        ));
+                                    }
+                                } else if id == &deposit_events {
+                                    if let Ok(event) =
+                                        serde_json::from_value::<CoinEvent>(value.clone())
+                                    {
+                                        deposit_event = Some(EventKey::new_from_address(
+                                            &event.guid.guid.addr,
+                                            event.guid.guid.creation_num.0,
+                                        ));
+                                    }
                                 }
-                            } else if id == deposit_events {
-                                symbol = Some(value.to_string());
+                            }
+
+                            // Some transfers are onesided (e.g. mints)
+                            if withdraw_event.is_some() || deposit_event.is_some() {
+                                if let Some(currency) = coin_cache
+                                    .get_currency(rest_client, coin, Some(txn_info.version.0))
+                                    .await?
+                                {
+                                    op_details = Some(OperationDetails::TransferCoin {
+                                        currency,
+                                        withdraw_event_key: withdraw_event,
+                                        deposit_event_key: deposit_event,
+                                    })
+                                } else {
+                                    return Err(ApiError::BadCoin);
+                                }
+                            }
+                        }
+                    }
+                    op_details
+                } else {
+                    None
+                };
+
+                let operation_identifier = OperationIdentifier {
+                    index: operation_index,
+                    network_index: None,
+                };
+
+                // TODO: support coin creation?
+                match op_details {
+                    Some(OperationDetails::CreateAccount) => {
+                        operations.push(Operation {
+                            operation_identifier: OperationIdentifier {
+                                index: operation_index,
+                                network_index: None,
+                            },
+                            related_operations: None,
+                            operation_type: OperationType::CreateAccount.to_string(),
+                            status: Some(status.to_string()),
+                            account: None,
+                            amount: None,
+                        });
+                        operation_index += 1;
+                    }
+                    Some(OperationDetails::TransferCoin {
+                        currency,
+                        deposit_event_key,
+                        withdraw_event_key,
+                    }) => {
+                        // Determine amount change this is silly, cause you have to pull it from the events
+                        if let Some(event_key) = deposit_event_key {
+                            if let Some(event) = events
+                                .iter()
+                                .find(|event| EventKey::from(event.key) == event_key)
+                            {
+                                if let Ok(event) =
+                                    serde_json::from_value::<DepositEvent>(event.data.clone())
+                                {
+                                    operations.push(Operation {
+                                        operation_identifier: operation_identifier.clone(),
+                                        related_operations: None,
+                                        operation_type: OperationType::Deposit.to_string(),
+                                        status: Some(status.to_string()),
+                                        account: Some(AccountIdentifier::from(address)),
+                                        amount: Some(Amount {
+                                            value: event.amount().to_string(),
+                                            currency: currency.clone(),
+                                        }),
+                                    });
+                                    operation_index += 1;
+                                }
                             }
                         }
 
-                        // Only if we got all the fields do we use it
-                        if let (Some(decimals), Some(symbol), Some(coin_type)) = (decimals, symbol, generic_type_params.first()) {
-                            Some(OperationDetails::CreateCoin {
-                                coin_type: coin_type.to_string(),
-                                symbol,
-                                decimals
-                            })
-                        } else {
-                            None
+                        if let Some(event_key) = withdraw_event_key {
+                            if let Some(event) = events
+                                .iter()
+                                .find(|event| EventKey::from(event.key) == event_key)
+                            {
+                                if let Ok(event) =
+                                    serde_json::from_value::<WithdrawEvent>(event.data.clone())
+                                {
+                                    operations.push(Operation {
+                                        operation_identifier: operation_identifier.clone(),
+                                        related_operations: None,
+                                        operation_type: OperationType::Deposit.to_string(),
+                                        status: Some(status.to_string()),
+                                        account: Some(AccountIdentifier::from(address)),
+                                        amount: Some(Amount {
+                                            value: format!("-{}", event.amount()),
+                                            currency: currency.clone(),
+                                        }),
+                                    });
+                                    operation_index += 1;
+                                }
+                            }
                         }
-
                     }
+                    _ => {}
                 }
-
             }
-            // Determine amount change this is silly, cause you have to pull it from the events
-
-            operations.push(Operation {
-                operation_identifier: OperationIdentifier {
-                    index: operation_index,
-                    network_index: None,
-                },
-                related_operations: None,
-                operation_type: "".to_string(),
-                status: Some(status.to_string()),
-                account: Some(AccountIdentifier::from(*address.inner())),
-                amount: None,
-            });
-
-            operation_index += 1;
         }
-
-        // TODO: Convert balance operations
-        //let currency = coin_cache.get_currency(rest_client, "", 0);
 
         Ok(Transaction {
             transaction_identifier: (&txn_info).into(),
-            operations: vec![],
+            operations,
             related_transactions: None,
         })
     }
@@ -552,20 +627,14 @@ pub enum OperationDetails {
         decimals: u64,
     },
     TransferCoin {
-        withdraw_event_key: Option<String>,
-        deposit_event_key: Option<String>,
+        currency: Currency,
+        withdraw_event_key: Option<EventKey>,
+        deposit_event_key: Option<EventKey>,
     },
 }
 
-pub struct Account {
-        // I don't really need these fields
-        //authentication_key: AuthenticationKey,
-        //self_address: AccountAddress,
-        sequence_number: u64,
-    }
-
-    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-    pub enum InternalOperation {
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum InternalOperation {
     Transfer(Transfer),
 }
 
@@ -668,5 +737,44 @@ impl Transfer {
             amount,
             currency,
         })
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct CoinEvent {
+    guid: Guid,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Guid {
+    guid: EventId,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct EventId {
+    #[serde(deserialize_with = "deserialize_account_address")]
+    addr: AccountAddress,
+    creation_num: U64,
+}
+
+fn deserialize_account_address<'de, D>(
+    deserializer: D,
+) -> std::result::Result<AccountAddress, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    if deserializer.is_human_readable() {
+        let s = <String>::deserialize(deserializer)?;
+        AccountAddress::from_hex_literal(&s).map_err(D::Error::custom)
+    } else {
+        // In order to preserve the Serde data model and help analysis tools,
+        // make sure to wrap our value in a container with the same name
+        // as the original type.
+        #[derive(::serde::Deserialize)]
+        #[serde(rename = "AccountAddress")]
+        struct Value([u8; AccountAddress::LENGTH]);
+
+        let value = Value::deserialize(deserializer)?;
+        Ok(AccountAddress::new(value.0))
     }
 }

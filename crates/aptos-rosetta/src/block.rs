@@ -94,11 +94,10 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
 
     let mut txns: Vec<Transaction> = Vec::new();
     for txn in transactions {
-        txns.push(Transaction::from_transaction(
-            server_context.coin_cache.clone(),
-            rest_client,
-            txn,
-        )?)
+        txns.push(
+            Transaction::from_transaction(server_context.coin_cache.clone(), rest_client, txn)
+                .await?,
+        )
     }
 
     let block = Block {

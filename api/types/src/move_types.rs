@@ -249,7 +249,7 @@ impl HexEncodedBytes {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct MoveStructValue(BTreeMap<Identifier, serde_json::Value>);
+pub struct MoveStructValue(pub BTreeMap<Identifier, serde_json::Value>);
 
 impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
     type Error = anyhow::Error;
