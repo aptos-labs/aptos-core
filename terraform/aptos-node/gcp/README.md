@@ -39,7 +39,7 @@ Install pre-requisites if needed:
 4. Modify `main.tf` file to configure Terraform, and create fullnode from Terraform module. Example content for `main.tf`:
   ```
   terraform {
-    required_version = "~> 1.1.0"
+    required_version = "~> 1.2.0"
     backend "gcs" {
       bucket = "BUCKET_NAME" # bucket name created in step 2
       prefix = "state/aptos-node"
