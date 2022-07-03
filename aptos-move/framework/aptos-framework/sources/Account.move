@@ -1,7 +1,6 @@
 module AptosFramework::Account {
     use Std::BCS;
     use Std::Errors;
-    use Std::GUID;
     use Std::Hash;
     use Std::Signer;
     use Std::Vector;
@@ -359,9 +358,10 @@ module AptosFramework::Account {
     /// A resource account is used to manage resources independent of an account managed by a user.
     public fun create_resource_account(
         source: &signer,
+        seed: vector<u8>,
     ): (signer, SignerCapability) {
-        let guid = GUID::create(source);
-        let bytes = BCS::to_bytes(&guid);
+        let bytes = BCS::to_bytes(&Signer::address_of(source));
+        Vector::append(&mut bytes, seed);
         let addr = create_address(Hash::sha3_256(bytes));
 
         let signer = create_account_internal(copy addr);
@@ -386,7 +386,7 @@ module AptosFramework::Account {
 
     #[test(user = @0x1)]
     public(script) fun test_create_resource_account(user: signer) {
-        let (resource_account, _) = create_resource_account(&user);
+        let (resource_account, _) = create_resource_account(&user, x"01");
         assert!(Signer::address_of(&resource_account) != Signer::address_of(&user), 0);
         Coin::register<TestCoin>(&resource_account);
     }
@@ -396,7 +396,7 @@ module AptosFramework::Account {
 
     #[test(user = @0x1)]
     public(script) fun test_module_capability(user: signer) acquires DummyResource {
-        let (resource_account, signer_cap) = create_resource_account(&user);
+        let (resource_account, signer_cap) = create_resource_account(&user, x"01");
         assert!(Signer::address_of(&resource_account) != Signer::address_of(&user), 0);
 
         let resource_account_from_cap = create_signer_with_capability(&signer_cap);
