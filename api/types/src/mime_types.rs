@@ -3,4 +3,3 @@
 
 pub const BCS_SIGNED_TRANSACTION: &str = "application/x.aptos.signed_transaction+bcs";
 pub const JSON: &str = "application/json";
-pub const BCS: &str = "application/x.aptos.output+bcs";
