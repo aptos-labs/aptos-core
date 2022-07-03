@@ -140,12 +140,13 @@ impl Events {
             self.ledger_info.version(),
         )?;
 
-        let resolver = self.context.move_resolver()?;
-        let events = resolver.as_converter().try_into_events(&contract_events)?;
-
         match accept_type {
-            AcceptType::Json => Response::new(self.ledger_info, &events),
-            AcceptType::Bcs => Response::new_bcs(self.ledger_info, &events),
+            AcceptType::Json => {
+                let resolver = self.context.move_resolver()?;
+                let events = resolver.as_converter().try_into_events(&contract_events)?;
+                Response::new(self.ledger_info, &events)
+            }
+            AcceptType::Bcs => Response::new_bcs(self.ledger_info, &contract_events),
         }
     }
 }
