@@ -359,11 +359,26 @@ module AptosFramework::Account {
     /// due to Move requirements that `move_to` be executed on a resource within the same module
     /// that defines that resource.
     ///
-    /// As a small example:
+    /// As a small example, a developer wishes to deploy a new LiquidityPool. Each Coin is housed
+    /// within a Coin<LiquidityPool<X, Y>>. The developer should follow these steps:
+    ///
+    /// 1. Create a new account using `create_resource_account`, stores the `signer_cap` in safe
+    /// space that can be retrieved in the ensuing steps, and rotates the authentication key to a
+    /// known private, public keypair.
+    /// 2. Define the LiquidityPool module's address to be this address.
+    /// 3. In the LiquidityPool module's `init_module` function, retrieve and store the `signer_cap`
+    /// and rotate the authentication key to `0x0`.
+    /// 4. When adding a new coin, the module will load the capability and hence the signer to
+    /// register and store new LiquidityCoin resources.
+    ///
     /// ```
-    /// let (signer, cap) = create_resource_account(&source);
-    /// let lp = LiquidityPool { signer_cap: cap, ... };
-    /// move_to(&signer, lp);
+    /// fun init_module(source: &signer) {
+    ///   let dev_address = @DEV_ADDR;
+    ///   let signer_cap = retrieve_capability_from_dev_address(&source, dev_address);
+    ///   let lp_signer = create_signer_with_capability(&signer_cap);
+    ///   let lp = LiquidityPoolInfo { signer_cap: signer_cap, ... };
+    ///   move_to(&lp_signer, lp);
+    /// }
     /// ```
     ///
     /// Later on during a coin registration:
@@ -381,7 +396,6 @@ module AptosFramework::Account {
     ): (signer, SignerCapability) {
         let guid = GUID::create(source);
         let bytes = BCS::to_bytes(&guid);
-        Vector::append(&mut bytes, BCS::to_bytes(&Timestamp::now_microseconds()));
         let addr = create_address(Hash::sha3_256(bytes));
 
         let signer = create_account_internal(copy addr);
@@ -404,12 +418,8 @@ module AptosFramework::Account {
         create_signer(*addr)
     }
 
-    #[test(core_resources = @CoreResources, user = @0x1)]
-    public(script) fun test_create_resource_account(
-        core_resources: signer,
-        user: signer,
-    ) {
-        Timestamp::set_time_has_started_for_testing(&core_resources);
+    #[test(user = @0x1)]
+    public(script) fun test_create_resource_account(user: signer) {
         let (resource_account, _) = create_resource_account(&user);
         assert!(Signer::address_of(&resource_account) != Signer::address_of(&user), 0);
         Coin::register<TestCoin>(&resource_account);
@@ -418,12 +428,8 @@ module AptosFramework::Account {
     #[test_only]
     struct DummyResource has key { }
 
-    #[test(core_resources = @CoreResources, user = @0x1)]
-    public(script) fun test_module_capability(
-        core_resources: signer,
-        user: signer,
-    ) acquires DummyResource {
-        Timestamp::set_time_has_started_for_testing(&core_resources);
+    #[test(user = @0x1)]
+    public(script) fun test_module_capability(user: signer) acquires DummyResource {
         let (resource_account, signer_cap) = create_resource_account(&user);
         assert!(Signer::address_of(&resource_account) != Signer::address_of(&user), 0);
 
