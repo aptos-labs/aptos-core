@@ -99,7 +99,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\"})",
+          "expr": "sum by (owner, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\"})",
           "interval": "",
           "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
           "refId": "A"
@@ -201,7 +201,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\" }[$AggInterval]))",
+          "expr": "sum by (owner, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\" }[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
           "refId": "A"
@@ -301,7 +301,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_connections_rejected{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\"}[1m])",
+          "expr": "rate(aptos_connections_rejected{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\"}[1m])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
           "refId": "A"
@@ -402,7 +402,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -505,7 +505,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", type=\"request\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", type=\"request\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -608,7 +608,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -710,7 +710,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
           "refId": "A"
@@ -811,7 +811,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", metric=\"allowed\", direction=\"inbound\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"inbound\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
@@ -912,7 +912,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", metric=\"throttled\", direction=\"inbound\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"inbound\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
@@ -1417,7 +1417,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\".*-($container)-e.*\", owner=~\"$owner\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\".*-($container)-e.*\", owner=~\"$owner\"}",
+          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\", owner=~\"$owner\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\", owner=~\"$owner\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1485,6 +1485,40 @@
         "regex": "",
         "skipUrlSync": false,
         "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(namespace)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "query": "label_values(namespace)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
       },
       {
         "current": {

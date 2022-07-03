@@ -97,7 +97,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -197,7 +197,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -297,7 +297,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -397,7 +397,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -497,7 +497,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -614,7 +614,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -714,7 +714,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(rate(aptos_struct_log_connect_error_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]) or 0 * rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])) / rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "(rate(aptos_struct_log_connect_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]) or 0 * rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])) / rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -831,7 +831,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "1-(rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
+          "expr": "1-(rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -931,7 +931,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) or\n      rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) * 0) + (rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) * 0 or rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]))",
+          "expr": "(rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) or\n      rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) * 0) + (rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) * 0 or rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -1031,7 +1031,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$AggInterval]) or 0 * rate(aptos_struct_log_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]))/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$AggInterval])",
+          "expr": "(rate(aptos_struct_log_queue_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$AggInterval]) or 0 * rate(aptos_struct_log_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]))/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -1131,7 +1131,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) or 0 * rate(aptos_struct_log_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]))/rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$AggInterval])",
+          "expr": "(rate(aptos_struct_log_send_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]) or 0 * rate(aptos_struct_log_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$AggInterval]))/rate(aptos_struct_log_processed_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -1196,6 +1196,40 @@
         "regex": "",
         "skipUrlSync": false,
         "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(namespace)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "query": "label_values(namespace)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
       },
       {
         "current": {
