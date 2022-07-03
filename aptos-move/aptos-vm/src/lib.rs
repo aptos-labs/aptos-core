@@ -119,7 +119,6 @@ pub mod move_vm_ext;
 pub mod natives;
 pub mod parallel_executor;
 pub mod read_write_set_analysis;
-pub mod script_to_script_function;
 pub mod system_module_names;
 pub mod transaction_metadata;
 

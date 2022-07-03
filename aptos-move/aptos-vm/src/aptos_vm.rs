@@ -15,7 +15,6 @@ use crate::{
     errors::expect_only_successful_execution,
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
-    script_to_script_function,
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     VMExecutor, VMValidator,
@@ -306,7 +305,6 @@ impl AptosVM {
 
             match payload {
                 TransactionPayload::Script(script) => {
-                    let remapped_script = script_to_script_function::remapping(script.code());
                     let mut senders = vec![txn_data.sender()];
                     senders.extend(txn_data.secondary_signers());
                     let loaded_func =
@@ -316,23 +314,12 @@ impl AptosVM {
                         convert_txn_args(script.args()),
                         &loaded_func,
                     )?;
-                    match remapped_script {
-                        // We are in this case before VERSION_2
-                        // or if there is no remapping for the script
-                        None => session.execute_script(
-                            script.code(),
-                            script.ty_args().to_vec(),
-                            args,
-                            gas_status,
-                        ),
-                        Some((module, function)) => session.execute_entry_function(
-                            module,
-                            function,
-                            script.ty_args().to_vec(),
-                            args,
-                            gas_status,
-                        ),
-                    }
+                    session.execute_script(
+                        script.code(),
+                        script.ty_args().to_vec(),
+                        args,
+                        gas_status,
+                    )
                 }
                 TransactionPayload::ScriptFunction(script_fn) => {
                     let mut senders = vec![txn_data.sender()];
@@ -573,6 +560,7 @@ impl AptosVM {
                     None => vec![*execute_as],
                     Some(sender) => vec![sender, *execute_as],
                 };
+
                 let loaded_func = tmp_session
                     .load_script(script.code(), script.ty_args().to_vec())
                     .map_err(|e| Err(e.into_vm_status()))?;
@@ -582,26 +570,17 @@ impl AptosVM {
                     &loaded_func,
                 )
                 .map_err(Err)?;
-                let remapped_script = script_to_script_function::remapping(script.code());
-                let execution_result = match remapped_script {
-                    // We are in this case before VERSION_2
-                    // or if there is no remapping for the script
-                    None => tmp_session.execute_script(
+
+                let execution_result = tmp_session
+                    .execute_script(
                         script.code(),
                         script.ty_args().to_vec(),
                         args,
                         &mut gas_status,
-                    ),
-                    Some((module, function)) => tmp_session.execute_entry_function(
-                        module,
-                        function,
-                        script.ty_args().to_vec(),
-                        args,
-                        &mut gas_status,
-                    ),
-                }
-                .and_then(|_| tmp_session.finish())
-                .map_err(|e| e.into_vm_status());
+                    )
+                    .and_then(|_| tmp_session.finish())
+                    .map_err(|e| e.into_vm_status());
+
                 match execution_result {
                     Ok(session_out) => session_out.into_change_set(&mut ()).map_err(Err)?,
                     Err(e) => {
