@@ -85,7 +85,7 @@ async fn account_balance(
     for (coin, balance) in balances {
         if let Some(currency) = server_context
             .coin_cache
-            .get_currency(rest_client, coin, balance_version)
+            .get_currency(rest_client, coin, Some(balance_version))
             .await?
         {
             amounts.push(Amount {
@@ -219,7 +219,7 @@ impl CoinCache {
         &self,
         rest_client: &aptos_rest_client::Client,
         coin: TypeTag,
-        version: u64,
+        version: Option<u64>,
     ) -> ApiResult<Option<Currency>> {
         {
             let currencies = self.currencies.read().unwrap();
@@ -243,7 +243,7 @@ impl CoinCache {
         &self,
         rest_client: &aptos_rest_client::Client,
         coin: TypeTag,
-        version: u64,
+        version: Option<u64>,
     ) -> ApiResult<Option<Currency>> {
         /// Type for deserializing coin info
         #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -270,9 +270,15 @@ impl CoinCache {
         let resource_tag = format!("0x1::Coin::CoinInfo<{}>", struct_tag);
         let encoded_resource_tag = utf8_percent_encode(&resource_tag, ENCODE_CHARS).to_string();
 
-        let response = rest_client
-            .get_account_resource_at_version(address, &encoded_resource_tag, version)
-            .await?;
+        let response = if let Some(version) = version {
+            rest_client
+                .get_account_resource_at_version(address, &encoded_resource_tag, version)
+                .await?
+        } else {
+            rest_client
+                .get_account_resource(address, &encoded_resource_tag)
+                .await?
+        };
 
         // At this point if we've retrieved it and it's bad, we error out
         if let Some(resource) = response.into_inner() {

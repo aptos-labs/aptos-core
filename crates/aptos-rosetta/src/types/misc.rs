@@ -79,7 +79,6 @@ pub struct Version {
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum OperationType {
-    CreateCoin,
     CreateAccount,
     Deposit,
     Withdraw,
