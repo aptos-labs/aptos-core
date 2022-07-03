@@ -5,6 +5,7 @@ use std::sync::Arc;
 // use futures::channel::{mpsc, mpsc::Sender, oneshot};
 use crate::quorum_store::batch_reader::BatchReader;
 use aptos_crypto::HashValue;
+use aptos_logger::debug;
 use aptos_types::transaction::SignedTransaction;
 use arc_swap::ArcSwapOption;
 use consensus_types::common::Payload;
@@ -12,8 +13,6 @@ use consensus_types::proof_of_store::LogicalTime;
 use consensus_types::request_response::WrapperCommand;
 use executor_types::Error;
 use futures::channel::mpsc::Sender;
-use tokio::sync::oneshot;
-use aptos_logger::debug;
 
 /// Notification of execution committed logical time for QuorumStore to clean.
 #[async_trait::async_trait]
@@ -84,34 +83,43 @@ impl DataManager for QuorumStoreDataManager {
         match payload {
             Payload::Empty => {
                 debug!("QSE: empty Payload");
-                Ok(Vec::new())},
+                Ok(Vec::new())
+            }
             Payload::DirectMempool(_) => {
                 unreachable!("Quorum store should be used.")
             }
             Payload::InQuorumStore(poss) => {
                 let mut receivers = Vec::new();
                 for pos in poss {
-                    debug!("QSE: requesting pos {:?}", pos);
-                    let (tx_data, rx_data) = oneshot::channel();
-                    self.data_reader
-                        .load()
-                        .as_ref()
-                        .unwrap() //TODO: can this be None? Need to make sure we call new_epoch() first.
-                        .get_batch(pos, tx_data)
-                        .await;
-                    receivers.push(rx_data);
+                    debug!("QSE: requesting pos {:?}, digest {}", pos, pos.digest());
+                    receivers.push(
+                        self.data_reader
+                            .load()
+                            .as_ref()
+                            .unwrap() //TODO: can this be None? Need to make sure we call new_epoch() first.
+                            .get_batch(pos)
+                            .await,
+                    );
                 }
                 let mut ret = Vec::new();
                 for rx in receivers {
-                    match rx.await.expect("oneshot was dropped") {
+                    debug!("QSE: waiting on rx");
+
+                    match rx
+                        .await
+                        .expect("Oneshot channel to get a batch was dropped")
+                    {
                         Ok(data) => {
-                            debug!("QSHE: data {:?}", data);
-                            ret.push(data)}
+                            debug!("QS: data {:?}", data);
+                            ret.push(data)
+                        }
                         Err(e) => {
-                            debug!("QSE: could not get data {:?}", e);
+                            debug!("QS: could not get data {:?}", e);
                             return Err(Error::CouldNotGetData);
                         }
                     }
+
+                    debug!("QSE: done waiting");
                 }
                 Ok(ret.into_iter().flatten().collect())
             }

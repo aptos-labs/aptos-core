@@ -15,6 +15,7 @@ use crate::quorum_store::{
 };
 use crate::round_manager::VerifiedEvent;
 use aptos_crypto::HashValue;
+use aptos_logger::debug;
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
@@ -29,7 +30,6 @@ use futures::{
 use std::collections::HashMap;
 use std::sync::{mpsc::sync_channel, Arc};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use aptos_logger::debug;
 
 pub type ProofReturnChannel = oneshot::Sender<Result<ProofOfStore, QuorumStoreError>>;
 pub type DigestReturnChannel = oneshot::Sender<Result<HashValue, QuorumStoreError>>;
@@ -56,7 +56,6 @@ pub struct QuorumStore {
     batch_aggregator: BatchAggregator,
     batch_store_tx: Sender<BatchStoreCommand>,
     proof_builder_tx: Sender<ProofBuilderCommand>,
-    // validator_signer: Arc<ValidatorSigner>,
     digest_end_batch: HashMap<HashValue, (Fragment, ProofReturnChannel)>,
 }
 
@@ -75,7 +74,7 @@ pub struct QuorumStoreConfig {
 }
 
 impl QuorumStore {
-    //TODO: pass epoc state
+    //TODO: pass epoch state
     pub fn new(
         epoch: u64, //TODO: pass the epoch config
         last_committed_round: Round,
@@ -88,8 +87,13 @@ impl QuorumStore {
         signer: ValidatorSigner,
         wrapper_command_rx: tokio::sync::mpsc::Receiver<QuorumStoreCommand>,
     ) -> (Self, Arc<BatchReader>) {
+        debug!(
+            "QS: QuorumStore new, epoch = {}, last r = {}, timeout ms {}",
+            epoch, last_committed_round, config.batch_request_timeout_ms,
+        );
         let validator_signer = Arc::new(signer);
-        //prepare the channels for communication among the working thread.
+
+        // Prepare communication channels among the threads.
         let (batch_store_tx, batch_store_rx) = channel(config.channel_size);
         let (batch_reader_tx, batch_reader_rx) = sync_channel(config.channel_size);
         let (proof_builder_tx, proof_builder_rx) = channel(config.channel_size);
@@ -124,6 +128,7 @@ impl QuorumStore {
         tokio::spawn(net.start());
         tokio::spawn(batch_store.start(validator_verifier, batch_store_rx));
 
+        debug!("QS: QuorumStore created");
         (
             Self {
                 epoch,

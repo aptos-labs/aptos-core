@@ -11,13 +11,13 @@ use crate::{
     },
     round_manager::VerifiedEvent,
 };
+use aptos_logger::debug;
 use aptos_types::PeerId;
 use channel::aptos_channel;
 use futures::StreamExt;
 use std::collections::HashMap;
 use std::sync::mpsc::SyncSender;
 use tokio::sync::mpsc::Sender;
-use aptos_logger::debug;
 
 pub(crate) struct NetworkListener {
     epoch: u64,
@@ -110,11 +110,19 @@ impl NetworkListener {
                 VerifiedEvent::Batch(batch) => {
                     let cmd: BatchReaderCommand;
                     if batch.maybe_payload.is_some() {
+                        debug!(
+                            "QS: batch response from {:?} digest {}",
+                            batch.source, batch.batch_info.digest
+                        );
                         cmd = BatchReaderCommand::BatchResponse(
                             batch.batch_info.digest,
                             batch.get_payload(),
                         );
                     } else {
+                        debug!(
+                            "QS: batch request from {:?} digest {}",
+                            batch.source, batch.batch_info.digest
+                        );
                         cmd = BatchReaderCommand::GetBatchForPeer(
                             batch.batch_info.digest,
                             batch.source,

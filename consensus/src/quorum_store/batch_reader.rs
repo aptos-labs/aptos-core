@@ -8,7 +8,9 @@ use crate::{
     network::NetworkSender,
     quorum_store::{batch_requester::BatchRequester, batch_store::BatchStoreCommand},
 };
+use anyhow::bail;
 use aptos_crypto::HashValue;
+use aptos_logger::debug;
 use aptos_types::PeerId;
 use consensus_types::common::Round;
 use consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
@@ -25,9 +27,7 @@ use std::{
     },
     time::Duration,
 };
-use anyhow::bail;
 use tokio::sync::{mpsc::Sender, oneshot};
-use aptos_logger::debug;
 
 // Make configuration parameter (passed to QuorumStore).
 /// Maximum number of rounds in the future from local prospective to hold batches for.
@@ -48,14 +48,14 @@ pub(crate) enum StoreType {
     LimitExceeded,
 }
 
-pub(crate) struct QuotaManger {
+pub(crate) struct QuotaManager {
     memory_balance: usize,
     db_balance: usize,
     db_quota: usize,
     memory_quota: usize,
 }
 
-impl QuotaManger {
+impl QuotaManager {
     fn new(max_db_balance: usize, max_memory_balance: usize) -> Self {
         assert!(max_db_balance >= max_memory_balance);
         Self {
@@ -101,7 +101,7 @@ pub struct BatchReader {
     my_peer_id: PeerId,
     last_committed_round: AtomicU64,
     db_cache: DashMap<HashValue, PersistedValue>,
-    peer_quota: DashMap<PeerId, QuotaManger>,
+    peer_quota: DashMap<PeerId, QuotaManager>,
     expirations: Mutex<BinaryHeap<(Reverse<Round>, HashValue)>>,
     batch_store_tx: Sender<BatchStoreCommand>,
     self_tx: SyncSender<BatchReaderCommand>,
@@ -145,7 +145,7 @@ impl BatchReader {
             let expiration = value.expiration;
             assert!(epoch >= expiration.epoch());
             if epoch > expiration.epoch()
-                || last_committed_round - MAX_BATCH_EXPIRY_ROUND_GAP > expiration.round()
+                || last_committed_round > expiration.round() + MAX_BATCH_EXPIRY_ROUND_GAP
             {
                 expired_keys.push(digest);
             } else {
@@ -163,12 +163,16 @@ impl BatchReader {
     }
 
     // returns true if value needs to be persisted
-    fn update_cache(&self, digest: HashValue, mut value: PersistedValue) -> anyhow::Result<Option<PersistedValue>> {
+    fn update_cache(
+        &self,
+        digest: HashValue,
+        mut value: PersistedValue,
+    ) -> anyhow::Result<Option<PersistedValue>> {
         let author = value.author;
         let mut entry = self
             .peer_quota
             .entry(author)
-            .or_insert(QuotaManger::new(self.db_quota, self.memory_quota));
+            .or_insert(QuotaManager::new(self.db_quota, self.memory_quota));
         match entry.store_type(value.num_bytes) {
             StoreType::MemoryCache => {}
             StoreType::PersistOnly => {
@@ -179,11 +183,13 @@ impl BatchReader {
             }
         }
 
+        let expiration_key = Reverse(value.expiration.round());
+        let ret = self.db_cache.insert(digest, value);
         self.expirations
             .lock()
             .unwrap()
-            .push((Reverse(value.expiration.round()), digest));
-        Ok(self.db_cache.insert(digest, value))
+            .push((expiration_key, digest));
+        Ok(ret)
     }
 
     pub(crate) fn save(&self, digest: HashValue, value: PersistedValue) -> anyhow::Result<bool> {
@@ -201,8 +207,11 @@ impl BatchReader {
                 self.free_quota(prev_value);
             }
         } else {
-            debug!("QS: failed to store to cache, expiration =  {:?}, last round = {}, MAX_BATCH_EXPIRY_ROUND_GAP = {} ", value.expiration, self.last_committed_round(), MAX_BATCH_EXPIRY_ROUND_GAP  );
-            bail!("Wrong expiration");
+            bail!(
+                "Wrong expiration {:?}, last committed round = {}",
+                value.expiration,
+                self.last_committed_round()
+            );
         }
         Ok(true)
     }
@@ -225,10 +234,23 @@ impl BatchReader {
         loop {
             if let Some((Reverse(r), _)) = expirations.peek() {
                 if *r <= expired_round {
-                    let (_, h) = expirations.pop().unwrap();
-                    let (_, persisted_value) = self.db_cache.remove(&h).unwrap();
-                    self.free_quota(persisted_value);
-                    ret.push(h);
+                    let (Reverse(r), h) = expirations.pop().unwrap();
+
+                    let cache_expiration_round = self
+                        .db_cache
+                        .get(&h)
+                        .expect("Expired entry not in cache")
+                        .expiration
+                        .round();
+                    if cache_expiration_round == r {
+                        let (_, persisted_value) = self
+                            .db_cache
+                            .remove(&h)
+                            .expect("Expired entry not in cache");
+                        self.free_quota(persisted_value);
+                        ret.push(h);
+                    } // Otherwise, expiration got extended, ignore.
+
                     continue;
                 }
             }
@@ -236,7 +258,6 @@ impl BatchReader {
         }
         ret
     }
-
 
     fn free_quota(&self, persisted_value: PersistedValue) {
         let mut quota_manager = self.peer_quota.get_mut(&persisted_value.author).unwrap();
@@ -246,7 +267,6 @@ impl BatchReader {
             quota_manager.free_quota(persisted_value.num_bytes, StoreType::PersistOnly);
         }
     }
-
 
     // TODO: maybe check the epoch to stop communicating on epoch change.
     // TODO: make sure state-sync also sends the message.
@@ -276,35 +296,34 @@ impl BatchReader {
     pub async fn get_batch(
         &self,
         proof: ProofOfStore,
-        ret_tx: oneshot::Sender<Result<Data, QuorumStoreError>>,
-    ) {
+    ) -> oneshot::Receiver<Result<Data, QuorumStoreError>> {
+        let (tx, rx) = oneshot::channel();
         if let Some(value) = self.db_cache.get(&proof.digest()) {
             if value.maybe_payload.is_some() {
-                ret_tx
-                    .send(Ok(value.maybe_payload.clone().unwrap()))
+                tx.send(Ok(value.maybe_payload.clone().unwrap()))
                     .expect("Receiver of requested batch is not available");
             } else {
                 self.batch_store_tx
                     .send(BatchStoreCommand::BatchRequest(
                         proof.digest().clone(),
                         self.my_peer_id,
-                        Some(ret_tx),
+                        Some(tx),
                     ))
                     .await
                     .expect("Failed to send to BatchStore");
             }
         } else {
             self.self_tx
-                .send(BatchReaderCommand::GetBatchForSelf(proof, ret_tx))
+                .send(BatchReaderCommand::GetBatchForSelf(proof, tx))
                 .expect("Batch Reader Receiver is not available");
         }
+        rx
     }
 
     pub(crate) async fn start(
         &self,
         batch_reader_rx: SyncReceiver<BatchReaderCommand>,
         network_sender: NetworkSender,
-        // signer: Arc<ValidatorSigner>,
         request_num_peers: usize,
         request_timeout_ms: usize,
     ) {
@@ -348,27 +367,20 @@ impl BatchReader {
                                     .await
                                     .expect("Failed to send to BatchStore");
                             }
-                        } //TODO: consider returning Nack
+                        } // TODO: consider returning Nack
                     }
                     BatchReaderCommand::GetBatchForSelf(proof, ret_tx) => {
                         batch_requester
-                            .add_request(
-                                proof.digest().clone(),
-                                proof.shuffled_signers(),
-                                ret_tx,
-                                // signer.clone(),
-                            )
+                            .add_request(proof.digest().clone(), proof.shuffled_signers(), ret_tx)
                             .await;
-                        // TODO: actual send over network and local match one-shot / time-out logic.
                     }
                     BatchReaderCommand::BatchResponse(digest, payload) => {
                         batch_requester.serve_request(digest, payload);
                     }
                 }
             }
-            batch_requester.handle_timeouts(
-                // signer.clone()
-            ).await;
+            batch_requester.handle_timeouts().await;
+            tokio::task::yield_now().await;
         }
     }
 }

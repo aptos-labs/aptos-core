@@ -54,8 +54,6 @@ pub fn start_consensus(
         Arc::new(DummyDataManager::new())
     };
 
-    Arc::new(QuorumStoreDataManager::new());
-
     let state_computer = Arc::new(ExecutionProxy::new(
         Box::new(BlockExecutor::<AptosVM>::new(aptos_db)),
         txn_notifier,
