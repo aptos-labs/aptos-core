@@ -53,9 +53,10 @@ module AptosFramework::ResourceAccount {
     /// or the source accounts current auth key.
     public(script) fun create_resource_account(
         origin: &signer,
+        seed: vector<u8>,
         optional_auth_key: vector<u8>,
     ) acquires Container {
-        let (resource, resource_signer_cap) = Account::create_resource_account(origin);
+        let (resource, resource_signer_cap) = Account::create_resource_account(origin, seed);
 
         let origin_addr = Signer::address_of(origin);
         if (!exists<Container>(origin_addr)) {
@@ -105,18 +106,17 @@ module AptosFramework::ResourceAccount {
     #[test(user = @0x1111)]
     public(script) fun end_to_end(user: signer) acquires Container {
         use Std::BCS;
-        use Std::GUID;
         use Std::Hash;
 
         let user_addr = Signer::address_of(&user);
         Account::create_account(user_addr);
 
-        let next_creation_num = GUID::get_next_creation_num(user_addr);
-        let id = GUID::create_id(user_addr, next_creation_num);
-        let bytes = BCS::to_bytes(&id);
+        let seed = x"01";
+        let bytes = BCS::to_bytes(&user_addr);
+        Vector::append(&mut bytes, copy seed);
         let resource_addr = Account::create_address_for_test(Hash::sha3_256(bytes));
 
-        create_resource_account(&user, Vector::empty());
+        create_resource_account(&user, seed, Vector::empty());
         let container = borrow_global<Container>(user_addr);
         let resource_cap = SimpleMap::borrow(&container.store, &resource_addr);
 
