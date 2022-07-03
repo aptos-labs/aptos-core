@@ -33,11 +33,26 @@ pub trait Evaluator: Debug + Sync + Send {
     /// as such.
     async fn evaluate(&self, input: &Self::Input) -> Result<Vec<EvaluationResult>, Self::Error>;
 
-    /// All evaluators must have a name. We use this to select evaluators
-    /// when building them from the initial configuration.
-    fn get_name() -> String
+    /// All evaluators must have a category. This is used for building
+    /// EvaluationResults.
+    fn get_category() -> String
     where
         Self: Sized;
+
+    /// All evaluators must have a name. We use this to select evaluators
+    /// when building them from the initial configuration.
+    fn get_name_suffix() -> String
+    where
+        Self: Sized;
+
+    /// This is the "fully qualified" name used for specifying that you
+    /// want to use this evaluator.
+    fn get_full_name() -> String
+    where
+        Self: Sized,
+    {
+        format!("{}_{}", Self::get_category(), Self::get_name_suffix())
+    }
 
     // It would be better to require From<&EvaluatorArgs> on the trait
     // itself, but that has a few issues. First, it would introduce a
@@ -68,11 +83,46 @@ pub trait Evaluator: Debug + Sync + Send {
     where
         Self: Sized,
     {
-        let name = Self::get_name();
+        let name = Self::get_full_name();
         match evaluator_names.take(&name) {
             Some(_) => evaluators.push(Self::evaluator_type_from_evaluator_args(evaluator_args)?),
             None => info!("Did not build evaluator {}", name),
         };
         Ok(())
+    }
+
+    // Helper for building EvaluationResults with the name already filled in.
+    fn build_evaluation_result(
+        &self,
+        headline: String,
+        score: u8,
+        explanation: String,
+    ) -> EvaluationResult
+    where
+        Self: Sized,
+    {
+        self.build_evaluation_result_with_links(headline, score, explanation, vec![])
+    }
+
+    // Helper for building EvaluationResults with the name already filled in
+    // and optionally with links.
+    fn build_evaluation_result_with_links(
+        &self,
+        headline: String,
+        score: u8,
+        explanation: String,
+        links: Vec<String>,
+    ) -> EvaluationResult
+    where
+        Self: Sized,
+    {
+        EvaluationResult {
+            headline,
+            score,
+            explanation,
+            category: Self::get_category(),
+            evaluator_name: Self::get_full_name(),
+            links,
+        }
     }
 }

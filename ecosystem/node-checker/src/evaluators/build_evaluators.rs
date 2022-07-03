@@ -6,7 +6,7 @@ use crate::{
     evaluator::Evaluator,
     evaluators::{
         direct::{
-            DirectEvaluatorInput, LatencyEvaluator, ApiEvaluatorError, TpsEvaluator,
+            ApiEvaluatorError, DirectEvaluatorInput, LatencyEvaluator, TpsEvaluator,
             TpsEvaluatorError,
         },
         metrics::{
@@ -21,8 +21,7 @@ use crate::{
 use anyhow::{bail, Result};
 use std::collections::HashSet;
 
-type ApiEvaluatorType =
-    Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = ApiEvaluatorError>>;
+type ApiEvaluatorType = Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = ApiEvaluatorError>>;
 type MetricsEvaluatorType =
     Box<dyn Evaluator<Input = MetricsEvaluatorInput, Error = MetricsEvaluatorError>>;
 type SystemInformationEvaluatorType = Box<
@@ -85,9 +84,7 @@ impl EvaluatorSet {
     pub fn get_direct_evaluators(&self) -> Vec<&EvaluatorType> {
         self.evaluators
             .iter()
-            .filter(|evaluator| {
-                matches!(evaluator, EvaluatorType::Tps(_) | EvaluatorType::Api(_))
-            })
+            .filter(|evaluator| matches!(evaluator, EvaluatorType::Api(_) | EvaluatorType::Tps(_)))
             .collect()
     }
 }

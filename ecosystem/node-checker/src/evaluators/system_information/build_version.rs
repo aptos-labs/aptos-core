@@ -39,22 +39,6 @@ impl BuildVersionEvaluator {
         Self { args }
     }
 
-    fn build_evaluation_result(
-        &self,
-        headline: String,
-        score: u8,
-        explanation: String,
-    ) -> EvaluationResult {
-        EvaluationResult {
-            headline,
-            score,
-            explanation,
-            category: CATEGORY.to_string(),
-            evaluator_name: Self::get_name(),
-            links: vec![],
-        }
-    }
-
     fn get_build_commit_hash(&self, system_information: &SystemInformation) -> GetValueResult {
         let evaluation_on_missing_fn = || {
             self.build_evaluation_result(
@@ -137,8 +121,12 @@ impl Evaluator for BuildVersionEvaluator {
         Ok(evaluation_results)
     }
 
-    fn get_name() -> String {
-        format!("{}_build_commit_hash", CATEGORY)
+    fn get_category() -> String {
+        CATEGORY.to_string()
+    }
+
+    fn get_name_suffix() -> String {
+        "build_commit_hash".to_string()
     }
 
     fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {

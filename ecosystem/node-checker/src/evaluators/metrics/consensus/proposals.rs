@@ -57,22 +57,6 @@ impl ConsensusProposalsEvaluator {
         get_metric(metrics, PROPOSALS_METRIC, None, evaluation_on_missing_fn)
     }
 
-    fn build_evaluation_result(
-        &self,
-        headline: String,
-        score: u8,
-        explanation: String,
-    ) -> EvaluationResult {
-        EvaluationResult {
-            headline,
-            score,
-            explanation,
-            category: CATEGORY.to_string(),
-            evaluator_name: Self::get_name(),
-            links: vec![],
-        }
-    }
-
     #[allow(clippy::comparison_chain)]
     fn build_evaluation(
         &self,
@@ -146,8 +130,12 @@ impl Evaluator for ConsensusProposalsEvaluator {
         Ok(evaluation_results)
     }
 
-    fn get_name() -> String {
-        format!("{}_proposals", CATEGORY)
+    fn get_category() -> String {
+        CATEGORY.to_string()
+    }
+
+    fn get_name_suffix() -> String {
+        "proposals".to_string()
     }
 
     fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {

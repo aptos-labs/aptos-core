@@ -9,7 +9,7 @@ use crate::{
     configuration::NodeAddress,
     evaluator::EvaluationSummary,
     evaluators::{
-        direct::{NodeIdentityEvaluatorError, TpsEvaluatorError, ApiEvaluatorError},
+        direct::{ApiEvaluatorError, NodeIdentityEvaluatorError, TpsEvaluatorError},
         metrics::MetricsEvaluatorError,
         system_information::SystemInformationEvaluatorError,
     },
