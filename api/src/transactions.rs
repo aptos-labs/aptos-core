@@ -397,10 +397,13 @@ impl Transactions {
         data: Vec<TransactionOnChainData>,
         accept_type: AcceptType,
     ) -> Result<impl Reply, Error> {
-        if data.is_empty() {
-            let txns: Vec<Transaction> = vec![];
-            return Response::new(self.ledger_info, &txns);
+        if accept_type == AcceptType::Bcs {
+            return Response::new_bcs(self.ledger_info, &data);
         }
+        if data.is_empty() {
+            return Response::new(self.ledger_info, &Vec::<Transaction>::new());
+        }
+
         let first_version = data[0].version;
         let mut timestamp = self.context.get_block_timestamp(first_version)?;
         let resolver = self.context.move_resolver()?;
@@ -415,10 +418,7 @@ impl Transactions {
                 Ok(txn)
             })
             .collect::<Result<_>>()?;
-        match accept_type {
-            AcceptType::Json => Response::new(self.ledger_info, &txns),
-            AcceptType::Bcs => Response::new_bcs(self.ledger_info, &txns),
-        }
+        Response::new(self.ledger_info, &txns)
     }
 
     pub async fn get_transaction(
@@ -431,6 +431,10 @@ impl Transactions {
             TransactionId::Version(version) => self.get_by_version(version)?,
         }
         .ok_or_else(|| self.transaction_not_found(id))?;
+
+        if accept_type == AcceptType::Bcs {
+            return Response::new_bcs(self.ledger_info, &txn_data);
+        }
 
         let resolver = self.context.move_resolver()?;
         let txn = match txn_data {
@@ -445,10 +449,7 @@ impl Transactions {
             }
         };
 
-        match accept_type {
-            AcceptType::Json => Response::new(self.ledger_info, &txn),
-            AcceptType::Bcs => Response::new_bcs(self.ledger_info, &txn),
-        }
+        Response::new(self.ledger_info, &txn)
     }
 
     pub fn signing_message(

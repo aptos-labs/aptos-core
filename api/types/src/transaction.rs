@@ -30,7 +30,7 @@ use std::{
     str::FromStr,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum TransactionData {
     OnChain(TransactionOnChainData),
     Pending(Box<SignedTransaction>),
@@ -48,7 +48,7 @@ impl From<SignedTransaction> for TransactionData {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TransactionOnChainData {
     pub version: u64,
     pub transaction: aptos_types::transaction::Transaction,
