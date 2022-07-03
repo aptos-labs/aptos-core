@@ -6,7 +6,7 @@ use crate::{
     evaluator::Evaluator,
     evaluators::{
         direct::{
-            DirectEvaluatorInput, LatencyEvaluator, LatencyEvaluatorError, TpsEvaluator,
+            DirectEvaluatorInput, LatencyEvaluator, ApiEvaluatorError, TpsEvaluator,
             TpsEvaluatorError,
         },
         metrics::{
@@ -21,8 +21,8 @@ use crate::{
 use anyhow::{bail, Result};
 use std::collections::HashSet;
 
-type LatencyEvaluatorType =
-    Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = LatencyEvaluatorError>>;
+type ApiEvaluatorType =
+    Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = ApiEvaluatorError>>;
 type MetricsEvaluatorType =
     Box<dyn Evaluator<Input = MetricsEvaluatorInput, Error = MetricsEvaluatorError>>;
 type SystemInformationEvaluatorType = Box<
@@ -42,7 +42,7 @@ type TpsEvaluatorType = Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = 
 /// see https://doc.rust-lang.org/reference/items/traits.html#object-safety.
 #[derive(Debug)]
 pub enum EvaluatorType {
-    Latency(LatencyEvaluatorType),
+    Api(ApiEvaluatorType),
     Metrics(MetricsEvaluatorType),
     SystemInformation(SystemInformationEvaluatorType),
     Tps(TpsEvaluatorType),
@@ -86,7 +86,7 @@ impl EvaluatorSet {
         self.evaluators
             .iter()
             .filter(|evaluator| {
-                matches!(evaluator, EvaluatorType::Tps(_) | EvaluatorType::Latency(_))
+                matches!(evaluator, EvaluatorType::Tps(_) | EvaluatorType::Api(_))
             })
             .collect()
     }

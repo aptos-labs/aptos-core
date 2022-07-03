@@ -1,12 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-mod latency;
+mod api;
 mod node_identity;
 mod tps;
 mod types;
 
-pub use latency::{LatencyEvaluator, LatencyEvaluatorArgs, LatencyEvaluatorError};
+pub use api::*;
+
 pub use node_identity::{
     get_node_identity, NodeIdentityEvaluator, NodeIdentityEvaluatorArgs, NodeIdentityEvaluatorError,
 };
