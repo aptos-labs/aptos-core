@@ -73,6 +73,11 @@ module AptosFramework::Account {
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1011;
     const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1012;
 
+    #[test_only]
+    public fun create_address_for_test(bytes: vector<u8>): address {
+        create_address(bytes)
+    }
+
     native fun create_address(bytes: vector<u8>): address;
     native fun create_signer(addr: address): signer;
 
@@ -352,45 +357,6 @@ module AptosFramework::Account {
     }
 
     /// A resource account is used to manage resources independent of an account managed by a user.
-    /// Some applications might include managing a Dao and the resources associated with the Dao or
-    /// a liquidity pool to create new liquidity pool coins without requiring the original account
-    /// owner to setup the resources. While one could theoretically manage a lot of this via
-    /// capabilities, the `move_to` semantics insist on a signer and cannot work with capabilities
-    /// due to Move requirements that `move_to` be executed on a resource within the same module
-    /// that defines that resource.
-    ///
-    /// As a small example, a developer wishes to deploy a new LiquidityPool. Each Coin is housed
-    /// within a Coin<LiquidityPool<X, Y>>. The developer should follow these steps:
-    ///
-    /// 1. Create a new account using `create_resource_account`, stores the `signer_cap` in safe
-    /// space that can be retrieved in the ensuing steps, and rotates the authentication key to a
-    /// known private, public keypair.
-    /// 2. Define the LiquidityPool module's address to be this address.
-    /// 3. In the LiquidityPool module's `init_module` function, retrieve and store the `signer_cap`
-    /// and rotate the authentication key to `0x0`.
-    /// 4. When adding a new coin, the module will load the capability and hence the signer to
-    /// register and store new LiquidityCoin resources.
-    ///
-    /// ```
-    /// fun init_module(source: &signer) {
-    ///   let dev_address = @DEV_ADDR;
-    ///   let signer_cap = retrieve_capability_from_dev_address(&source, dev_address);
-    ///   let lp_signer = create_signer_with_capability(&signer_cap);
-    ///   let lp = LiquidityPoolInfo { signer_cap: signer_cap, ... };
-    ///   move_to(&lp_signer, lp);
-    /// }
-    /// ```
-    ///
-    /// Later on during a coin registration:
-    /// ```
-    /// public fun add_coin<X, Y>(lp: &LP, x: Coin<x>, y: Coin<y>) {
-    ///     if(!exists<LiquidityCoin<X, Y>(LP::Address(lp), LiquidityCoin<X, Y>)) {
-    ///         let mint, burn = Coin::initialize<LiquidityCoin<X, Y>>(...);
-    ///         move_to(&create_signer_with_capability(&lp.cap), LiquidityCoin<X, Y>{ mint, burn });
-    ///     }
-    ///     ...
-    /// }
-    /// ```
     public fun create_resource_account(
         source: &signer,
     ): (signer, SignerCapability) {
