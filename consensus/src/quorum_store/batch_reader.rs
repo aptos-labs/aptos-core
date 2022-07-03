@@ -22,12 +22,17 @@ use std::{
     collections::BinaryHeap,
     sync::{
         atomic::{AtomicU64, Ordering},
-        mpsc::{Receiver as SyncReceiver, RecvTimeoutError, SyncSender},
         Mutex,
     },
     time::Duration,
 };
-use tokio::sync::{mpsc::Sender, oneshot};
+use tokio::{
+    sync::{
+        mpsc::{Receiver, Sender},
+        oneshot,
+    },
+    time,
+};
 
 // Make configuration parameter (passed to QuorumStore).
 /// Maximum number of rounds in the future from local prospective to hold batches for.
@@ -104,7 +109,7 @@ pub struct BatchReader {
     peer_quota: DashMap<PeerId, QuotaManager>,
     expirations: Mutex<BinaryHeap<(Reverse<Round>, HashValue)>>,
     batch_store_tx: Sender<BatchStoreCommand>,
-    self_tx: SyncSender<BatchReaderCommand>,
+    self_tx: Sender<BatchReaderCommand>,
     max_execution_round_lag: Round,
     memory_quota: usize,
     db_quota: usize,
@@ -117,7 +122,7 @@ impl BatchReader {
         db_content: HashMap<HashValue, PersistedValue>,
         my_peer_id: PeerId,
         batch_store_tx: Sender<BatchStoreCommand>,
-        self_tx: SyncSender<BatchReaderCommand>,
+        self_tx: Sender<BatchReaderCommand>,
         max_execution_round_lag: Round,
         memory_quota: usize,
         db_quota: usize,
@@ -313,16 +318,20 @@ impl BatchReader {
                     .expect("Failed to send to BatchStore");
             }
         } else {
-            self.self_tx
-                .send(BatchReaderCommand::GetBatchForSelf(proof, tx))
-                .expect("Batch Reader Receiver is not available");
+            assert!(
+                self.self_tx
+                    .send(BatchReaderCommand::GetBatchForSelf(proof, tx))
+                    .await
+                    .is_ok(),
+                "Batch Reader Receiver is not available"
+            );
         }
         rx
     }
 
     pub(crate) async fn start(
         &self,
-        batch_reader_rx: SyncReceiver<BatchReaderCommand>,
+        mut batch_reader_rx: Receiver<BatchReaderCommand>,
         network_sender: NetworkSender,
         request_num_peers: usize,
         request_timeout_ms: usize,
@@ -335,52 +344,50 @@ impl BatchReader {
             network_sender.clone(),
         );
 
+        let mut interval = time::interval(Duration::from_millis((request_timeout_ms / 2) as u64));
+
         loop {
-            // SyncReceiver holds a lock, so receive a message first to create short-lived borrow.
-            let cmd = match batch_reader_rx
-                .recv_timeout(Duration::from_millis((request_timeout_ms / 10) as u64))  // TODO: think about the right smaller timeout
-            {
-                Ok(cmd) => Some(cmd),
-                Err(err) => match err {
-                    RecvTimeoutError::Timeout => None,
-                    _ => break,
+            // TODO: shutdown?
+            tokio::select! {
+                biased;
+
+                _ = interval.tick() => {
+                    batch_requester.handle_timeouts().await;
                 },
-            };
-            if let Some(cmd) = cmd {
-                match cmd {
-                    BatchReaderCommand::GetBatchForPeer(digest, peer_id) => {
-                        //TODO: check if needs to read from db - probably storage will send directly?
-                        if let Some(value) = self.db_cache.get(&digest) {
-                            if value.maybe_payload.is_some() {
-                                let batch = Batch::new(
-                                    self.epoch(),
-                                    self.my_peer_id,
-                                    digest,
-                                    Some(value.maybe_payload.as_ref().unwrap().clone()),
-                                    // signer.clone(),
-                                );
-                                let msg = ConsensusMsg::BatchMsg(Box::new(batch));
-                                network_sender.send(msg, vec![peer_id]).await;
-                            } else {
-                                self.batch_store_tx
-                                    .send(BatchStoreCommand::BatchRequest(digest, peer_id, None))
-                                    .await
-                                    .expect("Failed to send to BatchStore");
-                            }
-                        } // TODO: consider returning Nack
-                    }
-                    BatchReaderCommand::GetBatchForSelf(proof, ret_tx) => {
-                        batch_requester
-                            .add_request(proof.digest().clone(), proof.shuffled_signers(), ret_tx)
-                            .await;
-                    }
-                    BatchReaderCommand::BatchResponse(digest, payload) => {
-                        batch_requester.serve_request(digest, payload);
-                    }
+
+                Some(cmd) = batch_reader_rx.recv() => {
+                    match cmd {
+            BatchReaderCommand::GetBatchForPeer(digest, peer_id) => {
+                //TODO: check if needs to read from db - probably storage will send directly?
+                if let Some(value) = self.db_cache.get(&digest) {
+                if value.maybe_payload.is_some() {
+                    let batch = Batch::new(
+                    self.epoch(),
+                    self.my_peer_id,
+                    digest,
+                    Some(value.maybe_payload.as_ref().unwrap().clone()),
+                    );
+                    let msg = ConsensusMsg::BatchMsg(Box::new(batch));
+                    network_sender.send(msg, vec![peer_id]).await;
+                } else {
+                    self.batch_store_tx
+                    .send(BatchStoreCommand::BatchRequest(digest, peer_id, None))
+                    .await
+                    .expect("Failed to send to BatchStore");
                 }
+                } // TODO: consider returning Nack
             }
-            batch_requester.handle_timeouts().await;
-            tokio::task::yield_now().await;
+                        BatchReaderCommand::GetBatchForSelf(proof, ret_tx) => {
+                            batch_requester
+                                .add_request(proof.digest().clone(), proof.shuffled_signers(), ret_tx)
+                                .await;
+                        }
+                        BatchReaderCommand::BatchResponse(digest, payload) => {
+                            batch_requester.serve_request(digest, payload);
+                        }
+                    }
+            }
+            }
         }
     }
 }

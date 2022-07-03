@@ -16,7 +16,6 @@ use aptos_types::PeerId;
 use channel::aptos_channel;
 use futures::StreamExt;
 use std::collections::HashMap;
-use std::sync::mpsc::SyncSender;
 use tokio::sync::mpsc::Sender;
 
 pub(crate) struct NetworkListener {
@@ -26,7 +25,7 @@ pub(crate) struct NetworkListener {
     //not sure if needed, depends who verifies.
     batch_aggregators: HashMap<PeerId, BatchAggregator>,
     batch_store_tx: Sender<BatchStoreCommand>,
-    batch_reader_tx: SyncSender<BatchReaderCommand>,
+    batch_reader_tx: Sender<BatchReaderCommand>,
     proof_builder_tx: Sender<ProofBuilderCommand>,
     max_batch_size: usize,
 }
@@ -36,7 +35,7 @@ impl NetworkListener {
         epoch: u64,
         network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
         batch_store_tx: Sender<BatchStoreCommand>,
-        batch_reader_tx: SyncSender<BatchReaderCommand>,
+        batch_reader_tx: Sender<BatchReaderCommand>,
         proof_builder_tx: Sender<ProofBuilderCommand>,
         max_batch_size: usize,
     ) -> Self {
@@ -128,9 +127,10 @@ impl NetworkListener {
                             batch.source,
                         );
                     }
-                    self.batch_reader_tx
-                        .send(cmd)
-                        .expect("could not push Batch batch_reader");
+                    assert!(
+                        self.batch_reader_tx.send(cmd).await.is_ok(),
+                        "could not push Batch batch_reader"
+                    );
                 }
 
                 _ => {

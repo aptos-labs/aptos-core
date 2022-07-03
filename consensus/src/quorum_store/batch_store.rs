@@ -12,21 +12,18 @@ use crate::{
     },
 };
 use aptos_crypto::HashValue;
+use aptos_logger::debug;
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
 use consensus_types::common::Round;
 use consensus_types::proof_of_store::{LogicalTime, SignedDigest};
 use serde::{Deserialize, Serialize};
-use std::sync::{
-    mpsc::{Receiver as SyncReceiver, SyncSender},
-    Arc,
-};
+use std::sync::Arc;
 use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
 };
-use aptos_logger::debug;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PersistRequest {
@@ -77,8 +74,8 @@ impl BatchStore {
         my_peer_id: PeerId,
         network_sender: NetworkSender,
         batch_store_tx: Sender<BatchStoreCommand>,
-        batch_reader_tx: SyncSender<BatchReaderCommand>,
-        batch_reader_rx: SyncReceiver<BatchReaderCommand>,
+        batch_reader_tx: Sender<BatchReaderCommand>,
+        batch_reader_rx: Receiver<BatchReaderCommand>,
         db: Arc<QuorumStoreDB>,
         validator_signer: Arc<ValidatorSigner>,
         max_execution_round_lag: Round,
@@ -164,7 +161,7 @@ impl BatchStore {
             }
 
             Err(e) => {
-                debug!("QS: failed to store to cache {:?}" ,e);
+                debug!("QS: failed to store to cache {:?}", e);
                 // Request to store a batch for longer than maximum gap.
                 None
             }

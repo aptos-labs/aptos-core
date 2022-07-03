@@ -28,7 +28,7 @@ use futures::{
     stream::{futures_unordered::FuturesUnordered, StreamExt as _},
 };
 use std::collections::HashMap;
-use std::sync::{mpsc::sync_channel, Arc};
+use std::sync::Arc;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 pub type ProofReturnChannel = oneshot::Sender<Result<ProofOfStore, QuorumStoreError>>;
@@ -95,7 +95,7 @@ impl QuorumStore {
 
         // Prepare communication channels among the threads.
         let (batch_store_tx, batch_store_rx) = channel(config.channel_size);
-        let (batch_reader_tx, batch_reader_rx) = sync_channel(config.channel_size);
+        let (batch_reader_tx, batch_reader_rx) = channel(config.channel_size);
         let (proof_builder_tx, proof_builder_rx) = channel(config.channel_size);
 
         let net = NetworkListener::new(

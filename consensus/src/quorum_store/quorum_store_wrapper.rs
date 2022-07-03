@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::data_manager::DataManager;
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
 use crate::quorum_store::quorum_store::QuorumStoreError;
@@ -11,7 +10,7 @@ use crate::quorum_store::{counters, quorum_store::QuorumStoreCommand};
 use crate::round_manager::VerifiedEvent;
 use aptos_crypto::hash::DefaultHasher;
 use aptos_crypto::HashValue;
-use aptos_infallible::Mutex;
+use aptos_logger::debug;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::PeerId;
 use bcs::to_bytes;
@@ -22,30 +21,24 @@ use consensus_types::request_response::ConsensusResponse;
 use consensus_types::{
     common::TransactionSummary, proof_of_store::ProofOfStore, request_response::WrapperCommand,
 };
-use futures::future::BoxFuture;
-use futures::stream::FuturesUnordered;
 use futures::{
     channel::{
         mpsc::{Receiver, Sender},
         oneshot,
     },
+    future::BoxFuture,
+    stream::FuturesUnordered,
     StreamExt,
 };
 use std::collections::{HashMap, HashSet};
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
-use aptos_logger::debug;
+use tokio::{sync::mpsc::Sender as TokioSender, time};
 
 // TODO: Consider storing batches and retrying upon QuorumStoreError:Timeout
 #[allow(dead_code)]
 pub struct QuorumStoreWrapper {
-    // TODO: remove, DataManager sends msg to wrapper
-    data_manager: Arc<dyn DataManager>,
     mempool_proxy: MempoolProxy,
-    quorum_store_sender: tokio::sync::mpsc::Sender<QuorumStoreCommand>,
+    quorum_store_sender: TokioSender<QuorumStoreCommand>,
     batches_to_filter: HashMap<HashValue, Vec<TransactionSummary>>,
     // TODO: batch_in_progress
     // TODO: add the expiration priority queue
@@ -57,7 +50,7 @@ pub struct QuorumStoreWrapper {
     // TODO: store all ProofOfStore (created locally, and received via broadcast)
     // TODO: need to be notified of ProofOfStore's that were committed
     mempool_txn_pull_max_count: u64,
-    // TODO: make sure this times max transaction size is smaller than quorumstore max batch size in bytes
+    // For ensuring that batch size does not exceed QuorumStore limit.
     quorum_store_max_batch_bytes: u64,
     last_end_batch_time: Instant,
 }
@@ -65,15 +58,13 @@ pub struct QuorumStoreWrapper {
 impl QuorumStoreWrapper {
     pub fn new(
         epoch: u64,
-        data_manager: Arc<dyn DataManager>,
         mempool_tx: Sender<QuorumStoreRequest>,
-        quorum_store_sender: tokio::sync::mpsc::Sender<QuorumStoreCommand>,
+        quorum_store_sender: TokioSender<QuorumStoreCommand>,
         mempool_txn_pull_timeout_ms: u64,
         mempool_txn_pull_max_count: u64,
         quorum_store_max_batch_bytes: u64,
     ) -> Self {
         Self {
-            data_manager,
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
             quorum_store_sender,
             batches_to_filter: HashMap::new(),
@@ -144,14 +135,14 @@ impl QuorumStoreWrapper {
                 .expect("could not send to QuorumStore");
             None
         } else {
-            if self.batch_in_progress.is_empty(){
+            if self.batch_in_progress.is_empty() {
                 return None;
             }
             let (proof_tx, proof_rx) = oneshot::channel();
             let (digest_tx, digest_rx) = oneshot::channel(); // TODO: consider computing batch digest here
             let logical_time = LogicalTime::new(
                 self.latest_logical_time.epoch(),
-                self.latest_logical_time.round() + 20, //TODO: take from quorum store config
+                self.latest_logical_time.round() + 20, // TODO: take from quorum store config
             );
             self.quorum_store_sender
                 .send(QuorumStoreCommand::EndBatch(
@@ -259,33 +250,38 @@ impl QuorumStoreWrapper {
                     }
                     batch.push(proof.clone());
                 }
-                let res = ConsensusResponse::GetBlockResponse(
-                    if batch.is_empty() {Payload::new_empty()}
-                    else {Payload::InQuorumStore(batch)});
+                let res = ConsensusResponse::GetBlockResponse(if batch.is_empty() {
+                    Payload::new_empty()
+                } else {
+                    Payload::InQuorumStore(batch)
+                });
                 callback
                     .send(Ok(res))
-                    .expect("BlcokResponse receiver not available");
+                    .expect("BlockResponse receiver not available");
             }
             WrapperCommand::CleanRequest(logical_time, digests) => {
                 debug!("QS: got clean request from execution");
                 self.latest_logical_time = logical_time; // TODO: max
                 for digest in digests {
-                    debug!("QS: removing digest {}, batches_to_filter {}, batches_for_consensus {}", digest, self.batches_to_filter.len() , self.batches_for_consensus.len());
+                    debug!(
+                        "QS: removing digest {}, batches_to_filter {}, batches_for_consensus {}",
+                        digest,
+                        self.batches_to_filter.len(),
+                        self.batches_for_consensus.len()
+                    );
                     self.batches_to_filter.remove(&digest);
                     self.batches_for_consensus.remove(&digest);
-                    debug!("QS: removed digest {}, batches_to_filter {}, batches_for_consensus {}", digest, self.batches_to_filter.len() , self.batches_for_consensus.len());
-
+                    debug!(
+                        "QS: removed digest {}, batches_to_filter {}, batches_for_consensus {}",
+                        digest,
+                        self.batches_to_filter.len(),
+                        self.batches_for_consensus.len()
+                    );
                 }
-                // TODO: remove but make CleanRequest not a ConsensusRequest,
-                // TODO: as notify_commit now calls CleanRequest.
-                // self.data_manager
-                //     .notify_commit(self.latest_logical_time)
-                //     .await;
             }
         }
     }
 
-    // TODO: use tokio select for the internal timeout feature
     pub async fn start(
         mut self,
         mut network_sender: NetworkSender,
@@ -293,25 +289,23 @@ impl QuorumStoreWrapper {
         mut shutdown: Receiver<()>,
         mut network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
     ) {
-        let mut scheduled_pulls: FuturesUnordered<ScheduledPull> = FuturesUnordered::new();
-        scheduled_pulls.push(ScheduledPull::new(
-            Instant::now() + Duration::from_millis(50),
-            false,
-        ));
         let mut proofs_in_progress: FuturesUnordered<BoxFuture<'_, _>> = FuturesUnordered::new();
+
+        // TODO: parameter? bring back back-off?
+        let mut interval = time::interval(Duration::from_millis(50));
 
         loop {
             let _timer = counters::MAIN_LOOP.start_timer();
-            // TODO: need an explicit shutdown message, as pulls will continue to schedule
+
             tokio::select! {
-                Some(_backoff) = scheduled_pulls.next() => {
+                Some(_s) = shutdown.next() => {
+                    break;
+                },
+
+                _ = interval.tick() => {
                     if let Some(proof_rx) = self.handle_scheduled_pull().await {
                         proofs_in_progress.push(Box::pin(proof_rx));
                     }
-                    scheduled_pulls.push(ScheduledPull::new(
-                        Instant::now() + Duration::from_millis(50),
-                        false
-                    ));
                 },
                 Some(next) = proofs_in_progress.next() => {
                     // TODO: handle failures
@@ -324,9 +318,6 @@ impl QuorumStoreWrapper {
                 },
                 Some(msg) = consensus_receiver.next() => {
                     self.handle_consensus_request(msg).await;
-                },
-                Some(_s) = shutdown.next() => {
-                    break;
                 },
                 Some(msg) = network_msg_rx.next() => {
                    if let VerifiedEvent::ProofOfStoreBroadcast(proof) = msg{
@@ -350,54 +341,5 @@ impl QuorumStoreWrapper {
         // 2. all completed digests that have not yet been cleaned: map<batch_id, digest>
         //    -- is this really needed? pull_payload filters anyway. maybe all that's needed
         //    is a broadcast queue?
-    }
-}
-
-/// From: Mempool ScheduledBroadcast
-pub(crate) struct ScheduledPull {
-    /// Time of scheduled pull
-    deadline: Instant,
-    backoff: bool,
-    waker: Arc<Mutex<Option<Waker>>>,
-}
-
-impl ScheduledPull {
-    pub fn new(deadline: Instant, backoff: bool) -> Self {
-        let waker: Arc<Mutex<Option<Waker>>> = Arc::new(Mutex::new(None));
-        let waker_clone = waker.clone();
-
-        if deadline > Instant::now() {
-            let tokio_instant = tokio::time::Instant::from_std(deadline);
-            // TODO: something more general?
-            tokio::spawn(async move {
-                tokio::time::sleep_until(tokio_instant).await;
-                let mut waker = waker_clone.lock();
-                if let Some(waker) = waker.take() {
-                    waker.wake()
-                }
-            });
-        }
-
-        Self {
-            deadline,
-            backoff,
-            waker,
-        }
-    }
-}
-
-impl Future for ScheduledPull {
-    type Output = bool; // whether this pull was scheduled as a backoff
-
-    fn poll(self: Pin<&mut Self>, context: &mut Context) -> Poll<Self::Output> {
-        if Instant::now() < self.deadline {
-            let waker_clone = context.waker().clone();
-            let mut waker = self.waker.lock();
-            *waker = Some(waker_clone);
-
-            Poll::Pending
-        } else {
-            Poll::Ready(self.backoff)
-        }
     }
 }
