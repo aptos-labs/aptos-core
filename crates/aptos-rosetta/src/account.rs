@@ -70,7 +70,8 @@ async fn account_balance(
 
     // Version to grab is the last entry in the block (balance is at end of block)
     let block_version = block_index_to_version(block_size, block_index);
-    let balance_version = block_index_to_version(block_size, block_index + 1) - 1;
+    let balance_version =
+        block_index_to_version(block_size, block_index.saturating_add(1)).saturating_sub(1);
 
     let balances = get_balances(
         rest_client,
@@ -97,11 +98,23 @@ async fn account_balance(
 
     // Filter based on requested currencies
     if let Some(currencies) = request.currencies {
-        let currencies: HashSet<Currency> = currencies.into_iter().collect();
+        let mut currencies: HashSet<Currency> = currencies.into_iter().collect();
+        // Remove extra currencies not requested
         amounts = amounts
             .into_iter()
             .filter(|amount| currencies.contains(&amount.currency))
-            .collect()
+            .collect();
+
+        // Zero out currencies that weren't in the account yet
+        for amount in amounts.iter() {
+            currencies.remove(&amount.currency);
+        }
+        for currency in currencies {
+            amounts.push(Amount {
+                value: 0.to_string(),
+                currency,
+            });
+        }
     }
 
     // Get the block identifier
@@ -176,30 +189,35 @@ async fn get_balances(
     address: AccountAddress,
     version: u64,
 ) -> ApiResult<HashMap<TypeTag, Balance>> {
-    let response = rest_client
+    // TOOD: Handle non not found errors
+    if let Ok(response) = rest_client
         .get_account_resources_at_version(address, version)
-        .await?;
-    let resources = response.inner();
-    let coin_identifier = Identifier::new("Coin").unwrap();
-    let coinstore_identifier = Identifier::new("CoinStore").unwrap();
+        .await
+    {
+        let resources = response.inner();
+        let coin_identifier = Identifier::new("Coin").unwrap();
+        let coinstore_identifier = Identifier::new("CoinStore").unwrap();
 
-    // Retrieve balances
-    Ok(resources
-        .iter()
-        .filter(|resource| {
-            resource.resource_type.address == AccountAddress::ONE
-                && resource.resource_type.module == coin_identifier
-                && resource.resource_type.name == coinstore_identifier
-        })
-        .filter_map(|resource| {
-            // Coin must have a type
-            let coin = resource.resource_type.type_params.first().unwrap();
-            match serde_json::from_value::<Balance>(resource.data.clone()) {
-                Ok(resource) => Some((coin.clone(), resource)),
-                Err(_) => None,
-            }
-        })
-        .collect())
+        // Retrieve balances
+        Ok(resources
+            .iter()
+            .filter(|resource| {
+                resource.resource_type.address == AccountAddress::ONE
+                    && resource.resource_type.module == coin_identifier
+                    && resource.resource_type.name == coinstore_identifier
+            })
+            .filter_map(|resource| {
+                // Coin must have a type
+                let coin = resource.resource_type.type_params.first().unwrap();
+                match serde_json::from_value::<Balance>(resource.data.clone()) {
+                    Ok(resource) => Some((coin.clone(), resource)),
+                    Err(_) => None,
+                }
+            })
+            .collect())
+    } else {
+        Ok(HashMap::new())
+    }
 }
 
 #[derive(Debug)]
