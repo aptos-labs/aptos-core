@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::TxnStats;
 use serde::Serialize;
 use std::{fmt, time::Duration};
+use transaction_emitter_lib::emitter::stats::TxnStats;
 
 #[derive(Default, Debug, Serialize)]
 pub struct TestReport {

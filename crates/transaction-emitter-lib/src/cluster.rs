@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{emit::query_sequence_numbers, instance::Instance, ClusterArgs};
+use crate::{emitter::query_sequence_numbers, instance::Instance, ClusterArgs};
 use anyhow::{anyhow, bail, format_err, Result};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},

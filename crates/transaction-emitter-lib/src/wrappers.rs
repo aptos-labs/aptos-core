@@ -4,7 +4,7 @@
 use crate::{
     args::{ClusterArgs, EmitArgs},
     cluster::Cluster,
-    emit::{EmitJobRequest, EmitThreadParams, TxnEmitter, TxnStats},
+    emitter::{stats::TxnStats, EmitJobRequest, EmitThreadParams, TxnEmitter},
     instance::Instance,
 };
 use anyhow::{Context, Result};
