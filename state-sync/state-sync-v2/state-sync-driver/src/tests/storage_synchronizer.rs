@@ -250,7 +250,7 @@ async fn test_execute_transactions_error() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_initialize_account_synchronizer() {
+async fn test_initialize_state_synchronizer() {
     // Create test data
     let target_ledger_info = create_epoch_ending_ledger_info();
     let output_list_with_proof = create_output_list_with_proof();
@@ -281,28 +281,28 @@ async fn test_initialize_account_synchronizer() {
             create_mock_reader_writer(None, Some(db_writer)),
         );
 
-    // Initialize the account synchronizer
+    // Initialize the state synchronizer
     let _ = storage_synchronizer
-        .initialize_account_synchronizer(
+        .initialize_state_synchronizer(
             vec![target_ledger_info.clone()],
             target_ledger_info,
             output_list_with_proof,
         )
         .unwrap();
 
-    // Save an account states chunk and verify we get a commit notification
+    // Save a state chunk and verify we get a commit notification
     storage_synchronizer
-        .save_account_states(0, create_state_value_chunk_with_proof(false))
+        .save_state_values(0, create_state_value_chunk_with_proof(false))
         .unwrap();
     assert_matches!(
         commit_listener.select_next_some().await,
-        CommitNotification::CommittedAccounts(_)
+        CommitNotification::CommittedStates(_)
     );
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[should_panic]
-async fn test_initialize_account_synchronizer_missing_info() {
+async fn test_initialize_state_synchronizer_missing_info() {
     // Create test data that is missing transaction infos
     let mut output_list_with_proof = create_output_list_with_proof();
     output_list_with_proof.proof.transaction_infos = vec![]; // This is invalid!
@@ -313,9 +313,9 @@ async fn test_initialize_account_synchronizer_missing_info() {
         create_mock_reader_writer(None, None),
     );
 
-    // Initialize the account synchronizer
-    let account_synchronizer_handle = storage_synchronizer
-        .initialize_account_synchronizer(
+    // Initialize the state synchronizer
+    let state_synchronizer_handle = storage_synchronizer
+        .initialize_state_synchronizer(
             vec![create_epoch_ending_ledger_info()],
             create_epoch_ending_ledger_info(),
             output_list_with_proof,
@@ -323,12 +323,12 @@ async fn test_initialize_account_synchronizer_missing_info() {
         .unwrap();
 
     // The handler should panic as it was given invalid data
-    account_synchronizer_handle.await.unwrap();
+    state_synchronizer_handle.await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[should_panic]
-async fn test_initialize_account_synchronizer_receiver_error() {
+async fn test_initialize_state_synchronizer_receiver_error() {
     // Setup the mock db writer. The db writer should always fail.
     let mut db_writer = create_mock_db_writer();
     db_writer
@@ -341,9 +341,9 @@ async fn test_initialize_account_synchronizer_receiver_error() {
         create_mock_reader_writer(None, Some(db_writer)),
     );
 
-    // Initialize the account synchronizer
-    let account_synchronizer_handle = storage_synchronizer
-        .initialize_account_synchronizer(
+    // Initialize the state synchronizer
+    let state_synchronizer_handle = storage_synchronizer
+        .initialize_state_synchronizer(
             vec![create_epoch_ending_ledger_info()],
             create_epoch_ending_ledger_info(),
             create_output_list_with_proof(),
@@ -351,11 +351,11 @@ async fn test_initialize_account_synchronizer_receiver_error() {
         .unwrap();
 
     // The handler should panic as storage failed to return a snapshot receiver
-    account_synchronizer_handle.await.unwrap();
+    state_synchronizer_handle.await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_save_account_states_completion() {
+async fn test_save_states_completion() {
     // Create test data
     let target_ledger_info = create_epoch_ending_ledger_info();
     let epoch_change_proofs = [
@@ -418,24 +418,24 @@ async fn test_save_account_states_completion() {
         .events()[0]
         .clone();
 
-    // Initialize the account synchronizer
-    let account_synchronizer_handle = storage_synchronizer
-        .initialize_account_synchronizer(
+    // Initialize the state synchronizer
+    let state_synchronizer_handle = storage_synchronizer
+        .initialize_state_synchronizer(
             epoch_change_proofs.to_vec(),
             target_ledger_info,
             output_list_with_proof.clone(),
         )
         .unwrap();
 
-    // Save an account states chunk and verify we get an account commit notification
+    // Save a state chunk and verify we get a commit notification
     storage_synchronizer
-        .save_account_states(0, create_state_value_chunk_with_proof(false))
+        .save_state_values(0, create_state_value_chunk_with_proof(false))
         .unwrap();
-    verify_account_commit_notification(&mut commit_listener, false, None).await;
+    verify_state_commit_notification(&mut commit_listener, false, None).await;
 
-    // Save an account states chunk that is the last chunk
+    // Save a state chunk that is the last chunk
     storage_synchronizer
-        .save_account_states(1, create_state_value_chunk_with_proof(true))
+        .save_state_values(1, create_state_value_chunk_with_proof(true))
         .unwrap();
 
     // Verify we get a commit notification
@@ -444,7 +444,7 @@ async fn test_save_account_states_completion() {
         events: vec![expected_event.clone()],
         transactions: vec![expected_transaction.clone()],
     };
-    verify_account_commit_notification(
+    verify_state_commit_notification(
         &mut commit_listener,
         true,
         Some(expected_committed_transactions.clone()),
@@ -452,13 +452,13 @@ async fn test_save_account_states_completion() {
     .await;
 
     // The handler should return as we've finished writing all states
-    account_synchronizer_handle.await.unwrap();
+    state_synchronizer_handle.await.unwrap();
     verify_no_pending_data(&storage_synchronizer);
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[should_panic]
-async fn test_save_account_states_dropped_error_listener() {
+async fn test_save_states_dropped_error_listener() {
     // Setup the mock snapshot receiver
     let mut snapshot_receiver = create_mock_receiver();
     snapshot_receiver
@@ -479,27 +479,27 @@ async fn test_save_account_states_dropped_error_listener() {
         create_mock_reader_writer(None, Some(db_writer)),
     );
 
-    // Initialize the account synchronizer
-    let account_synchronizer_handle = storage_synchronizer
-        .initialize_account_synchronizer(
+    // Initialize the state synchronizer
+    let state_synchronizer_handle = storage_synchronizer
+        .initialize_state_synchronizer(
             vec![create_epoch_ending_ledger_info()],
             create_epoch_ending_ledger_info(),
             create_output_list_with_proof(),
         )
         .unwrap();
 
-    // Save an account states chunk
+    // Save a state chunk
     let notification_id = 0;
     storage_synchronizer
-        .save_account_states(notification_id, create_state_value_chunk_with_proof(false))
+        .save_state_values(notification_id, create_state_value_chunk_with_proof(false))
         .unwrap();
 
     // The handler should panic as the commit listener was dropped
-    account_synchronizer_handle.await.unwrap();
+    state_synchronizer_handle.await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_save_account_states_invalid_chunk() {
+async fn test_save_states_invalid_chunk() {
     // Setup the mock snapshot receiver to always return errors
     let mut snapshot_receiver = create_mock_receiver();
     snapshot_receiver
@@ -520,35 +520,35 @@ async fn test_save_account_states_invalid_chunk() {
         create_mock_reader_writer(None, Some(db_writer)),
     );
 
-    // Initialize the account synchronizer
+    // Initialize the state synchronizer
     let _ = storage_synchronizer
-        .initialize_account_synchronizer(
+        .initialize_state_synchronizer(
             vec![create_epoch_ending_ledger_info()],
             create_epoch_ending_ledger_info(),
             create_output_list_with_proof(),
         )
         .unwrap();
 
-    // Save an account states chunk and verify we get an error notification
+    // Save a state chunk and verify we get an error notification
     let notification_id = 0;
     storage_synchronizer
-        .save_account_states(notification_id, create_state_value_chunk_with_proof(false))
+        .save_state_values(notification_id, create_state_value_chunk_with_proof(false))
         .unwrap();
     verify_error_notification(&mut error_listener, notification_id).await;
 }
 
 #[test]
 #[should_panic]
-fn test_save_account_states_without_initialize() {
+fn test_save_states_without_initialize() {
     // Create the storage synchronizer
     let (_, _, _, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
         create_mock_executor(),
         create_mock_reader_writer(None, None),
     );
 
-    // Attempting to save the account states should panic as the account
+    // Attempting to save the states should panic as the state
     // synchronizer was not initialized!
-    let _ = storage_synchronizer.save_account_states(0, create_state_value_chunk_with_proof(false));
+    let _ = storage_synchronizer.save_state_values(0, create_state_value_chunk_with_proof(false));
 }
 
 /// Creates a storage synchronizer for testing
@@ -605,20 +605,17 @@ fn create_storage_synchronizer(
     )
 }
 
-/// Verifies that the expected account commit notification is received by the listener
-async fn verify_account_commit_notification(
+/// Verifies that the expected state commit notification is received by the listener
+async fn verify_state_commit_notification(
     commit_listener: &mut CommitNotificationListener,
-    expected_all_accounts_synced: bool,
+    expected_all_synced: bool,
     expected_committed_transactions: Option<CommittedTransactions>,
 ) {
-    let CommitNotification::CommittedAccounts(committed_accounts) =
+    let CommitNotification::CommittedStates(committed_states) =
         commit_listener.select_next_some().await;
+    assert_eq!(committed_states.all_states_synced, expected_all_synced);
     assert_eq!(
-        committed_accounts.all_accounts_synced,
-        expected_all_accounts_synced
-    );
-    assert_eq!(
-        committed_accounts.committed_transaction,
+        committed_states.committed_transaction,
         expected_committed_transactions
     );
 }

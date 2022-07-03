@@ -9,7 +9,7 @@ use crate::{
     logging::{LogEntry, LogSchema},
     metrics,
     notification_handlers::{
-        CommitNotification, CommitNotificationListener, CommittedAccounts, CommittedTransactions,
+        CommitNotification, CommitNotificationListener, CommittedStates, CommittedTransactions,
         ConsensusNotificationHandler, ErrorNotification, ErrorNotificationListener,
         MempoolNotificationHandler,
     },
@@ -365,39 +365,38 @@ impl<
     }
 
     /// Handles a commit notification sent by the storage synchronizer for new
-    /// accounts.
+    /// state values.
     async fn handle_commit_notification(&mut self, commit_notification: CommitNotification) {
-        let CommitNotification::CommittedAccounts(committed_accounts) = commit_notification;
+        let CommitNotification::CommittedStates(committed_states) = commit_notification;
         info!(
             LogSchema::new(LogEntry::SynchronizerNotification).message(&format!(
-                "Received an account commit notification from the storage synchronizer. \
+                "Received a state commit notification from the storage synchronizer. \
                         All synced: {:?}, last committed index: {:?}.",
-                committed_accounts.all_accounts_synced,
-                committed_accounts.last_committed_account_index,
+                committed_states.all_states_synced, committed_states.last_committed_state_index,
             ))
         );
-        self.handle_committed_accounts(committed_accounts).await;
+        self.handle_committed_states(committed_states).await;
     }
 
-    /// Handles a notification sent by the storage synchronizer for committed accounts
-    async fn handle_committed_accounts(&mut self, committed_accounts: CommittedAccounts) {
+    /// Handles a notification sent by the storage synchronizer for committed states
+    async fn handle_committed_states(&mut self, committed_states: CommittedStates) {
         // Forward the notification to the bootstrapper
         if let Err(error) = self
             .bootstrapper
-            .handle_committed_accounts(committed_accounts.clone())
+            .handle_committed_state_values(committed_states.clone())
         {
             error!(LogSchema::new(LogEntry::SynchronizerNotification)
                 .error(&error)
-                .message("Failed to handle an account commit notification!"));
+                .message("Failed to handle a state commit notification!"));
         }
 
-        // If we've finished syncing all accounts, we'll have a single new committed
+        // If we've finished syncing all state values, we'll have a single new committed
         // transaction at the syncing version. In this case, we need to handle the
         // new committed transaction and events.
-        if committed_accounts.all_accounts_synced {
-            let committed_transactions = committed_accounts
-                .committed_transaction
-                .expect("Committed transaction should exist for last committed account chunk!");
+        if committed_states.all_states_synced {
+            let committed_transactions = committed_states.committed_transaction.expect(
+                "Committed transaction should exist for last committed state values chunk!",
+            );
 
             // Handle the commit notification
             utils::handle_committed_transactions(

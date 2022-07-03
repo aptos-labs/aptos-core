@@ -37,14 +37,14 @@ use std::{
 use storage_service_types::{CompleteDataRange, Epoch};
 use tokio::time::timeout;
 
-/// The number of accounts held at any version
-pub const TOTAL_NUM_ACCOUNTS: u64 = 2000;
+/// The number of state values held at any version
+pub const TOTAL_NUM_STATE_VALUES: u64 = 2000;
 
 /// Test constants for advertised data
-pub const MIN_ADVERTISED_ACCOUNTS: u64 = 9500;
-pub const MAX_ADVERTISED_ACCOUNTS: u64 = 10000;
 pub const MIN_ADVERTISED_EPOCH_END: u64 = 100;
 pub const MAX_ADVERTISED_EPOCH_END: u64 = 150;
+pub const MIN_ADVERTISED_STATES: u64 = 9500;
+pub const MAX_ADVERTISED_STATES: u64 = 10000;
 pub const MIN_ADVERTISED_TRANSACTION: u64 = 1000;
 pub const MAX_ADVERTISED_TRANSACTION: u64 = 10000;
 pub const MIN_ADVERTISED_TRANSACTION_OUTPUT: u64 = 1000;
@@ -115,7 +115,7 @@ impl AptosDataClient for MockAptosDataClient {
     fn get_global_data_summary(&self) -> GlobalDataSummary {
         // Create a random set of optimal chunk sizes to emulate changing environments
         let optimal_chunk_sizes = OptimalChunkSizes {
-            account_states_chunk_size: create_non_zero_random_u64(100),
+            state_chunk_size: create_non_zero_random_u64(100),
             epoch_chunk_size: create_non_zero_random_u64(10),
             transaction_chunk_size: create_non_zero_random_u64(1000),
             transaction_output_chunk_size: create_non_zero_random_u64(1000),
@@ -123,11 +123,9 @@ impl AptosDataClient for MockAptosDataClient {
 
         // Create a global data summary with a fixed set of data
         let advertised_data = AdvertisedData {
-            account_states: vec![CompleteDataRange::new(
-                MIN_ADVERTISED_ACCOUNTS,
-                MAX_ADVERTISED_ACCOUNTS,
-            )
-            .unwrap()],
+            states: vec![
+                CompleteDataRange::new(MIN_ADVERTISED_STATES, MAX_ADVERTISED_STATES).unwrap(),
+            ],
             epoch_ending_ledger_infos: vec![CompleteDataRange::new(
                 MIN_ADVERTISED_EPOCH_END,
                 MAX_ADVERTISED_EPOCH_END,
@@ -151,7 +149,7 @@ impl AptosDataClient for MockAptosDataClient {
         }
     }
 
-    async fn get_account_states_with_proof(
+    async fn get_state_values_with_proof(
         &self,
         _version: Version,
         start_index: u64,
@@ -159,26 +157,26 @@ impl AptosDataClient for MockAptosDataClient {
     ) -> Result<Response<StateValueChunkWithProof>, aptos_data_client::Error> {
         self.emulate_network_latencies();
 
-        // Create account blobs according to the given indices
-        let mut account_blobs = vec![];
+        // Create state keys and values according to the given indices
+        let mut state_keys_and_values = vec![];
         for _ in start_index..=end_index {
-            account_blobs.push((
+            state_keys_and_values.push((
                 StateKey::Raw(HashValue::random().to_vec()),
                 StateValue::from(vec![]),
             ));
         }
 
-        // Create an account states chunk with proof
-        let account_states = StateValueChunkWithProof {
+        // Create a state value chunk with proof
+        let state_value_chunk_with_proof = StateValueChunkWithProof {
             first_index: start_index,
             last_index: end_index,
             first_key: HashValue::random(),
             last_key: HashValue::random(),
-            raw_values: account_blobs,
+            raw_values: state_keys_and_values,
             proof: SparseMerkleRangeProof::new(vec![]),
             root_hash: HashValue::zero(),
         };
-        Ok(create_data_client_response(account_states))
+        Ok(create_data_client_response(state_value_chunk_with_proof))
     }
 
     async fn get_epoch_ending_ledger_infos(
@@ -298,11 +296,11 @@ impl AptosDataClient for MockAptosDataClient {
         }
     }
 
-    async fn get_number_of_account_states(
+    async fn get_number_of_states(
         &self,
         _version: Version,
     ) -> Result<Response<u64>, aptos_data_client::Error> {
-        Ok(create_data_client_response(TOTAL_NUM_ACCOUNTS))
+        Ok(create_data_client_response(TOTAL_NUM_STATE_VALUES))
     }
 
     async fn get_transaction_outputs_with_proof(

@@ -5,7 +5,7 @@ use crate::{
     driver::DriverConfiguration,
     error::Error,
     logging::{LogEntry, LogSchema},
-    notification_handlers::CommittedAccounts,
+    notification_handlers::CommittedStates,
     storage_synchronizer::StorageSynchronizerInterface,
     utils,
     utils::{SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
@@ -228,8 +228,8 @@ impl VerifiedEpochStates {
 }
 
 // TODO(joshlind): persist the index (e.g., in case we crash mid-download)?
-/// A simple container to manage state related to account state snapshot syncing
-struct AccountStateSyncer {
+/// A simple container to manage data related to state value snapshot syncing
+struct StateValueSyncer {
     // Whether or not a state snapshot receiver has been initialized
     initialized_state_snapshot_receiver: bool,
 
@@ -239,42 +239,39 @@ struct AccountStateSyncer {
     // The epoch ending ledger info for the version we're syncing
     ledger_info_to_sync: Option<LedgerInfoWithSignatures>,
 
-    // The next account index to commit (all accounts before this have been
+    // The next state value index to commit (all state values before this have been
     // committed).
-    next_account_index_to_commit: u64,
+    next_state_index_to_commit: u64,
 
-    // The next account index to process (all accounts before this have been
+    // The next state value index to process (all state values before this have been
     // processed -- i.e., sent to the storage synchronizer).
-    next_account_index_to_process: u64,
+    next_state_index_to_process: u64,
 
     // The transaction output (inc. info and proof) for the version we're syncing
     transaction_output_to_sync: Option<TransactionOutputListWithProof>,
 }
 
-impl AccountStateSyncer {
+impl StateValueSyncer {
     pub fn new() -> Self {
         Self {
             initialized_state_snapshot_receiver: false,
             is_sync_complete: false,
             ledger_info_to_sync: None,
-            next_account_index_to_commit: 0,
-            next_account_index_to_process: 0,
+            next_state_index_to_commit: 0,
+            next_state_index_to_process: 0,
             transaction_output_to_sync: None,
         }
     }
 
-    /// Resets all speculative state related to account state syncing (i.e., all
-    /// speculative data that as not been successfully committed to storage)
+    /// Resets all speculative state related to state value syncing (i.e., all
+    /// speculative data that has not been successfully committed to storage)
     pub fn reset_speculative_state(&mut self) {
-        self.next_account_index_to_process = self.next_account_index_to_commit
+        self.next_state_index_to_process = self.next_state_index_to_commit
     }
 }
 
 /// A simple component that manages the bootstrapping of the node
 pub struct Bootstrapper<StorageSyncer, StreamingClient> {
-    // The component used to sync account states (if downloading accounts)
-    account_state_syncer: AccountStateSyncer,
-
     // The currently active data stream (provided by the data streaming service)
     active_data_stream: Option<DataStreamListener>,
 
@@ -289,6 +286,9 @@ pub struct Bootstrapper<StorageSyncer, StreamingClient> {
 
     // The speculative state tracking the active data stream
     speculative_stream_state: Option<SpeculativeStreamState>,
+
+    // The component used to sync state values (if downloading states)
+    state_value_syncer: StateValueSyncer,
 
     // The client through which to stream data from the Aptos network
     streaming_client: StreamingClient,
@@ -320,7 +320,7 @@ impl<
         let verified_epoch_states = VerifiedEpochStates::new(latest_epoch_state);
 
         Self {
-            account_state_syncer: AccountStateSyncer::new(),
+            state_value_syncer: StateValueSyncer::new(),
             active_data_stream: None,
             bootstrap_notifier_channel: None,
             bootstrapped: false,
@@ -437,15 +437,14 @@ impl<
         // Check if we've already fetched the required data for bootstrapping.
         // If not, bootstrap according to the mode.
         match self.driver_configuration.config.bootstrapping_mode {
-            BootstrappingMode::DownloadLatestAccountStates => {
-                if (self.account_state_syncer.ledger_info_to_sync.is_none()
+            BootstrappingMode::DownloadLatestStates => {
+                if (self.state_value_syncer.ledger_info_to_sync.is_none()
                     && highest_synced_version >= highest_known_ledger_version)
-                    || self.account_state_syncer.is_sync_complete
+                    || self.state_value_syncer.is_sync_complete
                 {
                     return self.bootstrapping_complete();
                 }
-                self.fetch_all_account_states(highest_known_ledger_info)
-                    .await
+                self.fetch_all_state_values(highest_known_ledger_info).await
             }
             _ => {
                 if highest_synced_version >= highest_known_ledger_version {
@@ -484,10 +483,10 @@ impl<
             // Fetch and process any data notifications
             let data_notification = self.fetch_next_data_notification().await?;
             match data_notification.data_payload {
-                DataPayload::AccountStatesWithProof(account_states_with_proof) => {
-                    self.process_account_states_payload(
+                DataPayload::StateValuesWithProof(state_value_chunk_with_proof) => {
+                    self.process_state_values_payload(
                         data_notification.notification_id,
-                        account_states_with_proof,
+                        state_value_chunk_with_proof,
                     )
                     .await?;
                 }
@@ -530,13 +529,13 @@ impl<
         Ok(())
     }
 
-    /// Fetches all account states (as required to bootstrap the node)
-    async fn fetch_all_account_states(
+    /// Fetches state values (as required to bootstrap the node)
+    async fn fetch_all_state_values(
         &mut self,
         highest_known_ledger_info: LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
         // Verify we're trying to sync to an unchanging ledger info
-        if let Some(ledger_info_to_sync) = &self.account_state_syncer.ledger_info_to_sync {
+        if let Some(ledger_info_to_sync) = &self.state_value_syncer.ledger_info_to_sync {
             if ledger_info_to_sync != &highest_known_ledger_info {
                 panic!(
                     "Mismatch in ledger info to sync! Highest: {:?}, target: {:?}",
@@ -544,16 +543,12 @@ impl<
                 );
             }
         } else {
-            self.account_state_syncer.ledger_info_to_sync = Some(highest_known_ledger_info.clone());
+            self.state_value_syncer.ledger_info_to_sync = Some(highest_known_ledger_info.clone());
         }
 
-        // Fetch the transaction info first, before the account states
+        // Fetch the transaction info first, before the states
         let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
-        let data_stream = if self
-            .account_state_syncer
-            .transaction_output_to_sync
-            .is_none()
-        {
+        let data_stream = if self.state_value_syncer.transaction_output_to_sync.is_none() {
             self.streaming_client
                 .get_all_transaction_outputs(
                     highest_known_ledger_version,
@@ -562,9 +557,9 @@ impl<
                 )
                 .await?
         } else {
-            let start_account_index = Some(self.account_state_syncer.next_account_index_to_commit);
+            let start_index = Some(self.state_value_syncer.next_state_index_to_commit);
             self.streaming_client
-                .get_all_accounts(highest_known_ledger_version, start_account_index)
+                .get_all_state_values(highest_known_ledger_version, start_index)
                 .await?
         };
         self.active_data_stream = Some(data_stream);
@@ -727,114 +722,107 @@ impl<
         }
     }
 
-    /// Verifies the start and end indices in the given account states chunk
-    async fn verify_account_states_indices(
+    /// Verifies the start and end indices in the given state value chunk
+    async fn verify_states_values_indices(
         &mut self,
         notification_id: NotificationId,
-        account_states_chunk_with_proof: &StateValueChunkWithProof,
+        state_value_chunk_with_proof: &StateValueChunkWithProof,
     ) -> Result<(), Error> {
         // Verify the payload start index is valid
-        let expected_start_index = self.account_state_syncer.next_account_index_to_process;
-        if expected_start_index != account_states_chunk_with_proof.first_index {
+        let expected_start_index = self.state_value_syncer.next_state_index_to_process;
+        if expected_start_index != state_value_chunk_with_proof.first_index {
             self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
                 .await?;
             return Err(Error::VerificationError(format!(
-                "The start index of the account states was invalid! Expected: {:?}, received: {:?}",
-                expected_start_index, account_states_chunk_with_proof.first_index
+                "The start index of the state values was invalid! Expected: {:?}, received: {:?}",
+                expected_start_index, state_value_chunk_with_proof.first_index
             )));
         }
 
-        // Verify the number of account blobs is valid
-        let expected_num_accounts = account_states_chunk_with_proof
+        // Verify the number of state values is valid
+        let expected_num_state_values = state_value_chunk_with_proof
             .last_index
-            .checked_sub(account_states_chunk_with_proof.first_index)
-            .and_then(|version| version.checked_add(1)) // expected_num_accounts = last_index - first_index + 1
+            .checked_sub(state_value_chunk_with_proof.first_index)
+            .and_then(|version| version.checked_add(1)) // expected_num_state_values = last_index - first_index + 1
             .ok_or_else(|| {
-                Error::IntegerOverflow("The expected number of accounts has overflown!".into())
+                Error::IntegerOverflow("The expected number of state values has overflown!".into())
             })?;
-        let num_accounts = account_states_chunk_with_proof.raw_values.len() as u64;
-        if expected_num_accounts != num_accounts {
+        let num_state_values = state_value_chunk_with_proof.raw_values.len() as u64;
+        if expected_num_state_values != num_state_values {
             self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
                 .await?;
             return Err(Error::VerificationError(format!(
-                "The expected number of accounts was invalid! Expected: {:?}, received: {:?}",
-                expected_num_accounts, num_accounts,
+                "The expected number of state values was invalid! Expected: {:?}, received: {:?}",
+                expected_num_state_values, num_state_values,
             )));
         }
 
         // Verify the payload end index is valid
-        let expected_end_index = account_states_chunk_with_proof
+        let expected_end_index = state_value_chunk_with_proof
             .first_index
-            .checked_add(num_accounts)
-            .and_then(|version| version.checked_sub(1)) // expected_end_index = first_index + num_accounts - 1
+            .checked_add(num_state_values)
+            .and_then(|version| version.checked_sub(1)) // expected_end_index = first_index + num_state_values - 1
             .ok_or_else(|| {
                 Error::IntegerOverflow("The expected end of index has overflown!".into())
             })?;
-        if expected_end_index != account_states_chunk_with_proof.last_index {
+        if expected_end_index != state_value_chunk_with_proof.last_index {
             self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
                 .await?;
             return Err(Error::VerificationError(format!(
                 "The expected end index was invalid! Expected: {:?}, received: {:?}",
-                expected_num_accounts, account_states_chunk_with_proof.last_index,
+                expected_num_state_values, state_value_chunk_with_proof.last_index,
             )));
         }
 
         Ok(())
     }
 
-    /// Process a single account states with proof payload
-    async fn process_account_states_payload(
+    /// Process a single state value chunk with proof payload
+    async fn process_state_values_payload(
         &mut self,
         notification_id: NotificationId,
-        account_state_chunk_with_proof: StateValueChunkWithProof,
+        state_value_chunk_with_proof: StateValueChunkWithProof,
     ) -> Result<(), Error> {
-        // Verify that we're expecting account payloads
+        // Verify that we're expecting state value payloads
         let bootstrapping_mode = self.driver_configuration.config.bootstrapping_mode;
         if self.should_fetch_epoch_ending_ledger_infos()
-            || !matches!(
-                bootstrapping_mode,
-                BootstrappingMode::DownloadLatestAccountStates
-            )
+            || !matches!(bootstrapping_mode, BootstrappingMode::DownloadLatestStates)
         {
             self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
                 .await?;
             return Err(Error::InvalidPayload(
-                "Received an unexpected account states payload!".into(),
+                "Received an unexpected state values payload!".into(),
             ));
         }
 
         // Fetch the target ledger info and transaction info for bootstrapping
         let ledger_info_to_sync = self
-            .account_state_syncer
+            .state_value_syncer
             .ledger_info_to_sync
             .clone()
             .expect("Ledger info to sync is missing!");
         let transaction_output_to_sync = self
-            .account_state_syncer
+            .state_value_syncer
             .transaction_output_to_sync
             .clone()
             .expect("Transaction output to sync is missing!");
 
-        // Initialize the account state synchronizer (if not already done)
-        if !self
-            .account_state_syncer
-            .initialized_state_snapshot_receiver
-        {
+        // Initialize the state value synchronizer (if not already done)
+        if !self.state_value_syncer.initialized_state_snapshot_receiver {
             // Fetch all verified epoch change proofs
             let epoch_change_proofs = self.verified_epoch_states.all_epoch_ending_ledger_infos();
 
-            // Initialize the account state synchronizer
-            let _ = self.storage_synchronizer.initialize_account_synchronizer(
+            // Initialize the state value synchronizer
+            let _ = self.storage_synchronizer.initialize_state_synchronizer(
                 epoch_change_proofs,
                 ledger_info_to_sync,
                 transaction_output_to_sync.clone(),
             )?;
-            self.account_state_syncer
-                .initialized_state_snapshot_receiver = true;
+            self.state_value_syncer.initialized_state_snapshot_receiver = true;
         }
 
-        // Verify the account payload start and end indices
-        self.verify_account_states_indices(notification_id, &account_state_chunk_with_proof)
+        // Verify the state values payload start and end indices
+        self.verify_states_values_indices(notification_id, &state_value_chunk_with_proof)
             .await?;
 
         // Verify the chunk root hash matches the expected root hash
@@ -845,33 +833,35 @@ impl<
             .expect("Target transaction info should exist!")
             .ensure_state_checkpoint_hash()
             .expect("Must be at state checkpoint.");
-        if account_state_chunk_with_proof.root_hash != expected_root_hash {
+        if state_value_chunk_with_proof.root_hash != expected_root_hash {
             self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
                 .await?;
             return Err(Error::VerificationError(format!(
-                "The account states chunk with proof root hash: {:?} didn't match the expected hash: {:?}!",
-                account_state_chunk_with_proof.root_hash, expected_root_hash,
+                "The states chunk with proof root hash: {:?} didn't match the expected hash: {:?}!",
+                state_value_chunk_with_proof.root_hash, expected_root_hash,
             )));
         }
 
-        // Process the account states chunk and proof
-        let last_account_index = account_state_chunk_with_proof.last_index;
+        // Process the state values chunk and proof
+        let last_state_value_index = state_value_chunk_with_proof.last_index;
         if let Err(error) = self
             .storage_synchronizer
-            .save_account_states(notification_id, account_state_chunk_with_proof)
+            .save_state_values(notification_id, state_value_chunk_with_proof)
         {
             self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
                 .await?;
             return Err(Error::InvalidPayload(format!(
-                "The account states chunk with proof was invalid! Error: {:?}",
+                "The states chunk with proof was invalid! Error: {:?}",
                 error,
             )));
         }
 
-        // Update the next account index to process
-        self.account_state_syncer.next_account_index_to_process =
-            last_account_index.checked_add(1).ok_or_else(|| {
-                Error::IntegerOverflow("The next account index to process has overflown!".into())
+        // Update the next state value index to process
+        self.state_value_syncer.next_state_index_to_process =
+            last_state_value_index.checked_add(1).ok_or_else(|| {
+                Error::IntegerOverflow(
+                    "The next state value index to process has overflown!".into(),
+                )
             })?;
 
         Ok(())
@@ -934,13 +924,8 @@ impl<
         // Verify that we're expecting transaction or output payloads
         let bootstrapping_mode = self.driver_configuration.config.bootstrapping_mode;
         if self.should_fetch_epoch_ending_ledger_infos()
-            || (matches!(
-                bootstrapping_mode,
-                BootstrappingMode::DownloadLatestAccountStates
-            ) && self
-                .account_state_syncer
-                .transaction_output_to_sync
-                .is_some())
+            || (matches!(bootstrapping_mode, BootstrappingMode::DownloadLatestStates)
+                && self.state_value_syncer.transaction_output_to_sync.is_some())
         {
             self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
                 .await?;
@@ -949,11 +934,8 @@ impl<
             ));
         }
 
-        // If we're account state syncing, we expect a single transaction info
-        if matches!(
-            bootstrapping_mode,
-            BootstrappingMode::DownloadLatestAccountStates
-        ) {
+        // If we're state syncing, we expect a single transaction info
+        if matches!(bootstrapping_mode, BootstrappingMode::DownloadLatestStates) {
             return self
                 .verify_transaction_info_to_sync(
                     notification_id,
@@ -1049,7 +1031,7 @@ impl<
     }
 
     /// Verifies the payload contains the transaction info we require to
-    /// download all account states.
+    /// download all state values.
     async fn verify_transaction_info_to_sync(
         &mut self,
         notification_id: NotificationId,
@@ -1058,7 +1040,7 @@ impl<
     ) -> Result<(), Error> {
         // Verify the payload starting version
         let ledger_info_to_sync = self
-            .account_state_syncer
+            .state_value_syncer
             .ledger_info_to_sync
             .clone()
             .expect("Ledger info to sync is missing!");
@@ -1080,7 +1062,7 @@ impl<
                     Some(expected_start_version),
                 ) {
                     Ok(()) => {
-                        self.account_state_syncer.transaction_output_to_sync =
+                        self.state_value_syncer.transaction_output_to_sync =
                             Some(transaction_outputs_with_proof);
                     }
                     Err(error) => {
@@ -1259,29 +1241,29 @@ impl<
         .await
     }
 
-    /// Handles a notification from the driver that new accounts have been
+    /// Handles a notification from the driver that new state values have been
     /// committed to storage.
-    pub fn handle_committed_accounts(
+    pub fn handle_committed_state_values(
         &mut self,
-        committed_accounts: CommittedAccounts,
+        committed_states: CommittedStates,
     ) -> Result<(), Error> {
-        // Update the last committed account index
-        self.account_state_syncer.next_account_index_to_commit = committed_accounts
-            .last_committed_account_index
+        // Update the last committed state value index
+        self.state_value_syncer.next_state_index_to_commit = committed_states
+            .last_committed_state_index
             .checked_add(1)
             .ok_or_else(|| {
-                Error::IntegerOverflow("The next account index to commit has overflown!".into())
+                Error::IntegerOverflow("The next state value index to commit has overflown!".into())
             })?;
 
-        // Check if we've downloaded all account states
-        if committed_accounts.all_accounts_synced {
+        // Check if we've downloaded all state values
+        if committed_states.all_states_synced {
             info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
-                "Successfully synced all account states at version: {:?}. \
-                Last committed account index: {:?}",
-                self.account_state_syncer.ledger_info_to_sync,
-                committed_accounts.last_committed_account_index
+                "Successfully synced all state values at version: {:?}. \
+                Last committed index: {:?}",
+                self.state_value_syncer.ledger_info_to_sync,
+                committed_states.last_committed_state_index
             )));
-            self.account_state_syncer.is_sync_complete = true;
+            self.state_value_syncer.is_sync_complete = true;
         }
 
         Ok(())
@@ -1296,7 +1278,7 @@ impl<
 
     /// Resets the currently active data stream and speculative state
     fn reset_active_stream(&mut self) {
-        self.account_state_syncer.reset_speculative_state();
+        self.state_value_syncer.reset_speculative_state();
         self.speculative_stream_state = None;
         self.active_data_stream = None;
     }

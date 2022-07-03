@@ -327,7 +327,7 @@ mock! {
     pub StreamingClient {}
     #[async_trait]
     impl DataStreamingClient for StreamingClient {
-        async fn get_all_accounts(
+        async fn get_all_state_values(
             &self,
             version: Version,
             start_index: Option<u64>,
@@ -399,7 +399,7 @@ mock! {
             end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
         ) -> Result<(), crate::error::Error>;
 
-        fn initialize_account_synchronizer(
+        fn initialize_state_synchronizer(
             &mut self,
             epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
             target_ledger_info: LedgerInfoWithSignatures,
@@ -408,10 +408,10 @@ mock! {
 
         fn pending_storage_data(&self) -> bool;
 
-        fn save_account_states(
+        fn save_state_values(
             &mut self,
             notification_id: NotificationId,
-            account_states_with_proof: StateValueChunkWithProof,
+            state_value_chunk_with_proof: StateValueChunkWithProof,
         ) -> Result<(), crate::error::Error>;
 
         fn reset_chunk_executor(&mut self) -> Result<(), crate::error::Error>;
