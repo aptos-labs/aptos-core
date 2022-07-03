@@ -6,6 +6,7 @@ pub mod stats;
 pub mod submission_worker;
 
 use ::aptos_logger::*;
+use again::RetryPolicy;
 use anyhow::{format_err, Result};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
@@ -15,6 +16,7 @@ use aptos_sdk::{
 };
 use futures::future::{try_join_all, FutureExt};
 use itertools::zip;
+use once_cell::sync::Lazy;
 use rand::{
     distributions::{Distribution, Standard},
     Rng, RngCore,
@@ -43,6 +45,17 @@ const MAX_TXNS: u64 = 1_000_000;
 const SEND_AMOUNT: u64 = 1;
 const TXN_EXPIRATION_SECONDS: u64 = 180;
 const TXN_MAX_WAIT: Duration = Duration::from_secs(TXN_EXPIRATION_SECONDS as u64 + 30);
+
+// This retry policy is used for important client calls necessary for setting
+// up the test (e.g. account creation) and collecting its results (e.g. checking
+// account sequence numbers). If these fail, the whole test fails. We do not use
+// this for submitting transactions, as we have a way to handle when that fails.
+// This retry policy means an operation will take 8 seconds at most.
+static RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
+    RetryPolicy::exponential(Duration::from_millis(125))
+        .with_max_retries(6)
+        .with_jitter(true)
+});
 
 #[derive(Clone, Debug)]
 pub struct EmitThreadParams {
@@ -411,14 +424,16 @@ pub async fn query_sequence_numbers(
     client: &RestClient,
     addresses: &[AccountAddress],
 ) -> Result<Vec<u64>> {
-    Ok(
-        try_join_all(addresses.iter().map(|address| client.get_account(*address)))
-            .await
-            .map_err(|e| format_err!("Get accounts failed: {}", e))?
-            .into_iter()
-            .map(|resp| resp.into_inner().sequence_number)
-            .collect(),
+    Ok(try_join_all(
+        addresses
+            .iter()
+            .map(|address| RETRY_POLICY.retry(move || client.get_account(*address))),
     )
+    .await
+    .map_err(|e| format_err!("Get accounts failed: {}", e))?
+    .into_iter()
+    .map(|resp| resp.into_inner().sequence_number)
+    .collect())
 }
 
 pub fn gen_transfer_txn_request(

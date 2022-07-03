@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    emitter::{MAX_TXNS, MAX_TXN_BATCH_SIZE, SEND_AMOUNT},
+    emitter::{MAX_TXNS, MAX_TXN_BATCH_SIZE, RETRY_POLICY, SEND_AMOUNT},
     query_sequence_numbers, EmitJobRequest,
 };
 use anyhow::{format_err, Result};
@@ -34,6 +34,7 @@ pub struct AccountMinter<'t> {
     rng: StdRng,
     root_account: &'t mut LocalAccount,
 }
+
 impl<'t> AccountMinter<'t> {
     pub fn new(
         root_account: &'t mut LocalAccount,
@@ -355,8 +356,11 @@ pub async fn execute_and_wait_transactions(
         account.address()
     );
 
-    let pending_txns: Vec<Response<PendingTransaction>> =
-        try_join_all(txns.iter().map(|t| client.submit(t))).await?;
+    let pending_txns: Vec<Response<PendingTransaction>> = try_join_all(
+        txns.iter()
+            .map(|t| RETRY_POLICY.retry(move || client.submit(t))),
+    )
+    .await?;
 
     for pt in pending_txns {
         client

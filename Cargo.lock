@@ -90,6 +90,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "again"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05802a5ad4d172eaf796f7047b42d0af9db513585d16d4169660a21613d34b93"
+dependencies = [
+ "log",
+ "rand 0.7.3",
+ "wasm-timer",
+]
+
+[[package]]
 name = "ahash"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2785,7 +2796,7 @@ dependencies = [
  "diesel_derives",
  "num-bigint 0.2.6",
  "num-integer",
- "num-traits 0.1.43",
+ "num-traits 0.2.15",
  "pq-sys",
  "r2d2",
  "serde_json",
@@ -9001,6 +9012,7 @@ dependencies = [
 name = "transaction-emitter-lib"
 version = "0.0.0"
 dependencies = [
+ "again",
  "anyhow",
  "aptos",
  "aptos-config",
@@ -9013,6 +9025,7 @@ dependencies = [
  "clap 3.1.18",
  "futures",
  "itertools",
+ "once_cell",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "reqwest",
@@ -9546,6 +9559,21 @@ name = "wasm-bindgen-shared"
 version = "0.2.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d554b7f530dee5964d9a9468d95c1f8b8acae4f282807e7d27d4b03099a46744"
+
+[[package]]
+name = "wasm-timer"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be0ecb0db480561e9a7642b5d3e4187c128914e58aa84330b9493e3eb68c5e7f"
+dependencies = [
+ "futures",
+ "js-sys",
+ "parking_lot 0.11.2",
+ "pin-utils",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
 
 [[package]]
 name = "web-sys"
