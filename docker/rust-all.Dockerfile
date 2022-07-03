@@ -191,14 +191,17 @@ RUN apt-get update && apt-get install -y libssl1.1 ca-certificates openssh-clien
 RUN mkdir /aptos
 COPY rust-toolchain /aptos/rust-toolchain
 
+# copy helm charts from source
+RUN mkdir /etc/forge
+RUN mkdir -p /etc/forge/terraform/helm
+COPY --from=builder /aptos/terraform/helm /etc/forge/terraform/helm
+
 RUN cd /usr/local/bin && wget "https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/linux/amd64/kubectl" -O kubectl && chmod +x kubectl
-RUN cd /usr/local/bin && wget "https://releases.hashicorp.com/vault/1.5.0/vault_1.5.0_linux_amd64.zip" -O- | busybox unzip - && chmod +x vault
 RUN cd /usr/local/bin && wget "https://get.helm.sh/helm-v3.8.0-linux-amd64.tar.gz" -O- | busybox tar -zxvf - && mv linux-amd64/helm . && chmod +x helm
 ENV PATH "$PATH:/root/bin"
 
-RUN helm plugin install https://github.com/hypnoglow/helm-s3.git --version 0.10.0
-
-RUN mkdir /etc/forge
 WORKDIR /etc/forge
 COPY --from=builder /aptos/target/release/forge /usr/local/bin/forge
+
+
 ENTRYPOINT ["forge"]

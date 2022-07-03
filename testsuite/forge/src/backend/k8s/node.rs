@@ -3,9 +3,11 @@
 
 use crate::{
     scale_sts_replica, FullNode, HealthCheckError, Node, NodeExt, Result, Validator, Version,
+    KUBECTL_BIN,
 };
-use anyhow::{format_err, Context};
+use anyhow::{anyhow, format_err, Context};
 use aptos_config::config::NodeConfig;
+use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
 use reqwest::Url;
@@ -19,6 +21,7 @@ use std::{
 };
 
 const NODE_METRIC_PORT: u64 = 9101;
+pub const REST_API_PORT: u32 = 80;
 
 pub struct K8sNode {
     pub(crate) name: String,
@@ -30,6 +33,7 @@ pub struct K8sNode {
     pub(crate) port: u32,
     pub(crate) rest_api_port: u32,
     pub version: Version,
+    pub namespace: String,
 }
 
 impl K8sNode {
@@ -59,8 +63,46 @@ impl K8sNode {
         RestClient::new(self.rest_api_endpoint())
     }
 
-    fn sts_name(&self) -> &str {
+    pub fn sts_name(&self) -> &str {
         &self.sts_name
+    }
+
+    fn namespace(&self) -> &str {
+        &self.namespace
+    }
+
+    pub fn spawn_port_forward(&self) -> Result<()> {
+        // spawn a port-forward child process
+        let cmd = Command::new(KUBECTL_BIN)
+            .args([
+                "port-forward",
+                "-n",
+                self.namespace(),
+                &format!("svc/{}", self.dns()),
+                &format!("{}:{}", self.rest_api_port(), REST_API_PORT),
+            ])
+            .stdout(Stdio::null())
+            // .stderr(Stdio::null())
+            .spawn();
+        match cmd {
+            Ok(mut child) => {
+                // sleep a bit and check if port-forward failed for some reason
+                let timeout = Duration::from_secs(1);
+                thread::sleep(timeout);
+                match child.try_wait() {
+                    Ok(Some(status)) => {
+                        info!("Port-forward may have started already: exit {}", status);
+                        Ok(())
+                    }
+                    Ok(None) => {
+                        info!("Port-forward started for {:?}", self);
+                        Ok(())
+                    }
+                    Err(e) => Err(anyhow!("did not work {}", e)),
+                }
+            }
+            Err(err) => Err(anyhow!("did not start: {}", err)),
+        }
     }
 }
 
@@ -100,7 +142,7 @@ impl Node for K8sNode {
     }
 
     fn stop(&mut self) -> Result<()> {
-        println!("going to stop node {}", self.sts_name());
+        info!("going to stop node {}", self.sts_name());
         scale_sts_replica(self.sts_name(), 0)
     }
 
@@ -112,7 +154,7 @@ impl Node for K8sNode {
             sts_name
         };
         let delete_pvc_args = ["delete", "pvc", &pvc_name];
-        println!("{:?}", delete_pvc_args);
+        info!("{:?}", delete_pvc_args);
         let cleanup_output = Command::new("kubectl")
             .stdout(Stdio::inherit())
             .args(&delete_pvc_args)
@@ -170,7 +212,7 @@ impl Node for K8sNode {
             &format!("pod/{}", pod_name),
             &format!("{}:{}", port, NODE_METRIC_PORT),
         ];
-        println!("{:?}", port_forward_args);
+        info!("{:?}", port_forward_args);
         let _ = Command::new("kubectl")
             .stdout(Stdio::null())
             .args(&port_forward_args)

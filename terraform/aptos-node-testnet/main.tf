@@ -12,39 +12,59 @@ locals {
   workspace  = var.workspace_name_override != "" ? var.workspace_name_override : terraform.workspace
   aws_tags   = "Terraform=testnet,Workspace=${local.workspace}"
   chain_name = var.chain_name != "" ? var.chain_name : "${local.workspace}net"
+}
 
+# Forge testing overrides
+locals {
   # Forge assumes the chain_id is 4
   chain_id = var.enable_forge ? 4 : var.chain_id
 
-  # use this map to programatically set helm values
-  aptos_node_helm_values_computed = {
+  aptos_node_helm_values_forge_override = {
+    // no VFNs in forge for now
+    fullnode = {
+      groups = []
+    }
+    // make all services internal NodePort and open all ports
     service = {
       validator = {
         external = {
-          type = var.enable_forge ? "NodePort" : null
+          type = "NodePort"
         }
-        enableRestApi     = var.enable_forge
-        enableMetricsPort = var.enable_forge
+        enableRestApi     = true
+        enableMetricsPort = true
       }
       fullnode = {
         external = {
-          type = var.enable_forge ? "NodePort" : null
+          type = "NodePort"
         }
-        enableRestApi     = var.enable_forge
-        enableMetricsPort = var.enable_forge
+        enableRestApi     = true
+        enableMetricsPort = true
       }
+    }
+  }
+  genesis_helm_values_forge_override = {
+    chain = {
+      root_key = "0x48136DF3174A3DE92AFDB375FFE116908B69FF6FAB9B1410E548A33FEA1D159D"
     }
   }
 }
 
-# merge the operator-provided helm values via TF var
-# with the computed helm values
+# helm value override merging with forge
 module "aptos-node-helm-values-deepmerge" {
   # https://registry.terraform.io/modules/Invicton-Labs/deepmerge/null/0.1.5
   source = "Invicton-Labs/deepmerge/null"
   maps = [
-    local.aptos_node_helm_values_computed,
+    var.enable_forge ? local.aptos_node_helm_values_forge_override : map(),
     var.aptos_node_helm_values,
+  ]
+}
+
+module "genesis-helm-values-deepmerge" {
+  # https://registry.terraform.io/modules/Invicton-Labs/deepmerge/null/0.1.5
+  source = "Invicton-Labs/deepmerge/null"
+  maps = [
+    var.enable_forge ? local.genesis_helm_values_forge_override : map(),
+    var.genesis_helm_values,
   ]
 }
 
@@ -139,6 +159,6 @@ resource "helm_release" "genesis" {
         }
       }
     }),
-    jsonencode(var.genesis_helm_values)
+    jsonencode(module.genesis-helm-values-deepmerge.merged)
   ]
 }
