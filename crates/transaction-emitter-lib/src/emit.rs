@@ -33,7 +33,9 @@ use crate::{
     args::TransactionType,
     atomic_histogram::*,
     transaction_generator::{
-        account_generator::AccountGenerator, p2p_transaction_generator::P2PTransactionGenerator,
+        account_generator::AccountGenerator,
+        nft_mint::{initialize_nft_collection, NFTMint},
+        p2p_transaction_generator::P2PTransactionGenerator,
         TransactionGenerator,
     },
 };
@@ -620,6 +622,21 @@ impl<'t> TxnEmitter<'t> {
         let stop = Arc::new(AtomicBool::new(false));
         let stats = Arc::new(StatsAccumulator::default());
         let tokio_handle = Handle::current();
+        let mut creator_account = LocalAccount::generate(&mut self.rng);
+        let collection_name = "collection name".to_owned().into_bytes();
+        let token_name = "token name".to_owned().into_bytes();
+        if let TransactionType::NftMint = req.transaction_type {
+            initialize_nft_collection(
+                req.rest_clients[0].clone(),
+                self.root_account,
+                &mut creator_account,
+                &self.txn_factory,
+                &collection_name,
+                &token_name,
+            )
+            .await;
+        };
+        let nft_creator_account = Arc::new(creator_account);
         for client in req.rest_clients {
             for _ in 0..workers_per_endpoint {
                 let accounts = (&mut all_accounts).take(req.accounts_per_client).collect();
@@ -627,6 +644,7 @@ impl<'t> TxnEmitter<'t> {
                 let stop = stop.clone();
                 let params = req.thread_params.clone();
                 let stats = Arc::clone(&stats);
+
                 let txn_generator: Box<dyn TransactionGenerator> = match req.transaction_type {
                     TransactionType::P2P => Box::new(P2PTransactionGenerator::new(
                         self.from_rng().clone(),
@@ -637,6 +655,16 @@ impl<'t> TxnEmitter<'t> {
                         self.from_rng().clone(),
                         self.txn_factory.clone(),
                     )),
+                    TransactionType::NftMint => {
+                        let nft_mint = NFTMint::new(
+                            self.txn_factory.clone(),
+                            nft_creator_account.clone(),
+                            collection_name.clone(),
+                            token_name.clone(),
+                        )
+                        .await;
+                        Box::new(nft_mint)
+                    }
                 };
                 let worker = SubmissionWorker {
                     accounts,
