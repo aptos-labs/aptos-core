@@ -82,8 +82,8 @@ module AptosFramework::Block {
 
         // Authorization
         assert!(
-            proposer == @VMReserved || Stake::is_current_validator(proposer),
-            errors::requires_address(EVM_OR_VALIDATOR)
+            proposer == @VMReserved || Stake::is_current_epoch_validator(proposer),
+        errors::requires_address(EVM_OR_VALIDATOR)
         );
 
         let block_metadata_ref = borrow_global_mut<BlockMetadata>(@AptosFramework);
