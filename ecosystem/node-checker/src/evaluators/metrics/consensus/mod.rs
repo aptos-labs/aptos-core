@@ -4,9 +4,9 @@
 mod proposals;
 mod round;
 mod timeouts;
-mod types;
 
 pub use proposals::*;
 pub use round::*;
 pub use timeouts::*;
-pub use types::*;
+
+pub const CATEGORY: &str = "consensus";
