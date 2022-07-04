@@ -13,5 +13,6 @@ pub fn aptos_natives() -> NativeFunctionTable {
         .chain(framework::natives::all_natives(CORE_CODE_ADDRESS))
         .chain(move_table_extension::table_natives(CORE_CODE_ADDRESS))
         .chain(transaction_context_natives(CORE_CODE_ADDRESS))
+        .chain(aptos_extensions::aggregator_natives(CORE_CODE_ADDRESS))
         .collect()
 }

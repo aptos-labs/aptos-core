@@ -1,0 +1,16 @@
+[package]
+name = "aptos-extensions"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Move VM extensions"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+better_any = "0.1.1"
+smallvec = "1.8.0"
+
+move-deps = { path = "../move-deps", features = ["address32"] }

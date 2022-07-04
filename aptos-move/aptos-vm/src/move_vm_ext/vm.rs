@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_extensions::NativeAggregatorContext;
 use crate::{
     move_vm_ext::{MoveResolverExt, NativeTransactionContext, SessionExt, SessionId},
     natives::aptos_natives,
@@ -30,6 +31,7 @@ impl MoveVmExt {
     ) -> SessionExt<'r, '_, S> {
         let mut extensions = NativeContextExtensions::default();
         extensions.add(NativeTableContext::new(session_id.as_uuid(), remote));
+        extensions.add(NativeAggregatorContext::new(session_id.as_uuid()));
 
         let script_hash = match session_id {
             SessionId::Txn {

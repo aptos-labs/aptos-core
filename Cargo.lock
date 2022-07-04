@@ -373,6 +373,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-extensions"
+version = "0.1.0"
+dependencies = [
+ "better_any",
+ "move-deps",
+ "smallvec",
+]
+
+[[package]]
 name = "aptos-faucet"
 version = "0.1.0"
 dependencies = [
@@ -1258,6 +1267,7 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-crypto-derive",
+ "aptos-extensions",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-module-verifier",
