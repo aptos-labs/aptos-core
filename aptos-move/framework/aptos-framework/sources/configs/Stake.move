@@ -130,8 +130,7 @@ module AptosFramework::Stake {
         minimum_stake: u64,
         // A validator can only stake at most this amount. Any larger stake will be rejected.
         // If after joining the validator set and at the start of any epoch, a validator's stake exceeds this amount,
-        // they will be removed from the set.
-        // TODO: Revisit whether a validator should be removed from the validator set if their stake exceeds the max.
+        // their voting power and rewards would only be issued for the max stake amount.
         maximum_stake: u64,
         // A validator needs to initially lock up for at least this amount of time (in secs) to be able to join the
         // validator set. However, if over time, their remaining lockup drops below this, they won't get removed from
@@ -835,9 +834,14 @@ module AptosFramework::Stake {
             let pool_address = old_validator_info.addr;
             let validator_config = borrow_global_mut<ValidatorConfig>(pool_address);
             let new_validator_info = generate_validator_info(pool_address, *validator_config);
-            if (new_validator_info.voting_power >= validator_set_config.minimum_stake &&
-                new_validator_info.voting_power <= validator_set_config.maximum_stake
-            ) {
+
+            // Restrict a validator's voting power to the max stake allowed.
+            if (new_validator_info.voting_power > validator_set_config.maximum_stake) {
+                new_validator_info.voting_power = validator_set_config.maximum_stake;
+            };
+
+            // A validator needs at least the min stake required to join the validator set.
+            if (new_validator_info.voting_power >= validator_set_config.minimum_stake) {
                 Vector::push_back(&mut active_validators, new_validator_info);
                 Vector::push_back(&mut validator_perf.missed_votes, 0);
             };
@@ -908,8 +912,24 @@ module AptosFramework::Stake {
             remaining_lockup_time = stake_pool.locked_until_secs - current_time;
         };
 
+        let total_stake_before_rewards = Coin::value(&stake_pool.active) + Coin::value(&stake_pool.pending_inactive);
         let rewards_amount = distribute_reward(&mut stake_pool.active, num_blocks, num_successful_votes, remaining_lockup_time, validator_set_config);
-        rewards_amount = rewards_amount + distribute_reward(&mut stake_pool.pending_inactive, num_blocks, num_successful_votes, remaining_lockup_time, validator_set_config);
+        // Only give out rewards for pending_inactive if the total stake (active + pending_inactive) doesn't exceed the
+        // max allowed.
+        // First, this ensures rewards are only given to the mininum of (total stake, max stake allowed) as the voting
+        // power of a validator cannot exceed the max allowed (the excess stake above the max is effectively idle).
+        // Second, this prevents a potential manipulation where the validator withdraws the excess stake in order to
+        // receive rewards on both active and pending_inactive as the amounts individually do not exceed the max.
+        if (total_stake_before_rewards <= validator_set_config.maximum_stake) {
+            let pending_inactive_rewards = distribute_reward(
+                &mut stake_pool.pending_inactive,
+                num_blocks,
+                num_successful_votes,
+                remaining_lockup_time,
+                validator_set_config
+            );
+            rewards_amount = rewards_amount + pending_inactive_rewards;
+        };
 
         // Process any pending active or inactive stakes.
         Coin::merge<TestCoin>(&mut stake_pool.active, Coin::extract_all<TestCoin>(&mut stake_pool.pending_active));
@@ -933,11 +953,16 @@ module AptosFramework::Stake {
         remaining_lockup_time: u64,
         validator_set_config: &ValidatorSetConfiguration,
     ): u64 acquires TestCoinCapabilities {
+        let stake_amount = Coin::value<TestCoin>(stake);
+        if (stake_amount > validator_set_config.maximum_stake) {
+            stake_amount = validator_set_config.maximum_stake;
+        };
+
         // Validators receive rewards based on their performance (number of successful votes) and how long is their
         // remaining lockup time.
         // The total rewards = base rewards * performance multiplier * lockup multiplier.
         // Here we do multiplication before division to minimize rounding errors.
-        let base_rewards = Coin::value<TestCoin>(stake) * validator_set_config.rewards_rate / validator_set_config.rewards_rate_denominator;
+        let base_rewards = stake_amount * validator_set_config.rewards_rate / validator_set_config.rewards_rate_denominator;
         let rewards_denominator = num_blocks * validator_set_config.max_lockup_duration_secs;
         let rewards_amount = base_rewards * num_successful_votes * remaining_lockup_time / rewards_denominator;
         if (rewards_amount > 0) {
@@ -1056,6 +1081,49 @@ module AptosFramework::Stake {
         withdraw(&validator);
         assert!(Coin::balance<TestCoin>(validator_address) == 900, 4);
         assert_validator_state(validator_address, 101, 0, 0, 0, 0);
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator = @0x123)]
+    public(script) fun test_exceed_max_stake_allowed(
+        core_framework: signer,
+        core_resources: signer,
+        validator: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+
+        // Set the rewards rate to be very high so the validator's stake exceeds the max allowed after rewards.
+        initialize_validator_set(&core_resources, 0, 100, 0, MAXIMUM_LOCK_UP_SECS, true, 100, 100);
+
+        let validator_address = Signer::address_of(&validator);
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator, &mint_cap);
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+
+        // Join the validator set with max stake allowed.
+        join_validator_set(&validator, validator_address);
+        on_new_epoch();
+        assert!(is_current_validator(validator_address), 1);
+
+        // Rewards have been distributed, the validator's stake is now double the original amount.
+        on_new_epoch();
+        assert_validator_state(validator_address, 200, 0, 0, 0, 0);
+
+        // Validator's voting power is still not more than the max allowed amount of 100.
+        let validator_set = borrow_global<ValidatorSet>(@CoreResources);
+        let voting_power = Vector::borrow(&validator_set.active_validators, 0).voting_power;
+        assert!(voting_power == 100, voting_power);
+
+        // Unlock the excess stake after lockup expires. Timestamp is in microseconds.
+        Timestamp::update_global_time_for_test(MAXIMUM_LOCK_UP_SECS * 1000000);
+        unlock(&validator, 100);
+        assert_validator_state(validator_address, 100, 0, 0, 100, 0);
+        // Also increase lockup so we can still receive rewards.
+        increase_lockup(&validator, Timestamp::now_seconds() + MAXIMUM_LOCK_UP_SECS);
+        on_new_epoch();
+
+        // Validator should only receives 100 more reward coins for the active stake and enough for the pending inactive
+        assert_validator_state(validator_address, 200, 100, 0, 0, 0);
     }
 
     #[test(core_framework = @0x1, core_resources = @CoreResources, validator = @0x123)]
