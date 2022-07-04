@@ -6,7 +6,7 @@ use super::{
         common::{get_metric, GetMetricResult},
         types::{MetricsEvaluatorError, MetricsEvaluatorInput},
     },
-    types::CATEGORY,
+    CATEGORY,
 };
 use crate::{
     configuration::EvaluatorArgs,
