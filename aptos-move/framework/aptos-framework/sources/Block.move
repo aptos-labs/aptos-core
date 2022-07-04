@@ -82,7 +82,7 @@ module AptosFramework::Block {
 
         // Authorization
         assert!(
-            proposer == @VMReserved || Stake::is_current_validator(proposer),
+            proposer == @VMReserved || Stake::is_current_epoch_validator(proposer),
             Errors::requires_address(EVM_OR_VALIDATOR)
         );
 
