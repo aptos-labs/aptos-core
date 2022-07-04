@@ -32,11 +32,17 @@ const Header = () => {
             Docs
           </Button>
         </ChakraLinkBare>
-        <IconButton
-          variant="ghost"
-          icon={<FaDiscord />}
-          aria-label="Discord"
-        />
+        <ChakraLinkBare
+          href="https://discord.com/channels/945856774056083548/990744308850253904"
+        >
+          <IconButton
+            as="a"
+            target="_blank"
+            variant="ghost"
+            icon={<FaDiscord />}
+            aria-label="Discord"
+          />
+        </ChakraLinkBare>
         <IconButton
           icon={colorModeIcon}
           onClick={() => setColorMode(oppositeColor)}
