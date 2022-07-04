@@ -20,30 +20,29 @@ use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
 use channel::aptos_channel;
-use consensus_types::common::Round;
-use consensus_types::proof_of_store::{LogicalTime, ProofOfStore, SignedDigest};
-use futures::channel::oneshot;
+use consensus_types::{
+    common::Round,
+    proof_of_store::{LogicalTime, ProofOfStore, SignedDigest},
+};
 use futures::{
+    channel::oneshot,
     future::BoxFuture,
     stream::{futures_unordered::FuturesUnordered, StreamExt as _},
 };
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
-pub type ProofReturnChannel = oneshot::Sender<Result<ProofOfStore, QuorumStoreError>>;
-pub type DigestReturnChannel = oneshot::Sender<Result<HashValue, QuorumStoreError>>;
+pub type ProofReturnChannel = oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
 
 #[derive(Debug)]
 pub enum QuorumStoreCommand {
-    AppendToBatch(Data),
-    EndBatch(Data, LogicalTime, DigestReturnChannel, ProofReturnChannel),
+    AppendToBatch(Data, BatchId),
+    EndBatch(Data, BatchId, LogicalTime, ProofReturnChannel),
 }
 
 #[derive(Debug)]
 pub enum QuorumStoreError {
-    Timeout(HashValue),
-    BatchSizeLimit,
+    Timeout(BatchId),
 }
 
 pub struct QuorumStore {
@@ -51,7 +50,6 @@ pub struct QuorumStore {
     my_peer_id: PeerId,
     network_sender: NetworkSender,
     command_rx: Receiver<QuorumStoreCommand>,
-    batch_id: BatchId,
     fragment_id: usize,
     batch_aggregator: BatchAggregator,
     batch_store_tx: Sender<BatchStoreCommand>,
@@ -74,7 +72,7 @@ pub struct QuorumStoreConfig {
 }
 
 impl QuorumStore {
-    //TODO: pass epoch state
+    // TODO: pass epoch state
     pub fn new(
         epoch: u64, //TODO: pass the epoch config
         last_committed_round: Round,
@@ -135,9 +133,11 @@ impl QuorumStore {
                 my_peer_id,
                 network_sender,
                 command_rx: wrapper_command_rx,
-                batch_id: 0,
                 fragment_id: 0,
-                batch_aggregator: BatchAggregator::new(config.max_batch_size),
+                batch_aggregator: BatchAggregator::new(
+                    config.max_batch_size,
+                    AggregationMode::AssertWrongOrder,
+                ),
                 batch_store_tx,
                 proof_builder_tx,
                 // validator_signer,
@@ -148,16 +148,19 @@ impl QuorumStore {
     }
 
     /// Aggregate & compute rolling digest, synchronously by worker.
-    fn handle_append_to_batch(&mut self, fragment_payload: Data) -> Option<ConsensusMsg> {
+    fn handle_append_to_batch(
+        &mut self,
+        fragment_payload: Data,
+        batch_id: BatchId,
+    ) -> Option<ConsensusMsg> {
         if self.batch_aggregator.append_transactions(
-            self.batch_id,
+            batch_id,
             self.fragment_id,
             fragment_payload.clone(),
-            AggregationMode::AssertMissedFragment,
         ) {
             let fragment = Fragment::new(
                 self.epoch,
-                self.batch_id,
+                batch_id,
                 self.fragment_id,
                 fragment_payload,
                 None,
@@ -174,32 +177,26 @@ impl QuorumStore {
     fn handle_end_batch(
         &mut self,
         fragment_payload: Data,
+        batch_id: BatchId,
         expiration: LogicalTime,
-        digest_tx: DigestReturnChannel,
         proof_tx: ProofReturnChannel,
     ) -> Option<(
         BatchStoreCommand,
         tokio::sync::oneshot::Receiver<SignedDigest>,
     )> {
-        if let Some((num_bytes, payload, digest_hash)) = self.batch_aggregator.end_batch(
-            self.batch_id,
-            self.fragment_id,
-            fragment_payload.clone(),
-            AggregationMode::AssertMissedFragment,
-        ) {
-            digest_tx
-                .send(Ok(digest_hash))
-                .expect("Digest receiver not available");
+        if let Some((num_bytes, payload, digest_hash)) =
+            self.batch_aggregator
+                .end_batch(batch_id, self.fragment_id, fragment_payload.clone())
+        {
             let (persist_request_tx, persist_request_rx) = tokio::sync::oneshot::channel();
 
             let fragment = Fragment::new(
                 self.epoch,
-                self.batch_id,
+                batch_id,
                 self.fragment_id,
                 fragment_payload,
                 Some(expiration.clone()),
                 self.my_peer_id,
-                // self.validator_signer.clone(),
             );
             self.digest_end_batch
                 .insert(digest_hash, (fragment, proof_tx));
@@ -216,9 +213,6 @@ impl QuorumStore {
                 persist_request_rx,
             ))
         } else {
-            digest_tx
-                .send(Err(QuorumStoreError::BatchSizeLimit))
-                .expect("Proof receiver not available");
             None
         }
     }
@@ -230,18 +224,18 @@ impl QuorumStore {
             tokio::select! {
                 Some(command) = self.command_rx.recv() => {
                     match command {
-                        QuorumStoreCommand::AppendToBatch(fragment_payload) => {
-                            if let Some(msg) = self.handle_append_to_batch(fragment_payload){
+                        QuorumStoreCommand::AppendToBatch(fragment_payload, batch_id) => {
+                            if let Some(msg) = self.handle_append_to_batch(fragment_payload, batch_id){
                                self.network_sender.broadcast_without_self(msg).await;
                             }
                             self.fragment_id = self.fragment_id + 1;
                         }
 
-                        QuorumStoreCommand::EndBatch(fragment_payload, logical_time, digest_tx, proof_tx) => {
+                        QuorumStoreCommand::EndBatch(fragment_payload, batch_id, logical_time, proof_tx) => {
                             debug!("QS: end batch cmd received");
                             if let
                             Some((batch_store_command, response_rx)) =
-                                self.handle_end_batch(fragment_payload, logical_time, digest_tx, proof_tx){
+                                self.handle_end_batch(fragment_payload, batch_id, logical_time, proof_tx){
 
                             self.batch_store_tx
                                 .send(batch_store_command)
@@ -250,7 +244,6 @@ impl QuorumStore {
                             futures.push(Box::pin(response_rx));
                                 }
 
-                            self.batch_id = self.batch_id + 1;
                             self.fragment_id = 0;
                         }
                     }
@@ -262,11 +255,11 @@ impl QuorumStore {
                         let (last_fragment, proof_tx) =
                             self.digest_end_batch.remove(&signed_digest.info.digest).unwrap();
                         self.proof_builder_tx
-                            .send(ProofBuilderCommand::InitProof(signed_digest, proof_tx))
+                            .send(ProofBuilderCommand::InitProof(signed_digest, last_fragment.batch_id(), proof_tx))
                             .await
                             .expect("Failed to send to ProofBuilder");
 
-                        //TODO: consider waiting until proof_builder processes the command.
+                        // TODO: consider waiting until proof_builder processes the command.
                         self.network_sender
                             .broadcast_without_self(ConsensusMsg::FragmentMsg(Box::new(last_fragment)))
                             .await;

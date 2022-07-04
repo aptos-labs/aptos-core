@@ -3,7 +3,7 @@
 
 use crate::{
     quorum_store::{
-        batch_aggregator::{AggregationMode::IgnoreMissedFragment, BatchAggregator},
+        batch_aggregator::{AggregationMode, BatchAggregator},
         batch_reader::BatchReaderCommand,
         batch_store::{BatchStoreCommand, PersistRequest},
         proof_builder::ProofBuilderCommand,
@@ -55,7 +55,10 @@ impl NetworkListener {
         let entry = self
             .batch_aggregators
             .entry(source)
-            .or_insert(BatchAggregator::new(self.max_batch_size));
+            .or_insert(BatchAggregator::new(
+                self.max_batch_size,
+                AggregationMode::IgnoreWrongOrder,
+            ));
         if let Some(expiration) = fragment.fragment_info.maybe_expiration() {
             //end batch message
             debug!("QS: got end batch message");
@@ -64,7 +67,6 @@ impl NetworkListener {
                     fragment.batch_id(),
                     fragment.fragment_id(),
                     fragment.take_transactions(),
-                    IgnoreMissedFragment,
                 ) {
                     let persist_cmd = BatchStoreCommand::Persist(
                         PersistRequest::new(source, payload, digest, num_bytes, expiration),
@@ -82,7 +84,6 @@ impl NetworkListener {
                 fragment.batch_id(),
                 fragment.fragment_id(),
                 fragment.take_transactions(),
-                IgnoreMissedFragment,
             );
         }
     }
@@ -99,7 +100,7 @@ impl NetworkListener {
                     self.proof_builder_tx
                         .send(cmd)
                         .await
-                        .expect("could not push signed_digest to proof_builder");
+                        .expect("Could not send signed_digest to proof_builder");
                 }
 
                 VerifiedEvent::Fragment(fragment) => {
@@ -127,10 +128,11 @@ impl NetworkListener {
                             batch.source,
                         );
                     }
-                    assert!(
-                        self.batch_reader_tx.send(cmd).await.is_ok(),
-                        "could not push Batch batch_reader"
-                    );
+
+                    self.batch_reader_tx
+                        .send(cmd)
+                        .await
+                        .expect("could not push Batch batch_reader");
                 }
 
                 _ => {

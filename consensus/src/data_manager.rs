@@ -1,18 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-// use futures::channel::{mpsc, mpsc::Sender, oneshot};
 use crate::quorum_store::batch_reader::BatchReader;
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_types::transaction::SignedTransaction;
 use arc_swap::ArcSwapOption;
-use consensus_types::common::Payload;
-use consensus_types::proof_of_store::LogicalTime;
-use consensus_types::request_response::WrapperCommand;
+use consensus_types::{
+    common::Payload, proof_of_store::LogicalTime, request_response::WrapperCommand,
+};
 use executor_types::Error;
 use futures::channel::mpsc::Sender;
+use std::sync::Arc;
 
 /// Notification of execution committed logical time for QuorumStore to clean.
 #[async_trait::async_trait]
@@ -114,6 +113,7 @@ impl DataManager for QuorumStoreDataManager {
                             ret.push(data)
                         }
                         Err(e) => {
+                            // TODO: error is the right type now, propagate?.
                             debug!("QS: could not get data {:?}", e);
                             return Err(Error::CouldNotGetData);
                         }

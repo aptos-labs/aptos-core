@@ -6,10 +6,14 @@ use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_metrics_core::monitor;
 use aptos_types::transaction::SignedTransaction;
 use chrono::Utc;
-use consensus_types::common::TransactionSummary;
+use consensus_types::common::{Round, TransactionSummary};
 use futures::channel::{mpsc::Sender, oneshot};
-use std::collections::VecDeque;
-use std::time::Duration;
+use std::{
+    cmp::Reverse,
+    collections::{BinaryHeap, HashSet, VecDeque},
+    hash::Hash,
+    time::Duration,
+};
 use tokio::time::timeout;
 
 pub(crate) struct DigestTimeouts {
@@ -40,6 +44,34 @@ impl DigestTimeouts {
             .drain(0..num_expired)
             .map(|(_, h)| h)
             .collect()
+    }
+}
+
+pub(crate) struct RoundExpirations<I: Ord> {
+    expiries: BinaryHeap<(Reverse<Round>, I)>,
+}
+
+impl<I: Ord + Hash> RoundExpirations<I> {
+    pub(crate) fn new() -> Self {
+        Self {
+            expiries: BinaryHeap::new(),
+        }
+    }
+
+    pub(crate) fn add_item(&mut self, item: I, expiry_round: Round) {
+        self.expiries.push((Reverse(expiry_round), item));
+    }
+
+    /// Expire and return items corresponding to round <= given (expired) round.
+    pub(crate) fn expire(&mut self, round: Round) -> HashSet<I> {
+        let mut ret = HashSet::new();
+        while let Some((Reverse(r), _)) = self.expiries.peek() {
+            if *r <= round {
+                let (_, item) = self.expiries.pop().unwrap();
+                ret.insert(item);
+            }
+        }
+        ret
     }
 }
 

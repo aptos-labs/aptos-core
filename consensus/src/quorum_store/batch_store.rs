@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::quorum_store::QuorumStoreError;
 use crate::quorum_store::types::{Batch, Data, PersistedValue};
 use crate::{
     network::NetworkSender,
@@ -18,6 +17,7 @@ use aptos_types::{
 };
 use consensus_types::common::Round;
 use consensus_types::proof_of_store::{LogicalTime, SignedDigest};
+use executor_types::Error;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::{
@@ -52,7 +52,7 @@ pub(crate) enum BatchStoreCommand {
     BatchRequest(
         HashValue,
         PeerId,
-        Option<oneshot::Sender<Result<Data, QuorumStoreError>>>,
+        Option<oneshot::Sender<Result<Data, Error>>>,
     ),
     Clean(Vec<HashValue>),
 }

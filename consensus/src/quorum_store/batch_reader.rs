@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::quorum_store::QuorumStoreError;
-use crate::quorum_store::types::{Batch, Data, PersistedValue};
+use crate::quorum_store::{
+    types::{Batch, Data, PersistedValue},
+    utils::RoundExpirations,
+};
 use crate::{
     network::NetworkSender,
     quorum_store::{batch_requester::BatchRequester, batch_store::BatchStoreCommand},
@@ -12,14 +14,15 @@ use anyhow::bail;
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_types::PeerId;
-use consensus_types::common::Round;
-use consensus_types::proof_of_store::{LogicalTime, ProofOfStore};
+use consensus_types::{
+    common::Round,
+    proof_of_store::{LogicalTime, ProofOfStore},
+};
 use dashmap::DashMap;
+use executor_types::Error;
 use once_cell::sync::OnceCell;
-use std::collections::HashMap;
 use std::{
-    cmp::Reverse,
-    collections::BinaryHeap,
+    collections::HashMap,
     sync::{
         atomic::{AtomicU64, Ordering},
         Mutex,
@@ -38,12 +41,10 @@ use tokio::{
 /// Maximum number of rounds in the future from local prospective to hold batches for.
 const MAX_BATCH_EXPIRY_ROUND_GAP: Round = 20;
 
+#[derive(Debug)]
 pub(crate) enum BatchReaderCommand {
     GetBatchForPeer(HashValue, PeerId),
-    GetBatchForSelf(
-        ProofOfStore,
-        oneshot::Sender<Result<Data, QuorumStoreError>>,
-    ),
+    GetBatchForSelf(ProofOfStore, oneshot::Sender<Result<Data, Error>>),
     BatchResponse(HashValue, Data),
 }
 
@@ -71,26 +72,26 @@ impl QuotaManager {
         }
     }
 
-    pub(crate) fn store_type(&mut self, num_of_bytes: usize) -> StoreType {
-        if self.memory_balance + num_of_bytes <= self.memory_quota {
-            self.memory_balance = self.memory_balance + num_of_bytes;
-            self.db_balance = self.db_balance + num_of_bytes;
+    pub(crate) fn store_type(&mut self, num_bytes: usize) -> StoreType {
+        if self.memory_balance + num_bytes <= self.memory_quota {
+            self.memory_balance = self.memory_balance + num_bytes;
+            self.db_balance = self.db_balance + num_bytes;
             StoreType::MemoryCache
-        } else if self.db_balance + num_of_bytes <= self.db_quota {
-            self.db_balance = self.db_balance + num_of_bytes;
+        } else if self.db_balance + num_bytes <= self.db_quota {
+            self.db_balance = self.db_balance + num_bytes;
             StoreType::PersistOnly
         } else {
             StoreType::LimitExceeded
         }
     }
 
-    pub(crate) fn free_quota(&mut self, num_of_bytes: usize, store_type: StoreType) {
+    pub(crate) fn free_quota(&mut self, num_bytes: usize, store_type: StoreType) {
         match store_type {
             StoreType::MemoryCache => {
-                self.memory_balance = self.memory_balance - num_of_bytes;
+                self.memory_balance = self.memory_balance - num_bytes;
             }
             StoreType::PersistOnly => {
-                self.db_balance = self.db_balance - num_of_bytes;
+                self.db_balance = self.db_balance - num_bytes;
             }
             _ => {
                 unreachable!();
@@ -107,7 +108,7 @@ pub struct BatchReader {
     last_committed_round: AtomicU64,
     db_cache: DashMap<HashValue, PersistedValue>,
     peer_quota: DashMap<PeerId, QuotaManager>,
-    expirations: Mutex<BinaryHeap<(Reverse<Round>, HashValue)>>,
+    expirations: Mutex<RoundExpirations<HashValue>>,
     batch_store_tx: Sender<BatchStoreCommand>,
     self_tx: Sender<BatchReaderCommand>,
     max_execution_round_lag: Round,
@@ -127,17 +128,13 @@ impl BatchReader {
         memory_quota: usize,
         db_quota: usize,
     ) -> (Self, Vec<HashValue>) {
-        let db_cache = DashMap::new();
-        let peer_quota = DashMap::new();
-        let expirations = Mutex::new(BinaryHeap::new());
-
         let self_ob = Self {
             epoch: OnceCell::with_value(epoch),
             my_peer_id,
             last_committed_round: AtomicU64::new(last_committed_round),
-            db_cache,
-            peer_quota,
-            expirations,
+            db_cache: DashMap::new(),
+            peer_quota: DashMap::new(),
+            expirations: Mutex::new(RoundExpirations::new()),
             batch_store_tx,
             self_tx,
             max_execution_round_lag,
@@ -154,9 +151,9 @@ impl BatchReader {
             {
                 expired_keys.push(digest);
             } else {
-                let ret = self_ob.update_cache(digest, value);
-                assert!(ret.is_ok());
-                assert!(ret.unwrap().is_none());
+                self_ob
+                    .update_cache(digest, value)
+                    .expect("Storage limit exceeded upon BatchReader construction");
             }
         }
 
@@ -167,12 +164,8 @@ impl BatchReader {
         *self.epoch.get().unwrap()
     }
 
-    // returns true if value needs to be persisted
-    fn update_cache(
-        &self,
-        digest: HashValue,
-        mut value: PersistedValue,
-    ) -> anyhow::Result<Option<PersistedValue>> {
+    // Return an error if storage quota is exceeded.
+    fn update_cache(&self, digest: HashValue, mut value: PersistedValue) -> anyhow::Result<()> {
         let author = value.author;
         let mut entry = self
             .peer_quota
@@ -188,13 +181,15 @@ impl BatchReader {
             }
         }
 
-        let expiration_key = Reverse(value.expiration.round());
-        let ret = self.db_cache.insert(digest, value);
+        let expiration_round = value.expiration.round();
+        if let Some(prev_value) = self.db_cache.insert(digest, value) {
+            self.free_quota(prev_value);
+        }
         self.expirations
             .lock()
             .unwrap()
-            .push((expiration_key, digest));
-        Ok(ret)
+            .add_item(digest, expiration_round);
+        Ok(())
     }
 
     pub(crate) fn save(&self, digest: HashValue, value: PersistedValue) -> anyhow::Result<bool> {
@@ -208,9 +203,7 @@ impl BatchReader {
                     return Ok(false);
                 }
             }
-            if let Some(prev_value) = self.update_cache(digest, value)? {
-                self.free_quota(prev_value);
-            }
+            self.update_cache(digest, value)?;
         } else {
             bail!(
                 "Wrong expiration {:?}, last committed round = {}",
@@ -234,34 +227,31 @@ impl BatchReader {
             0
         };
 
-        let mut ret = Vec::new();
-        let mut expirations = self.expirations.lock().unwrap();
-        loop {
-            if let Some((Reverse(r), _)) = expirations.peek() {
-                if *r <= expired_round {
-                    let (Reverse(r), h) = expirations.pop().unwrap();
-
-                    let cache_expiration_round = self
+        self.expirations
+            .lock()
+            .unwrap()
+            .expire(expired_round)
+            .into_iter()
+            .filter_map(|h| {
+                let cache_expiration_round = self
+                    .db_cache
+                    .get(&h)
+                    .expect("Expired entry not in cache")
+                    .expiration
+                    .round();
+                if cache_expiration_round <= expired_round {
+                    let (_, persisted_value) = self
                         .db_cache
-                        .get(&h)
-                        .expect("Expired entry not in cache")
-                        .expiration
-                        .round();
-                    if cache_expiration_round == r {
-                        let (_, persisted_value) = self
-                            .db_cache
-                            .remove(&h)
-                            .expect("Expired entry not in cache");
-                        self.free_quota(persisted_value);
-                        ret.push(h);
-                    } // Otherwise, expiration got extended, ignore.
-
-                    continue;
+                        .remove(&h)
+                        .expect("Expired entry not in cache");
+                    self.free_quota(persisted_value);
+                    Some(h)
+                } else {
+                    None
+                    // Otherwise, expiration got extended, ignore.
                 }
-            }
-            break;
-        }
-        ret
+            })
+            .collect()
     }
 
     fn free_quota(&self, persisted_value: PersistedValue) {
@@ -298,10 +288,7 @@ impl BatchReader {
 
     // TODO: maybe check the epoch to stop communicating on epoch change.
     // TODO: use timeouts and return an error if cannot get tha batch.
-    pub async fn get_batch(
-        &self,
-        proof: ProofOfStore,
-    ) -> oneshot::Receiver<Result<Data, QuorumStoreError>> {
+    pub async fn get_batch(&self, proof: ProofOfStore) -> oneshot::Receiver<Result<Data, Error>> {
         let (tx, rx) = oneshot::channel();
         if let Some(value) = self.db_cache.get(&proof.digest()) {
             if value.maybe_payload.is_some() {
@@ -318,13 +305,10 @@ impl BatchReader {
                     .expect("Failed to send to BatchStore");
             }
         } else {
-            assert!(
-                self.self_tx
-                    .send(BatchReaderCommand::GetBatchForSelf(proof, tx))
-                    .await
-                    .is_ok(),
-                "Batch Reader Receiver is not available"
-            );
+            self.self_tx
+                .send(BatchReaderCommand::GetBatchForSelf(proof, tx))
+                .await
+                .expect("Batch Reader Receiver is not available");
         }
         rx
     }

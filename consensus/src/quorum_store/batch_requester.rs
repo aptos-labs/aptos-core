@@ -1,24 +1,26 @@
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::quorum_store::QuorumStoreError;
-use crate::quorum_store::types::{Batch, Data};
-use crate::quorum_store::utils::DigestTimeouts;
+use crate::quorum_store::{
+    types::{Batch, Data},
+    utils::DigestTimeouts,
+};
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_types::PeerId;
+use executor_types::Error;
 use std::collections::HashMap;
 use tokio::sync::oneshot;
 
 struct BatchRequesterState {
     signers: Vec<PeerId>,
     next_index: usize,
-    ret_tx: oneshot::Sender<Result<Data, QuorumStoreError>>,
+    ret_tx: oneshot::Sender<Result<Data, Error>>,
     num_retries: usize,
     max_num_retry: usize,
 }
 
 impl BatchRequesterState {
-    fn new(signers: Vec<PeerId>, ret_tx: oneshot::Sender<Result<Data, QuorumStoreError>>) -> Self {
+    fn new(signers: Vec<PeerId>, ret_tx: oneshot::Sender<Result<Data, Error>>) -> Self {
         Self {
             signers,
             next_index: 0,
@@ -59,7 +61,7 @@ impl BatchRequesterState {
         } else {
             debug!("QS: batch timed out, digest {}", digest);
             self.ret_tx
-                .send(Err(QuorumStoreError::Timeout(digest)))
+                .send(Err(Error::CouldNotGetData))
                 .expect("Receiver of requested batch not available");
         }
     }
@@ -108,7 +110,7 @@ impl BatchRequester {
         &mut self,
         digest: HashValue,
         signers: Vec<PeerId>,
-        ret_tx: oneshot::Sender<Result<Data, QuorumStoreError>>,
+        ret_tx: oneshot::Sender<Result<Data, Error>>,
     ) {
         let mut request_state = BatchRequesterState::new(signers, ret_tx);
         let request_peers = request_state
