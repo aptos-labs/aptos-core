@@ -5,8 +5,6 @@ metadata:
   labels:
     {{- include "forge.labels" . | nindent 4 }}
 data:
-  init_forge.sh: |-
-{{ (tpl (.Files.Get "files/init_forge.sh") .) | indent 4 }}
   cleanup_forge.sh: |-
 {{ (tpl (.Files.Get "files/cleanup_forge.sh") .) | indent 4 }}
 ---
@@ -38,7 +36,6 @@ spec:
         - sh
         - -c
         - |-
-          . /etc/forge/init_forge.sh
           tail -f /dev/null
           ret=$?
           . /etc/forge/cleanup_forge.sh
