@@ -72,6 +72,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub enum GetMetricResult {
     Present(u64),
     Missing(EvaluationResult),
