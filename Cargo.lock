@@ -1265,6 +1265,7 @@ dependencies = [
  "aptos-types",
  "aptos-workspace-hack",
  "bcs",
+ "better_any",
  "fail 0.5.0",
  "framework",
  "mirai-annotations",
@@ -1276,6 +1277,7 @@ dependencies = [
  "rayon",
  "serde 1.0.137",
  "serde_json",
+ "smallvec",
  "tracing",
 ]
 

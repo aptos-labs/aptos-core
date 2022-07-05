@@ -11,7 +11,7 @@ use crate::{
     },
     genesis::git::from_yaml,
 };
-use aptos_crypto::{ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
+use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_genesis::config::{HostAndPort, ValidatorConfiguration};
 use aptos_rest_client::Transaction;
 use aptos_types::{account_address::AccountAddress, account_config::aptos_root_address};
@@ -190,8 +190,8 @@ pub struct RegisterValidatorCandidate {
     #[clap(long)]
     pub(crate) validator_config_file: Option<PathBuf>,
     /// Hex encoded Consensus public key
-    #[clap(long, parse(try_from_str = Ed25519PublicKey::from_encoded_string))]
-    pub(crate) consensus_public_key: Option<Ed25519PublicKey>,
+    #[clap(long, parse(try_from_str = bls12381::PublicKey::from_encoded_string))]
+    pub(crate) consensus_public_key: Option<bls12381::PublicKey>,
     /// Host and port pair for the validator e.g. 127.0.0.1:6180
     #[clap(long)]
     pub(crate) validator_host: Option<HostAndPort>,
@@ -210,7 +210,7 @@ impl RegisterValidatorCandidate {
     fn process_inputs(
         &self,
     ) -> CliTypedResult<(
-        Ed25519PublicKey,
+        bls12381::PublicKey,
         x25519::PublicKey,
         Option<x25519::PublicKey>,
         HostAndPort,

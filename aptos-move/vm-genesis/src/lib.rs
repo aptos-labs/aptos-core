@@ -7,6 +7,7 @@ mod genesis_context;
 
 use crate::genesis_context::GenesisStateView;
 use aptos_crypto::{
+    bls12381,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     HashValue, PrivateKey, Uniform,
 };
@@ -273,6 +274,7 @@ fn create_and_initialize_validators(
     let aptos_root_address = account_config::aptos_root_address();
     let mut owners = vec![];
     let mut consensus_pubkeys = vec![];
+    let mut proof_of_possession = vec![];
     let mut validator_network_addresses = vec![];
     let mut full_node_network_addresses = vec![];
     let mut staking_distribution = vec![];
@@ -280,6 +282,7 @@ fn create_and_initialize_validators(
     for v in validators {
         owners.push(MoveValue::Address(v.address));
         consensus_pubkeys.push(MoveValue::vector_u8(v.consensus_pubkey.clone()));
+        proof_of_possession.push(MoveValue::vector_u8(v.proof_of_possession.clone()));
         validator_network_addresses.push(MoveValue::vector_u8(v.network_addresses.clone()));
         full_node_network_addresses
             .push(MoveValue::vector_u8(v.full_node_network_addresses.clone()));
@@ -294,6 +297,7 @@ fn create_and_initialize_validators(
             MoveValue::Signer(aptos_root_address),
             MoveValue::Vector(owners),
             MoveValue::Vector(consensus_pubkeys),
+            MoveValue::Vector(proof_of_possession),
             MoveValue::Vector(validator_network_addresses),
             MoveValue::Vector(full_node_network_addresses),
             MoveValue::Vector(staking_distribution),
@@ -393,8 +397,10 @@ pub fn test_genesis_change_set_and_validators(
 pub struct Validator {
     /// The Aptos account address of the validator
     pub address: AccountAddress,
-    /// Ed25519 public key used to sign consensus messages
+    /// bls12381 public key used to sign consensus messages
     pub consensus_pubkey: Vec<u8>,
+    /// Proof of Possession of the consensus pubkey
+    pub proof_of_possession: Vec<u8>,
     /// The Aptos account address of the validator's operator (same as `address` if the validator is
     /// its own operator)
     pub operator_address: AccountAddress,
@@ -408,6 +414,7 @@ pub struct Validator {
 
 pub struct TestValidator {
     pub key: Ed25519PrivateKey,
+    pub consensus_key: bls12381::PrivateKey,
     pub data: Validator,
 }
 
@@ -423,19 +430,28 @@ impl TestValidator {
         let key = Ed25519PrivateKey::generate(rng);
         let auth_key = AuthenticationKey::ed25519(&key.public_key());
         let address = auth_key.derived_address();
-        let consensus_pubkey = key.public_key().to_bytes().to_vec();
+        let consensus_key = bls12381::PrivateKey::generate(rng);
+        let consensus_pubkey = consensus_key.public_key().to_bytes().to_vec();
+        let proof_of_possession = bls12381::ProofOfPossession::create(&consensus_key)
+            .to_bytes()
+            .to_vec();
         let network_address = [0u8; 0].to_vec();
         let full_node_network_address = [0u8; 0].to_vec();
 
         let data = Validator {
             address,
             consensus_pubkey,
+            proof_of_possession,
             operator_address: address,
             network_addresses: network_address,
             full_node_network_addresses: full_node_network_address,
             stake_amount: 1,
         };
-        Self { key, data }
+        Self {
+            key,
+            consensus_key,
+            data,
+        }
     }
 }
 

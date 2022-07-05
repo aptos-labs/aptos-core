@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use anyhow::anyhow;
 use itertools::zip_eq;
 
-use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_crypto::bls12381;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress,
@@ -33,7 +33,7 @@ fn generate_commit_proof(
 
 fn aggregate_ledger_info(
     commit_ledger_info: &LedgerInfo,
-    unverified_signatures: BTreeMap<AccountAddress, Ed25519Signature>,
+    unverified_signatures: BTreeMap<AccountAddress, bls12381::Signature>,
     validator: &ValidatorVerifier,
 ) -> LedgerInfoWithSignatures {
     let valid_sigs = unverified_signatures
@@ -47,7 +47,7 @@ fn aggregate_ledger_info(
 // we differentiate buffer items at different stages
 // for better code readability
 pub struct OrderedItem {
-    pub unverified_signatures: BTreeMap<AccountAddress, Ed25519Signature>,
+    pub unverified_signatures: BTreeMap<AccountAddress, bls12381::Signature>,
     pub callback: StateComputerCommitCallBackType,
     pub ordered_blocks: Vec<ExecutedBlock>,
     pub ordered_proof: LedgerInfoWithSignatures,
@@ -174,7 +174,7 @@ impl BufferItem {
         }
     }
 
-    pub fn advance_to_signed(self, author: Author, signature: Ed25519Signature) -> Self {
+    pub fn advance_to_signed(self, author: Author, signature: bls12381::Signature) -> Self {
         match self {
             Self::Executed(executed_item) => {
                 let ExecutedItem {

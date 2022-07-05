@@ -2,11 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{account_address::AccountAddress, on_chain_config::ValidatorSet};
-use aptos_crypto::{
-    ed25519::{Ed25519PublicKey, Ed25519Signature},
-    hash::CryptoHash,
-    Signature, VerifyingKey,
-};
+use aptos_crypto::{bls12381, hash::CryptoHash, Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt};
 use thiserror::Error;
@@ -51,12 +47,12 @@ pub enum VerifyError {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ValidatorConsensusInfo {
-    public_key: Ed25519PublicKey,
+    public_key: bls12381::PublicKey,
     voting_power: u64,
 }
 
 impl ValidatorConsensusInfo {
-    pub fn new(public_key: Ed25519PublicKey, voting_power: u64) -> Self {
+    pub fn new(public_key: bls12381::PublicKey, voting_power: u64) -> Self {
         ValidatorConsensusInfo {
             public_key,
             voting_power,
@@ -135,7 +131,7 @@ impl ValidatorVerifier {
     }
 
     /// Helper method to initialize with a single author and public key with quorum voting power 1.
-    pub fn new_single(author: AccountAddress, public_key: Ed25519PublicKey) -> Self {
+    pub fn new_single(author: AccountAddress, public_key: bls12381::PublicKey) -> Self {
         let mut author_to_validator_info = BTreeMap::new();
         author_to_validator_info.insert(author, ValidatorConsensusInfo::new(public_key, 1));
         Self::new(author_to_validator_info)
@@ -146,7 +142,7 @@ impl ValidatorVerifier {
         &self,
         author: AccountAddress,
         message: &T,
-        signature: &Ed25519Signature,
+        signature: &bls12381::Signature,
     ) -> std::result::Result<(), VerifyError> {
         match self.get_public_key(&author) {
             Some(public_key) => {
@@ -171,7 +167,7 @@ impl ValidatorVerifier {
     pub fn verify_aggregated_struct_signature<T: CryptoHash + Serialize>(
         &self,
         message: &T,
-        aggregated_signature: &BTreeMap<AccountAddress, Ed25519Signature>,
+        aggregated_signature: &BTreeMap<AccountAddress, bls12381::Signature>,
     ) -> std::result::Result<(), VerifyError> {
         self.check_num_of_signatures(aggregated_signature)?;
         self.check_voting_power(aggregated_signature.keys())?;
@@ -186,19 +182,20 @@ impl ValidatorVerifier {
     pub fn batch_verify_aggregated_signatures<T: CryptoHash + Serialize>(
         &self,
         message: &T,
-        aggregated_signature: &BTreeMap<AccountAddress, Ed25519Signature>,
+        aggregated_signature: &BTreeMap<AccountAddress, bls12381::Signature>,
     ) -> std::result::Result<(), VerifyError> {
         self.check_num_of_signatures(aggregated_signature)?;
         self.check_voting_power(aggregated_signature.keys())?;
-        let keys_and_signatures: Vec<(Ed25519PublicKey, Ed25519Signature)> = aggregated_signature
-            .iter()
-            .flat_map(|(address, signature)| {
-                let sig = signature.clone();
-                self.get_public_key(address).map(|pub_key| (pub_key, sig))
-            })
-            .collect();
+        let keys_and_signatures: Vec<(bls12381::PublicKey, bls12381::Signature)> =
+            aggregated_signature
+                .iter()
+                .flat_map(|(address, signature)| {
+                    let sig = signature.clone();
+                    self.get_public_key(address).map(|pub_key| (pub_key, sig))
+                })
+                .collect();
         // Fallback is required to identify the source of the problem if batching fails.
-        if Ed25519Signature::batch_verify(message, keys_and_signatures).is_err() {
+        if bls12381::Signature::batch_verify(message, keys_and_signatures).is_err() {
             self.verify_aggregated_struct_signature(message, aggregated_signature)?
         }
         Ok(())
@@ -207,7 +204,7 @@ impl ValidatorVerifier {
     /// Ensure there are not more than the maximum expected signatures (all possible signatures).
     fn check_num_of_signatures(
         &self,
-        aggregated_signature: &BTreeMap<AccountAddress, Ed25519Signature>,
+        aggregated_signature: &BTreeMap<AccountAddress, bls12381::Signature>,
     ) -> std::result::Result<(), VerifyError> {
         let num_of_signatures = aggregated_signature.len();
         if num_of_signatures > self.len() {
@@ -244,7 +241,7 @@ impl ValidatorVerifier {
     }
 
     /// Returns the public key for this address.
-    pub fn get_public_key(&self, author: &AccountAddress) -> Option<Ed25519PublicKey> {
+    pub fn get_public_key(&self, author: &AccountAddress) -> Option<bls12381::PublicKey> {
         self.address_to_validator_info
             .get(author)
             .map(|validator_info| validator_info.public_key.clone())

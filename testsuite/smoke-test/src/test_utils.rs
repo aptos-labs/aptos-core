@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::{Identity, NodeConfig, SecureBackend};
-use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
@@ -11,7 +9,6 @@ use aptos_sdk::{
 use aptos_transaction_builder::aptos_stdlib;
 use forge::{LocalSwarm, NodeExt, Swarm};
 use rand::random;
-use std::{fs::File, io::Write, path::PathBuf};
 
 pub async fn create_and_fund_account(swarm: &'_ mut dyn Swarm, amount: u64) -> LocalAccount {
     let account = LocalAccount::generate(&mut rand::rngs::OsRng);
@@ -95,33 +92,9 @@ pub async fn assert_balance(client: &RestClient, account: &LocalAccount, balance
 /// AptosSwarms, regardless of if the swarm is a validator swarm, validator full
 /// node swarm, or a public full node swarm.
 pub mod swarm_utils {
-    use crate::test_utils::fetch_backend_storage;
-    use aptos_config::config::{NodeConfig, OnDiskStorageConfig, SecureBackend, WaypointConfig};
-    use aptos_global_constants::APTOS_ROOT_KEY;
-    use aptos_secure_storage::{CryptoStorage, KVStorage, OnDiskStorage, Storage};
+    use aptos_config::config::{NodeConfig, SecureBackend, WaypointConfig};
+    use aptos_secure_storage::{KVStorage, Storage};
     use aptos_types::waypoint::Waypoint;
-    use forge::{LocalNode, LocalSwarm, Swarm};
-
-    /// Loads the nodes's storage backend identified by the node index in the given swarm.
-    pub fn load_validators_backend_storage(validator: &LocalNode) -> SecureBackend {
-        fetch_backend_storage(validator.config(), None)
-    }
-
-    pub fn create_root_storage(swarm: &mut LocalSwarm) -> SecureBackend {
-        let chain_info = swarm.chain_info();
-        let root_key =
-            bcs::from_bytes(&bcs::to_bytes(chain_info.root_account.private_key()).unwrap())
-                .unwrap();
-
-        let mut root_storage_config = OnDiskStorageConfig::default();
-        root_storage_config.path = swarm.dir().join("root-storage.json");
-        let mut root_storage = OnDiskStorage::new(root_storage_config.path());
-        root_storage
-            .import_private_key(APTOS_ROOT_KEY, root_key)
-            .unwrap();
-
-        SecureBackend::OnDiskStorage(root_storage_config)
-    }
 
     pub fn insert_waypoint(node_config: &mut NodeConfig, waypoint: Waypoint) {
         let f = |backend: &SecureBackend| {
@@ -142,46 +115,6 @@ pub mod swarm_utils {
             _ => panic!("unexpected waypoint from node config"),
         }
     }
-}
-
-/// Loads the node's storage backend from the given node config. If a namespace
-/// is specified, the storage namespace will be overridden.
-fn fetch_backend_storage(
-    node_config: &NodeConfig,
-    overriding_namespace: Option<String>,
-) -> SecureBackend {
-    if let Identity::FromStorage(storage_identity) =
-        &node_config.validator_network.as_ref().unwrap().identity
-    {
-        match storage_identity.backend.clone() {
-            SecureBackend::OnDiskStorage(mut config) => {
-                if let Some(namespace) = overriding_namespace {
-                    config.namespace = Some(namespace);
-                }
-                SecureBackend::OnDiskStorage(config)
-            }
-            _ => unimplemented!("On-disk storage is the only backend supported in smoke tests"),
-        }
-    } else {
-        panic!("Couldn't load identity from storage");
-    }
-}
-
-/// Writes a given public key to a file specified by the given path using hex encoding.
-/// Contents are written using utf-8 encoding and a newline is appended to ensure that
-/// whitespace can be handled by tests.
-pub fn write_key_to_file_hex_format(key: &Ed25519PublicKey, key_file_path: PathBuf) {
-    let hex_encoded_key = hex::encode(key.to_bytes());
-    let key_and_newline = hex_encoded_key + "\n";
-    let mut file = File::create(key_file_path).unwrap();
-    file.write_all(key_and_newline.as_bytes()).unwrap();
-}
-
-/// Writes a given public key to a file specified by the given path using bcs encoding.
-pub fn write_key_to_file_bcs_format(key: &Ed25519PublicKey, key_file_path: PathBuf) {
-    let bcs_encoded_key = bcs::to_bytes(&key).unwrap();
-    let mut file = File::create(key_file_path).unwrap();
-    file.write_all(&bcs_encoded_key).unwrap();
 }
 
 /// This helper function creates 3 new accounts, mints funds, transfers funds
