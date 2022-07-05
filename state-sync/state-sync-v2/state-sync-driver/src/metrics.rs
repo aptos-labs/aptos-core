@@ -17,7 +17,7 @@ pub enum StorageSynchronizerOperations {
     AppliedTransactionOutputs, // Applied a chunk of transactions outputs.
     ExecutedTransactions,      // Executed a chunk of transactions.
     Synced,                    // Wrote a chunk of transactions and outputs to storage.
-    SyncedAccounts,            // Wrote a chunk of accounts to storage.
+    SyncedStates,              // Wrote a chunk of state values to storage.
     SyncedEpoch, // Wrote a chunk of transactions and outputs to storage that resulted in a new epoch.
 }
 
@@ -29,8 +29,8 @@ impl StorageSynchronizerOperations {
             }
             StorageSynchronizerOperations::ExecutedTransactions => "executed_transactions",
             StorageSynchronizerOperations::Synced => "synced",
-            StorageSynchronizerOperations::SyncedAccounts => "synced_accounts",
             StorageSynchronizerOperations::SyncedEpoch => "synced_epoch",
+            StorageSynchronizerOperations::SyncedStates => "synced_states",
         }
     }
 }

@@ -216,7 +216,7 @@ fn fetch_startup_info(storage: Arc<dyn DbReader>) -> Result<StartupInfo, Error> 
 }
 
 /// Initializes all relevant metric gauges (e.g., after a reboot
-/// or after an account state snapshot has been restored).
+/// or after a state snapshot has been restored).
 pub fn initialize_sync_gauges(storage: Arc<dyn DbReader>) -> Result<(), Error> {
     // Update the latest synced versions
     let highest_synced_version = fetch_latest_synced_version(storage.clone())?;

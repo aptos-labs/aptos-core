@@ -37,8 +37,8 @@ use rand::seq::SliceRandom;
 use std::{convert::TryFrom, fmt, sync::Arc, time::Duration};
 use storage_service_client::StorageServiceClient;
 use storage_service_types::{
-    AccountStatesChunkWithProofRequest, Epoch, EpochEndingLedgerInfoRequest,
-    NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest, StorageServerSummary,
+    Epoch, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
+    NewTransactionsWithProofRequest, StateValuesWithProofRequest, StorageServerSummary,
     StorageServiceRequest, StorageServiceResponse, TransactionOutputsWithProofRequest,
     TransactionsWithProofRequest,
 };
@@ -460,22 +460,6 @@ impl AptosDataClient for AptosNetDataClient {
         self.global_summary_cache.read().clone()
     }
 
-    async fn get_account_states_with_proof(
-        &self,
-        version: u64,
-        start_account_index: u64,
-        end_account_index: u64,
-    ) -> Result<Response<StateValueChunkWithProof>> {
-        let request = StorageServiceRequest::GetAccountStatesChunkWithProof(
-            AccountStatesChunkWithProofRequest {
-                version,
-                start_account_index,
-                end_account_index,
-            },
-        );
-        self.send_request_and_decode(request).await
-    }
-
     async fn get_epoch_ending_ledger_infos(
         &self,
         start_epoch: Epoch,
@@ -519,8 +503,22 @@ impl AptosDataClient for AptosNetDataClient {
         self.send_request_and_decode(request).await
     }
 
-    async fn get_number_of_account_states(&self, version: Version) -> Result<Response<u64>> {
-        let request = StorageServiceRequest::GetNumberOfAccountsAtVersion(version);
+    async fn get_number_of_states(&self, version: Version) -> Result<Response<u64>> {
+        let request = StorageServiceRequest::GetNumberOfStatesAtVersion(version);
+        self.send_request_and_decode(request).await
+    }
+
+    async fn get_state_values_with_proof(
+        &self,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+    ) -> Result<Response<StateValueChunkWithProof>> {
+        let request = StorageServiceRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
+            version,
+            start_index,
+            end_index,
+        });
         self.send_request_and_decode(request).await
     }
 
@@ -789,8 +787,8 @@ fn update_advertised_data_metrics(global_data_summary: GlobalDataSummary) {
     let optimal_chunk_sizes = &global_data_summary.optimal_chunk_sizes;
     for data_type in DataType::get_all_types() {
         let optimal_chunk_size = match data_type {
-            DataType::AccountStates => optimal_chunk_sizes.account_states_chunk_size,
             DataType::LedgerInfos => optimal_chunk_sizes.epoch_chunk_size,
+            DataType::States => optimal_chunk_sizes.state_chunk_size,
             DataType::TransactionOutputs => optimal_chunk_sizes.transaction_output_chunk_size,
             DataType::Transactions => optimal_chunk_sizes.transaction_chunk_size,
         };
@@ -819,8 +817,8 @@ fn update_advertised_data_metrics(global_data_summary: GlobalDataSummary) {
     // Update the lowest advertised data
     for data_type in DataType::get_all_types() {
         let lowest_advertised_version = match data_type {
-            DataType::AccountStates => advertised_data.lowest_account_states_version(),
             DataType::LedgerInfos => Some(0), // All nodes contain all epoch ending ledger infos
+            DataType::States => advertised_data.lowest_state_version(),
             DataType::TransactionOutputs => advertised_data.lowest_transaction_output_version(),
             DataType::Transactions => advertised_data.lowest_transaction_version(),
         };

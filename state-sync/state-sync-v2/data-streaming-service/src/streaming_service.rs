@@ -328,7 +328,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
 /// Verifies that all optimal chunk sizes are valid (i.e., not zero). Returns an
 /// error if a chunk size is 0.
 fn verify_optimal_chunk_sizes(optimal_chunk_sizes: &OptimalChunkSizes) -> Result<(), Error> {
-    if optimal_chunk_sizes.account_states_chunk_size == 0
+    if optimal_chunk_sizes.state_chunk_size == 0
         || optimal_chunk_sizes.epoch_chunk_size == 0
         || optimal_chunk_sizes.transaction_chunk_size == 0
         || optimal_chunk_sizes.transaction_output_chunk_size == 0

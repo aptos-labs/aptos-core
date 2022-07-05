@@ -24,11 +24,11 @@ pub struct DataNotification {
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum DataPayload {
-    AccountStatesWithProof(StateValueChunkWithProof),
     ContinuousTransactionOutputsWithProof(LedgerInfoWithSignatures, TransactionOutputListWithProof),
     ContinuousTransactionsWithProof(LedgerInfoWithSignatures, TransactionListWithProof),
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
     EndOfStream,
+    StateValuesWithProof(StateValueChunkWithProof),
     TransactionOutputsWithProof(TransactionOutputListWithProof),
     TransactionsWithProof(TransactionListWithProof),
 }
@@ -36,11 +36,11 @@ pub enum DataPayload {
 /// A request that has been sent to the Aptos data client.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataClientRequest {
-    AccountsWithProof(AccountsWithProofRequest),
     EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest),
     NewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest),
     NewTransactionsWithProof(NewTransactionsWithProofRequest),
-    NumberOfAccounts(NumberOfAccountsRequest),
+    NumberOfStates(NumberOfStatesRequest),
+    StateValuesWithProof(StateValuesWithProofRequest),
     TransactionsWithProof(TransactionsWithProofRequest),
     TransactionOutputsWithProof(TransactionOutputsWithProofRequest),
 }
@@ -49,20 +49,20 @@ impl DataClientRequest {
     /// Returns a summary label for the request
     pub fn get_label(&self) -> &'static str {
         match self {
-            Self::AccountsWithProof(_) => "accounts_with_proof",
             Self::EpochEndingLedgerInfos(_) => "epoch_ending_ledger_infos",
             Self::NewTransactionOutputsWithProof(_) => "new_transaction_outputs_with_proof",
             Self::NewTransactionsWithProof(_) => "new_transactions_with_proof",
-            Self::NumberOfAccounts(_) => "number_of_accounts",
+            Self::NumberOfStates(_) => "number_of_states",
+            Self::StateValuesWithProof(_) => "state_values_with_proof",
             Self::TransactionsWithProof(_) => "transactions_with_proof",
             Self::TransactionOutputsWithProof(_) => "transaction_outputs_with_proof",
         }
     }
 }
 
-/// A request for fetching account states.
+/// A request for fetching states values.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AccountsWithProofRequest {
+pub struct StateValuesWithProofRequest {
     pub version: Version,
     pub start_index: u64,
     pub end_index: u64,
@@ -90,9 +90,9 @@ pub struct NewTransactionOutputsWithProofRequest {
     pub known_epoch: Epoch,
 }
 
-/// A client request for fetching the number of accounts at a version.
+/// A client request for fetching the number of states at a version.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct NumberOfAccountsRequest {
+pub struct NumberOfStatesRequest {
     pub version: Version,
 }
 
