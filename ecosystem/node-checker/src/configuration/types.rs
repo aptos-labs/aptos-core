@@ -9,7 +9,8 @@ use crate::{
         },
         metrics::{
             ConsensusProposalsEvaluatorArgs, ConsensusRoundEvaluatorArgs,
-            ConsensusTimeoutsEvaluatorArgs, StateSyncVersionEvaluatorArgs,
+            ConsensusTimeoutsEvaluatorArgs, NetworkMinimumPeersEvaluatorArgs,
+            NetworkPeersWithinToleranceEvaluatorArgs, StateSyncVersionEvaluatorArgs,
         },
         system_information::BuildVersionEvaluatorArgs,
     },
@@ -142,6 +143,12 @@ pub struct EvaluatorArgs {
 
     #[clap(flatten)]
     pub latency_args: LatencyEvaluatorArgs,
+
+    #[clap(flatten)]
+    pub network_minimum_peers_args: NetworkMinimumPeersEvaluatorArgs,
+
+    #[clap(flatten)]
+    pub network_peers_tolerance_args: NetworkPeersWithinToleranceEvaluatorArgs,
 
     #[clap(flatten)]
     pub node_identity_args: NodeIdentityEvaluatorArgs,

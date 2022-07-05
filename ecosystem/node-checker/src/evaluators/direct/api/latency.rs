@@ -44,13 +44,13 @@ impl LatencyEvaluator {
     }
 
     async fn get_latency_datapoint(&self, target_url: Url) -> Result<Duration> {
-        let start = Instant::now();
         let client = reqwest::ClientBuilder::new()
             .timeout(std::time::Duration::from_millis(
                 self.args.max_latency_ms * 2,
             ))
             .build()
             .unwrap();
+        let start = Instant::now();
         client.get(target_url).send().await?;
         Ok(start.elapsed())
     }
