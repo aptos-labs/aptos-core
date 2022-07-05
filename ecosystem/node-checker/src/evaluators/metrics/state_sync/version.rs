@@ -134,24 +134,14 @@ impl Evaluator for StateSyncVersionEvaluator {
         let mut evaluation_results = vec![];
 
         // Get previous version from the target node.
-        let previous_target_version =
-            match self.get_sync_version(&input.previous_target_metrics, "first") {
-                GetMetricResult::Present(metric) => Some(metric),
-                GetMetricResult::Missing(evaluation_result) => {
-                    evaluation_results.push(evaluation_result);
-                    None
-                }
-            };
+        let previous_target_version = self
+            .get_sync_version(&input.previous_target_metrics, "first")
+            .unwrap(&mut evaluation_results);
 
         // Get the latest version from the target node.
-        let latest_target_version =
-            match self.get_sync_version(&input.latest_target_metrics, "second") {
-                GetMetricResult::Present(metric) => Some(metric),
-                GetMetricResult::Missing(evaluation_result) => {
-                    evaluation_results.push(evaluation_result);
-                    None
-                }
-            };
+        let latest_target_version = self
+            .get_sync_version(&input.latest_target_metrics, "second")
+            .unwrap(&mut evaluation_results);
 
         // Get the latest version from the baseline node. In this case, if we
         // cannot find the value, we return an error instead of a negative evalution,
