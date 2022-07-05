@@ -77,6 +77,18 @@ pub enum GetMetricResult {
     Missing(EvaluationResult),
 }
 
+impl GetMetricResult {
+    pub fn unwrap(self, evaluation_results: &mut Vec<EvaluationResult>) -> Option<u64> {
+        match self {
+            GetMetricResult::Present(value) => Some(value),
+            GetMetricResult::Missing(evaluation_result) => {
+                evaluation_results.push(evaluation_result);
+                None
+            }
+        }
+    }
+}
+
 pub fn parse_metrics(metrics: Vec<String>) -> Result<PrometheusScrape> {
     PrometheusScrape::parse(metrics.iter().map(|l| Ok(l.to_string()))).map_err(|e| anyhow!(e))
 }

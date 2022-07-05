@@ -7,7 +7,10 @@ use crate::{
             get_node_identity, LatencyEvaluatorArgs, NodeIdentityEvaluatorArgs, TpsEvaluatorArgs,
             TransactionPresenceEvaluatorArgs,
         },
-        metrics::{ConsensusProposalsEvaluatorArgs, StateSyncVersionEvaluatorArgs},
+        metrics::{
+            ConsensusProposalsEvaluatorArgs, ConsensusRoundEvaluatorArgs,
+            ConsensusTimeoutsEvaluatorArgs, StateSyncVersionEvaluatorArgs,
+        },
         system_information::BuildVersionEvaluatorArgs,
     },
     runner::BlockingRunnerArgs,
@@ -130,6 +133,12 @@ pub struct EvaluatorArgs {
 
     #[clap(flatten)]
     pub consensus_proposals_args: ConsensusProposalsEvaluatorArgs,
+
+    #[clap(flatten)]
+    pub consensus_round_args: ConsensusRoundEvaluatorArgs,
+
+    #[clap(flatten)]
+    pub consensus_timeouts_args: ConsensusTimeoutsEvaluatorArgs,
 
     #[clap(flatten)]
     pub latency_args: LatencyEvaluatorArgs,

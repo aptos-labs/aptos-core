@@ -67,19 +67,19 @@ impl ConsensusProposalsEvaluator {
             self.build_evaluation_result(
                 "Proposals count went backwards!".to_string(),
                 0,
-                "Successfully pulled metrics from target node twice, but the second time the proposals count went backwards!".to_string(),
+                format!("Successfully pulled metrics from target node twice, but the second time the consensus proposals count went backwards (from {} to {})", previous_proposals_count, latest_proposals_count),
             )
         } else if latest_proposals_count == previous_proposals_count {
             self.build_evaluation_result(
                 "Proposals count is not progressing".to_string(),
-                 50,
+                50,
                 "Successfully pulled metrics from target node twice, but the proposal count isn't progressing.".to_string(),
             )
         } else {
             self.build_evaluation_result(
-                 "Proposals count is increasing".to_string(),
-                 100,
-                 "Successfully pulled metrics from target node twice and saw that proposals count is increasing".to_string(),
+                "Proposals count is increasing".to_string(),
+                100,
+                format!("Successfully pulled metrics from target node twice and saw that proposals count is increasing (from {} to {})", previous_proposals_count, latest_proposals_count),
             )
         }
     }
@@ -97,24 +97,14 @@ impl Evaluator for ConsensusProposalsEvaluator {
         let mut evaluation_results = vec![];
 
         // Get previous proposals count from the target node.
-        let previous_proposals_count =
-            match self.get_proposals_count(&input.previous_target_metrics, "first") {
-                GetMetricResult::Present(metric) => Some(metric),
-                GetMetricResult::Missing(evaluation_result) => {
-                    evaluation_results.push(evaluation_result);
-                    None
-                }
-            };
+        let previous_proposals_count = self
+            .get_proposals_count(&input.previous_target_metrics, "first")
+            .unwrap(&mut evaluation_results);
 
         // Get the latest proposals count from the target node.
-        let latest_proposals_count =
-            match self.get_proposals_count(&input.latest_target_metrics, "second") {
-                GetMetricResult::Present(metric) => Some(metric),
-                GetMetricResult::Missing(evaluation_result) => {
-                    evaluation_results.push(evaluation_result);
-                    None
-                }
-            };
+        let latest_proposals_count = self
+            .get_proposals_count(&input.latest_target_metrics, "second")
+            .unwrap(&mut evaluation_results);
 
         match (previous_proposals_count, latest_proposals_count) {
             (Some(previous), Some(latest)) => {
