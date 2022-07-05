@@ -153,6 +153,11 @@ const config = {
                 type: "doc",
                 docId: "nodes/run-a-local-testnet",
               },
+              {
+                label: "Node Health Checker FAQ",
+                type: "doc",
+                docId: "nodes/node-health-checker-faq",
+              },
             ],
           },
           {

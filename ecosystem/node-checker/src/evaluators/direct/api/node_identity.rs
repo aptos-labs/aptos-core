@@ -164,7 +164,7 @@ impl Evaluator for NodeIdentityEvaluator {
     }
 
     fn get_evaluator_name() -> String {
-        "latency".to_string()
+        "node_identity".to_string()
     }
 
     fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {
