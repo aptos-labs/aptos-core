@@ -16,7 +16,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 - Stop your node and remove the data directory.
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- Pull the latest changes on `testnet` branch, make sure you're at commit `3b53225b5a1effcce5dee9597a129216510dc424`
+- Pull the latest changes on `testnet` branch, make sure you're at commit `898fdc4f4ae7eb2a7dad0b4da9b293d7510b5732`
 - Close the metrics port `9101` and REST API port `80` for your validator and fullnode
 - Restarting the node
 
@@ -24,14 +24,14 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 - Stop your node and remove the data volumes, `docker compose down --volumes`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- Update your docker image to use tag `testnet_3b53225b5a1effcce5dee9597a129216510dc424`. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_3b53225b5a1effcce5dee9597a129216510dc424/images/sha256-1625f70457a6060ae2e64e699274e1ddca02cb7856406a40d1891b6bf84ae072?context=explore)
+- Update your docker image to use tag `testnet_898fdc4f4ae7eb2a7dad0b4da9b293d7510b5732`. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_898fdc4f4ae7eb2a7dad0b4da9b293d7510b5732/images/sha256-4d41177e917f3f5d5d8ec77dea343160cdcdfdb79ada8e7ac5b7b5151ff9bd53?context=explore)
 - Close metrics port on 9101 and REST API port `80` for your validator and fullnode (remove it from the docker compose file)
 - Restarting the node: `docker compose up`
 
 ### Using Terraform
 
 - Increase `era` number in your Terraform config, this will wipe the data once applied.
-- Update your docker image to use tag `testnet_3b53225b5a1effcce5dee9597a129216510dc424` in the Terraform config. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_3b53225b5a1effcce5dee9597a129216510dc424/images/sha256-1625f70457a6060ae2e64e699274e1ddca02cb7856406a40d1891b6bf84ae072?context=explore)
+- Update your docker image to use tag `testnet_898fdc4f4ae7eb2a7dad0b4da9b293d7510b5732` in the Terraform config. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_898fdc4f4ae7eb2a7dad0b4da9b293d7510b5732/images/sha256-4d41177e917f3f5d5d8ec77dea343160cdcdfdb79ada8e7ac5b7b5151ff9bd53?context=explore)
 - Close metrics port and REST API port for validator and fullnode, add the helm values in your `main.tf ` file, for example:
     ```
     module "aptos-node" {
@@ -104,7 +104,7 @@ All the selected validator node will be receiving sufficient amount of test toke
 5. Join validator set
 
     ```
-    aptos -- node join-validator-set --profile ait2
+    aptos node join-validator-set --profile ait2
     ```
 
     ValidatorSet will be updated at every epoch change, which is **once every hour**. You will only see your node joining the validator set in next epoch. Both Validator and fullnode will start syncing once your validator is in the validator set.
