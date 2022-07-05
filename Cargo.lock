@@ -3367,6 +3367,7 @@ dependencies = [
 name = "forge-cli"
 version = "0.0.0"
 dependencies = [
+ "aptos-logger",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-workspace-hack",

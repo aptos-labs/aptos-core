@@ -29,10 +29,10 @@ genesis:
   username_prefix: aptos-node
   domain:
   validator:
-    use_public_dns: false
+    enable_onchain_discovery: false
     internal_host_suffix: validator-lb
   fullnode:
-    use_public_dns: true
+    enable_onchain_discovery: true
     internal_host_suffix: fullnode-lb
   # The path or move modules in the docker image to pull
   # Defaults to the aptos-framework in the aptoslabs/init docker image
@@ -45,3 +45,5 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name:
 
+# LEGACY: create PodSecurityPolicy, which exists at the cluster-level
+podSecurityPolicy: true

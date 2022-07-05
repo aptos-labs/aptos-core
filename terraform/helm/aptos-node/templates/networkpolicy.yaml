@@ -36,6 +36,7 @@ spec:
   {{- end }}
   # Monitoring metrics port
   - from:
+    - namespaceSelector: {}
     - podSelector:
         matchLabels:
           app.kubernetes.io/name: monitoring
