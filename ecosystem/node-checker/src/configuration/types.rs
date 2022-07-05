@@ -5,6 +5,7 @@ use crate::{
     evaluators::{
         direct::{
             get_node_identity, LatencyEvaluatorArgs, NodeIdentityEvaluatorArgs, TpsEvaluatorArgs,
+            TransactionPresenceEvaluatorArgs,
         },
         metrics::{ConsensusProposalsEvaluatorArgs, StateSyncVersionEvaluatorArgs},
         system_information::BuildVersionEvaluatorArgs,
@@ -142,6 +143,9 @@ pub struct EvaluatorArgs {
     #[clap(flatten)]
     #[oai(skip)]
     pub tps_args: TpsEvaluatorArgs,
+
+    #[clap(flatten)]
+    pub transaction_presence_args: TransactionPresenceEvaluatorArgs,
 }
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
@@ -188,6 +192,12 @@ impl NodeAddress {
 
     pub fn default_noise_port() -> u16 {
         DEFAULT_NOISE_PORT
+    }
+
+    pub fn get_api_url(&self) -> Url {
+        let mut url = self.url.clone();
+        url.set_port(Some(self.api_port)).unwrap();
+        url
     }
 }
 
