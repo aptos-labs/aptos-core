@@ -3,16 +3,16 @@
 
 use crate::{
     emitter::{
-        gen_transfer_txn_request, generate_invalid_transaction, stats::StatsAccumulator,
-        wait_for_accounts_sequence, MAX_TXN_BATCH_SIZE, SEND_AMOUNT, TXN_EXPIRATION_SECONDS,
+        stats::StatsAccumulator, wait_for_accounts_sequence, MAX_TXN_BATCH_SIZE,
+        TXN_EXPIRATION_SECONDS,
     },
+    transaction_generator::TransactionGenerator,
     EmitThreadParams,
 };
 use aptos_logger::{debug, info, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
-    transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use core::{
@@ -21,7 +21,7 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
-use rand::seq::{IteratorRandom, SliceRandom};
+use rand::seq::IteratorRandom;
 use std::{sync::Arc, time::Instant};
 use tokio::time::sleep;
 
@@ -33,7 +33,7 @@ pub struct SubmissionWorker {
     stop: Arc<AtomicBool>,
     params: EmitThreadParams,
     stats: Arc<StatsAccumulator>,
-    txn_factory: TransactionFactory,
+    txn_generator: Box<dyn TransactionGenerator>,
     invalid_transaction_ratio: usize,
     rng: ::rand::rngs::StdRng,
 }
@@ -42,7 +42,7 @@ pub struct SubmissionWorker {
 // bursts the target node too fast, and the emitter doesn't handle it
 // very well, instead waiting up until the timeout for the target seqnum
 // to progress, even though it never will. See more here:
-// https://github.com/aptos-labs/aptos-core/issues/1565
+// https://github.com/aptos-labs/aptos-core/issues/
 impl SubmissionWorker {
     pub fn new(
         accounts: Vec<LocalAccount>,
@@ -51,7 +51,7 @@ impl SubmissionWorker {
         stop: Arc<AtomicBool>,
         params: EmitThreadParams,
         stats: Arc<StatsAccumulator>,
-        txn_factory: TransactionFactory,
+        txn_generator: Box<dyn TransactionGenerator>,
         invalid_transaction_ratio: usize,
         rng: ::rand::rngs::StdRng,
     ) -> Self {
@@ -62,7 +62,7 @@ impl SubmissionWorker {
             stop,
             params,
             stats,
-            txn_factory,
+            txn_generator,
             invalid_transaction_ratio,
             rng,
         }
@@ -206,41 +206,11 @@ impl SubmissionWorker {
             .accounts
             .iter_mut()
             .choose_multiple(&mut self.rng, batch_size);
-        let mut requests = Vec::with_capacity(accounts.len());
-        let invalid_size = if self.invalid_transaction_ratio != 0 {
-            // if enable mix invalid tx, at least 1 invalid tx per batch
-            max(1, accounts.len() * self.invalid_transaction_ratio / 100)
-        } else {
-            0
-        };
-        let mut num_valid_tx = accounts.len() - invalid_size;
-        for sender in accounts {
-            let receiver = self
-                .all_addresses
-                .choose(&mut self.rng)
-                .expect("all_addresses can't be empty");
-            let request = if num_valid_tx > 0 {
-                num_valid_tx -= 1;
-                gen_transfer_txn_request(
-                    sender,
-                    receiver,
-                    SEND_AMOUNT,
-                    &self.txn_factory,
-                    gas_price,
-                )
-            } else {
-                generate_invalid_transaction(
-                    sender,
-                    receiver,
-                    SEND_AMOUNT,
-                    &self.txn_factory,
-                    gas_price,
-                    &requests,
-                    &mut self.rng,
-                )
-            };
-            requests.push(request);
-        }
-        requests
+        self.txn_generator.generate_transactions(
+            accounts,
+            self.all_addresses.clone(),
+            self.invalid_transaction_ratio,
+            gas_price,
+        )
     }
 }

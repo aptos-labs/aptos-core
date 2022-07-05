@@ -64,16 +64,4 @@ impl TransactionGenerator for AccountGenerator {
                 .gas_unit_price(gas_price),
         )
     }
-
-    // TODO(skedia): Add support for this.
-    fn generate_invalid_transaction(
-        &self,
-        _rng: &mut StdRng,
-        _sender: &mut LocalAccount,
-        _receiver: &AccountAddress,
-        _gas_price: u64,
-        _reqs: &[SignedTransaction],
-    ) -> SignedTransaction {
-        unimplemented!()
-    }
 }

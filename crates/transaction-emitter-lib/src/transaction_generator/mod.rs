@@ -10,6 +10,7 @@ use rand::rngs::StdRng;
 use std::{fmt::Debug, sync::Arc};
 
 pub mod account_generator;
+pub mod nft_mint;
 pub mod p2p_transaction_generator;
 
 pub trait TransactionGenerator: Debug + Sync + Send {
@@ -23,19 +24,23 @@ pub trait TransactionGenerator: Debug + Sync + Send {
 
     fn gen_single_txn(
         &self,
-        from: &mut LocalAccount,
-        to: &AccountAddress,
-        num_coins: u64,
-        txn_factory: &TransactionFactory,
-        gas_price: u64,
-    ) -> SignedTransaction;
+        _from: &mut LocalAccount,
+        _to: &AccountAddress,
+        _num_coins: u64,
+        _txn_factory: &TransactionFactory,
+        _gas_price: u64,
+    ) -> SignedTransaction {
+        unimplemented!()
+    }
 
     fn generate_invalid_transaction(
         &self,
-        rng: &mut StdRng,
-        sender: &mut LocalAccount,
-        receiver: &AccountAddress,
-        gas_price: u64,
-        reqs: &[SignedTransaction],
-    ) -> SignedTransaction;
+        _rng: &mut StdRng,
+        _sender: &mut LocalAccount,
+        _receiver: &AccountAddress,
+        _gas_price: u64,
+        _reqs: &[SignedTransaction],
+    ) -> SignedTransaction {
+        unimplemented!()
+    }
 }

@@ -63,6 +63,7 @@ pub struct ClusterArgs {
 pub enum TransactionType {
     P2P,
     AccountGeneration,
+    NftMint,
 }
 
 impl Display for TransactionType {
@@ -70,6 +71,7 @@ impl Display for TransactionType {
         let str = match self {
             TransactionType::P2P => "p2p",
             TransactionType::AccountGeneration => "account_generation",
+            TransactionType::NftMint => "nft_mint",
         };
         write!(f, "{}", str)
     }
@@ -88,6 +90,7 @@ impl FromStr for TransactionType {
         match s.to_lowercase().as_str() {
             "p2p" => Ok(TransactionType::P2P),
             "account_generation" => Ok(TransactionType::AccountGeneration),
+            "nft_mint" => Ok(TransactionType::NftMint),
             _ => Err("Invalid transaction type"),
         }
     }
