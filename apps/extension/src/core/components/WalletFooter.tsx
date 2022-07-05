@@ -6,6 +6,7 @@ import {
 } from '@chakra-ui/react';
 import { IoMdImage } from '@react-icons/all-files/io/IoMdImage';
 import { RiCopperCoinFill } from '@react-icons/all-files/ri/RiCopperCoinFill';
+import { RiFileListFill } from '@react-icons/all-files/ri/RiFileListFill';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { SettingsIcon } from '@chakra-ui/icons';
@@ -37,7 +38,7 @@ export default function WalletFooter() {
       py={2}
       bgColor={secondaryHeaderBgColor[colorMode]}
     >
-      <SimpleGrid width="100%" gap={4} columns={3}>
+      <SimpleGrid width="100%" gap={4} columns={4}>
         <Center width="100%">
           <ChakraLink to="/wallet">
             <IconButton
@@ -63,6 +64,21 @@ export default function WalletFooter() {
               size="md"
               aria-label="Gallery"
               icon={<IoMdImage />}
+              fontSize="xl"
+              display="flex"
+            />
+          </ChakraLink>
+        </Center>
+        <Center width="100%">
+          <ChakraLink to="/activity">
+            <IconButton
+              color={(pathname.includes('/activity'))
+                ? secondaryIconUnpressedColor[colorMode]
+                : secondaryIconColor[colorMode]}
+              variant="unstyled"
+              size="md"
+              aria-label="Activity"
+              icon={<RiFileListFill />}
               fontSize="xl"
               display="flex"
             />

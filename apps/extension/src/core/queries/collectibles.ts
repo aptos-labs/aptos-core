@@ -1,16 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient, HexString, TokenClient } from 'aptos';
+import {
+  AptosClient, HexString,
+  MaybeHexString, TokenClient,
+} from 'aptos';
 import axios from 'axios';
 import { useQuery } from 'react-query';
 import { validStorageUris } from 'core/constants';
 import useWalletState from 'core/hooks/useWalletState';
 import { MetadataJson } from 'core/types/TokenMetadata';
-import { AptosAccountState } from 'core/types';
 import { AptosNetwork } from 'core/utils/network';
 import { useCallback, useMemo } from 'react';
 import { getTokenIdDictFromString, TokenId } from 'core/utils/token';
+import { ScriptFunctionPayload } from 'aptos/dist/api/data-contracts';
+import { getScriptFunctionTransactions } from 'core/queries/transaction';
 
 interface TokenAttributes {
   description?: string;
@@ -23,96 +27,70 @@ interface TokenAttributes {
 }
 
 type CollectionDict = Record<string, TokenAttributes[]>;
-type StorageDict = Record<string, MetadataJson>;
 
 interface GetGalleryItemsProps {
-  aptosAccount: AptosAccountState;
+  address: MaybeHexString;
   nodeUrl: AptosNetwork;
 }
 
 // this is a temporary workaround until we get the indexer working
 export const getGalleryItems = async ({
-  aptosAccount,
+  address,
   nodeUrl,
 }: GetGalleryItemsProps) => {
-  if (!aptosAccount) {
-    return undefined;
-  }
-  const aptosClient = new AptosClient(nodeUrl);
-  const hexAddress = aptosAccount?.address().hex();
-  if (hexAddress) {
-    const collectionDict: CollectionDict = {};
-    const storageDict: StorageDict = {};
-    const accountTransactions = (await aptosClient
-      .getAccountTransactions(hexAddress)).filter((txn) => (
-      !txn?.vm_status?.includes('Move abort')
-    ));
-    accountTransactions.forEach((transaction) => {
-      if ('payload' in transaction && 'function' in transaction.payload) {
-        if (transaction?.payload?.function === '0x1::Token::create_unlimited_collection_script') {
-          const collectionName = new HexString(
-            transaction.payload.arguments[0],
-          ).toBuffer().toString();
-          collectionDict[collectionName] = [];
-        }
-      }
-    });
+  const createTokenTransactions = await getScriptFunctionTransactions({
+    address,
+    functionName: '0x1::Token::create_unlimited_token_script',
+    nodeUrl,
+  });
 
-    const storageUris = await Promise.all(accountTransactions.map(async (accountTransaction) => {
-      if (
-        'payload' in accountTransaction
-        && 'function' in accountTransaction.payload
-        && accountTransaction.payload.function === '0x1::Token::create_unlimited_token_script'
-      ) {
-        const uri = new HexString(accountTransaction.payload.arguments[5]).toBuffer().toString();
-        // check if uri is hosted on ipfs, arweave, or s3
-        if (validStorageUris.some((v) => uri.includes(v))) {
-          // Will need to re-examine this type in the future
-          const fetchedUrl = axios.get<MetadataJson>(uri);
-          return fetchedUrl;
-        }
-      }
-      return undefined;
-    }));
+  const collectionDict: CollectionDict = {};
 
-    storageUris.forEach((value) => {
-      if (value !== undefined && value.config.url?.toString()) {
-        storageDict[value.config.url.toString()] = value.data;
-      }
-    });
+  // Note: next block is currently not needed. Maybe it could be
+  // helpful in the future to support showing empty collections?
 
-    accountTransactions.forEach((accountTransaction) => {
-      if (
-        'payload' in accountTransaction
-        && 'function' in accountTransaction.payload
-        && accountTransaction.payload.function === '0x1::Token::create_unlimited_token_script'
-      ) {
-        const creator = (accountTransaction as any).sender;
-        const collectionName = new HexString(
-          accountTransaction.payload.arguments[0],
-        ).toBuffer().toString();
-        const name = new HexString(
-          accountTransaction.payload.arguments[1],
-        ).toBuffer().toString();
-        const uri = new HexString(
-          accountTransaction.payload.arguments[5],
-        ).toBuffer().toString();
-        collectionDict[collectionName].push({
-          id: {
-            collection: collectionName,
-            creator,
-            name,
-          },
-          metadata: storageDict[uri],
-          name,
-          uri,
-        });
-      }
+  // Initialize collection dict from `create_unlimited_collection` transactions
+  // const createCollectionTransactions = await getScriptFunctionTransactions({
+  //   address,
+  //   functionName: '0x1::Token::create_unlimited_collection_script',
+  //   nodeUrl,
+  // });
+  //
+  // createCollectionTransactions.forEach((txn) => {
+  //   const payload = txn.payload as ScriptFunctionPayload;
+  //   const collectionName = new HexString(payload.arguments[0]).toBuffer().toString();
+  //   collectionDict[collectionName] = [];
+  // });
+
+  await Promise.all(createTokenTransactions.map(async (txn) => {
+    const payload = txn.payload as ScriptFunctionPayload;
+
+    // TODO: do we need to go through HexString to deserialize the parameters?
+    const creator = txn.sender;
+    const collectionName = new HexString(payload.arguments[0]).toBuffer().toString();
+    const name = new HexString(payload.arguments[1]).toBuffer().toString();
+    const uri = new HexString(payload.arguments[5]).toBuffer().toString();
+
+    const isSupportedStorage = validStorageUris.some((storageUri) => uri.includes(storageUri));
+    const metadata = isSupportedStorage ? (await axios.get<MetadataJson>(uri)).data : undefined;
+
+    if (!(collectionName in collectionDict)) {
+      collectionDict[collectionName] = [];
+    }
+
+    collectionDict[collectionName].push({
+      id: {
+        collection: collectionName,
+        creator,
+        name,
+      },
+      metadata,
+      name,
+      uri,
     });
-    const flatMap = Array.from(Object.values(collectionDict)).flat(1);
-    return flatMap;
-  }
-  return undefined;
+  }));
+
+  return Array.from(Object.values(collectionDict)).flat(1);
 };
 
 export const collectiblesQueryKeys = Object.freeze({
@@ -185,10 +163,13 @@ export const useGalleryItems = () => {
     aptosAccount, aptosNetwork,
   } = useWalletState();
 
-  const getGalleryItemsQuery = useCallback(async () => {
-    const galleryItems = await getGalleryItems({ aptosAccount, nodeUrl: aptosNetwork });
-    return galleryItems;
-  }, [aptosAccount, aptosNetwork]);
+  const getGalleryItemsQuery = useCallback(
+    async () => (aptosAccount ? getGalleryItems({
+      address: aptosAccount.address(),
+      nodeUrl: aptosNetwork,
+    }) : null),
+    [aptosAccount, aptosNetwork],
+  );
 
   return useQuery(collectiblesQueryKeys.getGalleryItems, getGalleryItemsQuery);
 };
