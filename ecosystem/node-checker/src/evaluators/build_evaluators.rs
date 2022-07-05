@@ -11,7 +11,8 @@ use crate::{
         },
         metrics::{
             ConsensusProposalsEvaluator, ConsensusRoundEvaluator, ConsensusTimeoutsEvaluator,
-            MetricsEvaluatorError, MetricsEvaluatorInput, StateSyncVersionEvaluator,
+            MetricsEvaluatorError, MetricsEvaluatorInput, NetworkMinimumPeersEvaluator,
+            NetworkPeersWithinToleranceEvaluator, StateSyncVersionEvaluator,
         },
         system_information::{
             BuildVersionEvaluator, SystemInformationEvaluatorError, SystemInformationEvaluatorInput,
@@ -97,6 +98,11 @@ pub fn build_evaluators(
         evaluator_identifiers.iter().cloned().collect();
     let mut evaluators: Vec<EvaluatorType> = vec![];
 
+    BuildVersionEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_identifiers,
+        evaluator_args,
+    )?;
     ConsensusProposalsEvaluator::add_from_evaluator_args(
         &mut evaluators,
         &mut evaluator_identifiers,
@@ -112,22 +118,27 @@ pub fn build_evaluators(
         &mut evaluator_identifiers,
         evaluator_args,
     )?;
+    LatencyEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_identifiers,
+        evaluator_args,
+    )?;
+    NetworkMinimumPeersEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_identifiers,
+        evaluator_args,
+    )?;
+    NetworkPeersWithinToleranceEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_identifiers,
+        evaluator_args,
+    )?;
     StateSyncVersionEvaluator::add_from_evaluator_args(
         &mut evaluators,
         &mut evaluator_identifiers,
         evaluator_args,
     )?;
-    BuildVersionEvaluator::add_from_evaluator_args(
-        &mut evaluators,
-        &mut evaluator_identifiers,
-        evaluator_args,
-    )?;
     TpsEvaluator::add_from_evaluator_args(
-        &mut evaluators,
-        &mut evaluator_identifiers,
-        evaluator_args,
-    )?;
-    LatencyEvaluator::add_from_evaluator_args(
         &mut evaluators,
         &mut evaluator_identifiers,
         evaluator_args,

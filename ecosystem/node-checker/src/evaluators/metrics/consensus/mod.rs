@@ -9,4 +9,4 @@ pub use proposals::*;
 pub use round::*;
 pub use timeouts::*;
 
-pub const CATEGORY: &str = "consensus";
+const CATEGORY: &str = "consensus";
