@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::config::HANDSHAKE_VERSION;
-use aptos_crypto::{ed25519::Ed25519PublicKey, x25519};
+use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519};
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
@@ -72,7 +72,9 @@ pub struct ValidatorConfiguration {
     /// Account address
     pub account_address: AccountAddress,
     /// Key used for signing in consensus
-    pub consensus_public_key: Ed25519PublicKey,
+    pub consensus_public_key: bls12381::PublicKey,
+    /// Corresponding proof of consensus public key
+    pub proof_of_possession: bls12381::ProofOfPossession,
     /// Key used for signing transactions with the account
     pub account_public_key: Ed25519PublicKey,
     /// Public key used for validator network identity (same as account address)
@@ -96,6 +98,8 @@ pub struct StringValidatorConfiguration {
     pub account_address: String,
     /// Key used for signing in consensus
     pub consensus_public_key: String,
+    /// Corresponding proof of consensus public key
+    pub proof_of_possession: String,
     /// Key used for signing transactions with the account
     pub account_public_key: String,
     /// Public key used for validator network identity (same as account address)
@@ -143,6 +147,7 @@ impl TryFrom<ValidatorConfiguration> for Validator {
         Ok(Validator {
             address: derived_address,
             consensus_pubkey: config.consensus_public_key.to_bytes().to_vec(),
+            proof_of_possession: config.proof_of_possession.to_bytes().to_vec(),
             operator_address: auth_key.derived_address(),
             network_addresses: bcs::to_bytes(&validator_addresses).unwrap(),
             full_node_network_addresses: bcs::to_bytes(&full_node_addresses).unwrap(),

@@ -22,15 +22,15 @@
 
 use crate::{
     bls12381, bls12381::DST_BLS_SIG_IN_G2_WITH_POP, hash::CryptoHash, signing_message, traits,
-    CryptoMaterialError, Length, Uniform, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
-    VerifyingKey,
+    CryptoMaterialError, Genesis, Length, Uniform, ValidCryptoMaterial,
+    ValidCryptoMaterialStringExt, VerifyingKey,
 };
 use anyhow::{anyhow, Result};
 use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use serde::Serialize;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, fmt};
 
-#[derive(Clone, Eq, SerializeKey, DeserializeKey)]
+#[derive(Clone, Debug, Eq, SerializeKey, DeserializeKey)]
 /// A BLS12381 public key
 pub struct PublicKey {
     pub(crate) pubkey: blst::min_pk::PublicKey,
@@ -164,6 +164,25 @@ impl Uniform for PrivateKey {
     }
 }
 
+impl Genesis for PrivateKey {
+    fn genesis() -> Self {
+        let mut buf = [0u8; Self::LENGTH];
+        buf[Self::LENGTH - 1] = 1;
+        Self::try_from(buf.as_ref()).unwrap()
+    }
+}
+
+#[cfg(feature = "assert-private-keys-not-cloneable")]
+static_assertions::assert_not_impl_any!(PrivateKey: Clone);
+
+#[cfg(any(test, feature = "cloneable-private-keys"))]
+impl Clone for PrivateKey {
+    fn clone(&self) -> Self {
+        let serialized: &[u8] = &(self.to_bytes());
+        PrivateKey::try_from(serialized).unwrap()
+    }
+}
+
 //////////////////////
 // PublicKey Traits //
 //////////////////////
@@ -224,5 +243,34 @@ impl std::hash::Hash for PublicKey {
 impl PartialEq for PublicKey {
     fn eq(&self, other: &Self) -> bool {
         self.to_bytes()[..] == other.to_bytes()[..]
+    }
+}
+
+impl fmt::Display for PublicKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(&self.to_bytes()))
+    }
+}
+
+#[cfg(any(test, feature = "fuzzing"))]
+use crate::test_utils::KeyPair;
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest::prelude::*;
+
+/// Produces a uniformly random ed25519 keypair from a seed
+#[cfg(any(test, feature = "fuzzing"))]
+pub fn keypair_strategy() -> impl Strategy<Value = KeyPair<PrivateKey, PublicKey>> {
+    crate::test_utils::uniform_keypair_strategy::<PrivateKey, PublicKey>()
+}
+
+#[cfg(any(test, feature = "fuzzing"))]
+impl proptest::arbitrary::Arbitrary for PublicKey {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        crate::test_utils::uniform_keypair_strategy::<PrivateKey, PublicKey>()
+            .prop_map(|v| v.public_key)
+            .boxed()
     }
 }

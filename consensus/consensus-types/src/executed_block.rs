@@ -5,7 +5,7 @@ use crate::{
     block::Block,
     common::{Payload, Round},
     quorum_cert::QuorumCert,
-    vote_proposal::{MaybeSignedVoteProposal, VoteProposal},
+    vote_proposal::VoteProposal,
 };
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
@@ -94,16 +94,13 @@ impl ExecutedBlock {
         )
     }
 
-    pub fn maybe_signed_vote_proposal(&self, decoupled_execution: bool) -> MaybeSignedVoteProposal {
-        MaybeSignedVoteProposal {
-            vote_proposal: VoteProposal::new(
-                self.compute_result().extension_proof(),
-                self.block.clone(),
-                self.compute_result().epoch_state().clone(),
-                decoupled_execution,
-            ),
-            signature: self.compute_result().signature().clone(),
-        }
+    pub fn vote_proposal(&self, decoupled_execution: bool) -> VoteProposal {
+        VoteProposal::new(
+            self.compute_result().extension_proof(),
+            self.block.clone(),
+            self.compute_result().epoch_state().clone(),
+            decoupled_execution,
+        )
     }
 
     pub fn transactions_to_commit(&self, validators: &[AccountAddress]) -> Vec<Transaction> {

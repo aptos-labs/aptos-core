@@ -158,6 +158,7 @@ module AptosFramework::Genesis {
         core_resource_account: signer,
         owners: vector<address>,
         consensus_pubkeys: vector<vector<u8>>,
+        proof_of_possession: vector<vector<u8>>,
         validator_network_addresses: vector<vector<u8>>,
         full_node_network_addresses: vector<vector<u8>>,
         staking_distribution: vector<u64>,
@@ -179,9 +180,11 @@ module AptosFramework::Genesis {
             let cur_validator_network_addresses = *Vector::borrow(&validator_network_addresses, i);
             let cur_full_node_network_addresses = *Vector::borrow(&full_node_network_addresses, i);
             let consensus_pubkey = *Vector::borrow(&consensus_pubkeys, i);
+            let pop = *Vector::borrow(&proof_of_possession, i);
             Stake::register_validator_candidate(
                 &owner_account,
                 consensus_pubkey,
+                pop,
                 cur_validator_network_addresses,
                 cur_full_node_network_addresses,
             );

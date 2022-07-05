@@ -123,11 +123,13 @@ impl<S: KVStorage> GenesisBuilder<S> {
             let operator_address = operator_auth_key.derived_address();
             let validator_config = self.validator_config(&operator)?;
             let consensus_pubkey = bcs::from_bytes(&validator_config.args()[1])?;
-            let network_address = bcs::from_bytes(&validator_config.args()[2])?;
-            let full_node_network_address = bcs::from_bytes(&validator_config.args()[3])?;
+            let proof_of_possession = bcs::from_bytes(&validator_config.args()[2])?;
+            let network_address = bcs::from_bytes(&validator_config.args()[3])?;
+            let full_node_network_address = bcs::from_bytes(&validator_config.args()[4])?;
             validators.push(Validator {
                 address,
                 consensus_pubkey,
+                proof_of_possession,
                 operator_address,
                 network_addresses: network_address,
                 full_node_network_addresses: full_node_network_address,

@@ -9,6 +9,7 @@ use crate::{
     transaction::build_raw_transaction,
 };
 use aptos_config::config::HANDSHAKE_VERSION;
+use aptos_crypto::{bls12381, PrivateKey};
 use aptos_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OPERATOR_ACCOUNT, OPERATOR_KEY, OWNER_ACCOUNT,
     VALIDATOR_NETWORK_KEY,
@@ -103,8 +104,9 @@ pub fn build_validator_config_transaction<S: KVStorage + CryptoStorage>(
         .map(|v| v.value)?;
 
     let consensus_key = validator_storage
-        .get_public_key(CONSENSUS_KEY)
-        .map(|v| v.public_key)?;
+        .get::<bls12381::PrivateKey>(CONSENSUS_KEY)
+        .map(|v| v.value)?
+        .public_key();
     let fullnode_network_key = validator_storage
         .get_public_key(FULLNODE_NETWORK_KEY)
         .map(|v| v.public_key)

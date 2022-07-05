@@ -113,6 +113,18 @@ impl Signature {
 
         self.verify_aggregate_arbitrary_msg(&msgs_refs, pks)
     }
+
+    /// Return a dummy signature.
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy_signature() -> Self {
+        // TODO: maybe Alin knows better way to generate a dummy signature
+        use crate::{Genesis, SigningKey};
+
+        let private_key = PrivateKey::genesis();
+
+        let msg = b"hello foo";
+        private_key.sign_arbitrary_message(msg)
+    }
 }
 
 ///////////////////////////

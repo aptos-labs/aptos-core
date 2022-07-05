@@ -274,12 +274,13 @@ module AptosFramework::Stake {
     public(script) fun register_validator_candidate(
         account: &signer,
         consensus_pubkey: vector<u8>,
+        proof_of_possession: vector<u8>,
         network_addresses: vector<u8>,
         fullnode_addresses: vector<u8>,
     ) {
         let account_address = Signer::address_of(account);
         assert!(!exists<StakePool>(account_address), Errors::invalid_argument(EALREADY_REGISTERED));
-        assert!(Signature::ed25519_validate_pubkey(consensus_pubkey), Errors::invalid_argument(EINVALID_PUBLIC_KEY));
+        assert!(Signature::bls12381_validate_pubkey(consensus_pubkey, proof_of_possession), Errors::invalid_argument(EINVALID_PUBLIC_KEY));
 
         move_to(account, StakePool {
             active: Coin::zero<TestCoin>(),
@@ -404,6 +405,7 @@ module AptosFramework::Stake {
         account: &signer,
         pool_address: address,
         new_consensus_pubkey: vector<u8>,
+        proof_of_possession: vector<u8>,
     ) acquires StakePool, StakePoolEvents, ValidatorConfig {
         let stake_pool = borrow_global<StakePool>(pool_address);
         assert!(Signer::address_of(account) == stake_pool.operator_address, Errors::invalid_argument(ENOT_OPERATOR));
@@ -411,7 +413,7 @@ module AptosFramework::Stake {
         assert!(exists<ValidatorConfig>(pool_address), Errors::not_published(EVALIDATOR_CONFIG));
         let validator_info = borrow_global_mut<ValidatorConfig>(pool_address);
         let old_consensus_pubkey = validator_info.consensus_pubkey;
-        assert!(Signature::ed25519_validate_pubkey(new_consensus_pubkey), Errors::invalid_argument(EINVALID_PUBLIC_KEY));
+        assert!(Signature::bls12381_validate_pubkey(new_consensus_pubkey, proof_of_possession), Errors::invalid_argument(EINVALID_PUBLIC_KEY));
         validator_info.consensus_pubkey = new_consensus_pubkey;
 
         let stake_pool_events = borrow_global_mut<StakePoolEvents>(pool_address);
@@ -864,10 +866,14 @@ module AptosFramework::Stake {
     use AptosFramework::TestCoin;
 
     #[test_only]
-    const CONSENSUS_KEY_1: vector<u8> = x"9aa2353d22b30803f04a48b77369df9b7d56f7b2f2d001858f46f04e61f80f2e";
+    const CONSENSUS_KEY_1: vector<u8> = x"8a54b92288d4ba5073d3a52e80cc00ae9fbbc1cc5b433b46089b7804c38a76f00fc64746c7685ee628fc2d0b929c2294";
+    #[test_only]
+    const CONSENSUS_POP_1: vector<u8> = x"a9d6c1f1270f2d1454c89a83a4099f813a56dc7db55591d46aa4e6ccae7898b234029ba7052f18755e6fa5e6b73e235f14efc4e2eb402ca2b8f56bad69f965fc11b7b25eb1c95a06f83ddfd023eac4559b6582696cfea97b227f4ce5bdfdfed0";
 
     #[test_only]
-    const CONSENSUS_KEY_2: vector<u8> = x"3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c";
+    const CONSENSUS_KEY_2: vector<u8> = x"a344eb437bcd8096384206e1be9c80be3893fd7fdf867acce5a048e5b1546028bdac4caf419413fd16d4d6a609e0b0a3";
+    #[test_only]
+    const CONSENSUS_POP_2: vector<u8> = x"909d3a378ad5c17faf89f7a2062888100027eda18215c7735f917a4843cd41328b42fa4242e36dedb04432af14608973150acbff0c5d3f325ba04b287be9747398769a91d4244689cfa9c535a5a4d67073ee22090d5ab0a88ab8d2ff680e991e";
 
     #[test_only]
     const MAXIMUM_LOCK_UP_SECS: u64 = 1000;
@@ -930,7 +936,7 @@ module AptosFramework::Stake {
         store_test_coin_mint_cap(&core_resources, mint_cap);
 
         let pool_address = Signer::address_of(&validator);
-        register_validator_candidate(&validator, CONSENSUS_KEY_1, Vector::empty(), Vector::empty());
+        register_validator_candidate(&validator, CONSENSUS_KEY_1, CONSENSUS_POP_1, Vector::empty(), Vector::empty());
         let owner_cap = extract_owner_cap(&validator);
 
         // Add stake when the validator is not yet activated.
@@ -956,7 +962,7 @@ module AptosFramework::Stake {
         assert_validator_state(pool_address, 0, 0, 0, 0, 0);
 
         // Operator can separately rotate consensus key.
-        rotate_consensus_key(&validator, pool_address, CONSENSUS_KEY_2);
+        rotate_consensus_key(&validator, pool_address, CONSENSUS_KEY_2, CONSENSUS_POP_2);
 
         let OwnerCapability { pool_address: _ } = owner_cap;
         Coin::burn(coins, &burn_cap);
@@ -1003,7 +1009,7 @@ module AptosFramework::Stake {
         assert!(validator_config_2.config.validator_index == 1, 5);
 
         // Validator 1 rotates consensus key. Validator 2 leaves. Validator 3 joins.
-        rotate_consensus_key(&validator_1, validator_1_address, CONSENSUS_KEY_2);
+        rotate_consensus_key(&validator_1, validator_1_address, CONSENSUS_KEY_2, CONSENSUS_POP_2);
         leave_validator_set(&validator_2, validator_2_address);
         join_validator_set(&validator_3, validator_3_address);
         // Validator 2 is not effectively removed until next epoch.
@@ -1124,7 +1130,7 @@ module AptosFramework::Stake {
         Coin::register<TestCoin>(account);
         let address = Signer::address_of(account);
         Coin::deposit<TestCoin>(address, Coin::mint<TestCoin>(1000, mint_cap));
-        register_validator_candidate(account, CONSENSUS_KEY_1, Vector::empty(), Vector::empty());
+        register_validator_candidate(account, CONSENSUS_KEY_1, CONSENSUS_POP_1, Vector::empty(), Vector::empty());
         add_stake(account, 100);
         increase_lockup(account, Timestamp::now_seconds() + MAXIMUM_LOCK_UP_SECS);
         assert_validator_state(Signer::address_of(account), 100, 0, 0, 0, 0);

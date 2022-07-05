@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    bls12381,
+    ed25519::Ed25519PrivateKey,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
     traits::{SigningKey, Uniform},
+    PrivateKey,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
@@ -29,12 +31,19 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
     let message = TestAptosCrypto("Hello, World".to_string());
 
     let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
+
     let private_key = Ed25519PrivateKey::generate(&mut rng);
-    let public_key: Ed25519PublicKey = (&private_key).into();
+    let public_key = private_key.public_key();
     let signature = private_key.sign(&message);
+
+    let bls_private_key = bls12381::PrivateKey::generate(&mut rng);
+    let bls_public_key = bls_private_key.public_key();
+    let bls_signature = bls_private_key.sign(&message);
 
     tracer.trace_value(samples, &public_key)?;
     tracer.trace_value(samples, &signature)?;
+    tracer.trace_value(samples, &bls_public_key)?;
+    tracer.trace_value(samples, &bls_signature)?;
     tracer.trace_value::<MultiEd25519PublicKey>(samples, &public_key.into())?;
     tracer.trace_value::<MultiEd25519Signature>(samples, &signature.into())?;
     Ok(())

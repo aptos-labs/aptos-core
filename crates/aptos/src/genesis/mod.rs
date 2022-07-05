@@ -14,7 +14,7 @@ use crate::{
     genesis::git::{Client, GitOptions, LAYOUT_NAME},
     CliCommand, CliResult,
 };
-use aptos_crypto::{ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
+use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
 use aptos_genesis::{
     config::{HostAndPort, Layout, ValidatorConfiguration},
     GenesisInfo,
@@ -152,8 +152,11 @@ fn get_config(client: &Client, user: &str) -> CliTypedResult<ValidatorConfigurat
         .map_err(|_| CliError::UnexpectedError("account_address invalid".to_string()))?;
     let account_key = Ed25519PublicKey::from_encoded_string(&config.account_public_key)
         .map_err(|_| CliError::UnexpectedError("account_key invalid".to_string()))?;
-    let consensus_key = Ed25519PublicKey::from_encoded_string(&config.consensus_public_key)
+    let consensus_key = bls12381::PublicKey::from_encoded_string(&config.consensus_public_key)
         .map_err(|_| CliError::UnexpectedError("consensus_key invalid".to_string()))?;
+    let proof_of_possession =
+        bls12381::ProofOfPossession::from_encoded_string(&config.proof_of_possession)
+            .map_err(|_| CliError::UnexpectedError("proof_of_possession invalid".to_string()))?;
     let validator_network_key =
         x25519::PublicKey::from_encoded_string(&config.validator_network_public_key)
             .map_err(|_| CliError::UnexpectedError("validator_network_key invalid".to_string()))?;
@@ -173,6 +176,7 @@ fn get_config(client: &Client, user: &str) -> CliTypedResult<ValidatorConfigurat
     Ok(ValidatorConfiguration {
         account_address,
         consensus_public_key: consensus_key,
+        proof_of_possession,
         account_public_key: account_key,
         validator_network_public_key: validator_network_key,
         validator_host,
@@ -189,6 +193,8 @@ pub struct StringValidatorConfiguration {
     pub account_address: String,
     /// Key used for signing in consensus
     pub consensus_public_key: String,
+    /// Proof for the consensus key
+    pub proof_of_possession: String,
     /// Key used for signing transactions with the account
     pub account_public_key: String,
     /// Public key used for validator network identity (same as account address)
