@@ -43,6 +43,7 @@ use consensus_types::{
 };
 use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
+use rand::Rng;
 #[cfg(test)]
 use safety_rules::ConsensusState;
 use safety_rules::TSafetyRules;
@@ -144,6 +145,8 @@ pub struct RoundManager {
     storage: Arc<dyn PersistentLivenessStorage>,
     sync_only: bool,
     onchain_config: OnChainConsensusConfig,
+    can_propose: bool,
+    can_vote: bool,
 }
 
 impl RoundManager {
@@ -167,6 +170,9 @@ impl RoundManager {
         counters::OP_COUNTERS
             .gauge("decoupled_execution")
             .set(onchain_config.decoupled_execution() as i64);
+
+        let first_digit = proposal_generator.author().to_hex().chars().next().unwrap();
+        // let can_vote = first_digit <= '2'; // rand::thread_rng().gen_range(0, 100) > 15;
         Self {
             epoch_state,
             block_store,
@@ -178,6 +184,8 @@ impl RoundManager {
             storage,
             sync_only,
             onchain_config,
+            can_propose: first_digit > '4', // can_vote && rand::thread_rng().gen_range(0, 100) > 33,
+            can_vote: first_digit > '0', // can_vote,
         }
     }
 
@@ -225,7 +233,7 @@ impl RoundManager {
         );
         if self
             .proposer_election
-            .is_valid_proposer(self.proposal_generator.author(), new_round_event.round)
+            .is_valid_proposer(self.proposal_generator.author(), new_round_event.round) && self.can_propose
         {
             let proposal_msg = Box::new(self.generate_proposal(new_round_event).await?);
             let mut network = self.network.clone();
@@ -298,7 +306,7 @@ impl RoundManager {
                 true,
             )
             .await
-            .context("[RoundManager] Process proposal")?
+            .context("[RoundManager] Process proposal")?  && self.can_vote
         {
             self.process_proposal(proposal_msg.take_proposal()).await
         } else {
