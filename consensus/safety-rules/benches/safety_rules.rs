@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{ed25519::Ed25519PrivateKey, Uniform};
 use aptos_secure_storage::{InMemoryStorage, KVStorage, OnDiskStorage, Storage, VaultStorage};
 use aptos_types::validator_signer::ValidatorSigner;
 use consensus_types::block::block_test_utils;
@@ -23,35 +22,27 @@ fn lsr(mut safety_rules: Box<dyn TSafetyRules>, signer: ValidatorSigner, n: u64)
     let mut round = genesis_qc.certified_block().round();
 
     round += 1;
-    let mut b0 = test_utils::make_proposal_with_qc(round, genesis_qc, &signer, None);
+    let mut b0 = test_utils::make_proposal_with_qc(round, genesis_qc, &signer);
     safety_rules
         .construct_and_sign_vote_two_chain(&b0, None)
         .unwrap();
 
     round += 1;
-    let mut b1 =
-        test_utils::make_proposal_with_parent(data.clone(), round, &b0, None, &signer, None);
+    let mut b1 = test_utils::make_proposal_with_parent(data.clone(), round, &b0, None, &signer);
     safety_rules
         .construct_and_sign_vote_two_chain(&b1, None)
         .unwrap();
 
     round += 1;
-    let mut b2 =
-        test_utils::make_proposal_with_parent(data.clone(), round, &b1, None, &signer, None);
+    let mut b2 = test_utils::make_proposal_with_parent(data.clone(), round, &b1, None, &signer);
     safety_rules
         .construct_and_sign_vote_two_chain(&b2, None)
         .unwrap();
 
     for _i in 0..n {
         round += 1;
-        let b3 = test_utils::make_proposal_with_parent(
-            data.clone(),
-            round,
-            &b2,
-            Some(&b0),
-            &signer,
-            None,
-        );
+        let b3 =
+            test_utils::make_proposal_with_parent(data.clone(), round, &b2, Some(&b0), &signer);
 
         safety_rules
             .construct_and_sign_vote_two_chain(&b3, None)
@@ -70,11 +61,10 @@ fn in_memory(n: u64) {
         Storage::from(InMemoryStorage::new()),
         signer.author(),
         signer.private_key().clone(),
-        Ed25519PrivateKey::generate_for_testing(),
         waypoint,
         true,
     );
-    let safety_rules_manager = SafetyRulesManager::new_local(storage, false, false);
+    let safety_rules_manager = SafetyRulesManager::new_local(storage);
     lsr(safety_rules_manager.client(), signer, n);
 }
 
@@ -86,11 +76,10 @@ fn on_disk(n: u64) {
         Storage::from(OnDiskStorage::new(file_path)),
         signer.author(),
         signer.private_key().clone(),
-        Ed25519PrivateKey::generate_for_testing(),
         waypoint,
         true,
     );
-    let safety_rules_manager = SafetyRulesManager::new_local(storage, false, false);
+    let safety_rules_manager = SafetyRulesManager::new_local(storage);
     lsr(safety_rules_manager.client(), signer, n);
 }
 
@@ -102,11 +91,10 @@ fn serializer(n: u64) {
         Storage::from(OnDiskStorage::new(file_path)),
         signer.author(),
         signer.private_key().clone(),
-        Ed25519PrivateKey::generate_for_testing(),
         waypoint,
         true,
     );
-    let safety_rules_manager = SafetyRulesManager::new_serializer(storage, false, false);
+    let safety_rules_manager = SafetyRulesManager::new_serializer(storage);
     lsr(safety_rules_manager.client(), signer, n);
 }
 
@@ -118,13 +106,12 @@ fn thread(n: u64) {
         Storage::from(OnDiskStorage::new(file_path)),
         signer.author(),
         signer.private_key().clone(),
-        Ed25519PrivateKey::generate_for_testing(),
         waypoint,
         true,
     );
     // Test value, in milliseconds
     let timeout_ms = 5_000;
-    let safety_rules_manager = SafetyRulesManager::new_thread(storage, false, false, timeout_ms);
+    let safety_rules_manager = SafetyRulesManager::new_thread(storage, timeout_ms);
     lsr(safety_rules_manager.client(), signer, n);
 }
 
@@ -139,13 +126,12 @@ fn vault(n: u64) {
         Storage::from(storage),
         signer.author(),
         signer.private_key().clone(),
-        Ed25519PrivateKey::generate_for_testing(),
         waypoint,
         true,
     );
     // Test value in milliseconds.
     let timeout_ms = 5_000;
-    let safety_rules_manager = SafetyRulesManager::new_thread(storage, false, false, timeout_ms);
+    let safety_rules_manager = SafetyRulesManager::new_thread(storage, timeout_ms);
     lsr(safety_rules_manager.client(), signer, n);
 }
 

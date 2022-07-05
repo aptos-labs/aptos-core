@@ -1,9 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{ed25519, traits::*};
+use aptos_crypto::{bls12381, ed25519, traits::*};
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
+    move_core_types::gas_schedule::GasCost,
     move_vm_runtime::native_functions::NativeContext,
     move_vm_types::{
         gas_schedule::NativeCostIndex,
@@ -15,6 +16,38 @@ use move_deps::{
 };
 use smallvec::smallvec;
 use std::{collections::VecDeque, convert::TryFrom};
+
+pub fn native_bls12381_public_key_validation(
+    _context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    debug_assert!(_ty_args.is_empty());
+    debug_assert!(arguments.len() == 2);
+
+    // TODO: replace with proper gas cost
+    let cost = GasCost::new(super::cost::APTOS_LIB_TYPE_OF, 1).total();
+
+    let pop_bytes = pop_arg!(arguments, Vec<u8>);
+    let key_bytes = pop_arg!(arguments, Vec<u8>);
+
+    let pop = match bls12381::ProofOfPossession::try_from(&pop_bytes[..]) {
+        Ok(pop) => pop,
+        Err(_) => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
+    };
+
+    let public_key = match bls12381::PublicKey::try_from(&key_bytes[..]) {
+        Ok(key) => key,
+        Err(_) => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
+    };
+
+    let ret = if pop.verify(&public_key).is_ok() {
+        Value::bool(true)
+    } else {
+        Value::bool(false)
+    };
+    Ok(NativeResult::ok(cost, smallvec![ret]))
+}
 
 pub fn native_ed25519_publickey_validation(
     context: &mut NativeContext,
