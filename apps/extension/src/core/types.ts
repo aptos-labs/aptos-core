@@ -1,7 +1,8 @@
-/* eslint-disable class-methods-use-this */
-/* eslint-disable max-classes-per-file */
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
+
+/* eslint-disable class-methods-use-this */
+/* eslint-disable max-classes-per-file */
 
 import { AptosAccount, AptosAccountObject } from 'aptos';
 

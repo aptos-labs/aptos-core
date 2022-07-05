@@ -7,6 +7,7 @@ import { DEVNET_NODE_URL } from '../core/constants';
 import { MessageMethod, PermissionType } from '../core/types';
 import { getBackgroundAptosAccountState } from '../core/utils/account';
 import Permissions from '../core/utils/permissions';
+import { DappErrorType } from '../core/types/Errors';
 
 // Utils
 
@@ -26,12 +27,12 @@ async function checkConnected(sendResponse) {
   if (Permissions.isDomainAllowed(await getCurrentDomain())) {
     return true;
   }
-  sendResponse({ error: 'App not connected - call aptos.connect()' });
+  sendResponse({ error: DappErrorType.UNAUTHORIZED });
   return false;
 }
 
 function rejectRequest(sendResponse) {
-  sendResponse({ error: 'User rejected request' });
+  sendResponse({ error: DappErrorType.USER_REJECTION });
 }
 
 // Aptos dApp methods
@@ -44,7 +45,7 @@ function getAccountAddress(account, sendResponse) {
   if (account.address()) {
     sendResponse({ address: account.address().hex() });
   } else {
-    sendResponse({ error: 'No accounts signed in' });
+    sendResponse({ error: DappErrorType.NO_ACCOUNTS });
   }
 }
 
@@ -84,7 +85,7 @@ async function signAndSubmitTransaction(client, account, transaction, sendRespon
     const response = await client.submitTransaction(signedTransaction);
     sendResponse(response);
   } catch (error) {
-    sendResponse({ error });
+    sendResponse({ data: error, error: DappErrorType.TRANSACTION_FAILURE });
   }
 }
 
@@ -105,14 +106,14 @@ async function signTransactionAndSendResponse(client, account, transaction, send
     const signedTransaction = await signTransaction(client, account, transaction);
     sendResponse({ signedTransaction });
   } catch (error) {
-    sendResponse({ error });
+    sendResponse({ data: error, error: DappErrorType.TRANSACTION_FAILURE });
   }
 }
 
 async function handleDappRequest(request, sendResponse) {
   const account = await getBackgroundAptosAccountState();
   if (account === undefined) {
-    sendResponse({ error: 'No Accounts' });
+    sendResponse({ error: DappErrorType.NO_ACCOUNTS });
     return;
   }
 
