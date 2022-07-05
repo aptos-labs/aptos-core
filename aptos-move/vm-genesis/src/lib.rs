@@ -240,6 +240,12 @@ fn create_and_initialize_main_accounts(
     let rewards_rate_denominator = 1_000_000;
     let rewards_rate_numerator = rewards_rate_per_epoch * rewards_rate_denominator;
 
+    // TODO: Make increase and withdrawal limits configurable in the genesis blob.
+    let increase_limit = 3;
+    let increase_limit_denominator = 10;
+    let withdraw_limit = 3;
+    let withdraw_limit_denominator = 10;
+
     // Block timestamps are in microseconds and epoch_interval is used to check if a block timestamp
     // has crossed into a new epoch. So epoch_interval also needs to be in micro seconds.
     let epoch_interval_usecs = epoch_duration_secs * MICRO_SECONDS_PER_SECOND;
@@ -267,6 +273,10 @@ fn create_and_initialize_main_accounts(
             MoveValue::Bool(allow_new_validators),
             MoveValue::U64(rewards_rate_numerator),
             MoveValue::U64(rewards_rate_denominator),
+            MoveValue::U64(increase_limit),
+            MoveValue::U64(increase_limit_denominator),
+            MoveValue::U64(withdraw_limit),
+            MoveValue::U64(withdraw_limit_denominator),
         ]),
     );
 }
