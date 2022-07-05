@@ -43,6 +43,7 @@ aptosdb = { path = "../../aptosdb" }
 executor = { path = "../../../execution/executor" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers", optional = true }
 executor-types = { path = "../../../execution/executor-types" }
+scratchpad = { path = "../../scratchpad" }
 storage-interface = { path = "../../storage-interface" }
 
 [dev-dependencies]

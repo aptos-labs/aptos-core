@@ -85,6 +85,7 @@ use aptos_types::{
 use itertools::zip_eq;
 use once_cell::sync::Lazy;
 use schemadb::{SchemaBatch, DB};
+use scratchpad::SparseMerkleTree;
 use std::{
     collections::HashMap,
     iter::Iterator,
@@ -1255,6 +1256,7 @@ impl DbWriter for AptosDB {
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         version: Version,
         base_version: Option<Version>,
+        _checkpoint_at_snapshot: SparseMerkleTree<StateValue>,
     ) -> Result<()> {
         gauged_api("save_state_snapshot", || {
             let root_hash = self.state_store.merklize_value_set(
@@ -1285,6 +1287,7 @@ impl DbWriter for AptosDB {
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         save_state_snapshots: bool,
+        checkpoint: SparseMerkleTree<StateValue>,
     ) -> Result<()> {
         gauged_api("save_transactions", || {
             // Executing and committing from more than one threads not allowed -- consensus and
@@ -1336,7 +1339,13 @@ impl DbWriter for AptosDB {
                     })
                 {
                     let version = first_version + idx as LeafCount;
-                    self.save_state_snapshot(jmt_updates, jf_node_hashes, version, base_version)?;
+                    self.save_state_snapshot(
+                        jmt_updates,
+                        jf_node_hashes,
+                        version,
+                        base_version,
+                        checkpoint.clone(),
+                    )?;
                     base_version = Some(version);
                 }
             }

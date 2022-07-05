@@ -30,6 +30,7 @@ data-streaming-service = { path = "../data-streaming-service" }
 event-notifications = { path = "../../inter-component/event-notifications" }
 executor-types = { path = "../../../execution/executor-types" }
 mempool-notifications = { path = "../../inter-component/mempool-notifications" }
+scratchpad = { path = "../../../storage/scratchpad" }
 storage-interface = { path = "../../../storage/storage-interface" }
 
 [dev-dependencies]

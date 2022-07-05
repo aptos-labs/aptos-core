@@ -7,6 +7,7 @@ use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_state_view::StateView;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
+    state_store::state_value::StateValue,
     transaction::{
         Transaction, TransactionListWithProof, TransactionOutput, TransactionToCommit, Version,
     },
@@ -14,6 +15,7 @@ use aptos_types::{
 };
 use aptos_vm::VMExecutor;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
+use scratchpad::SparseMerkleTree;
 use storage_interface::{DbReader, DbReaderWriter, DbWriter, StartupInfo};
 
 fn create_test_executor() -> BlockExecutor<FakeVM> {
@@ -88,6 +90,7 @@ impl DbWriter for FakeDb {
         _first_version: Version,
         _base_state_version: Option<Version>,
         _ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        _checkpoint: SparseMerkleTree<StateValue>,
     ) -> Result<()> {
         Ok(())
     }
