@@ -174,7 +174,7 @@ impl<M: MetricCollector> BlockingRunner<M> {
                         .evaluate(&direct_evaluator_input)
                         .err_into::<RunnerError>(),
                 ),
-                EvaluatorType::Latency(evaluator) => Box::pin(
+                EvaluatorType::Api(evaluator) => Box::pin(
                     evaluator
                         .evaluate(&direct_evaluator_input)
                         .err_into::<RunnerError>(),

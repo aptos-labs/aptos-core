@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::DirectEvaluatorInput;
+use super::{super::DirectEvaluatorInput, ApiEvaluatorError, API_CATEGORY};
 use crate::{
     configuration::EvaluatorArgs,
     evaluator::{EvaluationResult, Evaluator},
@@ -11,14 +11,8 @@ use anyhow::Result;
 use clap::Parser;
 use poem_openapi::Object as PoemObject;
 use serde::{Deserialize, Serialize};
-use thiserror::Error as ThisError;
 use tokio::time::{Duration, Instant};
 use url::Url;
-
-pub const CATEGORY: &str = "performance";
-
-#[derive(Debug, ThisError)]
-pub enum LatencyEvaluatorError {}
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
 pub struct LatencyEvaluatorArgs {
@@ -49,22 +43,6 @@ impl LatencyEvaluator {
         Self { args }
     }
 
-    fn build_evaluation_result(
-        &self,
-        headline: String,
-        score: u8,
-        explanation: String,
-    ) -> EvaluationResult {
-        EvaluationResult {
-            headline,
-            score,
-            explanation,
-            category: CATEGORY.to_string(),
-            evaluator_name: Self::get_name(),
-            links: vec![],
-        }
-    }
-
     async fn get_latency_datapoint(&self, target_url: Url) -> Result<Duration> {
         let start = Instant::now();
         let client = reqwest::ClientBuilder::new()
@@ -81,7 +59,7 @@ impl LatencyEvaluator {
 #[async_trait::async_trait]
 impl Evaluator for LatencyEvaluator {
     type Input = DirectEvaluatorInput;
-    type Error = LatencyEvaluatorError;
+    type Error = ApiEvaluatorError;
 
     async fn evaluate(&self, input: &Self::Input) -> Result<Vec<EvaluationResult>, Self::Error> {
         let mut target_url = input.target_node_address.url.clone();
@@ -103,7 +81,7 @@ impl Evaluator for LatencyEvaluator {
                     0,
                     format!(
                         "The node returned too many errors while checking latency, the tolerance was {} errors out of {} calls: {}",
-                        self.args.num_allowed_errors, self.args.num_samples, errors.into_iter().map(|e| e.to_string()).collect::<Vec<String>>().join(", ")
+                        self.args.num_allowed_errors, self.args.num_samples, errors.into_iter().map(|e| e.to_string()).collect::<Vec<String>>().join(", "),
                     ),
                 )]);
             }
@@ -139,8 +117,12 @@ impl Evaluator for LatencyEvaluator {
         Ok(vec![evaluation_result])
     }
 
-    fn get_name() -> String {
-        format!("{}_latency", CATEGORY)
+    fn get_category_name() -> String {
+        API_CATEGORY.to_string()
+    }
+
+    fn get_evaluator_name() -> String {
+        "latency".to_string()
     }
 
     fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {
@@ -148,7 +130,7 @@ impl Evaluator for LatencyEvaluator {
     }
 
     fn evaluator_type_from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<EvaluatorType> {
-        Ok(EvaluatorType::Latency(Box::new(Self::from_evaluator_args(
+        Ok(EvaluatorType::Api(Box::new(Self::from_evaluator_args(
             evaluator_args,
         )?)))
     }

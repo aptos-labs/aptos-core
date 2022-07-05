@@ -66,22 +66,6 @@ impl StateSyncVersionEvaluator {
         )
     }
 
-    fn build_evaluation_result(
-        &self,
-        headline: String,
-        score: u8,
-        explanation: String,
-    ) -> EvaluationResult {
-        EvaluationResult {
-            headline,
-            score,
-            explanation,
-            category: CATEGORY.to_string(),
-            evaluator_name: Self::get_name(),
-            links: vec![],
-        }
-    }
-
     fn build_state_sync_version_evaluation(
         &self,
         previous_target_version: u64,
@@ -202,8 +186,12 @@ impl Evaluator for StateSyncVersionEvaluator {
         Ok(evaluation_results)
     }
 
-    fn get_name() -> String {
-        format!("{}_version", CATEGORY)
+    fn get_category_name() -> String {
+        CATEGORY.to_string()
+    }
+
+    fn get_evaluator_name() -> String {
+        "version".to_string()
     }
 
     fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {
