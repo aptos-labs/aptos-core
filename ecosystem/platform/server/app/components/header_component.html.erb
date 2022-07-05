@@ -1,14 +1,38 @@
 <%= content_tag :header, **@rest do %>
-  <a class="flex flex-nowrap items-center gap-2 md:gap-4 h-16" href="/" title="Aptos - Building the safest and most scalable Layer 1 blockchain">
-    <%= render IconComponent.new(:aptos_word, class: 'w-24 md:w-32') %>
-    <span class="font-display font-light text-neutral-200 text-xs md:text-base">Community</span>
+
+  <a class="flex flex-nowrap items-center gap-2 md:gap-4 h-16 mr-auto" href="/" title="Aptos - Building the safest and most scalable Layer 1 blockchain">
+    <%= render IconComponent.new(:aptos, class: 'w-8') %>
   </a>
-  <button class="md:hidden flex-nowrap hover:text-neutral-300" aria-label="Toggle navigation" data-action="click->header#toggleNav">
-    <%= render IconComponent.new(:hamburger, size: :medium) %>
-  </button>
-  <nav class="hidden open:flex md:flex flex-wrap flex-auto flex-col md:flex-row w-full md:w-auto border-neutral-800 border-b md:border-none mt-2 mb-4 md:m-0 justify-end md:gap-10 font-mono uppercase text-sm md:text-base" data-header-target="nav">
+
+  <nav class="hidden md:flex text-base flex-row flex-wrap md:gap-8 flex justify-end mr-12 font-mono uppercase lg:text-base text-sm open:text-lg open:flex open:fixed open:m-0 open:gap-2 open:p-10 open:top-16 open:right-0 open:bg-black/95 open:text-lg open:shadow-2xl open:min-w-fit open:md:max-w-lg open:rounded-b-lg open:border-neutral-800 open:border-t open:flex-col" data-header-target="nav">
     <% nav_items.each do |item| %>
-      <%= content_tag :a, item.name, href: item.url, title: item.title, class: 'border-neutral-800 py-2 border-t md:border-none hover:text-neutral-300', target: item.url.starts_with?('http') ? '_blank' : '' %>
+      <%= content_tag :a, item.name, href: item.url, title: item.title, class: 'py-2 text-neutral-200 hover:text-white', target: item.url.starts_with?('http') ? '_blank' : '' %>
     <% end %>
   </nav>
+
+  <% if @user %>
+    <div class="group relative">
+      <button class="w-8 h-8 bg-transparent border border-neutral-300 hover:bg-neutral-800 text-neutral-300 font-semibold rounded-lg inline-flex items-center justify-center group-hover:border-2 group-hover:border-teal-400">
+        <span><%= @user.username&.first&.upcase %></span>
+      </button>
+      <div class="-translate-y-4 pt-8 absolute right-0 z-10 scale-0 opacity-0 group-focus:scale-100 group-focus-within:scale-100 group-hover:scale-100 group-focus:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100 origin-top-right transition-opacity duration-150 cursor-default">
+        <div class="text-gray-700 p-2 bg-black/95 border-neutral-800 border-t rounded-b-lg min-w-fit shadow-xl whitespace-nowrap w-48 flex flex-col gap-2">
+          <div class="text-teal-400 px-3 py-2 font-mono"><%= @user.username %></div>
+          <div class="block h-px bg-neutral-500"></div>
+          <ul>
+            <% user_nav_items.each do |item| %>
+              <%= content_tag :a, item.name, href: item.url, title: item.title, class: 'rounded-lg py-2 px-4 block whitespace-no-wrap bg-transparent hover:bg-neutral-800 text-neutral-300 hover:text-white font-mono uppercase text-sm', target: item.url.starts_with?('http') ? '_blank' : '' %>
+            <% end %>
+          </ul>
+        </div>
+      </div>
+    </div>
+  <% else %>
+    <a title="Log in" href="<%= new_user_session_path %>" class="font-mono text-sm uppercase text-neutral-200 hover:text-white">Log in</a>
+    <a title="Sign up" href="<%= new_user_session_path %>" class="h-8 font-mono font-bold text-sm flex items-center justify-center leading-none py-1 px-8 rounded-lg uppercase bg-teal-400 hover:brightness-105 text-neutral-800 z-20">Sign up</a>
+  <% end %>
+
+  <button class="md:hidden flex-nowrap hover:text-teal-400" aria-label="Toggle navigation" data-action="click->header#toggleNav">
+    <%= render IconComponent.new(:hamburger, size: :medium) %>
+  </button>
 <% end %>
