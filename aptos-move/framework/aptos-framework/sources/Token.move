@@ -24,6 +24,7 @@ module AptosFramework::Token {
     const ETOKEN_ALREADY_EXISTS: u64 = 12;
     const ETOKEN_NOT_PUBLISHED: u64 = 13;
     const ETOKEN_STORE_NOT_PUBLISHED: u64 = 14;
+    const ETOKEN_SPLIT_AMOUNT_LARGER_THEN_TOKEN_AMOUNT: u64 = 15;
 
     //
     // Core data structures for holding tokens
@@ -356,6 +357,19 @@ module AptosFramework::Token {
         assert!(&dst_token.id == &source_token.id, Errors::invalid_argument(EINVALID_TOKEN_MERGE));
         dst_token.value = dst_token.value + source_token.value;
         let Token { id: _, value: _ } = source_token;
+    }
+
+    public fun split(dst_token: &mut Token, amount: u64): Token {
+        assert!(dst_token.value >= amount, ETOKEN_SPLIT_AMOUNT_LARGER_THEN_TOKEN_AMOUNT);
+        dst_token.value = dst_token.value - amount;
+        Token {
+            id: dst_token.id,
+            value: amount
+        }
+    }
+
+    public fun get_token_value(token: &Token): u64 {
+        token.value
     }
 
     public fun token_id(token: &Token): &TokenId {
