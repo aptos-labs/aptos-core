@@ -30,7 +30,12 @@ pub enum BlockType {
     },
     /// NIL blocks don't have authors or signatures: they're generated upon timeouts to fill in the
     /// gaps in the rounds.
-    NilBlock,
+    NilBlock {
+        /// Failed authors from the parent's block to this block (including this block)
+        /// I.e. the list of consecutive proposers from the
+        /// immediately preceeding rounds that didn't produce a successful block.
+        failed_authors: Vec<(Round, Author)>,
+    },
     /// A genesis block is the first committed block in any epoch that is identically constructed on
     /// all validators by any (potentially different) LedgerInfo that justifies the epoch change
     /// from the previous epoch.  The genesis block is used as the the first root block of the
@@ -117,19 +122,18 @@ impl BlockData {
     }
 
     pub fn is_nil_block(&self) -> bool {
-        matches!(self.block_type, BlockType::NilBlock)
+        matches!(self.block_type, BlockType::NilBlock { .. })
     }
 
     /// the list of consecutive proposers from the immediately preceeding
     /// rounds that didn't produce a successful block
     pub fn failed_authors(&self) -> Option<&Vec<(Round, Author)>> {
-        if let BlockType::Proposal {
-            ref failed_authors, ..
-        } = self.block_type
-        {
-            Some(failed_authors)
-        } else {
-            None
+        match self.block_type {
+            BlockType::Proposal {
+                ref failed_authors, ..
+            } => Some(failed_authors),
+            BlockType::NilBlock { ref failed_authors } => Some(failed_authors),
+            BlockType::Genesis => None,
         }
     }
 
@@ -187,7 +191,11 @@ impl BlockData {
         }
     }
 
-    pub fn new_nil(round: Round, quorum_cert: QuorumCert) -> Self {
+    pub fn new_nil(
+        round: Round,
+        quorum_cert: QuorumCert,
+        failed_authors: Vec<(Round, Author)>,
+    ) -> Self {
         // We want all the NIL blocks to agree on the timestamps even though they're generated
         // independently by different validators, hence we're using the timestamp of a parent + 1.
         assume!(quorum_cert.certified_block().timestamp_usecs() < u64::max_value()); // unlikely to be false in this universe
@@ -198,7 +206,7 @@ impl BlockData {
             round,
             timestamp_usecs,
             quorum_cert,
-            block_type: BlockType::NilBlock,
+            block_type: BlockType::NilBlock { failed_authors },
         }
     }
 
