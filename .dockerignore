@@ -19,6 +19,8 @@ ecosystem/
 scripts/
 target/
 terraform/
+!terraform/helm/aptos-node/
+!terraform/helm/genesis/
 
 *~
 *.swp

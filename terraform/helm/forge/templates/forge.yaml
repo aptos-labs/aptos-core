@@ -38,10 +38,10 @@ spec:
         - sh
         - -c
         - |-
-          . /etc/forge/scripts/init_forge.sh
+          . /etc/forge/init_forge.sh
           tail -f /dev/null
           ret=$?
-          . /etc/forge/scripts/cleanup_forge.sh
+          . /etc/forge/cleanup_forge.sh
           exit $ret
         resources:
           {{- toYaml .Values.forge.resources | nindent 10 }}
@@ -52,7 +52,7 @@ spec:
           value: "debug"
         volumeMounts:
         - name: forge-scripts
-          mountPath: /etc/forge/scripts
+          mountPath: /etc/forge
       {{- with .Values.forge }}
       {{- with .nodeSelector }}
       nodeSelector:

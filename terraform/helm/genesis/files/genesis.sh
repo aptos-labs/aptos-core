@@ -8,14 +8,14 @@
 # ERA
 # WORKSPACE: default /tmp
 # USERNAME_PREFIX: default aptos-node
-# VALIDATOR_HOST_SUFFIX: default validator-lb
-# FULLNODE_HOST_SUFFIX: default fullnode-lb
+# VALIDATOR_INTERNAL_HOST_SUFFIX: default validator-lb
+# FULLNODE_INTERNAL_HOST_SUFFIX: default fullnode-lb
 # 
 
 WORKSPACE=${WORKSPACE:-/tmp}
 USERNAME_PREFIX=${USERNAME_PREFIX:-aptos-node}
-VALIDATOR_HOST_SUFFIX=${VALIDATOR_HOST_SUFFIX:-validator-lb}
-FULLNODE_HOST_SUFFIX=${FULLNODE_HOST_SUFFIX:-fullnode-lb}
+VALIDATOR_INTERNAL_HOST_SUFFIX=${VALIDATOR_INTERNAL_HOST_SUFFIX:-validator-lb}
+FULLNODE_INTERNAL_HOST_SUFFIX=${FULLNODE_INTERNAL_HOST_SUFFIX:-fullnode-lb}
 MOVE_MODULES_DIR=${MOVE_MODULES_DIR:-"/aptos-framework/move/modules"}
 
 if [ -z ${ERA} ] || [ -z ${NUM_VALIDATORS} ]; then
@@ -33,8 +33,8 @@ echo "NUM_VALIDATORS=${NUM_VALIDATORS}"
 echo "ERA=${ERA}"
 echo "WORKSPACE=${WORKSPACE}"
 echo "USERNAME_PREFIX=${USERNAME_PREFIX}"
-echo "VALIDATOR_HOST_SUFFIX=${VALIDATOR_HOST_SUFFIX}"
-echo "FULLNODE_HOST_SUFFIX=${FULLNODE_HOST_SUFFIX}"
+echo "VALIDATOR_INTERNAL_HOST_SUFFIX=${VALIDATOR_INTERNAL_HOST_SUFFIX}"
+echo "FULLNODE_INTERNAL_HOST_SUFFIX=${FULLNODE_INTERNAL_HOST_SUFFIX}"
 
 # generate all validator configurations
 for i in $(seq 0 $(($NUM_VALIDATORS-1))); do
@@ -45,13 +45,13 @@ mkdir $user_dir
 if [ "${FULLNODE_ENABLE_ONCHAIN_DISCOVERY}" = "true" ]; then
     fullnode_host="fullnode${i}.${DOMAIN}:6182"
 else
-    fullnode_host="${username}-${FULLNODE_HOST_SUFFIX}:6182"
+    fullnode_host="${username}-${FULLNODE_INTERNAL_HOST_SUFFIX}:6182"
 fi
 
 if [ "${VALIDATOR_ENABLE_ONCHAIN_DISCOVERY}" = "true" ]; then
     validator_host="val${i}.${DOMAIN}:6180"
 else
-    validator_host="${username}-${VALIDATOR_HOST_SUFFIX}:6180"
+    validator_host="${username}-${VALIDATOR_INTERNAL_HOST_SUFFIX}:6180"
 fi
 
 
