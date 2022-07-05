@@ -65,6 +65,12 @@ module AptosFramework::Stake {
     const ENO_POST_GENESIS_VALIDATOR_SET_CHANGE_ALLOWED: u64 = 15;
     /// Invalid consensus public key
     const EINVALID_PUBLIC_KEY: u64 = 16;
+    /// Voting power increase has already reached the limit for current epoch.
+    /// No more stake can be added and no new validators can join the set.
+    const EVOTING_POWER_INCREASE_REACHED_LIMIT: u64 = 17;
+    /// Voting power withdrawal has already reached the limit for current epoch.
+    /// No more stake can be removed and no existing validators can leave the set.
+    const EVOTING_POWER_WITHDRAWAL_REACHED_LIMIT: u64 = 18;
 
     /// Capability that represents ownership and can be used to control the validator and the associated stake pool.
     /// Having this be separate from the signer for the account that the validator resources are hosted at allows
@@ -144,6 +150,15 @@ module AptosFramework::Stake {
         // For example, 0.001% (0.00001) can be represented as 10 / 1000000.
         rewards_rate: u64,
         rewards_rate_denominator: u64,
+        // Limit on how much % of total stake join per epoch.
+        // We use percentage here so that this amount doesn't need to be updated when the total network stake changes.
+        // Percentage is represented by a numerator and denominator, similar to rewards rate.
+        joining_limit: u64,
+        joining_limit_denominator: u64,
+        // Limit on how much % of total stake can be withdrawn per epoch.
+        // Percentage is represented by a numerator and denominator, similar to rewards rate.
+        withdrawal_limit: u64,
+        withdrawal_limit_denominator: u64,
     }
 
     /// Full ValidatorSet, stored in @CoreResource.
@@ -152,12 +167,33 @@ module AptosFramework::Stake {
     /// 3. on_new_epoch processes two pending queues and refresh ValidatorInfo from the owner's address.
     struct ValidatorSet has key {
         consensus_scheme: u8,
-        // active validators for the current epoch
+        // active validators for the current epoch.
         active_validators: vector<ValidatorInfo>,
-        // pending validators to leave in next epoch (still active)
+        // pending validators to leave in next epoch (still active).
         pending_inactive: vector<ValidatorInfo>,
-        // pending validators to join in next epoch
+        // pending validators to join in next epoch.
         pending_active: vector<ValidatorInfo>,
+    }
+
+    /// Represents the validator set's current epoch voting power and changes.
+    /// This is a separate resource from ValidatorSet to optimize the cost of reading as it'll be read when individual
+    /// validators join/leave/add stake/withdraw stake. ValidatorSet can contain many validators and thus are expensive
+    /// to read.
+    /// This can reduce efficiency gained from parallel execution if there are multiple validator txs that change the
+    /// voting power being executed together. There are, however, no other strategies to tracking the voting power
+    /// changes so we can apply limits appropriately.
+    struct ValidatorSetVotingPower has key {
+        // The total of all validators' voting power in the current epoch.
+        // u128 since the total supply of Aptos coin is u128.
+        total: u128,
+        // We track the withdrawing and joining voting power separately as they have different effect on the network's
+        // security. E.g. withdrawing is direct reduction of voting power but joining is not necessarily direct addition
+        // depending on whether the joining validators are ready to participate in time when the next epoch starts.
+        // Therefore, withdrawing usually affects the network's security while joining can affect the network's liveness
+        // There are also potential different limits on how much voting power can be withdrawing or joining the
+        // validator set.
+        withdrawing: u128,
+        joining: u128,
     }
 
     /// TestCoin capabilities, set during genesis and stored in @CoreResource account.
@@ -166,8 +202,11 @@ module AptosFramework::Stake {
         mint_cap: MintCapability<TestCoin>,
     }
 
+    /// Track the performance of validator so we can compute rewards accordingly.
     struct ValidatorPerformance has key {
+        // The number of blocks produced so far in the current epoch.
         num_blocks: u64,
+        // The number of missed votes per validators, ordered by validator index.
         missed_votes: vector<u64>,
     }
 
@@ -313,6 +352,10 @@ module AptosFramework::Stake {
         allow_validator_set_change: bool,
         rewards_rate: u64,
         rewards_rate_denominator: u64,
+        joining_limit: u64,
+        joining_limit_denominator: u64,
+        withdrawal_limit: u64,
+        withdrawal_limit_denominator: u64,
     ) {
         SystemAddresses::assert_core_resource(core_resources);
         move_to(core_resources, ValidatorSet {
@@ -320,6 +363,11 @@ module AptosFramework::Stake {
             active_validators: Vector::empty(),
             pending_active: Vector::empty(),
             pending_inactive: Vector::empty(),
+        });
+        move_to(core_resources, ValidatorSetVotingPower {
+            total: 0,
+            joining: 0,
+            withdrawing: 0,
         });
         move_to(core_resources, ValidatorSetConfiguration {
             minimum_stake,
@@ -329,6 +377,10 @@ module AptosFramework::Stake {
             allow_validator_set_change,
             rewards_rate,
             rewards_rate_denominator,
+            joining_limit,
+            joining_limit_denominator,
+            withdrawal_limit,
+            withdrawal_limit_denominator,
         });
         move_to(core_resources, ValidatorPerformance {
             num_blocks: 0,
@@ -458,7 +510,7 @@ module AptosFramework::Stake {
     public(script) fun add_stake(
         account: &signer,
         amount: u64,
-    ) acquires OwnerCapability, StakePool, StakePoolEvents, ValidatorSet, ValidatorSetConfiguration {
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
         let account_addr = Signer::address_of(account);
         let ownership_cap = borrow_global<OwnerCapability>(account_addr);
         add_stake_with_cap(account_addr, ownership_cap, Coin::withdraw<TestCoin>(account, amount));
@@ -469,11 +521,30 @@ module AptosFramework::Stake {
         pool_address: address,
         owner_cap: &OwnerCapability,
         coins: Coin<TestCoin>,
-    ) acquires StakePool, StakePoolEvents, ValidatorSet, ValidatorSetConfiguration {
+    ) acquires StakePool, StakePoolEvents, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
         assert!(owner_cap.pool_address == pool_address, Errors::invalid_argument(ENOT_OWNER));
+        let amount_added = Coin::value<TestCoin>(&coins);
 
+        let validator_set_config = borrow_global<ValidatorSetConfiguration>(@CoreResources);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
-        let amount = Coin::value<TestCoin>(&coins);
+        let validator_set = borrow_global<ValidatorSet>(@CoreResources);
+
+        // Update the amount of stake being added to the active validator set's total voting power.
+        // We only do this if the validator is either active or pending_active as they can no longer call
+        // join_validator_set if that's the case.
+        // If the validator pending_inactive, they can still add_stake but that shouldn't be counted as they will be
+        // removed from the validator set completely in the next epoch. If they rejoin the set later, join_validator_set
+        // would count the increase.
+        // Otherwise, if the validator is inactive, they will need to call join_validator_set to
+        // rejoin the validator set, in which case join_validator_set will add the total active stake to the joining
+        // voting power once.
+        if (Option::is_some(&find_validator(&validator_set.active_validators, pool_address))
+            || Option::is_some(&find_validator(&validator_set.pending_active, pool_address))) {
+            let validator_set_voting_power = borrow_global_mut<ValidatorSetVotingPower>(@CoreResources);
+            validator_set_voting_power.joining = validator_set_voting_power.joining + (amount_added as u128);
+            validate_voting_power_increase(validator_set_voting_power, validator_set_config);
+        };
+
         // Add to pending_active if it's a current validator because the stake is not counted until the next epoch.
         // Otherwise, the delegation can be added to active directly as the validator is also activated in the epoch.
         if (is_current_validator(pool_address)) {
@@ -482,17 +553,16 @@ module AptosFramework::Stake {
             Coin::merge<TestCoin>(&mut stake_pool.active, coins);
         };
 
-        let maximum_stake = borrow_global<ValidatorSetConfiguration>(@CoreResources).maximum_stake;
         let total_stake = Coin::value<TestCoin>(&stake_pool.active) +
                           Coin::value<TestCoin>(&stake_pool.pending_active);
-        assert!(total_stake <= maximum_stake, Errors::invalid_argument(ESTAKE_EXCEEDS_MAX));
+        assert!(total_stake <= validator_set_config.maximum_stake, Errors::invalid_argument(ESTAKE_EXCEEDS_MAX));
 
         let stake_pool_events = borrow_global_mut<StakePoolEvents>(pool_address);
         Event::emit_event<AddStakeEvent>(
             &mut stake_pool_events.add_stake_events,
             AddStakeEvent {
                 pool_address,
-                amount_added: amount,
+                amount_added,
             },
         );
     }
@@ -594,7 +664,7 @@ module AptosFramework::Stake {
     public(script) fun join_validator_set(
         account: &signer,
         pool_address: address,
-    ) acquires StakePool, StakePoolEvents, ValidatorConfig, ValidatorSetConfiguration, ValidatorSet {
+    ) acquires StakePool, StakePoolEvents, ValidatorConfig, ValidatorSetConfiguration, ValidatorSet, ValidatorSetVotingPower {
         let validator_set_config = borrow_global<ValidatorSetConfiguration>(@CoreResources);
         assert!(
             validator_set_config.allow_validator_set_change,
@@ -613,7 +683,7 @@ module AptosFramework::Stake {
     public(friend) fun join_validator_set_internal(
         account: &signer,
         pool_address: address,
-    ) acquires StakePool, StakePoolEvents, ValidatorConfig, ValidatorSet, ValidatorSetConfiguration {
+    ) acquires StakePool, StakePoolEvents, ValidatorConfig, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
         let stake_pool = borrow_global<StakePool>(pool_address);
         // Account has to be the operator.
         assert!(Signer::address_of(account) == stake_pool.operator_address, Errors::invalid_argument(ENOT_OPERATOR));
@@ -622,13 +692,19 @@ module AptosFramework::Stake {
         let validator_set_config = borrow_global<ValidatorSetConfiguration>(@CoreResources);
         validate_lockup_time(stake_pool.locked_until_secs, validator_set_config);
 
-        // Throw an error is the validator is already active.
+        // Throw an error is the validator is already active, pending_active, or pending_inactive.
         assert!(!is_validator_active(pool_address), Errors::invalid_argument(EALREADY_ACTIVE_VALIDATOR));
 
         // The validator is not yet activated so all added stake should be in active.
         let voting_power = Coin::value<TestCoin>(&stake_pool.active);
         assert!(voting_power >= validator_set_config.minimum_stake, Errors::invalid_argument(ESTAKE_TOO_LOW));
         assert!(voting_power <= validator_set_config.maximum_stake, Errors::invalid_argument(ESTAKE_TOO_HIGH));
+
+        // This doesn't double count voting power increase as add_stake only adds if the validator is active
+        // or pending_active.
+        let validator_set_voting_power = borrow_global_mut<ValidatorSetVotingPower>(@CoreResources);
+        validator_set_voting_power.joining = validator_set_voting_power.joining + (voting_power as u128);
+        validate_voting_power_increase(validator_set_voting_power, validator_set_config);
 
         // Add validator to pending_active, to be activated in the next epoch.
         let validator_config = borrow_global_mut<ValidatorConfig>(pool_address);
@@ -643,7 +719,7 @@ module AptosFramework::Stake {
     }
 
     /// Similar to unlock_with_cap but will use ownership capability from the signing account.
-    public(script) fun unlock(account: &signer, amount: u64) acquires OwnerCapability, StakePool, StakePoolEvents, ValidatorSet {
+    public(script) fun unlock(account: &signer, amount: u64) acquires OwnerCapability, StakePool, StakePoolEvents, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
         let account_addr = Signer::address_of(account);
         let ownership_cap = borrow_global<OwnerCapability>(account_addr);
         unlock_with_cap(account_addr, amount, ownership_cap);
@@ -654,7 +730,7 @@ module AptosFramework::Stake {
         pool_address: address,
         amount: u64,
         owner_cap: &OwnerCapability,
-    ) acquires StakePool, StakePoolEvents, ValidatorSet {
+    ) acquires StakePool, StakePoolEvents, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
         assert!(owner_cap.pool_address == pool_address, Errors::invalid_argument(ENOT_OWNER));
 
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
@@ -665,6 +741,28 @@ module AptosFramework::Stake {
         // leave the set early to be able to unlock.
         if (stake_pool.locked_until_secs > Timestamp::now_seconds()) {
             abort Errors::invalid_argument(EWITHDRAW_NOT_ALLOWED)
+        };
+
+        // Update the amount of stake being withdrawn from the active validator set's total voting power.
+        // We only do this if the validator is active.
+        // If the validator is pending_active, it's not possible to unlock immediately if we assume that the min lockup
+        // duration is longer than the epoch duration. So once they have locked up and called join_validator_set, it's
+        // impossible to unlock stake before the epoch ends and they get added to the validator set. Therefore, we don't
+        // need to update anything.
+        // Otherwise if the validator is pending_inactive or inactive, leave_validator_set already deducted all of their
+        // active stake, so we don't need to update anything.
+        let validator_set = borrow_global<ValidatorSet>(@CoreResources);
+        let validator_set_config = borrow_global<ValidatorSetConfiguration>(@CoreResources);
+        let validator_set_voting_power = borrow_global_mut<ValidatorSetVotingPower>(@CoreResources);
+        if (Option::is_some(&find_validator(&validator_set.active_validators, pool_address))) {
+            // If the validator is still active, we do not allow unlocking if remaining stake is below
+            // the min stake required. The validator would need to leave the validator set first.
+            if (Coin::value<TestCoin>(&stake_pool.active) < validator_set_config.minimum_stake) {
+                abort Errors::invalid_argument(EWITHDRAW_NOT_ALLOWED)
+            };
+
+            validator_set_voting_power.withdrawing = validator_set_voting_power.withdrawing + (amount as u128);
+            validate_voting_power_withdrawal(validator_set_voting_power, validator_set_config);
         };
 
         // Move requested amount to pending_inactive if the validator is already active.
@@ -725,21 +823,34 @@ module AptosFramework::Stake {
     public(script) fun leave_validator_set(
         account: &signer,
         pool_address: address,
-    ) acquires StakePool, StakePoolEvents, ValidatorSet, ValidatorSetConfiguration {
+    ) acquires StakePool, StakePoolEvents, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
         let validator_set_config = borrow_global_mut<ValidatorSetConfiguration>(@CoreResources);
         assert!(
             validator_set_config.allow_validator_set_change,
             Errors::invalid_argument(ENO_POST_GENESIS_VALIDATOR_SET_CHANGE_ALLOWED),
         );
+
         let stake_pool = borrow_global<StakePool>(pool_address);
         // Account has to be the operator.
         assert!(Signer::address_of(account) == stake_pool.operator_address, Errors::invalid_argument(ENOT_OPERATOR));
 
+        // Validate that the validator is in the active validator set, excluding pending_inactive.
         let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
-        // Validate that the validator is already part of the validator set.
         let maybe_index = find_validator(&validator_set.active_validators, pool_address);
         assert!(Option::is_some(&maybe_index), Errors::invalid_argument(ENOT_VALIDATOR));
         let index = Option::extract(&mut maybe_index);
+
+        let validator_set_voting_power = borrow_global_mut<ValidatorSetVotingPower>(@CoreResources);
+        // We don't need to consider the leaving validator's pending_inactive stake as it's already added to the
+        // total withdrawing amount by unlock().
+        validator_set_voting_power.withdrawing =
+            validator_set_voting_power.withdrawing + (Coin::value<TestCoin>(&stake_pool.active) as u128);
+        validate_voting_power_withdrawal(validator_set_voting_power, validator_set_config);
+
+        // We need to deduct the leaving validator's pending_active stake as they could have requested to add stake
+        // earlier.
+        validator_set_voting_power.joining =
+            validator_set_voting_power.joining - (Coin::value<TestCoin>(&stake_pool.pending_active) as u128);
 
         let validator_info = Vector::swap_remove(&mut validator_set.active_validators, index);
         assert!(Vector::length(&validator_set.active_validators) > 0, Errors::invalid_argument(ELAST_VALIDATOR));
@@ -793,7 +904,7 @@ module AptosFramework::Stake {
     /// pending inactive validators so they no longer can vote.
     /// 4. The validator's voting power in the validator set is updated to be the corresponding staking pool's voting
     /// power.
-    public(friend) fun on_new_epoch() acquires StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
+    public(friend) fun on_new_epoch() acquires StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
         let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
         let validator_set_config = borrow_global_mut<ValidatorSetConfiguration>(@CoreResources);
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@CoreResources);
@@ -827,8 +938,16 @@ module AptosFramework::Stake {
         let i = 0;
         let len = Vector::length(&validator_set.active_validators);
         let active_validators = Vector::empty();
-        validator_perf.num_blocks = 1;
+        validator_perf.num_blocks = 0;
         validator_perf.missed_votes = Vector::empty();
+
+        // Reset validator set's voting power tracking.
+        let validator_set_voting_power = borrow_global_mut<ValidatorSetVotingPower>(@CoreResources);
+        validator_set_voting_power.total = 0;
+        validator_set_voting_power.joining = 0;
+        validator_set_voting_power.withdrawing = 0;
+
+        // Process validators in the (new) active validator set.
         while (i < len) {
             let old_validator_info = Vector::borrow_mut(&mut validator_set.active_validators, i);
             let pool_address = old_validator_info.addr;
@@ -844,6 +963,8 @@ module AptosFramework::Stake {
             if (new_validator_info.voting_power >= validator_set_config.minimum_stake) {
                 Vector::push_back(&mut active_validators, new_validator_info);
                 Vector::push_back(&mut validator_perf.missed_votes, 0);
+                validator_set_voting_power.total =
+                    validator_set_voting_power.total + (new_validator_info.voting_power as u128);
             };
             i = i + 1;
         };
@@ -912,6 +1033,8 @@ module AptosFramework::Stake {
             remaining_lockup_time = stake_pool.locked_until_secs - current_time;
         };
 
+        let total_stake_before_rewards =
+            Coin::value(&stake_pool.active) + Coin::value(&stake_pool.pending_inactive);
         let rewards_amount = distribute_reward(&mut stake_pool.active, num_blocks, num_successful_votes, remaining_lockup_time, validator_set_config);
         // Only give out rewards for pending_inactive if the total stake (active + pending_inactive) doesn't exceed the
         // max allowed.
@@ -919,7 +1042,7 @@ module AptosFramework::Stake {
         // power of a validator cannot exceed the max allowed (the excess stake above the max is effectively idle).
         // Second, this prevents a potential manipulation where the validator withdraws the excess stake in order to
         // receive rewards on both active and pending_inactive as the amounts individually do not exceed the max.
-        if (Coin::value(&stake_pool.active) + Coin::value(&stake_pool.pending_inactive) <= validator_set_config.maximum_stake) {
+        if (total_stake_before_rewards <= validator_set_config.maximum_stake) {
             let pending_inactive_rewards = distribute_reward(
                 &mut stake_pool.pending_inactive,
                 num_blocks,
@@ -1023,6 +1146,48 @@ module AptosFramework::Stake {
             Option::is_some(&find_validator(&validator_set.pending_active, pool_address))
     }
 
+    /// Validate that the voting power increase in current epoch does not exceed the limit allowed.
+    fun validate_voting_power_increase(
+        validator_set_voting_power: &ValidatorSetVotingPower,
+        validator_set_config: &ValidatorSetConfiguration,
+    ) {
+        // Skip validator if there's no voting power in the current epoch. This is only the case during genesis.
+        if (validator_set_voting_power.total == 0) {
+            return
+        };
+
+        // This should not overflow as u128 can handle up to 3e38 and Aptos coin supply would not approach half of the
+        // decimals.
+        let joining_limit = (validator_set_config.joining_limit as u128);
+        let joining_limit_denominator = (validator_set_config.joining_limit_denominator as u128);
+        let maximum_increase_allowed = validator_set_voting_power.total * joining_limit / joining_limit_denominator;
+        assert!(
+            validator_set_voting_power.joining <= maximum_increase_allowed,
+            Errors::invalid_argument(EVOTING_POWER_INCREASE_REACHED_LIMIT),
+        );
+    }
+
+    /// Validate that the voting power withdrawal in current epoch does not exceed the limit allowed.
+    fun validate_voting_power_withdrawal(
+        validator_set_voting_power: &ValidatorSetVotingPower,
+        validator_set_config: &ValidatorSetConfiguration,
+    ) {
+        // Skip validator if there's no voting power in the current epoch. This is only the case during genesis.
+        if (validator_set_voting_power.total == 0) {
+            return
+        };
+
+        // This should not overflow as u128 can handle up to 3e38 and Aptos coin supply would not approach half of the
+        // decimals.
+        let withdrawal_limit = (validator_set_config.withdrawal_limit as u128);
+        let withdrawal_limit_denominator = (validator_set_config.withdrawal_limit_denominator as u128);
+        let maximum_withdrawal_allowed = validator_set_voting_power.total * withdrawal_limit / withdrawal_limit_denominator;
+        assert!(
+            validator_set_voting_power.withdrawing <= maximum_withdrawal_allowed,
+            Errors::invalid_argument(EVOTING_POWER_WITHDRAWAL_REACHED_LIMIT),
+        );
+    }
+
     #[test_only]
     use AptosFramework::TestCoin;
 
@@ -1044,10 +1209,10 @@ module AptosFramework::Stake {
         core_framework: signer,
         core_resources: signer,
         validator: signer,
-    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
         Timestamp::set_time_has_started_for_testing(&core_resources);
 
-        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100);
+        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 1, 1, 1, 1);
 
         let validator_address = Signer::address_of(&validator);
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
@@ -1057,7 +1222,7 @@ module AptosFramework::Stake {
 
         // Join the validator set with enough stake.
         join_validator_set(&validator, validator_address);
-        on_new_epoch();
+        end_epoch();
         assert!(is_current_validator(validator_address), 1);
 
         // Validator adds more stake (validator is already active).
@@ -1067,14 +1232,14 @@ module AptosFramework::Stake {
 
         // pending_active and pending_inactive stakes are processed in the new epoch.
         // Rewards were also distributed.
-        on_new_epoch();
+        end_epoch();
         assert_validator_state(validator_address, 201, 0, 0, 0, 0);
 
         // Unlock the entire stake after lockup expires. Timestamp is in microseconds.
         Timestamp::update_global_time_for_test(MAXIMUM_LOCK_UP_SECS * 1000000);
         unlock(&validator, 100);
         assert_validator_state(validator_address, 101, 0, 0, 100, 0);
-        on_new_epoch();
+        end_epoch();
 
         // Validator withdraws from inactive stake, including rewards on the withdrawn amount.
         withdraw(&validator);
@@ -1087,11 +1252,11 @@ module AptosFramework::Stake {
         core_framework: signer,
         core_resources: signer,
         validator: signer,
-    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
         Timestamp::set_time_has_started_for_testing(&core_resources);
 
         // Set the rewards rate to be very high so the validator's stake exceeds the max allowed after rewards.
-        initialize_validator_set(&core_resources, 0, 100, 0, MAXIMUM_LOCK_UP_SECS, true, 100, 100);
+        initialize_validator_set(&core_resources, 0, 100, 0, MAXIMUM_LOCK_UP_SECS, true, 100, 100, 1, 1, 1, 1);
 
         let validator_address = Signer::address_of(&validator);
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
@@ -1101,11 +1266,11 @@ module AptosFramework::Stake {
 
         // Join the validator set with max stake allowed.
         join_validator_set(&validator, validator_address);
-        on_new_epoch();
+        end_epoch();
         assert!(is_current_validator(validator_address), 1);
 
         // Rewards have been distributed, the validator's stake is now double the original amount.
-        on_new_epoch();
+        end_epoch();
         assert_validator_state(validator_address, 200, 0, 0, 0, 0);
 
         // Validator's voting power is still not more than the max allowed amount of 100.
@@ -1119,29 +1284,33 @@ module AptosFramework::Stake {
         assert_validator_state(validator_address, 100, 0, 0, 100, 0);
         // Also increase lockup so we can still receive rewards.
         increase_lockup(&validator, Timestamp::now_seconds() + MAXIMUM_LOCK_UP_SECS);
-        on_new_epoch();
+        end_epoch();
 
         // Validator should only receives 100 more reward coins for the active stake and enough for the pending inactive
         assert_validator_state(validator_address, 200, 100, 0, 0, 0);
     }
 
-    #[test(core_framework = @0x1, core_resources = @CoreResources, validator = @0x123)]
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator_1 = @0x123, validator_2 = @234)]
     public(script) fun test_delegated_staking_with_owner_cap(
         core_framework: signer,
         core_resources: signer,
-        validator: signer,
-    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
+        validator_1: signer,
+        validator_2: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
         Timestamp::set_time_has_started_for_testing(&core_resources);
 
-        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100);
+        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 1, 1, 1, 1);
 
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
         let stake = Coin::mint<TestCoin>(100, &mint_cap);
+        // Have validator 1 join the set first so validator 2 can leave later (at least 1 validator has to stay).
+        register_mint_stake(&validator_1, &mint_cap);
         store_test_coin_mint_cap(&core_resources, mint_cap);
+        join_validator_set(&validator_1, Signer::address_of(&validator_1));
 
-        let pool_address = Signer::address_of(&validator);
-        register_validator_candidate(&validator, CONSENSUS_KEY_1, CONSENSUS_POP_1, Vector::empty(), Vector::empty());
-        let owner_cap = extract_owner_cap(&validator);
+        let pool_address = Signer::address_of(&validator_2);
+        register_validator_candidate(&validator_2, CONSENSUS_KEY_1, CONSENSUS_POP_1, Vector::empty(), Vector::empty());
+        let owner_cap = extract_owner_cap(&validator_2);
 
         // Add stake when the validator is not yet activated.
         add_stake_with_cap(pool_address, &owner_cap, stake);
@@ -1149,15 +1318,16 @@ module AptosFramework::Stake {
         assert_validator_state(pool_address, 100, 0, 0, 0, 0);
 
         // Join the validator set with enough stake.
-        join_validator_set(&validator, pool_address);
-        on_new_epoch();
+        join_validator_set(&validator_2, pool_address);
+        end_epoch();
         assert!(is_current_validator(pool_address), 0);
 
         // Unlock the entire stake after lockup expires.
         Timestamp::update_global_time_for_test(MAXIMUM_LOCK_UP_SECS * 1000000);
+        leave_validator_set(&validator_2, pool_address);
+        end_epoch();
         unlock_with_cap(pool_address, 100, &owner_cap);
-        assert_validator_state(pool_address, 0, 0, 0, 100, 0);
-        on_new_epoch();
+        assert_validator_state(pool_address, 0, 100, 0, 0, 0);
 
         // Withdraw stake.
         let coins = withdraw_with_cap(pool_address, &owner_cap);
@@ -1166,12 +1336,12 @@ module AptosFramework::Stake {
         assert_validator_state(pool_address, 0, 0, 0, 0, 0);
 
         // Operator can separately rotate consensus key.
-        rotate_consensus_key(&validator, pool_address, CONSENSUS_KEY_2, CONSENSUS_POP_2);
+        rotate_consensus_key(&validator_2, pool_address, CONSENSUS_KEY_2, CONSENSUS_POP_2);
         let validator_config = borrow_global<ValidatorConfig>(pool_address);
         assert!(validator_config.consensus_pubkey == CONSENSUS_KEY_2, 2);
 
         // Operator can update network and fullnode addresses.
-        update_network_and_fullnode_addresses(&validator, pool_address, b"1", b"2");
+        update_network_and_fullnode_addresses(&validator_2, pool_address, b"1", b"2");
         let validator_config = borrow_global<ValidatorConfig>(pool_address);
         assert!(validator_config.network_addresses == b"1", 3);
         assert!(validator_config.fullnode_addresses == b"2", 4);
@@ -1188,13 +1358,13 @@ module AptosFramework::Stake {
         validator_1: signer,
         validator_2: signer,
         validator_3: signer
-    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
         Timestamp::set_time_has_started_for_testing(&core_resources);
         let validator_1_address = Signer::address_of(&validator_1);
         let validator_2_address = Signer::address_of(&validator_2);
         let validator_3_address = Signer::address_of(&validator_3);
 
-        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100);
+        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 1, 1, 1, 1);
 
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
         register_mint_stake(&validator_1, &mint_cap);
@@ -1206,7 +1376,7 @@ module AptosFramework::Stake {
         // Validator 1 and 2 join the validator set.
         join_validator_set(&validator_2, validator_2_address);
         join_validator_set(&validator_1, validator_1_address);
-        on_new_epoch();
+        end_epoch();
         assert!(is_current_validator(validator_1_address), 0);
         assert!(is_current_validator(validator_2_address), 1);
         // Validator indices should be ordered by validator addresses. In this case, validator 1 has a smaller address.
@@ -1233,7 +1403,7 @@ module AptosFramework::Stake {
         assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).active_validators, 0).config.consensus_pubkey == CONSENSUS_KEY_1, 0);
 
         // Changes applied after new epoch
-        on_new_epoch();
+        end_epoch();
         assert!(is_current_validator(validator_1_address), 5);
         assert_validator_state(validator_1_address, 101, 0, 0, 0, 0);
         assert!(!is_current_validator(validator_2_address), 4);
@@ -1243,27 +1413,353 @@ module AptosFramework::Stake {
         assert!(is_current_validator(validator_3_address), 5);
         assert_validator_state(validator_3_address, 100, 0, 0, 0, 1);
         assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).active_validators, 0).config.consensus_pubkey == CONSENSUS_KEY_2, 0);
-
-        // validators without enough stake will be removed
-        Timestamp::update_global_time_for_test(MAXIMUM_LOCK_UP_SECS * 1000000);
-        unlock(&validator_1, 50);
-        on_new_epoch();
-        assert!(!is_current_validator(validator_1_address), 6);
     }
 
     #[test(core_framework = @0x1, core_resources = @CoreResources, validator = @0x123)]
-    #[expected_failure(abort_code = 257)]
-    public(script) fun test_validator_cannot_join_leave_post_genesis(
+    #[expected_failure(abort_code = 3847)]
+    public(script) fun test_validator_cannot_join_post_genesis(
         core_framework: signer,
         core_resources: signer,
         validator: signer,
-    ) acquires OwnerCapability, StakePool, StakePoolEvents, ValidatorConfig, ValidatorSet, ValidatorSetConfiguration {
-        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, false, 1, 100);
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, ValidatorConfig, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        initialize_validator_set(
+            &core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, false, 1, 100, 1, 1, 1, 1);
 
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
         register_mint_stake(&validator, &mint_cap);
         store_test_coin_mint_cap(&core_resources, mint_cap);
         Coin::destroy_burn_cap<TestCoin>(burn_cap);
+
+        // Joining the validator set should fail as post genesis validator set change is not allowed.
+        join_validator_set(&validator, Signer::address_of(&validator));
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator = @0x123)]
+    #[expected_failure(abort_code = 3847)]
+    public(script) fun test_validator_cannot_leave_post_genesis(
+        core_framework: signer,
+        core_resources: signer,
+        validator: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        initialize_validator_set(
+            &core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, false, 1, 100, 1, 1, 1, 1);
+
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator, &mint_cap);
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+
+        // Bypass the check to join. This is the same function called during Genesis.
+        let validator_address = Signer::address_of(&validator);
+        join_validator_set_internal(&validator, validator_address);
+        end_epoch();
+
+        // Leaving the validator set should fail as post genesis validator set change is not allowed.
+        leave_validator_set(&validator, validator_address);
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator_1 = @0x123, validator_2 = @234)]
+    #[expected_failure(abort_code = 519)]
+    public(script) fun test_active_validator_cannot_unlock_before_leaving_validator_set(
+        core_framework: signer,
+        core_resources: signer,
+        validator_1: signer,
+        validator_2: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        // Voting power cannot decrease more than 49% in the same epoch.
+        initialize_validator_set(
+            &core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 1, 1, 49, 100);
+
+        // First validator joins the set.
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator_1, &mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+        join_validator_set(&validator_1, Signer::address_of(&validator_1));
+        end_epoch();
+
+        // Second validator joins the set and tries to unlock state without leaving the validator set. This should fail.
+        register_mint_stake(&validator_2, &mint_cap);
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+        let validator_2_address = Signer::address_of(&validator_2);
+        join_validator_set(&validator_2, validator_2_address);
+        end_epoch();
+        unlock(&validator_2, 50);
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator_1 = @0x123, validator_2 = @0x234)]
+    public(script) fun test_inactive_validator_add_stake_does_not_enforce_joining_limit(
+        core_framework: signer,
+        core_resources: signer,
+        validator_1: signer,
+        validator_2: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        // Voting power cannot increase more than 50% in the same epoch.
+        initialize_validator_set(
+            &core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 5, 10, 1, 1);
+
+        // First validator joins the set.
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator_1, &mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+        join_validator_set(&validator_1, Signer::address_of(&validator_1));
+        end_epoch();
+
+        // Second validator registers and adds stake. But since they haven't joined, they should not be limited by the
+        // voting power increase limit yet.
+        register_mint_stake(&validator_2, &mint_cap);
+        add_stake(&validator_2, 51);
+
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator_1 = @0x123, validator_2 = @0x234)]
+    #[expected_failure(abort_code = 4359)]
+    public(script) fun test_inactive_validator_join_validator_set_enforces_joining_limit(
+        core_framework: signer,
+        core_resources: signer,
+        validator_1: signer,
+        validator_2: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        // Voting power cannot increase more than 50% in the same epoch.
+        initialize_validator_set(
+            &core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 5, 10, 1, 1);
+
+        // First validator joins the set.
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator_1, &mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+        join_validator_set(&validator_1, Signer::address_of(&validator_1));
+        end_epoch();
+
+        // Second validator tries to join the set with a voting power increase of 100%. This should hit the limit and
+        // error out.
+        register_mint_stake(&validator_2, &mint_cap);
+        join_validator_set(&validator_2, Signer::address_of(&validator_2));
+
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator_1 = @0x123, validator_2 = @0x234)]
+    #[expected_failure(abort_code = 4359)]
+    public(script) fun test_pending_active_validator_add_stake_enforces_joining_limit(
+        core_framework: signer,
+        core_resources: signer,
+        validator_1: signer,
+        validator_2: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        // Voting power cannot increase more than 150% in the same epoch.
+        initialize_validator_set(
+            &core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 15, 10, 1, 1);
+
+        // First validator joins the set.
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator_1, &mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+        join_validator_set(&validator_1, Signer::address_of(&validator_1));
+        end_epoch();
+
+        // Second validator adds 100% stake, joins the set and then adds 51%. Total is 151% which is more than allowed.
+        register_mint_stake(&validator_2, &mint_cap);
+        join_validator_set(&validator_2, Signer::address_of(&validator_2));
+        add_stake(&validator_2, 51);
+
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator = @0x123)]
+    #[expected_failure(abort_code = 4359)]
+    public(script) fun test_active_validator_add_stake_enforces_joining_limit(
+        core_framework: signer,
+        core_resources: signer,
+        validator: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        // Voting power cannot increase more than 50% in the same epoch.
+        initialize_validator_set(
+            &core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 5, 10, 1, 1);
+
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator, &mint_cap);
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+        join_validator_set(&validator, Signer::address_of(&validator));
+        end_epoch();
+
+        // Validator adds stake > 50% of current total stake. This should fail.
+        add_stake(&validator, 51);
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator_1 = @0x123, validator_2 = @0x234)]
+    public(script) fun test_pending_inactive_validator_add_stake_does_not_enforce_joining_limit(
+        core_framework: signer,
+        core_resources: signer,
+        validator_1: signer,
+        validator_2: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        // Voting power cannot increase more than 150% in the same epoch.
+        initialize_validator_set(
+            &core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 15, 10, 1, 1);
+
+        // First validator joins the set.
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator_1, &mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+        join_validator_set(&validator_1, Signer::address_of(&validator_1));
+        end_epoch();
+
+        // Second validator joins the set, and then after one epoch leaves the set.
+        // While still pending_inactive, they try to add 151% more stake. This should not fail as the joining limit is
+        // not considered as validator 2 is already on the way out.
+        register_mint_stake(&validator_2, &mint_cap);
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+        let validator_2_address = Signer::address_of(&validator_2);
+        join_validator_set(&validator_2, validator_2_address);
+        end_epoch();
+        leave_validator_set(&validator_2, validator_2_address);
+        add_stake(&validator_2, 151);
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator_1 = @0x123, validator_2 = @0x234)]
+    public(script) fun test_inactive_validator_unlock_does_not_enforce_withdrawing_limit(
+        core_framework: signer,
+        core_resources: signer,
+        validator_1: signer,
+        validator_2: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        // Voting power cannot decrease more than 50% in the same epoch.
+        initialize_validator_set(
+            &core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 1, 1, 5, 10);
+
+        // First validator joins the set.
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator_1, &mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+        join_validator_set(&validator_1, Signer::address_of(&validator_1));
+        end_epoch();
+
+        // Second validator registers, adds stake, but then removes stake immediately.
+        // But since they haven't joined, they should not be limited by the voting power reduction limit yet.
+        register_mint_stake(&validator_2, &mint_cap);
+        Timestamp::update_global_time_for_test(MAXIMUM_LOCK_UP_SECS * 1000000);
+        add_stake(&validator_2, 51);
+        unlock(&validator_2, 51);
+        withdraw(&validator_2);
+
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator = @0x123)]
+    #[expected_failure(abort_code = 4359)]
+    public(script) fun test_active_validator_cannot_add_stake_past_limit(
+        core_framework: signer,
+        core_resources: signer,
+        validator: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        // Voting power cannot increase more than 50% in the same epoch.
+        initialize_validator_set(
+            &core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 5, 10, 1, 1);
+
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator, &mint_cap);
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+        join_validator_set(&validator, Signer::address_of(&validator));
+        end_epoch();
+
+        // Validator adds stake > 50% of current total stake. This should fail.
+        add_stake(&validator, 51);
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator = @0x123)]
+    #[expected_failure(abort_code = 4615)]
+    public(script) fun test_active_validator_unlock_enforces_withdrawing_limit(
+        core_framework: signer,
+        core_resources: signer,
+        validator: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        // Voting power cannot decrease more than 50% in the same epoch.
+        initialize_validator_set(
+            &core_resources, 10, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 1, 1, 5, 10);
+
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator, &mint_cap);
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+        join_validator_set(&validator, Signer::address_of(&validator));
+        end_epoch();
+
+        // Validator unlocks > 50% of current total stake. This should fail.
+        Timestamp::update_global_time_for_test(MAXIMUM_LOCK_UP_SECS * 1000000);
+        unlock(&validator, 51);
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator_1 = @0x123, validator_2 = @234)]
+    #[expected_failure(abort_code = 4615)]
+    public(script) fun test_active_validator_leave_validator_set_enforces_withdrawing_limit(
+        core_framework: signer,
+        core_resources: signer,
+        validator_1: signer,
+        validator_2: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        // Voting power cannot decrease more than 49% in the same epoch.
+        initialize_validator_set(
+            &core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 1, 1, 49, 100);
+
+        // First validator joins the set.
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator_1, &mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+        join_validator_set(&validator_1, Signer::address_of(&validator_1));
+        end_epoch();
+
+        // Second validator joins the set but requests to leave in the next epoch.
+        // Since they have 50% of the total voting power, leave_validator_set should fail (withdrawing limit is 49%).
+        register_mint_stake(&validator_2, &mint_cap);
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+        let validator_2_address = Signer::address_of(&validator_2);
+        join_validator_set(&validator_2, validator_2_address);
+        end_epoch();
+        leave_validator_set(&validator_2, validator_2_address)
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator_1 = @0x123, validator_2 = @234)]
+    public(script) fun test_pending_inactive_validator_unlock_does_not_enforce_withdrawing_limit(
+        core_framework: signer,
+        core_resources: signer,
+        validator_1: signer,
+        validator_2: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        // Voting power cannot decrease more than 50% in the same epoch.
+        initialize_validator_set(
+            &core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 1, 1, 5, 10);
+
+        // First validator joins the set.
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator_1, &mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+        join_validator_set(&validator_1, Signer::address_of(&validator_1));
+        end_epoch();
+
+        // Second validator joins the set but requests to leave in the next epoch.
+        // While pending_inactive, they unlock all of their stake. This should not fail as they're already leaving.
+        register_mint_stake(&validator_2, &mint_cap);
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+        join_validator_set(&validator_2, Signer::address_of(&validator_2));
+        Timestamp::update_global_time_for_test(MAXIMUM_LOCK_UP_SECS * 1000000);
+        unlock(&validator_2, 100);
+        withdraw(&validator_2);
     }
 
     #[test(
@@ -1283,7 +1779,7 @@ module AptosFramework::Stake {
         validator_3: signer,
         validator_4: signer,
         validator_5: signer,
-    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
         let v1_addr = Signer::address_of(&validator_1);
         let v2_addr = Signer::address_of(&validator_2);
         let v3_addr = Signer::address_of(&validator_3);
@@ -1291,7 +1787,7 @@ module AptosFramework::Stake {
         let v5_addr = Signer::address_of(&validator_5);
 
         Timestamp::set_time_has_started_for_testing(&core_resources);
-        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100);
+        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 1, 1, 1, 1);
 
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
         register_mint_stake(&validator_1, &mint_cap);
@@ -1304,29 +1800,29 @@ module AptosFramework::Stake {
         Coin::destroy_burn_cap<TestCoin>(burn_cap);
 
         join_validator_set(&validator_3, v3_addr);
-        on_new_epoch();
+        end_epoch();
         assert!(validator_index(v3_addr) == 0, 0);
 
         join_validator_set(&validator_4, v4_addr);
-        on_new_epoch();
+        end_epoch();
         assert!(validator_index(v3_addr) == 0, 1);
         assert!(validator_index(v4_addr) == 1, 2);
 
         join_validator_set(&validator_1, v1_addr);
-        on_new_epoch();
+        end_epoch();
         assert!(validator_index(v1_addr) == 0, 3);
         assert!(validator_index(v3_addr) == 1, 4);
         assert!(validator_index(v4_addr) == 2, 5);
 
         join_validator_set(&validator_2, v2_addr);
-        on_new_epoch();
+        end_epoch();
         assert!(validator_index(v1_addr) == 0, 6);
         assert!(validator_index(v2_addr) == 1, 7);
         assert!(validator_index(v3_addr) == 2, 8);
         assert!(validator_index(v4_addr) == 3, 9);
 
         join_validator_set(&validator_5, v5_addr);
-        on_new_epoch();
+        end_epoch();
         assert!(validator_index(v1_addr) == 0, 10);
         assert!(validator_index(v2_addr) == 1, 11);
         assert!(validator_index(v3_addr) == 2, 12);
@@ -1340,10 +1836,10 @@ module AptosFramework::Stake {
         core_resources: signer,
         validator_1: signer,
         validator_2: signer,
-    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
         Timestamp::set_time_has_started_for_testing(&core_resources);
 
-        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100);
+        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 1, 1, 1, 1);
 
         let validator_1_address = Signer::address_of(&validator_1);
         let validator_2_address = Signer::address_of(&validator_2);
@@ -1356,14 +1852,14 @@ module AptosFramework::Stake {
         // Both validators join the set.
         join_validator_set(&validator_1, validator_1_address);
         join_validator_set(&validator_2, validator_2_address);
-        on_new_epoch();
+        end_epoch();
 
         // Validator 2 missed votes.
         let missed_votes = Vector::empty<u64>();
         let validator_2_index = borrow_global<ValidatorConfig>(validator_2_address).validator_index;
         Vector::push_back(&mut missed_votes, validator_2_index);
         update_performance_statistics(missed_votes);
-        on_new_epoch();
+        end_epoch();
 
         // Validator 2 received no rewards. Validator 1 didn't miss votes so it still receives rewards.
         assert_validator_state(validator_1_address, 101, 0, 0, 0, 0);
@@ -1371,14 +1867,14 @@ module AptosFramework::Stake {
 
         // Validator 2 decides to leave. Both validators missed votes.
         Timestamp::update_global_time_for_test(MAXIMUM_LOCK_UP_SECS * 1000000);
-        unlock(&validator_2, 100);
         leave_validator_set(&validator_2, validator_2_address);
         let missed_votes = Vector::empty<u64>();
         let validator_1_index = borrow_global<ValidatorConfig>(validator_1_address).validator_index;
         Vector::push_back(&mut missed_votes, validator_1_index);
         Vector::push_back(&mut missed_votes, validator_2_index);
         update_performance_statistics(missed_votes);
-        on_new_epoch();
+        end_epoch();
+        unlock(&validator_2, 100);
 
         // Validator 1 and 2 received no additional rewards due to missing votes.
         assert_validator_state(validator_1_address, 101, 0, 0, 0, 0);
@@ -1390,10 +1886,10 @@ module AptosFramework::Stake {
         core_framework: signer,
         core_resources: signer,
         validator: signer,
-    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
         Timestamp::set_time_has_started_for_testing(&core_resources);
 
-        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100);
+        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100, 1, 1, 1, 1);
 
         let validator_address = Signer::address_of(&validator);
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
@@ -1401,7 +1897,7 @@ module AptosFramework::Stake {
         store_test_coin_mint_cap(&core_resources, mint_cap);
         Coin::destroy_burn_cap<TestCoin>(burn_cap);
         join_validator_set(&validator, validator_address);
-        on_new_epoch();
+        end_epoch();
 
         // Invalid validator index in the missed votes vector should not lead to abort.
         let missed_votes = Vector::empty<u64>();
@@ -1410,7 +1906,7 @@ module AptosFramework::Stake {
         Vector::push_back(&mut missed_votes, valid_validator_index);
         Vector::push_back(&mut missed_votes, out_of_bounds_index);
         update_performance_statistics(missed_votes);
-        on_new_epoch();
+        end_epoch();
 
         // Validator received no rewards due to missing votes.
         assert_validator_state(validator_address, 100, 0, 0, 0, 0);
@@ -1420,7 +1916,7 @@ module AptosFramework::Stake {
     public(script) fun test_change_validator_set_configs(core_resources: signer) acquires ValidatorSetConfiguration {
         use AptosFramework::GovernanceProposal;
 
-        initialize_validator_set(&core_resources, 0, 1, 0, 0, false, 0, 1);
+        initialize_validator_set(&core_resources, 0, 1, 0, 0, false, 0, 1, 1, 1, 1, 1);
 
         update_required_stake(GovernanceProposal::create_test_proposal(), 100, 1000);
         update_required_lockup(GovernanceProposal::create_test_proposal(), 1000, 10000);
@@ -1438,7 +1934,7 @@ module AptosFramework::Stake {
     public(script) fun register_mint_stake(
         account: &signer,
         mint_cap: &MintCapability<TestCoin>,
-    ) acquires OwnerCapability, StakePool, StakePoolEvents, ValidatorConfig, ValidatorSet, ValidatorSetConfiguration {
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, ValidatorConfig, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
         Coin::register<TestCoin>(account);
         let address = Signer::address_of(account);
         Coin::deposit<TestCoin>(address, Coin::mint<TestCoin>(1000, mint_cap));
@@ -1446,6 +1942,13 @@ module AptosFramework::Stake {
         add_stake(account, 100);
         increase_lockup(account, Timestamp::now_seconds() + MAXIMUM_LOCK_UP_SECS);
         assert_validator_state(Signer::address_of(account), 100, 0, 0, 0, 0);
+    }
+
+    #[test_only]
+    fun end_epoch() acquires StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration, ValidatorSetVotingPower {
+        // Set the number of blocks to 1 so reward distribution doesn't error out with division by zero.
+        borrow_global_mut<ValidatorPerformance>(@CoreResources).num_blocks = 1;
+        on_new_epoch();
     }
 
     #[test_only]
