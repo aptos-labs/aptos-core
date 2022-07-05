@@ -67,7 +67,10 @@ class User < ApplicationRecord
   # end
 
   def maybe_send_ait2_registration_complete_email
-    SendRegistrationCompleteEmailJob.perform_now({ user_id: id }) if ait2_registration_complete?
+    return unless ait2_registration_complete?
+
+    SendRegistrationCompleteEmailJob.perform_now({ user_id: id })
+    DiscourseAddGroupJob.perform_later({ user_id: id, group_name: 'ait2_eligible' })
   end
 
   def ait2_registration_complete?

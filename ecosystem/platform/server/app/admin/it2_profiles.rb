@@ -46,6 +46,7 @@ ActiveAdmin.register It2Profile do
   show do
     default_main_content do
       row :location
+      row(:it2_survey) { |profile| profile.user.it2_survey }
     end
   end
 end
