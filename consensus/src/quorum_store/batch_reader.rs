@@ -227,10 +227,8 @@ impl BatchReader {
             0
         };
 
-        self.expirations
-            .lock()
-            .unwrap()
-            .expire(expired_round)
+        let expired_digests = self.expirations.lock().unwrap().expire(expired_round);
+        expired_digests
             .into_iter()
             .filter_map(|h| {
                 let cache_expiration_round = self
@@ -267,7 +265,7 @@ impl BatchReader {
     // TODO: make sure state-sync also sends the message.
     // TODO: make sure message is sent execution re-starts (will also clean)
     pub async fn update_certified_round(&self, certified_time: LogicalTime) {
-        debug!("QS: updating round {:?}", certified_time);
+        debug!("QS: batch reader updating time {:?}", certified_time);
         let prev_round = self
             .last_committed_round
             .fetch_max(certified_time.round(), Ordering::SeqCst);

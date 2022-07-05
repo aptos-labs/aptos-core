@@ -110,7 +110,7 @@ pub struct QuorumStoreWrapper {
     batch_expirations: RoundExpirations<BatchId>,
     batch_builder: BatchBuilder,
     latest_logical_time: LogicalTime,
-    batches_for_consensus: HashMap<HashValue, ProofOfStore>,
+    proofs_for_consensus: HashMap<HashValue, ProofOfStore>,
     // TODO: use expiration priority queue as well
     // TODO: store all ProofOfStore (created locally, and received via broadcast)
     // TODO: need to be notified of ProofOfStore's that were committed
@@ -136,7 +136,7 @@ impl QuorumStoreWrapper {
             batch_expirations: RoundExpirations::new(),
             batch_builder: BatchBuilder::new(0, quorum_store_max_batch_bytes as usize),
             latest_logical_time: LogicalTime::new(epoch, 0),
-            batches_for_consensus: HashMap::new(),
+            proofs_for_consensus: HashMap::new(),
             mempool_txn_pull_max_count,
             quorum_store_max_batch_bytes,
             last_end_batch_time: Instant::now(),
@@ -231,13 +231,13 @@ impl QuorumStoreWrapper {
 
     // TODO: priority queue on LogicalTime to clean old proofs
     pub(crate) async fn insert_proof(&mut self, mut new_proof: ProofOfStore) {
-        let maybe_proof = self.batches_for_consensus.remove(new_proof.digest());
+        let maybe_proof = self.proofs_for_consensus.remove(new_proof.digest());
         if let Some(proof) = maybe_proof {
             if proof.expiration() > new_proof.expiration() {
                 new_proof = proof;
             }
         }
-        self.batches_for_consensus
+        self.proofs_for_consensus
             .insert(new_proof.digest().clone(), new_proof);
     }
 
@@ -274,7 +274,6 @@ impl QuorumStoreWrapper {
             // TODO: check what max_block_size consensus is using
             WrapperCommand::GetBlockRequest(max_block_size, filter, callback) => {
                 // TODO: Pass along to batch_store
-                // debug!("QS: got GetBlockRequest from consensus");
                 let excluded_proofs: HashSet<HashValue> = match filter {
                     PayloadFilter::Empty => HashSet::new(),
                     PayloadFilter::DirectMempool(_) => {
@@ -283,20 +282,25 @@ impl QuorumStoreWrapper {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                let mut batch = Vec::new();
-                for proof in self.batches_for_consensus.values() {
-                    if batch.len() == max_block_size as usize {
+                let mut proof_block = Vec::new();
+                for proof in self.proofs_for_consensus.values() {
+                    if proof_block.len() == max_block_size as usize {
                         break;
                     }
                     if excluded_proofs.contains(proof.digest()) {
                         continue;
                     }
-                    batch.push(proof.clone());
+                    proof_block.push(proof.clone());
                 }
-                let res = ConsensusResponse::GetBlockResponse(if batch.is_empty() {
+                let res = ConsensusResponse::GetBlockResponse(if proof_block.is_empty() {
                     Payload::new_empty()
                 } else {
-                    Payload::InQuorumStore(batch)
+                    debug!(
+                        "QS: GetBlockRequest excluded len {}, block len {}",
+                        excluded_proofs.len(),
+                        proof_block.len()
+                    );
+                    Payload::InQuorumStore(proof_block)
                 });
                 callback
                     .send(Ok(res))
@@ -319,11 +323,11 @@ impl QuorumStoreWrapper {
                     }
                 }
                 for digest in digests {
-                    if self.batches_for_consensus.remove(&digest).is_some() {
+                    if self.proofs_for_consensus.remove(&digest).is_some() {
                         debug!(
                             "QS: removed digest {} from batches_for_consensus, new size {}",
                             digest,
-                            self.batches_for_consensus.len(),
+                            self.proofs_for_consensus.len(),
                         );
                     }
                 }

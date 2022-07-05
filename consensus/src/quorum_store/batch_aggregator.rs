@@ -3,6 +3,7 @@
 
 use crate::quorum_store::types::{BatchId, Data};
 use aptos_crypto::{hash::DefaultHasher, HashValue};
+// use aptos_logger::debug;
 use bcs::to_bytes;
 
 struct IncrementalBatchState {
@@ -97,7 +98,7 @@ impl BatchAggregator {
                 if batch_id > self_batch_id {
                     self.batch_state.is_some() || fragment_id > 0
                 } else {
-                    batch_id == self_batch_id && fragment_id > self.next_fragment_id()
+                    fragment_id > self.next_fragment_id()
                 }
             }
             // Allow larger batch_id (> 0) the first time as quorum store might
@@ -141,13 +142,19 @@ impl BatchAggregator {
             }
         }
 
-        if self.batch_state.is_none() {
-            self.batch_state = Some(IncrementalBatchState::new(self.max_batch_bytes))
+        if fragment_id == 0 {
+            debug_assert!(self.batch_state.is_none());
+            self.batch_state = Some(IncrementalBatchState::new(self.max_batch_bytes));
+            self.batch_id = Some(batch_id);
         }
-        self.batch_state
-            .as_mut()
-            .unwrap()
-            .append_transactions(transactions)
+        if self.batch_state.is_some() {
+            self.batch_state
+                .as_mut()
+                .unwrap()
+                .append_transactions(transactions)
+        } else {
+            false
+        }
     }
 
     pub(crate) fn end_batch(

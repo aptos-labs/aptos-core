@@ -101,25 +101,13 @@ impl DataManager for QuorumStoreDataManager {
                     );
                 }
                 let mut ret = Vec::new();
+                debug!("QSE: waiting for data on {} receivers", receivers.len());
                 for rx in receivers {
-                    debug!("QSE: waiting on rx");
-
-                    match rx
+                    let data = rx
                         .await
-                        .expect("Oneshot channel to get a batch was dropped")
-                    {
-                        Ok(data) => {
-                            debug!("QS: data {:?}", data);
-                            ret.push(data)
-                        }
-                        Err(e) => {
-                            // TODO: error is the right type now, propagate?.
-                            debug!("QS: could not get data {:?}", e);
-                            return Err(Error::CouldNotGetData);
-                        }
-                    }
-
-                    debug!("QSE: done waiting");
+                        .expect("Oneshot channel to get a batch was dropped")?;
+                    debug!("QSE: got data, len {}", data.len());
+                    ret.push(data);
                 }
                 Ok(ret.into_iter().flatten().collect())
             }

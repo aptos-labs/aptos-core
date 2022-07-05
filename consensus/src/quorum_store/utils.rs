@@ -69,6 +69,8 @@ impl<I: Ord + Hash> RoundExpirations<I> {
             if *r <= round {
                 let (_, item) = self.expiries.pop().unwrap();
                 ret.insert(item);
+            } else {
+                break;
             }
         }
         ret
