@@ -98,6 +98,7 @@ impl<V> ChunkExecutor<V> {
                 base_view.txn_accumulator().num_leaves(),
                 base_view.state().checkpoint_version,
                 ledger_info,
+                to_commit.result_view.state_tree(),
             )?;
         }
 

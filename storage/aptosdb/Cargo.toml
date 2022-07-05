@@ -38,7 +38,7 @@ executor-types = { path = "../../execution/executor-types", optional = true }
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 num-variants = { path = "../../crates/num-variants" }
 schemadb = { path = "../schemadb" }
-scratchpad = { path = "../scratchpad", optional = true }
+scratchpad = { path = "../scratchpad" }
 storage-interface = { path = "../storage-interface" }
 
 [dev-dependencies]

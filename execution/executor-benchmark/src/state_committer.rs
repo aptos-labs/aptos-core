@@ -106,6 +106,7 @@ impl StateCommitter {
                 Some(&node_hashes),
                 self.version,
                 self.committed_version,
+                self.smt.clone(),
             )
             .unwrap();
         info!("Committing state. Saved.");
