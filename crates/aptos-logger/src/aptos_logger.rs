@@ -358,7 +358,7 @@ impl AptosData {
         }
 
         if let Some(sender) = &self.sender {
-            if let Err(e) = sender.try_send(LoggerServiceEvent::LogEntry(entry)) {
+            if let Err(_) = sender.try_send(LoggerServiceEvent::LogEntry(entry)) {
                 STRUCT_LOG_QUEUE_ERROR_COUNT.inc();
             }
         }
