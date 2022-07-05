@@ -78,23 +78,6 @@ impl TpsEvaluator {
     pub fn new(args: TpsEvaluatorArgs) -> Self {
         Self { args }
     }
-
-    fn build_evaluation_result(
-        &self,
-        headline: String,
-        score: u8,
-        explanation: String,
-        links: Vec<String>,
-    ) -> EvaluationResult {
-        EvaluationResult {
-            headline,
-            score,
-            explanation,
-            category: CATEGORY.to_string(),
-            evaluator_name: Self::get_name(),
-            links,
-        }
-    }
 }
 
 #[async_trait::async_trait]
@@ -152,14 +135,13 @@ impl Evaluator for TpsEvaluator {
                 "Transaction processing speed is sufficient".to_string(),
                 100,
                 description,
-                vec![],
             )
         } else {
             description.push_str(
                 " This implies that the hardware you're \
             using to run your node isn't powerful enough, please see the attached link",
             );
-            self.build_evaluation_result(
+            self.build_evaluation_result_with_links(
                 "Transaction processing speed is too low".to_string(),
                 0,
                 description,
@@ -170,8 +152,12 @@ impl Evaluator for TpsEvaluator {
         Ok(vec![evaluation_result])
     }
 
-    fn get_name() -> String {
-        format!("{}_tps", CATEGORY)
+    fn get_category_name() -> String {
+        CATEGORY.to_string()
+    }
+
+    fn get_evaluator_name() -> String {
+        "tps".to_string()
     }
 
     fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {
