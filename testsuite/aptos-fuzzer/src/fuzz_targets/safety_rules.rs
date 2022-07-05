@@ -6,8 +6,8 @@ use aptos_proptest_helpers::ValueGenerator;
 use safety_rules::{
     fuzzing::{fuzz_construct_and_sign_vote_two_chain, fuzz_sign_timeout_with_qc},
     fuzzing_utils::{
-        arb_block_data, arb_epoch_change_proof, arb_maybe_signed_vote_proposal,
-        arb_safety_rules_input, arb_timeout,
+        arb_block_data, arb_epoch_change_proof, arb_safety_rules_input, arb_timeout,
+        arb_vote_proposal,
         fuzzing::{fuzz_handle_message, fuzz_initialize, fuzz_sign_proposal},
     },
 };
@@ -61,12 +61,12 @@ impl FuzzTargetImpl for SafetyRulesConstructAndSignVote {
     }
 
     fn generate(&self, _idx: usize, _gen: &mut ValueGenerator) -> Option<Vec<u8>> {
-        Some(corpus_from_strategy(arb_maybe_signed_vote_proposal()))
+        Some(corpus_from_strategy(arb_vote_proposal()))
     }
 
     fn fuzz(&self, data: &[u8]) {
-        let maybe_signed_vote_proposal = fuzz_data_to_value(data, arb_maybe_signed_vote_proposal());
-        let _ = fuzz_construct_and_sign_vote_two_chain(maybe_signed_vote_proposal);
+        let vote_proposal = fuzz_data_to_value(data, arb_vote_proposal());
+        let _ = fuzz_construct_and_sign_vote_two_chain(vote_proposal);
     }
 }
 

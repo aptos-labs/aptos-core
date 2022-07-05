@@ -66,7 +66,7 @@ pub trait TSafetyRules {
     /// Attempts to vote for a given proposal following the voting rules.
     fn construct_and_sign_vote(
         &mut self,
-        vote_proposal: &MaybeSignedVoteProposal,
+        vote_proposal: &VoteProposal,
     ) -> Result<Vote, Error>;
 
     /// As the holder of the private key, SafetyRules also signs proposals or blocks.
@@ -301,7 +301,7 @@ struct EpochChangeProof {
 called to construct and sign a vote from a `vote_proposal` (`accumulator_extension_proof`, `block`, `next_epoch_state` option) and a `signature` option. It is called when consensus needs to sign a vote.
 
 ```
-struct MaybeSignedVoteProposal {
+struct VoteProposal {
     /// The vote proposal to be signed.
     pub vote_proposal: VoteProposal,
     /// The signature of this proposal's hash from Aptos Execution Correctness service. It is

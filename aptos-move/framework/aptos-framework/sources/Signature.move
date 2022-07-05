@@ -8,6 +8,12 @@ module AptosFramework::Signature {
     /// Does not abort.
     native public fun ed25519_validate_pubkey(public_key: vector<u8>): bool;
 
+    /// Return `true` if the bytes in `public_key` is a valid bls12381 public key and
+    /// passed the PoP check.
+    /// Return `false` otherwise.
+    /// Does not abort.
+    native public fun bls12381_validate_pubkey(public_key: vector<u8>, proof_of_possesion: vector<u8>): bool;
+
     /// Return true if the Ed25519 `signature` on `message` verifies against the Ed25519 public key
     /// `public_key`.
     /// Returns `false` if:

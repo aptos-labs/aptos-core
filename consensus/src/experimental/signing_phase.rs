@@ -10,7 +10,7 @@ use std::{
 use crate::{
     experimental::pipeline_phase::StatelessPipeline, metrics_safety_rules::MetricsSafetyRules,
 };
-use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_crypto::bls12381;
 use aptos_infallible::Mutex;
 use aptos_types::ledger_info::{LedgerInfo, LedgerInfoWithSignatures};
 use async_trait::async_trait;
@@ -43,7 +43,7 @@ impl Display for SigningRequest {
 }
 
 pub struct SigningResponse {
-    pub signature_result: Result<Ed25519Signature, Error>,
+    pub signature_result: Result<bls12381::Signature, Error>,
     pub commit_ledger_info: LedgerInfo,
 }
 
