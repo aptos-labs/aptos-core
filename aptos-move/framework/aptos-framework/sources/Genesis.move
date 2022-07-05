@@ -35,6 +35,10 @@ module AptosFramework::Genesis {
         allow_validator_set_change: bool,
         rewards_rate: u64,
         rewards_rate_denominator: u64,
+        increase_limit: u64,
+        increase_limit_denominator: u64,
+        withdrawal_limit: u64,
+        withdrawal_limit_denominator: u64,
     ) {
         initialize_internal(
             &core_resource_account,
@@ -55,6 +59,10 @@ module AptosFramework::Genesis {
             allow_validator_set_change,
             rewards_rate,
             rewards_rate_denominator,
+            increase_limit,
+            increase_limit_denominator,
+            withdrawal_limit,
+            withdrawal_limit_denominator,
         )
     }
 
@@ -77,6 +85,10 @@ module AptosFramework::Genesis {
         allow_validator_set_change: bool,
         rewards_rate: u64,
         rewards_rate_denominator: u64,
+        increase_limit: u64,
+        increase_limit_denominator: u64,
+        withdrawal_limit: u64,
+        withdrawal_limit_denominator: u64,
     ) {
         // initialize the core resource account
         Account::initialize(
@@ -108,6 +120,10 @@ module AptosFramework::Genesis {
             allow_validator_set_change,
             rewards_rate,
             rewards_rate_denominator,
+            increase_limit,
+            increase_limit_denominator,
+            withdrawal_limit,
+            withdrawal_limit_denominator,
         );
 
         VMConfig::initialize(
@@ -218,6 +234,10 @@ module AptosFramework::Genesis {
             0,
             0,
             true,
+            0,
+            1,
+            0,
+            1,
             0,
             1,
         )
