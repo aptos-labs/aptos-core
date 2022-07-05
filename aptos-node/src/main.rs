@@ -72,8 +72,17 @@ fn main() {
             rng,
         );
     } else {
-        let config = NodeConfig::load(args.config.unwrap()).expect("Failed to load node config");
+        // Load the config file
+        let config_path = args.config.unwrap();
+        let config = NodeConfig::load(config_path.clone()).unwrap_or_else(|error| {
+            panic!(
+                "Failed to load node config file! Given file path: {:?}. Error: {:?}",
+                config_path, error
+            )
+        });
         println!("Using node config {:?}", &config);
+
+        // Start the node
         aptos_node::start(config, None);
     };
 }
