@@ -9,6 +9,8 @@ use crate::{
     },
     ApiError, CoinCache,
 };
+use anyhow::anyhow;
+use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
 use aptos_logger::info;
 use aptos_rest_client::{
     aptos::Balance,
@@ -303,6 +305,31 @@ pub struct PublicKey {
     pub hex_bytes: String,
     /// Curve type associated with the key
     pub curve_type: CurveType,
+}
+
+impl TryFrom<Ed25519PublicKey> for PublicKey {
+    type Error = anyhow::Error;
+
+    fn try_from(public_key: Ed25519PublicKey) -> Result<Self, Self::Error> {
+        Ok(PublicKey {
+            hex_bytes: public_key.to_encoded_string()?,
+            curve_type: CurveType::Edwards25519,
+        })
+    }
+}
+
+impl TryFrom<PublicKey> for Ed25519PublicKey {
+    type Error = anyhow::Error;
+
+    fn try_from(public_key: PublicKey) -> Result<Self, Self::Error> {
+        if public_key.curve_type != CurveType::Edwards25519 {
+            return Err(anyhow!("Invalid curve type"));
+        }
+
+        Ok(Ed25519PublicKey::from_encoded_string(
+            &public_key.hex_bytes,
+        )?)
+    }
 }
 
 /// Related Transaction allows for connecting related transactions across shards, networks or

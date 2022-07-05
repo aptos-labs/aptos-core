@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{account, block, network};
+use crate::{account, block, construction, network};
 use aptos_rosetta::{
     client::RosettaClient,
     types::{NetworkIdentifier, NetworkRequest},
@@ -21,6 +21,8 @@ pub enum RosettaCliArgs {
     #[clap(subcommand)]
     Block(block::BlockCommand),
     #[clap(subcommand)]
+    Construction(construction::ConstructionCommand),
+    #[clap(subcommand)]
     Network(network::NetworkCommand),
 }
 
@@ -29,6 +31,7 @@ impl RosettaCliArgs {
         match self {
             RosettaCliArgs::Account(inner) => inner.execute().await,
             RosettaCliArgs::Block(inner) => inner.execute().await,
+            RosettaCliArgs::Construction(inner) => inner.execute().await,
             RosettaCliArgs::Network(inner) => inner.execute().await,
         }
     }
@@ -42,7 +45,7 @@ pub fn format_output<T: Serialize>(input: anyhow::Result<T>) -> anyhow::Result<S
 #[derive(Debug, Parser)]
 pub struct UrlArgs {
     /// URL for the Aptos Rosetta API. e.g. http://localhost:8080
-    #[clap(long, default_value = "http://localhost:8080")]
+    #[clap(long, default_value = "http://localhost:8082")]
     rosetta_api_url: url::Url,
 }
 

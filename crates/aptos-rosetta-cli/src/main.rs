@@ -20,6 +20,7 @@
 mod account;
 mod block;
 mod common;
+mod construction;
 mod network;
 
 use crate::common::{ErrorWrapper, RosettaCliArgs};
