@@ -14,8 +14,6 @@ This tutorial goes through how to build the wallet extension and how to use it w
 2. Wallet functionality
 3. dApp Integration
 
-The code for the wallet can be found on our [github](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/web-wallet).
-
 ## Step 1) Install the wallet on Chrome
 
 1. Download the latest [wallet release](https://github.com/aptos-labs/aptos-core/releases/) and unzip
