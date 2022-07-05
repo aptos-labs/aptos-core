@@ -1,6 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-use crate::transaction_generator::TransactionGenerator;
+use crate::transaction_generator::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -10,6 +10,7 @@ use aptos_sdk::{
 
 use crate::emitter::account_minter::create_and_fund_account_request;
 use aptos_logger::info;
+use rand::rngs::StdRng;
 use std::{fmt::Debug, sync::Arc};
 
 #[derive(Debug)]
@@ -21,7 +22,7 @@ pub struct NFTMint {
 }
 
 impl NFTMint {
-    pub async fn new(
+    pub fn new(
         txn_factory: TransactionFactory,
         creator_account: Arc<LocalAccount>,
         collection_name: Vec<u8>,
@@ -144,4 +145,51 @@ pub fn create_nft_transfer_request(
             1,
         )),
     )
+}
+
+#[derive(Debug)]
+pub struct NFTMintGeneratorCreator {
+    txn_factory: TransactionFactory,
+    creator_account: Arc<LocalAccount>,
+    collection_name: Vec<u8>,
+    token_name: Vec<u8>,
+}
+
+impl NFTMintGeneratorCreator {
+    pub async fn new(
+        mut rng: StdRng,
+        txn_factory: TransactionFactory,
+        root_account: &mut LocalAccount,
+        rest_client: RestClient,
+    ) -> Self {
+        let mut creator_account = LocalAccount::generate(&mut rng);
+        let collection_name = "collection name".to_owned().into_bytes();
+        let token_name = "token name".to_owned().into_bytes();
+        initialize_nft_collection(
+            rest_client,
+            root_account,
+            &mut creator_account,
+            &txn_factory,
+            &collection_name,
+            &token_name,
+        )
+        .await;
+        Self {
+            txn_factory,
+            creator_account: Arc::new(creator_account),
+            collection_name,
+            token_name,
+        }
+    }
+}
+
+impl TransactionGeneratorCreator for NFTMintGeneratorCreator {
+    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+        Box::new(NFTMint::new(
+            self.txn_factory.clone(),
+            self.creator_account.clone(),
+            self.collection_name.clone(),
+            self.token_name.clone(),
+        ))
+    }
 }

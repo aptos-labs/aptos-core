@@ -1,12 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    convert::TryFrom,
-    fmt::{Display, Formatter},
-    path::Path,
-    str::FromStr,
-};
+use std::{convert::TryFrom, path::Path};
 
 use anyhow::{bail, format_err, Result};
 use aptos::common::types::EncodingType;
@@ -66,33 +61,9 @@ pub enum TransactionType {
     NftMint,
 }
 
-impl Display for TransactionType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            TransactionType::P2P => "p2p",
-            TransactionType::AccountGeneration => "account_generation",
-            TransactionType::NftMint => "nft_mint",
-        };
-        write!(f, "{}", str)
-    }
-}
-
 impl Default for TransactionType {
     fn default() -> Self {
         TransactionType::P2P
-    }
-}
-
-impl FromStr for TransactionType {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "p2p" => Ok(TransactionType::P2P),
-            "account_generation" => Ok(TransactionType::AccountGeneration),
-            "nft_mint" => Ok(TransactionType::NftMint),
-            _ => Err("Invalid transaction type"),
-        }
     }
 }
 
@@ -126,7 +97,7 @@ pub struct EmitArgs {
     #[clap(long, help = "Percentage of invalid txs", default_value = "0")]
     pub invalid_tx: usize,
 
-    #[clap(long, default_value_t = TransactionType::P2P)]
+    #[clap(arg_enum)]
     pub transaction_type: TransactionType,
 }
 
