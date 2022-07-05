@@ -369,6 +369,32 @@ module AptosFramework::Coin {
         burn_cap: BurnCapability<FakeMoney>,
     }
 
+    #[test_only]
+    public(script) fun create_fake_money(
+        source: &signer,
+        destination: &signer,
+        amount: u64
+    ) acquires CoinEvents, CoinInfo, CoinStore {
+        let name = ASCII::string(b"Fake money");
+        let symbol = ASCII::string(b"FMD");
+
+        let (mint_cap, burn_cap) = initialize<FakeMoney>(
+            source,
+            name,
+            symbol,
+            18,
+            true
+        );
+        register<FakeMoney>(source);
+        register<FakeMoney>(destination);
+        let coins_minted = mint<FakeMoney>(amount, &mint_cap);
+        deposit(Signer::address_of(source), coins_minted);
+        move_to(source, FakeMoneyCapabilities {
+            mint_cap,
+            burn_cap
+        });
+    }
+
     #[test(source = @0x1, destination = @0x2)]
     public(script) fun end_to_end(
         source: signer,
