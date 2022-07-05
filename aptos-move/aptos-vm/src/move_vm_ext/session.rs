@@ -37,6 +37,7 @@ pub enum SessionId {
     Txn {
         sender: AccountAddress,
         sequence_number: u64,
+        script_hash: Vec<u8>,
     },
     BlockMeta {
         // block id
@@ -52,16 +53,14 @@ pub enum SessionId {
 
 impl SessionId {
     pub fn txn(txn: &SignatureCheckedTransaction) -> Self {
-        Self::Txn {
-            sender: txn.sender(),
-            sequence_number: txn.sequence_number(),
-        }
+        Self::txn_meta(&TransactionMetadata::new(&txn.clone().into_inner()))
     }
 
     pub fn txn_meta(txn_data: &TransactionMetadata) -> Self {
         Self::Txn {
             sender: txn_data.sender,
             sequence_number: txn_data.sequence_number,
+            script_hash: txn_data.script_hash.clone(),
         }
     }
 
