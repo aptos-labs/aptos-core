@@ -358,9 +358,11 @@ impl AptosData {
         }
 
         if let Some(sender) = &self.sender {
-            if let Err(e) = sender.try_send(LoggerServiceEvent::LogEntry(entry)) {
+            if sender
+                .try_send(LoggerServiceEvent::LogEntry(entry))
+                .is_err()
+            {
                 STRUCT_LOG_QUEUE_ERROR_COUNT.inc();
-                eprintln!("Failed to send structured log: {}", e);
             }
         }
     }
