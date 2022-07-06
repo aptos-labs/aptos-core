@@ -79,6 +79,16 @@ impl DbReader for StateStore {
             .transpose()
     }
 
+    /// Returns the proof of the given state key and version.
+    fn get_state_proof_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<SparseMerkleProof> {
+        let (_, proof) = self.state_merkle_db.get_with_proof(state_key, version)?;
+        Ok(proof)
+    }
+
     /// Get the state value with proof given the state key and version
     fn get_state_value_with_proof_by_version(
         &self,

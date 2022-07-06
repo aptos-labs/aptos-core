@@ -459,6 +459,15 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
+    /// Returns the proof of the given state key and version.
+    fn get_state_proof_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<SparseMerkleProof> {
+        unimplemented!()
+    }
+
     /// Gets a state value by state key along with the proof, out of the ledger state indicated by the state
     /// Merkle tree root with a sparse merkle proof proving state tree root.
     /// See [AptosDB::get_account_state_with_proof_by_version].

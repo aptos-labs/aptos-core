@@ -1079,6 +1079,25 @@ impl DbReader for AptosDB {
         })
     }
 
+    /// Returns the proof of the given state key and version.
+    fn get_state_proof_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<SparseMerkleProof> {
+        gauged_api("get_proof_by_version", || {
+            error_if_version_is_pruned(
+                &self.pruner,
+                PrunerIndex::StateStorePrunerIndex,
+                "State",
+                version,
+            )?;
+
+            self.state_store
+                .get_state_proof_by_version(state_key, version)
+        })
+    }
+
     fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
         gauged_api("get_startup_info", || {
             self.ledger_store
