@@ -10,7 +10,11 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 This document describes the main features and components of the Aptos SDK.
 
-The Aptos SDK provides APIs and interfaces you can use to interact with the Aptos Blockchain by connecting to the Aptos REST API. The REST API is the means for sending your transaction to the Aptos Blockchain.
+The Aptos SDK provides APIs and interfaces you can use to interact with the Aptos Blockchain by connecting to the Aptos REST API. The REST API is the means for sending your transaction to the Aptos Blockchain, and reading the blockchain's state. 
+
+:::tip
+See the [Aptos SDK docs](https://aptos-labs.github.io/ts-sdk-doc/).
+:::
 
 See below a high-level architecture diagram of the Aptos Typescript SDK.
 
@@ -26,13 +30,14 @@ sources={{
 
 The following are a few key features of the Aptos SDK:
 
-- **Key generation:** The Aptos SDKs provide convenient methods for generating [Ed25519](https://ed25519.cr.yp.to/) key pairs. The Ed25519 public keys can be used to derive the chain account addresses, while the private keys should be kept secret for transaction signing.
-- **Transaction signing and submission**: Although the Aptos REST APIs support signing a raw transaction on the server-side, signing the transactions on the client side is more secure and should be the preferred choice.
-- **Transaction status querying**: The Aptos SDKs support transaction status queries (success, failure, pending), by transaction hash.
-- **BCS library:** SDKs implement a [BCS](https://docs.rs/bcs/latest/bcs/) (Binary Canonical Serialization) library for transaction signing and submission. The Aptos Blockchain uses BCS for data serialization and deserialization.
-- **Methods for information retrieval**: Resources, modules, and transactions under a specific account can be retrieved with the SDK.
-- **Token APIs**: To reduce the amount of work for NFT minting and querying, Aptos SDKs have built-in NFT support in token standards.
-- **Faucet client**: The Aptos Faucet client is for minting test coins that are used for development.
+- **Key generation:** The Aptos SDK provides convenient methods for generating [Ed25519](https://ed25519.cr.yp.to/) key pairs. The Ed25519 public keys can be used to derive the chain account addresses, while the private keys should be kept secret for transaction signing. See the [class TransactionBuilderEd25519](https://aptos-labs.github.io/ts-sdk-doc/classes/TransactionBuilderEd25519.html).
+- **Transaction signing and submission**: Although the Aptos REST APIs support signing a raw transaction on the server-side, signing the transactions on the client side, using the Aptos SDK, is more secure and should be the preferred choice. 
+- **Transaction status querying**: The Aptos SDK supports transaction status queries (success, failure, pending), by transaction hash.
+- **BCS library:** The Aptos SDK implements a [BCS](https://docs.rs/bcs/latest/bcs/) (Binary Canonical Serialization) library for transaction signing and submission. The Aptos Blockchain uses BCS for data serialization and deserialization. See [Aptos SDK BCS](https://aptos-labs.github.io/ts-sdk-doc/modules/BCS.html).
+- **Methods for information retrieval**: Resources, modules, and transactions under a specific account can be retrieved with the Aptos SDK.
+- **Faucet client**: The Aptos [FaucetClient](https://aptos-labs.github.io/ts-sdk-doc/classes/FaucetClient.html) is for minting test coins that are used for development.
+- **Token client**: Aptos SDK provides built-in support for NFT minting and querying. See [TokenClient](https://aptos-labs.github.io/ts-sdk-doc/classes/TokenClient.html).
+
 
 ## Components of the Typescript SDK
 
@@ -40,7 +45,7 @@ The Aptos Typescript SDK has three logical layers. Refer to the above high-level
 
 1. The transportation layer.
 2. The core SDK layer.
-3. The high-level SDK API layer.
+3. An optional application layer. 
 
 The transportation layer is responsible for sending payloads to the REST API endpoints.
 
@@ -51,7 +56,11 @@ The core SDK layer exposes the functionalities needed by most applications, incl
 - Transaction status querying, and
 - Various kinds of information retrieval.
 
-The high-level APIs layer leverages the core SDK to provide convenient methods around **NFT tokens.**
+The optional application layer provides built-in support for **NFT token** API. 
+
+:::note
+You can also use this NFT token API as an example before you start developing your own application APIs using the SDK.
+:::
 
 ### OpenAPI client
 
@@ -59,7 +68,7 @@ The OpenAPI client is a set of classes that are generated based on the Aptos RES
 
 ### Aptos Account
 
-Provides the methods for:
+The [class AptosAccount](https://aptos-labs.github.io/ts-sdk-doc/classes/AptosAccount.html) provides the methods for:
 
 - Generating Ed25519 key pairs.
 - Signing a bytes buffer with an Ed25519 public key, and 
@@ -71,7 +80,7 @@ A subset of BCS standards implemented in Typescript.
 
 ### Transaction builder
 
-The transaction builder contains the Typescript types for constructing the transaction payloads. The Typescript SDK supports three kinds of transaction payloads:
+The transaction builder contains the Typescript types for constructing the transaction payloads. The transaction builder within the Typescript SDK supports the following transaction payloads:
 
 1. ScriptFunction
 2. Script
@@ -79,14 +88,14 @@ The transaction builder contains the Typescript types for constructing the trans
 
 ### Aptos Client
 
-The Aptos Client is the main component of Typescript SDK. It exposes the methods for retrieving the account resources, transactions, modules and events.
+The [class AptosClient](https://aptos-labs.github.io/ts-sdk-doc/classes/AptosClient.html) exposes the methods for retrieving the account resources, transactions, modules and events.
 
-The Aptos Client component also supports two methods for transaction signing and submission.
+In addition, the `AptosClient` component supports two methods for transaction signing and submission.
 
-1. Submitting transactions in JSON format, which delegates the signing message (input to the signing function) creation to the API server.
-2. Submitting transactions in BCS format, which prepares and signs the raw transactions on the client-side. This method leverages the BCS Library and Transaction Builder for constructing the transaction payloads.
+1. Submitting transactions in JSON format, which delegates the signing message (input to the signing function) creation to the API server. This is applicable when using the REST API and the Aptos server to generate the signing message, the transaction signature and submit the signed transaction to the Aptos Blockchain. See the tutorial [Your First Transaction](/tutorials/first-transaction.md).
+2. Submitting transactions in BCS format, which prepares and signs the raw transactions on the client-side. This method leverages the BCS Library and Transaction Builder for constructing the transaction payloads. See the guide [Creating a Signed Transaction](/guides/sign-a-transaction.md).
 
-:::note
+:::tip
 
 The second method, i.e., in BCS format, is the recommended way for submitting transactions to the Aptos Blockchain.
 
@@ -94,15 +103,15 @@ The second method, i.e., in BCS format, is the recommended way for submitting tr
 
 ### Token Client
 
-The Token Client provides methods for the creation, and querying of the NFT collections and tokens.
+The class [TokenClient](https://aptos-labs.github.io/ts-sdk-doc/classes/TokenClient.html) provides methods for creating and querying the NFT collections and tokens.
 
 ## Validation for Transaction Builder and BCS
 
-Signing and submitting the BCS transactions is the core functionality of Aptos SDKs. The Transaction Builder and the BCS are used to assemble and serialize the transaction payloads for signing and submission.
+The Transaction Builder and the BCS are used to assemble and serialize the transaction payloads for signing and submission.
 
 Given that different programming languages have different primitive type constraints (e.g., byte length, value range, etc.) and various composite types support (e.g., enum, struct, class, etc.), the code for data serialization is hard to validate.
 
-The Aptos SDK provides two levels of validation for Transaction Builder and BCS.
+The Aptos SDK validates the Transaction Builder and BCS in two ways:
 
 1. First, with the unit tests and end-to-end (e2e) tests.
 
