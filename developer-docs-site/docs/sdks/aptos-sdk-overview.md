@@ -13,7 +13,7 @@ This document describes the main features and components of the Aptos SDK.
 The Aptos SDK provides APIs and interfaces you can use to interact with the Aptos Blockchain by connecting to the Aptos REST API. The REST API is the means for sending your transaction to the Aptos Blockchain, and reading the blockchain's state. 
 
 :::tip
-See the [Aptos SDK docs](https://aptos-labs.github.io/ts-sdk-doc/).
+To see how to use the Aptos SDK, see the tutorial [Transactions with Typescript SDK](/sdks/transactions-with-ts-sdk). Also see the [Aptos SDK docs](https://aptos-labs.github.io/ts-sdk-doc/).
 :::
 
 See below a high-level architecture diagram of the Aptos Typescript SDK.
