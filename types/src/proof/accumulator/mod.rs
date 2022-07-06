@@ -20,9 +20,7 @@ use super::MerkleTreeInternalNode;
 use crate::proof::definition::{LeafCount, MAX_ACCUMULATOR_LEAVES};
 use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{
-    hash::{
-        CryptoHash, CryptoHasher, ACCUMULATOR_PLACEHOLDER_HASH, SPARSE_MERKLE_PLACEHOLDER_HASH,
-    },
+    hash::{CryptoHash, CryptoHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
 };
 use serde::{Deserialize, Serialize};
@@ -86,7 +84,7 @@ where
         Self {
             frozen_subtree_roots: Vec::new(),
             num_leaves: 0,
-            root_hash: *SPARSE_MERKLE_PLACEHOLDER_HASH,
+            root_hash: *ACCUMULATOR_PLACEHOLDER_HASH,
             phantom: PhantomData,
         }
     }
