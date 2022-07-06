@@ -310,7 +310,7 @@ async fn construction_payloads(
     let unsigned_transaction = transaction_factory
         .payload(txn_payload)
         .sender(sender)
-        .sequence_number(sequence_number + 1)
+        .sequence_number(sequence_number)
         .build();
 
     let signing_message = hex::encode(signing_message(&unsigned_transaction));
