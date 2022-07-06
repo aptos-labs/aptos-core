@@ -1376,6 +1376,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-proptest-helpers",
+ "aptos-state-view",
  "aptos-temppath",
  "aptos-types",
  "aptos-workspace-hack",

@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 /// A wrapper of the in-memory state sparse merkle tree and the transaction accumulator that
 /// represent a specific state collectively. Usually it is a state after executing a block.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExecutedTrees {
     /// The in-memory representation of state after execution.
     state: InMemoryState,
@@ -41,8 +41,11 @@ impl ExecutedTrees {
     }
 
     pub fn version(&self) -> Option<Version> {
-        let num_elements = self.txn_accumulator().num_leaves() as u64;
-        num_elements.checked_sub(1)
+        self.num_transactions().checked_sub(1)
+    }
+
+    pub fn num_transactions(&self) -> u64 {
+        self.txn_accumulator().num_leaves() as u64
     }
 
     pub fn state_id(&self) -> HashValue {
@@ -53,6 +56,10 @@ impl ExecutedTrees {
         state: InMemoryState,
         transaction_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
     ) -> Self {
+        assert_eq!(
+            state.current_version.map_or(0, |v| v + 1),
+            transaction_accumulator.num_leaves()
+        );
         Self {
             state,
             transaction_accumulator,

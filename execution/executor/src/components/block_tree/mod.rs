@@ -15,7 +15,7 @@ use aptos_types::{
     ledger_info::LedgerInfo, proof::definition::LeafCount, state_store::state_value::StateValue,
 };
 use consensus_types::block::Block as ConsensusBlock;
-use executor_types::{in_memory_state_calculator::IntoLedgerView, Error, ExecutedChunk};
+use executor_types::{Error, ExecutedChunk};
 use scratchpad::SparseMerkleTree;
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -219,10 +219,7 @@ impl BlockTree {
             ledger_info.consensus_block_id()
         };
 
-        let result_view = startup_info
-            .committed_tree_state
-            .clone()
-            .into_ledger_view(db)?;
+        let result_view = startup_info.committed_trees;
         block_lookup.fetch_or_add_block(id, ExecutedChunk::new_empty(result_view), None)
     }
 

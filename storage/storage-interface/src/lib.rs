@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, format_err, Result};
-use aptos_crypto::{
-    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
-    HashValue,
-};
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -19,8 +16,8 @@ use aptos_types::{
     nibble::nibble_path::NibblePath,
     on_chain_config::{access_path_for_config, ConfigID},
     proof::{
-        definition::LeafCount, AccumulatorConsistencyProof, SparseMerkleProof,
-        SparseMerkleRangeProof, TransactionAccumulatorSummary,
+        AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleRangeProof,
+        TransactionAccumulatorSummary,
     },
     state_proof::StateProof,
     state_store::{
@@ -51,29 +48,29 @@ pub mod sync_proof_fetcher;
 pub use executed_trees::ExecutedTrees;
 use scratchpad::SparseMerkleTree;
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StartupInfo {
     /// The latest ledger info.
     pub latest_ledger_info: LedgerInfoWithSignatures,
     /// If the above ledger info doesn't carry a validator set, the latest validator set. Otherwise
     /// `None`.
     pub latest_epoch_state: Option<EpochState>,
-    pub committed_tree_state: TreeState,
-    pub synced_tree_state: Option<TreeState>,
+    pub committed_trees: ExecutedTrees,
+    pub synced_trees: Option<ExecutedTrees>,
 }
 
 impl StartupInfo {
     pub fn new(
         latest_ledger_info: LedgerInfoWithSignatures,
         latest_epoch_state: Option<EpochState>,
-        committed_tree_state: TreeState,
-        synced_tree_state: Option<TreeState>,
+        committed_trees: ExecutedTrees,
+        synced_trees: Option<ExecutedTrees>,
     ) -> Self {
         Self {
             latest_ledger_info,
             latest_epoch_state,
-            committed_tree_state,
-            synced_tree_state,
+            committed_trees,
+            synced_trees,
         }
     }
 
@@ -84,19 +81,14 @@ impl StartupInfo {
         let latest_ledger_info =
             LedgerInfoWithSignatures::genesis(HashValue::zero(), ValidatorSet::empty());
         let latest_epoch_state = None;
-        let committed_tree_state = TreeState {
-            num_transactions: 0,
-            ledger_frozen_subtree_hashes: Vec::new(),
-            state_checkpoint_hash: *SPARSE_MERKLE_PLACEHOLDER_HASH,
-            state_checkpoint_version: None,
-        };
-        let synced_tree_state = None;
+        let committed_trees = ExecutedTrees::new_empty();
+        let synced_trees = None;
 
         Self {
             latest_ledger_info,
             latest_epoch_state,
-            committed_tree_state,
-            synced_tree_state,
+            committed_trees,
+            synced_trees,
         }
     }
 
@@ -111,60 +103,8 @@ impl StartupInfo {
             })
     }
 
-    pub fn into_latest_tree_state(self) -> TreeState {
-        self.synced_tree_state.unwrap_or(self.committed_tree_state)
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct TreeState {
-    pub num_transactions: LeafCount,
-    pub ledger_frozen_subtree_hashes: Vec<HashValue>,
-    /// Root hash of the state checkpoint (global sparse merkle tree).
-    pub state_checkpoint_hash: HashValue,
-    pub state_checkpoint_version: Option<Version>,
-}
-
-impl TreeState {
-    pub fn new(
-        num_transactions: LeafCount,
-        ledger_frozen_subtree_hashes: Vec<HashValue>,
-        state_checkpoint_hash: HashValue,
-        state_checkpoint_version: Option<Version>,
-    ) -> Self {
-        Self {
-            num_transactions,
-            ledger_frozen_subtree_hashes,
-            state_checkpoint_hash,
-            state_checkpoint_version,
-        }
-    }
-
-    pub fn new_at_state_checkpoint(
-        num_transactions: LeafCount,
-        ledger_frozen_subtree_hashes: Vec<HashValue>,
-        state_root_hash: HashValue,
-    ) -> Self {
-        Self {
-            num_transactions,
-            ledger_frozen_subtree_hashes,
-            state_checkpoint_hash: state_root_hash,
-            state_checkpoint_version: num_transactions.checked_sub(1),
-        }
-    }
-
-    pub fn new_empty() -> Self {
-        Self::new_at_state_checkpoint(0, Vec::new(), *SPARSE_MERKLE_PLACEHOLDER_HASH)
-    }
-
-    pub fn describe(&self) -> &'static str {
-        if self.num_transactions != 0 {
-            "DB has been bootstrapped."
-        } else if self.state_checkpoint_hash != *SPARSE_MERKLE_PLACEHOLDER_HASH {
-            "DB has no transaction, but a non-empty pre-genesis state."
-        } else {
-            "DB is empty, has no transaction or state."
-        }
+    pub fn into_latest_executed_trees(self) -> ExecutedTrees {
+        self.synced_trees.unwrap_or(self.committed_trees)
     }
 }
 
@@ -484,9 +424,9 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// Gets the latest TreeState no matter if db has been bootstrapped.
+    /// Gets the latest ExecutedTrees no matter if db has been bootstrapped.
     /// Used by the Db-bootstrapper.
-    fn get_latest_tree_state(&self) -> Result<TreeState> {
+    fn get_latest_executed_trees(&self) -> Result<ExecutedTrees> {
         unimplemented!()
     }
 

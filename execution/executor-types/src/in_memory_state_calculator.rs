@@ -1,89 +1,27 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{
-    collections::{hash_map, HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{hash_map, HashMap, HashSet};
 
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{anyhow, bail, Result};
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 use crate::{ParsedTransactionOutput, ProofReader};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_state_view::{account_with_state_cache::AsAccountWithStateCache, StateViewId};
+use aptos_state_view::account_with_state_cache::AsAccountWithStateCache;
 use aptos_types::{
     account_view::AccountView,
     epoch_state::EpochState,
     event::EventKey,
     nibble::nibble_path::NibblePath,
     on_chain_config,
-    proof::{accumulator::InMemoryAccumulator, definition::LeafCount},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionPayload, Version},
     write_set::{WriteOp, WriteSet},
 };
 use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
-use storage_interface::{
-    cached_state_view::{CachedStateView, StateCache},
-    in_memory_state::InMemoryState,
-    sync_proof_fetcher::SyncProofFetcher,
-    DbReader, ExecutedTrees, TreeState,
-};
-
-pub trait IntoLedgerView {
-    fn into_ledger_view(self, db: &Arc<dyn DbReader>) -> Result<ExecutedTrees>;
-}
-
-impl IntoLedgerView for TreeState {
-    fn into_ledger_view(self, db: &Arc<dyn DbReader>) -> Result<ExecutedTrees> {
-        let checkpoint_state = InMemoryState::new_at_checkpoint(
-            self.state_checkpoint_hash,
-            self.state_checkpoint_version,
-        );
-        let checkpoint_next_version = self.state_checkpoint_version.map_or(0, |v| v + 1);
-
-        ensure!(
-            checkpoint_next_version <= self.num_transactions,
-            "checkpoint is after latest version. checkpoint_next_version: {}, num_transactions: {}",
-            checkpoint_next_version,
-            self.num_transactions,
-        );
-
-        let state = if self.num_transactions == checkpoint_next_version {
-            checkpoint_state
-        } else {
-            ensure!(
-                self.num_transactions - checkpoint_next_version <= MAX_WRITE_SETS_AFTER_CHECKPOINT,
-                "Too many versions after state checkpoint. checkpoint_next_version: {}, num_transactions: {}",
-                checkpoint_next_version,
-                self.num_transactions,
-            );
-            let checkpoint_state_view = CachedStateView::new(
-                StateViewId::Miscellaneous,
-                db.clone(),
-                self.num_transactions,
-                checkpoint_state.checkpoint.clone(),
-                Arc::new(SyncProofFetcher::new(db.clone())),
-            )?;
-            let write_sets = db.get_write_sets(checkpoint_next_version, self.num_transactions)?;
-            checkpoint_state_view.prime_cache_by_write_set(&write_sets)?;
-            let state_cache = checkpoint_state_view.into_state_cache();
-            let calculator = InMemoryStateCalculator::new(&checkpoint_state, state_cache);
-            calculator.calculate_for_write_sets_after_checkpoint(&write_sets)?
-        };
-
-        let transaction_accumulator = Arc::new(InMemoryAccumulator::new(
-            self.ledger_frozen_subtree_hashes,
-            self.num_transactions,
-        )?);
-
-        Ok(ExecutedTrees::new(state, transaction_accumulator))
-    }
-}
-
-const MAX_WRITE_SETS_AFTER_CHECKPOINT: LeafCount = 200_000;
+use storage_interface::{cached_state_view::StateCache, in_memory_state::InMemoryState};
 
 pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);
 
