@@ -41,7 +41,7 @@ impl TryFrom<&AccountIdentifier> for AccountAddress {
             Ok(address)
         } else {
             Ok(AccountAddress::from_str(&account.address)
-                .map_err(|_| ApiError::AptosError("Invalid account address".to_string()))?)
+                .map_err(|_| ApiError::AptosError(Some("Invalid account address".to_string())))?)
         }
     }
 }
@@ -90,7 +90,7 @@ impl BlockIdentifier {
     pub fn from_transaction(block_size: u64, txn: &Transaction) -> ApiResult<BlockIdentifier> {
         let txn_info = txn
             .transaction_info()
-            .map_err(|err| ApiError::AptosError(err.to_string()))?;
+            .map_err(|err| ApiError::AptosError(Some(err.to_string())))?;
         Ok(Self::from_transaction_info(block_size, txn_info))
     }
 }
@@ -119,7 +119,7 @@ impl TryFrom<&NetworkIdentifier> for ChainId {
 
     fn try_from(network_identifier: &NetworkIdentifier) -> Result<Self, Self::Error> {
         ChainId::from_str(network_identifier.network.trim())
-            .map_err(|err| ApiError::AptosError(err.to_string()))
+            .map_err(|err| ApiError::AptosError(Some(err.to_string())))
     }
 }
 
