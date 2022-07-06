@@ -392,7 +392,7 @@ impl Transaction {
         use aptos_rest_client::Transaction::*;
         let (maybe_sender, txn_info, events) = match txn {
             // Pending transactions aren't supported by Rosetta (for now)
-            PendingTransaction(_) => return Err(ApiError::BadBlockRequest),
+            PendingTransaction(_) => return Err(ApiError::TransactionIsPending),
             UserTransaction(txn) => (Some(txn.request.sender), txn.info, txn.events),
             GenesisTransaction(txn) => (None, txn.info, txn.events),
             BlockMetadataTransaction(txn) => (None, txn.info, txn.events),
@@ -511,7 +511,7 @@ impl Transaction {
                                     if let Some(currency) = coin_cache
                                         .get_currency(
                                             rest_client,
-                                            coin_type,
+                                            coin_type.clone(),
                                             Some(txn_info.version.0),
                                         )
                                         .await?
@@ -522,7 +522,10 @@ impl Transaction {
                                             deposit_event_key: deposit_event,
                                         });
                                     } else {
-                                        return Err(ApiError::BadCoin);
+                                        return Err(ApiError::UnsupportedCurrency(format!(
+                                            "Currency {} is not supported",
+                                            coin_type
+                                        )));
                                     }
                                 }
                             }
@@ -698,10 +701,10 @@ impl InternalOperation {
                     }
                 }
 
-                Err(ApiError::BadTransactionPayload)
+                Err(ApiError::InvalidOperations)
             }
             2 => Ok(Self::Transfer(Transfer::extract_transfer(operations)?)),
-            _ => Err(ApiError::BadTransactionPayload),
+            _ => Err(ApiError::InvalidOperations),
         }
     }
 
@@ -740,7 +743,7 @@ impl Transfer {
                     == OperationType::Withdraw
             }))
         {
-            return Err(ApiError::BadTransferOperations(
+            return Err(ApiError::InvalidTransferOperations(
                 "Must have exactly 1 withdraw and 1 deposit".to_string(),
             ));
         }
@@ -752,7 +755,7 @@ impl Transfer {
         }
         let mut keys = op_map.keys();
         if !keys.contains(&OperationType::Withdraw) || !keys.contains(&OperationType::Deposit) {
-            return Err(ApiError::BadTransferOperations(
+            return Err(ApiError::InvalidTransferOperations(
                 "Must have exactly 1 withdraw and 1 deposit".to_string(),
             ));
         }
@@ -762,14 +765,18 @@ impl Transfer {
         let sender = if let Some(ref account) = withdraw.account {
             account.try_into()?
         } else {
-            return Err(ApiError::AccountNotFound);
+            return Err(ApiError::InvalidTransferOperations(
+                "Invalid withdraw account provided".to_string(),
+            ));
         };
 
         let deposit = op_map.get(&OperationType::Deposit).unwrap();
         let receiver = if let Some(ref account) = deposit.account {
             account.try_into()?
         } else {
-            return Err(ApiError::AccountNotFound);
+            return Err(ApiError::InvalidTransferOperations(
+                "Invalid deposit account provided".to_string(),
+            ));
         };
 
         let (amount, currency): (u64, Currency) =
@@ -778,26 +785,34 @@ impl Transfer {
             {
                 // Currencies have to be the same
                 if withdraw_amount.currency != deposit_amount.currency {
-                    return Err(ApiError::BadCoin);
+                    return Err(ApiError::InvalidTransferOperations(
+                        "Currency mismatch between withdraw and deposit".to_string(),
+                    ));
                 }
 
                 // Check that the currency is supported
                 // TODO: in future use currency, since there's more than just 1
                 let _ = is_native_coin(&withdraw_amount.currency)?;
 
-                let withdraw_value = i64::from_str(&withdraw_amount.value)
-                    .map_err(|_| ApiError::BadTransactionPayload)?;
-                let deposit_value = i64::from_str(&deposit_amount.value)
-                    .map_err(|_| ApiError::BadTransactionPayload)?;
+                let withdraw_value = i64::from_str(&withdraw_amount.value).map_err(|_| {
+                    ApiError::InvalidTransferOperations("Withdraw amount is invalid".to_string())
+                })?;
+                let deposit_value = i64::from_str(&deposit_amount.value).map_err(|_| {
+                    ApiError::InvalidTransferOperations("Deposit amount is invalid".to_string())
+                })?;
 
                 // We can't create or destroy coins, they must be negatives of each other
                 if -withdraw_value != deposit_value {
-                    return Err(ApiError::BadTransactionPayload);
+                    return Err(ApiError::InvalidTransferOperations(
+                        "Withdraw amount must be equal to negative of deposit amount".to_string(),
+                    ));
                 }
 
                 (deposit_value as u64, deposit_amount.currency.clone())
             } else {
-                return Err(ApiError::BadTransactionPayload);
+                return Err(ApiError::InvalidTransferOperations(
+                    "Must have exactly 1 withdraw and 1 deposit with amounts".to_string(),
+                ));
             };
 
         Ok(Transfer {

@@ -123,7 +123,9 @@ async fn construction_combine(
     // Single signer only supported for now
     // TODO: Support multi-agent / multi-signer?
     if request.signatures.len() != 1 {
-        return Err(ApiError::BadSignatureCount);
+        return Err(ApiError::UnsupportedSignatureCount(
+            request.signatures.len(),
+        ));
     }
 
     let signature = &request.signatures[0];
@@ -131,7 +133,7 @@ async fn construction_combine(
     if signature.signature_type != SignatureType::Ed25519
         || signature.public_key.curve_type != CurveType::Edwards25519
     {
-        return Err(ApiError::BadSignatureType);
+        return Err(ApiError::InvalidSignatureType);
     }
 
     let public_key: Ed25519PublicKey =
@@ -211,7 +213,7 @@ async fn construction_metadata(
 
     // Ensure this network really is the one we expect it to be
     if server_context.chain_id.id() != response.state().chain_id {
-        return Err(ApiError::BadNetwork);
+        return Err(ApiError::ChainIdMismatch);
     }
 
     // TODO: Suggest fees?
@@ -278,7 +280,7 @@ async fn construction_payloads(
     let metadata = if let Some(ref metadata) = request.metadata {
         metadata
     } else {
-        return Err(ApiError::BadTransactionPayload);
+        return Err(ApiError::MissingPayloadMetadata);
     };
 
     // Encode operation
@@ -289,7 +291,7 @@ async fn construction_payloads(
         ),
         InternalOperation::Transfer(transfer) => {
             if transfer.currency != native_coin() {
-                return Err(ApiError::BadCoin);
+                return Err(ApiError::UnsupportedCurrency(transfer.currency.symbol));
             }
             (
                 aptos_stdlib::encode_test_coin_transfer(transfer.receiver, transfer.amount),
@@ -342,7 +344,7 @@ async fn construction_preprocess(
     // Ensure that the max fee is only in the native coin
     let max_gas = if let Some(max_fees) = request.max_fee {
         if max_fees.len() != 1 {
-            return Err(ApiError::BadTransactionPayload);
+            return Err(ApiError::InvalidMaxGasFees);
         }
         let max_fee = max_fees.first().unwrap();
         is_native_coin(&max_fee.currency)?;
@@ -354,7 +356,7 @@ async fn construction_preprocess(
     // Let's not accept fractions, as we don't support it
     let gas_price_per_unit = if let Some(fee_multiplier) = request.suggested_fee_multiplier {
         if fee_multiplier != (fee_multiplier as u32) as f64 {
-            return Err(ApiError::BadTransactionPayload);
+            return Err(ApiError::InvalidGasMultiplier);
         }
 
         fee_multiplier as u64
