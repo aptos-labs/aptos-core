@@ -8,7 +8,7 @@ ActiveAdmin.register User do
   actions :all, except: %i[destroy new]
 
   permit_params :email, :is_root, :kyc_exempt
-  includes :authorizations, :it1_profile, :it2_profile
+  includes :authorizations, :it2_profile
 
   index do
     selectable_column
