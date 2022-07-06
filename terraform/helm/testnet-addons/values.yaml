@@ -10,6 +10,7 @@ genesis:
   username_prefix: aptos-node
   numValidators:
   chain_id:
+  era:
 
 waypoint:
   nodeSelector: {}
