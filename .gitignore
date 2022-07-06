@@ -90,3 +90,6 @@ target-out-docker
 # Typescript
 *.env
 node_modules
+
+# Vim ignores
+**/.*.swn
