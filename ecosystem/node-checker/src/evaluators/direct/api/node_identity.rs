@@ -15,9 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Display, str::FromStr};
 use thiserror::Error as ThisError;
 
-use super::DirectEvaluatorInput;
-
-pub const CATEGORY: &str = "node_identity";
+use super::{super::DirectEvaluatorInput, API_CATEGORY};
 
 /// This function hits the `/` endpoint of the API and returns the chain ID
 /// and role type, extracted from the IndexResponse.
@@ -86,23 +84,7 @@ impl NodeIdentityEvaluator {
         Self { args }
     }
 
-    fn build_evaluation(
-        &self,
-        headline: String,
-        score: u8,
-        explanation: String,
-    ) -> EvaluationResult {
-        EvaluationResult {
-            headline,
-            score,
-            explanation,
-            category: CATEGORY.to_string(),
-            evaluator_name: Self::get_name(),
-            links: vec![],
-        }
-    }
-
-    fn build_evaluation_result<T: Display + PartialEq>(
+    fn help_build_evaluation_result<T: Display + PartialEq>(
         &self,
         baseline_value: T,
         target_value: T,
@@ -133,7 +115,7 @@ impl NodeIdentityEvaluator {
                 ),
             )
         };
-        self.build_evaluation(headline, score, explanation)
+        self.build_evaluation_result(headline, score, explanation)
     }
 }
 
@@ -148,7 +130,7 @@ impl Evaluator for NodeIdentityEvaluator {
             match get_node_identity(&input.target_node_address).await {
                 Ok((chain_id, role_type)) => (chain_id, role_type),
                 Err(e) => {
-                    return Ok(vec![self.build_evaluation(
+                    return Ok(vec![self.build_evaluation_result(
                         "Failed to get node identity from target node".to_string(),
                         0,
                         format!(
@@ -162,12 +144,12 @@ impl Evaluator for NodeIdentityEvaluator {
             };
 
         let evaluation_results = vec![
-            self.build_evaluation_result(
+            self.help_build_evaluation_result(
                 input.baseline_node_information.chain_id,
                 target_chain_id,
                 "Chain ID",
             ),
-            self.build_evaluation_result(
+            self.help_build_evaluation_result(
                 input.baseline_node_information.role_type,
                 target_role_type,
                 "Role Type",
@@ -177,8 +159,12 @@ impl Evaluator for NodeIdentityEvaluator {
         Ok(evaluation_results)
     }
 
-    fn get_name() -> String {
-        CATEGORY.to_string()
+    fn get_category_name() -> String {
+        API_CATEGORY.to_string()
+    }
+
+    fn get_evaluator_name() -> String {
+        "node_identity".to_string()
     }
 
     fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {

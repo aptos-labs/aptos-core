@@ -271,6 +271,8 @@ GEM
       connection_pool (~> 2.2)
       http (>= 4.3, < 6.0)
       maxmind-db (~> 1.1)
+    memery (1.4.1)
+      ruby2_keywords (~> 0.0.2)
     method_source (1.0.0)
     mime-types (3.4.1)
       mime-types-data (~> 3.2015)
@@ -297,6 +299,8 @@ GEM
       timeout
     nio4r (2.5.8)
     nokogiri (1.13.6-arm64-darwin)
+      racc (~> 1.4)
+    nokogiri (1.13.6-x86_64-darwin)
       racc (~> 1.4)
     nokogiri (1.13.6-x86_64-linux)
       racc (~> 1.4)
@@ -481,6 +485,7 @@ GEM
 
 PLATFORMS
   arm64-darwin-21
+  x86_64-darwin-19
   x86_64-linux
 
 DEPENDENCIES
@@ -510,6 +515,7 @@ DEPENDENCIES
   kaminari
   lograge (~> 0.12.0)
   maxmind-geoip2
+  memery
   omniauth
   omniauth-discord
   omniauth-github

@@ -64,6 +64,7 @@ fullnode:
     max_inbound_connections: 100
 
 haproxy:
+  enabled: true
   replicas: 1
   image:
     repo: haproxy
@@ -108,6 +109,9 @@ serviceAccount:
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
   name:
+
+# LEGACY: create PodSecurityPolicy, which exists at the cluster-level
+podSecurityPolicy: true
 
 # Load test-data for starting a test network
 loadTestGenesis: false

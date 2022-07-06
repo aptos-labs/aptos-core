@@ -104,6 +104,19 @@ prop_compose! {
     }
 }
 
+// This generates an arbitrary BlockType::Proposal enum instance.
+prop_compose! {
+    pub fn arb_nil_block(
+    )(
+        author in any::<AccountAddress>(),
+        round in any::<u64>(),
+    ) -> BlockType {
+        BlockType::NilBlock{
+            failed_authors: vec![(round, author)],
+        }
+    }
+}
+
 // This generates an arbitrary MaybeSignedVoteProposal.
 prop_compose! {
     pub fn arb_maybe_signed_vote_proposal(
@@ -230,7 +243,7 @@ prop_compose! {
 fn arb_block_type() -> impl Strategy<Value = BlockType> {
     prop_oneof![
         arb_block_type_proposal(),
-        Just(BlockType::NilBlock),
+        arb_nil_block(),
         Just(BlockType::Genesis),
     ]
 }

@@ -32,6 +32,12 @@ class DiscourseController < ApplicationController
     sso.external_id = current_user.external_id # unique id for each user of your application
     sso.sso_secret = secret
 
+    sso.admin = current_user.is_root?
+
+    add_groups = []
+    add_groups.append('ait2_eligible') if current_user.ait2_registration_complete?
+    sso.add_groups = add_groups if add_groups.present?
+
     redirect_to sso.to_url(DiscourseHelper.discourse_url('/session/sso_login')), allow_other_host: true
   end
 

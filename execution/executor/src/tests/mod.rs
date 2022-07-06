@@ -409,6 +409,7 @@ fn apply_transaction_by_writeset(
             ledger_view.txn_accumulator().num_leaves(),
             ledger_view.state().checkpoint_version,
             None,
+            executed.result_view.state_tree(),
         )
         .unwrap();
 }
@@ -549,6 +550,7 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
                 ledger_view.txn_accumulator().num_leaves(),
                 ledger_view.state().checkpoint_version,
                 None,
+                executed.result_view.state_tree(),
             )
             .unwrap();
         ledger_view = executed.result_view;

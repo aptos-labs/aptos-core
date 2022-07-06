@@ -106,7 +106,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})\n",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})\n",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -196,7 +196,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"})",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"})",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
@@ -285,7 +285,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"})",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"})",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
@@ -367,7 +367,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_network_key_mismatch{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_network_key_mismatch{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
           "refId": "A"
@@ -474,7 +474,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", metric=\"allowed\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
@@ -564,7 +564,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", metric=\"allowed\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"allowed\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
@@ -654,7 +654,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", metric=\"throttled\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"inbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
@@ -744,7 +744,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", metric=\"throttled\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", metric=\"throttled\", direction=\"outbound\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
@@ -1234,7 +1234,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_network_notifications{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_network_notifications{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
+              "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_network_notifications{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_network_notifications{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
               "refId": "A"
@@ -1326,7 +1326,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
+              "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_peer_manager_requests{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
               "refId": "B"
@@ -1418,7 +1418,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_requests{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_requests{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
+              "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_requests{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_requests{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
               "refId": "A"
@@ -1510,7 +1510,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_health_check_events{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_health_check_events{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
+              "expr": "sum by (kubernetes_pod_name, role)(aptos_network_pending_health_check_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"enqueued\"}) - sum by (kubernetes_pod_name, role)(aptos_network_pending_health_check_events{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\",state=\"dequeued\"})",
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
               "refId": "A"
@@ -1602,7 +1602,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(aptos_network_pending_wire_messages{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\"}[$AggInterval])",
+              "expr": "rate(aptos_network_pending_wire_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\"}[$AggInterval])",
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
               "refId": "B"
@@ -1694,7 +1694,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(aptos_network_pending_connectivity_manager_requests{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\"}[$AggInterval])",
+              "expr": "rate(aptos_network_pending_connectivity_manager_requests{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role_type\"}[$AggInterval])",
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
               "refId": "B"
@@ -1803,7 +1803,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=~\"(declined|canceled)\"}[$AggInterval])",
+              "expr": "rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=~\"(declined|canceled)\"}[$AggInterval])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -1914,7 +1914,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\" }[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\" }[$AggInterval]))",
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
@@ -2006,7 +2006,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\" }[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\" }[$AggInterval]))",
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
@@ -2098,7 +2098,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
@@ -2192,7 +2192,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
@@ -2286,7 +2286,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
@@ -2380,7 +2380,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
@@ -2474,7 +2474,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"inbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
@@ -2568,7 +2568,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role_type, network_id, le) (rate(aptos_network_connection_upgrade_time_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"outbound\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
@@ -2679,7 +2679,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=~\"(sent|failed)\"}[$AggInterval]))",
+              "expr": "sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=~\"(sent|failed)\"}[$AggInterval]))",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -2772,7 +2772,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"response\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=\"received\"}[$AggInterval]))",
+              "expr": "sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"response\",state=\"failed\"}[$AggInterval])) / sum by(network_id, role_type, kubernetes_pod_name) (rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\",role_type=~\"$role_type\",kubernetes_pod_name=~\"$kubernetes_pod_name\",type=\"request\",state=\"received\"}[$AggInterval]))",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -2865,7 +2865,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id) (rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -2958,7 +2958,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -3052,7 +3052,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", type=\"request\",state=\"sent\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", type=\"request\",state=\"sent\"}[$AggInterval]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -3145,7 +3145,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", type=\"request\", state=\"received\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", type=\"request\", state=\"received\"}[$AggInterval]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -3239,7 +3239,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
@@ -3333,7 +3333,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
@@ -3427,7 +3427,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
@@ -3521,7 +3521,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
@@ -3615,7 +3615,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_outbound_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
@@ -3709,7 +3709,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
+              "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, network_id, role_type, le)(rate(aptos_network_inbound_rpc_handler_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", protocol_id=~\"$rpc_protocol\",kubernetes_pod_name=~\"$kubernetes_pod_name\",network_id=~\"$network_id\",role_type=~\"$role_type\"}[$AggInterval])))",
               "hide": false,
               "instant": false,
               "interval": "",
@@ -3820,7 +3820,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -3913,7 +3913,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -4005,7 +4005,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"sent\"}[$AggInterval]))",
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
@@ -4095,7 +4095,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
+              "expr": "sum by (kubernetes_pod_name, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role_type=~\"$role_type\", kubernetes_pod_name=~\"$kubernetes_pod_name\", state=\"received\"}[$AggInterval]))",
               "interval": "",
               "legendFormat": "{{kubernetes_pod_name}}-{{role_type}}-{{network_id}}",
               "refId": "A"
@@ -4160,6 +4160,40 @@
         "regex": "",
         "skipUrlSync": false,
         "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(namespace)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "query": "label_values(namespace)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
       },
       {
         "current": {

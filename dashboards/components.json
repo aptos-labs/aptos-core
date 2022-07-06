@@ -109,7 +109,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_last_committed_round{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_consensus_last_committed_round{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -212,7 +212,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", stage=\"committed\"}[$AggInterval])/rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", stage=\"committed\"}[$AggInterval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", stage=\"committed\"}[$AggInterval])/rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", stage=\"committed\"}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -305,7 +305,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_timeout_rounds_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_consensus_timeout_rounds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -398,7 +398,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_timeout_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_consensus_timeout_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -491,7 +491,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_error_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]) / on (kubernetes_pod_name) rate(consensus_duration_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", op='main_loop'}[$AggInterval])",
+          "expr": "rate(aptos_consensus_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]) / on (kubernetes_pod_name) rate(consensus_duration_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", op='main_loop'}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
@@ -600,7 +600,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role, le)(rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.50, sum by (kubernetes_pod_name, role, le)(rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -692,7 +692,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role, le)(rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.90, sum by (kubernetes_pod_name, role, le)(rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -784,7 +784,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role, le) (rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role, le) (rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -876,7 +876,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.5, sum by (kubernetes_pod_name, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.5, sum by (kubernetes_pod_name, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -967,7 +967,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.9, sum by (kubernetes_pod_name, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.9, sum by (kubernetes_pod_name, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1058,7 +1058,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.99, sum by (kubernetes_pod_name, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1165,13 +1165,13 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_key_manager_state{chain_name=~\"$chain_name\", state=\"liveness_error_encountered\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1h])",
+          "expr": "increase(aptos_key_manager_state{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"liveness_error_encountered\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1h])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}_liveness_error",
           "refId": "A"
         },
         {
-          "expr": "increase(aptos_key_manager_state{chain_name=~\"$chain_name\", state=\"unexpected_error_encountered\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1h])",
+          "expr": "increase(aptos_key_manager_state{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"unexpected_error_encountered\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1h])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}_unexpected_error",
           "refId": "B"
@@ -1260,7 +1260,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_key_manager_state{chain_name=~\"$chain_name\", state=\"keys_still_fresh\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1h])",
+          "expr": "increase(aptos_key_manager_state{chain_name=~\"$chain_name\", namespace=~\"$namespace\", state=\"keys_still_fresh\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[1h])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}_keys_still_fresh",
           "refId": "A"
@@ -1366,7 +1366,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"}",
+          "expr": "aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"}",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -1454,7 +1454,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"}",
+          "expr": "aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=~\"$network_id\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"}",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -1560,7 +1560,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", role=~\"$role\",kubernetes_pod_name=~\"$kubernetes_pod_name\",index=\"system_ttl\"}",
+          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\",kubernetes_pod_name=~\"$kubernetes_pod_name\",index=\"system_ttl\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -1654,7 +1654,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (kubernetes_pod_name, role) (rate(aptos_shared_mempool_transaction_broadcast_sum{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role) (rate(aptos_shared_mempool_transaction_broadcast_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1764,7 +1764,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", result=\"error\"}[$AggInterval])",
+          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", result=\"error\"}[$AggInterval])",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -1859,7 +1859,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"epoch\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", namespace=~\"$namespace\", field=\"epoch\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -1954,7 +1954,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"last_voted_round\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", namespace=~\"$namespace\", field=\"last_voted_round\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2049,7 +2049,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"preferred_round\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", namespace=~\"$namespace\", field=\"preferred_round\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2163,7 +2163,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_schemadb_get_latency_seconds_sum{chain_name=~\"$chain_name\", role=~\"$role\",kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_schemadb_get_latency_seconds_count{chain_name=~\"$chain_name\", role=~\"$role\",kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_schemadb_get_latency_seconds_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\",kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_schemadb_get_latency_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\",kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -2268,7 +2268,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_user_transactions_executed{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\",status=\"success\"}[1m])",
+          "expr": "rate(aptos_vm_user_transactions_executed{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\",status=\"success\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2360,7 +2360,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_system_transactions_executed{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[1m])",
+          "expr": "rate(aptos_vm_system_transactions_executed{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2452,7 +2452,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_txn_total_seconds_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[1m])/rate(aptos_vm_txn_total_seconds_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[1m])",
+          "expr": "rate(aptos_vm_txn_total_seconds_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[1m])/rate(aptos_vm_txn_total_seconds_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2561,7 +2561,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (kubernetes_pod_name, role, type) (rate(aptos_client_service_rpc_requests_count{chain_name=~\"$chain_name\", role=~\"$role\", type=~\"$requesttype\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role, type) (rate(aptos_client_service_rpc_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", type=~\"$requesttype\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{type}}",
           "refId": "A"
@@ -2655,7 +2655,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (kubernetes_pod_name, role, method, errorcode) (rate(aptos_client_service_internal_error_count{chain_name=~\"$chain_name\", role=~\"$role\", type=~\"$requesttype\", method=~\"$method\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role, method, errorcode) (rate(aptos_client_service_internal_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", type=~\"$requesttype\", method=~\"$method\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{method}} {{errortype}}",
           "refId": "A"
@@ -2749,7 +2749,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (kubernetes_pod_name, role, method, errortype) (rate(aptos_client_service_invalid_requests_count{chain_name=~\"$chain_name\", role=~\"$role\", type=~\"$requesttype\", method=~\"$method\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
+          "expr": "sum by (kubernetes_pod_name, role, method, errortype) (rate(aptos_client_service_invalid_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", type=~\"$requesttype\", method=~\"$method\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{method}} {{errortype}}",
           "refId": "A"
@@ -2839,7 +2839,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum  by (kubernetes_pod_name, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\",type=~\"$requesttype\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.50, sum  by (kubernetes_pod_name, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\",type=~\"$requesttype\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
@@ -2928,7 +2928,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.90, sum  by (kubernetes_pod_name, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\",type=~\"$requesttype\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.90, sum  by (kubernetes_pod_name, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\",type=~\"$requesttype\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
@@ -3017,7 +3017,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum  by (kubernetes_pod_name, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\",type=~\"$requesttype\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.99, sum  by (kubernetes_pod_name, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\",type=~\"$requesttype\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
@@ -3123,7 +3123,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -3212,7 +3212,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "1-(rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
+          "expr": "1-(rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -3303,7 +3303,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(rate(aptos_struct_log_connect_error_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]) or 0 * rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])) / rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
+          "expr": "(rate(aptos_struct_log_connect_error_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval]) or 0 * rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])) / rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{role}}",
           "refId": "A"
@@ -3366,6 +3366,40 @@
         "regex": "",
         "skipUrlSync": false,
         "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(namespace)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "query": "label_values(namespace)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
       },
       {
         "current": {

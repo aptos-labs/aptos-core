@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::DirectEvaluatorInput;
+use super::{super::DirectEvaluatorInput, ApiEvaluatorError, API_CATEGORY};
 use crate::{
     configuration::EvaluatorArgs,
     evaluator::{EvaluationResult, Evaluator},
@@ -9,16 +9,14 @@ use crate::{
 };
 use anyhow::Result;
 use clap::Parser;
+use const_format::formatcp;
 use poem_openapi::Object as PoemObject;
 use serde::{Deserialize, Serialize};
-use thiserror::Error as ThisError;
 use tokio::time::{Duration, Instant};
 use url::Url;
 
-pub const CATEGORY: &str = "performance";
-
-#[derive(Debug, ThisError)]
-pub enum LatencyEvaluatorError {}
+const LINK: &str =
+    "https://aptos.dev/nodes/node-health-checker-faq#how-does-the-latency-evaluator-work";
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
 pub struct LatencyEvaluatorArgs {
@@ -34,9 +32,18 @@ pub struct LatencyEvaluatorArgs {
     #[clap(long, default_value_t = 1)]
     pub num_allowed_errors: u16,
 
-    /// If the average latency exceeds this value, it will fail the evaluation.
-    #[clap(long, default_value_t = 500)]
-    pub max_latency_ms: u64,
+    #[clap(
+        long,
+        default_value_t = 1000,
+        help = formatcp!(
+            "If the average latency exceeds this value, it will fail the evaluation. \
+            This value is not the same as regular latency , e.g. with the ping tool. \
+            Instead, this measures the total RTT for an API call to the node. \
+            See {} for more information.",
+            LINK
+        )
+    )]
+    pub max_api_latency_ms: u64,
 }
 
 #[derive(Debug)]
@@ -49,30 +56,14 @@ impl LatencyEvaluator {
         Self { args }
     }
 
-    fn build_evaluation_result(
-        &self,
-        headline: String,
-        score: u8,
-        explanation: String,
-    ) -> EvaluationResult {
-        EvaluationResult {
-            headline,
-            score,
-            explanation,
-            category: CATEGORY.to_string(),
-            evaluator_name: Self::get_name(),
-            links: vec![],
-        }
-    }
-
     async fn get_latency_datapoint(&self, target_url: Url) -> Result<Duration> {
-        let start = Instant::now();
         let client = reqwest::ClientBuilder::new()
             .timeout(std::time::Duration::from_millis(
-                self.args.max_latency_ms * 2,
+                self.args.max_api_latency_ms * 2,
             ))
             .build()
             .unwrap();
+        let start = Instant::now();
         client.get(target_url).send().await?;
         Ok(start.elapsed())
     }
@@ -81,7 +72,7 @@ impl LatencyEvaluator {
 #[async_trait::async_trait]
 impl Evaluator for LatencyEvaluator {
     type Input = DirectEvaluatorInput;
-    type Error = LatencyEvaluatorError;
+    type Error = ApiEvaluatorError;
 
     async fn evaluate(&self, input: &Self::Input) -> Result<Vec<EvaluationResult>, Self::Error> {
         let mut target_url = input.target_node_address.url.clone();
@@ -98,13 +89,14 @@ impl Evaluator for LatencyEvaluator {
                 Err(e) => errors.push(e),
             }
             if errors.len() as u16 > self.args.num_allowed_errors {
-                return Ok(vec![self.build_evaluation_result(
-                    "Node returned too many errors while checking latency".to_string(),
+                return Ok(vec![self.build_evaluation_result_with_links(
+                    "Node returned too many errors while checking API latency".to_string(),
                     0,
                     format!(
-                        "The node returned too many errors while checking latency, the tolerance was {} errors out of {} calls: {}",
-                        self.args.num_allowed_errors, self.args.num_samples, errors.into_iter().map(|e| e.to_string()).collect::<Vec<String>>().join(", ")
+                        "The node returned too many errors while checking API RTT (Round trip time), the tolerance was {} errors out of {} calls: {}. Note, this latency is not the same as standard ping latency, see the attached link.",
+                        self.args.num_allowed_errors, self.args.num_samples, errors.into_iter().map(|e| e.to_string()).collect::<Vec<String>>().join(", "),
                     ),
+                    vec![LINK.to_string()],
                 )]);
             }
             tokio::time::sleep(std::time::Duration::from_millis(
@@ -116,31 +108,37 @@ impl Evaluator for LatencyEvaluator {
         let average_latency =
             latencies.iter().sum::<Duration>().as_millis() as u64 / latencies.len() as u64;
 
-        let evaluation_result = if average_latency > self.args.max_latency_ms {
-            self.build_evaluation_result(
-                "Average latency too high".to_string(),
+        let evaluation_result = if average_latency > self.args.max_api_latency_ms {
+            self.build_evaluation_result_with_links(
+                "Average API latency too high".to_string(),
                 50,
                 format!(
-                    "The average latency was {}ms, which is higher than the maximum allowed latency of {}ms",
-                    average_latency, self.args.max_latency_ms
+                    "The average API latency was {}ms, which is higher than the maximum allowed latency of {}ms. Note, this latency is not the same as standard ping latency, see the attached link.",
+                    average_latency, self.args.max_api_latency_ms
                 ),
+                vec![LINK.to_string()],
             )
         } else {
-            self.build_evaluation_result(
-                "Average latency is good".to_string(),
+            self.build_evaluation_result_with_links(
+                "Average API latency is good".to_string(),
                 100,
                 format!(
-                    "The average latency was {}ms, which is below the maximum allowed latency of {}ms",
-                    average_latency, self.args.max_latency_ms
+                    "The average API latency was {}ms, which is below the maximum allowed latency of {}ms. Note, this latency is not the same as standard ping latency, see the attached link.",
+                    average_latency, self.args.max_api_latency_ms
                 ),
+                vec![LINK.to_string()],
             )
         };
 
         Ok(vec![evaluation_result])
     }
 
-    fn get_name() -> String {
-        format!("{}_latency", CATEGORY)
+    fn get_category_name() -> String {
+        API_CATEGORY.to_string()
+    }
+
+    fn get_evaluator_name() -> String {
+        "latency".to_string()
     }
 
     fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {
@@ -148,7 +146,7 @@ impl Evaluator for LatencyEvaluator {
     }
 
     fn evaluator_type_from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<EvaluatorType> {
-        Ok(EvaluatorType::Latency(Box::new(Self::from_evaluator_args(
+        Ok(EvaluatorType::Api(Box::new(Self::from_evaluator_args(
             evaluator_args,
         )?)))
     }

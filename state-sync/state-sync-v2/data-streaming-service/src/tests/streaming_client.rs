@@ -7,8 +7,8 @@ use crate::{
     error::Error,
     streaming_client::{
         new_streaming_service_client_listener_pair, ContinuouslyStreamTransactionOutputsRequest,
-        ContinuouslyStreamTransactionsRequest, DataStreamingClient, GetAllAccountsRequest,
-        GetAllEpochEndingLedgerInfosRequest, GetAllTransactionOutputsRequest,
+        ContinuouslyStreamTransactionsRequest, DataStreamingClient,
+        GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, GetAllTransactionOutputsRequest,
         GetAllTransactionsRequest, NotificationFeedback, StreamRequest, StreamingServiceListener,
         TerminateStreamRequest,
     },
@@ -36,23 +36,23 @@ fn test_client_service_error() {
 }
 
 #[test]
-fn test_get_all_accounts() {
+fn test_get_all_states() {
     // Create a new streaming service client and listener
     let (streaming_service_client, streaming_service_listener) =
         new_streaming_service_client_listener_pair();
 
     // Note the request we expect to receive on the streaming service side
     let request_version = 100;
-    let expected_request = StreamRequest::GetAllAccounts(GetAllAccountsRequest {
+    let expected_request = StreamRequest::GetAllStates(GetAllStatesRequest {
         version: request_version,
         start_index: 0,
     });
 
-    // Spawn a new server thread to handle any account stream requests
+    // Spawn a new server thread to handle any stream requests
     let _handler = spawn_service_and_expect_request(streaming_service_listener, expected_request);
 
-    // Send an account stream request and verify we get a data stream listener
-    let response = block_on(streaming_service_client.get_all_accounts(request_version, None));
+    // Send a state value stream request and verify we get a data stream listener
+    let response = block_on(streaming_service_client.get_all_state_values(request_version, None));
     assert_ok!(response);
 }
 

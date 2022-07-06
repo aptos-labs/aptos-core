@@ -807,6 +807,7 @@ dependencies = [
  "aptos-workspace-hack",
  "async-trait",
  "clap 3.1.18",
+ "const_format",
  "env_logger 0.8.4",
  "futures",
  "log",
@@ -1534,6 +1535,7 @@ dependencies = [
  "rand 0.7.3",
  "regex",
  "reqwest",
+ "scratchpad",
  "serde 1.0.137",
  "serde_json",
  "storage-interface",
@@ -2263,9 +2265,9 @@ checksum = "fbdcdcb6d86f71c5e97409ad45898af11cbc995b4ee8112d59095a28d376c935"
 
 [[package]]
 name = "const_format"
-version = "0.2.25"
+version = "0.2.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2906f2480cdc015e998deac388331a0f1c1cd88744948c749513020c83c370bc"
+checksum = "939dc9e2eb9077e0679d2ce32de1ded8531779360b003b4a972a7a39ec263495"
 dependencies = [
  "const_format_proc_macros",
 ]
@@ -3367,6 +3369,7 @@ dependencies = [
 name = "forge-cli"
 version = "0.0.0"
 dependencies = [
+ "aptos-logger",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-workspace-hack",
@@ -8071,6 +8074,7 @@ dependencies = [
  "move-deps",
  "network",
  "once_cell",
+ "scratchpad",
  "serde 1.0.137",
  "storage-interface",
  "storage-service-client",

@@ -63,13 +63,13 @@ pub trait StorageSynchronizerInterface {
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error>;
 
-    /// Initializes an account synchronizer with the specified
+    /// Initializes a state synchronizer with the specified
     /// `target_ledger_info` and `target_output_with_proof` at the target
-    /// syncing version. Returns a join handle to the account synchronizer.
+    /// syncing version. Returns a join handle to the state synchronizer.
     ///
     /// Note: this assumes that `epoch_change_proofs`, `target_ledger_info`,
     /// and `target_output_with_proof` have already been verified.
-    fn initialize_account_synchronizer(
+    fn initialize_state_synchronizer(
         &mut self,
         epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
         target_ledger_info: LedgerInfoWithSignatures,
@@ -80,14 +80,14 @@ pub trait StorageSynchronizerInterface {
     /// to be executed/applied or committed.
     fn pending_storage_data(&self) -> bool;
 
-    /// Saves the given account states to storage.
+    /// Saves the given state values to storage.
     ///
-    /// Note: this requires that `initialize_account_synchronizer` has been
+    /// Note: this requires that `initialize_state_synchronizer` has been
     /// called.
-    fn save_account_states(
+    fn save_state_values(
         &mut self,
         notification_id: NotificationId,
-        account_states_with_proof: StateValueChunkWithProof,
+        state_value_chunk_with_proof: StateValueChunkWithProof,
     ) -> Result<(), Error>;
 
     /// Resets the chunk executor. This is required to support continuous
@@ -100,7 +100,7 @@ pub struct StorageSynchronizer<ChunkExecutor> {
     // The executor for transaction and transaction output chunks
     chunk_executor: Arc<ChunkExecutor>,
 
-    // A channel through which to notify the driver of committed account data
+    // A channel through which to notify the driver of committed data
     commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
 
     // The configuration of the state sync driver
@@ -121,7 +121,7 @@ pub struct StorageSynchronizer<ChunkExecutor> {
     // The channel through which to notify the state snapshot receiver of new data chunks
     state_snapshot_notifier: Option<mpsc::Sender<StorageDataChunk>>,
 
-    // The reader and writer for storage (required for account syncing)
+    // The reader and writer for storage (required for state syncing)
     storage: DbReaderWriter,
 }
 
@@ -256,7 +256,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizerInterface
         self.notify_executor(storage_data_chunk)
     }
 
-    fn initialize_account_synchronizer(
+    fn initialize_state_synchronizer(
         &mut self,
         epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
         target_ledger_info: LedgerInfoWithSignatures,
@@ -267,7 +267,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizerInterface
         let (state_snapshot_notifier, state_snapshot_listener) =
             mpsc::channel(max_pending_data_chunks);
 
-        // Spawn the state snapshot receiver that commits account states
+        // Spawn the state snapshot receiver that commits state values
         let receiver_handle = spawn_state_snapshot_receiver(
             self.chunk_executor.clone(),
             state_snapshot_listener,
@@ -289,17 +289,17 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizerInterface
         load_pending_data_chunks(self.pending_data_chunks.clone()) > 0
     }
 
-    fn save_account_states(
+    fn save_state_values(
         &mut self,
         notification_id: NotificationId,
-        account_states_with_proof: StateValueChunkWithProof,
+        state_value_chunk_with_proof: StateValueChunkWithProof,
     ) -> Result<(), Error> {
         let state_snapshot_notifier = &mut self
             .state_snapshot_notifier
             .as_mut()
             .expect("The state snapshot receiver has not been initialized!");
         let storage_data_chunk =
-            StorageDataChunk::Accounts(notification_id, account_states_with_proof);
+            StorageDataChunk::States(notification_id, state_value_chunk_with_proof);
         if let Err(error) = state_snapshot_notifier.try_send(storage_data_chunk) {
             Err(Error::UnexpectedError(format!(
                 "Failed to send storage data chunk to state snapshot listener: {:?}",
@@ -321,12 +321,12 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizerInterface
     }
 }
 
-/// A chunk of data to be executed and/or committed to storage (i.e., accounts,
+/// A chunk of data to be executed and/or committed to storage (i.e., states,
 /// transactions or outputs).
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 enum StorageDataChunk {
-    Accounts(NotificationId, StateValueChunkWithProof),
+    States(NotificationId, StateValueChunkWithProof),
     Transactions(
         NotificationId,
         TransactionListWithProof,
@@ -498,7 +498,7 @@ fn spawn_committer<
     spawn(runtime, committer)
 }
 
-/// Spawns a dedicated receiver that commits accounts from a state snapshot
+/// Spawns a dedicated receiver that commits state values from a state snapshot
 fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
     mut state_snapshot_listener: mpsc::Receiver<StorageDataChunk>,
@@ -529,36 +529,36 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
             .get_state_snapshot_receiver(version, expected_root_hash)
             .expect("Failed to initialize the state snapshot receiver!");
 
-        // Handle account state chunks
+        // Handle state value chunks
         loop {
             ::futures::select! {
                 storage_data_chunk = state_snapshot_listener.select_next_some() => {
                     // Process the chunk
                     match storage_data_chunk {
-                        StorageDataChunk::Accounts(notification_id, account_states_with_proof) => {
-                            let all_accounts_synced = account_states_with_proof.is_last_chunk();
-                            let last_committed_account_index = account_states_with_proof.last_index;
+                        StorageDataChunk::States(notification_id, states_with_proof) => {
+                            let all_states_synced = states_with_proof.is_last_chunk();
+                            let last_committed_state_index = states_with_proof.last_index;
 
                             // Attempt to commit the chunk
                             let commit_result = state_snapshot_receiver.add_chunk(
-                                account_states_with_proof.raw_values,
-                                account_states_with_proof.proof.clone(),
+                                states_with_proof.raw_values,
+                                states_with_proof.proof.clone(),
                             );
                             match commit_result {
                                 Ok(()) => {
                                     // Update the metrics
                                     metrics::set_gauge(
                                         &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                                        metrics::StorageSynchronizerOperations::SyncedAccounts
+                                        metrics::StorageSynchronizerOperations::SyncedStates
                                             .get_label(),
-                                        last_committed_account_index as u64,
+                                        last_committed_state_index as u64,
                                     );
 
-                                    if !all_accounts_synced {
+                                    if !all_states_synced {
                                         // Send a commit notification to the listener
-                                        let commit_notification = CommitNotification::new_committed_accounts(all_accounts_synced, last_committed_account_index, None);
+                                        let commit_notification = CommitNotification::new_committed_states(all_states_synced, last_committed_state_index, None);
                                         if let Err(error) = commit_notification_sender.send(commit_notification).await {
-                                            let error = format!("Failed to send account commit notification! Error: {:?}", error);
+                                            let error = format!("Failed to send state commit notification! Error: {:?}", error);
                                             send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
                                         }
 
@@ -567,13 +567,13 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                         continue; // Wait for the next chunk
                                     }
 
-                                    // All accounts have been synced! Create a new commit notification
-                                    let commit_notification = create_final_commit_notification(&target_output_with_proof, last_committed_account_index);
+                                    // All states have been synced! Create a new commit notification
+                                    let commit_notification = create_final_commit_notification(&target_output_with_proof, last_committed_state_index);
 
                                     // Finalize storage, reset the executor and send a commit
                                     // notification to the listener.
                                     let finalized_result = if let Err(error) = state_snapshot_receiver.finish_box() {
-                                        Err(format!("Failed to finish the account states synchronization! Error: {:?}", error))
+                                        Err(format!("Failed to finish the state value synchronization! Error: {:?}", error))
                                     } else if let Err(error) = storage.writer.finalize_state_snapshot(version, target_output_with_proof) {
                                         Err(format!("Failed to finalize the state snapshot! Error: {:?}", error))
                                     } else if let Err(error) = storage.writer.save_ledger_infos(&epoch_change_proofs) {
@@ -581,9 +581,9 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                     } else if let Err(error) = storage.writer.delete_genesis() {
                                         Err(format!("Failed to delete the genesis transaction! Error: {:?}", error))
                                     } else if let Err(error) = chunk_executor.reset() {
-                                        Err(format!("Failed to reset the chunk executor after account states synchronization! Error: {:?}", error))
+                                        Err(format!("Failed to reset the chunk executor after states synchronization! Error: {:?}", error))
                                     } else if let Err(error) = commit_notification_sender.send(commit_notification).await {
-                                       Err(format!("Failed to send the final account commit notification! Error: {:?}", error))
+                                       Err(format!("Failed to send the final state commit notification! Error: {:?}", error))
                                     } else if let Err(error) = utils::initialize_sync_gauges(storage.reader) {
                                        Err(format!("Failed to initialize the state sync version gauges! Error: {:?}", error))
                                     } else {
@@ -598,7 +598,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                     return; // There's nothing left to do!
                                 },
                                 Err(error) => {
-                                    let error = format!("Failed to commit account states chunk! Error: {:?}", error);
+                                    let error = format!("Failed to commit state value chunk! Error: {:?}", error);
                                     send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
                                 }
                             }
@@ -617,10 +617,10 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
     spawn(runtime, receiver)
 }
 
-/// Creates a final commit notification for the last account states chunk
+/// Creates a final commit notification for the last states chunk
 fn create_final_commit_notification(
     target_output_with_proof: &TransactionOutputListWithProof,
-    last_committed_account_index: u64,
+    last_committed_state_index: u64,
 ) -> CommitNotification {
     let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
         target_output_with_proof
@@ -636,9 +636,9 @@ fn create_final_commit_notification(
         events,
         transactions,
     };
-    CommitNotification::new_committed_accounts(
+    CommitNotification::new_committed_states(
         true,
-        last_committed_account_index,
+        last_committed_state_index,
         Some(committed_transaction),
     )
 }

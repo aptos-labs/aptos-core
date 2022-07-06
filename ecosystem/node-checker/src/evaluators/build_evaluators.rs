@@ -6,12 +6,13 @@ use crate::{
     evaluator::Evaluator,
     evaluators::{
         direct::{
-            DirectEvaluatorInput, LatencyEvaluator, LatencyEvaluatorError, TpsEvaluator,
-            TpsEvaluatorError,
+            ApiEvaluatorError, DirectEvaluatorInput, LatencyEvaluator, TpsEvaluator,
+            TpsEvaluatorError, TransactionPresenceEvaluator,
         },
         metrics::{
-            ConsensusProposalsEvaluator, MetricsEvaluatorError, MetricsEvaluatorInput,
-            StateSyncVersionEvaluator,
+            ConsensusProposalsEvaluator, ConsensusRoundEvaluator, ConsensusTimeoutsEvaluator,
+            MetricsEvaluatorError, MetricsEvaluatorInput, NetworkMinimumPeersEvaluator,
+            NetworkPeersWithinToleranceEvaluator, StateSyncVersionEvaluator,
         },
         system_information::{
             BuildVersionEvaluator, SystemInformationEvaluatorError, SystemInformationEvaluatorInput,
@@ -21,8 +22,7 @@ use crate::{
 use anyhow::{bail, Result};
 use std::collections::HashSet;
 
-type LatencyEvaluatorType =
-    Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = LatencyEvaluatorError>>;
+type ApiEvaluatorType = Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = ApiEvaluatorError>>;
 type MetricsEvaluatorType =
     Box<dyn Evaluator<Input = MetricsEvaluatorInput, Error = MetricsEvaluatorError>>;
 type SystemInformationEvaluatorType = Box<
@@ -42,7 +42,7 @@ type TpsEvaluatorType = Box<dyn Evaluator<Input = DirectEvaluatorInput, Error = 
 /// see https://doc.rust-lang.org/reference/items/traits.html#object-safety.
 #[derive(Debug)]
 pub enum EvaluatorType {
-    Latency(LatencyEvaluatorType),
+    Api(ApiEvaluatorType),
     Metrics(MetricsEvaluatorType),
     SystemInformation(SystemInformationEvaluatorType),
     Tps(TpsEvaluatorType),
@@ -85,46 +85,74 @@ impl EvaluatorSet {
     pub fn get_direct_evaluators(&self) -> Vec<&EvaluatorType> {
         self.evaluators
             .iter()
-            .filter(|evaluator| {
-                matches!(evaluator, EvaluatorType::Tps(_) | EvaluatorType::Latency(_))
-            })
+            .filter(|evaluator| matches!(evaluator, EvaluatorType::Api(_) | EvaluatorType::Tps(_)))
             .collect()
     }
 }
 
 pub fn build_evaluators(
-    evaluator_names: &[String],
+    evaluator_identifiers: &[String],
     evaluator_args: &EvaluatorArgs,
 ) -> Result<EvaluatorSet> {
-    let mut evaluator_names: HashSet<String> = evaluator_names.iter().cloned().collect();
+    let mut evaluator_identifiers: HashSet<String> =
+        evaluator_identifiers.iter().cloned().collect();
     let mut evaluators: Vec<EvaluatorType> = vec![];
 
+    BuildVersionEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_identifiers,
+        evaluator_args,
+    )?;
     ConsensusProposalsEvaluator::add_from_evaluator_args(
         &mut evaluators,
-        &mut evaluator_names,
+        &mut evaluator_identifiers,
+        evaluator_args,
+    )?;
+    ConsensusRoundEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_identifiers,
+        evaluator_args,
+    )?;
+    ConsensusTimeoutsEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_identifiers,
+        evaluator_args,
+    )?;
+    LatencyEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_identifiers,
+        evaluator_args,
+    )?;
+    NetworkMinimumPeersEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_identifiers,
+        evaluator_args,
+    )?;
+    NetworkPeersWithinToleranceEvaluator::add_from_evaluator_args(
+        &mut evaluators,
+        &mut evaluator_identifiers,
         evaluator_args,
     )?;
     StateSyncVersionEvaluator::add_from_evaluator_args(
         &mut evaluators,
-        &mut evaluator_names,
+        &mut evaluator_identifiers,
         evaluator_args,
     )?;
-    BuildVersionEvaluator::add_from_evaluator_args(
+    TpsEvaluator::add_from_evaluator_args(
         &mut evaluators,
-        &mut evaluator_names,
+        &mut evaluator_identifiers,
         evaluator_args,
     )?;
-    TpsEvaluator::add_from_evaluator_args(&mut evaluators, &mut evaluator_names, evaluator_args)?;
-    LatencyEvaluator::add_from_evaluator_args(
+    TransactionPresenceEvaluator::add_from_evaluator_args(
         &mut evaluators,
-        &mut evaluator_names,
+        &mut evaluator_identifiers,
         evaluator_args,
     )?;
 
-    if !evaluator_names.is_empty() {
+    if !evaluator_identifiers.is_empty() {
         bail!(
-            "The given evaluator names were unexpected: {:?}",
-            evaluator_names
+            "The given evaluator identifiers were unexpected: {:?}",
+            evaluator_identifiers
         );
     }
 

@@ -33,16 +33,16 @@ const MEMPOOL_COMMIT_ACK_TIMEOUT_MS: u64 = 5000; // 5 seconds
 /// A notification for new data that has been committed to storage
 #[derive(Clone, Debug)]
 pub enum CommitNotification {
-    CommittedAccounts(CommittedAccounts),
+    CommittedStates(CommittedStates),
 }
 
-/// A commit notification for new account states
+/// A commit notification for new state values
 #[derive(Clone, Debug)]
-pub struct CommittedAccounts {
-    pub all_accounts_synced: bool,
-    pub last_committed_account_index: u64,
+pub struct CommittedStates {
+    pub all_states_synced: bool,
+    pub last_committed_state_index: u64,
 
-    /// If `all_accounts_synced` is true, we expect a single committed
+    /// If `all_states_synced` is true, we expect a single committed
     /// transaction (as the node should have all required state at this version).
     pub committed_transaction: Option<CommittedTransactions>,
 }
@@ -55,17 +55,17 @@ pub struct CommittedTransactions {
 }
 
 impl CommitNotification {
-    pub fn new_committed_accounts(
-        all_accounts_synced: bool,
-        last_committed_account_index: u64,
+    pub fn new_committed_states(
+        all_states_synced: bool,
+        last_committed_state_index: u64,
         committed_transaction: Option<CommittedTransactions>,
     ) -> Self {
-        let committed_accounts = CommittedAccounts {
-            all_accounts_synced,
-            last_committed_account_index,
+        let committed_states = CommittedStates {
+            all_states_synced,
+            last_committed_state_index,
             committed_transaction,
         };
-        CommitNotification::CommittedAccounts(committed_accounts)
+        CommitNotification::CommittedStates(committed_states)
     }
 
     /// Handles the commit notification by notifying mempool and the event

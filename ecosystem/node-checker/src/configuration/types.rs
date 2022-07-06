@@ -5,8 +5,13 @@ use crate::{
     evaluators::{
         direct::{
             get_node_identity, LatencyEvaluatorArgs, NodeIdentityEvaluatorArgs, TpsEvaluatorArgs,
+            TransactionPresenceEvaluatorArgs,
         },
-        metrics::{ConsensusProposalsEvaluatorArgs, StateSyncVersionEvaluatorArgs},
+        metrics::{
+            ConsensusProposalsEvaluatorArgs, ConsensusRoundEvaluatorArgs,
+            ConsensusTimeoutsEvaluatorArgs, NetworkMinimumPeersEvaluatorArgs,
+            NetworkPeersWithinToleranceEvaluatorArgs, StateSyncVersionEvaluatorArgs,
+        },
         system_information::BuildVersionEvaluatorArgs,
     },
     runner::BlockingRunnerArgs,
@@ -131,7 +136,19 @@ pub struct EvaluatorArgs {
     pub consensus_proposals_args: ConsensusProposalsEvaluatorArgs,
 
     #[clap(flatten)]
+    pub consensus_round_args: ConsensusRoundEvaluatorArgs,
+
+    #[clap(flatten)]
+    pub consensus_timeouts_args: ConsensusTimeoutsEvaluatorArgs,
+
+    #[clap(flatten)]
     pub latency_args: LatencyEvaluatorArgs,
+
+    #[clap(flatten)]
+    pub network_minimum_peers_args: NetworkMinimumPeersEvaluatorArgs,
+
+    #[clap(flatten)]
+    pub network_peers_tolerance_args: NetworkPeersWithinToleranceEvaluatorArgs,
 
     #[clap(flatten)]
     pub node_identity_args: NodeIdentityEvaluatorArgs,
@@ -142,6 +159,9 @@ pub struct EvaluatorArgs {
     #[clap(flatten)]
     #[oai(skip)]
     pub tps_args: TpsEvaluatorArgs,
+
+    #[clap(flatten)]
+    pub transaction_presence_args: TransactionPresenceEvaluatorArgs,
 }
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
@@ -188,6 +208,12 @@ impl NodeAddress {
 
     pub fn default_noise_port() -> u16 {
         DEFAULT_NOISE_PORT
+    }
+
+    pub fn get_api_url(&self) -> Url {
+        let mut url = self.url.clone();
+        url.set_port(Some(self.api_port)).unwrap();
+        url
     }
 }
 

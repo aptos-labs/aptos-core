@@ -27,6 +27,7 @@ use std::{
 static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_cpus::get())
+        .thread_name(|index| format!("parallel_executor_{}", index))
         .build()
         .unwrap()
 });

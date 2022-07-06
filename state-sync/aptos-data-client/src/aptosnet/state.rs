@@ -302,19 +302,19 @@ impl PeerStates {
         // Calculate the global data summary using the advertised peer data
         let mut advertised_data = AdvertisedData::empty();
         let mut max_epoch_chunk_sizes = vec![];
+        let mut max_state_chunk_sizes = vec![];
         let mut max_transaction_chunk_sizes = vec![];
         let mut max_transaction_output_chunk_sizes = vec![];
-        let mut max_account_states_chunk_sizes = vec![];
         for summary in summaries {
             // Collect aggregate data advertisements
-            if let Some(account_states) = summary.data_summary.account_states {
-                advertised_data.account_states.push(account_states);
-            }
             if let Some(epoch_ending_ledger_infos) = summary.data_summary.epoch_ending_ledger_infos
             {
                 advertised_data
                     .epoch_ending_ledger_infos
                     .push(epoch_ending_ledger_infos);
+            }
+            if let Some(states) = summary.data_summary.states {
+                advertised_data.states.push(states);
             }
             if let Some(synced_ledger_info) = summary.data_summary.synced_ledger_info.as_ref() {
                 advertised_data
@@ -332,18 +332,17 @@ impl PeerStates {
 
             // Collect preferred max chunk sizes
             max_epoch_chunk_sizes.push(summary.protocol_metadata.max_epoch_chunk_size);
+            max_state_chunk_sizes.push(summary.protocol_metadata.max_state_chunk_size);
             max_transaction_chunk_sizes.push(summary.protocol_metadata.max_transaction_chunk_size);
             max_transaction_output_chunk_sizes
                 .push(summary.protocol_metadata.max_transaction_output_chunk_size);
-            max_account_states_chunk_sizes
-                .push(summary.protocol_metadata.max_account_states_chunk_size);
         }
 
         // Calculate optimal chunk sizes based on the advertised data
         let optimal_chunk_sizes = calculate_optimal_chunk_sizes(
             &self.storage_service_config,
-            max_account_states_chunk_sizes,
             max_epoch_chunk_sizes,
+            max_state_chunk_sizes,
             max_transaction_chunk_sizes,
             max_transaction_output_chunk_sizes,
         );
@@ -359,16 +358,13 @@ impl PeerStates {
 /// majority that mostly agrees on the same chunk sizes.
 pub(crate) fn calculate_optimal_chunk_sizes(
     config: &StorageServiceConfig,
-    max_account_states_chunk_sizes: Vec<u64>,
     max_epoch_chunk_sizes: Vec<u64>,
+    max_state_chunk_sizes: Vec<u64>,
     max_transaction_chunk_sizes: Vec<u64>,
     max_transaction_output_chunk_size: Vec<u64>,
 ) -> OptimalChunkSizes {
-    let account_states_chunk_size = median_or_max(
-        max_account_states_chunk_sizes,
-        config.max_account_states_chunk_sizes,
-    );
     let epoch_chunk_size = median_or_max(max_epoch_chunk_sizes, config.max_epoch_chunk_size);
+    let state_chunk_size = median_or_max(max_state_chunk_sizes, config.max_state_chunk_size);
     let transaction_chunk_size = median_or_max(
         max_transaction_chunk_sizes,
         config.max_transaction_chunk_size,
@@ -379,8 +375,8 @@ pub(crate) fn calculate_optimal_chunk_sizes(
     );
 
     OptimalChunkSizes {
-        account_states_chunk_size,
         epoch_chunk_size,
+        state_chunk_size,
         transaction_chunk_size,
         transaction_output_chunk_size,
     }

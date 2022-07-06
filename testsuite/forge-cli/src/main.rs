@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_logger::Level;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
 use forge::{ForgeConfig, Options, Result, *};
@@ -28,8 +29,12 @@ struct Args {
     burst: bool,
     #[structopt(flatten)]
     options: Options,
-    #[structopt(long, help = "Specify a test suite to run")]
-    suite: Option<String>,
+    #[structopt(
+        long,
+        help = "Specify a test suite to run",
+        default_value = "land_blocking"
+    )]
+    suite: String,
     #[structopt(long, multiple = true)]
     changelog: Option<Vec<String>>,
 
@@ -62,12 +67,8 @@ struct LocalSwarm {}
 
 #[derive(StructOpt, Debug)]
 struct K8sSwarm {
-    #[structopt(
-        long,
-        help = "Override the helm repo used for k8s tests",
-        default_value = "testnet-internal"
-    )]
-    helm_repo: String,
+    #[structopt(long, help = "The kubernetes namespace to use for test")]
+    namespace: String,
     #[structopt(
         long,
         help = "The image tag currently is used for validators",
@@ -85,6 +86,11 @@ struct K8sSwarm {
         help = "Path to flattened directory containing compiled Move modules"
     )]
     move_modules_dir: Option<String>,
+    #[structopt(
+        long,
+        help = "If set, uses kubectl port-forward instead of assuming k8s DNS access"
+    )]
+    port_forward: bool,
 }
 
 #[derive(StructOpt, Debug)]
@@ -92,19 +98,20 @@ struct SetValidator {
     validator_name: String,
     #[structopt(long, help = "Override the image tag used for upgrade validators")]
     image_tag: String,
-    #[structopt(
-        long,
-        help = "Override the helm repo used for k8s tests",
-        default_value = "testnet-internal"
-    )]
-    helm_repo: String,
+    #[structopt(long, help = "The kubernetes namespace to clean up")]
+    namespace: String,
 }
 
 #[derive(StructOpt, Debug)]
-struct CleanUp {}
+struct CleanUp {
+    #[structopt(long, help = "The kubernetes namespace to clean up")]
+    namespace: String,
+}
 
 #[derive(StructOpt, Debug)]
 struct Resize {
+    #[structopt(long, help = "The kubernetes namespace to resize")]
+    namespace: String,
     #[structopt(long, default_value = "30")]
     num_validators: usize,
     #[structopt(
@@ -121,23 +128,25 @@ struct Resize {
     testnet_image_tag: String,
     #[structopt(
         long,
-        help = "If set, performs validator healthcheck and assumes k8s DNS access"
-    )]
-    require_validator_healthcheck: bool,
-    #[structopt(
-        long,
-        help = "Override the helm repo used for k8s tests",
-        default_value = "testnet-internal"
-    )]
-    helm_repo: String,
-    #[structopt(
-        long,
         help = "Path to flattened directory containing compiled Move modules"
     )]
     move_modules_dir: Option<String>,
+    #[structopt(
+        long,
+        help = "If set, uses kubectl port-forward instead of assuming k8s DNS access"
+    )]
+    port_forward: bool,
 }
 
 fn main() -> Result<()> {
+    let mut logger = aptos_logger::Logger::new();
+    logger
+        .channel_size(1000)
+        .is_async(false)
+        .level(Level::Info)
+        .read_env();
+    logger.build();
+
     let args = Args::from_args();
     let mut global_emit_job_request = EmitJobRequest::default()
         .accounts_per_client(args.accounts_per_client)
@@ -164,16 +173,19 @@ fn main() -> Result<()> {
                 global_emit_job_request,
             ),
             TestCommand::K8sSwarm(k8s) => {
-                let mut test_suite = k8s_test_suite();
-                if let Some(suite) = args.suite.as_ref() {
-                    test_suite = get_test_suite(suite);
-                }
+                let mut test_suite = get_test_suite(args.suite.as_ref());
                 if let Some(move_modules_dir) = k8s.move_modules_dir {
                     test_suite = test_suite.with_genesis_modules_path(move_modules_dir);
                 }
                 run_forge(
                     test_suite,
-                    K8sFactory::new(k8s.helm_repo, k8s.image_tag, k8s.base_image_tag).unwrap(),
+                    K8sFactory::new(
+                        k8s.namespace,
+                        k8s.image_tag,
+                        k8s.base_image_tag,
+                        k8s.port_forward,
+                    )
+                    .unwrap(),
                     &args.options,
                     args.changelog,
                     global_emit_job_request,
@@ -185,18 +197,19 @@ fn main() -> Result<()> {
             OperatorCommand::SetValidator(set_validator) => set_validator_image_tag(
                 set_validator.validator_name,
                 set_validator.image_tag,
-                set_validator.helm_repo,
+                set_validator.namespace,
             ),
-            OperatorCommand::CleanUp(_) => runtime.block_on(uninstall_testnet_resources()),
+            OperatorCommand::CleanUp(cleanup) => {
+                runtime.block_on(uninstall_testnet_resources(cleanup.namespace))
+            }
             OperatorCommand::Resize(resize) => {
-                runtime.block_on(uninstall_testnet_resources())?;
-                runtime.block_on(reinstall_testnet_resources(
-                    resize.helm_repo,
+                runtime.block_on(install_testnet_resources(
+                    resize.namespace,
                     resize.num_validators,
                     resize.validator_image_tag,
                     resize.testnet_image_tag,
-                    resize.require_validator_healthcheck,
                     resize.move_modules_dir,
+                    resize.port_forward,
                 ))?;
                 Ok(())
             }
@@ -292,6 +305,8 @@ fn get_test_suite(suite_name: &str) -> ForgeConfig<'static> {
         "land_blocking_compat" => land_blocking_test_compat_suite(),
         "land_blocking" => land_blocking_test_suite(),
         "pre_release" => pre_release_suite(),
+        // TODO(rustielin): verify each test suite
+        "k8s_suite" => k8s_test_suite(),
         single_test => single_test_suite(single_test),
     }
 }
