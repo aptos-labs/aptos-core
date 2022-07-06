@@ -24,10 +24,19 @@ mod construction;
 mod network;
 
 use crate::common::{ErrorWrapper, RosettaCliArgs};
+use aptos_logger::Level;
 use clap::Parser;
 
 #[tokio::main]
 async fn main() {
+    let mut logger = aptos_logger::Logger::new();
+    logger
+        .channel_size(1000)
+        .is_async(false)
+        .level(Level::Warn)
+        .read_env();
+    logger.build();
+
     let args: RosettaCliArgs = RosettaCliArgs::parse();
 
     let result = args.execute().await;

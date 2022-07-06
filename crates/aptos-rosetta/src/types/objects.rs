@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    common::{is_native_coin, native_coin},
     error::ApiResult,
     types::{
         AccountIdentifier, BlockIdentifier, Error, NetworkIdentifier, OperationIdentifier,
@@ -80,7 +81,7 @@ impl From<Balance> for Amount {
         Amount {
             value: balance.coin.value.to_string(),
             // TODO: Support other currencies
-            currency: SupportedCurrencies::NativeCoin.into(),
+            currency: native_coin(),
         }
     }
 }
@@ -176,42 +177,6 @@ pub struct Currency {
     pub decimals: u64,
 }
 
-pub const APTOS: &str = "aptos";
-pub const APTOS_DECIMALS: u64 = 6;
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum SupportedCurrencies {
-    NativeCoin,
-}
-
-impl From<SupportedCurrencies> for Currency {
-    fn from(currency: SupportedCurrencies) -> Self {
-        match currency {
-            SupportedCurrencies::NativeCoin => Currency {
-                symbol: APTOS.to_string(),
-                decimals: APTOS_DECIMALS,
-            },
-        }
-    }
-}
-
-impl TryFrom<&Currency> for SupportedCurrencies {
-    type Error = ApiError;
-
-    fn try_from(value: &Currency) -> Result<Self, Self::Error> {
-        match value.symbol.as_str() {
-            APTOS => {
-                if value.decimals != APTOS_DECIMALS {
-                    Err(ApiError::BadCoin)
-                } else {
-                    Ok(Self::NativeCoin)
-                }
-            }
-            _ => Err(ApiError::BadCoin),
-        }
-    }
-}
-
 /// Various signing curves supported by Rosetta.  We only use [`CurveType::Edwards25519`]
 /// [API Spec](https://www.rosetta-api.org/docs/models/CurveType.html)
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -276,6 +241,15 @@ pub struct Operation {
     /// TODO: Determine if this is required
     #[serde(skip_serializing_if = "Option::is_none")]
     pub amount: Option<Amount>,
+    /// Operation specific metadata for any operation that's missing information it needs
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<OperationSpecificMetadata>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct OperationSpecificMetadata {
+    /// Sender for operations that affect accounts other than the sender
+    pub sender: AccountIdentifier,
 }
 
 /// Used for query operations to apply conditions.  Defaults to [`Operator::And`] if no value is
@@ -572,6 +546,12 @@ impl Transaction {
                             status: Some(status.to_string()),
                             account: Some(AccountIdentifier::from(address)),
                             amount: None,
+                            metadata: Some(OperationSpecificMetadata {
+                                sender: maybe_sender
+                                    .map(|address| *address.inner())
+                                    .unwrap_or(AccountAddress::ONE)
+                                    .into(),
+                            }),
                         });
                         operation_index += 1;
                     }
@@ -602,6 +582,7 @@ impl Transaction {
                                             value: amount.to_string(),
                                             currency: currency.clone(),
                                         }),
+                                        metadata: None,
                                     });
                                     operation_index += 1;
                                 }
@@ -629,6 +610,7 @@ impl Transaction {
                                             value: format!("-{}", amount),
                                             currency: currency.clone(),
                                         }),
+                                        metadata: None,
                                     });
                                     operation_index += 1;
                                 }
@@ -662,6 +644,7 @@ impl Transaction {
                         value: format!("-{}", txn_info.gas_used),
                         currency: gas_currency,
                     }),
+                    metadata: None,
                 });
             } else {
                 return Err(ApiError::AptosError(
@@ -694,19 +677,46 @@ pub enum OperationDetails {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum InternalOperation {
+    CreateAccount(CreateAccount),
     Transfer(Transfer),
 }
 
 impl InternalOperation {
-    pub fn extract_transfer(operations: &Vec<Operation>) -> ApiResult<InternalOperation> {
-        Ok(Self::Transfer(Transfer::extract_transfer(operations)?))
+    pub fn extract(operations: &Vec<Operation>) -> ApiResult<InternalOperation> {
+        match operations.len() {
+            1 => {
+                if let Some(operation) = operations.first() {
+                    if operation.operation_type == OperationType::CreateAccount.to_string() {
+                        if let (Some(OperationSpecificMetadata { sender }), Some(account)) =
+                            (&operation.metadata, &operation.account)
+                        {
+                            return Ok(Self::CreateAccount(CreateAccount {
+                                sender: sender.account_address()?,
+                                new_account: account.account_address()?,
+                            }));
+                        }
+                    }
+                }
+
+                Err(ApiError::BadTransactionPayload)
+            }
+            2 => Ok(Self::Transfer(Transfer::extract_transfer(operations)?)),
+            _ => Err(ApiError::BadTransactionPayload),
+        }
     }
 
     pub fn sender(&self) -> AccountAddress {
         match self {
-            Self::Transfer(transfer) => transfer.sender,
+            Self::CreateAccount(inner) => inner.sender,
+            Self::Transfer(inner) => inner.sender,
         }
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct CreateAccount {
+    pub sender: AccountAddress,
+    pub new_account: AccountAddress,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -773,7 +783,7 @@ impl Transfer {
 
                 // Check that the currency is supported
                 // TODO: in future use currency, since there's more than just 1
-                let _ = SupportedCurrencies::try_from(&withdraw_amount.currency)?;
+                let _ = is_native_coin(&withdraw_amount.currency)?;
 
                 let withdraw_value = i64::from_str(&withdraw_amount.value)
                     .map_err(|_| ApiError::BadTransactionPayload)?;

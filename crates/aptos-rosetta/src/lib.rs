@@ -130,7 +130,6 @@ pub fn routes(
         )
         .with(aptos_api::log::logger())
         .recover(handle_rejection)
-    // TODO Logger?
     // TODO metrics?
 }
 
@@ -139,7 +138,7 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
     let code;
     let body;
 
-    debug!("Failed with: {:?}", err);
+    println!("Failed with: {:?}", err);
 
     if err.is_not_found() {
         code = StatusCode::NOT_FOUND;
