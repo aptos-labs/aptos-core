@@ -97,7 +97,7 @@ pub struct EmitArgs {
     #[clap(long, help = "Percentage of invalid txs", default_value = "0")]
     pub invalid_tx: usize,
 
-    #[clap(arg_enum)]
+    #[clap(long, arg_enum, default_value = "p2p", ignore_case = true)]
     pub transaction_type: TransactionType,
 }
 
