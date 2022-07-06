@@ -27,7 +27,7 @@ aptos-time-service = { path = "../../crates/aptos-time-service", features = ["as
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 channel = { path = "../../crates/channel" }
-event-notifications = { path = "../../state-sync/inter-component/event-notifications" }
+event-notifications = { path = "../../crates/state-sync/inter-component/event-notifications" }
 netcore = { path = "../netcore" }
 network = { path = "../." }
 network-discovery = { path = "../discovery" }

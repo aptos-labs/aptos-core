@@ -41,9 +41,9 @@ aptos-types = { path = "../types" }
 aptos-vm = { path = "../aptos-move/aptos-vm" }
 aptos-workspace-hack = { path = "../crates/aptos-workspace-hack" }
 channel = { path = "../crates/channel" }
-consensus-notifications = { path = "../state-sync/inter-component/consensus-notifications" }
+consensus-notifications = { path = "../crates/state-sync/inter-component/consensus-notifications" }
 consensus-types = { path = "consensus-types", default-features = false }
-event-notifications = { path = "../state-sync/inter-component/event-notifications" }
+event-notifications = { path = "../crates/state-sync/inter-component/event-notifications" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
 fallible = { path = "../crates/fallible" }

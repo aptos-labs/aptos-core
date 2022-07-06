@@ -1,0 +1,55 @@
+[package]
+name = "state-sync-driver"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+repository = "https://github.com/aptos-labs/aptos-core"
+description = "The driver for state sync"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+futures = "0.3.21"
+once_cell = "1.10.0"
+serde = { version = "1.0.137", default-features = false }
+thiserror = "1.0.31"
+tokio = { version = "1.18.2", features = ["full"] }
+tokio-stream = "0.1.8"
+
+aptos-config = { path = "../../../../config" }
+aptos-crypto = { path = "../../../aptos-crypto" }
+aptos-data-client = { path = "../../aptos-data-client" }
+aptos-infallible = { path = "../../../aptos-infallible" }
+aptos-logger = { path = "../../../aptos-logger" }
+aptos-metrics-core = { path = "../../../aptos-metrics-core" }
+aptos-types = { path = "../../../../types" }
+aptos-workspace-hack = { path = "../../../aptos-workspace-hack" }
+consensus-notifications = { path = "../../inter-component/consensus-notifications" }
+data-streaming-service = { path = "../data-streaming-service" }
+event-notifications = { path = "../../inter-component/event-notifications" }
+executor-types = { path = "../../../../execution/executor-types" }
+mempool-notifications = { path = "../../inter-component/mempool-notifications" }
+scratchpad = { path = "../../../../storage/scratchpad" }
+storage-interface = { path = "../../../../storage/storage-interface" }
+
+[dev-dependencies]
+anyhow = "1.0.57"
+async-trait = "0.1.53"
+bcs = "0.1.3"
+claim = "0.5.0"
+mockall = "0.11.0"
+
+aptos-crypto = { path = "../../../aptos-crypto" }
+aptos-temppath = { path = "../../../aptos-temppath" }
+aptos-time-service = { path = "../../../aptos-time-service", features = ["async", "testing"] }
+aptos-vm = { path = "../../../../aptos-move/aptos-vm" }
+aptosdb = { path = "../../../../storage/aptosdb" }
+channel = { path = "../../../channel" }
+executor = { path = "../../../../execution/executor" }
+executor-test-helpers = { path = "../../../../execution/executor-test-helpers" }
+move-deps = { path = "../../../../aptos-move/move-deps", features = ["address32"] }
+network = { path = "../../../../network", features = ["fuzzing"] }
+storage-service-client = { path = "../../storage-service/client" }
+storage-service-types = { path = "../../storage-service/types" }
+vm-genesis = { path = "../../../../aptos-move/vm-genesis", features = ["fuzzing"] }
