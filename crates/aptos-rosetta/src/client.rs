@@ -92,20 +92,6 @@ impl RosettaClient {
             .send()
             .await?;
 
-        self.json(response).await
-    }
-
-    async fn json<T: serde::de::DeserializeOwned>(
-        &self,
-        response: reqwest::Response,
-    ) -> anyhow::Result<T> {
-        if !response.status().is_success() {
-            return Err(anyhow::anyhow!(
-                "Request failed: {:?}",
-                response.error_for_status()
-            ));
-        }
-
         Ok(response.json().await?)
     }
 }
