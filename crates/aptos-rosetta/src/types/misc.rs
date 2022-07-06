@@ -31,8 +31,8 @@ pub struct Error {
 /// Error details that are specific to the instance
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ErrorDetails {
-    /// Detailed error message
-    pub error: String,
+    /// Related error details
+    pub details: String,
 }
 
 /// Status of an operation
@@ -106,10 +106,10 @@ impl FromStr for OperationType {
             Self::CREATE_ACCOUNT => Ok(OperationType::CreateAccount),
             Self::DEPOSIT => Ok(OperationType::Deposit),
             Self::WITHDRAW => Ok(OperationType::Withdraw),
-            _ => Err(ApiError::DeserializationFailed(format!(
+            _ => Err(ApiError::DeserializationFailed(Some(format!(
                 "Invalid OperationType: {}",
                 s
-            ))),
+            )))),
         }
     }
 }
@@ -168,10 +168,10 @@ impl FromStr for OperationStatusType {
         match s.to_lowercase().trim() {
             Self::SUCCESS => Ok(OperationStatusType::Success),
             Self::FAILURE => Ok(OperationStatusType::Failure),
-            _ => Err(ApiError::DeserializationFailed(format!(
+            _ => Err(ApiError::DeserializationFailed(Some(format!(
                 "Invalid OperationStatusType: {}",
                 s
-            ))),
+            )))),
         }
     }
 }
