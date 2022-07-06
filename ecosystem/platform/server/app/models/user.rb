@@ -23,6 +23,7 @@ class User < ApplicationRecord
   validates :terms_accepted, acceptance: true
 
   has_many :authorizations, dependent: :destroy
+  has_one :it1_profile
   has_one :it2_profile, dependent: :destroy
   has_one :it2_survey, dependent: :destroy
   has_many :nfts, dependent: :destroy
