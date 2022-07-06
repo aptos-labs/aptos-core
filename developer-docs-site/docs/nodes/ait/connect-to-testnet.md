@@ -109,10 +109,18 @@ All the selected validator node will be receiving sufficient amount of test toke
 
     ValidatorSet will be updated at every epoch change, which is **once every hour**. You will only see your node joining the validator set in next epoch. Both Validator and fullnode will start syncing once your validator is in the validator set.
 
+6. Check validator set
+
+    ```
+    aptos node show-validator-set --profile ait2
+    ```
+    
+    You should be able to see your validator node in "pending_active" list. And when the epoch change happens, the node will be moved into "active_validators" list. This should happen within one hour from the completion of previous step. During this time, you might see errors like "No connected AptosNet peers", which is normal.
+
 
 ## Verify node connections
 
-You can check the details about node liveness definition [here](https://aptos.dev/reference/node-liveness-criteria/#verifying-the-liveness-of-your-node).
+You can check the details about node liveness definition [here](https://aptos.dev/reference/node-liveness-criteria/#verifying-the-liveness-of-your-node). Once your validator node joined the validator set, you can verify the correctness following those steps:
 
 1. Verify that your node is connecting to other peers on testnet. (Replace `127.0.0.1` with your Validator IP/DNS if deployed on the cloud)
 
