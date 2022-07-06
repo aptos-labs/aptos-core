@@ -4,7 +4,7 @@
 use crate::{account, block, construction, network};
 use aptos_rosetta::{
     client::RosettaClient,
-    types::{NetworkIdentifier, NetworkRequest},
+    types::{NetworkIdentifier, NetworkRequest, PartialBlockIdentifier},
 };
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
@@ -44,7 +44,7 @@ pub fn format_output<T: Serialize>(input: anyhow::Result<T>) -> anyhow::Result<S
 
 #[derive(Debug, Parser)]
 pub struct UrlArgs {
-    /// URL for the Aptos Rosetta API. e.g. http://localhost:8080
+    /// URL for the Aptos Rosetta API. e.g. http://localhost:8082
     #[clap(long, default_value = "http://localhost:8082")]
     rosetta_api_url: url::Url,
 }
@@ -78,4 +78,27 @@ impl NetworkArgs {
 #[derive(Serialize)]
 pub struct ErrorWrapper {
     pub error: String,
+}
+
+#[derive(Debug, Parser)]
+pub struct BlockArgs {
+    #[clap(long)]
+    block_index: Option<u64>,
+    #[clap(long)]
+    block_hash: Option<String>,
+}
+
+impl From<BlockArgs> for Option<PartialBlockIdentifier> {
+    fn from(args: BlockArgs) -> Self {
+        Some(args.into())
+    }
+}
+
+impl From<BlockArgs> for PartialBlockIdentifier {
+    fn from(args: BlockArgs) -> Self {
+        PartialBlockIdentifier {
+            index: args.block_index,
+            hash: args.block_hash,
+        }
+    }
 }
