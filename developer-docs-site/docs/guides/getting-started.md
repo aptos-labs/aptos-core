@@ -64,7 +64,7 @@ Now your basic Aptos development environment ready.
 ## IDE plugins for Move
 
 - A [Move language syntax plugin](https://marketplace.visualstudio.com/items?itemName=damirka.move-syntax) for Visual Studio Code.
-- A [Visual Studio Code plugin for Move, called move-analyzer](https://marketplace.visualstudio.com/items?itemName=move.move-analyzer).
+- [Move analyzer for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=move.move-analyzer) - supports advanced code navigation and syntax highlighting.
 
 ## Aptos CLI
 
