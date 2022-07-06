@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    scale_sts_replica, FullNode, HealthCheckError, Node, NodeExt, Result, Validator, Version,
-    KUBECTL_BIN,
+    scale_stateful_set_replicas, FullNode, HealthCheckError, Node, NodeExt, Result, Validator,
+    Version, KUBECTL_BIN,
 };
 use anyhow::{anyhow, format_err, Context};
 use aptos_config::config::NodeConfig;
@@ -143,7 +143,7 @@ impl Node for K8sNode {
     }
 
     async fn start(&mut self) -> Result<()> {
-        scale_sts_replica(self.sts_name(), 1)?;
+        scale_stateful_set_replicas(self.sts_name(), 1)?;
         self.wait_until_healthy(Instant::now() + Duration::from_secs(60))
             .await?;
 
@@ -152,7 +152,7 @@ impl Node for K8sNode {
 
     fn stop(&mut self) -> Result<()> {
         info!("going to stop node {}", self.sts_name());
-        scale_sts_replica(self.sts_name(), 0)
+        scale_stateful_set_replicas(self.sts_name(), 0)
     }
 
     fn clear_storage(&mut self) -> Result<()> {
