@@ -7,20 +7,22 @@ use aptos::common::types::{EncodingOptions, PrivateKeyInputOptions, ProfileOptio
 use aptos_crypto::{
     ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, ValidCryptoMaterialStringExt,
 };
+use aptos_logger::info;
 use aptos_rosetta::{
     client::RosettaClient,
+    common::native_coin,
     types::{
         AccountIdentifier, Amount, ConstructionCombineRequest, ConstructionDeriveRequest,
         ConstructionDeriveResponse, ConstructionMetadata, ConstructionMetadataRequest,
         ConstructionMetadataResponse, ConstructionParseRequest, ConstructionPayloadsRequest,
         ConstructionPayloadsResponse, ConstructionPreprocessRequest, ConstructionSubmitRequest,
-        Currency, NetworkIdentifier, Operation, OperationIdentifier, OperationType, PublicKey,
-        Signature, SignatureType, TransactionIdentifier,
+        NetworkIdentifier, Operation, OperationIdentifier, OperationSpecificMetadata,
+        OperationType, PublicKey, Signature, SignatureType, TransactionIdentifier,
     },
 };
 use aptos_types::account_address::AccountAddress;
 use clap::{Parser, Subcommand};
-use std::convert::TryInto;
+use std::{collections::HashMap, convert::TryInto};
 
 #[derive(Debug, Subcommand)]
 pub enum ConstructionCommand {
@@ -51,18 +53,34 @@ pub struct CreateAccountCommand {
     #[clap(flatten)]
     private_key_options: PrivateKeyInputOptions,
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
+    sender: Option<AccountAddress>,
+    #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     new_account: AccountAddress,
 }
 
 impl CreateAccountCommand {
     pub async fn execute(self) -> anyhow::Result<TransactionIdentifier> {
+        info!("Create account: {:?}", self);
         let client = self.url_args.client();
         let network_identifier = self.network_args.network_identifier();
-        let account = self.new_account.into();
+        let new_account = self.new_account.into();
         let private_key = self.private_key_options.extract_private_key(
             self.encoding_options.encoding,
             &self.profile_options.profile,
         )?;
+
+        let sender_account: AccountIdentifier = if let Some(sender) = self.sender {
+            sender.into()
+        } else {
+            derive_account(
+                &client,
+                network_identifier.clone(),
+                private_key.public_key().try_into()?,
+            )
+            .await?
+        };
+        let mut keys = HashMap::new();
+        keys.insert(sender_account.account_address()?, private_key);
 
         let operations = vec![Operation {
             operation_identifier: OperationIdentifier {
@@ -72,11 +90,14 @@ impl CreateAccountCommand {
             related_operations: None,
             operation_type: OperationType::CreateAccount.to_string(),
             status: None,
-            account: Some(account),
+            account: Some(new_account),
             amount: None,
+            metadata: Some(OperationSpecificMetadata {
+                sender: sender_account,
+            }),
         }];
 
-        submit_operations(&client, network_identifier, private_key, operations).await
+        submit_operations(&client, network_identifier, &keys, operations).await
     }
 }
 
@@ -93,6 +114,8 @@ pub struct TransferCommand {
     #[clap(flatten)]
     private_key_options: PrivateKeyInputOptions,
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
+    sender: Option<AccountAddress>,
+    #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     receiver: AccountAddress,
     #[clap(long)]
     amount: u64,
@@ -100,18 +123,25 @@ pub struct TransferCommand {
 
 impl TransferCommand {
     pub async fn execute(self) -> anyhow::Result<TransactionIdentifier> {
+        info!("Transfer {:?}", self);
         let client = self.url_args.client();
         let network_identifier = self.network_args.network_identifier();
         let private_key = self.private_key_options.extract_private_key(
             self.encoding_options.encoding,
             &self.profile_options.profile,
         )?;
-        let account = derive_account(
-            &client,
-            network_identifier.clone(),
-            private_key.public_key().try_into()?,
-        )
-        .await?;
+        let account: AccountIdentifier = if let Some(sender) = self.sender {
+            sender.into()
+        } else {
+            derive_account(
+                &client,
+                network_identifier.clone(),
+                private_key.public_key().try_into()?,
+            )
+            .await?
+        };
+        let mut keys = HashMap::new();
+        keys.insert(account.account_address()?, private_key);
 
         let operations = vec![
             Operation {
@@ -124,6 +154,7 @@ impl TransferCommand {
                 status: None,
                 account: Some(account),
                 amount: Some(val_to_amount(self.amount, true)),
+                metadata: None,
             },
             Operation {
                 operation_identifier: OperationIdentifier {
@@ -135,20 +166,21 @@ impl TransferCommand {
                 status: None,
                 account: Some(self.receiver.into()),
                 amount: Some(val_to_amount(self.amount, false)),
+                metadata: None,
             },
         ];
 
-        submit_operations(&client, network_identifier, private_key, operations).await
+        submit_operations(&client, network_identifier, &keys, operations).await
     }
 }
 
 async fn submit_operations(
     client: &RosettaClient,
     network_identifier: NetworkIdentifier,
-    private_key: Ed25519PrivateKey,
+    keys: &HashMap<AccountAddress, Ed25519PrivateKey>,
     operations: Vec<Operation>,
 ) -> anyhow::Result<TransactionIdentifier> {
-    let public_key: PublicKey = private_key.public_key().try_into()?;
+    let public_key: PublicKey = keys.iter().next().unwrap().1.public_key().try_into()?;
 
     let metadata = metadata(
         client,
@@ -168,8 +200,7 @@ async fn submit_operations(
         public_key,
     )
     .await?;
-    let signed_txn =
-        sign_transaction(client, network_identifier.clone(), &private_key, response).await?;
+    let signed_txn = sign_transaction(client, network_identifier.clone(), keys, response).await?;
     submit_transaction(client, network_identifier, signed_txn).await
 }
 
@@ -178,7 +209,6 @@ async fn derive_account(
     network_identifier: NetworkIdentifier,
     public_key: PublicKey,
 ) -> anyhow::Result<AccountIdentifier> {
-    // TODO: If it's not derivable then what?
     if let ConstructionDeriveResponse {
         account_identifier: Some(account_id),
     } = client
@@ -202,9 +232,7 @@ async fn metadata(
     fee_multiplier: u32,
     public_key: PublicKey,
 ) -> anyhow::Result<ConstructionMetadataResponse> {
-    // TODO: Pull gas currency a better way
-    let amount = val_to_amount(max_fee, true);
-
+    let amount = val_to_amount(max_fee, false);
     let preprocess_response = client
         .preprocess(&ConstructionPreprocessRequest {
             network_identifier: network_identifier.clone(),
@@ -253,26 +281,35 @@ async fn unsigned_transaction(
 async fn sign_transaction(
     client: &RosettaClient,
     network_identifier: NetworkIdentifier,
-    private_key: &Ed25519PrivateKey,
-    mut unsigned_response: ConstructionPayloadsResponse,
+    keys: &HashMap<AccountAddress, Ed25519PrivateKey>,
+    unsigned_response: ConstructionPayloadsResponse,
 ) -> anyhow::Result<String> {
-    // TODO: Support more than one payload
-    let signing_payload = unsigned_response.payloads.pop().unwrap();
-    let unsigned_transaction = unsigned_response.unsigned_transaction;
+    let mut signatures = Vec::new();
+    for payload in unsigned_response.payloads {
+        if let Some(ref account) = payload.account_identifier {
+            let address = account.account_address()?;
+            if let Some(private_key) = keys.get(&address) {
+                let signing_bytes = hex::decode(&payload.hex_bytes)?;
+                let txn_signature = private_key.sign_arbitrary_message(&signing_bytes);
+                signatures.push(Signature {
+                    signing_payload: payload,
+                    public_key: private_key.public_key().try_into()?,
+                    signature_type: SignatureType::Ed25519,
+                    hex_bytes: txn_signature.to_encoded_string()?,
+                })
+            } else {
+                return Err(anyhow!("Address in payload is unknown {}", address));
+            }
+        } else {
+            return Err(anyhow!("No account in payload to sign!"));
+        }
+    }
 
-    let unsigned_bytes = unsigned_transaction.as_bytes();
-    let txn_signature = private_key.sign_arbitrary_message(unsigned_bytes);
-    let signature = Signature {
-        signing_payload,
-        public_key: private_key.public_key().try_into()?,
-        signature_type: SignatureType::Ed25519,
-        hex_bytes: txn_signature.to_encoded_string()?,
-    };
     let signed_response = client
         .combine(&ConstructionCombineRequest {
             network_identifier: network_identifier.clone(),
-            unsigned_transaction,
-            signatures: vec![signature],
+            unsigned_transaction: unsigned_response.unsigned_transaction,
+            signatures,
         })
         .await?;
 
@@ -310,9 +347,6 @@ fn val_to_amount(amount: u64, withdraw: bool) -> Amount {
     };
     Amount {
         value,
-        currency: Currency {
-            symbol: "TC".to_string(),
-            decimals: 6,
-        },
+        currency: native_coin(),
     }
 }

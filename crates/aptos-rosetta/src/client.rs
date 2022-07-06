@@ -10,10 +10,11 @@ use crate::{
         ConstructionMetadataResponse, ConstructionParseRequest, ConstructionParseResponse,
         ConstructionPayloadsRequest, ConstructionPayloadsResponse, ConstructionPreprocessRequest,
         ConstructionPreprocessResponse, ConstructionSubmitRequest, ConstructionSubmitResponse,
-        NetworkListResponse, NetworkOptionsResponse, NetworkRequest, NetworkStatusResponse,
+        Error, NetworkListResponse, NetworkOptionsResponse, NetworkRequest, NetworkStatusResponse,
         TransactionIdentifierResponse,
     },
 };
+use anyhow::anyhow;
 use aptos_rest_client::aptos_api_types::mime_types::JSON;
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient};
 use serde::{de::DeserializeOwned, Serialize};
@@ -69,7 +70,7 @@ impl RosettaClient {
         &self,
         request: &ConstructionMetadataRequest,
     ) -> anyhow::Result<ConstructionMetadataResponse> {
-        self.make_call("construction/hash", request).await
+        self.make_call("construction/metadata", request).await
     }
 
     pub async fn parse(
@@ -128,6 +129,11 @@ impl RosettaClient {
             .body(serde_json::to_string(request)?)
             .send()
             .await?;
+
+        if !response.status().is_success() {
+            let error: Error = response.json().await?;
+            return Err(anyhow!("Failed API with: {:?}", error));
+        }
 
         Ok(response.json().await?)
     }

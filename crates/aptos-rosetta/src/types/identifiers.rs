@@ -3,7 +3,7 @@
 
 use crate::{
     block::version_to_block_index,
-    common::{strip_hex_prefix, BLOCKCHAIN},
+    common::BLOCKCHAIN,
     error::{ApiError, ApiResult},
 };
 use aptos_rest_client::{aptos_api_types::TransactionInfo, Transaction};
@@ -37,9 +37,12 @@ impl TryFrom<&AccountIdentifier> for AccountAddress {
 
     fn try_from(account: &AccountIdentifier) -> Result<Self, Self::Error> {
         // Allow 0x in front of account address
-        Ok(AccountAddress::from_str(strip_hex_prefix(
-            &account.address,
-        ))?)
+        if let Ok(address) = AccountAddress::from_hex_literal(&account.address) {
+            Ok(address)
+        } else {
+            Ok(AccountAddress::from_str(&account.address)
+                .map_err(|_| ApiError::AptosError("Invalid account address".to_string()))?)
+        }
     }
 }
 

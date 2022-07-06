@@ -4,7 +4,7 @@
 use crate::{
     common::{
         check_network, decode_bcs, decode_key, encode_bcs, get_account, handle_request,
-        with_context,
+        is_native_coin, native_coin, with_context,
     },
     error::{ApiError, ApiResult},
     types::{InternalOperation, *},
@@ -13,7 +13,7 @@ use crate::{
 use aptos_crypto::{
     ed25519::{Ed25519PublicKey, Ed25519Signature},
     hash::CryptoHash,
-    signing_message, ValidCryptoMaterialStringExt,
+    signing_message,
 };
 use aptos_logger::debug;
 use aptos_sdk::transaction_builder::TransactionFactory;
@@ -22,7 +22,7 @@ use aptos_types::transaction::{
     authenticator::AuthenticationKey, RawTransaction, SignedTransaction,
     Transaction::UserTransaction,
 };
-use std::{convert::TryFrom, str::FromStr};
+use std::str::FromStr;
 use warp::Filter;
 
 pub fn combine_route(
@@ -114,11 +114,11 @@ async fn construction_combine(
     request: ConstructionCombineRequest,
     server_context: RosettaContext,
 ) -> ApiResult<ConstructionCombineResponse> {
-    debug!("/construction/combine");
+    debug!("/construction/combine {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
-    let bytes = hex::decode(request.unsigned_transaction)?;
-    let raw_txn: RawTransaction = bcs::from_bytes(&bytes)?;
+    let unsigned_txn: RawTransaction =
+        decode_bcs(&request.unsigned_transaction, "UnsignedTransaction")?;
 
     // Single signer only supported for now
     // TODO: Support multi-agent / multi-signer?
@@ -138,7 +138,7 @@ async fn construction_combine(
         decode_key(&signature.public_key.hex_bytes, "Ed25519PublicKey")?;
     let signature: Ed25519Signature = decode_key(&signature.hex_bytes, "Ed25519Signature")?;
 
-    let signed_txn = SignedTransaction::new(raw_txn, public_key, signature);
+    let signed_txn = SignedTransaction::new(unsigned_txn, public_key, signature);
 
     Ok(ConstructionCombineResponse {
         signed_transaction: encode_bcs(&signed_txn)?,
@@ -148,19 +148,19 @@ async fn construction_combine(
 /// Construction derive command (OFFLINE)
 ///
 /// Derive account address from Public key
-///
-/// TODO: What if the public key changes?
+/// Note: This only works for new accounts.  After the account is created, all APIs should provide
+/// both account and key.
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionderive)
 async fn construction_derive(
     request: ConstructionDeriveRequest,
     server_context: RosettaContext,
 ) -> ApiResult<ConstructionDeriveResponse> {
-    debug!("/construction/derive");
+    debug!("/construction/derive {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
-    let public_key = Ed25519PublicKey::from_encoded_string(&request.public_key.hex_bytes)
-        .map_err(|_| ApiError::deserialization_failed("Ed25519PublicKey"))?;
+    let public_key: Ed25519PublicKey =
+        decode_key(&request.public_key.hex_bytes, "Ed25519PublicKey")?;
     let address = AuthenticationKey::ed25519(&public_key)
         .derived_address()
         .to_string();
@@ -175,19 +175,17 @@ async fn construction_derive(
 
 /// Construction hash command (OFFLINE)
 ///
-/// Hash a transaction to get it's identifier
+/// Hash a transaction to get it's identifier for lookup in mempool
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionhash)
 async fn construction_hash(
     request: ConstructionHashRequest,
     server_context: RosettaContext,
 ) -> ApiResult<TransactionIdentifierResponse> {
-    debug!("/construction/hash");
+    debug!("/construction/hash {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
-    let signed_bytes = hex::decode(&request.signed_transaction)?;
-    let signed_transaction: SignedTransaction = bcs::from_bytes(&signed_bytes)
-        .map_err(|_| ApiError::deserialization_failed("SignedTransaction"))?;
+    let signed_transaction = decode_bcs(&request.signed_transaction, "SignedTransaction")?;
     let hash = UserTransaction(signed_transaction).hash().to_hex();
 
     Ok(TransactionIdentifierResponse {
@@ -204,7 +202,7 @@ async fn construction_metadata(
     request: ConstructionMetadataRequest,
     server_context: RosettaContext,
 ) -> ApiResult<ConstructionMetadataResponse> {
-    debug!("/construction/metadata");
+    debug!("/construction/metadata {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
     let rest_client = server_context.rest_client()?;
@@ -229,17 +227,17 @@ async fn construction_metadata(
 
 /// Construction parse command (OFFLINE)
 ///
-/// Parses operations from a transaction
+/// Parses operations from a transaction, used for verifying transaction construction
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionparse)
 async fn construction_parse(
     request: ConstructionParseRequest,
     server_context: RosettaContext,
 ) -> ApiResult<ConstructionParseResponse> {
-    debug!("/construction/parse");
+    debug!("/construction/parse {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
-    let (account_identifier_signers, _raw_txn) = if request.signed {
+    let (account_identifier_signers, _unsigned_txn) = if request.signed {
         let signed_txn: SignedTransaction = decode_bcs(&request.transaction, "SignedTransaction")?;
         let mut account_identifier_signers: Vec<_> = signed_txn
             .authenticator()
@@ -247,13 +245,13 @@ async fn construction_parse(
             .into_iter()
             .map(AccountIdentifier::from)
             .collect();
-        let raw_txn = signed_txn.into_raw_transaction();
-        account_identifier_signers.push(raw_txn.sender().into());
+        let unsigned_txn = signed_txn.into_raw_transaction();
+        account_identifier_signers.push(unsigned_txn.sender().into());
 
-        (Some(account_identifier_signers), raw_txn)
+        (Some(account_identifier_signers), unsigned_txn)
     } else {
-        let raw_txn: RawTransaction = decode_bcs(&request.transaction, "RawTransaction")?;
-        (None, raw_txn)
+        let unsigned_txn: RawTransaction = decode_bcs(&request.transaction, "UnsignedTransaction")?;
+        (None, unsigned_txn)
     };
 
     // TODO: Convert operations
@@ -265,47 +263,63 @@ async fn construction_parse(
 
 /// Construction payloads command (OFFLINE)
 ///
-/// TODO
+/// Constructs payloads for given known operations
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionpayloads)
 async fn construction_payloads(
     request: ConstructionPayloadsRequest,
     server_context: RosettaContext,
 ) -> ApiResult<ConstructionPayloadsResponse> {
-    debug!("/construction/payloads");
+    debug!("/construction/payloads {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
-    let transfer = Transfer::extract_transfer(&request.operations)?;
+    // Retrieve the real operation we're doing
+    let operation = InternalOperation::extract(&request.operations)?;
     let metadata = if let Some(ref metadata) = request.metadata {
         metadata
     } else {
         return Err(ApiError::BadTransactionPayload);
     };
 
-    // Encode the transfer operation
-    let txn_payload = aptos_stdlib::encode_test_coin_transfer(transfer.receiver, transfer.amount);
+    // Encode operation
+    let (txn_payload, sender) = match operation {
+        InternalOperation::CreateAccount(create_account) => (
+            aptos_stdlib::encode_account_create_account(create_account.new_account),
+            create_account.sender,
+        ),
+        InternalOperation::Transfer(transfer) => {
+            if transfer.currency != native_coin() {
+                return Err(ApiError::BadCoin);
+            }
+            (
+                aptos_stdlib::encode_test_coin_transfer(transfer.receiver, transfer.amount),
+                transfer.sender,
+            )
+        }
+    };
+
+    // Build the transaction and make it ready for signing
     let transaction_factory = TransactionFactory::new(server_context.chain_id)
         .with_gas_unit_price(metadata.gas_price_per_unit)
         .with_max_gas_amount(metadata.max_gas);
     let sequence_number = metadata.sequence_number;
-    let raw_txn = transaction_factory
+    let unsigned_transaction = transaction_factory
         .payload(txn_payload)
-        .sender(transfer.sender)
+        .sender(sender)
         .sequence_number(sequence_number + 1)
         .build();
 
-    let txn_bytes = signing_message(&raw_txn);
-    let hex_bytes = hex::encode(txn_bytes);
+    let signing_message = hex::encode(signing_message(&unsigned_transaction));
     let payload = SigningPayload {
         address: None,
-        account_identifier: Some(AccountIdentifier::from(transfer.sender)),
-        hex_bytes: hex_bytes.clone(),
+        account_identifier: Some(AccountIdentifier::from(sender)),
+        hex_bytes: signing_message,
         signature_type: Some(SignatureType::Ed25519),
     };
 
     // Transaction is both the unsigned transaction and the payload
     Ok(ConstructionPayloadsResponse {
-        unsigned_transaction: hex_bytes,
+        unsigned_transaction: encode_bcs(&unsigned_transaction)?,
         payloads: vec![payload],
     })
 }
@@ -322,7 +336,7 @@ async fn construction_preprocess(
     request: ConstructionPreprocessRequest,
     server_context: RosettaContext,
 ) -> ApiResult<ConstructionPreprocessResponse> {
-    debug!("/construction/preprocess");
+    debug!("/construction/preprocess {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
     // Ensure that the max fee is only in the native coin
@@ -331,7 +345,7 @@ async fn construction_preprocess(
             return Err(ApiError::BadTransactionPayload);
         }
         let max_fee = max_fees.first().unwrap();
-        let _ = SupportedCurrencies::try_from(&max_fee.currency)?;
+        is_native_coin(&max_fee.currency)?;
         u64::from_str(&max_fee.value)?
     } else {
         DEFAULT_MAX_GAS_PRICE
@@ -339,7 +353,7 @@ async fn construction_preprocess(
 
     // Let's not accept fractions, as we don't support it
     let gas_price_per_unit = if let Some(fee_multiplier) = request.suggested_fee_multiplier {
-        if fee_multiplier != (fee_multiplier as u64) as f64 {
+        if fee_multiplier != (fee_multiplier as u32) as f64 {
             return Err(ApiError::BadTransactionPayload);
         }
 
@@ -351,7 +365,7 @@ async fn construction_preprocess(
     Ok(ConstructionPreprocessResponse {
         options: Some(MetadataOptions {
             // We only accept P2P transactions for now
-            internal_operation: InternalOperation::extract_transfer(&request.operations)?,
+            internal_operation: InternalOperation::extract(&request.operations)?,
             max_gas,
             gas_price_per_unit,
         }),
@@ -368,7 +382,7 @@ async fn construction_submit(
     request: ConstructionSubmitRequest,
     server_context: RosettaContext,
 ) -> ApiResult<ConstructionSubmitResponse> {
-    debug!("/construction/submit");
+    debug!("/construction/submit {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
     let rest_client = server_context.rest_client()?;
