@@ -8,7 +8,8 @@ use aptos::common::types::EncodingType;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_sdk::types::chain_id::ChainId;
-use clap::Parser;
+use clap::{ArgEnum, Parser};
+
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -53,6 +54,19 @@ pub struct ClusterArgs {
     pub mint_args: MintArgs,
 }
 
+#[derive(Debug, Clone, Copy, ArgEnum, Deserialize, Parser, Serialize)]
+pub enum TransactionType {
+    P2P,
+    AccountGeneration,
+    NftMint,
+}
+
+impl Default for TransactionType {
+    fn default() -> Self {
+        TransactionType::P2P
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
 pub struct EmitArgs {
     #[clap(long, default_value = "15")]
@@ -82,6 +96,9 @@ pub struct EmitArgs {
 
     #[clap(long, help = "Percentage of invalid txs", default_value = "0")]
     pub invalid_tx: usize,
+
+    #[clap(arg_enum)]
+    pub transaction_type: TransactionType,
 }
 
 fn parse_target(target: &str) -> Result<Url> {
