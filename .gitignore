@@ -66,3 +66,7 @@ mobile/vendor/bundle/
 .turbo
 .next/**
 *.log
+
+# Webpack profiler
+stats.json
+apps/extension/dist

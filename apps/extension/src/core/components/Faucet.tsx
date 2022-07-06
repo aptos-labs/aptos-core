@@ -5,7 +5,8 @@ import {
   Button, useToast,
 } from '@chakra-ui/react';
 import React from 'react';
-import { FaFaucet } from 'react-icons/fa';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faFaucet } from '@fortawesome/free-solid-svg-icons/faFaucet';
 import useWalletState from 'core/hooks/useWalletState';
 import { fundAccountWithFaucet } from 'core/queries/faucet';
 import { useMutation, useQueryClient } from 'react-query';
@@ -49,7 +50,7 @@ export default function Faucet() {
   return (
     <Button
       isLoading={isFaucetLoading}
-      leftIcon={<FaFaucet />}
+      leftIcon={<FontAwesomeIcon icon={faFaucet} />}
       onClick={faucetOnClick}
       isDisabled={isFaucetLoading}
     >

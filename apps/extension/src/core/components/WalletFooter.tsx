@@ -4,8 +4,8 @@
 import {
   Center, IconButton, SimpleGrid, useColorMode,
 } from '@chakra-ui/react';
-import { IoMdImage } from 'react-icons/io';
-import { RiCopperCoinFill } from 'react-icons/ri';
+import { IoMdImage } from '@react-icons/all-files/io/IoMdImage';
+import { RiCopperCoinFill } from '@react-icons/all-files/ri/RiCopperCoinFill';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { SettingsIcon } from '@chakra-ui/icons';

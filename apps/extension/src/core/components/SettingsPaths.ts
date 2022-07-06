@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { BiNetworkChart } from 'react-icons/bi';
-import { FaKey } from 'react-icons/fa';
-import { GoSignOut } from 'react-icons/go';
+import { BiNetworkChart } from '@react-icons/all-files/bi/BiNetworkChart';
+import { FaKey } from '@react-icons/all-files/fa/FaKey';
+import { GoSignOut } from '@react-icons/all-files/go/GoSignOut';
 import { SettingsListItemProps } from './SettingsListItem';
 
 export const signOutSecondaryGridBgColor = {

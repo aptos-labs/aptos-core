@@ -22,7 +22,7 @@ import {
 } from '@chakra-ui/react';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import React, { useMemo, useRef } from 'react';
-import { IoIosSend } from 'react-icons/io';
+import { IoIosSend } from '@react-icons/all-files/io/IoIosSend';
 import useWalletState from 'core/hooks/useWalletState';
 import {
   getAccountExists,

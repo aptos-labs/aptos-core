@@ -23,12 +23,12 @@ import {
 } from '@chakra-ui/react';
 import { useParams } from 'react-router-dom';
 import { useTokenData } from 'core/queries/collectibles';
-import { BsFillCollectionFill } from 'react-icons/bs';
-import { GrStorage } from 'react-icons/gr';
+import { GrStorage } from '@react-icons/all-files/gr/GrStorage';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import SquareImage from './SquareImage';
 import ArweaveLogo from './ArweaveLogo';
 import IPFSlogo from './IPFSLogo';
+import CollectionIcon from './CollectionIcon';
 
 const imageNotFound = 'https://www.flexx.co/assets/camaleon_cms/image-not-found-4a963b95bf081c3ea02923dceaeb3f8085e1a654fc54840aac61a57a60903fef.png';
 const imageBoxShadow = 'rgba(0, 0, 0, 0.25) 0px 54px 55px, rgba(0, 0, 0, 0.12) 0px -12px 30px, rgba(0, 0, 0, 0.12) 0px 4px 6px, rgba(0, 0, 0, 0.17) 0px 12px 13px, rgba(0, 0, 0, 0.09) 0px -3px 5px';
@@ -160,7 +160,7 @@ function TokenBody() {
           <VStack spacing={4} pt={4} width="100%">
             <Grid templateColumns="28px 1fr" gap={6} width="100%">
               <Box pt={1}>
-                <Icon fontSize={28} as={BsFillCollectionFill} />
+                <Icon fontSize={28} as={CollectionIcon} />
               </Box>
               <Box>
                 <Text fontSize="md">{data?.collection}</Text>
