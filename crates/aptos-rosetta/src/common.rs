@@ -3,20 +3,16 @@
 
 use crate::{
     error::{ApiError, ApiResult},
-    types::NetworkIdentifier,
+    types::{Currency, NetworkIdentifier},
     RosettaContext,
 };
-use aptos_crypto::ValidCryptoMaterial;
+use aptos_crypto::{ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_logger::debug;
 use aptos_rest_client::{aptos::Balance, Account, Response};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{
-    convert::{Infallible, TryInto},
-    future::Future,
-    str::FromStr,
-};
+use std::{convert::Infallible, future::Future, str::FromStr};
 use warp::Filter;
 
 pub const BLOCKCHAIN: &str = "aptos";
@@ -136,8 +132,23 @@ pub fn decode_key<T: DeserializeOwned + ValidCryptoMaterial>(
     str: &str,
     type_name: &'static str,
 ) -> ApiResult<T> {
-    hex::decode(str)?
-        .as_slice()
-        .try_into()
-        .map_err(|_| ApiError::deserialization_failed(type_name))
+    T::from_encoded_string(str).map_err(|_| ApiError::deserialization_failed(type_name))
+}
+
+const DEFAULT_COIN: &str = "TC";
+const DEFAULT_DECIMALS: u64 = 6;
+
+pub fn native_coin() -> Currency {
+    Currency {
+        symbol: DEFAULT_COIN.to_string(),
+        decimals: DEFAULT_DECIMALS,
+    }
+}
+
+pub fn is_native_coin(currency: &Currency) -> ApiResult<()> {
+    if currency == &native_coin() {
+        Ok(())
+    } else {
+        Err(ApiError::BadCoin)
+    }
 }

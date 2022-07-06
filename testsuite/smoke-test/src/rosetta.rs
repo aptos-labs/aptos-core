@@ -6,7 +6,8 @@ use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_rosetta::{
     client::RosettaClient,
-    types::{AccountBalanceRequest, BlockRequest, Currency, SupportedCurrencies},
+    common::native_coin,
+    types::{AccountBalanceRequest, BlockRequest},
 };
 use forge::{LocalSwarm, Node};
 use std::{future::Future, str::FromStr, time::Duration};
@@ -73,10 +74,7 @@ async fn test_account_balance() {
     assert_eq!(1, response.balances.len());
     let balance = response.balances.first().unwrap();
     assert_eq!(DEFAULT_FUNDED_COINS, u64::from_str(&balance.value).unwrap());
-    assert_eq!(
-        &Currency::from(SupportedCurrencies::NativeCoin),
-        &balance.currency
-    );
+    assert_eq!(&native_coin(), &balance.currency);
 }
 
 #[tokio::test]
