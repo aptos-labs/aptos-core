@@ -18,12 +18,14 @@ export const MessageMethod = Object.freeze({
   GET_ACCOUNT_ADDRESS: 'getAccountAddress',
   IS_CONNECTED: 'is_connected',
   SIGN_AND_SUBMIT_TRANSACTION: 'signAndSubmitTransaction',
+  SIGN_MESSAGE: 'signMessage',
   SIGN_TRANSACTION: 'signTransaction',
 } as const);
 
 export const PermissionType = Object.freeze({
   CONNECT: 'connect',
   SIGN_AND_SUBMIT_TRANSACTION: 'signAndSubmitTransaction',
+  SIGN_MESSAGE: 'signMessage',
   SIGN_TRANSACTION: 'signTransaction',
 } as const);
 

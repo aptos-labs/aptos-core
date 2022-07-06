@@ -26,6 +26,10 @@ class Web3 {
     return this.message(MessageMethod.GET_ACCOUNT_ADDRESS, {});
   }
 
+  signMessage(message) {
+    return this.message(MessageMethod.SIGN_MESSAGE, { message });
+  }
+
   signAndSubmitTransaction(transaction) {
     return this.message(MessageMethod.SIGN_AND_SUBMIT_TRANSACTION, { transaction });
   }

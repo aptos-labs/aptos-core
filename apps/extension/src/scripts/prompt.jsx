@@ -65,6 +65,8 @@ function PromptState() {
       case PermissionType.SIGN_TRANSACTION:
         permissions.push('Sign a transaction');
         break;
+      case PermissionType.SIGN_MESSAGE:
+        permissions.push('Sign a message');
       default:
         break;
     }

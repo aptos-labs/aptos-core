@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient } from 'aptos';
+import { AptosClient, BCS } from 'aptos';
 import fetchAdapter from '@vespaiach/axios-fetch-adapter';
+import { sign } from 'tweetnacl';
 import { DEVNET_NODE_URL } from '../core/constants';
 import { MessageMethod, PermissionType } from '../core/types';
 import { getBackgroundAptosAccountState } from '../core/utils/account';
@@ -43,7 +44,7 @@ function getAccountAddress(account, sendResponse) {
   }
 
   if (account.address()) {
-    sendResponse({ address: account.address().hex() });
+    sendResponse({ address: account.address().hex(), publicKey: account.pubKey().hex() });
   } else {
     sendResponse({ error: DappErrorType.NO_ACCOUNTS });
   }
@@ -110,6 +111,30 @@ async function signTransactionAndSendResponse(client, account, transaction, send
   }
 }
 
+async function signMessage(account, message, sendResponse) {
+  if (!checkConnected(sendResponse)) {
+    return;
+  }
+
+  const permission = await Permissions.requestPermissions(
+    PermissionType.SIGN_MESSAGE,
+    await getCurrentDomain(),
+  );
+  if (!permission) {
+    rejectRequest(sendResponse);
+    return;
+  }
+  try {
+    const serializer = new BCS.Serializer();
+    serializer.serializeStr(message);
+    const signature = sign(serializer.getBytes(), account.signingKey.secretKey);
+    const signedMessage = Buffer.from(signature).toString('hex');
+    sendResponse({ signedMessage });
+  } catch (error) {
+    sendResponse({ data: error, error: DappErrorType.TRANSACTION_FAILURE });
+  }
+}
+
 async function handleDappRequest(request, sendResponse) {
   const account = await getBackgroundAptosAccountState();
   if (account === undefined) {
@@ -137,6 +162,9 @@ async function handleDappRequest(request, sendResponse) {
       break;
     case MessageMethod.SIGN_TRANSACTION:
       signTransactionAndSendResponse(client, account, request.args.transaction, sendResponse);
+      break;
+    case MessageMethod.SIGN_MESSAGE:
+      signMessage(account, request.args.message, sendResponse);
       break;
     default:
       // method not supported

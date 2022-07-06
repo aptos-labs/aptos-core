@@ -70,6 +70,7 @@ export default class Permissions {
         return false;
       case PermissionType.SIGN_AND_SUBMIT_TRANSACTION:
       case PermissionType.SIGN_TRANSACTION:
+      case PermissionType.SIGN_MESSAGE:
         if (!await this.isDomainAllowed(domain)) {
           return false;
         }
