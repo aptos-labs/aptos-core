@@ -92,6 +92,7 @@ service:
   validator:
     external: 
       type: LoadBalancer
+    externalTrafficPolicy: Local
     loadBalancerSourceRanges:
     enableRestApi: true
     enableMetricsPort: true
@@ -99,6 +100,7 @@ service:
   fullnode:
     external: 
       type: LoadBalancer
+    externalTrafficPolicy: Local
     loadBalancerSourceRanges:
     enableRestApi: true
     enableMetricsPort: true
