@@ -23,6 +23,10 @@ class DiscourseAddGroupJob < ApplicationJob
     return if discourse_user_id.nil? || group_id.nil?
 
     @client.group_add(group_id, user_id: discourse_user_id)
+  rescue DiscourseApi::UnprocessableEntity => e
+    return if e.response.body['errors'].first.to_s.include? 'already a member of this group'
+
+    raise
   end
 
   memoize def discourse_user_id
