@@ -123,9 +123,9 @@ async fn construction_combine(
     // Single signer only supported for now
     // TODO: Support multi-agent / multi-signer?
     if request.signatures.len() != 1 {
-        return Err(ApiError::UnsupportedSignatureCount(
+        return Err(ApiError::UnsupportedSignatureCount(Some(
             request.signatures.len(),
-        ));
+        )));
     }
 
     let signature = &request.signatures[0];
@@ -291,7 +291,9 @@ async fn construction_payloads(
         ),
         InternalOperation::Transfer(transfer) => {
             if transfer.currency != native_coin() {
-                return Err(ApiError::UnsupportedCurrency(transfer.currency.symbol));
+                return Err(ApiError::UnsupportedCurrency(Some(
+                    transfer.currency.symbol,
+                )));
             }
             (
                 aptos_stdlib::encode_test_coin_transfer(transfer.receiver, transfer.amount),

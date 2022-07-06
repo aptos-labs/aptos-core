@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types;
+use crate::{types, types::ErrorDetails};
 use hex::FromHexError;
 use move_deps::move_core_types::account_address::AccountAddressParseError;
 use serde::{Deserialize, Serialize};
@@ -12,8 +12,8 @@ pub type ApiResult<T> = Result<T, ApiError>;
 
 #[derive(Debug, Deserialize, Serialize, Error)]
 pub enum ApiError {
-    #[error("Aptos error: {0}")]
-    AptosError(String),
+    #[error("Aptos error")]
+    AptosError(Option<String>),
     #[error("Must provide either hash or index but not both")]
     BlockParameterConflict,
     #[error("Transaction is pending")]
@@ -22,12 +22,12 @@ pub enum ApiError {
     NetworkIdentifierMismatch,
     #[error("ChainId doesn't match the on-chain state")]
     ChainIdMismatch,
-    #[error("Deserialization failed {0}")]
-    DeserializationFailed(String),
-    #[error("Transfer operations failed {0}")]
-    InvalidTransferOperations(String),
-    #[error("Account not found {0}")]
-    AccountNotFound(String),
+    #[error("Deserialization failed")]
+    DeserializationFailed(Option<String>),
+    #[error("Transfer operations failed")]
+    InvalidTransferOperations(Option<&'static str>),
+    #[error("Account not found")]
+    AccountNotFound(Option<String>),
     #[error("Invalid signature type, only Ed25519 is supported")]
     InvalidSignatureType,
     #[error("Invalid max gas fees, only one native gas fee is allowed")]
@@ -38,10 +38,10 @@ pub enum ApiError {
     InvalidOperations,
     #[error("Missing payload metadata containing the internal transaction")]
     MissingPayloadMetadata,
-    #[error("Unsupported currency {0}")]
-    UnsupportedCurrency(String),
-    #[error("Unsupported signature count {0}")]
-    UnsupportedSignatureCount(usize),
+    #[error("Unsupported currency")]
+    UnsupportedCurrency(Option<String>),
+    #[error("Unsupported signature count")]
+    UnsupportedSignatureCount(Option<usize>),
     #[error("Node is offline, and this API is not supported in offline mode")]
     NodeIsOffline,
     #[error("Block is not yet complete, request will need to be retried")]
@@ -52,23 +52,23 @@ impl ApiError {
     pub fn all() -> Vec<ApiError> {
         use ApiError::*;
         vec![
-            AptosError(String::new()),
+            AptosError(None),
             TransactionIsPending,
-            DeserializationFailed(String::new()),
-            InvalidTransferOperations(String::new()),
+            DeserializationFailed(None),
+            InvalidTransferOperations(None),
             InvalidSignatureType,
             NodeIsOffline,
             BlockIncomplete,
             BlockParameterConflict,
             NetworkIdentifierMismatch,
             ChainIdMismatch,
-            AccountNotFound(String::new()),
+            AccountNotFound(None),
             InvalidMaxGasFees,
             InvalidGasMultiplier,
             InvalidOperations,
             MissingPayloadMetadata,
-            UnsupportedCurrency(String::new()),
-            UnsupportedSignatureCount(0),
+            UnsupportedCurrency(None),
+            UnsupportedSignatureCount(None),
         ]
     }
 
@@ -119,7 +119,7 @@ impl ApiError {
     }
 
     pub fn deserialization_failed(type_: &str) -> ApiError {
-        ApiError::DeserializationFailed(type_.to_string())
+        ApiError::DeserializationFailed(Some(type_.to_string()))
     }
 
     pub fn into_error(self) -> types::Error {
@@ -129,11 +129,21 @@ impl ApiError {
 
 impl From<&ApiError> for types::Error {
     fn from(error: &ApiError) -> Self {
+        let details = match error {
+            ApiError::AptosError(details) => details.clone(),
+            ApiError::DeserializationFailed(details) => details.clone(),
+            ApiError::InvalidTransferOperations(details) => details.map(|inner| inner.to_string()),
+            ApiError::AccountNotFound(details) => details.clone(),
+            ApiError::UnsupportedCurrency(details) => details.clone(),
+            ApiError::UnsupportedSignatureCount(details) => details.map(|inner| inner.to_string()),
+            _ => None,
+        }
+        .map(|details| ErrorDetails { details });
         types::Error {
             message: error.message(),
             code: error.code(),
             retriable: error.retriable(),
-            details: None,
+            details,
             description: None,
         }
     }
@@ -141,31 +151,31 @@ impl From<&ApiError> for types::Error {
 
 impl From<AccountAddressParseError> for ApiError {
     fn from(err: AccountAddressParseError) -> Self {
-        ApiError::DeserializationFailed(err.to_string())
+        ApiError::DeserializationFailed(Some(err.to_string()))
     }
 }
 
 impl From<FromHexError> for ApiError {
     fn from(err: FromHexError) -> Self {
-        ApiError::DeserializationFailed(err.to_string())
+        ApiError::DeserializationFailed(Some(err.to_string()))
     }
 }
 
 impl From<bcs::Error> for ApiError {
     fn from(err: bcs::Error) -> Self {
-        ApiError::DeserializationFailed(err.to_string())
+        ApiError::DeserializationFailed(Some(err.to_string()))
     }
 }
 
 impl From<anyhow::Error> for ApiError {
     fn from(err: anyhow::Error) -> Self {
-        ApiError::AptosError(err.to_string())
+        ApiError::AptosError(Some(err.to_string()))
     }
 }
 
 impl From<std::num::ParseIntError> for ApiError {
     fn from(err: std::num::ParseIntError) -> Self {
-        ApiError::DeserializationFailed(err.to_string())
+        ApiError::DeserializationFailed(Some(err.to_string()))
     }
 }
 

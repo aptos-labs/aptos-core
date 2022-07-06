@@ -522,10 +522,10 @@ impl Transaction {
                                             deposit_event_key: deposit_event,
                                         });
                                     } else {
-                                        return Err(ApiError::UnsupportedCurrency(format!(
+                                        return Err(ApiError::UnsupportedCurrency(Some(format!(
                                             "Currency {} is not supported",
                                             coin_type
-                                        )));
+                                        ))));
                                     }
                                 }
                             }
@@ -650,9 +650,9 @@ impl Transaction {
                     metadata: None,
                 });
             } else {
-                return Err(ApiError::AptosError(
+                return Err(ApiError::AptosError(Some(
                     "Failed to load gas currency".to_string(),
-                ));
+                )));
             }
         }
 
@@ -743,9 +743,9 @@ impl Transfer {
                     == OperationType::Withdraw
             }))
         {
-            return Err(ApiError::InvalidTransferOperations(
-                "Must have exactly 1 withdraw and 1 deposit".to_string(),
-            ));
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Must have exactly 1 withdraw and 1 deposit",
+            )));
         }
 
         let mut op_map = HashMap::new();
@@ -755,9 +755,9 @@ impl Transfer {
         }
         let mut keys = op_map.keys();
         if !keys.contains(&OperationType::Withdraw) || !keys.contains(&OperationType::Deposit) {
-            return Err(ApiError::InvalidTransferOperations(
-                "Must have exactly 1 withdraw and 1 deposit".to_string(),
-            ));
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Must have exactly 1 withdraw and 1 deposit",
+            )));
         }
 
         // Verify accounts and amounts
@@ -765,18 +765,18 @@ impl Transfer {
         let sender = if let Some(ref account) = withdraw.account {
             account.try_into()?
         } else {
-            return Err(ApiError::InvalidTransferOperations(
-                "Invalid withdraw account provided".to_string(),
-            ));
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Invalid withdraw account provided",
+            )));
         };
 
         let deposit = op_map.get(&OperationType::Deposit).unwrap();
         let receiver = if let Some(ref account) = deposit.account {
             account.try_into()?
         } else {
-            return Err(ApiError::InvalidTransferOperations(
-                "Invalid deposit account provided".to_string(),
-            ));
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Invalid deposit account provided",
+            )));
         };
 
         let (amount, currency): (u64, Currency) =
@@ -785,9 +785,9 @@ impl Transfer {
             {
                 // Currencies have to be the same
                 if withdraw_amount.currency != deposit_amount.currency {
-                    return Err(ApiError::InvalidTransferOperations(
-                        "Currency mismatch between withdraw and deposit".to_string(),
-                    ));
+                    return Err(ApiError::InvalidTransferOperations(Some(
+                        "Currency mismatch between withdraw and deposit",
+                    )));
                 }
 
                 // Check that the currency is supported
@@ -795,24 +795,24 @@ impl Transfer {
                 let _ = is_native_coin(&withdraw_amount.currency)?;
 
                 let withdraw_value = i64::from_str(&withdraw_amount.value).map_err(|_| {
-                    ApiError::InvalidTransferOperations("Withdraw amount is invalid".to_string())
+                    ApiError::InvalidTransferOperations(Some("Withdraw amount is invalid"))
                 })?;
                 let deposit_value = i64::from_str(&deposit_amount.value).map_err(|_| {
-                    ApiError::InvalidTransferOperations("Deposit amount is invalid".to_string())
+                    ApiError::InvalidTransferOperations(Some("Deposit amount is invalid"))
                 })?;
 
                 // We can't create or destroy coins, they must be negatives of each other
                 if -withdraw_value != deposit_value {
-                    return Err(ApiError::InvalidTransferOperations(
-                        "Withdraw amount must be equal to negative of deposit amount".to_string(),
-                    ));
+                    return Err(ApiError::InvalidTransferOperations(Some(
+                        "Withdraw amount must be equal to negative of deposit amount",
+                    )));
                 }
 
                 (deposit_value as u64, deposit_amount.currency.clone())
             } else {
-                return Err(ApiError::InvalidTransferOperations(
-                    "Must have exactly 1 withdraw and 1 deposit with amounts".to_string(),
-                ));
+                return Err(ApiError::InvalidTransferOperations(Some(
+                    "Must have exactly 1 withdraw and 1 deposit with amounts",
+                )));
             };
 
         Ok(Transfer {

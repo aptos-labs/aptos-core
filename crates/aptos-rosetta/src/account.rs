@@ -154,12 +154,12 @@ async fn get_block_index_from_request(
             } else {
                 // Lookup by hash doesn't work since we're faking blocks, need to verify that it's a
                 // block
-                let response = rest_client
-                    .get_transaction(
-                        HashValue::from_str(&hash)
-                            .map_err(|err| ApiError::DeserializationFailed(err.to_string()))?,
-                    )
-                    .await?;
+                let response =
+                    rest_client
+                        .get_transaction(HashValue::from_str(&hash).map_err(|err| {
+                            ApiError::DeserializationFailed(Some(err.to_string()))
+                        })?)
+                        .await?;
                 let version = response.inner().version();
 
                 if let Some(version) = version {
@@ -301,10 +301,10 @@ impl CoinCache {
         // At this point if we've retrieved it and it's bad, we error out
         if let Some(resource) = response.into_inner() {
             let coin_info = serde_json::from_value::<CoinInfo>(resource.data).map_err(|_| {
-                ApiError::DeserializationFailed(format!(
+                ApiError::DeserializationFailed(Some(format!(
                     "CoinInfo failed to deserialize for {}",
                     coin
-                ))
+                )))
             })?;
 
             Ok(Some(Currency {
@@ -312,10 +312,10 @@ impl CoinCache {
                 decimals: coin_info.decimals.0,
             }))
         } else {
-            Err(ApiError::DeserializationFailed(format!(
+            Err(ApiError::DeserializationFailed(Some(format!(
                 "Currency {} not found",
                 coin
-            )))
+            ))))
         }
     }
 }

@@ -95,7 +95,7 @@ pub async fn get_account(
     rest_client
         .get_account(address)
         .await
-        .map_err(|_| ApiError::AccountNotFound(address.to_string()))
+        .map_err(|_| ApiError::AccountNotFound(Some(address.to_string())))
 }
 
 /// Retrieve the timestamp according ot the Rosetta spec (milliseconds)
@@ -140,6 +140,6 @@ pub fn is_native_coin(currency: &Currency) -> ApiResult<()> {
     if currency == &native_coin() {
         Ok(())
     } else {
-        Err(ApiError::UnsupportedCurrency(currency.symbol.clone()))
+        Err(ApiError::UnsupportedCurrency(Some(currency.symbol.clone())))
     }
 }

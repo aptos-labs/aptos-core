@@ -56,7 +56,7 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
         (None, Some(hash)) => {
             // Allow 0x in front of hash
             let hash = HashValue::from_str(strip_hex_prefix(hash))
-                .map_err(|err| ApiError::DeserializationFailed(err.to_string()))?;
+                .map_err(|err| ApiError::DeserializationFailed(Some(err.to_string())))?;
             let response = rest_client.get_transaction(hash).await?;
             let txn = response.into_inner();
             let version = txn.version().unwrap();
