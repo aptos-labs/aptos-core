@@ -9,9 +9,9 @@ use anyhow::{bail, format_err};
 use aptos_logger::info;
 use aptos_sdk::types::PeerId;
 use k8s_openapi::api::{
-    apps::v1::{Deployment, StatefulSet},
+    apps::v1::StatefulSet,
     batch::v1::Job,
-    core::v1::Namespace,
+    core::v1::{Namespace, PersistentVolumeClaim},
 };
 use kube::{
     api::{Api, DeleteParams, ListParams, Meta},
@@ -159,13 +159,19 @@ pub(crate) async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
     // if operating on the default namespace,
     match kube_namespace.as_str() {
         "default" => {
-            let deployments: Api<Deployment> = Api::namespaced(client.clone(), "default");
-            let stateful_sets: Api<StatefulSet> = Api::namespaced(client, "default");
+            let pvcs: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), "default");
 
             // delete all deployments and statefulsets
             // cross this with all the compute resources created by aptos-node helm chart
-            delete_k8s_collection(deployments, "deployments").await?;
-            delete_k8s_collection(stateful_sets, "stateful_sets").await?;
+            uninstall_helm_release(
+                APTOS_NODE_HELM_RELEASE_NAME.to_string(),
+                kube_namespace.clone(),
+            )?;
+            uninstall_helm_release(
+                GENESIS_HELM_RELEASE_NAME.to_string(),
+                kube_namespace.clone(),
+            )?;
+            delete_k8s_collection(pvcs, "pvcs").await?;
         }
         s if s.starts_with("forge") => {
             let namespaces: Api<Namespace> = Api::all(client);
@@ -182,6 +188,30 @@ pub(crate) async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
             );
         }
     }
+
+    Ok(())
+}
+
+fn uninstall_helm_release(release_name: String, kube_namespace: String) -> Result<()> {
+    let uninstall_args = [
+        "uninstall".to_string(),
+        "--namespace".to_string(),
+        kube_namespace.clone(),
+        "--keep-history".to_string(),
+        release_name.clone(),
+    ];
+    info!("{:?}", uninstall_args);
+    // do not error on exit code, as helm uninstall is not idempotent
+    let _uninstall_output = Command::new(HELM_BIN)
+        .stdout(Stdio::inherit())
+        .args(&uninstall_args)
+        .output()
+        .unwrap_or_else(|_| {
+            panic!(
+                "failed to helm uninstall release {} from namespace {}",
+                release_name, kube_namespace
+            )
+        });
 
     Ok(())
 }
@@ -413,7 +443,7 @@ pub async fn create_k8s_client() -> K8sClient {
     K8sClient::try_from(config_infer).unwrap()
 }
 
-pub fn scale_sts_replica(sts_name: &str, replica_num: u64) -> Result<()> {
+pub fn scale_stateful_set_replicas(sts_name: &str, replica_num: u64) -> Result<()> {
     let scale_sts_args = [
         "scale",
         "sts",
