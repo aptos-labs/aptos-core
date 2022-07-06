@@ -5,7 +5,7 @@ use crate::{
     evaluators::{
         direct::{
             get_node_identity, LatencyEvaluatorArgs, NodeIdentityEvaluatorArgs, TpsEvaluatorArgs,
-            TransactionPresenceEvaluatorArgs,
+            TransactionAvailabilityEvaluatorArgs,
         },
         metrics::{
             ConsensusProposalsEvaluatorArgs, ConsensusRoundEvaluatorArgs,
@@ -18,6 +18,7 @@ use crate::{
 };
 use anyhow::{bail, format_err, Result};
 use aptos_config::config::RoleType;
+use aptos_rest_client::Client as AptosRestClient;
 use aptos_sdk::types::chain_id::ChainId;
 use clap::Parser;
 use once_cell::sync::Lazy;
@@ -87,14 +88,12 @@ pub struct NodeConfiguration {
 // It'd be better to have an enum with two variants, e.g. unfetched and fetched.
 impl NodeConfiguration {
     /// Only call this after fetch_additional_configuration has been called.
-    #[allow(dead_code)]
     pub fn get_chain_id(&self) -> ChainId {
         self.chain_id
             .expect("get_chain_id called before fetch_additional_configuration")
     }
 
     /// Only call this after fetch_additional_configuration has been called.
-    #[allow(dead_code)]
     pub fn get_role_type(&self) -> RoleType {
         self.role_type
             .expect("get_role_type called before fetch_additional_configuration")
@@ -161,7 +160,7 @@ pub struct EvaluatorArgs {
     pub tps_args: TpsEvaluatorArgs,
 
     #[clap(flatten)]
-    pub transaction_presence_args: TransactionPresenceEvaluatorArgs,
+    pub transaction_availability_args: TransactionAvailabilityEvaluatorArgs,
 }
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
@@ -214,6 +213,15 @@ impl NodeAddress {
         let mut url = self.url.clone();
         url.set_port(Some(self.api_port)).unwrap();
         url
+    }
+
+    pub fn get_api_client(&self) -> AptosRestClient {
+        let client = reqwest::ClientBuilder::new()
+            .timeout(std::time::Duration::from_secs(4))
+            .build()
+            .unwrap();
+
+        AptosRestClient::from((client, self.get_api_url()))
     }
 }
 

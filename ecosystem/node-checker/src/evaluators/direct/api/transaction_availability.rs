@@ -18,18 +18,18 @@ use std::time::Duration;
 const TRANSACTIONS_ENDPOINT: &str = "/transactions";
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
-pub struct TransactionPresenceEvaluatorArgs {
+pub struct TransactionAvailabilityEvaluatorArgs {
     #[clap(long, default_value_t = 5)]
     pub transaction_fetch_delay_secs: u64,
 }
 
 #[derive(Debug)]
-pub struct TransactionPresenceEvaluator {
-    args: TransactionPresenceEvaluatorArgs,
+pub struct TransactionAvailabilityEvaluator {
+    args: TransactionAvailabilityEvaluatorArgs,
 }
 
-impl TransactionPresenceEvaluator {
-    pub fn new(args: TransactionPresenceEvaluatorArgs) -> Self {
+impl TransactionAvailabilityEvaluator {
+    pub fn new(args: TransactionAvailabilityEvaluatorArgs) -> Self {
         Self { args }
     }
 
@@ -96,7 +96,7 @@ impl TransactionPresenceEvaluator {
 }
 
 #[async_trait::async_trait]
-impl Evaluator for TransactionPresenceEvaluator {
+impl Evaluator for TransactionAvailabilityEvaluator {
     type Input = DirectEvaluatorInput;
     type Error = ApiEvaluatorError;
 
@@ -195,11 +195,13 @@ impl Evaluator for TransactionPresenceEvaluator {
     }
 
     fn get_evaluator_name() -> String {
-        "transaction_presence".to_string()
+        "transaction_availability".to_string()
     }
 
     fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {
-        Ok(Self::new(evaluator_args.transaction_presence_args.clone()))
+        Ok(Self::new(
+            evaluator_args.transaction_availability_args.clone(),
+        ))
     }
 
     fn evaluator_type_from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<EvaluatorType> {

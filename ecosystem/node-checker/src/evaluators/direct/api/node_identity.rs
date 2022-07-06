@@ -6,64 +6,27 @@ use crate::{
     evaluator::{EvaluationResult, Evaluator},
     evaluators::EvaluatorType,
 };
-use anyhow::{anyhow, format_err, Result};
+use anyhow::{format_err, Result};
 use aptos_config::config::RoleType;
 use aptos_sdk::types::chain_id::ChainId;
 use clap::Parser;
 use poem_openapi::Object as PoemObject;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Display, str::FromStr};
+use std::fmt::Display;
 use thiserror::Error as ThisError;
 
-use super::{super::DirectEvaluatorInput, API_CATEGORY};
+use super::{super::DirectEvaluatorInput, get_index_response, API_CATEGORY};
 
 /// This function hits the `/` endpoint of the API and returns the chain ID
 /// and role type, extracted from the IndexResponse.
 pub async fn get_node_identity(node_address: &NodeAddress) -> Result<(ChainId, RoleType)> {
-    let mut url = node_address.url.clone();
-    url.set_port(Some(node_address.api_port))
-        .map_err(|_| format_err!("Failed to set port for URL"))?;
-
-    let client = reqwest::ClientBuilder::new()
-        .timeout(std::time::Duration::from_secs(4))
-        .build()
-        .unwrap();
-
-    let response = client
-        .get(url)
-        .send()
+    let index_response = get_index_response(node_address)
         .await
-        .map_err(|e| format_err!("Failed to get node identity {}", e))?;
-    let response_body = response
-        .text()
-        .await
-        .map_err(|e| format_err!("Failed to get body of node identity response {}", e))?;
-
-    let data: HashMap<String, serde_json::Value> =
-        serde_json::from_str(&response_body).map_err(|e| {
-            format_err!(
-                "Failed to process response body as valid JSON with string key/values {}",
-                e
-            )
-        })?;
-
-    let chain_id_raw: u8 = data
-        .get("chain_id")
-        .ok_or_else(|| format_err!("Failed to get chain_id from node identity"))?
-        .as_u64()
-        .ok_or_else(|| anyhow!("Failed to read chain ID from node identity as u8"))?
-        as u8;
-    let chain_id = ChainId::new(chain_id_raw);
-
-    let role_type_raw = data
-        .get("node_role")
-        .ok_or_else(|| format_err!("Failed to get node_role from node identity"))?
-        .as_str()
-        .ok_or_else(|| anyhow!("Failed to read node_role from node identity as str"))?;
-    let role_type = RoleType::from_str(role_type_raw)
-        .map_err(|e| format_err!("Failed to parse node_role {}", e))?;
-
-    Ok((chain_id, role_type))
+        .map_err(|e| format_err!("Failed to get response from index (/) of API, make sure your API port ({}) is open: {}", node_address.api_port, e))?;
+    Ok((
+        ChainId::new(index_response.ledger_info.chain_id),
+        index_response.node_role,
+    ))
 }
 
 #[derive(Debug, ThisError)]
@@ -126,32 +89,15 @@ impl Evaluator for NodeIdentityEvaluator {
 
     /// Assert that the node identity (role type and chain ID) of the two nodes match.
     async fn evaluate(&self, input: &Self::Input) -> Result<Vec<EvaluationResult>, Self::Error> {
-        let (target_chain_id, target_role_type) =
-            match get_node_identity(&input.target_node_address).await {
-                Ok((chain_id, role_type)) => (chain_id, role_type),
-                Err(e) => {
-                    return Ok(vec![self.build_evaluation_result(
-                        "Failed to get node identity from target node".to_string(),
-                        0,
-                        format!(
-                            "Failed to get node identity from target node, \
-                        make sure your API port ({}) is open and you're running \
-                        the correct node version: {}",
-                            input.target_node_address.api_port, e
-                        ),
-                    )])
-                }
-            };
-
         let evaluation_results = vec![
             self.help_build_evaluation_result(
-                input.baseline_node_information.chain_id,
-                target_chain_id,
+                input.get_baseline_chain_id(),
+                input.get_target_chain_id(),
                 "Chain ID",
             ),
             self.help_build_evaluation_result(
                 input.baseline_node_information.role_type,
-                target_role_type,
+                input.target_index_response.node_role,
                 "Role Type",
             ),
         ];
