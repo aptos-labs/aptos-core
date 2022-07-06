@@ -56,7 +56,7 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
         (None, Some(hash)) => {
             // Allow 0x in front of hash
             let hash = HashValue::from_str(strip_hex_prefix(hash))
-                .map_err(|err| ApiError::AptosError(err.to_string()))?;
+                .map_err(|err| ApiError::DeserializationFailed(err.to_string()))?;
             let response = rest_client.get_transaction(hash).await?;
             let txn = response.into_inner();
             let version = txn.version().unwrap();
@@ -72,7 +72,7 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
 
             get_block_by_index(rest_client, server_context.block_size, block_index).await?
         }
-        (_, _) => return Err(ApiError::BadBlockRequest),
+        (_, _) => return Err(ApiError::BlockParameterConflict),
     };
 
     // Build up the transaction, which should contain the `operations` as the change set
@@ -148,7 +148,7 @@ async fn get_block_by_index(
 
         // We can't give an incomplete block, it'll have to be retried
         if txns.len() != block_size as usize {
-            return Err(ApiError::BadBlockRequest);
+            return Err(ApiError::BlockIncomplete);
         }
         Ok((parent_txn, txns))
     }
