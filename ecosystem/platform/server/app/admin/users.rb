@@ -3,6 +3,14 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
+def it1_profile_link(user)
+  id = ActiveRecord::Base.connection.select_all('select id from it1_profiles where user_id = $1', nil,
+                                                [user.id]).first&.first&.last
+  return unless id
+
+  link_to("It1 profile ##{id}", admin_it1_profile_url(id))
+end
+
 ActiveAdmin.register User do
   menu priority: 1
   actions :all, except: %i[destroy new]
@@ -13,7 +21,7 @@ ActiveAdmin.register User do
   index do
     selectable_column
     id_column
-    column :it1_profile
+    column(:it1_profile) { |user| it1_profile_link(user) }
     column :it2_profile
     column :authorizations
     column 'External ID', :external_id
@@ -40,7 +48,7 @@ ActiveAdmin.register User do
   show do
     default_main_content do
       row :authorizations
-      row :it1_profile
+      row(:it1_profile) { |user| it1_profile_link(user) }
       row :it2_profile
     end
   end
