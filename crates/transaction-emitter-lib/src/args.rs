@@ -82,7 +82,9 @@ fn parse_target(target: &str) -> Result<Url> {
         bail!("Scheme must not be empty, try prefixing URL with http://");
     }
     if url.port().is_none() {
-        url.set_port(Some(DEFAULT_API_PORT)).map_err(|_| {
+        let split = target.split(":");
+        let port = if split.count() > 1 { url.port_or_known_default() } else { Some(DEFAULT_API_PORT) };
+        url.set_port(port).map_err(|_| {
             anyhow::anyhow!(
                 "Failed to set port to default value, make sure you have set a scheme like http://"
             )

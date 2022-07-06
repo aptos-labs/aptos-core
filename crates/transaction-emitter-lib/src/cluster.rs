@@ -43,7 +43,7 @@ impl Cluster {
             .into_iter()
             .map(|url| {
                 Instance::new(
-                    format!("{}:{}", url.host().unwrap(), url.port().unwrap()), /* short_hash */
+                    format!("{}:{}", url.host().unwrap(), url.port_or_known_default().unwrap()), /* short_hash */
                     url,
                     None,
                 )
@@ -116,19 +116,11 @@ impl TryFrom<&ClusterArgs> for Cluster {
     type Error = anyhow::Error;
 
     fn try_from(args: &ClusterArgs) -> Result<Self, Self::Error> {
-        let mut urls = Vec::new();
         for url in &args.targets {
             if !url.has_host() {
                 bail!("No host found in URL: {}", url);
             }
-            let mut url = url.clone();
-            if url.port().is_none() {
-                url.set_port(Some(8080))
-                    .map_err(|_| format_err!("Failed to set port unexpectedly"))?;
-            }
-            urls.push(url);
         }
-
         let mint_key = if let Some(ref key) = args.mint_args.mint_key {
             key.private_key()
         } else {
@@ -140,7 +132,7 @@ impl TryFrom<&ClusterArgs> for Cluster {
                 .unwrap()
         };
 
-        let cluster = Cluster::from_host_port(urls, mint_key, args.mint_args.chain_id, args.vasp);
+        let cluster = Cluster::from_host_port(args.targets.clone(), mint_key, args.mint_args.chain_id, args.vasp);
 
         Ok(cluster)
     }
