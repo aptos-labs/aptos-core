@@ -26,4 +26,4 @@ When faced with this error, you might see that the validation reports something 
 
 Because we must do a TCP handshake (one round trip) and then make an HTTP request (another round trip).
 
-The reason we have the latency evaluator is to ensure we can maintain good network performance. In particular, if the latency too your node is too high, it will result in low TPS and high time to finality, both of which are very important to running a highly performant L1 blockchain. If you receive this error, you must work to try and improve the latency to your node, we already set high thresholds on this value with the understanding that nodes will be running all over the world.
+The reason we have the latency evaluator is to ensure we can maintain good network performance. In particular, if the latency to your node is too high, it will result in low TPS and high time to finality, both of which are very important to running a highly performant L1 blockchain. **If you receive this error, you will need to try and improve the latency to your node, we have set high thresholds on this value with the understanding that nodes will be running all over the world**.
