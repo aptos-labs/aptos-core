@@ -109,9 +109,18 @@ pub fn routes(
     context: RosettaContext,
 ) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
     account::routes(context.clone())
-        .or(block::routes(context.clone()))
-        .or(construction::routes(context.clone()))
-        .or(network::routes(context))
+        .or(block::block_route(context.clone()))
+        .or(construction::combine_route(context.clone()))
+        .or(construction::derive_route(context.clone()))
+        .or(construction::hash_route(context.clone()))
+        .or(construction::metadata_route(context.clone()))
+        .or(construction::parse_route(context.clone()))
+        .or(construction::payloads_route(context.clone()))
+        .or(construction::preprocess_route(context.clone()))
+        .or(construction::submit_route(context.clone()))
+        .or(network::list_route(context.clone()))
+        .or(network::options_route(context.clone()))
+        .or(network::status_route(context))
         // TODO: Add health check?
         .with(
             warp::cors()
