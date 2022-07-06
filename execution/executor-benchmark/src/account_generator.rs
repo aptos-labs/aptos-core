@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_sdk::{move_types::account_address::AccountAddress, types::LocalAccount};
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{rngs::StdRng, RngCore, SeedableRng};
 use std::{collections::VecDeque, sync::mpsc};
 
 type Seed = [u8; 32];
@@ -12,25 +12,42 @@ pub struct AccountGenerator {
 }
 
 impl AccountGenerator {
-    const USER_ACCOUNTS_SEED: Seed = [1; 32];
-    const SEED_ACCOUNTS_SEED: Seed = [2; 32];
+    const MAX_ACCOUNT_GEN_PER_RNG: u64 = 40000;
+    const SEED_ACCOUNTS_ROOT_SEED: u64 = u64::max_value();
+    const USER_ACCOUNTS_ROOT_SEED: u64 = 0;
 
     pub fn new_for_seed_accounts() -> Self {
-        Self::new(Self::SEED_ACCOUNTS_SEED)
+        Self::new(Self::SEED_ACCOUNTS_ROOT_SEED, 0)
     }
 
-    pub fn new_for_user_accounts() -> Self {
-        Self::new(Self::USER_ACCOUNTS_SEED)
+    pub fn new_for_user_accounts(num_to_skip: u64) -> Self {
+        Self::new(Self::USER_ACCOUNTS_ROOT_SEED, num_to_skip)
     }
 
-    fn new(seed: Seed) -> Self {
+    fn new(root_seed: u64, num_to_skip: u64) -> Self {
+        let mut root_rng = StdRng::seed_from_u64(root_seed);
+        let num_rngs_to_skip = num_to_skip / Self::MAX_ACCOUNT_GEN_PER_RNG;
+        for _ in 0..num_rngs_to_skip {
+            root_rng.next_u64();
+        }
+        let active_rng_to_skip = num_to_skip % Self::MAX_ACCOUNT_GEN_PER_RNG;
+        let mut active_rng_quota = Self::MAX_ACCOUNT_GEN_PER_RNG - active_rng_to_skip;
+        let mut active_rng = StdRng::seed_from_u64(root_rng.next_u64());
+        for _ in 0..active_rng_to_skip {
+            LocalAccount::generate(&mut active_rng);
+        }
         let (sender, receiver) = mpsc::sync_channel(100 /* bound */);
 
         std::thread::Builder::new()
             .name("account_generator".to_string())
             .spawn(move || {
-                let mut rng = StdRng::from_seed(seed);
-                while sender.send(LocalAccount::generate(&mut rng)).is_ok() {}
+                while sender.send(LocalAccount::generate(&mut active_rng)).is_ok() {
+                    active_rng_quota -= 1;
+                    if active_rng_quota == 0 {
+                        active_rng = StdRng::seed_from_u64(root_rng.next_u64());
+                        active_rng_quota = Self::MAX_ACCOUNT_GEN_PER_RNG;
+                    }
+                }
             })
             .expect("Failed to spawn transaction generator thread.");
 
