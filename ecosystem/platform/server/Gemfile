@@ -41,6 +41,8 @@ gem 'cancancan'
 gem 'devise'
 gem 'kaminari'
 
+gem 'memery'
+
 # Oauth
 gem 'omniauth'
 gem 'omniauth-discord'

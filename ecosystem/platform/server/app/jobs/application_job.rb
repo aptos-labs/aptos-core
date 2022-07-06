@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class ApplicationJob < ActiveJob::Base
+  include Memery
+
   # Automatically retry jobs that encountered a deadlock
   retry_on ActiveRecord::Deadlocked
 
