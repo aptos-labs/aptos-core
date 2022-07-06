@@ -25,6 +25,14 @@ pub struct InMemoryState {
     pub updated_since_checkpoint: HashSet<StateKey>,
 }
 
+impl PartialEq for InMemoryState {
+    fn eq(&self, other: &InMemoryState) -> bool {
+        self.current_version == other.current_version && self.current == other.current
+    }
+}
+
+impl Eq for InMemoryState {}
+
 impl InMemoryState {
     pub fn new(
         checkpoint: SparseMerkleTree<StateValue>,
@@ -33,6 +41,7 @@ impl InMemoryState {
         current_version: Option<Version>,
         updated_since_checkpoint: HashSet<StateKey>,
     ) -> Self {
+        assert!(checkpoint_version.map_or(0, |v| v + 1) <= current_version.map_or(0, |v| v + 1));
         Self {
             checkpoint,
             checkpoint_version,

@@ -13,7 +13,7 @@ use aptos_types::{
     move_resource::MoveStorage, transaction::TransactionListWithProof,
 };
 use event_notifications::{EventNotificationSender, EventSubscriptionService};
-use executor_types::{in_memory_state_calculator::IntoLedgerView, ChunkExecutorTrait};
+use executor_types::ChunkExecutorTrait;
 use std::sync::Arc;
 use storage_interface::DbReader;
 
@@ -85,19 +85,9 @@ impl<C: ChunkExecutorTrait> ExecutorProxyTrait for ExecutorProxy<C> {
         let current_epoch_state = storage_info.get_epoch_state().clone();
         let latest_ledger_info = storage_info.latest_ledger_info.clone();
 
-        let synced_trees = storage_info
-            .into_latest_tree_state()
-            .into_ledger_view(&self.storage)
-            .map_err(|error| {
-                Error::UnexpectedError(format!(
-                    "Failed to construct latest ledger view from storage: {}",
-                    error
-                ))
-            })?;
-
         Ok(SyncState::new(
             latest_ledger_info,
-            synced_trees,
+            storage_info.into_latest_executed_trees(),
             current_epoch_state,
         ))
     }

@@ -64,6 +64,7 @@ fn test_state_store_pruner() {
     let state_store = &StateStore::new(
         Arc::clone(&aptos_db.ledger_db),
         Arc::clone(&aptos_db.state_merkle_db),
+        false, /* readonly */
     );
     let pruner = Pruner::new(
         Arc::clone(&aptos_db.ledger_db),
@@ -150,6 +151,7 @@ fn test_state_store_pruner_disabled() {
     let state_store = &StateStore::new(
         Arc::clone(&aptos_db.ledger_db),
         Arc::clone(&aptos_db.state_merkle_db),
+        false, /* readonly */
     );
     let pruner = Pruner::new(
         Arc::clone(&aptos_db.ledger_db),
@@ -221,7 +223,11 @@ fn test_worker_quit_eagerly() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let db = aptos_db.ledger_db;
-    let state_store = &StateStore::new(Arc::clone(&db), Arc::clone(&aptos_db.state_merkle_db));
+    let state_store = &StateStore::new(
+        Arc::clone(&db),
+        Arc::clone(&aptos_db.state_merkle_db),
+        false, /* readonly */
+    );
 
     let _root0 = put_value_set(
         &db,

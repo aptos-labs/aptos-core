@@ -20,18 +20,20 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use aptos_vm::VMExecutor;
-use executor_types::{in_memory_state_calculator::IntoLedgerView, ExecutedChunk};
+use executor_types::ExecutedChunk;
 use move_deps::move_core_types::move_resource::MoveResource;
 use std::{collections::btree_map::BTreeMap, sync::Arc};
-use storage_interface::{cached_state_view::CachedStateView, DbReaderWriter, DbWriter, TreeState};
+use storage_interface::{
+    cached_state_view::CachedStateView, DbReaderWriter, DbWriter, ExecutedTrees,
+};
 
 pub fn generate_waypoint<V: VMExecutor>(
     db: &DbReaderWriter,
     genesis_txn: &Transaction,
 ) -> Result<Waypoint> {
-    let tree_state = db.reader.get_latest_tree_state()?;
+    let executed_trees = db.reader.get_latest_executed_trees()?;
 
-    let committer = calculate_genesis::<V>(db, tree_state, genesis_txn)?;
+    let committer = calculate_genesis::<V>(db, executed_trees, genesis_txn)?;
     Ok(committer.waypoint)
 }
 
@@ -43,15 +45,15 @@ pub fn maybe_bootstrap<V: VMExecutor>(
     genesis_txn: &Transaction,
     waypoint: Waypoint,
 ) -> Result<bool> {
-    let tree_state = db.reader.get_latest_tree_state()?;
+    let executed_trees = db.reader.get_latest_executed_trees()?;
     // if the waypoint is not targeted with the genesis txn, it may be either already bootstrapped, or
     // aiming for state sync to catch up.
-    if tree_state.num_transactions != waypoint.version() {
+    if executed_trees.version().map_or(0, |v| v + 1) != waypoint.version() {
         info!(waypoint = %waypoint, "Skip genesis txn.");
         return Ok(false);
     }
 
-    let committer = calculate_genesis::<V>(db, tree_state, genesis_txn)?;
+    let committer = calculate_genesis::<V>(db, executed_trees, genesis_txn)?;
     ensure!(
         waypoint == committer.waypoint(),
         "Waypoint verification failed. Expected {:?}, got {:?}.",
@@ -111,16 +113,15 @@ impl GenesisCommitter {
 
 pub fn calculate_genesis<V: VMExecutor>(
     db: &DbReaderWriter,
-    tree_state: TreeState,
+    executed_trees: ExecutedTrees,
     genesis_txn: &Transaction,
 ) -> Result<GenesisCommitter> {
     // DB bootstrapper works on either an empty transaction accumulator or an existing block chain.
     // In the very extreme and sad situation of losing quorum among validators, we refer to the
     // second use case said above.
-    let genesis_version = tree_state.num_transactions;
-    let base_view = tree_state.into_ledger_view(&db.reader)?;
+    let genesis_version = executed_trees.version().map_or(0, |v| v + 1);
     let base_state_view =
-        base_view.verified_state_view(StateViewId::Miscellaneous, db.reader.clone())?;
+        executed_trees.verified_state_view(StateViewId::Miscellaneous, db.reader.clone())?;
 
     let epoch = if genesis_version == 0 {
         GENESIS_EPOCH
@@ -130,7 +131,7 @@ pub fn calculate_genesis<V: VMExecutor>(
 
     let (mut output, _, _) =
         ChunkOutput::by_transaction_execution::<V>(vec![genesis_txn.clone()], base_state_view)?
-            .apply_to_ledger(&base_view)?;
+            .apply_to_ledger(&executed_trees)?;
     ensure!(
         !output.to_commit.is_empty(),
         "Genesis txn execution failed."
@@ -177,7 +178,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     let committer = GenesisCommitter::new(
         db.writer.clone(),
         output,
-        base_view.state().checkpoint_version,
+        executed_trees.state().checkpoint_version,
     )?;
     info!(
         "Genesis calculated: ledger_info_with_sigs {:?}, waypoint {:?}",

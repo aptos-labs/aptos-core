@@ -37,7 +37,7 @@ use futures::StreamExt;
 use mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
 use move_deps::move_core_types::language_storage::TypeTag;
 use std::collections::BTreeMap;
-use storage_interface::{StartupInfo, TreeState};
+use storage_interface::{ExecutedTrees, StartupInfo};
 use storage_service_types::CompleteDataRange;
 
 /// Creates a new data stream listener and notification sender pair
@@ -124,7 +124,7 @@ pub fn create_startup_info() -> StartupInfo {
     StartupInfo::new(
         create_epoch_ending_ledger_info(),
         Some(EpochState::empty()),
-        TreeState::new_at_state_checkpoint(0, vec![], HashValue::random()),
+        ExecutedTrees::new_empty(),
         None,
     )
 }

@@ -1,6 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{sync::Arc, time::Duration};
+
+use proptest::prelude::*;
+
 use crate::{
     error_if_version_is_pruned, get_first_seq_num_and_limit,
     pruner::{Pruner, PrunerIndex},
@@ -16,9 +20,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{ExecutionStatus, TransactionInfo},
 };
-use proptest::prelude::*;
-use std::{sync::Arc, time::Duration};
-use storage_interface::{DbReader, Order, TreeState};
+use storage_interface::{DbReader, ExecutedTrees, Order};
 use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
 
 proptest! {
@@ -114,13 +116,13 @@ fn test_error_if_version_is_pruned() {
 }
 
 #[test]
-fn test_get_latest_tree_state() {
+fn test_get_latest_executed_trees() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
 
     // entirely emtpy db
-    let empty = db.get_latest_tree_state().unwrap();
-    assert_eq!(empty, TreeState::new_empty(),);
+    let empty = db.get_latest_executed_trees().unwrap();
+    assert_eq!(empty, ExecutedTrees::new_empty());
 
     // bootstrapped db (any transaction info is in)
     let key = StateKey::Raw(String::from("test_key").into_bytes());
@@ -137,14 +139,13 @@ fn test_get_latest_tree_state() {
     );
     put_transaction_info(&db, 0, &txn_info);
 
-    let bootstrapped = db.get_latest_tree_state().unwrap();
+    let bootstrapped = db.get_latest_executed_trees().unwrap();
     assert_eq!(
         bootstrapped,
-        TreeState::new(
-            1,
-            vec![txn_info.hash()],
+        ExecutedTrees::new_at_state_checkpoint(
             txn_info.state_checkpoint_hash().unwrap(),
-            Some(0),
+            vec![txn_info.hash()],
+            1,
         ),
     );
 }

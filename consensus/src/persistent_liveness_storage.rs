@@ -12,7 +12,6 @@ use aptos_types::{
 use consensus_types::{
     block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
 };
-use executor_types::in_memory_state_calculator::IntoLedgerView;
 use std::{cmp::max, collections::HashSet, sync::Arc};
 use storage_interface::DbReader;
 
@@ -364,14 +363,8 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             .expect("unable to read ledger info from storage")
             .expect("startup info is None");
         let ledger_recovery_data = LedgerRecoveryData::new(startup_info.latest_ledger_info.clone());
-        let frozen_root_hashes = startup_info
-            .committed_tree_state
-            .ledger_frozen_subtree_hashes
-            .clone();
-        let root_executed_trees = startup_info
-            .committed_tree_state
-            .into_ledger_view(&self.aptos_db)
-            .expect("Failed to construct committed ledger view.");
+        let root_executed_trees = startup_info.committed_trees;
+
         match RecoveryData::new(
             last_vote,
             ledger_recovery_data.clone(),
@@ -379,7 +372,10 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             RootMetadata::new(
                 root_executed_trees.txn_accumulator().num_leaves(),
                 root_executed_trees.state_id(),
-                frozen_root_hashes,
+                root_executed_trees
+                    .txn_accumulator()
+                    .frozen_subtree_roots()
+                    .clone(),
             ),
             quorum_certs,
             highest_2chain_timeout_cert,

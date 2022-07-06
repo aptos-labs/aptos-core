@@ -30,7 +30,7 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use aptosdb::backup::restore_handler::RestoreHandler;
 use executor::chunk_executor::ChunkExecutor;
-use executor_types::{in_memory_state_calculator::IntoLedgerView, TransactionReplayer};
+use executor_types::TransactionReplayer;
 use futures::{
     future,
     future::TryFutureExt,
@@ -407,9 +407,7 @@ impl TransactionRestoreBatchController {
         let replay_start = Instant::now();
         let first_version = self.replay_from_version.unwrap();
         let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.aptosdb));
-        let persisted_view = restore_handler
-            .get_tree_state(first_version.checked_sub(1))?
-            .into_ledger_view(&db.reader)?;
+        let persisted_view = restore_handler.get_executed_trees(first_version.checked_sub(1))?;
         let chunk_replayer = Arc::new(ChunkExecutor::<AptosVM>::new_with_view(db, persisted_view));
 
         let db_commit_stream = txns_to_execute_stream

@@ -11,13 +11,13 @@ use aptos_jellyfish_merkle::restore::StateSnapshotRestore;
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
-    proof::definition::LeafCount,
+    proof::{accumulator::InMemoryAccumulator, definition::LeafCount},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version},
 };
 use schemadb::DB;
 use std::sync::Arc;
-use storage_interface::{DbReader, TreeState};
+use storage_interface::{in_memory_state::InMemoryState, DbReader, ExecutedTrees};
 
 /// Provides functionalities for AptosDB data restore.
 #[derive(Clone)]
@@ -101,19 +101,26 @@ impl RestoreHandler {
         )
     }
 
-    pub fn get_tree_state(&self, version: Option<Version>) -> Result<TreeState> {
+    pub fn get_executed_trees(&self, version: Option<Version>) -> Result<ExecutedTrees> {
         let num_transactions: LeafCount = version.map_or(0, |v| v + 1);
         let frozen_subtrees = self
             .ledger_store
             .get_frozen_subtree_hashes(num_transactions)?;
-        let state_root_hash = match version {
-            None => *SPARSE_MERKLE_PLACEHOLDER_HASH,
-            Some(ver) => self.state_store.get_root_hash(ver)?,
+        // For now, we know there must be a state snapshot at `version`. We need to recover checkpoint after make commit async.
+        let (committed_version, committed_root_hash) = if let Some((version, hash)) = self
+            .state_store
+            .get_state_snapshot_before(num_transactions)?
+        {
+            (Some(version), hash)
+        } else {
+            (None, *SPARSE_MERKLE_PLACEHOLDER_HASH)
         };
-        Ok(TreeState::new_at_state_checkpoint(
-            num_transactions,
-            frozen_subtrees,
-            state_root_hash,
+
+        let transaction_accumulator =
+            Arc::new(InMemoryAccumulator::new(frozen_subtrees, num_transactions)?);
+        Ok(ExecutedTrees::new(
+            InMemoryState::new_at_checkpoint(committed_root_hash, committed_version),
+            transaction_accumulator,
         ))
     }
 
