@@ -149,7 +149,7 @@ function TokenBody() {
           <Heading>
             {data?.name}
           </Heading>
-          <Text>
+          <Text fontSize="md">
             {data?.metadata?.description}
           </Text>
         </VStack>
@@ -214,6 +214,7 @@ function TokenBody() {
                 <React.Fragment key={attribute.trait_type}>
                   <Flex justifyContent="left" key={attribute.trait_type}>
                     <Text
+                      fontSize="md"
                       fontWeight={300}
                       color={secondaryAttributeColor[colorMode]}
                     >
@@ -222,6 +223,7 @@ function TokenBody() {
                   </Flex>
                   <Flex justifyContent="right" key={attribute.value}>
                     <Text
+                      fontSize="md"
                       fontWeight={500}
                     >
                       {attribute.value}

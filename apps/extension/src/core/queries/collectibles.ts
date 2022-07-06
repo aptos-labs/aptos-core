@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosClient, HexString, TokenClient } from 'aptos';
-import axios, { AxiosError, AxiosResponse } from 'axios';
+import axios from 'axios';
 import { useQuery } from 'react-query';
 import { validStorageUris } from 'core/constants';
 import useWalletState from 'core/hooks/useWalletState';
@@ -168,8 +168,8 @@ export const useTokenData = ({
 
     // Cast as AxiosResponse of type TokenDataResponse
     const reformattedTokenData = (
-      tokenData as unknown as AxiosResponse<TokenDataResponse, AxiosError>
-    ).data;
+      tokenData as unknown as TokenDataResponse
+    );
 
     // Get Arweave / IPFS link
     const tokenMetadata = await axios.get<MetadataJson>(reformattedTokenData.uri);
