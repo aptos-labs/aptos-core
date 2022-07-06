@@ -61,7 +61,7 @@ Start by cloning the `aptos-core` GitHub repo from [[GitHub](https://github.com/
 
 Now your basic Aptos development environment ready.
 
-## Move plugins
+## IDE plugins for Move
 
 - A [Move language syntax plugin](https://marketplace.visualstudio.com/items?itemName=damirka.move-syntax) for Visual Studio Code.
 - A [Visual Studio Code plugin for Move, called move-analyzer](https://marketplace.visualstudio.com/items?itemName=move.move-analyzer).
