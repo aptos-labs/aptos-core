@@ -49,7 +49,15 @@ impl State {
                 oldest_ledger_version,
             }
         } else {
-            todo!()
+            anyhow::bail!(
+                "Failed to build State from headers due to missing values in response. \
+                Chain ID: {:?}, Version: {:?}, Timestamp: {:?}, Epoch: {:?}, Oldest Ledger Version: {:?}",
+                maybe_chain_id,
+                maybe_version,
+                maybe_timestamp,
+                maybe_epoch,
+                oldest_ledger_version,
+            )
         };
 
         Ok(state)
