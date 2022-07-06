@@ -82,6 +82,11 @@ variable "image_tag" {
   default     = "devnet"
 }
 
+variable "enable_debug_mode_unsafe" {
+  description = "Enable debug mode, this is unsafe for production"
+  default     = false
+}
+
 ### Helm values
 
 variable "aptos_node_helm_values" {
