@@ -139,7 +139,7 @@ async fn get_block_index_from_request(
             index: Some(_),
             hash: Some(_),
         }) => {
-            return Err(ApiError::HistoricBalancesUnsupported);
+            return Err(ApiError::BlockParameterConflict);
         }
         Some(PartialBlockIdentifier {
             index: Some(block_index),
@@ -166,7 +166,7 @@ async fn get_block_index_from_request(
                     let block_index = version_to_block_index(block_size, version);
                     // If it's not the beginning of a block, then it's invalid
                     if version != block_index_to_version(block_size, block_index) {
-                        return Err(ApiError::BadBlockRequest);
+                        return Err(ApiError::TransactionIsPending);
                     }
 
                     block_index
@@ -272,7 +272,7 @@ impl CoinCache {
         }
 
         let struct_tag = match coin {
-            TypeTag::Struct(tag) => tag,
+            TypeTag::Struct(ref tag) => tag,
             // This is a poorly formed coin, and we'll just skip over it
             _ => return Ok(None),
         };
@@ -300,15 +300,22 @@ impl CoinCache {
 
         // At this point if we've retrieved it and it's bad, we error out
         if let Some(resource) = response.into_inner() {
-            let coin_info =
-                serde_json::from_value::<CoinInfo>(resource.data).map_err(|_| ApiError::BadCoin)?;
+            let coin_info = serde_json::from_value::<CoinInfo>(resource.data).map_err(|_| {
+                ApiError::DeserializationFailed(format!(
+                    "CoinInfo failed to deserialize for {}",
+                    coin
+                ))
+            })?;
 
             Ok(Some(Currency {
                 symbol: coin_info.symbol,
                 decimals: coin_info.decimals.0,
             }))
         } else {
-            Err(ApiError::BadCoin)
+            Err(ApiError::DeserializationFailed(format!(
+                "Currency {} not found",
+                coin
+            )))
         }
     }
 }

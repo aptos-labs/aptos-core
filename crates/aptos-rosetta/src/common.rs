@@ -8,7 +8,7 @@ use crate::{
 };
 use aptos_crypto::{ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_logger::debug;
-use aptos_rest_client::{aptos::Balance, Account, Response};
+use aptos_rest_client::{Account, Response};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -23,12 +23,13 @@ pub fn check_network(
     server_context: &RosettaContext,
 ) -> ApiResult<()> {
     if network_identifier.blockchain == BLOCKCHAIN
-        || ChainId::from_str(network_identifier.network.trim()).map_err(|_| ApiError::BadNetwork)?
+        || ChainId::from_str(network_identifier.network.trim())
+            .map_err(|_| ApiError::NetworkIdentifierMismatch)?
             == server_context.chain_id
     {
         Ok(())
     } else {
-        Err(ApiError::BadNetwork)
+        Err(ApiError::NetworkIdentifierMismatch)
     }
 }
 
@@ -94,17 +95,7 @@ pub async fn get_account(
     rest_client
         .get_account(address)
         .await
-        .map_err(|_| ApiError::AccountNotFound)
-}
-
-pub async fn get_account_balance(
-    rest_client: &aptos_rest_client::Client,
-    address: AccountAddress,
-) -> ApiResult<Response<Balance>> {
-    rest_client
-        .get_account_balance(address)
-        .await
-        .map_err(|_| ApiError::AccountNotFound)
+        .map_err(|_| ApiError::AccountNotFound(address.to_string()))
 }
 
 /// Retrieve the timestamp according ot the Rosetta spec (milliseconds)
@@ -149,6 +140,6 @@ pub fn is_native_coin(currency: &Currency) -> ApiResult<()> {
     if currency == &native_coin() {
         Ok(())
     } else {
-        Err(ApiError::BadCoin)
+        Err(ApiError::UnsupportedCurrency(currency.symbol.clone()))
     }
 }
