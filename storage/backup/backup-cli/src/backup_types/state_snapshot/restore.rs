@@ -142,7 +142,9 @@ impl StateSnapshotRestoreController {
             leaf_idx.set(chunk.last_idx as i64);
         }
 
-        receiver.finish()
+        receiver.finish()?;
+        self.run_mode.finish(self.version);
+        Ok(())
     }
 
     async fn read_state_value(

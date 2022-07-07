@@ -101,7 +101,7 @@ impl StateCommitter {
             .freeze()
             .new_node_hashes_since(&self.committed_smt.clone().freeze());
         self.db
-            .save_state_snapshot(
+            .save_state_snapshot_for_bench(
                 to_commit,
                 Some(&node_hashes),
                 self.version,
