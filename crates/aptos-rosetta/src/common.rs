@@ -40,7 +40,7 @@ pub fn with_context(
     warp::any().map(move || context.clone())
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 pub struct EmptyRequest;
 
 pub fn with_empty_request() -> impl Filter<Extract = (EmptyRequest,), Error = Infallible> + Clone {

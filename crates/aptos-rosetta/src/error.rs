@@ -46,6 +46,8 @@ pub enum ApiError {
     NodeIsOffline,
     #[error("Block is not yet complete, request will need to be retried")]
     BlockIncomplete,
+    #[error("Transaction cannot be parsed")]
+    TransactionParseError(Option<&'static str>),
 }
 
 impl ApiError {
@@ -69,6 +71,7 @@ impl ApiError {
             MissingPayloadMetadata,
             UnsupportedCurrency(None),
             UnsupportedSignatureCount(None),
+            TransactionParseError(None),
         ]
     }
 
@@ -92,6 +95,7 @@ impl ApiError {
             MissingPayloadMetadata => 15,
             UnsupportedCurrency(_) => 16,
             UnsupportedSignatureCount(_) => 17,
+            TransactionParseError(_) => 18,
         }
     }
 
@@ -136,6 +140,7 @@ impl From<&ApiError> for types::Error {
             ApiError::AccountNotFound(details) => details.clone(),
             ApiError::UnsupportedCurrency(details) => details.clone(),
             ApiError::UnsupportedSignatureCount(details) => details.map(|inner| inner.to_string()),
+            ApiError::TransactionParseError(details) => details.map(|inner| inner.to_string()),
             _ => None,
         }
         .map(|details| ErrorDetails { details });

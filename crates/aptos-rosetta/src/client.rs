@@ -15,9 +15,11 @@ use crate::{
     },
 };
 use anyhow::anyhow;
+use aptos_logger::debug;
 use aptos_rest_client::aptos_api_types::mime_types::JSON;
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient};
 use serde::{de::DeserializeOwned, Serialize};
+use std::fmt::Debug;
 use url::Url;
 
 /// Client for testing & interacting with a Rosetta service
@@ -117,11 +119,12 @@ impl RosettaClient {
         self.make_call("network/status", request).await
     }
 
-    async fn make_call<'a, I: Serialize, O: DeserializeOwned>(
+    async fn make_call<'a, I: Serialize + Debug, O: DeserializeOwned>(
         &'a self,
         path: &'static str,
         request: &'a I,
     ) -> anyhow::Result<O> {
+        debug!("Rosetta Client path:{} request:{:?}", path, request);
         let response = self
             .inner
             .post(self.address.join(path)?)

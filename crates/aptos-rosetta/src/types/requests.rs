@@ -218,7 +218,7 @@ pub struct ConstructionPayloadsResponse {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ConstructionPreprocessRequest {
     pub network_identifier: NetworkIdentifier,
-    /// TODO: Operations expected to occur from the transaction?
+    /// Operations that make up an `InternalOperation`
     pub operations: Vec<Operation>,
     /// Max gas price
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -342,7 +342,6 @@ pub struct NetworkStatusResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sync_status: Option<SyncStatus>,
     /// Connected peers
-    /// TODO: This doesn't seem to really be used anywhere, is it necessary?
     pub peers: Vec<Peer>,
 }
 
