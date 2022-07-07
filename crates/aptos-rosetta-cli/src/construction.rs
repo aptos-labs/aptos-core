@@ -24,6 +24,10 @@ use aptos_types::account_address::AccountAddress;
 use clap::{Parser, Subcommand};
 use std::{collections::HashMap, convert::TryInto};
 
+/// Construction commands
+///
+/// At a high level, this provides the full E2E commands provided by the construction API for
+/// Rosetta.  This can be used for testing to ensure everything works properly
 #[derive(Debug, Subcommand)]
 pub enum ConstructionCommand {
     CreateAccount(CreateAccountCommand),
@@ -40,6 +44,9 @@ impl ConstructionCommand {
     }
 }
 
+/// Creates an account using Rosetta, no funds will be transferred
+///
+/// EncodingOptions are here so we can allow using the BCS encoded mint key
 #[derive(Debug, Parser)]
 pub struct CreateAccountCommand {
     #[clap(flatten)]
@@ -52,8 +59,11 @@ pub struct CreateAccountCommand {
     profile_options: ProfileOptions,
     #[clap(flatten)]
     private_key_options: PrivateKeyInputOptions,
+    /// The sending account, since the private key doesn't always match the
+    /// AccountAddress if it rotates
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     sender: Option<AccountAddress>,
+    /// The new account (TODO: Maybe we want to take in the public key instead)
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     new_account: AccountAddress,
 }
@@ -69,19 +79,17 @@ impl CreateAccountCommand {
             &self.profile_options.profile,
         )?;
 
-        let sender_account: AccountIdentifier = if let Some(sender) = self.sender {
-            sender.into()
-        } else {
-            derive_account(
-                &client,
-                network_identifier.clone(),
-                private_key.public_key().try_into()?,
-            )
-            .await?
-        };
+        let sender: AccountIdentifier = get_account_address(
+            &client,
+            network_identifier.clone(),
+            &private_key,
+            self.sender,
+        )
+        .await?;
         let mut keys = HashMap::new();
-        keys.insert(sender_account.account_address()?, private_key);
+        keys.insert(sender.account_address()?, private_key);
 
+        // A create account transaction is just a Create account operation
         let operations = vec![Operation {
             operation_identifier: OperationIdentifier {
                 index: 0,
@@ -92,15 +100,16 @@ impl CreateAccountCommand {
             status: None,
             account: Some(new_account),
             amount: None,
-            metadata: Some(OperationSpecificMetadata {
-                sender: sender_account,
-            }),
+            metadata: Some(OperationSpecificMetadata { sender }),
         }];
 
         submit_operations(&client, network_identifier, &keys, operations).await
     }
 }
 
+/// Transfer coins via Rosetta
+///
+/// Only the native coin is allowed for now
 #[derive(Debug, Parser)]
 pub struct TransferCommand {
     #[clap(flatten)]
@@ -113,10 +122,14 @@ pub struct TransferCommand {
     profile_options: ProfileOptions,
     #[clap(flatten)]
     private_key_options: PrivateKeyInputOptions,
+    /// The sending account, since the private key doesn't always match the
+    /// AccountAddress if it rotates
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     sender: Option<AccountAddress>,
+    /// The receiving account
     #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
     receiver: AccountAddress,
+    /// The amount of coins to send
     #[clap(long)]
     amount: u64,
 }
@@ -130,19 +143,17 @@ impl TransferCommand {
             self.encoding_options.encoding,
             &self.profile_options.profile,
         )?;
-        let account: AccountIdentifier = if let Some(sender) = self.sender {
-            sender.into()
-        } else {
-            derive_account(
-                &client,
-                network_identifier.clone(),
-                private_key.public_key().try_into()?,
-            )
-            .await?
-        };
+        let sender: AccountIdentifier = get_account_address(
+            &client,
+            network_identifier.clone(),
+            &private_key,
+            self.sender,
+        )
+        .await?;
         let mut keys = HashMap::new();
-        keys.insert(account.account_address()?, private_key);
+        keys.insert(sender.account_address()?, private_key);
 
+        // A transfer operation is made up of a withdraw and a deposit
         let operations = vec![
             Operation {
                 operation_identifier: OperationIdentifier {
@@ -152,7 +163,7 @@ impl TransferCommand {
                 related_operations: None,
                 operation_type: OperationType::Withdraw.to_string(),
                 status: None,
-                account: Some(account),
+                account: Some(sender),
                 amount: Some(val_to_amount(self.amount, true)),
                 metadata: None,
             },
@@ -174,36 +185,64 @@ impl TransferCommand {
     }
 }
 
+/// Retrieves the account address from the derivation path if there isn't an overriding account specified
+async fn get_account_address(
+    client: &RosettaClient,
+    network_identifier: NetworkIdentifier,
+    private_key: &Ed25519PrivateKey,
+    maybe_sender: Option<AccountAddress>,
+) -> anyhow::Result<AccountIdentifier> {
+    if let Some(sender) = maybe_sender {
+        Ok(sender.into())
+    } else {
+        derive_account(
+            client,
+            network_identifier,
+            private_key.public_key().try_into()?,
+        )
+        .await
+    }
+}
+
+/// Submits the operations to the blockchain
 async fn submit_operations(
     client: &RosettaClient,
     network_identifier: NetworkIdentifier,
     keys: &HashMap<AccountAddress, Ed25519PrivateKey>,
     operations: Vec<Operation>,
 ) -> anyhow::Result<TransactionIdentifier> {
-    let public_key: PublicKey = keys.iter().next().unwrap().1.public_key().try_into()?;
-
-    let metadata = metadata(
+    // Retrieve txn metadata
+    let (metadata, public_keys) = metadata(
         client,
         network_identifier.clone(),
         operations.clone(),
         10000,
         1,
-        public_key.clone(),
+        keys,
     )
     .await?;
 
+    // Build the transaction, sign it, and submit it
     let response = unsigned_transaction(
         client,
         network_identifier.clone(),
-        operations,
+        operations.clone(),
         metadata.metadata,
-        public_key,
+        public_keys,
     )
     .await?;
-    let signed_txn = sign_transaction(client, network_identifier.clone(), keys, response).await?;
+    let signed_txn = sign_transaction(
+        client,
+        network_identifier.clone(),
+        keys,
+        response,
+        operations,
+    )
+    .await?;
     submit_transaction(client, network_identifier, signed_txn).await
 }
 
+/// Derives an [`AccountAddress`] from the [`PublicKey`]
 async fn derive_account(
     client: &RosettaClient,
     network_identifier: NetworkIdentifier,
@@ -224,14 +263,16 @@ async fn derive_account(
     }
 }
 
+/// Retrieves the metadata for the set of operations
 async fn metadata(
     client: &RosettaClient,
     network_identifier: NetworkIdentifier,
     operations: Vec<Operation>,
     max_fee: u64,
     fee_multiplier: u32,
-    public_key: PublicKey,
-) -> anyhow::Result<ConstructionMetadataResponse> {
+    keys: &HashMap<AccountAddress, Ed25519PrivateKey>,
+) -> anyhow::Result<(ConstructionMetadataResponse, Vec<PublicKey>)> {
+    // Request the given operation with the given gas constraints
     let amount = val_to_amount(max_fee, false);
     let preprocess_response = client
         .preprocess(&ConstructionPreprocessRequest {
@@ -241,33 +282,58 @@ async fn metadata(
             suggested_fee_multiplier: Some(fee_multiplier as f64),
         })
         .await?;
-    client
-        .metadata(&ConstructionMetadataRequest {
-            network_identifier,
-            options: preprocess_response.options.unwrap(),
-            public_keys: vec![public_key],
-        })
-        .await
+
+    // Process the required public keys
+    let mut public_keys = Vec::new();
+    if let Some(accounts) = preprocess_response.required_public_keys {
+        for account in accounts {
+            if let Some(key) = keys.get(&account.account_address()?) {
+                public_keys.push(key.public_key().try_into()?);
+            } else {
+                return Err(anyhow!("No public key found for account"));
+            }
+        }
+    } else {
+        return Err(anyhow!("No public keys found required for transaction"));
+    };
+
+    // Request the metadata
+    if let Some(options) = preprocess_response.options {
+        client
+            .metadata(&ConstructionMetadataRequest {
+                network_identifier,
+                options,
+                public_keys: public_keys.clone(),
+            })
+            .await
+            .map(|response| (response, public_keys))
+    } else {
+        Err(anyhow!(
+            "No metadata options returned from preprocess response"
+        ))
+    }
 }
 
+/// Build an unsigned transaction
 async fn unsigned_transaction(
     client: &RosettaClient,
     network_identifier: NetworkIdentifier,
     operations: Vec<Operation>,
     metadata: ConstructionMetadata,
-    public_key: PublicKey,
+    public_keys: Vec<PublicKey>,
 ) -> anyhow::Result<ConstructionPayloadsResponse> {
+    // Build the unsigned transaction
     let payloads = client
         .payloads(&ConstructionPayloadsRequest {
             network_identifier: network_identifier.clone(),
-            operations,
+            operations: operations.clone(),
             metadata: Some(metadata),
-            public_keys: Some(vec![public_key]),
+            public_keys: Some(public_keys),
         })
         .await?;
 
-    // Verify
-    client
+    // Verify that we can parse the transaction
+    let response = client
         .parse(&ConstructionParseRequest {
             network_identifier,
             signed: false,
@@ -275,22 +341,42 @@ async fn unsigned_transaction(
         })
         .await?;
 
-    Ok(payloads)
+    if response.account_identifier_signers.is_some() {
+        Err(anyhow!("Signers were in the unsigned transaction!"))
+    } else if operations != response.operations {
+        Err(anyhow!(
+            "Operations were not parsed to be the same as input! Expected {:?} Got {:?}",
+            operations,
+            response.operations
+        ))
+    } else {
+        Ok(payloads)
+    }
 }
 
+/// Signs a transaction and combines it with an unsigned transaction
 async fn sign_transaction(
     client: &RosettaClient,
     network_identifier: NetworkIdentifier,
     keys: &HashMap<AccountAddress, Ed25519PrivateKey>,
     unsigned_response: ConstructionPayloadsResponse,
+    operations: Vec<Operation>,
 ) -> anyhow::Result<String> {
     let mut signatures = Vec::new();
+    let mut signers: Vec<AccountIdentifier> = Vec::new();
+
+    // Go through all payloads, and sign them accordingly
     for payload in unsigned_response.payloads {
+        // Payloads must have a signer and an associated key
         if let Some(ref account) = payload.account_identifier {
             let address = account.account_address()?;
+
             if let Some(private_key) = keys.get(&address) {
+                // Sign the message
                 let signing_bytes = hex::decode(&payload.hex_bytes)?;
                 let txn_signature = private_key.sign_arbitrary_message(&signing_bytes);
+
+                signers.push(address.into());
                 signatures.push(Signature {
                     signing_payload: payload,
                     public_key: private_key.public_key().try_into()?,
@@ -298,13 +384,17 @@ async fn sign_transaction(
                     hex_bytes: txn_signature.to_encoded_string()?,
                 })
             } else {
-                return Err(anyhow!("Address in payload is unknown {}", address));
+                return Err(anyhow!(
+                    "Address in payload doesn't have an associated key {}",
+                    address
+                ));
             }
         } else {
             return Err(anyhow!("No account in payload to sign!"));
         }
     }
 
+    // Build the signed transaction
     let signed_response = client
         .combine(&ConstructionCombineRequest {
             network_identifier: network_identifier.clone(),
@@ -313,8 +403,8 @@ async fn sign_transaction(
         })
         .await?;
 
-    // Verify
-    client
+    // Verify transaction can be parsed properly
+    let response = client
         .parse(&ConstructionParseRequest {
             network_identifier,
             signed: true,
@@ -322,9 +412,32 @@ async fn sign_transaction(
         })
         .await?;
 
-    Ok(signed_response.signed_transaction)
+    // Signers must match exactly
+    if let Some(parsed_signers) = response.account_identifier_signers {
+        if signers != parsed_signers {
+            return Err(anyhow!(
+                "Signers don't match Expected: {:?} Got: {:?}",
+                signers,
+                parsed_signers
+            ));
+        }
+    } else {
+        return Err(anyhow!("Signers were in the unsigned transaction!"));
+    }
+
+    // Operations must match exactly
+    if operations != response.operations {
+        Err(anyhow!(
+            "Operations were not parsed to be the same as input! Expected {:?} Got {:?}",
+            operations,
+            response.operations
+        ))
+    } else {
+        Ok(signed_response.signed_transaction)
+    }
 }
 
+/// Submit a transaction to the
 async fn submit_transaction(
     client: &RosettaClient,
     network_identifier: NetworkIdentifier,
@@ -339,6 +452,9 @@ async fn submit_transaction(
         .transaction_identifier)
 }
 
+/// Converts a value to a Rosetta [`Amount`]
+///
+/// Only works with the native coin
 fn val_to_amount(amount: u64, withdraw: bool) -> Amount {
     let value = if withdraw {
         format!("-{}", amount)

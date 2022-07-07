@@ -7,6 +7,8 @@ use clap::{Parser, Subcommand};
 
 /// Block APIs
 ///
+/// Used for pulling blocks from the blockchain
+///
 /// [API Spec](https://www.rosetta-api.org/docs/BlockApi.html)
 #[derive(Debug, Subcommand)]
 pub enum BlockCommand {
