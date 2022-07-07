@@ -52,8 +52,7 @@ evaluator_args:
       mint_file: mint.key
     minimum_tps: 1000
     repeat_target_count: 1
-  transaction_availability_args:
-    transaction_fetch_delay_secs: 5
+  transaction_availability_args: {}
 runner_args:
   blocking_runner_args:
     metrics_fetch_delay_secs: 5

@@ -7,24 +7,21 @@ use crate::{
     evaluator::{EvaluationResult, Evaluator},
     evaluators::EvaluatorType,
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use aptos_rest_client::{aptos_api_types::TransactionInfo, Client as AptosRestClient, Transaction};
-use aptos_sdk::crypto::HashValue;
 use clap::Parser;
 use poem_openapi::Object as PoemObject;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::cmp::{max, min};
 
 const TRANSACTIONS_ENDPOINT: &str = "/transactions";
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
-pub struct TransactionAvailabilityEvaluatorArgs {
-    #[clap(long, default_value_t = 5)]
-    pub transaction_fetch_delay_secs: u64,
-}
+pub struct TransactionAvailabilityEvaluatorArgs {}
 
 #[derive(Debug)]
 pub struct TransactionAvailabilityEvaluator {
+    #[allow(dead_code)]
     args: TransactionAvailabilityEvaluatorArgs,
 }
 
@@ -33,46 +30,20 @@ impl TransactionAvailabilityEvaluator {
         Self { args }
     }
 
-    /// Get the transaction info of the latest transaction.
-    async fn get_transaction_info(
+    /// Fetch a transaction by version and return it.
+    async fn get_transaction_by_version(
         client: &AptosRestClient,
-    ) -> Result<TransactionInfo, ApiEvaluatorError> {
-        Self::unwrap_transaction_info(
-            client
-                .get_transactions(None, Some(1))
-                .await
-                .map_err(|e| {
-                    ApiEvaluatorError::EndpointError(
-                        TRANSACTIONS_ENDPOINT.to_string(),
-                        e.context("The node API failed to return a transaction".to_string()),
-                    )
-                })?
-                .into_inner()
-                .into_iter()
-                .next()
-                .ok_or_else(|| {
-                    ApiEvaluatorError::EndpointError(
-                        TRANSACTIONS_ENDPOINT.to_string(),
-                        anyhow!("The node API returned success but with no transactions"),
-                    )
-                })?,
-        )
-    }
-
-    /// Fetch a transaction by hash and return it.
-    async fn get_transaction_from_hash(
-        client: &AptosRestClient,
-        hash: HashValue,
+        version: u64,
     ) -> Result<Transaction, ApiEvaluatorError> {
         Ok(client
-            .get_transaction(hash)
+            .get_transaction_by_version(version)
             .await
             .map_err(|e| {
                 ApiEvaluatorError::EndpointError(
                     TRANSACTIONS_ENDPOINT.to_string(),
                     e.context(format!(
-                        "The node API failed to return the requested transaction: {}",
-                        hash
+                        "The node API failed to return the requested transaction with version: {}",
+                        version
                     )),
                 )
             })?
@@ -104,88 +75,127 @@ impl Evaluator for TransactionAvailabilityEvaluator {
     /// baseline produced after a delay. We confirm that the transactions are
     /// same by looking at the version.
     async fn evaluate(&self, input: &Self::Input) -> Result<Vec<EvaluationResult>, Self::Error> {
+        let oldest_baseline_version = input
+            .baseline_index_response
+            .ledger_info
+            .oldest_ledger_version
+            .0;
+        let oldest_target_version = input
+            .target_index_response
+            .ledger_info
+            .oldest_ledger_version
+            .0;
+        let latest_baseline_version = input.baseline_index_response.ledger_info.ledger_version.0;
+        let latest_target_version = input.target_index_response.ledger_info.ledger_version.0;
+
+        // Get the oldest ledger version between the two nodes.
+        let oldest_shared_version = max(oldest_baseline_version, oldest_target_version);
+
+        // Get the least up to date latest ledger version between the two nodes.
+        let latest_shared_version = min(latest_baseline_version, latest_target_version);
+
+        // Ensure that there is a window between the oldest shared version and
+        // latest shared version. If there is not, it will not be possible to
+        // pull a transaction that both nodes have.
+        if oldest_shared_version > latest_shared_version {
+            return Ok(vec![self.build_evaluation_result(
+                "Unable to pull transaction from both nodes".to_string(),
+                0,
+                format!(
+                    "We were unable to find a ledger version window between \
+                        the baseline and target nodes. The oldest and latest \
+                        ledger versions on the baseline node are {} and {}. \
+                        The oldest and latest ledger versions on the target \
+                        node are {} and {}. Taking the max of the oldest ledger \
+                        versions ({}) and the min of the newest ledger versions ({}) \
+                        means there is no ledger version window in which there is \
+                        a transaction available from the API of both nodes. Likely \
+                        this means your node is too out of sync with the network, \
+                        but it could also indicate an over-aggressive pruner.",
+                    oldest_baseline_version,
+                    latest_baseline_version,
+                    oldest_target_version,
+                    latest_target_version,
+                    oldest_shared_version,
+                    latest_shared_version,
+                ),
+            )]);
+        }
+
+        // We've asserted that both nodes are sufficiently up to date relative
+        // to each other, we should be able to pull the same transaction from
+        // both nodes.
+
         let baseline_client =
             AptosRestClient::new(input.baseline_node_information.node_address.get_api_url());
 
-        let latest_baseline_transaction_info = Self::get_transaction_info(&baseline_client).await?;
-
-        tokio::time::sleep(Duration::from_secs(self.args.transaction_fetch_delay_secs)).await;
+        let latest_baseline_transaction_info = Self::unwrap_transaction_info(
+            Self::get_transaction_by_version(&baseline_client, latest_shared_version).await?,
+        )?;
 
         let target_client = AptosRestClient::new(input.target_node_address.get_api_url());
-        let evaluation = match Self::get_transaction_from_hash(
-            &target_client,
-            HashValue::from(latest_baseline_transaction_info.hash),
-        )
-        .await
-        {
-            Ok(latest_target_transaction) => {
-                match Self::unwrap_transaction_info(latest_target_transaction) {
-                    Ok(latest_target_transaction_info) => {
-                        if latest_baseline_transaction_info.accumulator_root_hash
-                            == latest_target_transaction_info.accumulator_root_hash
-                        {
-                            self.build_evaluation_result(
-                                "Target node produced valid recent transaction".to_string(),
-                                100,
-                                format!(
-                                    "We got the latest transaction from the baseline node ({}), waited {} \
-                                        seconds, and then asked your node to give us that transaction, and \
-                                        it did. Great! This implies that your node is keeping up with other \
-                                        nodes in the network.",
-                                    latest_baseline_transaction_info.hash, self.args.transaction_fetch_delay_secs,
-                                ),
-                            )
-                        } else {
-                            self.build_evaluation_result(
-                                "Target node produced recent transaction, but it was invalid".to_string(),
-                                0,
-                                format!(
-                                    "We got the latest transaction from the baseline node ({}), waited {} \
-                                        seconds, and then asked your node to give us that transaction, and \
-                                        it did. However, the transaction was invalid compared to the baseline \
-                                        as the accumulator root hash of the transaction ({}) was different \
-                                        compared to the baseline ({}).",
-                                    latest_baseline_transaction_info.hash,
-                                    self.args.transaction_fetch_delay_secs,
-                                    latest_target_transaction_info.accumulator_root_hash,
-                                    latest_baseline_transaction_info.accumulator_root_hash,
-                                ),
-                            )
+        let evaluation =
+            match Self::get_transaction_by_version(&target_client, latest_shared_version).await {
+                Ok(latest_target_transaction) => {
+                    match Self::unwrap_transaction_info(latest_target_transaction) {
+                        Ok(latest_target_transaction_info) => {
+                            if latest_baseline_transaction_info.accumulator_root_hash
+                                == latest_target_transaction_info.accumulator_root_hash
+                            {
+                                self.build_evaluation_result(
+                                    "Target node produced valid recent transaction".to_string(),
+                                    100,
+                                    format!(
+                                        "We were able to pull the same transaction (version: {}) \
+                                    from both your node and the baseline node. Great! This \
+                                    implies that your node is keeping up with other nodes \
+                                    in the network.",
+                                        latest_shared_version,
+                                    ),
+                                )
+                            } else {
+                                self.build_evaluation_result(
+                                    "Target node produced recent transaction, but it was invalid"
+                                        .to_string(),
+                                    0,
+                                    format!(
+                                        "We were able to pull the same transaction (version: {}) \
+                                    from both your node and the baseline node. However, the \
+                                    transaction was invalid compared to the baseline as the \
+                                    accumulator root hash of the transaction ({}) was different \
+                                    compared to the baseline ({}).",
+                                        latest_shared_version,
+                                        latest_target_transaction_info.accumulator_root_hash,
+                                        latest_baseline_transaction_info.accumulator_root_hash,
+                                    ),
+                                )
+                            }
                         }
-                    }
-                    Err(e) => self.build_evaluation_result(
-                        "Target node produced recent transaction, but it was missing metadata"
-                            .to_string(),
-                        10,
-                        format!(
-                            "We got the latest transaction from the baseline node ({}), waited {} \
-                                seconds, and then asked your node to give us that transaction, and \
-                                it did. However, the transaction was missing metadata such as the
-                                version, accumulator root hash, etc. Error: {}",
-                            latest_baseline_transaction_info.hash,
-                            self.args.transaction_fetch_delay_secs,
-                            e,
+                        Err(error) => self.build_evaluation_result(
+                            "Target node produced recent transaction, but it was missing metadata"
+                                .to_string(),
+                            10,
+                            format!(
+                                "We were able to pull the same transaction (version: {}) \
+                            from both your node and the baseline node. However, the \
+                            the transaction was missing metadata such as the version, \
+                            accumulator root hash, etc. Error: {}",
+                                latest_shared_version, error,
+                            ),
                         ),
-                    ),
+                    }
                 }
-            }
-            Err(e) => self.build_evaluation_result(
-                "Target node failed to produce recent transaction".to_string(),
-                50,
-                format!(
-                    "We got the latest transaction from the baseline node ({}), waited {} \
-                        seconds, and then asked your node to give us that transaction, and \
-                        it could not. This implies that your node is lagging behind the \
-                        baseline by at least {} seconds, or some other issue with \
-                        the API of your node, such as an issue with the transaction \
-                        pruner. Error from retrieving the transaction: {}",
-                    latest_baseline_transaction_info.hash,
-                    self.args.transaction_fetch_delay_secs,
-                    self.args.transaction_fetch_delay_secs,
-                    e,
+                Err(error) => self.build_evaluation_result(
+                    "Target node failed to produce transaction".to_string(),
+                    25,
+                    format!(
+                        "The target node claims it has transactions between versions {} and {}, \
+                    but it was unable to return the transaction with version {}. This implies \
+                    some something is wrong with your node's API. Error: {}",
+                        oldest_target_version, latest_target_version, latest_shared_version, error,
+                    ),
                 ),
-            ),
-        };
+            };
 
         Ok(vec![evaluation])
     }
