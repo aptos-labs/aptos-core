@@ -8,8 +8,14 @@ class Authorization < ApplicationRecord
 
   validates_uniqueness_of :uid, scope: [:provider]
 
+  PROVIDER_NAME_MAP = { github: 'GitHub', google: 'Google', discord: 'Discord' }.with_indifferent_access.freeze
+
+  def display_provider
+    PROVIDER_NAME_MAP[provider] || provider
+  end
+
   def display_name
-    "#{provider} [#{full_name || username || email || uid}]"
+    "#{provider} [#{username || email || full_name || uid}]"
   end
 
   def display_shortname

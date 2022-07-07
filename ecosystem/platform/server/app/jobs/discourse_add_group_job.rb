@@ -3,18 +3,18 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
-class DiscourseAddGroupJob < ApplicationJob
+class DiscourseAddGroupJob < DiscourseJob
   # Ex args: { user_id: 32, group_name: "group-name" }
   def perform(args)
     @args = args
     @user = User.find(args[:user_id])
     @group_name = args[:group_name]
 
-    @client = DiscourseHelper.system_client
-
     unless @user.registration_completed?
       return Rails.logger.debug("User not confirmed: #{@user.id} - #{@user.external_id}")
     end
+
+    @client = DiscourseHelper.system_client
 
     add_group
   end
@@ -27,14 +27,6 @@ class DiscourseAddGroupJob < ApplicationJob
     return if e.response.body['errors'].first.to_s.include? 'already a member of this group'
 
     raise
-  end
-
-  memoize def discourse_user_id
-    id = @client.by_external_id(@user.external_id)['id']
-    Rails.logger.debug("Fetched forum user id #{id} for user #{@user.id} - #{@user.external_id}")
-    id
-  rescue DiscourseApi::NotFoundError
-    Rails.logger.debug("Forum account does not exist yet for user #{@user.id} - #{@user.external_id}")
   end
 
   memoize def group_id
