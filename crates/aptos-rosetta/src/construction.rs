@@ -273,12 +273,11 @@ async fn construction_parse(
 
     let (account_identifier_signers, unsigned_txn) = if request.signed {
         let signed_txn: SignedTransaction = decode_bcs(&request.transaction, "SignedTransaction")?;
-        let account_identifier_signers: Vec<_> = signed_txn
-            .authenticator()
-            .secondary_signer_addreses()
-            .into_iter()
-            .map(AccountIdentifier::from)
-            .collect();
+        let mut account_identifier_signers: Vec<_> = vec![signed_txn.sender().into()];
+
+        for account in signed_txn.authenticator().secondary_signer_addreses() {
+            account_identifier_signers.push(account.into())
+        }
 
         (
             Some(account_identifier_signers),
