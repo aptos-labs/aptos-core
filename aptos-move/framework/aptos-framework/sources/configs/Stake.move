@@ -178,6 +178,7 @@ module AptosFramework::Stake {
         set_operator_events: EventHandle<SetOperatorEvent>,
         add_stake_events: EventHandle<AddStakeEvent>,
         rotate_consensus_key_events: EventHandle<RotateConsensusKeyEvent>,
+        update_network_and_fullnode_addresses_events: EventHandle<UpdateNetworkAndFullnodeAddressesEvent>,
         increase_lockup_events: EventHandle<IncreaseLockupEvent>,
         join_validator_set_events: EventHandle<JoinValidatorSetEvent>,
         distribute_rewards_events: EventHandle<DistributeRewardsEvent>,
@@ -205,6 +206,14 @@ module AptosFramework::Stake {
         pool_address: address,
         old_consensus_pubkey: vector<u8>,
         new_consensus_pubkey: vector<u8>,
+    }
+
+    struct UpdateNetworkAndFullnodeAddressesEvent has drop, store {
+        pool_address: address,
+        old_network_addresses: vector<u8>,
+        new_network_addresses: vector<u8>,
+        old_fullnode_addresses: vector<u8>,
+        new_fullnode_addresses: vector<u8>,
     }
 
     struct IncreaseLockupEvent has drop, store {
@@ -361,6 +370,7 @@ module AptosFramework::Stake {
             set_operator_events: Event::new_event_handle<SetOperatorEvent>(account),
             add_stake_events: Event::new_event_handle<AddStakeEvent>(account),
             rotate_consensus_key_events: Event::new_event_handle<RotateConsensusKeyEvent>(account),
+            update_network_and_fullnode_addresses_events: Event::new_event_handle<UpdateNetworkAndFullnodeAddressesEvent>(account),
             increase_lockup_events: Event::new_event_handle<IncreaseLockupEvent>(account),
             join_validator_set_events: Event::new_event_handle<JoinValidatorSetEvent>(account),
             distribute_rewards_events: Event::new_event_handle<DistributeRewardsEvent>(account),
@@ -511,6 +521,36 @@ module AptosFramework::Stake {
                 pool_address,
                 old_consensus_pubkey,
                 new_consensus_pubkey,
+            },
+        );
+    }
+
+    /// Update the network and full node addresses of the validator. This only takes effect in the next epoch.
+    public(script) fun update_network_and_fullnode_addresses(
+        account: &signer,
+        pool_address: address,
+        new_network_addresses: vector<u8>,
+        new_fullnode_addresses: vector<u8>,
+    ) acquires StakePool, StakePoolEvents, ValidatorConfig {
+        let stake_pool = borrow_global<StakePool>(pool_address);
+        assert!(Signer::address_of(account) == stake_pool.operator_address, Errors::invalid_argument(ENOT_OPERATOR));
+
+        assert!(exists<ValidatorConfig>(pool_address), Errors::not_published(EVALIDATOR_CONFIG));
+        let validator_info = borrow_global_mut<ValidatorConfig>(pool_address);
+        let old_network_addresses = validator_info.network_addresses;
+        validator_info.network_addresses = new_network_addresses;
+        let old_fullnode_addresses = validator_info.fullnode_addresses;
+        validator_info.fullnode_addresses = new_fullnode_addresses;
+
+        let stake_pool_events = borrow_global_mut<StakePoolEvents>(pool_address);
+        Event::emit_event<UpdateNetworkAndFullnodeAddressesEvent>(
+            &mut stake_pool_events.update_network_and_fullnode_addresses_events,
+            UpdateNetworkAndFullnodeAddressesEvent {
+                pool_address,
+                old_network_addresses,
+                new_network_addresses,
+                old_fullnode_addresses,
+                new_fullnode_addresses,
             },
         );
     }
@@ -1056,6 +1096,14 @@ module AptosFramework::Stake {
 
         // Operator can separately rotate consensus key.
         rotate_consensus_key(&validator, pool_address, CONSENSUS_KEY_2, CONSENSUS_POP_2);
+        let validator_config = borrow_global<ValidatorConfig>(pool_address);
+        assert!(validator_config.consensus_pubkey == CONSENSUS_KEY_2, 2);
+
+        // Operator can update network and fullnode addresses.
+        update_network_and_fullnode_addresses(&validator, pool_address, b"1", b"2");
+        let validator_config = borrow_global<ValidatorConfig>(pool_address);
+        assert!(validator_config.network_addresses == b"1", 3);
+        assert!(validator_config.fullnode_addresses == b"2", 4);
 
         let OwnerCapability { pool_address: _ } = owner_cap;
         Coin::burn(coins, &burn_cap);
