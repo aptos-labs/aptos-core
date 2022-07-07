@@ -11,10 +11,11 @@ module AptosFramework::Aggregator {
     /// Creates a new Aggregator instance, zero-initialized.
     public fun new<IntTy>(): Aggregator<IntTy> {
         assert!(is_integral<IntTy>(), Errors::invalid_argument(E_NON_INTEGRAL_TYPE));
-        Aggregator { handle: 0 }
+        Aggregator { handle: new_handle<IntTy>() }
     }
 
-    native fun is_integral<T>(): bool;
+    native fun is_integral<IntTy>(): bool;
+    native fun new_handle<IntTy>(): u128;
 
     #[test_only]
     struct FakeData {}
