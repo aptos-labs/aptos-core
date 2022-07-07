@@ -144,6 +144,11 @@ jobs:
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       merge_or_canary: ${{ github.event.pull_request.auto_merge != null && 'merge' || 'canary' }}
+      # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge
+      # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
+      # by this GHA. If there is a Forge namespace collision though, this action will fail and will either need operator
+      # intervention or to wait for Forge's auto-cleanup routine to kick in.
+      FORGE_NAMESPACE_BASE: forge-${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
 
   community-platform:
     needs: [permission-check]
