@@ -9,31 +9,31 @@ publish = false
 edition = "2018"
 
 [dependencies]
-move-abigen = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-binary-format = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-bytecode-utils = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-bytecode-verifier = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-cli = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-command-line-common = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-compiler = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-docgen = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-errmapgen = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-ir-compiler = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-model = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-package = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-prover = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-resource-viewer = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-stackless-bytecode-interpreter = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-stdlib = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-symbol-pool = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-table-extension = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-unit-test = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-vm-runtime = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-move-vm-types = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-read-write-set = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
-read-write-set-dynamic = { git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" }
+move-abigen = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-binary-format = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-bytecode-utils = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-bytecode-verifier = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-cli = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-command-line-common = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-compiler = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-core-types = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-docgen = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-errmapgen = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-ir-compiler = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-model = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-package = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-prover = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-resource-viewer = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-stackless-bytecode-interpreter = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-stdlib = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-symbol-pool = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-table-extension = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-unit-test = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-vm-runtime = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-vm-test-utils = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+move-vm-types = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+read-write-set = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
+read-write-set-dynamic = { git = "https://github.com/georgemitenkov/move.git", branch = "local" }
 
 [features]
 default = []
