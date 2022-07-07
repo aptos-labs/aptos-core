@@ -6,7 +6,7 @@ module AptosFramework::Coin {
     use Std::Option::{Self, Option};
     use Std::Signer;
 
-    use AptosFramework::TypeInfo;
+    use AptosFramework::TypeInfo::{Self, TypeInfo};
 
     //
     // Errors.
@@ -86,7 +86,7 @@ module AptosFramework::Coin {
 
     /// Set of data sent to the event stream when a new coin store is registered.
     struct RegisterEvent has drop, store {
-        type_info: TypeInfo::TypeInfo,
+        type_info: TypeInfo,
     }
 
     /// Capability required to mint coins.
@@ -606,6 +606,11 @@ module AptosFramework::Coin {
         let zero = zero<FakeMoney>();
         assert!(value(&zero) == 0, 1);
         destroy_zero(zero);
+    }
+
+    #[test_only]
+    public fun destroy_mint_cap<CoinType>(mint_cap: MintCapability<CoinType>) {
+        let MintCapability<CoinType> { } = mint_cap;
     }
 
     #[test_only]
