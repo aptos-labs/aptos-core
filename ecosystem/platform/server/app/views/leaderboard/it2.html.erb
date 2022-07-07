@@ -97,8 +97,8 @@
               <% end %>
             <% end %>
           <% end %>
-          <%= t.with_column(:avg_votes_per_epoch, 'Votes', align: 'left') %>
-          <%= t.with_column(:latest_reported_timestamp, 'Last Metrics Update', align: 'right') %>
+          <%= t.with_column(:num_votes, 'Votes', align: 'left') %>
+          <%= t.with_column(:last_metrics_update, 'Last Metrics Update', align: 'right') %>
 
           <%= t.with_body do %>
             <% @metrics.each_with_index do |metric, i| %>
@@ -106,8 +106,8 @@
                 <%= tr.with_column(align: 'right') do %>
                   <%= metric.rank %>
                 <% end %>
-                <%= tr.with_column(class: 'max-w-0 2xl:max-w-full w-full 2xl:w-auto truncate', title: metric.validator) do %>
-                  <%= metric.validator %>
+                <%= tr.with_column(class: 'max-w-0 2xl:max-w-full w-full 2xl:w-auto truncate', title: metric.proposer) do %>
+                  <%= metric.proposer %>
                 <% end %>
                 <%= tr.with_column(align: 'left') do %>
                   <div class="flex items-center gap-2">
@@ -122,11 +122,11 @@
                   </div>
                 <% end %>
                 <%= tr.with_column(align: 'left') do %>
-                  <%= metric.avg_votes_per_epoch %>
+                  <%= metric.num_votes %>
                 <% end %>
                 <%= tr.with_column(align: 'right') do %>
-                  <% if metric.latest_reported_timestamp %>
-                    <%= Time.at(metric.latest_reported_timestamp).utc.to_fs(:db) %>
+                  <% if metric.last_metrics_update %>
+                    <%= Time.at(metric.last_metrics_update).utc.to_fs(:db) %>
                   <% end %>
                 <% end %>
               <% end %>
