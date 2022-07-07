@@ -13,7 +13,8 @@ const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement
 );
 
-window.addEventListener("load", () => {
+window.addEventListener("load", async () => {
+  await window.aptos.connect();
   root.render(
     <React.StrictMode>
       <App />

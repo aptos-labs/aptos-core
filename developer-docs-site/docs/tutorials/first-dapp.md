@@ -58,7 +58,7 @@ You will now have a basic React app up and running in your browser.
 
 ## Step 2: Integrate the Aptos Wallet Web3 API
 
-The Aptos Wallet provides a Web3 API for dapps at `window.aptos`. You can see how it works by opening up the browser console and running `await window.aptos.account()`. It will print out the address corresponding to the account you set up in the Aptos Wallet.
+The Aptos Wallet provides a Web3 API for dapps at `window.aptos`. You can see how it works by opening up the browser console and running `await window.aptos.connect()`. It will print out the address corresponding to the account you set up in the Aptos Wallet.
 
 Next we will update our app to use this API to display the Wallet account's address.
 
@@ -102,9 +102,24 @@ declare global {
 
 This lets us use the `window.aptos` API without having to do `(window as any).aptos`.
 
+### Connecting to the wallet
+Our app is now ready to use the `window.aptos` API. Lets establish a connection to the wallet before load. Add the following to `src/index.tsx`:
+
+```typescript
+window.addEventListener('load', async () => {
+  await window.aptos.connect();
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+});
+```
+
+
 ### Display `window.aptos.account()` in the app
 
-Our app is now ready to use the `window.aptos` API. We will change `src/App.tsx` to retrieve the value of `window.aptos.account()` (the wallet account) on initial render, store it in state, and then display it:
+Now we will change `src/App.tsx` to retrieve the value of `window.aptos.account()` (the wallet account) on initial render, store it in state, and then display it:
 
 ```typescript
 import React from 'react';
