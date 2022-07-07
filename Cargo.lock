@@ -3225,7 +3225,6 @@ dependencies = [
  "bcs",
  "itertools",
  "once_cell",
- "rayon",
  "scratchpad",
  "serde 1.0.137",
  "storage-interface",
