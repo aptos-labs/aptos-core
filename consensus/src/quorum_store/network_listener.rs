@@ -3,7 +3,7 @@
 
 use crate::{
     quorum_store::{
-        batch_aggregator::{AggregationMode::IgnoreMissedFragment, BatchAggregator},
+        batch_aggregator::{AggregationMode, BatchAggregator},
         batch_reader::BatchReaderCommand,
         batch_store::{BatchStoreCommand, PersistRequest},
         proof_builder::ProofBuilderCommand,
@@ -11,13 +11,12 @@ use crate::{
     },
     round_manager::VerifiedEvent,
 };
+use aptos_logger::debug;
 use aptos_types::PeerId;
 use channel::aptos_channel;
 use futures::StreamExt;
 use std::collections::HashMap;
-use std::sync::mpsc::SyncSender;
 use tokio::sync::mpsc::Sender;
-use aptos_logger::debug;
 
 pub(crate) struct NetworkListener {
     epoch: u64,
@@ -26,7 +25,7 @@ pub(crate) struct NetworkListener {
     //not sure if needed, depends who verifies.
     batch_aggregators: HashMap<PeerId, BatchAggregator>,
     batch_store_tx: Sender<BatchStoreCommand>,
-    batch_reader_tx: SyncSender<BatchReaderCommand>,
+    batch_reader_tx: Sender<BatchReaderCommand>,
     proof_builder_tx: Sender<ProofBuilderCommand>,
     max_batch_size: usize,
 }
@@ -36,7 +35,7 @@ impl NetworkListener {
         epoch: u64,
         network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
         batch_store_tx: Sender<BatchStoreCommand>,
-        batch_reader_tx: SyncSender<BatchReaderCommand>,
+        batch_reader_tx: Sender<BatchReaderCommand>,
         proof_builder_tx: Sender<ProofBuilderCommand>,
         max_batch_size: usize,
     ) -> Self {
@@ -56,7 +55,10 @@ impl NetworkListener {
         let entry = self
             .batch_aggregators
             .entry(source)
-            .or_insert(BatchAggregator::new(self.max_batch_size));
+            .or_insert(BatchAggregator::new(
+                self.max_batch_size,
+                AggregationMode::IgnoreWrongOrder,
+            ));
         if let Some(expiration) = fragment.fragment_info.maybe_expiration() {
             //end batch message
             debug!("QS: got end batch message");
@@ -65,7 +67,6 @@ impl NetworkListener {
                     fragment.batch_id(),
                     fragment.fragment_id(),
                     fragment.take_transactions(),
-                    IgnoreMissedFragment,
                 ) {
                     let persist_cmd = BatchStoreCommand::Persist(
                         PersistRequest::new(source, payload, digest, num_bytes, expiration),
@@ -83,7 +84,6 @@ impl NetworkListener {
                 fragment.batch_id(),
                 fragment.fragment_id(),
                 fragment.take_transactions(),
-                IgnoreMissedFragment,
             );
         }
     }
@@ -100,7 +100,7 @@ impl NetworkListener {
                     self.proof_builder_tx
                         .send(cmd)
                         .await
-                        .expect("could not push signed_digest to proof_builder");
+                        .expect("Could not send signed_digest to proof_builder");
                 }
 
                 VerifiedEvent::Fragment(fragment) => {
@@ -110,18 +110,28 @@ impl NetworkListener {
                 VerifiedEvent::Batch(batch) => {
                     let cmd: BatchReaderCommand;
                     if batch.maybe_payload.is_some() {
+                        debug!(
+                            "QS: batch response from {:?} digest {}",
+                            batch.source, batch.batch_info.digest
+                        );
                         cmd = BatchReaderCommand::BatchResponse(
                             batch.batch_info.digest,
                             batch.get_payload(),
                         );
                     } else {
+                        debug!(
+                            "QS: batch request from {:?} digest {}",
+                            batch.source, batch.batch_info.digest
+                        );
                         cmd = BatchReaderCommand::GetBatchForPeer(
                             batch.batch_info.digest,
                             batch.source,
                         );
                     }
+
                     self.batch_reader_tx
                         .send(cmd)
+                        .await
                         .expect("could not push Batch batch_reader");
                 }
 

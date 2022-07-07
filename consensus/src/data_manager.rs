@@ -1,18 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-// use futures::channel::{mpsc, mpsc::Sender, oneshot};
 use crate::quorum_store::batch_reader::BatchReader;
 use aptos_crypto::HashValue;
+use aptos_logger::debug;
 use aptos_types::transaction::SignedTransaction;
 use arc_swap::ArcSwapOption;
-use consensus_types::common::Payload;
-use consensus_types::proof_of_store::LogicalTime;
-use consensus_types::request_response::WrapperCommand;
+use consensus_types::{
+    common::Payload, proof_of_store::LogicalTime, request_response::WrapperCommand,
+};
 use executor_types::Error;
 use futures::channel::mpsc::Sender;
-use tokio::sync::oneshot;
+use std::sync::Arc;
 
 /// Notification of execution committed logical time for QuorumStore to clean.
 #[async_trait::async_trait]
@@ -26,7 +25,7 @@ pub trait DataManager: Send + Sync {
         quorum_store_wrapper_tx: Sender<WrapperCommand>,
     );
 
-    async fn get_data(&self, payload: Payload) -> Result<Vec<SignedTransaction>, Error>;
+    async fn get_data(&self, payload: Payload, logical_time: LogicalTime) -> Result<Vec<SignedTransaction>, Error>;
 }
 
 /// Execution -> QuorumStore notification of commits.
@@ -79,32 +78,38 @@ impl DataManager for QuorumStoreDataManager {
     }
 
     // TODO: handle the case that the data was garbage collected and return error
-    async fn get_data(&self, payload: Payload) -> Result<Vec<SignedTransaction>, Error> {
+    async fn get_data(&self, payload: Payload, logical_time: LogicalTime) -> Result<Vec<SignedTransaction>, Error> {
         match payload {
-            Payload::Empty => Ok(Vec::new()),
+            Payload::Empty => {
+                debug!("QSE: empty Payload");
+                Ok(Vec::new())
+            }
             Payload::DirectMempool(_) => {
                 unreachable!("Quorum store should be used.")
             }
             Payload::InQuorumStore(poss) => {
                 let mut receivers = Vec::new();
                 for pos in poss {
-                    let (tx_data, rx_data) = oneshot::channel();
-                    self.data_reader
-                        .load()
-                        .as_ref()
-                        .unwrap() //TODO: can this be None? Need to make sure we call new_epoch() first.
-                        .get_batch(pos, tx_data)
-                        .await;
-                    receivers.push(rx_data);
+                    debug!("QSE: requesting pos {:?}, digest {}", pos, pos.digest());
+                    if logical_time < pos.expiration(){
+                        receivers.push(
+                            self.data_reader
+                                .load()
+                                .as_ref()
+                                .unwrap() //TODO: can this be None? Need to make sure we call new_epoch() first.
+                                .get_batch(pos)
+                                .await,
+                        );
+                    }
                 }
                 let mut ret = Vec::new();
+                debug!("QSE: waiting for data on {} receivers", receivers.len());
                 for rx in receivers {
-                    match rx.await.expect("oneshot was dropped") {
-                        Ok(data) => ret.push(data),
-                        Err(_) => {
-                            return Err(Error::CouldNotGetData);
-                        }
-                    }
+                    let data = rx
+                        .await
+                        .expect("Oneshot channel to get a batch was dropped")?;
+                    debug!("QSE: got data, len {}", data.len());
+                    ret.push(data);
                 }
                 Ok(ret.into_iter().flatten().collect())
             }
@@ -136,7 +141,7 @@ impl DataManager for DummyDataManager {
 
     fn new_epoch(&self, _: Arc<BatchReader>, _: Sender<WrapperCommand>) {}
 
-    async fn get_data(&self, payload: Payload) -> Result<Vec<SignedTransaction>, Error> {
+    async fn get_data(&self, payload: Payload, _logical_time: LogicalTime) -> Result<Vec<SignedTransaction>, Error> {
         match payload {
             Payload::Empty => Ok(Vec::new()),
             Payload::DirectMempool(txns) => Ok(txns),

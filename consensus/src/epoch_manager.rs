@@ -420,7 +420,6 @@ impl EpochManager {
 
         let quorum_store_wrapper = QuorumStoreWrapper::new(
             self.epoch(),
-            self.data_manager.clone(),
             self.quorum_store_to_mempool_tx.clone(),
             wrapper_to_quorum_store_tx,
             self.config.mempool_txn_pull_timeout_ms,
@@ -842,6 +841,7 @@ impl EpochManager {
         mut round_timeout_sender_rx: channel::Receiver<Round>,
         mut network_receivers: NetworkReceivers,
     ) {
+        debug!("QS: Initial start");
         // initial start of the processor
         self.await_reconfig_notification().await;
         loop {

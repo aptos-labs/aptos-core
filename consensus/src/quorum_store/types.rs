@@ -184,22 +184,15 @@ impl Batch {
         source: PeerId,
         digest_hash: HashValue,
         maybe_payload: Option<Data>,
-        // signer: Arc<ValidatorSigner>,
     ) -> Self {
         let batch_info = BatchInfo {
             epoch,
             digest: digest_hash,
         };
-        // let signature = if maybe_payload.is_some() {
-        //     Some(signer.sign(&batch_info))
-        // } else {
-        //     None
-        // };
         Self {
             source,
             maybe_payload,
             batch_info,
-            // maybe_signature: signature,
         }
     }
 
@@ -232,11 +225,6 @@ impl Batch {
             } else {
                 bail!("wrong sender");
             }
-            // if let Some(signature) = &self.maybe_signature {
-            //     Ok(validator.verify(self.source, &self.batch_info, signature)?)
-            // } else {
-            //     bail!("Missing signature");
-            // }
         }
     }
 

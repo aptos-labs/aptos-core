@@ -25,7 +25,7 @@ use consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock
 use executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
 use fail::fail_point;
 use futures::{SinkExt, StreamExt};
-use std::{boxed::Box, sync::Arc};
+use std::{boxed::Box, cmp::max, sync::Arc};
 
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
@@ -114,7 +114,11 @@ impl StateComputer for ExecutionProxy {
         );
 
         let payload = block.get_payload();
-        let txns = self.data_manager.get_data(payload).await?;
+        debug!("QSE: trying to get data., round {} ", block.round());
+
+        let logical_time = LogicalTime::new(block.epoch(), block.epoch());
+
+        let txns = self.data_manager.get_data(payload, logical_time).await?;
 
         // TODO: figure out error handling for the prologue txn
         let compute_result = monitor!(
@@ -160,17 +164,14 @@ impl StateComputer for ExecutionProxy {
         for block in blocks {
             block_ids.push(block.id());
             let payload = block.get_payload();
-            let signed_txns = self.data_manager.get_data(payload.clone()).await?;
+            debug!("QSE: getting data in commit, round {}", block.round());
+            let signed_txns = self.data_manager.get_data(payload.clone(), LogicalTime::new(block.epoch(), block.round())).await?;
             payloads.push(payload);
             txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));
             reconfig_events.extend(block.reconfig_event());
 
-            if block.epoch() > latest_epoch {
-                latest_epoch = block.epoch();
-            }
-            if block.round() > latest_round {
-                latest_round = block.round();
-            }
+            latest_epoch = max(latest_epoch, block.epoch());
+            latest_round = max(latest_round, block.round());
         }
 
         monitor!(

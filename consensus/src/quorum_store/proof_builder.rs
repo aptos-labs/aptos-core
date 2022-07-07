@@ -1,25 +1,28 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::quorum_store::{ProofReturnChannel, QuorumStoreError};
-use crate::quorum_store::utils::DigestTimeouts;
+use crate::quorum_store::{
+    quorum_store::{ProofReturnChannel, QuorumStoreError},
+    types::BatchId,
+    utils::DigestTimeouts,
+};
 use aptos_crypto::HashValue;
+use aptos_logger::debug;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use consensus_types::proof_of_store::{ProofOfStore, SignedDigest, SignedDigestError};
 use std::collections::HashMap;
 use tokio::sync::mpsc::Receiver;
-use aptos_logger::debug;
 
 #[derive(Debug)]
 pub(crate) enum ProofBuilderCommand {
-    InitProof(SignedDigest, ProofReturnChannel),
+    InitProof(SignedDigest, BatchId, ProofReturnChannel),
     AppendSignature(SignedDigest),
 }
 
 pub(crate) struct ProofBuilder {
     // peer_id: PeerId,
     proof_timeout_ms: usize,
-    digest_to_proof: HashMap<HashValue, (ProofOfStore, ProofReturnChannel)>,
+    digest_to_proof: HashMap<HashValue, (ProofOfStore, BatchId, ProofReturnChannel)>,
     timeouts: DigestTimeouts,
 }
 
@@ -37,6 +40,7 @@ impl ProofBuilder {
     fn init_proof(
         &mut self,
         signed_digest: SignedDigest,
+        batch_id: BatchId,
         validator_verifier: &ValidatorVerifier,
         tx: ProofReturnChannel,
     ) -> Result<(), SignedDigestError> {
@@ -44,9 +48,11 @@ impl ProofBuilder {
 
         self.timeouts.add_digest(info.digest, self.proof_timeout_ms);
         self.digest_to_proof
-            .insert(info.digest, (ProofOfStore::new(info), tx));
+            .insert(info.digest, (ProofOfStore::new(info), batch_id, tx));
 
         self.add_signature(signed_digest, &validator_verifier)?;
+
+        // TODO: should we do regular pull to check timeouts or is this Ok?
         self.expire();
         Ok(())
     }
@@ -67,24 +73,25 @@ impl ProofBuilder {
         let digest = signed_digest.info.digest.clone();
         self.digest_to_proof
             .entry(signed_digest.info.digest)
-            .and_modify(|(proof, _)| {
+            .and_modify(|(proof, _, _)| {
                 ret = proof.add_signature(signed_digest.peer_id, signed_digest.signature);
                 if ret.is_ok() {
                     ready = proof.ready(validator_verifier);
                 }
             });
         if ready {
-            let (proof, tx) = self.digest_to_proof.remove(&digest).unwrap();
-            tx.send(Ok(proof)).expect("Unable to send proof of store");
+            let (proof, batch_id, tx) = self.digest_to_proof.remove(&digest).unwrap();
+            tx.send(Ok((proof, batch_id)))
+                .expect("Unable to send the proof of store");
         }
         ret
     }
 
     fn expire(&mut self) {
         for digest in self.timeouts.expire() {
-            if let Some((_, tx)) = self.digest_to_proof.remove(&digest) {
-                tx.send(Err(QuorumStoreError::Timeout(digest)))
-                    .expect("Unable to send proof of store");
+            if let Some((_, batch_id, tx)) = self.digest_to_proof.remove(&digest) {
+                tx.send(Err(QuorumStoreError::Timeout(batch_id)))
+                    .expect("Unable to send the timeout a proof of store");
             }
         }
     }
@@ -96,19 +103,17 @@ impl ProofBuilder {
     ) {
         while let Some(command) = network_rx.recv().await {
             match command {
-                ProofBuilderCommand::InitProof(signed_digest, tx) => {
-                    if let Err(_) = self.init_proof(signed_digest, &validator_verifier, tx) {
-                        // Shouldn't happen can check peer_id and abort.
-                        // Either we got signed digest from sb else or wrong signature.
-                    }
+                ProofBuilderCommand::InitProof(signed_digest, batch_id, tx) => {
+                    self.init_proof(signed_digest, batch_id, &validator_verifier, tx)
+                        .expect("Error initializing proof of store");
                 }
                 ProofBuilderCommand::AppendSignature(signed_digest) => {
                     if let Err(e) = self.add_signature(signed_digest, &validator_verifier) {
                         // Can happen if we already garbage collected
-                        debug!("could not add signature {:?}", e);
+                        debug!("QS: could not add signature {:?}", e);
                         //TODO: do something
                     } else {
-                        debug!("QS: added signature to prrof");
+                        debug!("QS: added signature to proof");
                     }
                 }
             }
