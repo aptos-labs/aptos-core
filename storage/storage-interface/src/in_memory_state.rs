@@ -7,7 +7,7 @@ use aptos_types::{
     transaction::Version,
 };
 use scratchpad::SparseMerkleTree;
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 /// This represents the state at a certain version in memory.
 ///
@@ -22,7 +22,7 @@ pub struct InMemoryState {
     pub checkpoint_version: Option<Version>,
     pub current: SparseMerkleTree<StateValue>,
     pub current_version: Option<Version>,
-    pub updated_since_checkpoint: HashSet<StateKey>,
+    pub updated_since_checkpoint: HashMap<StateKey, StateValue>,
 }
 
 impl InMemoryState {
@@ -31,7 +31,7 @@ impl InMemoryState {
         checkpoint_version: Option<Version>,
         current: SparseMerkleTree<StateValue>,
         current_version: Option<Version>,
-        updated_since_checkpoint: HashSet<StateKey>,
+        updated_since_checkpoint: HashMap<StateKey, StateValue>,
     ) -> Self {
         assert!(checkpoint_version.map_or(0, |v| v + 1) <= current_version.map_or(0, |v| v + 1));
         Self {
@@ -45,7 +45,7 @@ impl InMemoryState {
 
     pub fn new_empty() -> Self {
         let smt = SparseMerkleTree::new_empty();
-        Self::new(smt.clone(), None, smt, None, HashSet::new())
+        Self::new(smt.clone(), None, smt, None, HashMap::new())
     }
 
     pub fn new_at_checkpoint(root_hash: HashValue, checkpoint_version: Option<Version>) -> Self {
@@ -55,7 +55,7 @@ impl InMemoryState {
             checkpoint_version,
             smt,
             checkpoint_version,
-            HashSet::new(),
+            HashMap::new(),
         )
     }
 

@@ -1,11 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::{hash_map, HashMap, HashSet};
+use std::collections::{hash_map, HashMap};
 
 use anyhow::{anyhow, bail, Result};
 use once_cell::sync::Lazy;
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 use crate::{ParsedTransactionOutput, ProofReader};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -19,7 +18,7 @@ use aptos_types::{
     transaction::{Transaction, TransactionPayload, Version},
     write_set::{WriteOp, WriteSet},
 };
-use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
+use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree};
 use storage_interface::{cached_state_view::StateCache, in_memory_state::InMemoryState};
 
 pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);
@@ -31,7 +30,7 @@ pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_
 ///   2. a transaction chunk or block ended (where `finish()` is called)
 ///
 /// | ------------------------------------------ | -------------------------- |
-/// |  (updated_between_checkpoint_and_latest)   |  (updated_after_latest)    |
+/// |  (updated_between_checkpoint_and_latest)   |  (updates_after_latest)    |
 /// \                                            \                            |
 ///  checkpoint SMT                               latest SMT                  |
 ///                                                                          /
@@ -52,8 +51,8 @@ pub struct InMemoryStateCalculator {
     latest: FrozenSparseMerkleTree<StateValue>,
 
     next_version: Version,
-    updated_between_checkpoint_and_latest: HashSet<StateKey>,
-    updated_after_latest: HashSet<StateKey>,
+    updated_between_checkpoint_and_latest: HashMap<StateKey, StateValue>,
+    updates_after_latest: HashMap<StateKey, StateValue>,
 }
 
 impl InMemoryStateCalculator {
@@ -80,7 +79,7 @@ impl InMemoryStateCalculator {
             latest: current.freeze(),
             next_version: current_version.map_or(0, |v| v + 1),
             updated_between_checkpoint_and_latest: updated_since_checkpoint,
-            updated_after_latest: HashSet::new(),
+            updates_after_latest: HashMap::new(),
         }
     }
 
@@ -124,63 +123,46 @@ impl InMemoryStateCalculator {
         txn: &Transaction,
         txn_output: &ParsedTransactionOutput,
     ) -> Result<(HashMap<StateKey, StateValue>, Option<HashValue>)> {
-        let updated_state_keys = process_write_set(
+        let updated_state_kvs = process_write_set(
             Some(txn),
             &mut self.state_cache,
             txn_output.write_set().clone(),
         )?;
-        self.updated_after_latest
-            .extend(updated_state_keys.into_iter());
+        self.updates_after_latest.extend(updated_state_kvs.clone());
         self.next_version += 1;
 
         if txn_output.is_reconfig() {
-            self.checkpoint()
+            Ok((updated_state_kvs, Some(self.checkpoint_root_hash()?)))
         } else {
             match txn {
                 Transaction::BlockMetadata(_) | Transaction::UserTransaction(_) => {
-                    Ok((HashMap::new(), None))
+                    Ok((updated_state_kvs, None))
                 }
                 Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => {
-                    self.checkpoint()
+                    Ok((updated_state_kvs, Some(self.checkpoint_root_hash()?)))
                 }
             }
         }
     }
 
-    fn checkpoint(&mut self) -> Result<(HashMap<StateKey, StateValue>, Option<HashValue>)> {
+    fn checkpoint_root_hash(&mut self) -> Result<HashValue> {
         // Update SMT.
-        let updates_after_latest = self.updates_after_latest()?;
-        let smt_updates: Vec<_> = updates_after_latest
+        let smt_updates: Vec<_> = self
+            .updates_after_latest
             .iter()
             .map(|(key, value)| (key.hash(), value))
             .collect();
         let new_checkpoint = self.latest.batch_update(smt_updates, &self.proof_reader)?;
         let root_hash = new_checkpoint.root_hash();
 
-        // Calculate the set of state items that got changed since last checkpoint.
-        let updated_between_checkpoint_and_latest: Vec<_> = self
-            .updated_between_checkpoint_and_latest
-            .difference(&self.updated_after_latest)
-            .map(|key| match self.latest.get(key.hash()) {
-                StateStoreStatus::ExistsInScratchPad(value) => Ok((key.clone(), value)),
-                _ => Err(anyhow!(
-                    "Pending state after checkpoint missing. key: {:?}",
-                    key,
-                )),
-            })
-            .collect::<Result<_>>()?;
-
-        let mut state_updates = updates_after_latest;
-        state_updates.extend(updated_between_checkpoint_and_latest.into_iter());
-
         // Move self to the new checkpoint.
         self.latest = new_checkpoint.clone();
         self.checkpoint = new_checkpoint.unfreeze();
         self.checkpoint_version = self.next_version.checked_sub(1);
-        self.updated_between_checkpoint_and_latest = HashSet::new();
-        self.updated_after_latest = HashSet::new();
+        self.updated_between_checkpoint_and_latest = HashMap::new();
+        self.updates_after_latest = HashMap::new();
 
-        Ok((state_updates, Some(root_hash)))
+        Ok(root_hash)
     }
 
     fn parse_validator_set(state_cache: &HashMap<StateKey, StateValue>) -> Result<EpochState> {
@@ -199,41 +181,23 @@ impl InMemoryStateCalculator {
         })
     }
 
-    fn updates_after_latest(&self) -> Result<HashMap<StateKey, StateValue>> {
-        self.updated_after_latest
-            .iter()
-            .collect::<Vec<_>>()
-            .par_iter()
-            .with_min_len(100)
-            .map(|key| {
-                Ok((
-                    (**key).clone(),
-                    self.state_cache
-                        .get(key)
-                        .ok_or_else(|| anyhow!("State value should exist."))?
-                        .clone(),
-                ))
-            })
-            .collect::<Result<_>>()
-    }
-
-    fn finish(self) -> Result<(InMemoryState, HashMap<StateKey, StateValue>)> {
-        let updates_after_latest = self.updates_after_latest()?;
-        let smt_updates: Vec<_> = updates_after_latest
+    fn finish(mut self) -> Result<(InMemoryState, HashMap<StateKey, StateValue>)> {
+        let smt_updates: Vec<_> = self
+            .updates_after_latest
             .iter()
             .map(|(key, value)| (key.hash(), value))
             .collect();
         let latest = self.latest.batch_update(smt_updates, &self.proof_reader)?;
 
-        let mut updated_since_checkpoint = self.updated_between_checkpoint_and_latest;
-        updated_since_checkpoint.extend(updates_after_latest.keys().cloned());
+        self.updated_between_checkpoint_and_latest
+            .extend(self.updates_after_latest);
 
         let result_state = InMemoryState::new(
             self.checkpoint,
             self.checkpoint_version,
             latest.unfreeze(),
             self.next_version.checked_sub(1),
-            updated_since_checkpoint,
+            self.updated_between_checkpoint_and_latest,
         );
 
         Ok((result_state, self.state_cache))
@@ -246,7 +210,7 @@ impl InMemoryStateCalculator {
         for write_set in write_sets {
             let state_updates =
                 process_write_set(None, &mut self.state_cache, (*write_set).clone())?;
-            self.updated_after_latest.extend(state_updates.into_iter());
+            self.updates_after_latest.extend(state_updates.into_iter());
             self.next_version += 1;
         }
         let (result_state, _) = self.finish()?;
@@ -256,53 +220,43 @@ impl InMemoryStateCalculator {
 
 // Checks the write set is a subset of the read set.
 // Updates the `state_cache` to reflect the latest value.
-// Returns all state keys touched.
+// Returns all state key-value pair touched.
 pub fn process_write_set(
     transaction: Option<&Transaction>,
     state_cache: &mut HashMap<StateKey, StateValue>,
     write_set: WriteSet,
-) -> Result<HashSet<StateKey>> {
+) -> Result<HashMap<StateKey, StateValue>> {
     // Find all keys this transaction touches while processing each write op.
-    let mut updated_keys = HashSet::new();
-    for (state_key, write_op) in write_set.into_iter() {
-        process_state_key_write_op(
-            transaction,
-            state_cache,
-            &mut updated_keys,
-            state_key,
-            write_op,
-        )?;
-    }
-
-    Ok(updated_keys)
+    write_set
+        .into_iter()
+        .map(|(state_key, write_op)| {
+            process_state_key_write_op(transaction, state_cache, state_key, write_op)
+        })
+        .collect::<Result<_>>()
 }
 
 fn process_state_key_write_op(
     transaction: Option<&Transaction>,
     state_cache: &mut HashMap<StateKey, StateValue>,
-    updated_keys: &mut HashSet<StateKey>,
     state_key: StateKey,
     write_op: WriteOp,
-) -> Result<()> {
+) -> Result<(StateKey, StateValue)> {
+    let state_value = match write_op {
+        WriteOp::Value(new_value) => StateValue::from(new_value),
+        WriteOp::Deletion => StateValue::empty(),
+    };
     match state_cache.entry(state_key.clone()) {
         hash_map::Entry::Occupied(mut entry) => {
-            match write_op {
-                WriteOp::Value(new_value) => entry.insert(StateValue::from(new_value)),
-                WriteOp::Deletion => entry.insert(StateValue::empty()),
-            };
+            entry.insert(state_value.clone());
         }
         hash_map::Entry::Vacant(entry) => {
             if let Some(txn) = transaction {
                 ensure_txn_valid_for_vacant_entry(txn)?;
             }
-            match write_op {
-                WriteOp::Value(new_value) => entry.insert(StateValue::from(new_value)),
-                WriteOp::Deletion => entry.insert(StateValue::empty()),
-            };
+            entry.insert(state_value.clone());
         }
     }
-    updated_keys.insert(state_key);
-    Ok(())
+    Ok((state_key, state_value))
 }
 
 fn ensure_txn_valid_for_vacant_entry(transaction: &Transaction) -> Result<()> {

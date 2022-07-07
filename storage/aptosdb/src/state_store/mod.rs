@@ -15,7 +15,7 @@ use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{
     iterator::JellyfishMerkleIterator, restore::StateSnapshotRestore, StateValueWriter,
 };
-use aptos_logger::debug;
+use aptos_logger::{debug, info};
 use aptos_state_view::StateViewId;
 use aptos_types::{
     nibble::nibble_path::NibblePath,
@@ -138,7 +138,7 @@ impl StateStore {
             .lock()
             .checkpoint_version
             .map_or(0, |v| v + 1)
-            < version
+            <= version
         {
             self.initialize(false)
                 .expect("StateStore initialization failed.")
@@ -173,15 +173,18 @@ impl StateStore {
             .get_latest_transaction_info_option()?
             .map(|(version, _)| version + 1)
             .unwrap_or(0);
-        ensure!(
-            snapshot_next_version <= num_transactions,
-            "snapshot is after latest version. snapshot_next_version: {}, num_transactions: {}",
-            snapshot_next_version,
-            num_transactions,
-        );
+
+        // For non-restore cases, always snapshot_next_version <= num_transactions.
+        if snapshot_next_version > num_transactions {
+            info!(
+            snapshot_next_version = snapshot_next_version,
+                num_transactions = num_transactions,
+            "snapshot is after latest transaction version. It should only happen in restore mode",
+           );
+        }
 
         // Replaying the committed write sets after the latest snapshot.
-        if snapshot_next_version != num_transactions {
+        if snapshot_next_version < num_transactions {
             ensure!(
                 num_transactions - snapshot_next_version <= MAX_WRITE_SETS_AFTER_CHECKPOINT,
                 "Too many versions after state snapshot. snapshot_next_version: {}, num_transactions: {}",
@@ -218,6 +221,7 @@ impl StateStore {
             root_hash = root_hash,
             "StateStore initialization finished.",
         );
+
         Ok(())
     }
 

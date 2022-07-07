@@ -182,6 +182,29 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .unwrap();
     verify_committed_txn_status(t6.as_ref(), &block1[8]).unwrap();
 
+    // test the initial balance.
+    let db_state_view = db.reader.state_view_at_version(Some(6)).unwrap();
+    let account1_state_view = db_state_view.as_account_with_state_view(&account1_address);
+    verify_account_balance(get_account_balance(&account1_state_view), |x| {
+        x == 2_000_000
+    })
+    .unwrap();
+
+    let account2_state_view = db_state_view.as_account_with_state_view(&account2_address);
+
+    verify_account_balance(get_account_balance(&account2_state_view), |x| {
+        x == 1_200_000
+    })
+    .unwrap();
+
+    let account3_state_view = db_state_view.as_account_with_state_view(&account3_address);
+
+    verify_account_balance(get_account_balance(&account3_state_view), |x| {
+        x == 1_000_000
+    })
+    .unwrap();
+
+    // test the final balance.
     let db_state_view = db
         .reader
         .state_view_at_version(Some(current_version))
