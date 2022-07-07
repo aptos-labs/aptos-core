@@ -18,7 +18,7 @@ The first step in signing a transaction is to generate the signing message from 
 - The Aptos server with the [Aptos REST API](/rest-api). The Aptos server will generate the signing message, the transaction signature and will submit the signed transaction to the Aptos Blockchain. However, this approach is not secure. See [Submitting transactions in BCS vs JSON
 ](/sdks/transactions-with-ts-sdk#submitting-transactions-in-bcs-vs-json).
   - Also see the tutorial [Your First Transaction](../tutorials/first-transaction.md) that explains this approach.
-- Moreover, you may prefer instead that your client application, for example, a hardware security module (HSM), be responsible for generating the signed transaction. In this approach, before submitting transactions, a client must:
+- However, you may prefer instead that your client application, for example, a hardware security module (HSM), be responsible for generating the signed transaction. In this approach, before submitting transactions, a client must:
   - Serialize the transactions into bytes, and
   - Sign the bytes with the account private key. See [Accounts][account] for how account and private key works.
 
