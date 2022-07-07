@@ -94,6 +94,21 @@ resource "helm_release" "calico" {
 }
 
 locals {
+  # for performance reasons, require validators and fullnodes to have their own k8s worker nodes on scheduling
+  validator_and_fullnode_affinity = {
+    podAntiAffinity = {
+      requiredDuringSchedulingIgnoredDuringExecution = [{
+        labelSelector = {
+          matchExpressions = [{
+            key      = "app.kubernetes.io/name"
+            operator = "In"
+            values   = ["validator", "fullnode"]
+          }]
+        }
+        topologyKey = "kubernetes.io/hostname"
+      }]
+    }
+  }
   helm_values = jsonencode({
     numValidators = var.num_validators
     imageTag      = var.image_tag
@@ -115,6 +130,7 @@ locals {
         value  = "validators"
         effect = "NoExecute"
       }]
+      affinity         = local.validator_and_fullnode_affinity
       remoteLogAddress = var.enable_logger ? "${local.workspace_name}-log-aptos-logger:5044" : null
     }
     fullnode = {
@@ -129,6 +145,7 @@ locals {
         value  = "validators"
         effect = "NoExecute"
       }]
+      affinity = local.validator_and_fullnode_affinity
     }
     haproxy = {
       nodeSelector = {
@@ -209,7 +226,7 @@ resource "helm_release" "monitoring" {
         name = var.validator_name
       }
       service = {
-        domain   = local.domain
+        domain = local.domain
       }
       monitoring = {
         prometheus = {
