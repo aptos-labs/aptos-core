@@ -5,8 +5,11 @@ use crate::{
     common::{is_native_coin, native_coin},
     error::ApiResult,
     types::{
-        AccountIdentifier, BlockIdentifier, Error, NetworkIdentifier, OperationIdentifier,
-        OperationStatus, OperationStatusType, OperationType, TransactionIdentifier,
+        account_identifier, coin_identifier, coin_info_identifier, coin_store_identifier,
+        decimals_identifier, deposit_events_identifier, sequence_number_identifier,
+        symbol_identifier, test_coin_identifier, withdraw_events_identifier, AccountIdentifier,
+        BlockIdentifier, Error, NetworkIdentifier, OperationIdentifier, OperationStatus,
+        OperationStatusType, OperationType, TransactionIdentifier,
     },
     ApiError, CoinCache,
 };
@@ -17,9 +20,7 @@ use aptos_rest_client::{
     aptos::Balance,
     aptos_api_types::{WriteSetChange, U64},
 };
-use aptos_sdk::move_types::{ident_str, identifier::Identifier};
 use aptos_types::{account_address::AccountAddress, event::EventKey};
-use itertools::Itertools;
 use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
 use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
 use std::{
@@ -46,7 +47,6 @@ pub struct Allow {
     /// If the server is allowed to lookup historical transactions
     pub historical_balance_lookup: bool,
     /// All times after this are valid timestamps
-    /// TODO: Determine if we even need to bother with this
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp_start_index: Option<u64>,
     /// All call methods supported
@@ -202,7 +202,10 @@ pub enum Direction {
 }
 
 /// Tells how balances can change without a specific transaction on the account
-/// TODO: Determine if we need to set these for staking
+///
+/// Balance exemptions are not necessary, because staking rewards go to the staking
+/// pool and not to the account.  When they are removed from the pool, normal events
+/// for transfer will occur.
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/ExemptionType.html)
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -238,7 +241,6 @@ pub struct Operation {
     pub account: Option<AccountIdentifier>,
     /// Amount in the operation
     ///
-    /// TODO: Determine if this is required
     #[serde(skip_serializing_if = "Option::is_none")]
     pub amount: Option<Amount>,
     /// Operation specific metadata for any operation that's missing information it needs
@@ -413,17 +415,6 @@ impl Transaction {
             OperationStatusType::Failure
         };
 
-        // TODO: put these somewhere better
-        let account: Identifier = ident_str!("Account").into();
-        let coin_info: Identifier = ident_str!("CoinInfo").into();
-        let coin_id: Identifier = ident_str!("Coin").into();
-        let coin_store: Identifier = ident_str!("CoinStore").into();
-        let sequence_number: Identifier = ident_str!("sequence_number").into();
-        let deposit_events: Identifier = ident_str!("deposit_events").into();
-        let withdraw_events: Identifier = ident_str!("withdraw_events").into();
-        let decimals_id: Identifier = ident_str!("decimals").into();
-        let symbol_id: Identifier = ident_str!("symbol").into();
-
         for change in &txn_info.changes {
             // TODO: Handle delete resource ?
             if let WriteSetChange::WriteResource { address, data, .. } = change {
@@ -436,29 +427,29 @@ impl Transaction {
                 // Only handle framework events for now
                 let op_details = if *data.typ.address.inner() == AccountAddress::ONE {
                     let mut op_details = None;
-                    if module == account && name == account {
+                    if module == account_identifier() && name == account_identifier() {
                         // Account sequence number increase (possibly creation)
                         // Find out if it's the 0th sequence number (creation)
                         for (id, value) in data.data.0.iter() {
-                            if id == &sequence_number {
+                            if id == &sequence_number_identifier() {
                                 if let Ok(U64(0)) = serde_json::from_value::<U64>(value.clone()) {
                                     op_details = Some(OperationDetails::CreateAccount);
                                     break;
                                 }
                             }
                         }
-                    } else if module == coin_id && name == coin_info {
+                    } else if module == coin_identifier() && name == coin_info_identifier() {
                         // Coin creation
                         let mut decimals: Option<u64> = None;
                         let mut symbol = None;
 
                         // Find the coin details
                         for (id, value) in data.data.0.iter() {
-                            if id == &decimals_id {
+                            if id == &decimals_identifier() {
                                 if let Ok(U64(dec)) = serde_json::from_value::<U64>(value.clone()) {
                                     decimals = Some(dec);
                                 }
-                            } else if id == &symbol_id {
+                            } else if id == &symbol_identifier() {
                                 if let Ok(sym) = serde_json::from_value::<String>(value.clone()) {
                                     symbol = Some(sym);
                                 }
@@ -475,7 +466,7 @@ impl Transaction {
                                 decimals,
                             })
                         }
-                    } else if module == coin_id && name == coin_store {
+                    } else if module == coin_identifier() && name == coin_store_identifier() {
                         if let Some(coin) = generic_type_params.first() {
                             // Account balance change
                             let mut withdraw_event = None;
@@ -483,7 +474,7 @@ impl Transaction {
 
                             // Find the coin details
                             for (id, value) in data.data.0.iter() {
-                                if id == &withdraw_events {
+                                if id == &withdraw_events_identifier() {
                                     serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
                                     if let Ok(event) =
                                         serde_json::from_value::<CoinEventId>(value.clone())
@@ -493,7 +484,7 @@ impl Transaction {
                                             event.guid.guid.id.creation_num.0,
                                         ));
                                     }
-                                } else if id == &deposit_events {
+                                } else if id == &deposit_events_identifier() {
                                     if let Ok(event) =
                                         serde_json::from_value::<CoinEventId>(value.clone())
                                     {
@@ -629,8 +620,8 @@ impl Transaction {
         if let Some(sender) = maybe_sender {
             let gas_tag = TypeTag::Struct(StructTag {
                 address: AccountAddress::ONE,
-                module: ident_str!("TestCoin").into(),
-                name: ident_str!("TestCoin").into(),
+                module: test_coin_identifier(),
+                name: test_coin_identifier(),
                 type_params: vec![],
             });
             if let Some(gas_currency) = coin_cache.get_currency(rest_client, gas_tag, None).await? {
@@ -734,17 +725,9 @@ impl Transfer {
     pub fn extract_transfer(operations: &Vec<Operation>) -> ApiResult<Transfer> {
         // Only support 1:1 P2P transfer
         // This is composed of a Deposit and a Withdraw operation
-        if operations.len() != 2
-            && (!operations.iter().any(|op| {
-                OperationType::from_str(&op.operation_type).unwrap_or(OperationType::Withdraw)
-                    == OperationType::Deposit
-            }) || !operations.iter().any(|op| {
-                OperationType::from_str(&op.operation_type).unwrap_or(OperationType::Deposit)
-                    == OperationType::Withdraw
-            }))
-        {
+        if operations.len() != 2 {
             return Err(ApiError::InvalidTransferOperations(Some(
-                "Must have exactly 1 withdraw and 1 deposit",
+                "Must have exactly 2 operations a withdraw and a deposit",
             )));
         }
 
@@ -753,10 +736,15 @@ impl Transfer {
             let op_type = OperationType::from_str(&op.operation_type)?;
             op_map.insert(op_type, op);
         }
-        let mut keys = op_map.keys();
-        if !keys.contains(&OperationType::Withdraw) || !keys.contains(&OperationType::Deposit) {
+        if !op_map.contains_key(&OperationType::Withdraw) {
             return Err(ApiError::InvalidTransferOperations(Some(
-                "Must have exactly 1 withdraw and 1 deposit",
+                "Must have a withdraw",
+            )));
+        }
+
+        if !op_map.contains_key(&OperationType::Deposit) {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Must have a deposit",
             )));
         }
 

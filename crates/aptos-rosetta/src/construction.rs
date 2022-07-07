@@ -16,11 +16,20 @@ use aptos_crypto::{
     signing_message,
 };
 use aptos_logger::debug;
-use aptos_sdk::transaction_builder::TransactionFactory;
+use aptos_sdk::{
+    move_types::{
+        identifier::Identifier,
+        language_storage::{StructTag, TypeTag},
+    },
+    transaction_builder::TransactionFactory,
+};
 use aptos_transaction_builder::aptos_stdlib;
-use aptos_types::transaction::{
-    authenticator::AuthenticationKey, RawTransaction, SignedTransaction,
-    Transaction::UserTransaction,
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{
+        authenticator::AuthenticationKey, RawTransaction, SignedTransaction,
+        Transaction::UserTransaction, TransactionPayload,
+    },
 };
 use std::str::FromStr;
 use warp::Filter;
@@ -239,28 +248,175 @@ async fn construction_parse(
     debug!("/construction/parse {:?}", request);
     check_network(request.network_identifier, &server_context)?;
 
-    let (account_identifier_signers, _unsigned_txn) = if request.signed {
+    let (account_identifier_signers, unsigned_txn) = if request.signed {
         let signed_txn: SignedTransaction = decode_bcs(&request.transaction, "SignedTransaction")?;
-        let mut account_identifier_signers: Vec<_> = signed_txn
+        let account_identifier_signers: Vec<_> = signed_txn
             .authenticator()
             .secondary_signer_addreses()
             .into_iter()
             .map(AccountIdentifier::from)
             .collect();
-        let unsigned_txn = signed_txn.into_raw_transaction();
-        account_identifier_signers.push(unsigned_txn.sender().into());
 
-        (Some(account_identifier_signers), unsigned_txn)
+        (
+            Some(account_identifier_signers),
+            signed_txn.into_raw_transaction(),
+        )
     } else {
         let unsigned_txn: RawTransaction = decode_bcs(&request.transaction, "UnsignedTransaction")?;
         (None, unsigned_txn)
     };
+    let sender = unsigned_txn.sender();
 
-    // TODO: Convert operations
+    // This is messy, but all we can do
+    // TODO: Support write set for genesis?
+    let operations = match unsigned_txn.into_payload() {
+        TransactionPayload::ScriptFunction(inner) => {
+            let (module, script_name, type_args, args) = inner.into_inner();
+
+            if AccountAddress::ONE == *module.address()
+                && coin_identifier() == Identifier::from(module.name())
+                && transfer_identifier() == script_name
+            {
+                parse_transfer_operation(sender, &type_args, &args)?
+            } else if AccountAddress::ONE == *module.address()
+                && account_identifier() == Identifier::from(module.name())
+                && create_account_identifier() == script_name
+            {
+                parse_create_account_operation(sender, &type_args, &args)?
+            } else {
+                return Err(ApiError::TransactionParseError(Some(
+                    "Unsupported operation type",
+                )));
+            }
+        }
+        _ => {
+            return Err(ApiError::TransactionParseError(Some(
+                "Unsupported transaction type",
+            )))
+        }
+    };
+
     Ok(ConstructionParseResponse {
-        operations: vec![],
+        operations,
         account_identifier_signers,
     })
+}
+
+fn parse_create_account_operation(
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    // There are no typeargs for create account
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(
+            "Create account should not have type arguments",
+        )));
+    }
+
+    // Create account
+    if let Some(encoded_address) = args.first() {
+        let new_address: AccountAddress = bcs::from_bytes(encoded_address)?;
+
+        Ok(vec![Operation {
+            operation_identifier: OperationIdentifier {
+                index: 0,
+                network_index: None,
+            },
+            related_operations: None,
+            operation_type: OperationType::CreateAccount.to_string(),
+            status: None,
+            account: Some(new_address.into()),
+            amount: None,
+            metadata: Some(OperationSpecificMetadata {
+                sender: sender.into(),
+            }),
+        }])
+    } else {
+        Err(ApiError::InvalidOperations)
+    }
+}
+
+fn parse_transfer_operation(
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    let mut operations = Vec::new();
+
+    // Check coin is the native coin
+    if let Some(TypeTag::Struct(StructTag {
+        address,
+        module,
+        name,
+        type_params,
+    })) = type_args.first()
+    {
+        // Currency must be the native coin for now
+        if *address != AccountAddress::ONE
+            || *module != test_coin_identifier()
+            || *name != test_coin_identifier()
+            || !type_params.is_empty()
+        {
+            return Err(ApiError::TransactionParseError(Some(
+                "Invalid coin for transfer",
+            )));
+        }
+    } else {
+        return Err(ApiError::TransactionParseError(Some(
+            "No coin type in transfer",
+        )));
+    };
+
+    // Retrieve the args for the operations
+
+    let receiver: AccountAddress = if let Some(receiver) = args.get(0) {
+        bcs::from_bytes(receiver)?
+    } else {
+        return Err(ApiError::TransactionParseError(Some(
+            "No receiver in transfer",
+        )));
+    };
+    let amount: u64 = if let Some(amount) = args.get(1) {
+        bcs::from_bytes(amount)?
+    } else {
+        return Err(ApiError::TransactionParseError(Some(
+            "No amount in transfer",
+        )));
+    };
+
+    operations.push(Operation {
+        operation_identifier: OperationIdentifier {
+            index: 0,
+            network_index: None,
+        },
+        related_operations: None,
+        operation_type: OperationType::Withdraw.to_string(),
+        status: None,
+        account: Some(sender.into()),
+        amount: Some(Amount {
+            value: format!("-{}", amount),
+            currency: native_coin(),
+        }),
+        metadata: None,
+    });
+
+    operations.push(Operation {
+        operation_identifier: OperationIdentifier {
+            index: 1,
+            network_index: None,
+        },
+        related_operations: None,
+        operation_type: OperationType::Deposit.to_string(),
+        status: None,
+        account: Some(receiver.into()),
+        amount: Some(Amount {
+            value: amount.to_string(),
+            currency: native_coin(),
+        }),
+        metadata: None,
+    });
+    Ok(operations)
 }
 
 /// Construction payloads command (OFFLINE)
@@ -290,11 +446,7 @@ async fn construction_payloads(
             create_account.sender,
         ),
         InternalOperation::Transfer(transfer) => {
-            if transfer.currency != native_coin() {
-                return Err(ApiError::UnsupportedCurrency(Some(
-                    transfer.currency.symbol,
-                )));
-            }
+            is_native_coin(&transfer.currency)?;
             (
                 aptos_stdlib::encode_test_coin_transfer(transfer.receiver, transfer.amount),
                 transfer.sender,
@@ -368,7 +520,6 @@ async fn construction_preprocess(
 
     Ok(ConstructionPreprocessResponse {
         options: Some(MetadataOptions {
-            // We only accept P2P transactions for now
             internal_operation: InternalOperation::extract(&request.operations)?,
             max_gas,
             gas_price_per_unit,
