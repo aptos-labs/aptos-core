@@ -229,9 +229,9 @@ module AptosFramework::TokenV1 {
         royalty_points_denominator: u64,
         royalty_points_nominator: u64,
         token_mutate_setting: vector<bool>,
-        property_keys: vector<String>,
+        property_keys: vector<vector<u8>>,
         property_values: vector<vector<u8>>,
-        property_types: vector<String>,
+        property_types: vector<vector<u8>>,
     ) acquires Collections, TokenStore {
         create_token(
             creator,
@@ -245,9 +245,9 @@ module AptosFramework::TokenV1 {
             royalty_points_denominator,
             royalty_points_nominator,
             token_mutate_setting,
-            property_keys,
+            PropertyMap::generate_string_vector(property_keys),
             property_values,
-            property_types,
+            PropertyMap::generate_string_vector(property_types),
         );
     }
 
