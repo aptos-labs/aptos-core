@@ -1284,7 +1284,7 @@ impl DbWriter for AptosDB {
                 version,
                 base_version,
             )?;
-            debug!(
+            trace!(
                 version = version,
                 base_version = base_version,
                 root_hash = root_hash,
