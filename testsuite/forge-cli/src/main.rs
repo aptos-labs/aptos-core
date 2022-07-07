@@ -91,6 +91,11 @@ struct K8sSwarm {
         help = "If set, uses kubectl port-forward instead of assuming k8s DNS access"
     )]
     port_forward: bool,
+    #[structopt(
+        long,
+        help = "If set, keeps the forge testnet active in the specified namespace"
+    )]
+    keep: bool,
 }
 
 #[derive(StructOpt, Debug)]
@@ -104,8 +109,11 @@ struct SetValidator {
 
 #[derive(StructOpt, Debug)]
 struct CleanUp {
-    #[structopt(long, help = "The kubernetes namespace to clean up")]
-    namespace: String,
+    #[structopt(
+        long,
+        help = "The kubernetes namespace to clean up. If unset, attemps to cleanup all by using forge-management configmaps"
+    )]
+    namespace: Option<String>,
 }
 
 #[derive(StructOpt, Debug)]
@@ -180,16 +188,18 @@ fn main() -> Result<()> {
                 run_forge(
                     test_suite,
                     K8sFactory::new(
-                        k8s.namespace,
+                        k8s.namespace.clone(),
                         k8s.image_tag,
                         k8s.base_image_tag,
                         k8s.port_forward,
+                        k8s.keep,
                     )
                     .unwrap(),
                     &args.options,
                     args.changelog,
                     global_emit_job_request,
-                )
+                )?;
+                Ok(())
             }
         },
         // cmd input for cluster operations
@@ -200,7 +210,12 @@ fn main() -> Result<()> {
                 set_validator.namespace,
             ),
             OperatorCommand::CleanUp(cleanup) => {
-                runtime.block_on(uninstall_testnet_resources(cleanup.namespace))
+                if let Some(namespace) = cleanup.namespace {
+                    runtime.block_on(uninstall_testnet_resources(namespace))?;
+                } else {
+                    runtime.block_on(cleanup_cluster_with_management())?;
+                }
+                Ok(())
             }
             OperatorCommand::Resize(resize) => {
                 runtime.block_on(install_testnet_resources(
