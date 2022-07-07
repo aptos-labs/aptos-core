@@ -81,12 +81,14 @@ impl RosettaClient {
     ) -> anyhow::Result<ConstructionParseResponse> {
         self.make_call("construction/parse", request).await
     }
+
     pub async fn payloads(
         &self,
         request: &ConstructionPayloadsRequest,
     ) -> anyhow::Result<ConstructionPayloadsResponse> {
         self.make_call("construction/payloads", request).await
     }
+
     pub async fn preprocess(
         &self,
         request: &ConstructionPreprocessRequest,
