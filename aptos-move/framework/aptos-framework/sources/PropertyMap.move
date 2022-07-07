@@ -2,7 +2,7 @@
 /// It maps a String key to a PropertyValue that consists of a String type and a vec value
 module AptosFramework::PropertyMap {
     use Std::Vector;
-    use Std::ASCII::String;
+    use Std::ASCII::{Self, String};
     use AptosFramework::SimpleMap::{Self, SimpleMap};
 
     const MAX_PROPERTY_MAP_SIZE: u64 = 1000;
@@ -104,6 +104,16 @@ module AptosFramework::PropertyMap {
             update_property_value(list, key, *value);
             i = i + 1;
         };
+    }
+
+    public fun generate_string_vector(values: vector<vector<u8>>): vector<String> {
+        let vals: vector<String> = Vector::empty<String>();
+        let i = 0;
+        while (i < Vector::length(&values)) {
+            Vector::push_back(&mut vals, ASCII::string(*Vector::borrow(&mut values, i )));
+            i = i + 1;
+        };
+        vals
     }
 
     #[test_only]
