@@ -541,13 +541,16 @@ async fn construction_preprocess(
         DEFAULT_GAS_PRICE_PER_UNIT
     };
 
+    let internal_operation = InternalOperation::extract(&request.operations)?;
+    let required_public_keys = vec![internal_operation.sender().into()];
+
     Ok(ConstructionPreprocessResponse {
         options: Some(MetadataOptions {
-            internal_operation: InternalOperation::extract(&request.operations)?,
+            internal_operation,
             max_gas,
             gas_price_per_unit,
         }),
-        required_public_keys: None,
+        required_public_keys: Some(required_public_keys),
     })
 }
 
