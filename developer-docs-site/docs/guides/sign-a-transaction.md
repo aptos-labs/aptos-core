@@ -12,17 +12,22 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 All transactions executed on the Aptos Blockchain must be signed. This requirement is enforced by the chain for security reasons.
 
-You can use the [Aptos REST API](/rest-api) for this purpose. The Aptos server will generate the signing message, the transaction signature and will submit the signed transaction to the Aptos Blockchain. Also see the tutorial [Your First Transaction](../tutorials/first-transaction.md).
+## Generating the signing message 
 
-However, you may prefer instead that your client application, for example, a hardware security module (HSM), be responsible for generating the signed transaction. Before submitting transactions, a client must:
+The first step in signing a transaction is to generate the signing message from the transaction. To generate such a signing message, you can use:
+- The Aptos server with the [Aptos REST API](/rest-api). The Aptos server will generate the signing message, the transaction signature and will submit the signed transaction to the Aptos Blockchain. However, this approach is not secure. See [Submitting transactions in BCS vs JSON
+](/sdks/transactions-with-ts-sdk#submitting-transactions-in-bcs-vs-json).
+  - Also see the tutorial [Your First Transaction](../tutorials/first-transaction.md) that explains this approach.
+- Moreover, you may prefer instead that your client application, for example, a hardware security module (HSM), be responsible for generating the signed transaction. In this approach, before submitting transactions, a client must:
+  - Serialize the transactions into bytes, and
+  - Sign the bytes with the account private key. See [Accounts][account] for how account and private key works.
 
-- Serialize the transactions into bytes, and
-- Sign the bytes with the account private key. See [Accounts][account] for how account and private key works.
+This guide will introduce the concepts behind constructing a transaction, generating the appropriate message to sign using the BCS-serialization, and various methods for signing within Aptos.
 
-This guide will introduce the concepts behind constructing a transaction, generating the appropriate message to sign, and various methods for signing within Aptos.
+:::tip
 
-:::info
-Code examples in this section are in Typescript.
+We strongly recommend that you use the BCS format for submitting transactions to the Aptos Blockchain.
+
 :::
 
 ## Overview
@@ -33,6 +38,10 @@ Creating a transaction that is ready to be executed on the Aptos Blockchain requ
 2. Generate the signing message containing the appropriate salt (`prefix_bytes`), and generate the signature of the raw transaction by using the client's private key.
 3. Create the `Authenticator` and the signed transaction, and
 4. BCS-serialize the signed transaction (not shown in the diagram in [Overview](#overview) section).
+
+:::info
+Code examples in this section are in Typescript.
+:::
 
 See the below high-level flow diagram showing how a raw transaction becomes a signed transaction:
 

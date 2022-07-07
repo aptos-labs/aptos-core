@@ -5,11 +5,19 @@ slug: "transactions-with-ts-sdk"
 
 # Transactions with Typescript SDK
 
-This tutorial shows the steps of creating, signing and submitting a transaction through Typescript SDK. 
+This tutorial shows the steps of creating, signing and submitting a transaction in BCS format using the Aptos Typescript SDK.
 
-As described in the tutorial [Your First Transaction](../tutorials/first-transaction.md), transactions in JSON format can be submitted through Aptos REST APIs. The Typescript SDK provides wrappers to significantly reduce the amount of manual work needed to prepare and submit transactions in JSON format. 
+## Submitting transactions in BCS vs JSON
 
-The Typescript SDK also supports signing and submitting transactions in BCS format. See [Creating a Signed Transaction](../guides/sign-a-transaction.md). In this tutorial you will submit a transaction in BCS format.
+**BCS:** Submitting transactions in the BCS format is more secure than submitting in JSON format. In this method you will create the BCS-serialized signing message on the client side. For a conceptual guide on submitting in BCS format, see [Creating a Signed Transaction](../guides/sign-a-transaction.md). The Typescript SDK supports signing and submitting transactions in BCS format.
+
+**JSON:** When you submit the transactions in JSON format, you will use the REST API and rely on the Aptos server to create the signing message. This approach creates a risk that a user signs an unintended transaction faked by a malicious API server. See the tutorial [Your First Transaction](../tutorials/first-transaction.md), for how to submit transactions in JSON format. In addition, the Typescript SDK provides wrappers to significantly reduce the amount of manual work needed to prepare and submit transactions in JSON format. 
+
+:::tip
+
+We strongly recommend that you use the BCS format for submitting transactions to the Aptos Blockchain.
+
+:::
 
 ## Before you proceed
 
@@ -22,10 +30,10 @@ or
 `yarn add aptos`
 
 :::note
-Although Typescript is used in this tutorial, Aptos TS SDK also works in Javascript projects.
+See [the source code for this tutorial](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/bcs_transaction.ts). Although Typescript is used in this tutorial, Aptos TS SDK also works in Javascript projects.
 :::
 
-The source code of this tutorial can be found here: TODO add link
+
 
 ## Step 1: Create accounts
 
@@ -60,7 +68,7 @@ accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::Te
 console.log(`Bob coins: ${(accountResource?.data as any).coin.value}. Should be 0!`);
 ```
 
-With the above code we created two accounts on Aptos’s devnet, and minted 5000 test coins for Alice’s account and 0 test coin for Bob’s account.
+With the above code we created two accounts on Aptos devnet and minted 5000 test coins for the Alice’s account and 0 test coin for the Bob’s account.
 
 ## Step 2: Prepare the transaction payload
 
@@ -72,11 +80,11 @@ The Typescript SDK supports three types of transaction payloads:
 
 See [https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html](https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html) for details.
 
-The `ScriptFunction` payload is used to invoke an on-chain Move script function. Within `ScriptFunction` payload, you are able to specify the function name and arguments. 
+The `ScriptFunction` payload is used to invoke an on-chain Move script function. Within `ScriptFunction` payload you can specify the function name and arguments. 
 
-The `Script` payload contains the bytecode for the Aptos MoveVM (Move Virtual Machine) to execute. Within the `Script` payload, you are able to provide the script code in bytes and the arguments to the script. 
+The `Script` payload contains the bytecode for the Aptos MoveVM (Move Virtual Machine) to execute. Within the `Script` payload, you can provide the script code in bytes and the arguments to the script. 
 
-The `ModuleBundle` payload is used to publish multiple modules at once. Within `ModuleBundle` payload, you are able to provide the module bytecodes.
+The `ModuleBundle` payload is used to publish multiple modules at once. Within `ModuleBundle` payload, you can provide the module bytecode.
 
 To transfer coins from Alice’s account to Bob’s account, we need to prepare a `ScriptFunction` payload with a `transfer` function.
 
@@ -159,8 +167,3 @@ Bob coins: 0. Should be 0!
 Bob coins: 717. Should be 717!
 ```
 
-## Security of BCS transaction
-
-Submitting transactions in the BCS format is more secure than submitting transaction in JSON format. See [Aptos Client](aptos-sdk-overview#aptos-client). 
-
-The code that submits the transactions in JSON format delegates the signing messages creation to the REST API server. This creates a risk that a user signs an unintended transaction faked by a malicious API server. 
