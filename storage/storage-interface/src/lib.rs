@@ -48,7 +48,7 @@ pub mod sync_proof_fetcher;
 pub use executed_trees::ExecutedTrees;
 use scratchpad::SparseMerkleTree;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct StartupInfo {
     /// The latest ledger info.
     pub latest_ledger_info: LedgerInfoWithSignatures,

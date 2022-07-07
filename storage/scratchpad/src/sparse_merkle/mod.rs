@@ -287,17 +287,6 @@ pub struct SparseMerkleTree<V> {
     inner: Arc<Inner<V>>,
 }
 
-impl<V> Eq for SparseMerkleTree<V> where V: Clone + CryptoHash + Send + Sync {}
-
-impl<V> PartialEq for SparseMerkleTree<V>
-where
-    V: Clone + CryptoHash + Send + Sync,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.root_hash() == other.root_hash()
-    }
-}
-
 impl<V> SparseMerkleTree<V>
 where
     V: Clone + CryptoHash + Send + Sync,
@@ -321,6 +310,10 @@ where
         Self {
             inner: Inner::new(SubTree::new_empty()),
         }
+    }
+
+    pub fn has_same_root_hash(&self, other: &Self) -> bool {
+        self.root_hash() == other.root_hash()
     }
 
     fn get_oldest_ancestor(&self) -> Self {

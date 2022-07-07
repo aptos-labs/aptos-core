@@ -122,7 +122,7 @@ fn test_get_latest_executed_trees() {
 
     // entirely emtpy db
     let empty = db.get_latest_executed_trees().unwrap();
-    assert_eq!(empty, ExecutedTrees::new_empty());
+    assert!(empty.is_same_view(&ExecutedTrees::new_empty()));
 
     // bootstrapped db (any transaction info is in)
     let key = StateKey::Raw(String::from("test_key").into_bytes());
@@ -140,13 +140,12 @@ fn test_get_latest_executed_trees() {
     put_transaction_info(&db, 0, &txn_info);
 
     let bootstrapped = db.get_latest_executed_trees().unwrap();
-    assert_eq!(
-        bootstrapped,
-        ExecutedTrees::new_at_state_checkpoint(
+    assert!(
+        bootstrapped.is_same_view(&ExecutedTrees::new_at_state_checkpoint(
             txn_info.state_checkpoint_hash().unwrap(),
             vec![txn_info.hash()],
             1,
-        ),
+        ))
     );
 }
 

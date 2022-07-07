@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 /// A wrapper of the in-memory state sparse merkle tree and the transaction accumulator that
 /// represent a specific state collectively. Usually it is a state after executing a block.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct ExecutedTrees {
     /// The in-memory representation of state after execution.
     state: InMemoryState,
@@ -91,7 +91,8 @@ impl ExecutedTrees {
     }
 
     pub fn is_same_view(&self, rhs: &Self) -> bool {
-        self.transaction_accumulator.root_hash() == rhs.transaction_accumulator.root_hash()
+        self.state().has_same_current_state(rhs.state())
+            && self.transaction_accumulator.root_hash() == rhs.transaction_accumulator.root_hash()
     }
 
     pub fn verified_state_view(

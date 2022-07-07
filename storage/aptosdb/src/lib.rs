@@ -1098,10 +1098,10 @@ impl DbReader for AptosDB {
                         let committed_version = latest_ledger_info.ledger_info().version();
                         Ok(if synced_version_opt.is_none() {
                             assert_eq!(
-                            Some(committed_version), executed_trees.version(),
-                            "ledger_info_version {:?} doesn't match with committed_executed_trees version {:?}",
-                            Some(committed_version),
-                            executed_trees.version()
+                                Some(committed_version), executed_trees.version(),
+                                "ledger_info_version {:?} doesn't match with committed_executed_trees version {:?}",
+                                Some(committed_version),
+                                executed_trees.version()
                             );
                             StartupInfo::new(
                                 latest_ledger_info,
