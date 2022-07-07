@@ -5,7 +5,11 @@
 //!
 //! [Rosetta API Spec](https://www.rosetta-api.org/docs/Reference.html)
 
-use crate::{account::CoinCache, error::ApiError};
+use crate::{
+    account::CoinCache,
+    common::{handle_request, with_context},
+    error::{ApiError, ApiResult},
+};
 use aptos_api::runtime::WebServer;
 use aptos_config::config::ApiConfig;
 use aptos_logger::debug;
@@ -120,8 +124,8 @@ pub fn routes(
         .or(construction::submit_route(context.clone()))
         .or(network::list_route(context.clone()))
         .or(network::options_route(context.clone()))
-        .or(network::status_route(context))
-        // TODO: Add health check?
+        .or(network::status_route(context.clone()))
+        .or(health_check_route(context))
         .with(
             warp::cors()
                 .allow_any_origin()
@@ -169,4 +173,39 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
     rep.headers_mut()
         .insert("access-control-allow-origin", HeaderValue::from_static("*"));
     Ok(rep)
+}
+
+/// These parameters are directly passed onto the underlying rest server for a healthcheck
+#[derive(serde::Deserialize)]
+struct HealthCheckParams {
+    pub duration_secs: Option<u64>,
+}
+
+/// Default amount of time the fullnode is accepted to be behind (arbitrarily it's 5 minutes)
+const HEALTH_CHECK_DEFAULT_SECS: u64 = 300;
+
+#[derive(Debug)]
+struct HealthCheckError;
+impl warp::reject::Reject for HealthCheckError {}
+
+pub fn health_check_route(
+    server_context: RosettaContext,
+) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::path!("-" / "healthy")
+        .and(warp::path::end())
+        .and(warp::query().map(move |params: HealthCheckParams| params))
+        .and(with_context(server_context))
+        .and_then(handle_request(health_check))
+}
+
+/// Calls the underlying REST health check
+async fn health_check(
+    params: HealthCheckParams,
+    server_context: RosettaContext,
+) -> ApiResult<&'static str> {
+    let rest_client = server_context.rest_client()?;
+    let duration_secs = params.duration_secs.unwrap_or(HEALTH_CHECK_DEFAULT_SECS);
+    rest_client.health_check(duration_secs).await?;
+
+    Ok("aptos-node:ok")
 }
