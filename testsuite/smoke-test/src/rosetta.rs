@@ -37,6 +37,7 @@ pub async fn setup_test(
 
     // Start the server
     let _rosetta = aptos_rosetta::bootstrap_async(
+        10,
         swarm.chain_id(),
         api_config,
         Some(aptos_rest_client::Client::new(
