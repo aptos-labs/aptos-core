@@ -773,8 +773,12 @@ module AptosFramework::Stake {
         let len = Vector::length(&missed_votes);
         while (i < len) {
             let validator_index = *Vector::borrow(&missed_votes, i);
-            let missed_votes_count = Vector::borrow_mut(validator_missed_votes_counts, validator_index);
-            *missed_votes_count = *missed_votes_count + 1;
+            // Skip any validator indices that are out of bounds, this ensures that this function doesn't abort if there
+            // are out of bounds errors.
+            if (validator_index < Vector::length(validator_missed_votes_counts)) {
+                let missed_votes_count = Vector::borrow_mut(validator_missed_votes_counts, validator_index);
+                *missed_votes_count = *missed_votes_count + 1;
+            };
             i = i + 1;
         };
         validator_perf.num_blocks = validator_perf.num_blocks + 1;
@@ -1261,6 +1265,88 @@ module AptosFramework::Stake {
         assert!(validator_index(v3_addr) == 2, 12);
         assert!(validator_index(v4_addr) == 3, 13);
         assert!(validator_index(v5_addr) == 4, 14);
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator_1 = @0x123, validator_2 = @0x234)]
+    public(script) fun test_update_performance_statistics(
+        core_framework: signer,
+        core_resources: signer,
+        validator_1: signer,
+        validator_2: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+
+        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100);
+
+        let validator_1_address = Signer::address_of(&validator_1);
+        let validator_2_address = Signer::address_of(&validator_2);
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator_1, &mint_cap);
+        register_mint_stake(&validator_2, &mint_cap);
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+
+        // Both validators join the set.
+        join_validator_set(&validator_1, validator_1_address);
+        join_validator_set(&validator_2, validator_2_address);
+        on_new_epoch();
+
+        // Validator 2 missed votes.
+        let missed_votes = Vector::empty<u64>();
+        let validator_2_index = borrow_global<ValidatorConfig>(validator_2_address).validator_index;
+        Vector::push_back(&mut missed_votes, validator_2_index);
+        update_performance_statistics(missed_votes);
+        on_new_epoch();
+
+        // Validator 2 received no rewards. Validator 1 didn't miss votes so it still receives rewards.
+        assert_validator_state(validator_1_address, 101, 0, 0, 0, 0);
+        assert_validator_state(validator_2_address, 100, 0, 0, 0, 1);
+
+        // Validator 2 decides to leave. Both validators missed votes.
+        Timestamp::update_global_time_for_test(MAXIMUM_LOCK_UP_SECS * 1000000);
+        unlock(&validator_2, 100);
+        leave_validator_set(&validator_2, validator_2_address);
+        let missed_votes = Vector::empty<u64>();
+        let validator_1_index = borrow_global<ValidatorConfig>(validator_1_address).validator_index;
+        Vector::push_back(&mut missed_votes, validator_1_index);
+        Vector::push_back(&mut missed_votes, validator_2_index);
+        update_performance_statistics(missed_votes);
+        on_new_epoch();
+
+        // Validator 1 and 2 received no additional rewards due to missing votes.
+        assert_validator_state(validator_1_address, 101, 0, 0, 0, 0);
+        assert_validator_state(validator_2_address, 0, 100, 0, 0, 1);
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator = @0x123)]
+    public(script) fun test_update_performance_statistics_should_not_fail_due_to_out_of_bounds(
+        core_framework: signer,
+        core_resources: signer,
+        validator: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+
+        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, true, 1, 100);
+
+        let validator_address = Signer::address_of(&validator);
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator, &mint_cap);
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+        join_validator_set(&validator, validator_address);
+        on_new_epoch();
+
+        // Invalid validator index in the missed votes vector should not lead to abort.
+        let missed_votes = Vector::empty<u64>();
+        let valid_validator_index = borrow_global<ValidatorConfig>(validator_address).validator_index;
+        let out_of_bounds_index = valid_validator_index + 100;
+        Vector::push_back(&mut missed_votes, valid_validator_index);
+        Vector::push_back(&mut missed_votes, out_of_bounds_index);
+        update_performance_statistics(missed_votes);
+        on_new_epoch();
+
+        // Validator received no rewards due to missing votes.
+        assert_validator_state(validator_address, 100, 0, 0, 0, 0);
     }
 
     #[test(core_resources = @CoreResources)]
