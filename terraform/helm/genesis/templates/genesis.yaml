@@ -1,3 +1,4 @@
+{{- $imageTag := .Values.genesis.image.tag | default .Values.imageTag }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -68,7 +69,7 @@ subjects:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "aptos-genesis.fullname" . }}-e{{ .Values.chain.era }}
+  name: {{ include "aptos-genesis.fullname" . }}-e{{ .Values.chain.era }}-{{ $imageTag | substr 0 4 }}
   labels:
     {{- include "aptos-genesis.labels" . | nindent 4 }}
     app.kubernetes.io/name: genesis
@@ -84,7 +85,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: genesis
-        image: {{ .Values.genesis.image.repo }}:{{ .Values.genesis.image.tag | default .Values.imageTag }}
+        image: {{ .Values.genesis.image.repo }}:{{ $imageTag }}
         imagePullPolicy: {{ .Values.genesis.image.pullPolicy }}
         workingDir: /tmp
         command:
