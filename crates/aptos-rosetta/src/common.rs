@@ -5,13 +5,15 @@ use crate::{
     block::{block_index_to_version, version_to_block_index},
     error::{ApiError, ApiResult},
     types::{
-        BlockIdentifier, Currency, MetadataRequest, NetworkIdentifier, PartialBlockIdentifier,
+        test_coin_identifier, BlockIdentifier, Currency, MetadataRequest, NetworkIdentifier,
+        PartialBlockIdentifier,
     },
     RosettaContext,
 };
 use aptos_crypto::{HashValue, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_logger::debug;
 use aptos_rest_client::{Account, Response};
+use aptos_sdk::move_types::language_storage::{StructTag, TypeTag};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -137,6 +139,15 @@ pub fn native_coin() -> Currency {
     }
 }
 
+pub fn native_coin_tag() -> TypeTag {
+    TypeTag::Struct(StructTag {
+        address: AccountAddress::ONE,
+        module: test_coin_identifier(),
+        name: test_coin_identifier(),
+        type_params: vec![],
+    })
+}
+
 pub fn is_native_coin(currency: &Currency) -> ApiResult<()> {
     if currency == &native_coin() {
         Ok(())
@@ -146,8 +157,8 @@ pub fn is_native_coin(currency: &Currency) -> ApiResult<()> {
 }
 
 pub fn string_to_hash(str: &str) -> ApiResult<HashValue> {
-    Ok(HashValue::from_str(strip_hex_prefix(str))
-        .map_err(|err| ApiError::DeserializationFailed(Some(err.to_string())))?)
+    HashValue::from_str(strip_hex_prefix(str))
+        .map_err(|err| ApiError::DeserializationFailed(Some(err.to_string())))
 }
 
 /// Determines which block to pull for the request

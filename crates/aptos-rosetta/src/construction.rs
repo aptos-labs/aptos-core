@@ -340,20 +340,12 @@ fn parse_create_account_operation(
     if let Some(encoded_address) = args.first() {
         let new_address: AccountAddress = bcs::from_bytes(encoded_address)?;
 
-        Ok(vec![Operation {
-            operation_identifier: OperationIdentifier {
-                index: 0,
-                network_index: None,
-            },
-            related_operations: None,
-            operation_type: OperationType::CreateAccount.to_string(),
-            status: None,
-            account: Some(new_address.into()),
-            amount: None,
-            metadata: Some(OperationSpecificMetadata {
-                sender: sender.into(),
-            }),
-        }])
+        Ok(vec![Operation::create_account(
+            0,
+            None,
+            new_address,
+            sender,
+        )])
     } else {
         Err(ApiError::InvalidOperations)
     }
@@ -407,37 +399,8 @@ fn parse_transfer_operation(
         )));
     };
 
-    operations.push(Operation {
-        operation_identifier: OperationIdentifier {
-            index: 0,
-            network_index: None,
-        },
-        related_operations: None,
-        operation_type: OperationType::Withdraw.to_string(),
-        status: None,
-        account: Some(sender.into()),
-        amount: Some(Amount {
-            value: format!("-{}", amount),
-            currency: native_coin(),
-        }),
-        metadata: None,
-    });
-
-    operations.push(Operation {
-        operation_identifier: OperationIdentifier {
-            index: 1,
-            network_index: None,
-        },
-        related_operations: None,
-        operation_type: OperationType::Deposit.to_string(),
-        status: None,
-        account: Some(receiver.into()),
-        amount: Some(Amount {
-            value: amount.to_string(),
-            currency: native_coin(),
-        }),
-        metadata: None,
-    });
+    operations.push(Operation::withdraw(0, None, sender, native_coin(), amount));
+    operations.push(Operation::deposit(1, None, receiver, native_coin(), amount));
     Ok(operations)
 }
 
