@@ -23,7 +23,7 @@ tokio-stream = "0.1.8"
 aptos-api = { path = "../api" }
 aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
-aptos-data-client = { path = "../state-sync/aptos-data-client" }
+aptos-data-client = { path = "../crates/state-sync/aptos-data-client" }
 aptos-genesis = { path = "../crates/aptos-genesis", features = ["testing"] }
 aptos-infallible = { path = "../crates/aptos-infallible" }
 aptos-logger = { path = "../crates/aptos-logger" }
@@ -40,22 +40,22 @@ aptosdb = { path = "../storage/aptosdb" }
 backup-service = { path = "../storage/backup/backup-service" }
 cached-framework-packages = { path = "../aptos-move/framework/cached-packages" }
 consensus = { path = "../consensus" }
-consensus-notifications = { path = "../state-sync/inter-component/consensus-notifications" }
+consensus-notifications = { path = "../crates/state-sync/inter-component/consensus-notifications" }
 crash-handler = { path = "../crates/crash-handler" }
-data-streaming-service = { path = "../state-sync/state-sync-v2/data-streaming-service" }
-event-notifications = { path = "../state-sync/inter-component/event-notifications" }
+data-streaming-service = { path = "../crates/state-sync/state-sync-v2/data-streaming-service" }
+event-notifications = { path = "../crates/state-sync/inter-component/event-notifications" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
 framework = { path = "../aptos-move/framework" }
 inspection-service = { path = "../crates/inspection-service" }
-mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
+mempool-notifications = { path = "../crates/state-sync/inter-component/mempool-notifications" }
 network = { path = "../network" }
 network-builder = { path = "../network/builder" }
-state-sync-multiplexer = { path = "../state-sync/state-sync-v2/state-sync-multiplexer" }
-state-sync-v1 = { path = "../state-sync/state-sync-v1" }
+state-sync-multiplexer = { path = "../crates/state-sync/state-sync-v2/state-sync-multiplexer" }
+state-sync-v1 = { path = "../crates/state-sync/state-sync-v1" }
 storage-interface = { path = "../storage/storage-interface" }
-storage-service-client = { path = "../state-sync/storage-service/client" }
-storage-service-server = { path = "../state-sync/storage-service/server" }
+storage-service-client = { path = "../crates/state-sync/storage-service/client" }
+storage-service-server = { path = "../crates/state-sync/storage-service/server" }
 
 [features]
 default = []

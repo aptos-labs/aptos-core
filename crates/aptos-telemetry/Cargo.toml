@@ -37,5 +37,5 @@ aptos-workspace-hack = { path = "../aptos-workspace-hack" }
 aptosdb = { path = "../../storage/aptosdb" }
 consensus = { path = "../../consensus" }
 network = { path = "../../network" }
-state-sync-driver = { path = "../../state-sync/state-sync-v2/state-sync-driver" }
-state-sync-v1 = { path = "../../state-sync/state-sync-v1" }
+state-sync-driver = { path = "../state-sync/state-sync-v2/state-sync-driver" }
+state-sync-v1 = { path = "../state-sync/state-sync-v1" }

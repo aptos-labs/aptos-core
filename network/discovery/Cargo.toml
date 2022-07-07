@@ -26,7 +26,7 @@ aptos-time-service = { path = "../../crates/aptos-time-service" }
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 channel = { path = "../../crates/channel" }
-event-notifications = { path = "../../state-sync/inter-component/event-notifications" }
+event-notifications = { path = "../../crates/state-sync/inter-component/event-notifications" }
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 network = { path = "../../network" }
 short-hex-str = { path = "../../crates/short-hex-str" }

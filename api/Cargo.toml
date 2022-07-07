@@ -57,7 +57,7 @@ aptosdb = { path = "../storage/aptosdb", features = ["fuzzing"] }
 cached-framework-packages = { path = "../aptos-move/framework/cached-packages" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
-mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
+mempool-notifications = { path = "../crates/state-sync/inter-component/mempool-notifications" }
 move-deps = { path = "../aptos-move/move-deps" }
 vm-validator = { path = "../vm-validator" }
 

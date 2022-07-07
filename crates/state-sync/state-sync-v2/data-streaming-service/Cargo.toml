@@ -19,23 +19,23 @@ thiserror = "1.0.31"
 tokio = { version = "1.18.2", features = ["full"] }
 tokio-stream = "0.1.8"
 
-aptos-config = { path = "../../../config" }
-aptos-crypto = { path = "../../../crates/aptos-crypto" }
+aptos-config = { path = "../../../../config" }
+aptos-crypto = { path = "../../../aptos-crypto" }
 aptos-data-client = { path = "../../aptos-data-client" }
-aptos-id-generator = { path = "../../../crates/aptos-id-generator" }
-aptos-infallible = { path = "../../../crates/aptos-infallible" }
-aptos-logger = { path = "../../../crates/aptos-logger" }
-aptos-metrics-core = { path = "../../../crates/aptos-metrics-core" }
-aptos-types = { path = "../../../types" }
-aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
-channel = { path = "../../../crates/channel" }
-network = { path = "../../../network" }
-short-hex-str = { path = "../../../crates/short-hex-str" }
+aptos-id-generator = { path = "../../../aptos-id-generator" }
+aptos-infallible = { path = "../../../aptos-infallible" }
+aptos-logger = { path = "../../../aptos-logger" }
+aptos-metrics-core = { path = "../../../aptos-metrics-core" }
+aptos-types = { path = "../../../../types" }
+aptos-workspace-hack = { path = "../../../aptos-workspace-hack" }
+channel = { path = "../../../channel" }
+network = { path = "../../../../network" }
+short-hex-str = { path = "../../../short-hex-str" }
 
 [dev-dependencies]
 claim = "0.5.0"
 rand = "0.7.3"
 tokio = { version = "1.18.2", features = ["full"] }
 
-aptos-types = { path = "../../../types" }
+aptos-types = { path = "../../../../types" }
 storage-service-types = { path = "../../storage-service/types" }
