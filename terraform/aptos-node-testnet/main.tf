@@ -56,7 +56,7 @@ module "aptos-node-helm-values-deepmerge" {
   # https://registry.terraform.io/modules/Invicton-Labs/deepmerge/null/0.1.5
   source = "Invicton-Labs/deepmerge/null"
   maps = [
-    var.enable_forge ? local.aptos_node_helm_values_forge_override : map(),
+    jsondecode(var.enable_forge ? jsonencode(local.aptos_node_helm_values_forge_override) : jsonencode({})),
     var.aptos_node_helm_values,
   ]
 }
@@ -65,7 +65,7 @@ module "genesis-helm-values-deepmerge" {
   # https://registry.terraform.io/modules/Invicton-Labs/deepmerge/null/0.1.5
   source = "Invicton-Labs/deepmerge/null"
   maps = [
-    var.enable_forge ? local.genesis_helm_values_forge_override : map(),
+    var.enable_forge ? local.genesis_helm_values_forge_override : {},
     var.genesis_helm_values,
   ]
 }

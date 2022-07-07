@@ -8,7 +8,8 @@ metadata:
     app.kubernetes.io/name: load-test
 spec:
   concurrencyPolicy: Replace
-  schedule: {{ printf "*/%d * * * *" (int .Values.load_test.intervalMins) | quote }}
+  # schedule: {{ printf "*/%d * * * *" (int .Values.load_test.intervalMins) | quote }}
+  schedule: "* * * * *"
   jobTemplate:
     spec:
       template:
@@ -27,15 +28,16 @@ spec:
             imagePullPolicy: {{ .Values.load_test.image.pullPolicy }}
             command:
             - transaction-emitter
-            - --emit-tx
+            - emit-tx
             - --mint-key={{ .Values.load_test.config.mint_key }}
             - --chain-id={{ .Values.genesis.chain_id }}
-            {{- if .Values.load_test.config.use_validators }}
-            - --peers={{- range $i, $e := until (int .Values.genesis.numValidators) -}}{{$.Values.genesis.username_prefix}}-aptos-node-{{$i}}-validator-lb:80,{{- end -}}
-            {{- else }}
-            - --peers={{- range $i, $e := until (int .Values.genesis.numValidators) -}}{{$.Values.genesis.username_prefix}}-aptos-node-{{$i}}-fullnode-lb:80,{{- end -}}
+            {{- range $i := until (int $.Values.genesis.numValidators) }}
+              {{- $port := 80 }}
+              {{- $nodeType := ternary "validator" "fullnode" $.Values.load_test.config.use_validators }}
+              {{- $nodeName := join "-" (list $.Values.genesis.username_prefix $i $nodeType "lb") }}
+            - --targets=http://{{ $nodeName }}:{{ $port }}
             {{- end }}
-          {{- with .Values.load_test }}
+            {{- with .Values.load_test }}
             - --duration={{ .config.duration }}
             - --accounts-per-client={{ .config.accounts_per_client }}
             - --workers-per-ac={{ .config.workers_per_ac }}
