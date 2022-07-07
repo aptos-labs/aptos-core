@@ -47,6 +47,7 @@ trait ServerArgs {
     /// Retrieve the chain id
     fn chain_id(&self) -> ChainId;
 
+    /// Size of the imaginary blocks made up for this system
     fn block_size(&self) -> u64;
 }
 
