@@ -13,7 +13,7 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || 'https://faucet.devnet.aptosl
   let resources = await client.getAccountResources(account1.address());
   let accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
   let balance = (accountResource.data as { coin: { value: string } }).coin.value;
-  console.log(`account2 coins: ${balance}. Should be 5000!`);
+  console.log(`account1 coins: ${balance}. Should be 5000!`);
 
   const account2 = new AptosAccount();
   await faucetClient.fundAccount(account2.address(), 0);
