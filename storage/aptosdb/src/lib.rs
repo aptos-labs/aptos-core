@@ -654,7 +654,9 @@ impl AptosDB {
 
             let state_updates_vec = txns_to_commit
                 .iter()
-                .map(|txn_to_commit| txn_to_commit.state_updates())
+                .map(|txn_to_commit| {
+                    txn_to_commit.state_updates()
+                })
                 .collect::<Vec<_>>();
             self.state_store
                 .put_value_sets(state_updates_vec, first_version, cs)?;
@@ -1377,7 +1379,7 @@ impl DbWriter for AptosDB {
                 for (idx, jmt_updates, jf_node_hashes) in txns_to_commit
                     .iter()
                     .enumerate()
-                    .filter(|(_idx, txn_to_commit)| !txn_to_commit.state_updates().is_empty())
+                    .filter(|(_idx, txn_to_commit)| txn_to_commit.is_state_checkpoint())
                     .map(|(idx, txn_to_commit)| {
                         (
                             idx,
