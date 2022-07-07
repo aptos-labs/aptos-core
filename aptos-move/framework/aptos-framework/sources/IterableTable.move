@@ -107,7 +107,7 @@ module AptosFramework::IterableTable {
         (&v.val, v.prev, v.next)
     }
 
-    /// Acquire an immutable reference to the value and previous/next key which `key` maps to
+    /// Acquire an mutable reference to the value and previous/next key which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun borrow_iter_mut<K: copy + store + drop, V: store>(table: &mut IterableTable<K, V>, key: K): (&mut V, Option<K>, Option<K>) {
         let v = Table::borrow_mut(&mut table.inner, key);
