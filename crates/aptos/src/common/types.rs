@@ -72,8 +72,8 @@ pub enum CliError {
     IO(String, #[source] std::io::Error),
     #[error("Move compilation failed: {0}")]
     MoveCompilationError(String),
-    #[error("Move unit tests failed: {0}")]
-    MoveTestError(String),
+    #[error("Move unit tests failed")]
+    MoveTestError,
     #[error("Unable to parse '{0}': error: {1}")]
     UnableToParse(&'static str, String),
     #[error("Unable to read file '{0}', error: {1}")]
@@ -93,7 +93,7 @@ impl CliError {
             CliError::ConfigNotFoundError(_) => "ConfigNotFoundError",
             CliError::IO(_, _) => "IO",
             CliError::MoveCompilationError(_) => "MoveCompilationError",
-            CliError::MoveTestError(_) => "MoveTestError",
+            CliError::MoveTestError => "MoveTestError",
             CliError::UnableToParse(_, _) => "UnableToParse",
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
