@@ -16,8 +16,7 @@ use aptos_rosetta::{
         ConstructionDeriveResponse, ConstructionMetadata, ConstructionMetadataRequest,
         ConstructionMetadataResponse, ConstructionParseRequest, ConstructionPayloadsRequest,
         ConstructionPayloadsResponse, ConstructionPreprocessRequest, ConstructionSubmitRequest,
-        NetworkIdentifier, Operation, OperationIdentifier, OperationSpecificMetadata,
-        OperationType, PublicKey, Signature, SignatureType, TransactionIdentifier,
+        NetworkIdentifier, Operation, PublicKey, Signature, SignatureType, TransactionIdentifier,
     },
 };
 use aptos_types::account_address::AccountAddress;
@@ -73,13 +72,12 @@ impl CreateAccountCommand {
         info!("Create account: {:?}", self);
         let client = self.url_args.client();
         let network_identifier = self.network_args.network_identifier();
-        let new_account = self.new_account.into();
         let private_key = self.private_key_options.extract_private_key(
             self.encoding_options.encoding,
             &self.profile_options.profile,
         )?;
 
-        let sender: AccountIdentifier = get_account_address(
+        let sender = get_account_address(
             &client,
             network_identifier.clone(),
             &private_key,
@@ -87,21 +85,10 @@ impl CreateAccountCommand {
         )
         .await?;
         let mut keys = HashMap::new();
-        keys.insert(sender.account_address()?, private_key);
+        keys.insert(sender, private_key);
 
         // A create account transaction is just a Create account operation
-        let operations = vec![Operation {
-            operation_identifier: OperationIdentifier {
-                index: 0,
-                network_index: None,
-            },
-            related_operations: None,
-            operation_type: OperationType::CreateAccount.to_string(),
-            status: None,
-            account: Some(new_account),
-            amount: None,
-            metadata: Some(OperationSpecificMetadata { sender }),
-        }];
+        let operations = vec![Operation::create_account(0, None, self.new_account, sender)];
 
         submit_operations(&client, network_identifier, &keys, operations).await
     }
@@ -143,7 +130,7 @@ impl TransferCommand {
             self.encoding_options.encoding,
             &self.profile_options.profile,
         )?;
-        let sender: AccountIdentifier = get_account_address(
+        let sender = get_account_address(
             &client,
             network_identifier.clone(),
             &private_key,
@@ -151,34 +138,12 @@ impl TransferCommand {
         )
         .await?;
         let mut keys = HashMap::new();
-        keys.insert(sender.account_address()?, private_key);
+        keys.insert(sender, private_key);
 
         // A transfer operation is made up of a withdraw and a deposit
         let operations = vec![
-            Operation {
-                operation_identifier: OperationIdentifier {
-                    index: 0,
-                    network_index: None,
-                },
-                related_operations: None,
-                operation_type: OperationType::Withdraw.to_string(),
-                status: None,
-                account: Some(sender),
-                amount: Some(val_to_amount(self.amount, true)),
-                metadata: None,
-            },
-            Operation {
-                operation_identifier: OperationIdentifier {
-                    index: 1,
-                    network_index: None,
-                },
-                related_operations: None,
-                operation_type: OperationType::Deposit.to_string(),
-                status: None,
-                account: Some(self.receiver.into()),
-                amount: Some(val_to_amount(self.amount, false)),
-                metadata: None,
-            },
+            Operation::withdraw(0, None, sender, native_coin(), self.amount),
+            Operation::deposit(1, None, self.receiver, native_coin(), self.amount),
         ];
 
         submit_operations(&client, network_identifier, &keys, operations).await
@@ -191,16 +156,17 @@ async fn get_account_address(
     network_identifier: NetworkIdentifier,
     private_key: &Ed25519PrivateKey,
     maybe_sender: Option<AccountAddress>,
-) -> anyhow::Result<AccountIdentifier> {
+) -> anyhow::Result<AccountAddress> {
     if let Some(sender) = maybe_sender {
-        Ok(sender.into())
+        Ok(sender)
     } else {
-        derive_account(
+        Ok(derive_account(
             client,
             network_identifier,
             private_key.public_key().try_into()?,
         )
-        .await
+        .await?
+        .account_address()?)
     }
 }
 

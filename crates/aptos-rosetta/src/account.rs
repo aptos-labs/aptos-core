@@ -8,7 +8,10 @@
 
 use crate::{
     block::block_index_to_version,
-    common::{check_network, get_block_index_from_request, handle_request, with_context},
+    common::{
+        check_network, get_block_index_from_request, handle_request, native_coin, native_coin_tag,
+        with_context,
+    },
     error::{ApiError, ApiResult},
     types::{
         coin_identifier, coin_store_identifier, AccountBalanceRequest, AccountBalanceResponse,
@@ -204,6 +207,11 @@ impl CoinCache {
         coin: TypeTag,
         version: Option<u64>,
     ) -> ApiResult<Option<Currency>> {
+        // Short circuit for the default coin
+        if coin == native_coin_tag() {
+            return Ok(Some(native_coin()));
+        }
+
         {
             let currencies = self.currencies.read().unwrap();
             if let Some(currency) = currencies.get(&coin) {
