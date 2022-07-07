@@ -28,6 +28,8 @@ class User < ApplicationRecord
   has_one :it2_survey, dependent: :destroy
   has_many :nfts, dependent: :destroy
 
+  before_save :maybe_enqueue_forum_sync
+
   def self.from_omniauth(auth, current_user = nil)
     # find an existing user or create a user and authorizations
     # schema of auth https://github.com/omniauth/omniauth/wiki/Auth-Hash-Schema
@@ -70,7 +72,7 @@ class User < ApplicationRecord
   def maybe_send_ait2_registration_complete_email
     return unless ait2_registration_complete?
 
-    SendRegistrationCompleteEmailJob.perform_now({ user_id: id })
+    SendRegistrationCompleteEmailJob.perform_later({ user_id: id })
     DiscourseAddGroupJob.perform_later({ user_id: id, group_name: 'ait2_eligible' })
   end
 
@@ -131,6 +133,12 @@ class User < ApplicationRecord
   end
 
   private
+
+  def maybe_enqueue_forum_sync
+    return unless username_previously_changed? || email_previously_changed? || is_root_previously_changed?
+
+    DiscourseSyncSsoJob.perform_later({ user_id: id })
+  end
 
   # This is to allow username instead of email login in devise (for aptos admins)
   def email_required?

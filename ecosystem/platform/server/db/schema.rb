@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2022_07_01_031008) do
+ActiveRecord::Schema[7.0].define(version: 2022_07_07_015905) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -241,6 +241,7 @@ ActiveRecord::Schema[7.0].define(version: 2022_07_01_031008) do
     t.uuid "external_id", default: -> { "gen_random_uuid()" }, null: false
     t.boolean "kyc_exempt", default: false
     t.string "completed_persona_inquiry_id"
+    t.integer "discourse_id"
     t.index ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true
     t.index ["current_sign_in_ip"], name: "index_users_on_current_sign_in_ip"
     t.index ["email"], name: "index_users_on_email", unique: true

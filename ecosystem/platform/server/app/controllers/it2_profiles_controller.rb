@@ -45,11 +45,7 @@ class It2ProfilesController < ApplicationController
     if @it2_profile.save
       log @it2_profile, 'created'
 
-      if Flipper.enabled?(:node_health_checker)
-        @it2_profile.enqueue_nhc_job(true)
-      else
-        validate_node(v, do_location: true)
-      end
+      @it2_profile.enqueue_nhc_job(true)
 
       if @it2_profile.validator_verified?
         current_user.maybe_send_ait2_registration_complete_email
@@ -82,11 +78,7 @@ class It2ProfilesController < ApplicationController
                     notice: 'AIT2 node information updated' and return
       end
 
-      if Flipper.enabled?(:node_health_checker)
-        @it2_profile.enqueue_nhc_job(ip_changed)
-      else
-        validate_node(v, do_location: ip_changed)
-      end
+      @it2_profile.enqueue_nhc_job(ip_changed)
 
       if @it2_profile.validator_verified?
         redirect_to it2_path, notice: 'AIT2 node verification completed successfully!' and return
