@@ -43,7 +43,7 @@
         "log_balance_changes": false,
         "log_reconciliations": false,
         "ignore_reconciliation_error": false,
-        "historical_balance_disabled": true,
+        "historical_balance_disabled": false,
         "exempt_accounts": "",
         "bootstrap_balances": "",
         "interesting_accounts": "",
