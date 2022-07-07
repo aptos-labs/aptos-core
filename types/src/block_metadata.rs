@@ -85,6 +85,10 @@ impl BlockMetadata {
         &self.previous_block_votes
     }
 
+    pub fn failed_proposer_indices(&self) -> &Vec<u32> {
+        &self.failed_proposer_indices
+    }
+
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
@@ -129,7 +133,7 @@ impl MoveStructType for BlockResource {
 
 impl MoveResource for BlockResource {}
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NewBlockEvent {
     epoch: u64,
     round: u64,
