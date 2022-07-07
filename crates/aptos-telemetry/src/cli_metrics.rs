@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{build_information::get_build_information, service, service::TelemetryEvent, utils};
+use crate::{service, service::TelemetryEvent, utils};
 use aptos_logger::error;
 use std::{collections::BTreeMap, time::Duration};
 
@@ -16,16 +16,18 @@ const ERROR: &str = "error";
 
 /// Collects and sends the build information via telemetry
 pub async fn send_cli_telemetry_event(
+    mut cli_information: BTreeMap<String, String>,
     command: String,
     latency: Duration,
     success: bool,
     error: Option<String>,
 ) {
-    // Collect the build information
-    let mut cli_information = get_build_information(None);
-
+    println!("{:?}", cli_information);
     // Collection information about the cli command
-    collect_cli_info(command, latency, success, error, &mut cli_information);
+    cli_information.insert(COMMAND.into(), command);
+    cli_information.insert(LATENCY.into(), latency.as_millis().to_string());
+    cli_information.insert(SUCCESS.into(), success.to_string());
+    utils::insert_optional_value(&mut cli_information, ERROR, error);
 
     // Create a new telemetry event
     let telemetry_event = TelemetryEvent {
@@ -45,18 +47,4 @@ pub async fn send_cli_telemetry_event(
             error
         );
     }
-}
-
-/// Collects the cli info and appends it to the given map
-pub(crate) fn collect_cli_info(
-    command: String,
-    latency: Duration,
-    success: bool,
-    error: Option<String>,
-    build_information: &mut BTreeMap<String, String>,
-) {
-    build_information.insert(COMMAND.into(), command);
-    build_information.insert(LATENCY.into(), latency.as_millis().to_string());
-    build_information.insert(SUCCESS.into(), success.to_string());
-    utils::insert_optional_value(build_information, ERROR, error);
 }

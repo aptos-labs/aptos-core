@@ -3,6 +3,7 @@
 
 use crate::{gather_metrics, json_encoder::JsonEncoder, NUM_METRICS};
 use aptos_config::config::NodeConfig;
+use aptos_telemetry::{build_information, build_information_internal};
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
@@ -120,8 +121,11 @@ async fn serve_requests(
         // Expose the system and build information
         (&Method::GET, "/system_information") => {
             if node_config.inspection_service.expose_system_information {
-                let system_information =
-                    aptos_telemetry::utils::get_system_and_build_information(None);
+                let mut system_information = build_information!();
+                let system_information = aptos_telemetry::utils::get_system_and_build_information(
+                    &mut system_information,
+                    None,
+                );
                 let encoded_information = serde_json::to_string(&system_information).unwrap();
                 *resp.body_mut() = Body::from(encoded_information);
             } else {

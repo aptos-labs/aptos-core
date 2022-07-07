@@ -6,12 +6,12 @@ use crate::{
     CliResult,
 };
 use aptos_rest_client::Client;
+use aptos_telemetry::{build_information, build_information_internal};
 use aptos_types::chain_id::ChainId;
 use itertools::Itertools;
 use move_deps::move_core_types::account_address::AccountAddress;
 use reqwest::Url;
 use serde::Serialize;
-use shadow_rs::shadow;
 use std::{
     collections::BTreeMap,
     env,
@@ -22,8 +22,6 @@ use std::{
     str::FromStr,
     time::Instant,
 };
-
-shadow!(build);
 
 /// Prompts for confirmation until a yes or no is given explicitly
 pub fn prompt_yes(prompt: &str) -> bool {
@@ -67,8 +65,15 @@ pub async fn to_common_result<T: Serialize>(
     } else {
         None
     };
-    aptos_telemetry::cli_metrics::send_cli_telemetry_event(command.into(), latency, !is_err, error)
-        .await;
+    let cli_information: BTreeMap<String, String> = build_information!();
+    aptos_telemetry::cli_metrics::send_cli_telemetry_event(
+        cli_information,
+        command.into(),
+        latency,
+        !is_err,
+        error,
+    )
+    .await;
     let result: ResultWrapper<T> = result.into();
     let string = serde_json::to_string_pretty(&result).unwrap();
     if is_err {

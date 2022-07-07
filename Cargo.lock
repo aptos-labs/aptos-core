@@ -4232,6 +4232,7 @@ dependencies = [
  "reqwest",
  "rusty-fork",
  "serde_json",
+ "shadow-rs",
  "sysinfo",
  "tokio",
 ]
