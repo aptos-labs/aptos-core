@@ -1,18 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    common::EmptyRequest,
-    types::{
-        AccountBalanceRequest, AccountBalanceResponse, BlockRequest, BlockResponse,
-        ConstructionCombineRequest, ConstructionCombineResponse, ConstructionDeriveRequest,
-        ConstructionDeriveResponse, ConstructionHashRequest, ConstructionMetadataRequest,
-        ConstructionMetadataResponse, ConstructionParseRequest, ConstructionParseResponse,
-        ConstructionPayloadsRequest, ConstructionPayloadsResponse, ConstructionPreprocessRequest,
-        ConstructionPreprocessResponse, ConstructionSubmitRequest, ConstructionSubmitResponse,
-        Error, NetworkListResponse, NetworkOptionsResponse, NetworkRequest, NetworkStatusResponse,
-        TransactionIdentifierResponse,
-    },
+use crate::types::{
+    AccountBalanceRequest, AccountBalanceResponse, BlockRequest, BlockResponse,
+    ConstructionCombineRequest, ConstructionCombineResponse, ConstructionDeriveRequest,
+    ConstructionDeriveResponse, ConstructionHashRequest, ConstructionMetadataRequest,
+    ConstructionMetadataResponse, ConstructionParseRequest, ConstructionParseResponse,
+    ConstructionPayloadsRequest, ConstructionPayloadsResponse, ConstructionPreprocessRequest,
+    ConstructionPreprocessResponse, ConstructionSubmitRequest, ConstructionSubmitResponse, Error,
+    MetadataRequest, NetworkListResponse, NetworkOptionsResponse, NetworkRequest,
+    NetworkStatusResponse, TransactionIdentifierResponse,
 };
 use anyhow::anyhow;
 use aptos_logger::debug;
@@ -104,7 +101,7 @@ impl RosettaClient {
     }
 
     pub async fn network_list(&self) -> anyhow::Result<NetworkListResponse> {
-        self.make_call("network/list", &EmptyRequest).await
+        self.make_call("network/list", &MetadataRequest {}).await
     }
 
     pub async fn network_options(
