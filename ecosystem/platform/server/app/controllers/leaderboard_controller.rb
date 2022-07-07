@@ -8,6 +8,9 @@ class LeaderboardController < ApplicationController
   IT1_RESULTS = File.read(File.join(Rails.root, 'public/it1_leaderboard_final.json'))
   It1Metric = Struct.new(*IT1_METRIC_KEYS)
 
+  IT2_METRIC_KEYS = %i[rank validator liveness participation avg_votes_per_epoch latest_reported_timestamp].freeze
+  It2Metric = Struct.new(*IT2_METRIC_KEYS)
+
   def it1
     expires_in 1.minute, public: true
     default_sort = [[:participation, -1], [:liveness, -1], [:latest_reported_timestamp, -1]]
@@ -34,6 +37,38 @@ class LeaderboardController < ApplicationController
     end
 
     @sort_columns = %w[rank liveness participation latest_reported_timestamp]
+    sort = sort_params(@sort_columns)
+    sort_metrics!(@metrics, sort) if sort
+  end
+
+  def it2
+    expires_in 1.minute, public: true
+    default_sort = [[:avg_votes_per_epoch, -1], [:participation, -1], [:liveness, -1], [:latest_reported_timestamp, -1]]
+    @metrics, @last_updated = Rails.cache.fetch(:it2_leaderboard, expires_in: 1.minute) do
+      response = HTTParty.get(ENV.fetch('LEADERBOARD_IT2_URL'))
+      metrics = JSON.parse(response.body).map do |metric|
+        timestamp = if metric['latest_reported_timestamp'].blank?
+                      nil
+                    else
+                      DateTime.parse(metric['latest_reported_timestamp']).to_f
+                    end
+        It2Metric.new(
+          -1,
+          metric['validator'],
+          metric['liveness'].to_f,
+          metric['participation'].to_f,
+          metric['avg_votes_per_epoch'].to_i,
+          timestamp
+        )
+      end
+      sort_metrics!(metrics, default_sort)
+      metrics.each_with_index do |metric, i|
+        metric.rank = i + 1
+      end
+      [metrics, Time.now]
+    end
+
+    @sort_columns = %w[rank liveness participation avg_votes_per_epoch latest_reported_timestamp]
     sort = sort_params(@sort_columns)
     sort_metrics!(@metrics, sort) if sort
   end
