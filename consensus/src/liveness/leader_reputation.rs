@@ -406,7 +406,7 @@ impl ReputationHeuristic for ProposerAndVoterHeuristic {
             .count_failed_proposals(epoch, candidates, history);
 
         COMMITTED_PROPOSALS_IN_WINDOW.set(*proposals.get(&self.author).unwrap_or(&0) as i64);
-        FAILED_PROPOSALS_IN_WINDOW.set(*proposals.get(&self.author).unwrap_or(&0) as i64);
+        FAILED_PROPOSALS_IN_WINDOW.set(*failed_proposals.get(&self.author).unwrap_or(&0) as i64);
         COMMITTED_VOTES_IN_WINDOW.set(*votes.get(&self.author).unwrap_or(&0) as i64);
         LEADER_REPUTATION_HISTORY_SIZE.set(proposals.values().sum::<u32>() as i64);
 
