@@ -212,12 +212,12 @@ impl CliCommand<&'static str> for TestPackage {
             aptos_debug_natives::aptos_debug_natives(),
             false,
         )
-        .map_err(|err| CliError::MoveTestError(err.to_string()))?;
+        .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
 
         // TODO: commit back up to the move repo
         match result {
             UnitTestResult::Success => Ok("Success"),
-            UnitTestResult::Failure => Ok("Failure"),
+            UnitTestResult::Failure => Err(CliError::MoveTestError),
         }
     }
 }
