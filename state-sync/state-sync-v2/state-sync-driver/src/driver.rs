@@ -308,11 +308,7 @@ impl<
             .reconfiguration_events
             .is_empty()
         {
-            metrics::increment_gauge(
-                &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                metrics::StorageSynchronizerOperations::SyncedEpoch.get_label(),
-                1,
-            );
+            utils::update_new_epoch_metrics(self.storage.clone());
         }
     }
 
