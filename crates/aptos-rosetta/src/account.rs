@@ -7,16 +7,15 @@
 //!
 
 use crate::{
-    block::{block_index_to_version, version_to_block_index},
-    common::{check_network, handle_request, with_context},
+    block::block_index_to_version,
+    common::{check_network, get_block_index_from_request, handle_request, with_context},
     error::{ApiError, ApiResult},
     types::{
         coin_identifier, coin_store_identifier, AccountBalanceRequest, AccountBalanceResponse,
-        Amount, BlockIdentifier, Currency, PartialBlockIdentifier,
+        Amount, BlockIdentifier, Currency,
     },
     RosettaContext,
 };
-use aptos_crypto::HashValue;
 use aptos_logger::{debug, trace};
 use aptos_rest_client::{aptos::Balance, aptos_api_types::U64};
 use aptos_sdk::move_types::language_storage::TypeTag;
@@ -25,7 +24,6 @@ use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    str::FromStr,
     sync::{Arc, RwLock},
 };
 use warp::Filter;
@@ -146,65 +144,6 @@ async fn convert_balances_to_amounts(
     }
 
     Ok(amounts)
-}
-
-/// Determines which block to pull for the request
-async fn get_block_index_from_request(
-    rest_client: &aptos_rest_client::Client,
-    partial_block_identifier: Option<PartialBlockIdentifier>,
-    block_size: u64,
-) -> ApiResult<u64> {
-    Ok(match partial_block_identifier {
-        Some(PartialBlockIdentifier {
-            index: Some(_),
-            hash: Some(_),
-        }) => {
-            return Err(ApiError::BlockParameterConflict);
-        }
-        // Lookup by block index
-        Some(PartialBlockIdentifier {
-            index: Some(block_index),
-            hash: None,
-        }) => block_index,
-        // Lookup by block hash
-        Some(PartialBlockIdentifier {
-            index: None,
-            hash: Some(hash),
-        }) => {
-            if hash == BlockIdentifier::genesis_txn().hash {
-                0
-            } else {
-                // Lookup by hash doesn't work since we're faking blocks, need to verify that it's a
-                // block
-                let response =
-                    rest_client
-                        .get_transaction(HashValue::from_str(&hash).map_err(|err| {
-                            ApiError::DeserializationFailed(Some(err.to_string()))
-                        })?)
-                        .await?;
-                let version = response.inner().version();
-
-                if let Some(version) = version {
-                    let block_index = version_to_block_index(block_size, version);
-                    // If it's not the beginning of a block, then it's invalid
-                    if version != block_index_to_version(block_size, block_index) {
-                        return Err(ApiError::TransactionIsPending);
-                    }
-
-                    block_index
-                } else {
-                    // If the transaction is pending, it's incomplete
-                    return Err(ApiError::BlockIncomplete);
-                }
-            }
-        }
-        // Lookup latest version
-        _ => {
-            let response = rest_client.get_ledger_information().await?;
-            let state = response.state();
-            version_to_block_index(block_size, state.version) - 1
-        }
-    })
 }
 
 /// Retrieve the balances for an account
