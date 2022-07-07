@@ -7,11 +7,13 @@ use anyhow::Result;
 use aptos_crypto::HashValue;
 use futures::channel::oneshot;
 use std::{fmt, fmt::Formatter};
+use aptos_types::block_info::Round;
 
 /// Message sent from Consensus to QuorumStore.
 pub enum WrapperCommand {
     /// Request to pull block to submit to consensus.
     GetBlockRequest(
+        Round,
         // max block size
         u64,
         // block payloads to exclude from the requested block
@@ -25,11 +27,11 @@ pub enum WrapperCommand {
 impl fmt::Display for WrapperCommand {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            WrapperCommand::GetBlockRequest(block_size, excluded, _) => {
+            WrapperCommand::GetBlockRequest(round, block_size, excluded, _) => {
                 write!(
                     f,
-                    "GetBlockRequest [block_size: {}, excluded: {}]",
-                    block_size, excluded
+                    "GetBlockRequest [round: {}, block_size: {}, excluded: {}]",
+                    round, block_size, excluded
                 )
             }
             WrapperCommand::CleanRequest(logical_time, digests) => {

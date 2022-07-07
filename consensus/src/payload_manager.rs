@@ -16,6 +16,7 @@ use futures::{
 };
 use std::time::Duration;
 use tokio::time::{sleep, timeout};
+use aptos_types::block_info::Round;
 
 const NO_TXN_DELAY: u64 = 30;
 
@@ -47,11 +48,12 @@ impl QuorumStoreClient {
 
     async fn pull_internal(
         &self,
+        round: Round,
         max_size: u64,
         exclude_payloads: PayloadFilter,
     ) -> Result<Payload, QuorumStoreError> {
         let (callback, callback_rcv) = oneshot::channel();
-        let req = WrapperCommand::GetBlockRequest(max_size, exclude_payloads.clone(), callback);
+        let req = WrapperCommand::GetBlockRequest(round,max_size, exclude_payloads.clone(), callback);
         // send to shared mempool
         self.consensus_to_quorum_store_sender
             .clone()
@@ -76,6 +78,7 @@ impl QuorumStoreClient {
 impl PayloadManager for QuorumStoreClient {
     async fn pull_payload(
         &self,
+        round: Round,
         max_size: u64,
         exclude_payloads: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
@@ -90,7 +93,7 @@ impl PayloadManager for QuorumStoreClient {
         let payload = loop {
             count -= 1;
             let payload = self
-                .pull_internal(max_size, exclude_payloads.clone())
+                .pull_internal(round, max_size, exclude_payloads.clone())
                 .await?;
             if payload.is_empty() && !pending_ordering && count > 0 {
                 if let Some(callback) = callback_wrapper.take() {

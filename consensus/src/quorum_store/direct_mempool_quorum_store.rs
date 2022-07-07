@@ -80,7 +80,7 @@ impl DirectMempoolQuorumStore {
 
     async fn handle_consensus_request(&self, req: WrapperCommand) {
         match req {
-            WrapperCommand::GetBlockRequest(max_size, payload_filter, callback) => {
+            WrapperCommand::GetBlockRequest(_round, max_size, payload_filter, callback) => {
                 self.handle_block_request(max_size, payload_filter, callback)
                     .await;
             }

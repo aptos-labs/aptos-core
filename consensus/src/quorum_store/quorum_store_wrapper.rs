@@ -49,7 +49,6 @@ pub struct QuorumStoreWrapper {
     batch_builder: BatchBuilder,
     latest_logical_time: LogicalTime,
     proofs_for_consensus: HashMap<HashValue, ProofOfStore>,
-    proof_expirations: RoundExpirations<HashValue>,
     mempool_txn_pull_max_count: u64,
     // For ensuring that batch size does not exceed QuorumStore limit.
     quorum_store_max_batch_bytes: u64,
@@ -73,7 +72,6 @@ impl QuorumStoreWrapper {
             batch_builder: BatchBuilder::new(0, quorum_store_max_batch_bytes as usize),
             latest_logical_time: LogicalTime::new(epoch, 0),
             proofs_for_consensus: HashMap::new(),
-            proof_expirations: RoundExpirations::new(),
             mempool_txn_pull_max_count,
             quorum_store_max_batch_bytes,
             last_end_batch_time: Instant::now(),
@@ -174,11 +172,8 @@ impl QuorumStoreWrapper {
                 new_proof = proof;
             }
         }
-        let digest = new_proof.digest().clone();
-        let expiration = new_proof.expiration().round();
         self.proofs_for_consensus
-            .insert(digest, new_proof);
-        self.proof_expirations.add_item(digest, expiration);
+            .insert(*new_proof.digest(), new_proof);
     }
 
     pub(crate) async fn handle_local_proof(
@@ -212,7 +207,7 @@ impl QuorumStoreWrapper {
     pub(crate) async fn handle_consensus_request(&mut self, msg: WrapperCommand) {
         match msg {
             // TODO: check what max_block_size consensus is using
-            WrapperCommand::GetBlockRequest(max_block_size, filter, callback) => {
+            WrapperCommand::GetBlockRequest(round, max_block_size, filter, callback) => {
                 // TODO: Pass along to batch_store
                 let excluded_proofs: HashSet<HashValue> = match filter {
                     PayloadFilter::Empty => HashSet::new(),
@@ -223,14 +218,20 @@ impl QuorumStoreWrapper {
                 };
 
                 let mut proof_block = Vec::new();
+                let mut expired = Vec::new();
                 for proof in self.proofs_for_consensus.values() {
                     if proof_block.len() == max_block_size as usize {
                         break;
                     }
-                    if excluded_proofs.contains(proof.digest()) {
-                        continue;
+
+                    if proof.expiration() < LogicalTime::new(self.latest_logical_time.epoch(), round){
+                        expired.push(proof.digest().clone());
+                    } else  if !excluded_proofs.contains(proof.digest()) {
+                        proof_block.push(proof.clone());
                     }
-                    proof_block.push(proof.clone());
+                }
+                for digest in expired {
+                    self.proofs_for_consensus.remove(&digest);
                 }
                 let res = ConsensusResponse::GetBlockResponse(if proof_block.is_empty() {
                     Payload::new_empty()
@@ -248,6 +249,9 @@ impl QuorumStoreWrapper {
             }
             WrapperCommand::CleanRequest(logical_time, digests) => {
                 debug!("QS: got clean request from execution");
+                assert_eq!(self.latest_logical_time.epoch(),
+                    logical_time.epoch(),
+                    "Wrong epoch");
                 assert!(
                     self.latest_logical_time < logical_time,
                     "Non-increasing logical time"
@@ -262,8 +266,7 @@ impl QuorumStoreWrapper {
                         );
                     }
                 }
-                let expired_digests = self.proof_expirations.expire(logical_time.round());
-                for digest in digests.into_iter().chain(expired_digests.into_iter()) {
+                for digest in digests {
                     if self.proofs_for_consensus.remove(&digest).is_some() {
                         debug!(
                             "QS: removed digest {} from batches_for_consensus, new size {}",
