@@ -51,6 +51,7 @@ impl IncrementalBatchState {
     }
 }
 
+// TODO: also apply this to num_bytes violating the maximum constraint (rename).
 /// Enum that determines how BatchAggregator handles missing fragments in the stream.
 /// For streams arriving on the network, it makes sense to be best effort, while for
 /// own stream, we assert that the fragments are in expected order.
@@ -92,12 +93,17 @@ impl BatchAggregator {
         }
     }
 
+    // Should only be called with a non-outdated fragment.
     fn missed_fragment(&self, batch_id: BatchId, fragment_id: usize) -> bool {
         match self.batch_id {
             Some(self_batch_id) => {
                 if batch_id > self_batch_id {
                     self.batch_state.is_some() || fragment_id > 0
                 } else {
+                    assert!(
+                        batch_id == self_batch_id,
+                        "Missed fragment called with an outdated fragment"
+                    );
                     fragment_id > self.next_fragment_id()
                 }
             }
@@ -117,22 +123,22 @@ impl BatchAggregator {
         fragment_id: usize,
         transactions: Data,
     ) -> bool {
-        let outdated_fragment = self.outdated_fragment(batch_id, fragment_id);
-        let missed_fragment = self.missed_fragment(batch_id, fragment_id);
-
-        match self.mode {
-            AggregationMode::AssertWrongOrder => {
-                assert!(
-                    !outdated_fragment && !missed_fragment,
-                    "Wrong batch / fragment ID"
-                )
-            }
-            AggregationMode::IgnoreWrongOrder => {
-                if outdated_fragment {
-                    // Replay or batch / fragment received out of order - ignore.
+        if self.outdated_fragment(batch_id, fragment_id) {
+            match self.mode {
+                // Replay or batch / fragment received out of order.
+                AggregationMode::AssertWrongOrder => panic!("Outdated batch / fragment ID"),
+                AggregationMode::IgnoreWrongOrder => {
                     return false;
                 }
+            }
+        }
 
+        let missed_fragment = self.missed_fragment(batch_id, fragment_id);
+        match self.mode {
+            AggregationMode::AssertWrongOrder => {
+                assert!(!missed_fragment, "Wrong batch / fragment ID")
+            }
+            AggregationMode::IgnoreWrongOrder => {
                 if missed_fragment {
                     // If we started receiving a new batch, allow aggregating it by
                     // clearing the state. Otherwise, when some fragment is skipped

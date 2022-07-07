@@ -6,15 +6,14 @@ use crate::network_interface::ConsensusMsg;
 use crate::quorum_store::{
     counters,
     quorum_store::{QuorumStoreCommand, QuorumStoreError},
-    types::{BatchId, Data, TxnData},
-    utils::{MempoolProxy, RoundExpirations},
+    types::{BatchId, Data},
+    utils::{BatchBuilder, MempoolProxy, RoundExpirations},
 };
 use crate::round_manager::VerifiedEvent;
-use aptos_crypto::{hash::DefaultHasher, HashValue};
+use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_types::{transaction::SignedTransaction, PeerId};
-use bcs::to_bytes;
+use aptos_types::PeerId;
 use channel::aptos_channel;
 use consensus_types::{
     common::TransactionSummary,
@@ -33,73 +32,11 @@ use futures::{
 };
 use std::{
     collections::{HashMap, HashSet},
-    mem,
     time::{Duration, Instant},
 };
 use tokio::{sync::mpsc::Sender as TokioSender, time};
 
 type ProofReceiveChannel = oneshot::Receiver<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
-
-struct BatchBuilder {
-    id: BatchId,
-    summaries: Vec<TransactionSummary>,
-    num_bytes: usize,
-    max_bytes: usize,
-}
-
-impl BatchBuilder {
-    pub fn new(batch_id: BatchId, max_bytes: usize) -> Self {
-        Self {
-            id: batch_id,
-            summaries: Vec::new(),
-            num_bytes: 0,
-            max_bytes,
-        }
-    }
-
-    pub fn append_transaction(&mut self, txn: &SignedTransaction) -> Option<TxnData> {
-        let bytes = to_bytes(&txn).unwrap();
-
-        if self.num_bytes + bytes.len() > self.max_bytes {
-            None
-        } else {
-            self.summaries.push(TransactionSummary {
-                sender: txn.sender(),
-                sequence_number: txn.sequence_number(),
-            });
-            self.num_bytes = self.num_bytes + bytes.len();
-
-            let mut hasher = DefaultHasher::new(b"TxnData");
-            hasher.update(&bytes);
-            Some(TxnData {
-                txn_bytes: bytes,
-                hash: hasher.finish(),
-            })
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.summaries.is_empty()
-    }
-
-    pub fn batch_id(&self) -> BatchId {
-        self.id
-    }
-
-    /// Clears the state, increments (batch) id.
-    pub fn take_batch(&mut self) -> Vec<TransactionSummary> {
-        self.id = self.id + 1;
-        self.num_bytes = 0;
-        mem::take(&mut self.summaries)
-    }
-
-    pub fn cloned_summaries(&self) -> Vec<TransactionSummary> {
-        self.summaries.clone()
-    }
-}
-
-// batch_in_progress: Vec<TransactionSummary>,
-// bytes_in_progress: usize,
 
 // TODO: Consider storing batches and retrying upon QuorumStoreError:Timeout
 #[allow(dead_code)]
@@ -110,10 +47,8 @@ pub struct QuorumStoreWrapper {
     batch_expirations: RoundExpirations<BatchId>,
     batch_builder: BatchBuilder,
     latest_logical_time: LogicalTime,
-    proofs_for_consensus: HashMap<HashValue, ProofOfStore>,
     // TODO: use expiration priority queue as well
-    // TODO: store all ProofOfStore (created locally, and received via broadcast)
-    // TODO: need to be notified of ProofOfStore's that were committed
+    proofs_for_consensus: HashMap<HashValue, ProofOfStore>,
     mempool_txn_pull_max_count: u64,
     // For ensuring that batch size does not exceed QuorumStore limit.
     quorum_store_max_batch_bytes: u64,
@@ -160,20 +95,20 @@ impl QuorumStoreWrapper {
             .unwrap();
 
         let mut end_batch = false;
-        let mut txns_data = Vec::new();
 
         // TODO: pass TxnData to QuorumStore to save extra serialization.
+        // TODO: clean up this disgusting code below.
         let mut pulled_txns_cloned = pulled_txns.clone();
+        let mut num_pulled = 0;
         for txn in pulled_txns {
-            match self.batch_builder.append_transaction(&txn) {
-                Some(data) => txns_data.push(data),
-                None => {
-                    end_batch = true;
-                    break;
-                }
+            if !self.batch_builder.append_transaction(&txn) {
+                end_batch = true;
+                break;
+            } else {
+                num_pulled = num_pulled + 1;
             }
         }
-        let txns: Data = pulled_txns_cloned.drain(0..txns_data.len()).collect();
+        let txns: Data = pulled_txns_cloned.drain(0..num_pulled).collect();
 
         // TODO: config param for timeout
         if self.last_end_batch_time.elapsed().as_millis() > 500 {
@@ -210,7 +145,7 @@ impl QuorumStoreWrapper {
                 .expect("could not send to QuorumStore");
 
             self.batches_in_progress
-                .insert(batch_id, self.batch_builder.take_batch());
+                .insert(batch_id, self.batch_builder.take_batch().0);
             self.batch_expirations.add_item(batch_id, expiry_round);
 
             Some(proof_rx)

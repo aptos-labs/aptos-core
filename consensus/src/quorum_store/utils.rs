@@ -1,10 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::HashValue;
+use crate::quorum_store::types::{BatchId, TxnData};
+use aptos_crypto::{hash::DefaultHasher, HashValue};
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_metrics_core::monitor;
 use aptos_types::transaction::SignedTransaction;
+use bcs::to_bytes;
 use chrono::Utc;
 use consensus_types::common::{Round, TransactionSummary};
 use futures::channel::{mpsc::Sender, oneshot};
@@ -12,9 +14,74 @@ use std::{
     cmp::Reverse,
     collections::{BinaryHeap, HashSet, VecDeque},
     hash::Hash,
+    mem,
     time::Duration,
 };
 use tokio::time::timeout;
+
+pub(crate) struct BatchBuilder {
+    id: BatchId,
+    summaries: Vec<TransactionSummary>,
+    data: Vec<TxnData>,
+    num_bytes: usize,
+    max_bytes: usize,
+}
+
+impl BatchBuilder {
+    pub(crate) fn new(batch_id: BatchId, max_bytes: usize) -> Self {
+        Self {
+            id: batch_id,
+            summaries: Vec::new(),
+            data: Vec::new(),
+            num_bytes: 0,
+            max_bytes,
+        }
+    }
+
+    pub(crate) fn append_transaction(&mut self, txn: &SignedTransaction) -> bool {
+        let bytes = to_bytes(&txn).unwrap();
+
+        if self.num_bytes + bytes.len() <= self.max_bytes {
+            self.summaries.push(TransactionSummary {
+                sender: txn.sender(),
+                sequence_number: txn.sequence_number(),
+            });
+            self.num_bytes = self.num_bytes + bytes.len();
+
+            // TODO: check if hashing per txn is too costly (hopefully not as hashes are
+            // associated with txns later in the process). Also, potentially parallelize.
+            // Then, we should also probably parallelize incoming digest computation.
+            let mut hasher = DefaultHasher::new(b"TxnData");
+            hasher.update(&bytes);
+            self.data.push(TxnData {
+                txn_bytes: bytes,
+                hash: hasher.finish(),
+            });
+            true
+        } else {
+            false
+        }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.summaries.is_empty()
+    }
+
+    pub(crate) fn batch_id(&self) -> BatchId {
+        self.id
+    }
+
+    /// Clears the state, increments (batch) id.
+    pub(crate) fn take_batch(&mut self) -> (Vec<TransactionSummary>, Vec<TxnData>) {
+        self.id = self.id + 1;
+        self.num_bytes = 0;
+        (mem::take(&mut self.summaries), mem::take(&mut self.data))
+    }
+
+    pub(crate) fn cloned_summaries(&self) -> Vec<TransactionSummary> {
+        self.summaries.clone()
+    }
+}
 
 pub(crate) struct DigestTimeouts {
     timeouts: VecDeque<(i64, HashValue)>,

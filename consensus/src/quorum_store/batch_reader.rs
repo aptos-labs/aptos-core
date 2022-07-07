@@ -49,8 +49,7 @@ pub(crate) enum BatchReaderCommand {
 }
 
 #[derive(PartialEq)]
-enum StorageKind {
-    MemoryOnly,
+enum StorageMode {
     PersistedOnly,
     MemoryAndPersisted,
 }
@@ -73,35 +72,36 @@ impl QuotaManager {
         }
     }
 
-    pub(crate) fn update_quota(&mut self, num_bytes: usize) -> anyhow::Result<StorageKind> {
+    pub(crate) fn update_quota(&mut self, num_bytes: usize) -> anyhow::Result<StorageMode> {
         if self.memory_balance + num_bytes <= self.memory_quota {
             self.memory_balance = self.memory_balance + num_bytes;
             self.db_balance = self.db_balance + num_bytes;
-            Ok(StorageKind::MemoryAndPersisted)
+            Ok(StorageMode::MemoryAndPersisted)
         } else if self.db_balance + num_bytes <= self.db_quota {
             self.db_balance = self.db_balance + num_bytes;
-            Ok(StorageKind::PersistedOnly)
+            Ok(StorageMode::PersistedOnly)
         } else {
             bail!("Storage quota exceeded ");
         }
     }
 
-    pub(crate) fn free_quota(&mut self, num_bytes: usize, store_kind: StorageKind) {
-        match store_kind {
-            StorageKind::MemoryOnly => {
-                // MemoryOnly is used to cache data requested by execution compute for
-                // the later use by execution commit. As it is already part of the blocks
-                // agreed by consensus, the quote is not charged to anyone.
-                unreachable!("MemoryOnly quota charged to a peer (must be free)");
-            }
-            StorageKind::PersistedOnly => {
+    pub(crate) fn free_quota(&mut self, num_bytes: usize, storage_mode: StorageMode) {
+        match storage_mode {
+            StorageMode::PersistedOnly => {
                 self.db_balance = self.db_balance - num_bytes;
             }
-            StorageKind::MemoryAndPersisted => {
+            StorageMode::MemoryAndPersisted => {
                 self.memory_balance = self.memory_balance - num_bytes;
                 self.db_balance = self.db_balance - num_bytes;
             }
         }
+    }
+}
+
+fn payload_storage_mode(persisted_value: &PersistedValue) -> StorageMode {
+    match persisted_value.maybe_payload {
+        Some(_) => StorageMode::MemoryAndPersisted,
+        None => StorageMode::PersistedOnly,
     }
 }
 
@@ -111,7 +111,7 @@ pub struct BatchReader {
     epoch: OnceCell<u64>,
     my_peer_id: PeerId,
     last_committed_round: AtomicU64,
-    db_cache: DashMap<HashValue, (PersistedValue, StorageKind)>,
+    db_cache: DashMap<HashValue, PersistedValue>,
     peer_quota: DashMap<PeerId, QuotaManager>,
     expirations: Mutex<RoundExpirations<HashValue>>,
     batch_store_tx: Sender<BatchStoreCommand>,
@@ -176,14 +176,13 @@ impl BatchReader {
             .peer_quota
             .entry(author)
             .or_insert(QuotaManager::new(self.db_quota, self.memory_quota));
-        let store_kind = quota_manager.update_quota(value.num_bytes)?;
-        if store_kind == StorageKind::PersistedOnly {
+        if quota_manager.update_quota(value.num_bytes)? == StorageMode::PersistedOnly {
             value.remove_payload();
         }
 
         let expiration_round = value.expiration.round();
-        if let Some((prev_value, prev_kind)) = self.db_cache.insert(digest, (value, store_kind)) {
-            self.free_quota(prev_value, prev_kind);
+        if let Some(prev_value) = self.db_cache.insert(digest, value) {
+            self.free_quota(prev_value);
         }
         self.expirations
             .lock()
@@ -198,7 +197,7 @@ impl BatchReader {
             && value.expiration.round() <= self.last_committed_round() + MAX_BATCH_EXPIRY_ROUND_GAP
         {
             if let Some(entry) = self.db_cache.get(&digest) {
-                if entry.0.expiration.round() >= value.expiration.round() {
+                if entry.expiration.round() >= value.expiration.round() {
                     debug!("QS: already have the digest with higher expiration");
                     return Ok(false);
                 }
@@ -235,15 +234,18 @@ impl BatchReader {
                     .db_cache
                     .get(&h)
                     .expect("Expired entry not in cache")
-                    .0 // PersistedValue
                     .expiration
                     .round();
+
+                // We need to check up-to-date expiration again because receiving the same
+                // digest with a higher expiration would update the persisted value and
+                // effectively extend the expiration.
                 if cache_expiration_round <= expired_round {
-                    let (_, (persisted_value, store_kind)) = self
+                    let (_, persisted_value) = self
                         .db_cache
                         .remove(&h)
                         .expect("Expired entry not in cache");
-                    self.free_quota(persisted_value, store_kind);
+                    self.free_quota(persisted_value);
                     Some(h)
                 } else {
                     None
@@ -253,19 +255,15 @@ impl BatchReader {
             .collect()
     }
 
-    fn free_quota(&self, persisted_value: PersistedValue, store_kind: StorageKind) {
-        if store_kind != StorageKind::MemoryOnly {
-            let mut quota_manager = self
-                .peer_quota
-                .get_mut(&persisted_value.author)
-                .expect("No QuotaManager for batch author");
-            assert_eq!(
-                persisted_value.maybe_payload.is_some(),
-                store_kind == StorageKind::MemoryAndPersisted,
-                "BatchReader payload and storage kind mismatch"
-            );
-            quota_manager.free_quota(persisted_value.num_bytes, store_kind);
-        }
+    fn free_quota(&self, persisted_value: PersistedValue) {
+        let mut quota_manager = self
+            .peer_quota
+            .get_mut(&persisted_value.author)
+            .expect("No QuotaManager for batch author");
+        quota_manager.free_quota(
+            persisted_value.num_bytes,
+            payload_storage_mode(&persisted_value),
+        );
     }
 
     // TODO: maybe check the epoch to stop communicating on epoch change.
@@ -296,11 +294,8 @@ impl BatchReader {
     pub async fn get_batch(&self, proof: ProofOfStore) -> oneshot::Receiver<Result<Data, Error>> {
         let (tx, rx) = oneshot::channel();
 
-        if let Some(entry) = self.db_cache.get(&proof.digest()) {
-            let value = &entry.0;
-            let store_kind = &entry.1;
-
-            if *store_kind == StorageKind::PersistedOnly {
+        if let Some(value) = self.db_cache.get(&proof.digest()) {
+            if payload_storage_mode(&value) == StorageMode::PersistedOnly {
                 assert!(
                     value.maybe_payload.is_none(),
                     "BatchReader payload and storage kind mismatch"
@@ -345,6 +340,7 @@ impl BatchReader {
             network_sender.clone(),
         );
 
+        // TODO: experiment / decide on the parameter for generating the interval duration (i.e. "/2").
         let mut interval = time::interval(Duration::from_millis((request_timeout_ms / 2) as u64));
 
         loop {
@@ -359,18 +355,18 @@ impl BatchReader {
                 Some(cmd) = batch_reader_rx.recv() => {
                     match cmd {
             BatchReaderCommand::GetBatchForPeer(digest, peer_id) => {
-                if let Some(entry) = self.db_cache.get(&digest) {
-                    let value = &entry.0;
-            let store_kind = &entry.1;
+                if let Some(value) = self.db_cache.get(&digest) {
 
-                if *store_kind == StorageKind::PersistedOnly {
+            match payload_storage_mode(&value) {
+                StorageMode::PersistedOnly => {
                     assert!(value.maybe_payload.is_none(),
                                             "BatchReader payload and storage kind mismatch");
                     self.batch_store_tx
                     .send(BatchStoreCommand::BatchRequest(digest, peer_id, None))
                     .await
                     .expect("Failed to send to BatchStore");
-                } else {
+                },
+            StorageMode::MemoryAndPersisted => {
                     let batch = Batch::new(
                     self.epoch(),
                     self.my_peer_id,
@@ -378,8 +374,9 @@ impl BatchReader {
                     Some(value.maybe_payload.clone().expect("BatchReader payload and storage kind mismatch")),
                     );
                     let msg = ConsensusMsg::BatchMsg(Box::new(batch));
-                    network_sender.send(msg, vec![peer_id]).await;
-                } // TODO: consider returning Nack
+                network_sender.send(msg, vec![peer_id]).await;
+            }
+                    } // TODO: consider returning Nack
                 }
             }
                         BatchReaderCommand::GetBatchForSelf(proof, ret_tx) => {

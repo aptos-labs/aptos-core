@@ -25,7 +25,7 @@ use consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock
 use executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
 use fail::fail_point;
 use futures::{SinkExt, StreamExt};
-use std::{boxed::Box, sync::Arc};
+use std::{boxed::Box, cmp::max, sync::Arc};
 
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
@@ -167,12 +167,8 @@ impl StateComputer for ExecutionProxy {
             txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));
             reconfig_events.extend(block.reconfig_event());
 
-            if block.epoch() > latest_epoch {
-                latest_epoch = block.epoch();
-            }
-            if block.round() > latest_round {
-                latest_round = block.round();
-            }
+            latest_epoch = max(latest_epoch, block.epoch());
+            latest_round = max(latest_round, block.round());
         }
 
         monitor!(
