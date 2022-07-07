@@ -50,6 +50,7 @@ Rails.application.routes.draw do
   get 'nft-nyc', to: 'nft_nyc#show'
 
   get 'leaderboard/it1', to: redirect('/it1')
+  get 'leaderboard/it2', to: 'leaderboard#it2'
 
   get 'it1', to: 'leaderboard#it1'
   root 'static_page#community'
