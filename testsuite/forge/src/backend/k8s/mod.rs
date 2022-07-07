@@ -100,7 +100,8 @@ impl Factory for K8sFactory {
         // create the forge-management configmap before installing anything
         create_management_configmap(self.kube_namespace.clone(), self.keep).await?;
 
-        let (_era, validators, fullnodes) = install_testnet_resources(
+        // try installing testnet resources, but clean up if it fails
+        let (_era, validators, fullnodes) = match install_testnet_resources(
             self.kube_namespace.clone(),
             node_num.get(),
             format!("{}", init_version),
@@ -108,7 +109,14 @@ impl Factory for K8sFactory {
             genesis_modules_path,
             self.use_port_forward,
         )
-        .await?;
+        .await
+        {
+            Ok(res) => res,
+            Err(e) => {
+                uninstall_testnet_resources(self.kube_namespace.clone()).await?;
+                bail!(e);
+            }
+        };
 
         let swarm = K8sSwarm::new(
             &self.root_key,
