@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::{check_network, handle_request, strip_hex_prefix, with_context},
+    common::{check_network, get_block_index_from_request, handle_request, with_context},
     error::{ApiError, ApiResult},
     types::{Block, BlockIdentifier, BlockRequest, BlockResponse, Transaction},
     RosettaContext,
 };
-use aptos_crypto::HashValue;
 use aptos_logger::{debug, trace};
-use std::str::FromStr;
 use warp::Filter;
 
 /// The year 2000 in seconds, as this is the lower limit for Rosetta API implementations
@@ -42,46 +40,17 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
     check_network(request.network_identifier, &server_context)?;
 
     let rest_client = server_context.rest_client()?;
+    let block_size = server_context.block_size;
 
     // Retrieve by block or by hash, both or neither is not allowed
+    let block_index =
+        get_block_index_from_request(rest_client, Some(request.block_identifier), block_size)
+            .await?;
+
     let (parent_transaction, transactions): (
         aptos_rest_client::Transaction,
         Vec<aptos_rest_client::Transaction>,
-    ) = match (
-        &request.block_identifier.index,
-        &request.block_identifier.hash,
-    ) {
-        // By index
-        (Some(block_index), None) => {
-            get_block_by_index(rest_client, server_context.block_size, *block_index).await?
-        }
-        // By hash
-        (None, Some(hash)) => {
-            // Allow 0x in front of hash
-            let hash = HashValue::from_str(strip_hex_prefix(hash))
-                .map_err(|err| ApiError::DeserializationFailed(Some(err.to_string())))?;
-            let response = rest_client.get_transaction(hash).await?;
-
-            // If there is no version, then it's a pending transaction
-            if let Some(version) = response.inner().version() {
-                let block_index = version_to_block_index(server_context.block_size, version);
-                get_block_by_index(rest_client, server_context.block_size, block_index).await?
-            } else {
-                return Err(ApiError::BlockIncomplete);
-            }
-        }
-        // Get current version
-        (None, None) => {
-            let response = rest_client.get_ledger_information().await?;
-            let version = response.state().version;
-
-            // The current version won't be a full block, so we have to go one before it
-            let block_index = version_to_block_index(server_context.block_size, version) - 1;
-
-            get_block_by_index(rest_client, server_context.block_size, block_index).await?
-        }
-        (_, _) => return Err(ApiError::BlockParameterConflict),
-    };
+    ) = get_block_by_index(rest_client, block_size, block_index).await?;
 
     let block = build_block(server_context, parent_transaction, transactions).await?;
 
