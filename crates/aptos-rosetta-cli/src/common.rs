@@ -28,11 +28,12 @@ pub enum RosettaCliArgs {
 
 impl RosettaCliArgs {
     pub async fn execute(self) -> anyhow::Result<String> {
+        use RosettaCliArgs::*;
         match self {
-            RosettaCliArgs::Account(inner) => inner.execute().await,
-            RosettaCliArgs::Block(inner) => inner.execute().await,
-            RosettaCliArgs::Construction(inner) => inner.execute().await,
-            RosettaCliArgs::Network(inner) => inner.execute().await,
+            Account(inner) => inner.execute().await,
+            Block(inner) => inner.execute().await,
+            Construction(inner) => inner.execute().await,
+            Network(inner) => inner.execute().await,
         }
     }
 }
@@ -50,6 +51,7 @@ pub struct UrlArgs {
 }
 
 impl UrlArgs {
+    /// Retrieve a [`RosettaClient`]
     pub fn client(self) -> RosettaClient {
         RosettaClient::new(self.rosetta_api_url)
     }
@@ -80,10 +82,13 @@ pub struct ErrorWrapper {
     pub error: String,
 }
 
+/// Arguments for requesting a block
 #[derive(Debug, Parser)]
 pub struct BlockArgs {
+    /// The index of the block to request
     #[clap(long)]
     block_index: Option<u64>,
+    /// The hash of the block to request
     #[clap(long)]
     block_hash: Option<String>,
 }
