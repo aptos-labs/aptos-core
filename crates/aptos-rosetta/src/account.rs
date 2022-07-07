@@ -11,15 +11,15 @@ use crate::{
     common::{check_network, handle_request, with_context},
     error::{ApiError, ApiResult},
     types::{
-        AccountBalanceRequest, AccountBalanceResponse, Amount, BlockIdentifier, Currency,
-        PartialBlockIdentifier,
+        coin_identifier, coin_store_identifier, AccountBalanceRequest, AccountBalanceResponse,
+        Amount, BlockIdentifier, Currency, PartialBlockIdentifier,
     },
     RosettaContext,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, trace};
 use aptos_rest_client::{aptos::Balance, aptos_api_types::U64};
-use aptos_sdk::move_types::{identifier::Identifier, language_storage::TypeTag};
+use aptos_sdk::move_types::language_storage::TypeTag;
 use aptos_types::account_address::AccountAddress;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use serde::{Deserialize, Serialize};
@@ -129,6 +129,7 @@ async fn account_balance(
     })
 }
 
+/// Determines which block to pull for the request
 async fn get_block_index_from_request(
     rest_client: &aptos_rest_client::Client,
     partial_block_identifier: Option<PartialBlockIdentifier>,
@@ -141,10 +142,12 @@ async fn get_block_index_from_request(
         }) => {
             return Err(ApiError::BlockParameterConflict);
         }
+        // Lookup by block index
         Some(PartialBlockIdentifier {
             index: Some(block_index),
             hash: None,
         }) => block_index,
+        // Lookup by block hash
         Some(PartialBlockIdentifier {
             index: None,
             hash: Some(hash),
@@ -176,6 +179,7 @@ async fn get_block_index_from_request(
                 }
             }
         }
+        // Lookup latest version
         _ => {
             let response = rest_client.get_ledger_information().await?;
             let state = response.state();
@@ -184,34 +188,36 @@ async fn get_block_index_from_request(
     })
 }
 
+/// Retrieve the balances for an account
 async fn get_balances(
     rest_client: &aptos_rest_client::Client,
     address: AccountAddress,
     version: u64,
 ) -> ApiResult<HashMap<TypeTag, Balance>> {
-    // TOOD: Handle non not found errors
+    // TODO: Handle non not found errors
     if let Ok(response) = rest_client
         .get_account_resources_at_version(address, version)
         .await
     {
-        let resources = response.inner();
-        let coin_identifier = Identifier::new("Coin").unwrap();
-        let coinstore_identifier = Identifier::new("CoinStore").unwrap();
-
         // Retrieve balances
-        Ok(resources
+        Ok(response
+            .inner()
             .iter()
             .filter(|resource| {
                 resource.resource_type.address == AccountAddress::ONE
-                    && resource.resource_type.module == coin_identifier
-                    && resource.resource_type.name == coinstore_identifier
+                    && resource.resource_type.module == coin_identifier()
+                    && resource.resource_type.name == coin_store_identifier()
             })
             .filter_map(|resource| {
-                // Coin must have a type
-                let coin = resource.resource_type.type_params.first().unwrap();
-                match serde_json::from_value::<Balance>(resource.data.clone()) {
-                    Ok(resource) => Some((coin.clone(), resource)),
-                    Err(_) => None,
+                // Currency must have a type
+                if let Some(coin_type) = resource.resource_type.type_params.first() {
+                    match serde_json::from_value::<Balance>(resource.data.clone()) {
+                        Ok(resource) => Some((coin_type.clone(), resource)),
+                        Err(_) => None,
+                    }
+                } else {
+                    // Skip currencies that don't match
+                    None
                 }
             })
             .collect())
@@ -220,6 +226,7 @@ async fn get_balances(
     }
 }
 
+/// A cache for currencies, so we don't have to keep looking up the status of it
 #[derive(Debug)]
 pub struct CoinCache {
     currencies: RwLock<HashMap<TypeTag, Option<Currency>>>,
