@@ -101,12 +101,14 @@ module AptosFramework::Block {
             }
         );
 
+        // Update performance score after potential reconfigure, which resets all performance scores.
+        // This has to happen before the epoch transition as the transaction that triggers the transition
+        // is the last the last in the previous epoch.
+        Stake::update_performance_statistics(missed_votes);
+
         if (timestamp - Reconfiguration::last_reconfiguration_time() > block_metadata_ref.epoch_internal) {
             Reconfiguration::reconfigure();
         };
-
-        // Update performance score after potential reconfigure, which resets all performance scores.
-        Stake::update_performance_statistics(missed_votes);
     }
 
     /// Get the current block height
