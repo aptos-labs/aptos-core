@@ -5,7 +5,7 @@ use crate::{
     evaluators::{
         direct::{
             get_node_identity, LatencyEvaluatorArgs, NodeIdentityEvaluatorArgs, TpsEvaluatorArgs,
-            TransactionPresenceEvaluatorArgs,
+            TransactionAvailabilityEvaluatorArgs,
         },
         metrics::{
             ConsensusProposalsEvaluatorArgs, ConsensusRoundEvaluatorArgs,
@@ -18,11 +18,13 @@ use crate::{
 };
 use anyhow::{bail, format_err, Result};
 use aptos_config::config::RoleType;
+use aptos_rest_client::Client as AptosRestClient;
 use aptos_sdk::types::chain_id::ChainId;
 use clap::Parser;
 use once_cell::sync::Lazy;
 use poem_openapi::{types::Example, Object as PoemObject};
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use url::Url;
 
 pub const DEFAULT_METRICS_PORT: u16 = 9101;
@@ -87,14 +89,12 @@ pub struct NodeConfiguration {
 // It'd be better to have an enum with two variants, e.g. unfetched and fetched.
 impl NodeConfiguration {
     /// Only call this after fetch_additional_configuration has been called.
-    #[allow(dead_code)]
     pub fn get_chain_id(&self) -> ChainId {
         self.chain_id
             .expect("get_chain_id called before fetch_additional_configuration")
     }
 
     /// Only call this after fetch_additional_configuration has been called.
-    #[allow(dead_code)]
     pub fn get_role_type(&self) -> RoleType {
         self.role_type
             .expect("get_role_type called before fetch_additional_configuration")
@@ -105,12 +105,14 @@ impl NodeConfiguration {
     /// match up. If they're not set, we set them using the values we find.
     pub async fn fetch_additional_configuration(&mut self) -> Result<()> {
         let (reported_chain_id, reported_role_type) =
-            get_node_identity(&self.node_address).await.map_err(|e| {
-                format_err!(
+            get_node_identity(&self.node_address, Duration::from_secs(5))
+                .await
+                .map_err(|e| {
+                    format_err!(
                     "Failed to fetch chain ID and role type for baseline node configuration: {}",
                     e
                 )
-            })?;
+                })?;
         if let Some(configured_chain_id) = self.chain_id {
             if configured_chain_id != reported_chain_id {
                 bail!("Chain ID mismatch: The baseline configuration {} says the chain ID is {} but the node reports chain ID {}", self.configuration_name, configured_chain_id, reported_chain_id);
@@ -161,7 +163,7 @@ pub struct EvaluatorArgs {
     pub tps_args: TpsEvaluatorArgs,
 
     #[clap(flatten)]
-    pub transaction_presence_args: TransactionPresenceEvaluatorArgs,
+    pub transaction_availability_args: TransactionAvailabilityEvaluatorArgs,
 }
 
 #[derive(Clone, Debug, Deserialize, Parser, PoemObject, Serialize)]
@@ -214,6 +216,15 @@ impl NodeAddress {
         let mut url = self.url.clone();
         url.set_port(Some(self.api_port)).unwrap();
         url
+    }
+
+    pub fn get_api_client(&self, timeout: Duration) -> AptosRestClient {
+        let client = reqwest::ClientBuilder::new()
+            .timeout(timeout)
+            .build()
+            .unwrap();
+
+        AptosRestClient::from((client, self.get_api_url()))
     }
 }
 

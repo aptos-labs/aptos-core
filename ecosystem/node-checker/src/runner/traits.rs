@@ -21,6 +21,9 @@ pub enum RunnerError {
     #[error("Failed to evaluate API: {0}")]
     ApiEvaluatorError(#[from] ApiEvaluatorError),
 
+    #[error("Data was missing from the baseline node: {0}")]
+    BaselineMissingDataError(Error),
+
     /// We failed to collect metrics for some reason.
     #[error("Failed to collect metrics: {0}")]
     MetricCollectorError(#[from] MetricCollectorError),

@@ -241,6 +241,7 @@ name = "aptos-api-types"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "aptos-config",
  "aptos-crypto",
  "aptos-state-view",
  "aptos-transaction-builder",
