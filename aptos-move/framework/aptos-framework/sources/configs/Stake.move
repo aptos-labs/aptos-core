@@ -646,8 +646,12 @@ module AptosFramework::Stake {
         let len = Vector::length(&missed_votes);
         while (i < len) {
             let validator_index = *Vector::borrow(&missed_votes, i);
-            let missed_votes_count = Vector::borrow_mut(validator_missed_votes_counts, validator_index);
-            *missed_votes_count = *missed_votes_count + 1;
+            // Skip any validator indices that are out of bounds, this ensures that this function doesn't abort if there
+            // are out of bounds errors.
+            if (validator_index < Vector::length(validator_missed_votes_counts)) {
+                let missed_votes_count = Vector::borrow_mut(validator_missed_votes_counts, validator_index);
+                *missed_votes_count = *missed_votes_count + 1;
+            };
             i = i + 1;
         };
         validator_perf.num_blocks = validator_perf.num_blocks + 1;
