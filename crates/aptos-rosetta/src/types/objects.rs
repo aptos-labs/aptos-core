@@ -1,6 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+//! Objects of the Rosetta spec
+//!
+//! [Spec](https://www.rosetta-api.org/docs/api_objects.html)
+
 use crate::{
     common::{is_native_coin, native_coin},
     error::ApiResult,
@@ -15,7 +19,6 @@ use crate::{
 };
 use anyhow::anyhow;
 use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
-use aptos_logger::info;
 use aptos_rest_client::{
     aptos::Balance,
     aptos_api_types::{WriteSetChange, U64},
@@ -401,12 +404,6 @@ impl Transaction {
             StateCheckpointTransaction(txn) => (None, txn.info, vec![]),
         };
 
-        info!(
-            "TRANSACTION: \n====\nTransaction: {}\n---\n Events: {}",
-            serde_json::to_string_pretty(&txn_info).unwrap(),
-            serde_json::to_string_pretty(&events).unwrap()
-        );
-
         let mut operations = vec![];
         let mut operation_index: u64 = 0;
         let status = if txn_info.success {
@@ -655,6 +652,7 @@ impl Transaction {
     }
 }
 
+/// An enum for processing which operation is in a transaction
 pub enum OperationDetails {
     CreateAccount,
     CreateCoin {
@@ -669,6 +667,8 @@ pub enum OperationDetails {
     },
 }
 
+/// A holder for all information related to a specific transaction
+/// built from [`Operation`]s
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum InternalOperation {
     CreateAccount(CreateAccount),
@@ -676,6 +676,7 @@ pub enum InternalOperation {
 }
 
 impl InternalOperation {
+    /// Pulls the [`InternalOperation`] from the set of [`Operation`]
     pub fn extract(operations: &Vec<Operation>) -> ApiResult<InternalOperation> {
         match operations.len() {
             1 => {
@@ -699,6 +700,7 @@ impl InternalOperation {
         }
     }
 
+    /// The sender of the transaction
     pub fn sender(&self) -> AccountAddress {
         match self {
             Self::CreateAccount(inner) => inner.sender,
@@ -707,12 +709,14 @@ impl InternalOperation {
     }
 }
 
+/// Operation to create an account
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CreateAccount {
     pub sender: AccountAddress,
     pub new_account: AccountAddress,
 }
 
+/// Operation to transfer coins between accounts
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Transfer {
     pub sender: AccountAddress,

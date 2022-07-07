@@ -3,7 +3,7 @@
 
 use crate::{
     error::{ApiError, ApiResult},
-    types::{Currency, NetworkIdentifier},
+    types::{Currency, MetadataRequest, NetworkIdentifier},
     RosettaContext,
 };
 use aptos_crypto::{ValidCryptoMaterial, ValidCryptoMaterialStringExt};
@@ -40,11 +40,9 @@ pub fn with_context(
     warp::any().map(move || context.clone())
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
-pub struct EmptyRequest;
-
-pub fn with_empty_request() -> impl Filter<Extract = (EmptyRequest,), Error = Infallible> + Clone {
-    warp::any().map(move || EmptyRequest)
+pub fn with_empty_request() -> impl Filter<Extract = (MetadataRequest,), Error = Infallible> + Clone
+{
+    warp::any().map(move || MetadataRequest {})
 }
 
 /// Handles a generic request to warp

@@ -77,6 +77,7 @@ pub struct Version {
     pub middleware_version: String,
 }
 
+/// An internal enum to support Operation typing
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum OperationType {
     CreateAccount,
@@ -124,9 +125,12 @@ impl Display for OperationType {
     }
 }
 
+/// An internal type to support typing of Operation statuses
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum OperationStatusType {
+    /// Operation was part of a successfully committed transaction
     Success,
+    /// Operation was not part of a successfully committed transaction
     Failure,
 }
 

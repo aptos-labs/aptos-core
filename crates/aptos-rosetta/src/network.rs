@@ -3,14 +3,11 @@
 
 use crate::{
     block::{block_index_to_version, version_to_block_index},
-    common::{
-        check_network, get_timestamp, handle_request, with_context, with_empty_request,
-        EmptyRequest,
-    },
+    common::{check_network, get_timestamp, handle_request, with_context, with_empty_request},
     error::ApiError,
     types::{
-        Allow, BlockIdentifier, NetworkListResponse, NetworkOptionsResponse, NetworkRequest,
-        NetworkStatusResponse, OperationStatusType, OperationType, Peer, Version,
+        Allow, BlockIdentifier, MetadataRequest, NetworkListResponse, NetworkOptionsResponse,
+        NetworkRequest, NetworkStatusResponse, OperationStatusType, OperationType, Peer, Version,
     },
     RosettaContext, MIDDLEWARE_VERSION, NODE_VERSION, ROSETTA_VERSION,
 };
@@ -53,7 +50,7 @@ pub fn status_route(
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/NetworkApi.html#networklist)
 async fn network_list(
-    _empty: EmptyRequest,
+    _empty: MetadataRequest,
     server_context: RosettaContext,
 ) -> Result<NetworkListResponse, ApiError> {
     debug!("/network/list");

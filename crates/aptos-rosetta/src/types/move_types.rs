@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+//! Types and identifiers for parsing Move structs and types
+
 use aptos_sdk::move_types::{ident_str, identifier::Identifier};
 
 pub fn account_identifier() -> Identifier {
@@ -14,6 +16,7 @@ pub fn coin_identifier() -> Identifier {
 pub fn coin_info_identifier() -> Identifier {
     ident_str!("CoinInfo").into()
 }
+
 pub fn coin_store_identifier() -> Identifier {
     ident_str!("CoinStore").into()
 }
