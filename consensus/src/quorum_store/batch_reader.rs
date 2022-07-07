@@ -240,7 +240,7 @@ impl BatchReader {
                 // We need to check up-to-date expiration again because receiving the same
                 // digest with a higher expiration would update the persisted value and
                 // effectively extend the expiration.
-                if cache_expiration_round <= expired_round {
+                if cache_expiration_round < expired_round {
                     let (_, persisted_value) = self
                         .db_cache
                         .remove(&h)

@@ -133,7 +133,7 @@ impl<I: Ord + Hash> RoundExpirations<I> {
     pub(crate) fn expire(&mut self, round: Round) -> HashSet<I> {
         let mut ret = HashSet::new();
         while let Some((Reverse(r), _)) = self.expiries.peek() {
-            if *r <= round {
+            if *r < round {
                 let (_, item) = self.expiries.pop().unwrap();
                 ret.insert(item);
             } else {

@@ -31,9 +31,10 @@ use futures::{
     StreamExt,
 };
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashSet},
     time::{Duration, Instant},
 };
+use std::collections::HashMap;
 use tokio::{sync::mpsc::Sender as TokioSender, time};
 
 type ProofReceiveChannel = oneshot::Receiver<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
@@ -47,8 +48,8 @@ pub struct QuorumStoreWrapper {
     batch_expirations: RoundExpirations<BatchId>,
     batch_builder: BatchBuilder,
     latest_logical_time: LogicalTime,
-    // TODO: use expiration priority queue as well
     proofs_for_consensus: HashMap<HashValue, ProofOfStore>,
+    proof_expirations: RoundExpirations<HashValue>,
     mempool_txn_pull_max_count: u64,
     // For ensuring that batch size does not exceed QuorumStore limit.
     quorum_store_max_batch_bytes: u64,
@@ -72,6 +73,7 @@ impl QuorumStoreWrapper {
             batch_builder: BatchBuilder::new(0, quorum_store_max_batch_bytes as usize),
             latest_logical_time: LogicalTime::new(epoch, 0),
             proofs_for_consensus: HashMap::new(),
+            proof_expirations: RoundExpirations::new(),
             mempool_txn_pull_max_count,
             quorum_store_max_batch_bytes,
             last_end_batch_time: Instant::now(),
@@ -172,8 +174,11 @@ impl QuorumStoreWrapper {
                 new_proof = proof;
             }
         }
+        let digest = new_proof.digest().clone();
+        let expiration = new_proof.expiration().round();
         self.proofs_for_consensus
-            .insert(new_proof.digest().clone(), new_proof);
+            .insert(digest, new_proof);
+        self.proof_expirations.add_item(digest, expiration);
     }
 
     pub(crate) async fn handle_local_proof(
@@ -257,7 +262,8 @@ impl QuorumStoreWrapper {
                         );
                     }
                 }
-                for digest in digests {
+                let expired_digests = self.proof_expirations.expire(logical_time.round());
+                for digest in digests.into_iter().chain(expired_digests.into_iter()) {
                     if self.proofs_for_consensus.remove(&digest).is_some() {
                         debug!(
                             "QS: removed digest {} from batches_for_consensus, new size {}",
