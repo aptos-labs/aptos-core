@@ -1,6 +1,29 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+//! Construction APIs
+//!
+//! The construction APIs break down transactions into composable parts that are
+//! used to be generic across blockchains.  A flow of operations can be found
+//! in the [specifications](https://www.rosetta-api.org/docs/construction_api_introduction.html)
+//!
+//! This is broken down in the following flow:
+//!
+//! * Preprocess (based on operations) gets information to fetch from metadata (onchchain)
+//! * Metadata fetches onchain information e.g. sequence number
+//! * Payloads generates an unsigned transaction
+//! * Application outside signs the payload from the transactino
+//! * Combine puts the signed transaction payload with the unsigned transaction
+//! * Submit submits the signed transaciton to the blockchain
+//!
+//! There are also 2 other sometimes used APIs
+//! * Derive (get an account from the private key)
+//! * Hash (get a hash of the transaction to lookup in mempool)
+//!
+//! Note: there is an "online" mode and an "offline" mode.  The offline APIs can run without
+//! a connection to a full node.  The online ones need a connection to a full node.
+//!
+
 use crate::{
     common::{
         check_network, decode_bcs, decode_key, encode_bcs, get_account, handle_request,
