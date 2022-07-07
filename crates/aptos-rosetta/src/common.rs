@@ -2,11 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    block::{block_index_to_version, version_to_block_index},
     error::{ApiError, ApiResult},
-    types::{Currency, MetadataRequest, NetworkIdentifier},
+    types::{
+        BlockIdentifier, Currency, MetadataRequest, NetworkIdentifier, PartialBlockIdentifier,
+    },
     RosettaContext,
 };
-use aptos_crypto::{ValidCryptoMaterial, ValidCryptoMaterialStringExt};
+use aptos_crypto::{HashValue, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_logger::debug;
 use aptos_rest_client::{Account, Response};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
@@ -140,4 +143,64 @@ pub fn is_native_coin(currency: &Currency) -> ApiResult<()> {
     } else {
         Err(ApiError::UnsupportedCurrency(Some(currency.symbol.clone())))
     }
+}
+
+pub fn string_to_hash(str: &str) -> ApiResult<HashValue> {
+    Ok(HashValue::from_str(strip_hex_prefix(str))
+        .map_err(|err| ApiError::DeserializationFailed(Some(err.to_string())))?)
+}
+
+/// Determines which block to pull for the request
+pub async fn get_block_index_from_request(
+    rest_client: &aptos_rest_client::Client,
+    partial_block_identifier: Option<PartialBlockIdentifier>,
+    block_size: u64,
+) -> ApiResult<u64> {
+    Ok(match partial_block_identifier {
+        Some(PartialBlockIdentifier {
+            index: Some(_),
+            hash: Some(_),
+        }) => {
+            return Err(ApiError::BlockParameterConflict);
+        }
+        // Lookup by block index
+        Some(PartialBlockIdentifier {
+            index: Some(block_index),
+            hash: None,
+        }) => block_index,
+        // Lookup by block hash
+        Some(PartialBlockIdentifier {
+            index: None,
+            hash: Some(hash),
+        }) => {
+            if hash == BlockIdentifier::genesis_txn().hash {
+                0
+            } else {
+                // Lookup by hash doesn't work since we're faking blocks, need to verify that it's a
+                // block
+                let response = rest_client.get_transaction(string_to_hash(&hash)?).await?;
+                let version = response.inner().version();
+
+                if let Some(version) = version {
+                    let block_index = version_to_block_index(block_size, version);
+                    // If it's not the beginning of a block, then it's invalid
+                    if version != block_index_to_version(block_size, block_index) {
+                        return Err(ApiError::TransactionIsPending);
+                    }
+
+                    block_index
+                } else {
+                    // If the transaction is pending, it's incomplete
+                    return Err(ApiError::BlockIncomplete);
+                }
+            }
+        }
+        // Lookup latest version
+        _ => {
+            let response = rest_client.get_ledger_information().await?;
+            let state = response.state();
+            // The current version won't be a full block, so we have to go one before it
+            version_to_block_index(block_size, state.version) - 1
+        }
+    })
 }
