@@ -26,6 +26,7 @@ mod network;
 use crate::common::{ErrorWrapper, RosettaCliArgs};
 use aptos_logger::Level;
 use clap::Parser;
+use std::process::exit;
 
 #[tokio::main]
 async fn main() {
@@ -47,7 +48,8 @@ async fn main() {
             let error = ErrorWrapper {
                 error: error.to_string(),
             };
-            println!("{}", serde_json::to_string_pretty(&error).unwrap())
+            println!("{}", serde_json::to_string_pretty(&error).unwrap());
+            exit(-1)
         }
     }
 }
