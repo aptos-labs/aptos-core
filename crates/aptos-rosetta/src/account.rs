@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     str::FromStr,
-    sync::RwLock,
+    sync::{Arc, RwLock},
 };
 use warp::Filter;
 
@@ -80,12 +80,40 @@ async fn account_balance(
     )
     .await?;
 
-    let mut amounts = vec![];
+    let amounts = convert_balances_to_amounts(
+        rest_client,
+        server_context.coin_cache.clone(),
+        request.currencies,
+        balances,
+        balance_version,
+    )
+    .await?;
+
+    // Get the block identifier
+    let response = rest_client
+        .get_transaction_by_version(block_version)
+        .await?;
+    let block_identifier = BlockIdentifier::from_transaction(block_size, response.inner())?;
+
+    Ok(AccountBalanceResponse {
+        block_identifier,
+        balances: amounts,
+    })
+}
+
+/// Lookup currencies and convert them to Rosetta types
+async fn convert_balances_to_amounts(
+    rest_client: &aptos_rest_client::Client,
+    coin_cache: Arc<CoinCache>,
+    maybe_filter_currencies: Option<Vec<Currency>>,
+    balances: HashMap<TypeTag, Balance>,
+    balance_version: u64,
+) -> ApiResult<Vec<Amount>> {
+    let mut amounts = Vec::new();
 
     // Lookup coins, and fill in currency codes
     for (coin, balance) in balances {
-        if let Some(currency) = server_context
-            .coin_cache
+        if let Some(currency) = coin_cache
             .get_currency(rest_client, coin, Some(balance_version))
             .await?
         {
@@ -97,7 +125,7 @@ async fn account_balance(
     }
 
     // Filter based on requested currencies
-    if let Some(currencies) = request.currencies {
+    if let Some(currencies) = maybe_filter_currencies {
         let mut currencies: HashSet<Currency> = currencies.into_iter().collect();
         // Remove extra currencies not requested
         amounts = amounts
@@ -117,16 +145,7 @@ async fn account_balance(
         }
     }
 
-    // Get the block identifier
-    let response = rest_client
-        .get_transaction_by_version(block_version)
-        .await?;
-    let block_identifier = BlockIdentifier::from_transaction(block_size, response.inner())?;
-
-    Ok(AccountBalanceResponse {
-        block_identifier,
-        balances: amounts,
-    })
+    Ok(amounts)
 }
 
 /// Determines which block to pull for the request
