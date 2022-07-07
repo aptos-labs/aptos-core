@@ -2,11 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::{format_output, BlockArgs, NetworkArgs, UrlArgs};
-use aptos_rosetta::types::{AccountBalanceRequest, AccountBalanceResponse, Currency};
+use aptos_rosetta::{
+    common::native_coin,
+    types::{AccountBalanceRequest, AccountBalanceResponse},
+};
 use aptos_types::account_address::AccountAddress;
 use clap::{Parser, Subcommand};
 
 /// Account APIs
+///
+/// Used for pulling state of an account at a point in time
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/AccountApi.html)
 #[derive(Debug, Subcommand)]
@@ -33,6 +38,7 @@ pub struct AccountBalanceCommand {
     url_args: UrlArgs,
     #[clap(flatten)]
     block_args: BlockArgs,
+    /// Whether to filter the currency to the native coin
     #[clap(long)]
     filter_currency: bool,
     /// Account to list the balance
@@ -49,10 +55,7 @@ impl AccountBalanceCommand {
                 account_identifier: self.account.into(),
                 block_identifier: self.block_args.into(),
                 currencies: if self.filter_currency {
-                    Some(vec![Currency {
-                        symbol: "TC".to_string(),
-                        decimals: 6,
-                    }])
+                    Some(vec![native_coin()])
                 } else {
                     None
                 },
