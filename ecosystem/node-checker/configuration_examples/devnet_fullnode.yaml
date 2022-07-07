@@ -1,0 +1,56 @@
+# Base config generated with: /Users/dport/a/core/target/debug/aptos-node-checker configuration create --configuration-name devnet_fullnode --configuration-name-pretty Devnet FullNode --url http://124.231.84.12 --evaluators state_sync_version api_latency network_peers_within_tolerance api_transaction_presence
+---
+node_address:
+  url: "https://fullnode.devnet.aptoslabs.com"
+  metrics_port: 9101
+  api_port: 80
+  noise_port: 6180
+configuration_name: devnet_fullnode
+configuration_name_pretty: Devnet FullNode
+chain_id: ~
+role_type: ~
+evaluators:
+  - api_latency
+  - api_transaction_presence
+evaluator_args:
+  build_version_args: {}
+  consensus_proposals_args: {}
+  consensus_round_args: {}
+  consensus_timeouts_args:
+    allowed_consensus_timeouts: 0
+  latency_args:
+    num_samples: 5
+    delay_between_samples_ms: 20
+    num_allowed_errors: 1
+    max_api_latency_ms: 1000
+  network_minimum_peers_args:
+    minimum_peers_inbound: 0
+    minimum_peers_outbound: 1
+  network_peers_tolerance_args:
+    inbound_peers_tolerance: 10
+    outbound_peers_tolerance: 10
+  node_identity_args: {}
+  state_sync_version_args:
+    version_delta_tolerance: 5000
+  tps_args:
+    emit_args:
+      accounts_per_client: 15
+      workers_per_ac: ~
+      wait_millis: 0
+      burst: false
+      do_not_check_stats_at_end: false
+      txn_expiration_time_secs: 30
+      duration: 60
+      invalid_tx: 0
+      transaction_type: P2P
+    mint_args:
+      mint_key: ~
+      mint_file: mint.key
+    minimum_tps: 1000
+    repeat_target_count: 1
+  transaction_presence_args:
+    transaction_fetch_delay_secs: 5
+runner_args:
+  blocking_runner_args:
+    metrics_fetch_delay_secs: 5
+
