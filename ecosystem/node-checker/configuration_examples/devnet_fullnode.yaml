@@ -1,4 +1,4 @@
-# Base config generated with: /Users/dport/a/core/target/debug/aptos-node-checker configuration create --configuration-name devnet_fullnode --configuration-name-pretty Devnet FullNode --url http://124.231.84.12 --evaluators state_sync_version api_latency network_peers_within_tolerance api_transaction_presence
+# Base config generated with: aptos-node-checker configuration create --configuration-name devnet_fullnode --configuration-name-pretty Devnet FullNode --url http://124.231.84.12 --evaluators state_sync_version api_latency network_peers_within_tolerance api_transaction_presence
 ---
 node_address:
   url: "https://fullnode.devnet.aptoslabs.com"
