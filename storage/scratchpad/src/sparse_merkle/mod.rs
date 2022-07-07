@@ -312,6 +312,10 @@ where
         }
     }
 
+    pub fn has_same_root_hash(&self, other: &Self) -> bool {
+        self.root_hash() == other.root_hash()
+    }
+
     fn get_oldest_ancestor(&self) -> Self {
         Self {
             inner: self.inner.get_oldest_ancestor(),

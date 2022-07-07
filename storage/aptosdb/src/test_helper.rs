@@ -567,12 +567,16 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
     db.state_merkle_db
         .put::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version), &leaf_node)
         .unwrap();
-    let _smt = SparseMerkleTree::<StateValue>::default()
+    let smt = SparseMerkleTree::<StateValue>::default()
         .batch_update(vec![(key.hash(), &value)], &ProofReader::new_empty())
         .unwrap();
     db.ledger_db
-        .put::<StateValueSchema>(&(key, version), &value)
+        .put::<StateValueSchema>(&(key.clone(), version), &value)
         .unwrap();
+    let mut in_memory_state = db.state_store.in_memory_state().lock();
+    in_memory_state.current = smt;
+    in_memory_state.current_version = Some(version);
+    in_memory_state.updated_since_checkpoint.insert(key);
 }
 
 pub fn test_sync_transactions_impl(

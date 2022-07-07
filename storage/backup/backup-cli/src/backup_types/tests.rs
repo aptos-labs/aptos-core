@@ -160,7 +160,7 @@ fn test_end_to_end_impl(d: TestData) {
     .unwrap();
 
     // Check
-    let tgt_db = AptosDB::new_for_test(&tgt_db_dir);
+    let tgt_db = AptosDB::new_readonly_for_test(&tgt_db_dir);
     assert_eq!(
         d.db.get_transactions(
             d.txn_start_ver,

@@ -23,10 +23,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptosdb::AptosDB;
-use executor_types::{
-    in_memory_state_calculator::IntoLedgerView, BlockExecutorTrait, ChunkExecutorTrait,
-    TransactionReplayer,
-};
+use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
 use storage_interface::{DbReaderWriter, ExecutedTrees};
 
 use crate::{
@@ -363,12 +360,7 @@ fn apply_transaction_by_writeset(
     db: &DbReaderWriter,
     transactions_and_writesets: Vec<(Transaction, WriteSet)>,
 ) {
-    let ledger_view: ExecutedTrees = db
-        .reader
-        .get_latest_tree_state()
-        .unwrap()
-        .into_ledger_view(&db.reader)
-        .unwrap();
+    let ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
 
     let transactions_and_outputs = transactions_and_writesets
         .iter()
@@ -528,12 +520,7 @@ impl TestBlock {
 fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
     let executor = TestExecutor::new();
     let db = &executor.db;
-    let mut ledger_view: ExecutedTrees = db
-        .reader
-        .get_latest_tree_state()
-        .unwrap()
-        .into_ledger_view(&db.reader)
-        .unwrap();
+    let mut ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
 
     for txn in transactions {
         let out = ChunkOutput::by_transaction_execution::<MockVM>(

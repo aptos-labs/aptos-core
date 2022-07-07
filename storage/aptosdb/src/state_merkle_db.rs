@@ -74,6 +74,24 @@ impl StateMerkleDb {
         )
     }
 
+    pub fn get_state_snapshot_version_before(
+        &self,
+        next_version: Version,
+    ) -> Result<Option<Version>> {
+        if next_version > 0 {
+            let max_possible_version = next_version - 1;
+            let mut iter = self.rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+            iter.seek_for_prev(&NodeKey::new_empty_path(max_possible_version))?;
+            if let Some((key, _node)) = iter.next().transpose()? {
+                // TODO: If we break up a single update batch to multiple commits, we would need to
+                // deal with a partial version, which hasn't got the root committed.
+                return Ok(Some(key.version()));
+            }
+        }
+        // No version before genesis.
+        Ok(None)
+    }
+
     /// Finds the rightmost leaf by scanning the entire DB.
     #[cfg(test)]
     pub fn get_rightmost_leaf_naive(&self) -> Result<Option<(NodeKey, LeafNode)>> {
