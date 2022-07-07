@@ -363,12 +363,13 @@ pub async fn execute_and_wait_transactions(
     )
     .await?;
 
-    for pt in pending_txns {
-        client
-            .wait_for_transaction(&pt.into_inner())
-            .await
-            .map_err(|e| format_err!("Failed to wait for transactions: {}", e))?;
-    }
+    try_join_all(
+        pending_txns
+            .iter()
+            .map(|pt| RETRY_POLICY.retry(move || client.wait_for_transaction(pt.inner()))),
+    )
+    .await
+    .map_err(|e| format_err!("Failed to wait for transactions: {}", e))?;
 
     debug!(
         "[{:?}] Account {} is at sequence number {} now",

@@ -91,11 +91,10 @@ impl Context {
     }
 
     pub fn get_latest_ledger_info(&self) -> Result<LedgerInfo, Error> {
-        if let Some(oldest_version) = self.db.get_first_txn_version()? {
+        if let Some(_oldest_version) = self.db.get_first_txn_version()? {
             Ok(LedgerInfo::new(
                 &self.chain_id(),
                 &self.get_latest_ledger_info_with_signatures()?,
-                oldest_version,
             ))
         } else {
             return Err(anyhow! {"Failed to retrieve oldest version"}.into());
