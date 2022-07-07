@@ -3,7 +3,7 @@
 node_address:
   url: "https://fullnode.devnet.aptoslabs.com"
   metrics_port: 9101
-  api_port: 80
+  api_port: 443
   noise_port: 6180
 configuration_name: devnet_fullnode
 configuration_name_pretty: Devnet FullNode
@@ -48,9 +48,10 @@ evaluator_args:
       mint_file: mint.key
     minimum_tps: 1000
     repeat_target_count: 1
-  transaction_presence_args:
+  transaction_availability_args:
     transaction_fetch_delay_secs: 5
 runner_args:
   blocking_runner_args:
     metrics_fetch_delay_secs: 5
+    api_client_timeout_secs: 4
 
