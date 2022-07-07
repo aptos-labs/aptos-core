@@ -3,8 +3,8 @@
 
 use crate::{
     backend::k8s::node::{K8sNode, REST_API_PORT},
-    create_k8s_client, query_sequence_numbers, set_validator_image_tag, ChainInfo, FullNode, Node,
-    Result, Swarm, Validator, Version,
+    create_k8s_client, query_sequence_numbers, set_validator_image_tag,
+    uninstall_testnet_resources, ChainInfo, FullNode, Node, Result, Swarm, Validator, Version,
 };
 use ::aptos_logger::*;
 use anyhow::{anyhow, bail, format_err};
@@ -21,7 +21,7 @@ use kube::{
     client::Client as K8sClient,
 };
 use std::{collections::HashMap, convert::TryFrom, env, net::TcpListener, str, sync::Arc};
-use tokio::time::Duration;
+use tokio::{runtime::Runtime, time::Duration};
 
 const VALIDATOR_LB: &str = "validator-lb";
 const FULLNODES_LB: &str = "fullnode-lb";
@@ -35,6 +35,7 @@ pub struct K8sSwarm {
     versions: Arc<HashMap<Version, String>>,
     pub chain_id: ChainId,
     kube_namespace: String,
+    keep: bool,
 }
 
 impl K8sSwarm {
@@ -45,6 +46,7 @@ impl K8sSwarm {
         kube_namespace: &str,
         validators: HashMap<AccountAddress, K8sNode>,
         fullnodes: HashMap<AccountAddress, K8sNode>,
+        keep: bool,
     ) -> Result<Self> {
         let kube_client = create_k8s_client().await;
 
@@ -69,7 +71,7 @@ impl K8sSwarm {
         versions.insert(base_version, base_image_tag.to_string());
         versions.insert(cur_version, image_tag.to_string());
 
-        Ok(Self {
+        Ok(K8sSwarm {
             validators,
             fullnodes,
             root_account,
@@ -77,6 +79,7 @@ impl K8sSwarm {
             chain_id: ChainId::new(4),
             versions: Arc::new(versions),
             kube_namespace: kube_namespace.to_string(),
+            keep,
         })
     }
 
@@ -205,7 +208,7 @@ pub fn k8s_wait_genesis_strategy() -> impl Iterator<Item = Duration> {
 
 /// Amount of time to wait for nodes to respond on the REST API
 pub fn k8s_wait_nodes_strategy() -> impl Iterator<Item = Duration> {
-    ExponentWithLimitDelay::new(1000, 10 * 1000, 10 * 60 * 1000)
+    ExponentWithLimitDelay::new(1000, 10 * 1000, 15 * 60 * 1000)
 }
 
 #[derive(Clone, Debug)]
@@ -381,4 +384,17 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
     }
 
     Ok(unhealthy_nodes)
+}
+
+impl Drop for K8sSwarm {
+    fn drop(&mut self) {
+        let runtime = Runtime::new().unwrap();
+        if !self.keep {
+            runtime
+                .block_on(uninstall_testnet_resources(self.kube_namespace.clone()))
+                .unwrap();
+        } else {
+            println!("Keeping kube_namespace {}", self.kube_namespace);
+        }
+    }
 }
