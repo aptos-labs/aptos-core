@@ -73,6 +73,15 @@ module AptosFramework::IterableTable {
         &mut Table::borrow_mut(&mut table.inner, key).val
     }
 
+    /// Acquire a mutable reference to the value which `key` maps to.
+    /// Insert the pair (`key`, `default`) first if there is no entry for `key`.
+    public fun borrow_mut_with_default<K: copy + store + drop, V: store + drop>(table: &mut IterableTable<K, V>, key: K, default: V): &mut V {
+        if (!contains(table, key)) {
+            add(table, key, default)
+        };
+        borrow_mut(table, key)
+    }
+
     /// Returns the length of the table, i.e. the number of entries.
     public fun length<K: copy + store + drop, V: store>(table: &IterableTable<K, V>): u64 {
         Table::length(&table.inner)
