@@ -71,14 +71,20 @@ impl BlockStore {
         sync_info: &SyncInfo,
         mut retriever: BlockRetriever,
     ) -> anyhow::Result<()> {
-        self.sync_to_highest_commit_cert(sync_info.highest_ledger_info(), &retriever.network)
-            .await;
+        self.sync_to_highest_commit_cert(
+            sync_info.highest_commit_cert().ledger_info(),
+            &retriever.network,
+        )
+        .await;
         self.sync_to_highest_ordered_cert(
             sync_info.highest_ordered_cert().clone(),
-            sync_info.highest_ledger_info().clone(),
+            sync_info.highest_commit_cert().clone(),
             &mut retriever,
         )
         .await?;
+
+        self.insert_quorum_cert(sync_info.highest_commit_cert(), &mut retriever)
+            .await?;
 
         self.insert_quorum_cert(sync_info.highest_ordered_cert(), &mut retriever)
             .await?;
@@ -103,14 +109,13 @@ impl BlockStore {
             _ => (),
         }
         if self.ordered_root().round() < qc.commit_info().round() {
-            let finality_proof = qc.ledger_info();
-            self.commit(finality_proof.clone()).await?;
+            self.commit(qc.clone()).await?;
             if qc.ends_epoch() {
                 retriever
                     .network
                     .broadcast(ConsensusMsg::EpochChangeProof(Box::new(
                         EpochChangeProof::new(
-                            vec![finality_proof.clone()],
+                            vec![qc.ledger_info().clone()],
                             /* more = */ false,
                         ),
                     )))
@@ -162,15 +167,15 @@ impl BlockStore {
     async fn sync_to_highest_ordered_cert(
         &self,
         highest_ordered_cert: QuorumCert,
-        highest_ledger_info: LedgerInfoWithSignatures,
+        highest_commit_cert: QuorumCert,
         retriever: &mut BlockRetriever,
     ) -> anyhow::Result<()> {
-        if !self.need_sync_for_ledger_info(&highest_ledger_info) {
+        if !self.need_sync_for_ledger_info(highest_commit_cert.ledger_info()) {
             return Ok(());
         }
         let (root, root_metadata, blocks, quorum_certs) = Self::fast_forward_sync(
             &highest_ordered_cert,
-            highest_ledger_info.clone(),
+            &highest_commit_cert,
             retriever,
             self.storage.clone(),
             self.state_computer.clone(),
@@ -185,7 +190,7 @@ impl BlockStore {
         self.rebuild(root, root_metadata, blocks, quorum_certs)
             .await;
 
-        if highest_ledger_info.ledger_info().ends_epoch() {
+        if highest_commit_cert.ledger_info().ledger_info().ends_epoch() {
             retriever
                 .network
                 .notify_epoch_change(EpochChangeProof::new(
@@ -199,7 +204,7 @@ impl BlockStore {
 
     pub async fn fast_forward_sync<'a>(
         highest_ordered_cert: &'a QuorumCert,
-        highest_ledger_info: LedgerInfoWithSignatures,
+        highest_commit_cert: &'a QuorumCert,
         retriever: &'a mut BlockRetriever,
         storage: Arc<dyn PersistentLivenessStorage>,
         state_computer: Arc<dyn StateComputer>,
@@ -212,14 +217,17 @@ impl BlockStore {
 
         // we fetch the blocks from
         let num_blocks = highest_ordered_cert.certified_block().round()
-            - highest_ledger_info.ledger_info().round()
+            - highest_commit_cert.ledger_info().ledger_info().round()
             + 1;
 
+        // although unlikely, we might wrap num_blocks around on a 32-bit machine
+        assert!(num_blocks < std::usize::MAX as u64);
+        
         let blocks = retriever
             .retrieve_block_for_qc(
                 highest_ordered_cert,
                 num_blocks,
-                highest_ledger_info.commit_info().id(),
+                highest_commit_cert.commit_info().id(),
             )
             .await?;
 
@@ -233,11 +241,9 @@ impl BlockStore {
 
         assert_eq!(
             blocks.last().expect("blocks are empty").id(),
-            highest_ledger_info.ledger_info().commit_info().id()
+            highest_commit_cert.commit_info().id()
         );
 
-        // although unlikely, we might wrap num_blocks around on a 32-bit machine
-        assert!(num_blocks < std::usize::MAX as u64);
         let mut quorum_certs = vec![highest_ordered_cert.clone()];
         quorum_certs.extend(
             blocks
@@ -252,7 +258,9 @@ impl BlockStore {
         // If a node restarts in the middle of state synchronization, it is going to try to catch up
         // to the stored quorum certs as the new root.
         storage.save_tree(blocks.clone(), quorum_certs.clone())?;
-        state_computer.sync_to(highest_ledger_info).await?;
+        state_computer
+            .sync_to(highest_commit_cert.ledger_info().clone())
+            .await?;
 
         // we do not need to update block_tree.highest_commit_decision_ledger_info here
         // because the block_tree is going to rebuild itself.

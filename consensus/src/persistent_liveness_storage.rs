@@ -53,12 +53,7 @@ pub trait PersistentLivenessStorage: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct RootInfo(
-    pub Block,
-    pub QuorumCert,
-    pub QuorumCert,
-    pub LedgerInfoWithSignatures,
-);
+pub struct RootInfo(pub Block, pub QuorumCert, pub QuorumCert, pub QuorumCert);
 
 /// LedgerRecoveryData is a subset of RecoveryData that we can get solely from ledger info.
 #[derive(Clone)]
@@ -127,11 +122,15 @@ impl LedgerRecoveryData {
 
         info!("Consensus root block is {}", root_block);
 
+        let root_commit_cert = root_ordered_cert
+            .create_merged_with_executed_state(latest_ledger_info_sig)
+            .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
+
         Ok(RootInfo(
             root_block,
             root_quorum_cert,
             root_ordered_cert,
-            latest_ledger_info_sig,
+            root_commit_cert,
         ))
     }
 }
