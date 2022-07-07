@@ -1377,7 +1377,7 @@ impl DbWriter for AptosDB {
                 for (idx, jmt_updates, jf_node_hashes) in txns_to_commit
                     .iter()
                     .enumerate()
-                    .filter(|(_idx, txn_to_commit)| !txn_to_commit.state_updates().is_empty())
+                    .filter(|(_idx, txn_to_commit)| txn_to_commit.is_checkpoint())
                     .map(|(idx, txn_to_commit)| {
                         (
                             idx,

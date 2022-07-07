@@ -1125,6 +1125,10 @@ impl TransactionToCommit {
         &self.transaction_info
     }
 
+    pub fn is_checkpoint(&self) -> bool {
+        self.transaction_info().state_checkpoint_hash.is_some()
+    }
+
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn set_transaction_info(&mut self, txn_info: TransactionInfo) {
         self.transaction_info = txn_info
