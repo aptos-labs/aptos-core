@@ -1,3 +1,4 @@
+{{- if .Values.haproxy.enabled }}
 {{- range $i, $e := until (int .Values.numValidators) }}
 ---
 # make the validator index available in tpl using $.Values.i 
@@ -206,4 +207,5 @@ spec:
       imagePullSecrets:
       - name: {{ $.Values.imagePullSecret }}
       {{- end }}
+{{- end }}
 {{- end }}

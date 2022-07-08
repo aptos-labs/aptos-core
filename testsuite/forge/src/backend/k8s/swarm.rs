@@ -23,8 +23,8 @@ use kube::{
 use std::{collections::HashMap, convert::TryFrom, env, net::TcpListener, str, sync::Arc};
 use tokio::{runtime::Runtime, time::Duration};
 
-const VALIDATOR_LB: &str = "validator-lb";
-const FULLNODES_LB: &str = "fullnode-lb";
+const VALIDATOR_SERVICE_SUFFIX: &str = "validator";
+const FULLNODE_SERVICE_SUFFIX: &str = "fullnode";
 const LOCALHOST: &str = "127.0.0.1";
 
 pub struct K8sSwarm {
@@ -255,7 +255,7 @@ pub(crate) async fn get_validators(
     let services = list_services(client, kube_namespace).await?;
     let validators = services
         .into_iter()
-        .filter(|s| s.name.contains(VALIDATOR_LB))
+        .filter(|s| s.name.contains(VALIDATOR_SERVICE_SUFFIX))
         .map(|s| {
             let mut port = REST_API_PORT;
             let mut ip = s.host_ip.clone();
@@ -266,7 +266,8 @@ pub(crate) async fn get_validators(
             let node_id = parse_node_id(&s.name).expect("error to parse node id");
             let node = K8sNode {
                 name: format!("aptos-node-{}-validator", node_id),
-                sts_name: parse_node_pod_basename(&s.name).unwrap(),
+                // the base validator service name is the same as that of the StatefulSet
+                sts_name: s.name.clone(),
                 // TODO: fetch this from running node
                 peer_id: PeerId::random(),
                 node_id,
@@ -294,7 +295,7 @@ pub(crate) async fn get_fullnodes(
     let services = list_services(client, kube_namespace).await?;
     let fullnodes = services
         .into_iter()
-        .filter(|s| s.name.contains(FULLNODES_LB))
+        .filter(|s| s.name.contains(FULLNODE_SERVICE_SUFFIX))
         .map(|s| {
             let mut port = REST_API_PORT;
             let mut ip = s.host_ip.clone();
@@ -305,7 +306,8 @@ pub(crate) async fn get_fullnodes(
             let node_id = parse_node_id(&s.name).expect("error to parse node id");
             let node = K8sNode {
                 name: format!("aptos-node-{}-fullnode", node_id),
-                sts_name: format!("{}-e{}", parse_node_pod_basename(&s.name).unwrap(), era),
+                // the base fullnode service name is the same as that of the StatefulSet plus the era
+                sts_name: format!("{}-e{}", &s.name, era),
                 // TODO: fetch this from running node
                 peer_id: PeerId::random(),
                 node_id,
@@ -335,17 +337,6 @@ fn parse_node_id(s: &str) -> Result<usize> {
     let v = v[1].split('-').collect::<Vec<&str>>();
     let idx: usize = v[0].parse().unwrap();
     Ok(idx)
-}
-
-// gets the node's underlying STS name based on its associated LB service name
-// assumes the input is named <RELEASE>-aptos-node-<INDEX>-<validator|fullnode>-lb
-fn parse_node_pod_basename(s: &str) -> Result<String> {
-    // first get rid of the prefixes
-    let v = s.split("-lb").collect::<Vec<&str>>();
-    if v.is_empty() {
-        return Err(format_err!("Failed to parse {:?} sts name format", s));
-    }
-    Ok(v[0].to_string())
 }
 
 fn load_root_key(root_key_bytes: &[u8]) -> Ed25519PrivateKey {

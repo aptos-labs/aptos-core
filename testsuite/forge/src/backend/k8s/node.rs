@@ -21,7 +21,9 @@ use std::{
 };
 
 const NODE_METRIC_PORT: u64 = 9101;
-pub const REST_API_PORT: u32 = 80;
+
+// this is the port on the validator service itself, as opposed to 80 on the validator haproxy service
+pub const REST_API_PORT: u32 = 8080;
 
 pub struct K8sNode {
     pub(crate) name: String,
