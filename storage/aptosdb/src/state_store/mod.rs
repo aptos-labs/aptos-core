@@ -36,6 +36,7 @@ use storage_interface::{
 
 use crate::{
     change_set::ChangeSet,
+    gauged_api,
     schema::{stale_node_index::StaleNodeIndexSchema, state_value::StateValueSchema},
     state_merkle_db::{add_node_batch, StateMerkleDb},
     AptosDbError, LedgerStore, TransactionStore, OTHER_TIMERS_SECONDS,
@@ -367,9 +368,10 @@ impl StateStore {
         }
 
         // commit jellyfish merkle nodes
-        self.state_merkle_db.write_schemas(batch)?;
-
-        Ok(new_root_hash)
+        gauged_api("commit_jellyfish_merkle_nodes", || {
+            self.state_merkle_db.write_schemas(batch)?;
+            Ok(new_root_hash)
+        })
     }
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
