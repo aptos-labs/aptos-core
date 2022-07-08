@@ -3,16 +3,15 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{build_information::collect_build_info, system_information::collect_system_info};
+use crate::{build_information::get_build_information, system_information::collect_system_info};
 use prometheus::proto::MetricFamily;
 use std::collections::BTreeMap;
 
 /// Used to expose system and build information
 pub fn get_system_and_build_information(chain_id: Option<String>) -> BTreeMap<String, String> {
-    let mut information: BTreeMap<String, String> = BTreeMap::new();
-    collect_build_info(chain_id, &mut information);
-    collect_system_info(&mut information);
-    information
+    let mut system_and_build_information = get_build_information(chain_id);
+    collect_system_info(&mut system_and_build_information);
+    system_and_build_information
 }
 
 /// Inserts an optional value into the given map iff the value exists

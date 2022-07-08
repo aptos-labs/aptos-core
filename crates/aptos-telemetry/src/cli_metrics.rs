@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{build_information::get_build_information, service, service::TelemetryEvent, utils};
+use crate::{service, service::TelemetryEvent, utils};
 use aptos_logger::error;
 use std::{collections::BTreeMap, time::Duration};
 
@@ -16,21 +16,19 @@ const ERROR: &str = "error";
 
 /// Collects and sends the build information via telemetry
 pub async fn send_cli_telemetry_event(
+    mut build_information: BTreeMap<String, String>,
     command: String,
     latency: Duration,
     success: bool,
     error: Option<String>,
 ) {
-    // Collect the build information
-    let mut cli_information = get_build_information(None);
-
     // Collection information about the cli command
-    collect_cli_info(command, latency, success, error, &mut cli_information);
+    collect_cli_info(command, latency, success, error, &mut build_information);
 
     // Create a new telemetry event
     let telemetry_event = TelemetryEvent {
         name: APTOS_CLI_METRICS.into(),
-        params: cli_information,
+        params: build_information,
     };
 
     // TODO(joshlind): can we find a better way of identifying each CLI user?
