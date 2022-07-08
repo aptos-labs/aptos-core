@@ -40,6 +40,7 @@ validator:
     ledger_prune_window: 10000000
     state_store_prune_window: 1000000
     pruning_batch_size: 10000
+  enableNetworkPolicy: true
 
 fullnode:
   groups:
