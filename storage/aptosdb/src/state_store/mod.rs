@@ -367,8 +367,10 @@ impl StateStore {
         }
 
         // commit jellyfish merkle nodes
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_jellyfish_merkle_nodes"])
+            .start_timer();
         self.state_merkle_db.write_schemas(batch)?;
-
         Ok(new_root_hash)
     }
 
