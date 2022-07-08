@@ -68,7 +68,7 @@ jobs:
         if: env.FORGE_ENABLED == 'true'
         shell: bash
         run: |
-          kubectl delete $FORGE_POD_NAME || true
+          kubectl delete pod $FORGE_POD_NAME || true
           kubectl wait --for=delete "pod/${FORGE_POD_NAME}" || true
       - name: Run Forge
         if: env.FORGE_ENABLED == 'true'
