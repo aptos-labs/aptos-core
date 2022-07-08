@@ -55,7 +55,6 @@ jobs:
         if: env.FORGE_ENABLED == 'true'
         shell: bash
         run: |
-          set -ex
           # replace non alphanumeric chars with dash
           FORGE_NAMESPACE="${FORGE_NAMESPACE_BASE//[^[:alnum:]]/-}"
           # use the first 64 chars only for namespace, as it is the maximum for k8s resources
@@ -69,14 +68,13 @@ jobs:
         if: env.FORGE_ENABLED == 'true'
         shell: bash
         run: |
-          set -ex
           kubectl delete $FORGE_POD_NAME || true
-          kubectl wait --for=delete "pod/${FORGE_POD_NAME}"
+          kubectl wait --for=delete "pod/${FORGE_POD_NAME}" || true
       - name: Run Forge
         if: env.FORGE_ENABLED == 'true'
         shell: bash
         run: |
-          set -ex
+          set +e
           FORGE_START_TIME_MS="$(date '+%s')000"
 
           # Run forge with test runner in k8s
