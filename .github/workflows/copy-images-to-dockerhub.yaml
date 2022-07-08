@@ -13,6 +13,7 @@ permissions:
 jobs:
   copy-images:
     strategy:
+      fail-fast: false
       matrix:
         IMAGE_NAME: [validator, forge, init, validator_tcb, tools, faucet, txn-emitter, indexer, node-checker]
 
