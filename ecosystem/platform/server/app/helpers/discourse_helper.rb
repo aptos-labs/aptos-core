@@ -21,6 +21,6 @@ module DiscourseHelper
   end
 
   def self.discourse_url(path)
-    URI.join(base_url, path)
+    URI.join(base_url, path).to_s
   end
 end
