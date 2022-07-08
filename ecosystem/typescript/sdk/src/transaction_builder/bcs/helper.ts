@@ -45,3 +45,9 @@ export function bcsSerializeStr(value: string): Bytes {
   serializer.serializeStr(value);
   return serializer.getBytes();
 }
+
+export function bcsSerializeBool(value: boolean): Bytes {
+  const serializer = new Serializer();
+  serializer.serializeBool(value);
+  return serializer.getBytes();
+}
