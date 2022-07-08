@@ -63,19 +63,35 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 ## Joining Validator Set
 
-All the selected validator node will be receiving sufficient amount of test token (101,000,000) airdrop from Aptos Labs team to stake their node.
+All the selected validator node will be receiving sufficient amount of test token (100,100,000) airdrop from Aptos Labs team to stake their node.
 
-1. Initialize Aptos CLI
+1. Initialize Aptos CLI.
 
     ```
     aptos init --profile ait2 \
-    --private-key <account-private-key> \
+    --private-key <account_private_key> \
     --rest-url http://ait2.aptosdev.com \
     --faucet-url http://ait2.aptosdev.com \
     --assume-yes
     ```
+    
+    Note: `account_private_key` can be found in the `private-keys.yaml` file.
 
-2. Register validator candidate on chain
+2. Check your validator account balance
+
+    ```
+    aptos account list --profile ait2
+    ```
+    
+    This will show you the coin balance you have in the validator account. You should be able to see something like:
+    
+    ```
+    "coin": {
+        "value": "100100000"
+      }
+    ```
+
+3. Register validator candidate on chain
 
     ```
     aptos node register-validator-candidate \
@@ -85,7 +101,7 @@ All the selected validator node will be receiving sufficient amount of test toke
 
     Replace `aptosbot.yaml` with your validator node config file.
 
-3. Add stake to your validator node
+4. Add stake to your validator node
 
     ```
     aptos node add-stake --amount 100000000 --profile ait2
@@ -93,7 +109,7 @@ All the selected validator node will be receiving sufficient amount of test toke
 
     Please don't add too much stake to make sure you still have sufficient token to pay gas fee.
 
-4. Set lockup time for your stake, minimal of 72 hours is required to join validator set.
+5. Set lockup time for your stake, minimal of 72 hours is required to join validator set.
 
     ```
     aptos node increase-lockup \
@@ -101,7 +117,7 @@ All the selected validator node will be receiving sufficient amount of test toke
     --lockup-duration 75h
     ```
 
-5. Join validator set
+6. Join validator set
 
     ```
     aptos node join-validator-set --profile ait2
@@ -109,13 +125,17 @@ All the selected validator node will be receiving sufficient amount of test toke
 
     ValidatorSet will be updated at every epoch change, which is **once every hour**. You will only see your node joining the validator set in next epoch. Both Validator and fullnode will start syncing once your validator is in the validator set.
 
-6. Check validator set
+7. Check validator set
 
     ```
-    aptos node show-validator-set --profile ait2
+    aptos node show-validator-set --profile ait2 | jq -r '.Result.pending_active' | grep <account_address>
     ```
     
-    You should be able to see your validator node in "pending_active" list. And when the epoch change happens, the node will be moved into "active_validators" list. This should happen within one hour from the completion of previous step. During this time, you might see errors like "No connected AptosNet peers", which is normal.
+    You should be able to see your validator node in "pending_active" list. And when the next epoch change happens, the node will be moved into "active_validators" list. This should happen within one hour from the completion of previous step. During this time, you might see errors like "No connected AptosNet peers", which is normal.
+    
+    ```
+    aptos node show-validator-set --profile ait2 | jq -r '.Result.active_validators' | grep <account_address>
+    ```
 
 
 ## Verify node connections
@@ -143,7 +163,7 @@ You can check the details about node liveness definition [here](https://aptos.de
     curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_network_peer_connected{.*remote_peer_id=\"<Aptos Peer ID>\".*}"
     ```
 
-3. Once we have enough nodes coming online to form consensus, you can also check if consensus is making progress
+3. Once your node state sync to the latest version, you can also check if consensus is making progress
 
     ```
     curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_consensus_current_round"
