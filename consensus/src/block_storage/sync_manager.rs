@@ -222,8 +222,8 @@ impl BlockStore {
 
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
         assert!(num_blocks < std::usize::MAX as u64);
-        
-        let blocks = retriever
+
+        let mut blocks = retriever
             .retrieve_block_for_qc(
                 highest_ordered_cert,
                 num_blocks,
@@ -239,6 +239,7 @@ impl BlockStore {
             blocks.first().expect("blocks are empty").id(),
         );
 
+        // Confirm retrival ended when it hit the last block we care about, even if it didn't reach all num_blocks blocks.
         assert_eq!(
             blocks.last().expect("blocks are empty").id(),
             highest_commit_cert.commit_info().id()
@@ -248,9 +249,42 @@ impl BlockStore {
         quorum_certs.extend(
             blocks
                 .iter()
-                .take(num_blocks as usize - 1)
+                .take(blocks.len() - 1)
                 .map(|block| block.quorum_cert().clone()),
         );
+
+        // check if highest_commit_cert is a fork,
+        // if so, we need to fetch it's block as well, to have a proof of commit.
+        if !blocks
+            .iter()
+            .any(|block| block.id() == highest_commit_cert.certified_block().id())
+        {
+            let fetched_commit_blocks = retriever
+                .retrieve_block_for_qc(
+                    highest_commit_cert,
+                    1,
+                    highest_commit_cert.commit_info().id(),
+                )
+                .await?;
+
+            assert_eq!(fetched_commit_blocks.len(), 1);
+            let block = fetched_commit_blocks
+                .into_iter()
+                .next()
+                .expect("blocks are empty");
+            assert_eq!(
+                block.id(),
+                highest_commit_cert.certified_block().id(),
+                "Expecting in the retrieval response, for commit certificate fork, first block should be {}, but got {}",
+                highest_commit_cert.certified_block().id(),
+                block.id(),
+            );
+
+            blocks.push(block);
+            quorum_certs.push(highest_commit_cert.clone());
+        }
+
+        assert_eq!(blocks.len(), quorum_certs.len());
         for (i, block) in blocks.iter().enumerate() {
             assert_eq!(block.id(), quorum_certs[i].certified_block().id());
         }
