@@ -345,9 +345,8 @@ SyncInfo:
     - highest_ordered_cert:
         OPTION:
           TYPENAME: QuorumCert
-    - highest_ledger_info:
-        OPTION:
-          TYPENAME: LedgerInfoWithSignatures
+    - highest_commit_cert:
+        TYPENAME: QuorumCert
     - highest_2chain_timeout_cert:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate

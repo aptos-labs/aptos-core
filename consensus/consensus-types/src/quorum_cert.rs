@@ -126,4 +126,19 @@ impl QuorumCert {
         self.vote_data.verify()?;
         Ok(())
     }
+
+    pub fn create_merged_with_executed_state(
+        &self,
+        executed_ledger_info: LedgerInfoWithSignatures,
+    ) -> anyhow::Result<QuorumCert> {
+        let self_commit_info = self.commit_info();
+        let executed_commit_info = executed_ledger_info.ledger_info().commit_info();
+        ensure!(
+            self_commit_info.match_ordered_only(executed_commit_info),
+            "Block info from QC and executed LI need to match, {:?} and {:?}",
+            self_commit_info,
+            executed_commit_info
+        );
+        Ok(Self::new(self.vote_data.clone(), executed_ledger_info))
+    }
 }
