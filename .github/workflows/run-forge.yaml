@@ -116,7 +116,7 @@ jobs:
           # parse the JSON report
           cat $FORGE_OUTPUT | awk '/====json-report-begin===/{f=1;next} /====json-report-end===/{f=0} f' > "${FORGE_REPORT}"
           # If no report was generated, fill with default report
-          if [ -s "${FORGE_REPORT}" ]; then
+          if [ ! -s "${FORGE_REPORT}" ]; then
             echo '{"text": "Forge test runner terminated"}' > "${FORGE_REPORT}"
           fi
 
