@@ -3,7 +3,9 @@
 
 #![forbid(unsafe_code)]
 
-use aptos_metrics_core::{register_histogram_vec, register_int_gauge, HistogramVec, IntGauge};
+use aptos_metrics_core::{
+    exponential_buckets, register_histogram_vec, register_int_gauge, HistogramVec, IntGauge,
+};
 use once_cell::sync::Lazy;
 
 pub static OLDEST_GENERATION: Lazy<IntGauge> = Lazy::new(|| {
@@ -26,7 +28,8 @@ pub static TIMER: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_scratchpad_smt_timer_seconds",
         "Various timers for performance analysis.",
-        &["name"]
+        &["name"],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
     )
     .unwrap()
 });
