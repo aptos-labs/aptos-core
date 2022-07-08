@@ -65,7 +65,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 All the selected validator node will be receiving sufficient amount of test token (100,100,000) airdrop from Aptos Labs team to stake their node.
 
-1. Initialize Aptos CLI.
+1. Initialize Aptos CLI
 
     ```
     aptos init --profile ait2 \
