@@ -17,7 +17,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 - Stop your node and remove the data directory.
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
 - Pull the latest changes on `testnet` branch, make sure you're at commit `898fdc4f4ae7eb2a7dad0b4da9b293d7510b5732`
-- Close the metrics port `9101` and REST API port `80` for your validator and fullnode
+- Close the metrics port `9101` and REST API port `80` for your validator (you can leave it open for fullnode).
 - Restarting the node
 
 ### Using Docker
@@ -25,14 +25,14 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 - Stop your node and remove the data volumes, `docker compose down --volumes`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
 - Update your docker image to use tag `testnet_898fdc4f4ae7eb2a7dad0b4da9b293d7510b5732`. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_898fdc4f4ae7eb2a7dad0b4da9b293d7510b5732/images/sha256-4d41177e917f3f5d5d8ec77dea343160cdcdfdb79ada8e7ac5b7b5151ff9bd53?context=explore)
-- Close metrics port on 9101 and REST API port `80` for your validator and fullnode (remove it from the docker compose file)
+- Close metrics port on 9101 and REST API port `80` for your validator (remove it from the docker compose file), you can leave it open for fullnode.
 - Restarting the node: `docker compose up`
 
 ### Using Terraform
 
 - Increase `era` number in your Terraform config, this will wipe the data once applied.
 - Update your docker image to use tag `testnet_898fdc4f4ae7eb2a7dad0b4da9b293d7510b5732` in the Terraform config. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_898fdc4f4ae7eb2a7dad0b4da9b293d7510b5732/images/sha256-4d41177e917f3f5d5d8ec77dea343160cdcdfdb79ada8e7ac5b7b5151ff9bd53?context=explore)
-- Close metrics port and REST API port for validator and fullnode, add the helm values in your `main.tf ` file, for example:
+- Close metrics port and REST API port for validator (you can leave it open for fullnode), add the helm values in your `main.tf ` file, for example:
     ```
     module "aptos-node" {
         ...
