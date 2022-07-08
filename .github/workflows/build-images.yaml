@@ -14,7 +14,7 @@ name: "Build+Push Images"
 on: # build on main branch OR when a PR is labeled with `CICD:build-images`
   # Allow us to run this specific workflow without a PR
   workflow_dispatch:
-  pull_request_target:
+  pull_request:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
@@ -90,9 +90,6 @@ jobs:
   rust-images:
     # trigger only for push events (on protected branches as defined above) OR on PR events with the "CICD:build-images" label.
     needs: [permission-check, determine-last-green-commit]
-    strategy:
-      matrix:
-        IMAGE_TARGET: [release, test]
 
     runs-on: high-perf-docker
     steps:
@@ -117,7 +114,6 @@ jobs:
       - name: Build and Push Rust images
         run: docker/docker-bake-rust-all.sh
         env:
-          IMAGE_TARGET: ${{ matrix.IMAGE_TARGET }}
           LAST_GREEN_COMMIT: ${{ needs.determine-last-green-commit.outputs.lastGreenCommit }}
 
   sdk-integration-test:

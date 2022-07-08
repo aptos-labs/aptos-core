@@ -26,8 +26,6 @@ jobs:
       - uses: actions/checkout@v3
       - run: sudo apt-get install shellcheck --assume-yes --no-install-recommends
       - run: shellcheck scripts/dev_setup.sh
-      - run: shellcheck scripts/dockerhub_prune.sh
-      - run: shellcheck scripts/weekly-dep-report.sh
 
   ecosystem-lint:
     runs-on: ubuntu-latest
