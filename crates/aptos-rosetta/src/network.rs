@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block::{block_index_to_version, version_to_block_index},
     common::{check_network, get_timestamp, handle_request, with_context, with_empty_request},
     error::ApiError,
     types::{
@@ -12,6 +11,7 @@ use crate::{
     RosettaContext, MIDDLEWARE_VERSION, NODE_VERSION, ROSETTA_VERSION,
 };
 use aptos_logger::{debug, trace};
+use std::time::Duration;
 use warp::Filter;
 
 pub fn list_route(
@@ -141,41 +141,42 @@ async fn network_status(
     );
 
     check_network(request.network_identifier, &server_context)?;
-    let block_size = server_context.block_size;
-
     let rest_client = server_context.rest_client()?;
-    let genesis_txn = BlockIdentifier::genesis_txn();
+    let block_cache = server_context.block_cache()?;
+    let genesis_block_info = block_cache.get_block_info(0).await?;
+    let genesis_block_identifier = BlockIdentifier::from_block_info(genesis_block_info);
     let response = rest_client.get_ledger_information().await?;
     let state = response.state();
 
-    // Get the last "block"
-    let previous_block = version_to_block_index(block_size, state.version) - 1;
-    let block_version = block_index_to_version(block_size, previous_block);
-    let response = rest_client
-        .get_transaction_by_version(block_version)
-        .await?;
-    let transaction = response.inner();
-    let latest_txn = BlockIdentifier::from_transaction(block_size, transaction)?;
-
-    let current_block_timestamp = get_timestamp(&response);
-
-    let oldest_block_identifier = if let Some(mut version) = state.oldest_ledger_version {
-        // For non-genesis versions we have to ensure that really the next "block" is the oldest
-        if version != 0 {
-            let block_index = version_to_block_index(block_size, version);
-            // If the txn is the first in the block include it, otherwise, return the next block
-            if block_index_to_version(block_size, block_index) != version {
-                version = block_index_to_version(block_size, block_index + 1);
-            }
+    // Get the latest block (but be one behind)
+    let latest_version = state.version;
+    let mut block_info = None;
+    // Try for 10 times to get the latest block
+    // TODO: Improve this performance
+    for _ in 1..10 {
+        if let Ok(info) = block_cache.get_block_info_by_version(latest_version).await {
+            block_info = Some(info);
+            break;
         }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    // If we don't have the block info, fail
+    let block_info = if let Some(block_info) = block_info {
+        block_info
+    } else {
+        return Err(ApiError::BlockIncomplete);
+    };
 
-        Some(BlockIdentifier::from_transaction(
-            block_size,
-            rest_client
-                .get_transaction_by_version(version)
-                .await?
-                .inner(),
-        )?)
+    let block_info = block_cache
+        .get_block_info(block_info.block_height - 1)
+        .await?;
+    let current_block_identifier = BlockIdentifier::from_block_info(block_info);
+    let current_block_timestamp = get_timestamp(block_info);
+
+    let oldest_block_identifier = if let Some(version) = state.oldest_ledger_version {
+        let block_info = block_cache.get_block_info_by_version(version).await?;
+
+        Some(BlockIdentifier::from_block_info(block_info))
     } else {
         None
     };
@@ -184,9 +185,9 @@ async fn network_status(
     let peers: Vec<Peer> = vec![];
 
     let response = NetworkStatusResponse {
-        current_block_identifier: latest_txn,
+        current_block_identifier,
         current_block_timestamp,
-        genesis_block_identifier: genesis_txn,
+        genesis_block_identifier,
         oldest_block_identifier,
         sync_status: None,
         peers,

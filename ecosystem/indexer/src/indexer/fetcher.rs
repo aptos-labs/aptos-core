@@ -9,7 +9,7 @@ use url::Url;
 
 // TODO: make this configurable
 const RETRY_TIME_MILLIS: u64 = 5000;
-const TRANSACTION_FETCH_BATCH_SIZE: u64 = 500;
+const TRANSACTION_FETCH_BATCH_SIZE: u16 = 500;
 
 #[derive(Debug)]
 pub struct TransactionFetcher {

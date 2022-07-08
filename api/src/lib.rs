@@ -16,6 +16,7 @@ mod state;
 mod transactions;
 pub(crate) mod version;
 
+mod blocks;
 mod failpoint;
 #[cfg(any(test))]
 pub(crate) mod tests;

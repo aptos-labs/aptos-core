@@ -150,6 +150,69 @@ impl TransactionStore {
         Err(AptosDbError::NotFound(format!("BlockMetadata preceding version {}", version)).into())
     }
 
+    /// Searches forward from the version to find the state checkpoint transaction
+    pub fn get_block_boundaries(&self, version: Version) -> Result<(Version, Version)> {
+        // Must be larger than a block size, otherwise a NotFound error will be raised wrongly.
+        const MAX_VERSIONS_TO_SEARCH: usize = 1000 * 100;
+
+        // Genesis is always 0,0
+        if version == 0 {
+            return Ok((0, 0));
+        }
+
+        // Linear searches via `DB::iter()` and `DB::rev_iter()` here, NOT expecting performance hit, due to the fact
+        // that the iterator caches data block and that there are limited number of transactions in
+        // each block.
+        let mut iter = self.db.rev_iter::<TransactionSchema>(Default::default())?;
+        iter.seek(&version)?;
+        let mut start_version = None;
+        for res in iter.take(MAX_VERSIONS_TO_SEARCH) {
+            let (v, txn) = res?;
+            // If we've found the beginning of the block, stop
+            if matches!(
+                txn,
+                Transaction::GenesisTransaction(_) | Transaction::BlockMetadata(_)
+            ) {
+                start_version = Some(v);
+                break;
+            }
+        }
+
+        let mut iter = self.db.iter::<TransactionSchema>(Default::default())?;
+        iter.seek(&version)?;
+        let mut end_version = None;
+        for res in iter.take(MAX_VERSIONS_TO_SEARCH) {
+            let (v, txn) = res?;
+            match txn {
+                Transaction::BlockMetadata(_) => {
+                    // If the current version is the beginning of the block, we need to find the
+                    // rest of the block
+                    if start_version != Some(v) {
+                        // This block metadata is the next block, so you need the previous version
+                        end_version = Some(v - 1);
+                        break;
+                    }
+                }
+                Transaction::StateCheckpoint => {
+                    end_version = Some(v);
+                    break;
+                }
+                _ => {}
+            }
+        }
+
+        // If we've found both, we have the whole block
+        if let (Some(start), Some(end)) = (start_version, end_version) {
+            Ok((start, end))
+        } else {
+            Err(AptosDbError::NotFound(format!(
+                "Block boundaries not found for version {}",
+                version
+            ))
+            .into())
+        }
+    }
+
     /// Save signed transaction at `version`
     pub fn put_transaction(
         &self,
