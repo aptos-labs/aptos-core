@@ -12,6 +12,7 @@ module AptosFramework::SimpleMap {
 
     const EKEY_ALREADY_EXISTS: u64 = 0;
     const EKEY_NOT_FOUND: u64 = 1;
+    const EINDEX_OUT_OF_BOUNDS: u64 = 2; 
 
     struct SimpleMap<Key: store, Value: store> has store {
         data: vector<Element<Key, Value>>,
@@ -133,6 +134,15 @@ module AptosFramework::SimpleMap {
         }
     }
 
+    fun get_entry<Key: store, Value: store>(
+        map: &SimpleMap<Key, Value>,
+        index: u64,
+    ) : (&Key, &Value) {
+        assert!(index < Vector::length(&map.data) && index >= 0, Errors::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+
+        (&Vector::borrow(&map.data, index).key, &Vector::borrow(&map.data, index).value)
+    }
+
     #[test]
     public fun add_remove_many() {
         let map = create<u64, u64>();
@@ -215,6 +225,34 @@ module AptosFramework::SimpleMap {
         remove(&mut map, &3);
         remove(&mut map, &3);
 
+        destroy_empty(map);
+    }
+
+    #[test]
+    public fun test_get_entry_valid_index() {
+        let map = create<u64, u64>();
+        add(&mut map, 3, 1);
+        add(&mut map, 5, 2);
+
+        let (key, value) = get_entry(&map, 0);
+        assert!(key == &3, 0);
+        assert!(value == &1, 0);
+
+        (key, value) = get_entry(&map, 1);
+        assert!(key == &5, 0);
+        assert!(value == &2, 0);
+
+        remove(&mut map, &3);
+        remove(&mut map, &5);
+
+        destroy_empty(map);
+    }
+
+    #[test]
+    #[expected_failure]
+    public fun test_get_entry_invalid_index() {
+        let map = create<u64, u64>();
+        get_entry(&map, 0);
         destroy_empty(map);
     }
 }
