@@ -812,7 +812,6 @@ impl TransactionToCommitGen {
             TransactionInfo::new_placeholder(self.gas_used, self.status),
             // state updates will be dealt with in BlockGen at a state checkpoint
             HashMap::new(), /* state updates */
-            None,
             self.write_set,
             events,
         )
@@ -1141,7 +1140,6 @@ impl BlockGen {
             Transaction::StateCheckpoint(HashValue::random()),
             TransactionInfo::new_placeholder(0, ExecutionStatus::Success),
             state_updates,
-            None,
             WriteSet::default(),
             Vec::new(),
         ));

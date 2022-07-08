@@ -11,7 +11,6 @@ use aptos_crypto::{
 };
 use aptos_logger::error;
 use aptos_types::{
-    nibble::nibble_path::NibblePath,
     proof::accumulator::InMemoryAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, TransactionOutput, TransactionStatus},
@@ -40,22 +39,13 @@ impl ApplyChunkOutput {
             Self::sort_transactions(transactions, transaction_outputs)?;
 
         // Apply the write set, get the latest state.
-        let (
-            state_updates_vec,
-            new_node_hashes_vec,
-            state_checkpoint_hashes,
-            result_state,
-            next_epoch_state,
-        ) = InMemoryStateCalculator::new(base_view.state(), state_cache)
-            .calculate_for_transaction_chunk(&to_keep, new_epoch)?;
+        let (state_updates_vec, state_checkpoint_hashes, result_state, next_epoch_state) =
+            InMemoryStateCalculator::new(base_view.state(), state_cache)
+                .calculate_for_transaction_chunk(&to_keep, new_epoch)?;
 
         // Calculate TransactionData and TransactionInfo, i.e. the ledger history diff.
-        let (to_commit, transaction_info_hashes) = Self::assemble_ledger_diff(
-            to_keep,
-            state_updates_vec,
-            new_node_hashes_vec,
-            state_checkpoint_hashes,
-        );
+        let (to_commit, transaction_info_hashes) =
+            Self::assemble_ledger_diff(to_keep, state_updates_vec, state_checkpoint_hashes);
         let result_view = ExecutedTrees::new(
             result_state,
             Arc::new(base_view.txn_accumulator().append(&transaction_info_hashes)),
@@ -151,17 +141,14 @@ impl ApplyChunkOutput {
     fn assemble_ledger_diff(
         to_keep: Vec<(Transaction, ParsedTransactionOutput)>,
         state_updates_vec: Vec<HashMap<StateKey, StateValue>>,
-        new_node_hashes_vec: Vec<HashMap<NibblePath, HashValue>>,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
     ) -> (Vec<(Transaction, TransactionData)>, Vec<HashValue>) {
         let mut to_commit = vec![];
         let mut txn_info_hashes = vec![];
-        for (((txn, txn_output), state_checkpoint_hash), (new_node_hashes, state_updates)) in
-            itertools::zip_eq(
-                itertools::zip_eq(to_keep, state_checkpoint_hashes),
-                itertools::zip_eq(new_node_hashes_vec, state_updates_vec),
-            )
-        {
+        for (((txn, txn_output), state_checkpoint_hash), state_updates) in itertools::zip_eq(
+            itertools::zip_eq(to_keep, state_checkpoint_hashes),
+            state_updates_vec,
+        ) {
             let (write_set, events, reconfig_events, gas_used, status) = txn_output.unpack();
             let event_tree = {
                 let event_hashes: Vec<_> = events.iter().map(CryptoHash::hash).collect();
@@ -186,7 +173,6 @@ impl ApplyChunkOutput {
                 txn,
                 TransactionData::new(
                     state_updates,
-                    new_node_hashes,
                     write_set,
                     events,
                     reconfig_events,

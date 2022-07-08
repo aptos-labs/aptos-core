@@ -1386,22 +1386,16 @@ impl DbWriter for AptosDB {
             if save_state_snapshots {
                 let mut base_version = base_state_version;
                 // find all the checkpoint versions
-                for (idx, jmt_updates, jf_node_hashes) in txns_to_commit
+                for (idx, jmt_updates) in txns_to_commit
                     .iter()
                     .enumerate()
                     .filter(|(_idx, txn_to_commit)| !txn_to_commit.state_updates().is_empty())
-                    .map(|(idx, txn_to_commit)| {
-                        (
-                            idx,
-                            jmt_updates(txn_to_commit.state_updates()),
-                            txn_to_commit.jf_node_hashes(),
-                        )
-                    })
+                    .map(|(idx, txn_to_commit)| (idx, jmt_updates(txn_to_commit.state_updates())))
                 {
                     let version = first_version + idx as LeafCount;
                     self.save_state_snapshot(
                         jmt_updates,
-                        jf_node_hashes,
+                        None,
                         version,
                         base_version,
                         state_tree.clone(),
