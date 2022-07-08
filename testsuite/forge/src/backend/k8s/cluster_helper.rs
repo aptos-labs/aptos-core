@@ -32,17 +32,37 @@ use std::{
 };
 use tempfile::TempDir;
 
+// binaries expected to be present on test runner
 const HELM_BIN: &str = "helm";
 pub const KUBECTL_BIN: &str = "kubectl";
 const MAX_NUM_VALIDATORS: usize = 30;
+
+// helm release names and helm chart paths
 const APTOS_NODE_HELM_RELEASE_NAME: &str = "aptos-node";
 const GENESIS_HELM_RELEASE_NAME: &str = "genesis";
 const APTOS_NODE_HELM_CHART_PATH: &str = "terraform/helm/aptos-node";
 const GENESIS_HELM_CHART_PATH: &str = "terraform/helm/genesis";
+
 // cleanup namespaces after 30 min unless "keep = true"
 const NAMESPACE_CLEANUP_THRESHOLD_SECS: u64 = 1800;
 const POD_CLEANUP_THRESHOLD_SECS: u64 = 86400;
 pub const MANAGEMENT_CONFIGMAP_PREFIX: &str = "forge-management";
+
+// We use the macros below to get around the current limitations of the
+// "include_str!" macro (which loads the file content at compile time, rather
+// than at runtime).
+
+// Helm value file names.
+macro_rules! APTOS_NODE_FORGE_HELM_VALUES {
+    () => {
+        "helm-values/aptos-node-values.yaml"
+    };
+}
+macro_rules! GENESIS_FORGE_HELM_VALUES {
+    () => {
+        "helm-values/genesis-values.yaml"
+    };
+}
 
 async fn wait_genesis_job(kube_client: &K8sClient, era: &str, kube_namespace: &str) -> Result<()> {
     aptos_retrier::retry_async(k8s_wait_genesis_strategy(), || {
@@ -285,13 +305,9 @@ fn upgrade_validator(
     )
 }
 
-fn upgrade_aptos_node_helm(
-    release_name: String,
-    options: &[String],
-    kube_namespace: String,
-) -> Result<()> {
+fn upgrade_aptos_node_helm(options: &[String], kube_namespace: String) -> Result<()> {
     upgrade_helm_release(
-        release_name,
+        APTOS_NODE_HELM_RELEASE_NAME.to_string(),
         APTOS_NODE_HELM_CHART_PATH.to_string(),
         options,
         kube_namespace,
@@ -333,38 +349,51 @@ pub async fn install_testnet_resources(
     let new_era = get_new_era().unwrap();
     let kube_client = create_k8s_client().await;
 
-    // get old values and cache it
+    // get deployment-specific helm values and cache it
     let tmp_dir = TempDir::new().expect("Could not create temp dir");
     let aptos_node_values_file = dump_helm_values_to_file(APTOS_NODE_HELM_RELEASE_NAME, &tmp_dir)?;
     let genesis_values_file = dump_helm_values_to_file(GENESIS_HELM_RELEASE_NAME, &tmp_dir)?;
 
-    // just helm upgrade
+    // get forge override helm values and cache it
+    let aptos_node_forge_helm_values_yaml = format!(
+        include_str!(APTOS_NODE_FORGE_HELM_VALUES!()),
+        num_validators = base_num_validators,
+        era = &new_era,
+        image_tag = &base_genesis_image_tag,
+    );
+    let aptos_node_forge_values_file = dump_string_to_file(
+        "aptos-node-values.yaml".to_string(),
+        aptos_node_forge_helm_values_yaml,
+        &tmp_dir,
+    )?;
+    let genesis_forge_helm_values_yaml = format!(
+        include_str!(GENESIS_FORGE_HELM_VALUES!()),
+        num_validators = base_num_validators,
+        image_tag = &base_genesis_image_tag,
+        era = &new_era,
+        root_key = DEFAULT_ROOT_KEY,
+    );
+    let genesis_forge_values_file = dump_string_to_file(
+        "genesis-values.yaml".to_string(),
+        genesis_forge_helm_values_yaml,
+        &tmp_dir,
+    )?;
 
+    // combine all helm values
     let aptos_node_upgrade_options = vec![
         // use the old values
         "-f".to_string(),
         aptos_node_values_file,
-        "--set".to_string(),
-        format!("chain.era={}", &new_era),
-        "--set".to_string(),
-        format!("numValidators={}", base_num_validators),
-        "--set".to_string(),
-        format!("imageTag={}", &base_genesis_image_tag),
+        "-f".to_string(),
+        aptos_node_forge_values_file,
     ];
 
     let mut genesis_upgrade_options = vec![
         // use the old values
         "-f".to_string(),
         genesis_values_file,
-        "--set".to_string(),
-        format!("chain.era={}", &new_era),
-        "--set".to_string(),
-        format!("genesis.numValidators={}", base_num_validators),
-        "--set".to_string(),
-        // NOTE: remember to prepend 0x to the key
-        format!("chain.rootKey=0x{}", DEFAULT_ROOT_KEY),
-        "--set".to_string(),
-        format!("imageTag={}", &base_genesis_image_tag),
+        "-f".to_string(),
+        genesis_forge_values_file,
     ];
 
     // run genesis from the directory in aptos/init image
@@ -375,7 +404,7 @@ pub async fn install_testnet_resources(
         ]);
     }
 
-    // upgrade testnet
+    // upgrade genesis
     upgrade_genesis_helm(genesis_upgrade_options.as_slice(), kube_namespace.clone())?;
 
     // wait for genesis to run again, and get the updated validators
@@ -383,7 +412,6 @@ pub async fn install_testnet_resources(
 
     // TODO(rustielin): get the helm releases to be consistent
     upgrade_aptos_node_helm(
-        APTOS_NODE_HELM_RELEASE_NAME.to_string(),
         aptos_node_upgrade_options.as_slice(),
         kube_namespace.clone(),
     )?;
@@ -490,25 +518,24 @@ fn get_helm_status(helm_release_name: &str) -> Result<Value> {
         .map_err(|e| format_err!("failed to deserialize helm values: {}", e))
 }
 
+fn dump_string_to_file(file_name: String, content: String, tmp_dir: &TempDir) -> Result<String> {
+    let file_path = tmp_dir.path().join(file_name.clone());
+    info!("Wrote content to: {:?}", &file_path);
+    let mut file = File::create(file_path).expect("Could not create file in temp dir");
+    file.write_all(&content.into_bytes())
+        .expect("Could not write to file");
+    let file_path_str = tmp_dir.path().join(file_name).display().to_string();
+    Ok(file_path_str)
+}
+
 fn dump_helm_values_to_file(helm_release_name: &str, tmp_dir: &TempDir) -> Result<String> {
     // get aptos-node values
     let v: Value = get_helm_status(helm_release_name).unwrap();
     let config = &v["config"];
+    let content = config.to_string();
+    let file_name = format!("{}_status.json", helm_release_name);
 
-    // store the helm values for later use
-    let file_path = tmp_dir
-        .path()
-        .join(format!("{}_status.json", helm_release_name));
-    info!("Wrote helm values to: {:?}", &file_path);
-    let mut file = File::create(file_path).expect("Could not create file in temp dir");
-    file.write_all(&config.to_string().into_bytes())
-        .expect("Could not write to file");
-    let file_path_str = tmp_dir
-        .path()
-        .join(format!("{}_status.json", helm_release_name))
-        .display()
-        .to_string();
-    Ok(file_path_str)
+    dump_string_to_file(file_name, content, tmp_dir)
 }
 
 pub async fn create_management_configmap(kube_namespace: String, keep: bool) -> Result<()> {
