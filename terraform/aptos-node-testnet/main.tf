@@ -18,56 +18,6 @@ locals {
 locals {
   # Forge assumes the chain_id is 4
   chain_id = var.enable_forge ? 4 : var.chain_id
-
-  aptos_node_helm_values_forge_override = {
-    // no VFNs in forge for now
-    fullnode = {
-      groups = []
-    }
-    // make all services internal ClusterIP and open all ports
-    service = {
-      validator = {
-        external = {
-          type = "ClusterIP"
-        }
-        enableRestApi     = true
-        enableMetricsPort = true
-      }
-      fullnode = {
-        external = {
-          type = "ClusterIP"
-        }
-        enableRestApi     = true
-        enableMetricsPort = true
-      }
-    }
-  }
-  genesis_helm_values_forge_override = {
-    chain = {
-      # this key is hard-coded into forge. see:
-      # testsuite/forge/src/backend/k8s/mod.rs
-      root_key = "0x48136DF3174A3DE92AFDB375FFE116908B69FF6FAB9B1410E548A33FEA1D159D"
-    }
-  }
-}
-
-# helm value override merging with forge
-module "aptos-node-helm-values-deepmerge" {
-  # https://registry.terraform.io/modules/Invicton-Labs/deepmerge/null/0.1.5
-  source = "Invicton-Labs/deepmerge/null"
-  maps = [
-    var.enable_forge ? tomap(local.aptos_node_helm_values_forge_override) : {},
-    var.aptos_node_helm_values,
-  ]
-}
-
-module "genesis-helm-values-deepmerge" {
-  # https://registry.terraform.io/modules/Invicton-Labs/deepmerge/null/0.1.5
-  source = "Invicton-Labs/deepmerge/null"
-  maps = [
-    var.enable_forge ? tomap(local.genesis_helm_values_forge_override) : {},
-    var.genesis_helm_values,
-  ]
 }
 
 module "validator" {
@@ -98,7 +48,7 @@ module "validator" {
   validator_name = "aptos-node"
 
   num_validators = var.num_validators
-  helm_values    = module.aptos-node-helm-values-deepmerge.merged
+  helm_values    = var.aptos_node_helm_values
 
   # allow all nodegroups to surge to 2x their size, in case of total nodes replacement
   validator_instance_num = var.num_validator_instance > 0 ? 2 * var.num_validator_instance : var.num_validators
@@ -161,6 +111,6 @@ resource "helm_release" "genesis" {
         }
       }
     }),
-    jsonencode(module.genesis-helm-values-deepmerge.merged)
+    jsonencode(var.genesis_helm_values)
   ]
 }
