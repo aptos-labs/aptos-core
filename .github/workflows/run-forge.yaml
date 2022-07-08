@@ -55,6 +55,7 @@ jobs:
         if: env.FORGE_ENABLED == 'true'
         shell: bash
         run: |
+          set -ex
           # replace non alphanumeric chars with dash
           FORGE_NAMESPACE="${FORGE_NAMESPACE_BASE//[^[:alnum:]]/-}"
           # use the first 64 chars only for namespace, as it is the maximum for k8s resources
@@ -68,13 +69,14 @@ jobs:
         if: env.FORGE_ENABLED == 'true'
         shell: bash
         run: |
+          set -ex
           kubectl delete $FORGE_POD_NAME || true
           kubectl wait --for=delete "pod/${FORGE_POD_NAME}"
       - name: Run Forge
         if: env.FORGE_ENABLED == 'true'
         shell: bash
         run: |
-          set +e
+          set -ex
           FORGE_START_TIME_MS="$(date '+%s')000"
 
           # Run forge with test runner in k8s
@@ -87,8 +89,17 @@ jobs:
           # tail the logs to get them in GHA runner. tee them for further parsing
           kubectl wait --for=condition=Ready "pod/${FORGE_POD_NAME}"
           kubectl logs -f $FORGE_POD_NAME | tee $FORGE_OUTPUT
+
           FORGE_END_TIME_MS="$(date '+%s')000"
-          FORGE_EXIT_CODE=$?
+
+          # parse the pod status: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
+          forge_pod_status=$(kubectl get pod $FORGE_POD_NAME -o jsonpath="{.status.phase}")
+          if [ "$forge_pod_status" = "Succeeded" ]; then
+            FORGE_EXIT_CODE=0
+          else
+            FORGE_EXIT_CODE=1
+          fi
+
           # export env vars for next step
           echo "FORGE_EXIT_CODE=$FORGE_EXIT_CODE" >> $GITHUB_ENV
           echo "FORGE_START_TIME_MS=$FORGE_START_TIME_MS" >> $GITHUB_ENV
@@ -107,7 +118,21 @@ jobs:
           # parse the JSON report
           cat $FORGE_OUTPUT | awk '/====json-report-begin===/{f=1;next} /====json-report-end===/{f=0} f' > "${FORGE_REPORT}"
           # If no report was generated, fill with default report
-          [ ! -s "${FORGE_REPORT}" ] && echo '{"text": "Forge test runner terminated"}' > "${FORGE_REPORT}"
+          if [ -s "${FORGE_REPORT}" ]; then
+            echo '{"text": "Forge test runner terminated"}' > "${FORGE_REPORT}"
+          fi
+
+          # If no report text was generated, fill with default text
+          FORGE_REPORT_TXT=$(cat $FORGE_REPORT | jq -r .text)
+          if [ -z "$FORGE_REPORT_TXT" ]; then
+            FORGE_REPORT_TXT="Forge report text empty. See test runner output."
+          fi
+
+          if [ "$FORGE_EXIT_CODE" == "0" ]; then
+            FORGE_COMMENT_HEADER='### :white_check_mark: Forge test success'
+          else
+            FORGE_COMMENT_HEADER='### :x: Forge test failure'
+          fi
 
           # remove the "aptos-" prefix to get the chain name as reported to Prometheus
           FORGE_CHAIN_NAME=${FORGE_CLUSTER_NAME#"aptos-"} 
@@ -119,7 +144,8 @@ jobs:
 
           # export env vars for next step
           echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
-          echo "FORGE_REPORT_TXT=$(cat $FORGE_REPORT | jq -r .text)" >> $GITHUB_ENV
+          echo "FORGE_COMMENT_HEADER=$FORGE_COMMENT_HEADER" >> $GITHUB_ENV
+          echo "FORGE_REPORT_TXT=$FORGE_REPORT_TXT" >> $GITHUB_ENV
           echo "FORGE_DASHBOARD_LINK=$FORGE_DASHBOARD_LINK" >> $GITHUB_ENV
 
           # report metrics to pushgateway
@@ -130,9 +156,9 @@ jobs:
         uses: thollander/actions-comment-pull-request@v1
         with:
           message: |
-            Forge run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            Grafana dashboard: ${{ env.FORGE_DASHBOARD_LINK }}
-            Forge test result: 
+            ${{ env.FORGE_COMMENT_HEADER }}
+            * [Test runner output](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            * [Grafana dashboard](${{ env.FORGE_DASHBOARD_LINK }})
             ```
             ${{ env.FORGE_REPORT_TXT }}
             ```
