@@ -24,7 +24,7 @@ pub const STATE_STORE_PRUNER_NAME: &str = "state store pruner";
 
 pub struct StateStorePruner {
     db: Arc<DB>,
-    index_min_nonpurged_version: AtomicVersion,
+    max_index_purged_version: AtomicVersion,
     index_purged_at: Mutex<Instant>,
     /// Keeps track of the target version that the pruner needs to achieve.
     target_version: AtomicVersion,
@@ -105,14 +105,10 @@ impl DBPruner for StateStorePruner {
 }
 
 impl StateStorePruner {
-    pub fn new(
-        db: Arc<DB>,
-        index_min_nonpurged_version: Version,
-        index_purged_at: Instant,
-    ) -> Self {
+    pub fn new(db: Arc<DB>, max_index_purged_version: Version, index_purged_at: Instant) -> Self {
         let pruner = StateStorePruner {
             db,
-            index_min_nonpurged_version: AtomicVersion::new(index_min_nonpurged_version),
+            max_index_purged_version: AtomicVersion::new(max_index_purged_version),
             index_purged_at: Mutex::new(index_purged_at),
             target_version: AtomicVersion::new(0),
             min_readable_version: AtomicVersion::new(0),
@@ -130,36 +126,28 @@ impl StateStorePruner {
         const MIN_INTERVAL: Duration = Duration::from_secs(10);
         const MIN_VERSIONS: u64 = 60000;
 
+        let min_readable_version = self.min_readable_version.load(Ordering::Relaxed);
+        let max_index_purged_version = self.max_index_purged_version.load(Ordering::Relaxed);
+
         // A deletion is issued at most once in one minute and when the pruner has progressed by at
         // least 60000 versions (assuming the pruner deletes as slow as 1000 versions per second,
         // this imposes at most one minute of work in vain after restarting.)
         let now = Instant::now();
-        if self.min_readable_version.load(Ordering::Relaxed) < self.index_min_nonpurged_version() {
-            warn!("State pruner inconsistent, min_readable_version is {} and  index_min_non-purged_version is {}",
-                self.min_readable_version.load(Ordering::Relaxed), self.index_min_nonpurged_version());
-            return Ok(());
-        }
-
         if now - *self.index_purged_at.lock() > MIN_INTERVAL
-            && self.min_readable_version.load(Ordering::Relaxed)
-                - self.index_min_nonpurged_version()
-                + 1
-                > MIN_VERSIONS
+            && min_readable_version - max_index_purged_version > MIN_VERSIONS
         {
-            let new_min_non_purged_version = self.min_readable_version.load(Ordering::Relaxed) + 1;
             self.db.range_delete::<StaleNodeIndexSchema, Version>(
-                &self.index_min_nonpurged_version(),
-                &new_min_non_purged_version, // end is exclusive
+                &(max_index_purged_version + 1), // begin is inclusive
+                &(min_readable_version + 1),     // end is exclusive
             )?;
-            self.index_min_nonpurged_version
-                .store(new_min_non_purged_version, Ordering::Relaxed);
+            // The index items at min_readable_version has been consumed already because they
+            // indicate nodes that became stale at that version, keeping that version readable,
+            // hence is purged above.
+            self.max_index_purged_version
+                .store(min_readable_version, Ordering::Relaxed);
             *self.index_purged_at.lock() = now;
         }
         Ok(())
-    }
-
-    pub fn index_min_nonpurged_version(&self) -> Version {
-        self.index_min_nonpurged_version.load(Ordering::Relaxed)
     }
 
     pub fn target_version(&self) -> Version {
