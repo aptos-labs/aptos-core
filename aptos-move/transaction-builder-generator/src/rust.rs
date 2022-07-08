@@ -218,6 +218,11 @@ impl ScriptFunctionCall {
             .with_external_definitions(external_definitions)
             .with_serialization(!self.local_types);
         rust::CodeGenerator::new(&config)
+            .with_derive_macros(vec![
+                "Clone".to_string(),
+                "Debug".to_string(),
+                "PartialEq".to_string(),
+            ])
             .with_custom_derive_block(custom_derive_block)
             .output(&mut self.out, &script_registry)
             .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", err)))?;
