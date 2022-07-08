@@ -6,10 +6,10 @@ use crate::{
     logging::{LogEvent, LogSchema},
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
-    persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
+    persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     state_replication::StateComputer,
 };
-use anyhow::bail;
+use anyhow::{bail, Context};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -289,6 +289,29 @@ impl BlockStore {
         // If a node restarts in the middle of state synchronization, it is going to try to catch up
         // to the stored quorum certs as the new root.
         storage.save_tree(blocks.clone(), quorum_certs.clone())?;
+
+        // Check early that recovery will succeed, and return before corrupting our state in case it will not.
+        LedgerRecoveryData::new(highest_commit_cert.ledger_info().clone())
+            .find_root(&mut blocks.clone(), &mut quorum_certs.clone())
+            .with_context(|| {
+                // for better readability
+                quorum_certs.sort_by_key(|qc| qc.certified_block().round());
+                format!(
+                    "\nRoot id: {}\nBlocks in db: {}\nQuorum Certs in db: {}\n",
+                    highest_commit_cert.commit_info().id(),
+                    blocks
+                        .iter()
+                        .map(|b| format!("\n\t{}", b))
+                        .collect::<Vec<String>>()
+                        .concat(),
+                    quorum_certs
+                        .iter()
+                        .map(|qc| format!("\n\t{}", qc))
+                        .collect::<Vec<String>>()
+                        .concat(),
+                )
+            })?;
+
         state_computer
             .sync_to(highest_commit_cert.ledger_info().clone())
             .await?;
