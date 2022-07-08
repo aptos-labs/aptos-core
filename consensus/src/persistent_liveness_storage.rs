@@ -69,7 +69,7 @@ impl LedgerRecoveryData {
     /// and the ledger info for the root block, return an error if it can not be found.
     ///
     /// We guarantee that the block corresponding to the storage's latest ledger info always exists.
-    fn find_root(
+    pub fn find_root(
         &self,
         blocks: &mut Vec<Block>,
         quorum_certs: &mut Vec<QuorumCert>,
