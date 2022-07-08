@@ -121,3 +121,19 @@ variable "fullnode_instance_type" {
   description = "Instance type used for validator and fullnodes"
   default     = "c5.xlarge"
 }
+
+variable "enable_indexer" {
+  default = false
+}
+
+variable "indexer_db_publicly_accessible" {
+  default = false
+}
+
+variable "indexer_db_password" {
+  default = "password"
+}
+
+variable "indexer_helm_values" {
+  default = {}
+}
