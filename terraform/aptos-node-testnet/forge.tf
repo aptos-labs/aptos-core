@@ -35,6 +35,16 @@ locals {
     }
   }
   genesis_helm_values_forge_override = {
+    genesis = {
+      validator = {
+        # use non-HAProxy service for validator AptosNet in genesis
+        internal_host_suffix = "validator"
+      }
+      fullnode = {
+        # use non-HAProxy service for fullnode AptosNet in genesis
+        internal_host_suffix = "fullnode"
+      }
+    }
     chain = {
       # this key is hard-coded into forge. see:
       # testsuite/forge/src/backend/k8s/mod.rs
