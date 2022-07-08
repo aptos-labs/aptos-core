@@ -6,11 +6,10 @@
 //! [Spec](https://www.rosetta-api.org/docs/api_identifiers.html)
 
 use crate::{
-    block::version_to_block_index,
-    common::BLOCKCHAIN,
+    common::{strip_hex_prefix, BLOCKCHAIN},
     error::{ApiError, ApiResult},
 };
-use aptos_rest_client::{aptos_api_types::TransactionInfo, Transaction};
+use aptos_rest_client::aptos_api_types::{BlockInfo, TransactionInfo};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -82,22 +81,11 @@ impl BlockIdentifier {
         }
     }
 
-    pub fn from_transaction_info(block_size: u64, info: &TransactionInfo) -> BlockIdentifier {
-        if info.version.0 == 0 {
-            BlockIdentifier::genesis_txn()
-        } else {
-            BlockIdentifier {
-                index: version_to_block_index(block_size, info.version.0),
-                hash: info.accumulator_root_hash.to_string(),
-            }
+    pub fn from_block_info(block_info: BlockInfo) -> BlockIdentifier {
+        BlockIdentifier {
+            index: block_info.block_height,
+            hash: strip_hex_prefix(&block_info.block_hash.to_string()).to_string(),
         }
-    }
-
-    pub fn from_transaction(block_size: u64, txn: &Transaction) -> ApiResult<BlockIdentifier> {
-        let txn_info = txn
-            .transaction_info()
-            .map_err(|err| ApiError::AptosError(Some(err.to_string())))?;
-        Ok(Self::from_transaction_info(block_size, txn_info))
     }
 }
 

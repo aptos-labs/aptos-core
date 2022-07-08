@@ -241,7 +241,7 @@ async fn construction_metadata(
 
     let rest_client = server_context.rest_client()?;
     let address = request.options.internal_operation.sender();
-    let response = get_account(rest_client, address).await?;
+    let response = get_account(&rest_client, address).await?;
 
     // Ensure this network really is the one we expect it to be
     if server_context.chain_id.id() != response.state().chain_id {

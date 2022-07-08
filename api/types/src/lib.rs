@@ -3,6 +3,7 @@
 
 mod account;
 mod address;
+mod block;
 mod bytecode;
 mod convert;
 mod error;
@@ -18,6 +19,7 @@ mod transaction;
 
 pub use account::AccountData;
 pub use address::Address;
+pub use block::BlockInfo;
 pub use bytecode::Bytecode;
 pub use convert::{new_vm_ascii_string, AsConverter, MoveConverter};
 pub use error::Error;

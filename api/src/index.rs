@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    accounts,
+    accounts, blocks,
     context::Context,
     events,
     failpoint::fail_point,
@@ -30,6 +30,7 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .or(accounts::get_account(context.clone()))
         .or(accounts::get_account_resources(context.clone()))
         .or(accounts::get_account_modules(context.clone()))
+        .or(blocks::get_block_info(context.clone()))
         .or(transactions::get_bcs_transaction(context.clone()))
         .or(transactions::get_json_transaction(context.clone()))
         .or(transactions::get_bcs_transactions(context.clone()))
