@@ -71,8 +71,7 @@ All the selected validator node will be receiving sufficient amount of test toke
     aptos init --profile ait2 \
     --private-key <account_private_key> \
     --rest-url http://ait2.aptosdev.com \
-    --faucet-url http://ait2.aptosdev.com \
-    --assume-yes
+    --skip-faucet
     ```
     
     Note: `account_private_key` can be found in the `private-keys.yaml` file.
