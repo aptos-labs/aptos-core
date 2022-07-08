@@ -115,7 +115,7 @@ locals {
         value  = "validators"
         effect = "NoExecute"
       }]
-      remoteLogAddress = var.enable_logger ? "${local.workspace_name}-log-aptos-logger:5044" : null
+      remoteLogAddress = var.enable_logger ? "${helm_release.logger[0].name}-aptos-logger:5044" : null
     }
     fullnode = {
       storage = {
@@ -181,7 +181,7 @@ resource "helm_release" "logger" {
       serviceAccount = {
         create = false
         # this name must match the serviceaccount created by the aptos-node helm chart
-        name = "${local.helm_release_name}-aptos-node-validator"
+        name = local.helm_release_name == "aptos-node" ? "aptos-node-validator" : "${local.helm_release_name}-aptos-node-validator"
       }
     }),
     jsonencode(var.logger_helm_values),

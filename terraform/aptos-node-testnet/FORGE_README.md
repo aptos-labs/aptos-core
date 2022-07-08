@@ -5,6 +5,13 @@ for it to work. The below helm values must be set:
 
 ```
   aptos_node_helm_values_forge_override = {
+    // Hit validators directly in Forge, rather than using HAProxy
+    validator = {
+      enableNetworkPolicy = false
+    }
+    haproxy = {
+      enabled = false
+    }
     // no VFNs in forge for now
     fullnode = {
       groups = []
@@ -27,8 +34,17 @@ for it to work. The below helm values must be set:
       }
     }
   }
-
   genesis_helm_values_forge_override = {
+    genesis = {
+      validator = {
+        # use non-HAProxy service for validator AptosNet in genesis
+        internal_host_suffix = "validator"
+      }
+      fullnode = {
+        # use non-HAProxy service for fullnode AptosNet in genesis
+        internal_host_suffix = "fullnode"
+      }
+    }
     chain = {
       # this key is hard-coded into forge. see:
       # testsuite/forge/src/backend/k8s/mod.rs
