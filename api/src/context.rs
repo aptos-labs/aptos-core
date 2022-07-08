@@ -90,6 +90,14 @@ impl Context {
         callback.await?
     }
 
+    pub fn get_genesis_accumulator_hash(&self) -> Result<HashValue, Error> {
+        let state_proof = self.db.get_state_proof_with_ledger_info(0)?;
+
+        Ok(state_proof
+            .latest_ledger_info()
+            .transaction_accumulator_hash())
+    }
+
     pub fn get_latest_ledger_info(&self) -> Result<LedgerInfo, Error> {
         if let Some(oldest_version) = self.db.get_first_txn_version()? {
             Ok(LedgerInfo::new(
