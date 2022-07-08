@@ -7,7 +7,6 @@ use crate::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     ledger_info::LedgerInfo,
-    nibble::nibble_path::NibblePath,
     proof::{
         accumulator::InMemoryAccumulator, TransactionInfoListWithProof, TransactionInfoWithProof,
     },
@@ -1093,7 +1092,6 @@ pub struct TransactionToCommit {
     transaction: Transaction,
     transaction_info: TransactionInfo,
     state_updates: HashMap<StateKey, StateValue>,
-    jf_node_hashes: Option<HashMap<NibblePath, HashValue>>,
     write_set: WriteSet,
     events: Vec<ContractEvent>,
 }
@@ -1103,7 +1101,6 @@ impl TransactionToCommit {
         transaction: Transaction,
         transaction_info: TransactionInfo,
         state_updates: HashMap<StateKey, StateValue>,
-        jf_node_hashes: Option<HashMap<NibblePath, HashValue>>,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
     ) -> Self {
@@ -1111,7 +1108,6 @@ impl TransactionToCommit {
             transaction,
             transaction_info,
             state_updates,
-            jf_node_hashes,
             write_set,
             events,
         }
@@ -1132,10 +1128,6 @@ impl TransactionToCommit {
 
     pub fn state_updates(&self) -> &HashMap<StateKey, StateValue> {
         &self.state_updates
-    }
-
-    pub fn jf_node_hashes(&self) -> Option<&HashMap<NibblePath, HashValue>> {
-        self.jf_node_hashes.as_ref()
     }
 
     pub fn write_set(&self) -> &WriteSet {

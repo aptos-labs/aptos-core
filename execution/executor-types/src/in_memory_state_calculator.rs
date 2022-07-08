@@ -14,7 +14,6 @@ use aptos_types::{
     account_view::AccountView,
     epoch_state::EpochState,
     event::EventKey,
-    nibble::nibble_path::NibblePath,
     on_chain_config,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionPayload, Version},
@@ -91,20 +90,16 @@ impl InMemoryStateCalculator {
         new_epoch: bool,
     ) -> Result<(
         Vec<HashMap<StateKey, StateValue>>,
-        Vec<HashMap<NibblePath, HashValue>>,
         Vec<Option<HashValue>>,
         InMemoryState,
         Option<EpochState>,
     )> {
         let mut state_updates_vec = Vec::new();
-        let mut new_node_hashes_vec = Vec::new();
         let mut state_checkpoint_hashes = Vec::new();
 
         for (txn, txn_output) in to_keep {
-            let (state_updates, new_node_hashes, state_checkpoint_hash) =
-                self.add_transaction(txn, txn_output)?;
+            let (state_updates, state_checkpoint_hash) = self.add_transaction(txn, txn_output)?;
             state_updates_vec.push(state_updates);
-            new_node_hashes_vec.push(new_node_hashes);
             state_checkpoint_hashes.push(state_checkpoint_hash);
         }
         let (result_state, accounts) = self.finish()?;
@@ -118,7 +113,6 @@ impl InMemoryStateCalculator {
 
         Ok((
             state_updates_vec,
-            new_node_hashes_vec,
             state_checkpoint_hashes,
             result_state,
             next_epoch_state,
@@ -129,11 +123,7 @@ impl InMemoryStateCalculator {
         &mut self,
         txn: &Transaction,
         txn_output: &ParsedTransactionOutput,
-    ) -> Result<(
-        HashMap<StateKey, StateValue>,
-        HashMap<NibblePath, HashValue>,
-        Option<HashValue>,
-    )> {
+    ) -> Result<(HashMap<StateKey, StateValue>, Option<HashValue>)> {
         let updated_state_keys = process_write_set(
             Some(txn),
             &mut self.state_cache,
@@ -148,7 +138,7 @@ impl InMemoryStateCalculator {
         } else {
             match txn {
                 Transaction::BlockMetadata(_) | Transaction::UserTransaction(_) => {
-                    Ok((HashMap::new(), HashMap::new(), None))
+                    Ok((HashMap::new(), None))
                 }
                 Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => {
                     self.checkpoint()
@@ -157,13 +147,7 @@ impl InMemoryStateCalculator {
         }
     }
 
-    fn checkpoint(
-        &mut self,
-    ) -> Result<(
-        HashMap<StateKey, StateValue>,
-        HashMap<NibblePath, HashValue>,
-        Option<HashValue>,
-    )> {
+    fn checkpoint(&mut self) -> Result<(HashMap<StateKey, StateValue>, Option<HashValue>)> {
         // Update SMT.
         let updates_after_latest = self.updates_after_latest()?;
         let smt_updates: Vec<_> = updates_after_latest
@@ -171,8 +155,6 @@ impl InMemoryStateCalculator {
             .map(|(key, value)| (key.hash(), value))
             .collect();
         let new_checkpoint = self.latest.batch_update(smt_updates, &self.proof_reader)?;
-        let new_node_hashes =
-            new_checkpoint.new_node_hashes_since(&self.checkpoint.clone().freeze());
         let root_hash = new_checkpoint.root_hash();
 
         // Calculate the set of state items that got changed since last checkpoint.
@@ -198,7 +180,7 @@ impl InMemoryStateCalculator {
         self.updated_between_checkpoint_and_latest = HashSet::new();
         self.updated_after_latest = HashSet::new();
 
-        Ok((state_updates, new_node_hashes, Some(root_hash)))
+        Ok((state_updates, Some(root_hash)))
     }
 
     fn parse_validator_set(state_cache: &HashMap<StateKey, StateValue>) -> Result<EpochState> {
