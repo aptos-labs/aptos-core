@@ -8,7 +8,7 @@ sidebar_position: 14
 
 Do this only if you received the confirmation email from Aptos team for your eligibility. Nodes not selected will not have enough tokens to join the testnet. You can still run public fullnode in this case if you want.
 
-## Boostrapping validator node
+## Bootstrapping validator node
 
 Before joining the testnet, you need to bootstrap your node with the genesis blob and waypoint provided by Aptos Labs team. This will convert your node from test mode to prod mode.
 
