@@ -4,8 +4,10 @@ module AptosFramework::Account {
     use Std::Hash;
     use Std::Signer;
     use Std::Vector;
+
     use AptosFramework::ChainId;
     use AptosFramework::Coin;
+    use AptosFramework::SystemAddresses;
     use AptosFramework::TestCoin::TestCoin;
     use AptosFramework::Timestamp;
     use AptosFramework::TransactionFee;
@@ -80,7 +82,8 @@ module AptosFramework::Account {
     native fun create_address(bytes: vector<u8>): address;
     native fun create_signer(addr: address): signer;
 
-    public fun initialize(account: &signer,
+    public fun initialize(
+        account: &signer,
         module_addr: address,
         module_name: vector<u8>,
         script_prologue_name: vector<u8>,
@@ -91,7 +94,7 @@ module AptosFramework::Account {
         writeset_epilogue_name: vector<u8>,
         currency_code_required: bool,
     ) {
-        assert!(Signer::address_of(account) == @CoreResources, Errors::requires_address(ENOT_APTOS_FRAMEWORK));
+        SystemAddresses::assert_aptos_framework(account);
         move_to(account, ChainSpecificAccountInfo {
             module_addr,
             module_name,

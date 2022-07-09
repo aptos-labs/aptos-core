@@ -8,7 +8,7 @@ pub use aptos_api_types::{
 use aptos_api_types::{mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, BlockInfo};
 use aptos_crypto::HashValue;
 use aptos_types::{
-    account_address::AccountAddress, account_config::aptos_root_address,
+    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
     transaction::SignedTransaction,
 };
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
@@ -50,7 +50,7 @@ impl Client {
     }
 
     pub async fn get_aptos_version(&self) -> Result<Response<AptosVersion>> {
-        self.get_resource::<AptosVersion>(aptos_root_address(), "0x1::Version::Version")
+        self.get_resource::<AptosVersion>(CORE_CODE_ADDRESS, "0x1::Version::Version")
             .await
     }
 

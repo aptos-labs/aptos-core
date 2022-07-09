@@ -1,5 +1,6 @@
 module AptosFramework::TransactionFee {
     use AptosFramework::Coin::{Self, BurnCapability};
+    use AptosFramework::SystemAddresses;
     use AptosFramework::TestCoin::TestCoin;
 
     friend AptosFramework::Account;
@@ -17,7 +18,8 @@ module AptosFramework::TransactionFee {
         );
     }
 
-    public fun store_test_coin_burn_cap(core_framework: &signer, burn_cap: BurnCapability<TestCoin>) {
-        move_to(core_framework, TestCoinCapabilities { burn_cap })
+    public fun store_test_coin_burn_cap(account: &signer, burn_cap: BurnCapability<TestCoin>) {
+        SystemAddresses::assert_aptos_framework(account);
+        move_to(account, TestCoinCapabilities { burn_cap })
     }
 }

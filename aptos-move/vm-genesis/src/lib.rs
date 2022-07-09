@@ -12,7 +12,7 @@ use aptos_crypto::{
     HashValue, PrivateKey, Uniform,
 };
 use aptos_types::{
-    account_config::{self, events::NewEpochEvent},
+    account_config::{self, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
@@ -267,7 +267,7 @@ fn initialize_on_chain_governance(session: &mut SessionExt<impl MoveResolver>) {
         "initialize",
         vec![],
         serialize_values(&vec![
-            MoveValue::Signer(account_config::aptos_framework_address()),
+            MoveValue::Signer(CORE_CODE_ADDRESS),
             MoveValue::U128(min_voting_threshold),
             MoveValue::U64(required_proposer_stake),
             MoveValue::U64(voting_period_secs),
@@ -305,7 +305,7 @@ fn create_and_initialize_validators(
         "create_initialize_validators",
         vec![],
         serialize_values(&vec![
-            MoveValue::Signer(account_config::aptos_root_address()),
+            MoveValue::Signer(CORE_CODE_ADDRESS),
             MoveValue::Vector(owners),
             MoveValue::Vector(consensus_pubkeys),
             MoveValue::Vector(proof_of_possession),
@@ -366,9 +366,10 @@ fn verify_genesis_write_set(events: &[ContractEvent]) {
         .iter()
         .filter(|e| e.key() == &NewEpochEvent::event_key())
         .collect();
-    assert!(
-        new_epoch_events.len() == 1,
-        "There should only be one NewEpochEvent"
+    assert_eq!(
+        new_epoch_events.len(),
+        1,
+        "There should only be exactly one NewEpochEvent"
     );
     assert_eq!(new_epoch_events[0].sequence_number(), 0,);
 }

@@ -3,7 +3,7 @@
 
 use crate::{on_chain_config::OnChainConfig, validator_info::ValidatorInfo};
 
-use crate::on_chain_config::{ConfigID, CONFIG_ADDRESS_STR};
+use crate::on_chain_config::ConfigID;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -84,7 +84,7 @@ impl ValidatorSet {
 impl OnChainConfig for ValidatorSet {
     // validator_set_address
     const IDENTIFIER: &'static str = "ValidatorSet";
-    const CONFIG_ID: ConfigID = ConfigID(CONFIG_ADDRESS_STR, "Stake", Self::IDENTIFIER);
+    const CONFIG_ID: ConfigID = ConfigID("0x1", "Stake", Self::IDENTIFIER);
 }
 
 impl IntoIterator for ValidatorSet {

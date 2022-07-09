@@ -6,7 +6,7 @@ use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{aptos_root_address, AccountResource},
+    account_config::{aptos_root_address, AccountResource, CORE_CODE_ADDRESS},
     account_view::AccountView,
     block_metadata::BlockMetadata,
     state_store::state_key::StateKey,
@@ -39,10 +39,10 @@ fn test_genesis() {
     assert_eq!(li.version(), 0);
 
     let account_resource_path = StateKey::AccessPath(AccessPath::new(
-        aptos_root_address(),
+        CORE_CODE_ADDRESS,
         AccountResource::struct_tag().access_vector(),
     ));
-    let (aptos_root_account_resource, state_proof) = db
+    let (aptos_framework_account_resource, state_proof) = db
         .reader
         .get_state_value_with_proof_by_version(&account_resource_path, 0)
         .unwrap();
@@ -56,7 +56,7 @@ fn test_genesis() {
         .verify(
             txn_info.state_checkpoint_hash().unwrap(),
             account_resource_path.hash(),
-            aptos_root_account_resource.as_ref(),
+            aptos_framework_account_resource.as_ref(),
         )
         .unwrap();
 }
@@ -87,11 +87,11 @@ fn test_reconfiguration() {
         .state_view_at_version(Some(current_version))
         .unwrap();
     let validator_account_state_view = db_state_view.as_account_with_state_view(&validator_account);
-    let root_address = aptos_root_address();
-    let root_account_state_view = db_state_view.as_account_with_state_view(&root_address);
+    let aptos_framework_account_state_view =
+        db_state_view.as_account_with_state_view(&CORE_CODE_ADDRESS);
 
     assert_eq!(
-        root_account_state_view
+        aptos_framework_account_state_view
             .get_validator_set()
             .unwrap()
             .unwrap()
@@ -167,10 +167,11 @@ fn test_reconfiguration() {
         .state_view_at_version(Some(current_version))
         .unwrap();
 
-    let root_account_state_view2 = db_state_view.as_account_with_state_view(&root_address);
+    let aptos_framework_account_state_view2 =
+        db_state_view.as_account_with_state_view(&CORE_CODE_ADDRESS);
 
     assert_eq!(
-        root_account_state_view2
+        aptos_framework_account_state_view2
             .get_version()
             .unwrap()
             .unwrap()

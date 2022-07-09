@@ -6,7 +6,7 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::aptos_root_address,
+    account_config::CORE_CODE_ADDRESS,
     contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
@@ -549,7 +549,7 @@ impl MoveStorage for &dyn DbReader {
         let config_value_option = self
             .get_state_value_with_proof_by_version(
                 &StateKey::AccessPath(AccessPath::new(
-                    aptos_root_address(),
+                    CORE_CODE_ADDRESS,
                     access_path_for_config(config_id).path,
                 )),
                 version,

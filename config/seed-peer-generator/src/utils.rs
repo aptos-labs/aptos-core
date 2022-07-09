@@ -8,7 +8,7 @@ use aptos_config::config::{Peer, PeerRole, PeerSet};
 use aptos_logger::prelude::*;
 use aptos_rest_client::Client;
 use aptos_types::{
-    account_config::aptos_root_address,
+    account_config::CORE_CODE_ADDRESS,
     network_address::NetworkAddress,
     on_chain_config::{access_path_for_config, OnChainConfig, ValidatorSet},
     validator_info::ValidatorInfo,
@@ -39,7 +39,7 @@ fn get_validator_set(client_endpoint: String) -> anyhow::Result<ValidatorSet> {
     let client = Client::new(url::Url::parse(&client_endpoint)?);
     let rt = tokio::runtime::Runtime::new().unwrap();
     let validator_set_response = rt.block_on(client.get_resource::<ValidatorSet>(
-        aptos_root_address(),
+        CORE_CODE_ADDRESS,
         std::str::from_utf8(&access_path_for_config(ValidatorSet::CONFIG_ID).path)?,
     ))?;
     Ok(validator_set_response.inner().clone())

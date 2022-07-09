@@ -14,7 +14,7 @@ use crate::{
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_genesis::config::{HostAndPort, ValidatorConfiguration};
 use aptos_rest_client::{Response, Transaction};
-use aptos_types::{account_address::AccountAddress, account_config::aptos_root_address};
+use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use async_trait::async_trait;
 use clap::Parser;
 use std::{
@@ -490,7 +490,7 @@ impl CliCommand<serde_json::Value> for ShowValidatorSet {
         let client = self.rest_options.client(&self.profile_options.profile)?;
         let response = get_resource_migration(
             &client,
-            aptos_root_address(),
+            CORE_CODE_ADDRESS,
             "0x1::Stake::ValidatorSet",
             "0x1::stake::ValidatorSet",
         )
