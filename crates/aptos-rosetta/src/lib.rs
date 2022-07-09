@@ -7,6 +7,7 @@
 
 use crate::{
     account::CoinCache,
+    block::BlockCache,
     common::{handle_request, with_context},
     error::{ApiError, ApiResult},
 };
@@ -41,19 +42,27 @@ pub const ROSETTA_VERSION: &str = "1.4.12";
 #[derive(Clone, Debug)]
 pub struct RosettaContext {
     /// A rest client to connect to a fullnode
-    rest_client: Option<aptos_rest_client::Client>,
+    rest_client: Option<Arc<aptos_rest_client::Client>>,
     /// ChainId of the chain to connect to
     pub chain_id: ChainId,
-    /// Block size of made up blocks
-    pub block_size: u64,
     /// Coin cache for looking up Currency details
     pub coin_cache: Arc<CoinCache>,
+    /// Block index cache
+    pub block_cache: Option<Arc<BlockCache>>,
 }
 
 impl RosettaContext {
-    fn rest_client(&self) -> Result<&aptos_rest_client::Client, ApiError> {
+    fn rest_client(&self) -> ApiResult<Arc<aptos_rest_client::Client>> {
         if let Some(ref client) = self.rest_client {
-            Ok(client)
+            Ok(client.clone())
+        } else {
+            Err(ApiError::NodeIsOffline)
+        }
+    }
+
+    fn block_cache(&self) -> ApiResult<Arc<BlockCache>> {
+        if let Some(ref block_cache) = self.block_cache {
+            Ok(block_cache.clone())
         } else {
             Err(ApiError::NodeIsOffline)
         }
@@ -62,7 +71,6 @@ impl RosettaContext {
 
 /// Creates HTTP server (warp-based) for Rosetta
 pub fn bootstrap(
-    block_size: u64,
     chain_id: ChainId,
     api_config: ApiConfig,
     rest_client: Option<aptos_rest_client::Client>,
@@ -75,18 +83,12 @@ pub fn bootstrap(
 
     debug!("Starting up Rosetta server with {:?}", api_config);
 
-    runtime.spawn(bootstrap_async(
-        block_size,
-        chain_id,
-        api_config,
-        rest_client,
-    ));
+    runtime.spawn(bootstrap_async(chain_id, api_config, rest_client));
     Ok(runtime)
 }
 
 /// Creates HTTP server for Rosetta in an async context
 pub async fn bootstrap_async(
-    block_size: u64,
     chain_id: ChainId,
     api_config: ApiConfig,
     rest_client: Option<aptos_rest_client::Client>,
@@ -94,11 +96,21 @@ pub async fn bootstrap_async(
     debug!("Starting up Rosetta server with {:?}", api_config);
     let api = WebServer::from(api_config);
     let handle = tokio::spawn(async move {
+        // If it's Online mode, add the block cache
+        let rest_client = rest_client.map(Arc::new);
+        let block_cache = if let Some(ref rest_client) = rest_client {
+            Some(Arc::new(
+                BlockCache::new(rest_client.clone()).await.unwrap(),
+            ))
+        } else {
+            None
+        };
+
         let context = RosettaContext {
-            block_size,
-            rest_client,
+            rest_client: rest_client.clone(),
             chain_id,
             coin_cache: Arc::new(CoinCache::new()),
+            block_cache,
         };
         api.serve(routes(context)).await;
     });

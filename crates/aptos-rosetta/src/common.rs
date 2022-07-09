@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block::{block_index_to_version, version_to_block_index},
     error::{ApiError, ApiResult},
     types::{
         test_coin_identifier, BlockIdentifier, Currency, MetadataRequest, NetworkIdentifier,
@@ -12,7 +11,7 @@ use crate::{
 };
 use aptos_crypto::{HashValue, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_logger::debug;
-use aptos_rest_client::{Account, Response};
+use aptos_rest_client::{aptos_api_types::BlockInfo, Account, Response};
 use aptos_sdk::move_types::language_storage::{StructTag, TypeTag};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
@@ -20,6 +19,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{convert::Infallible, future::Future, str::FromStr};
 use warp::Filter;
 
+/// The year 2000 in seconds, as this is the lower limit for Rosetta API implementations
+const Y2K_SECS: u64 = 946713600000;
 pub const BLOCKCHAIN: &str = "aptos";
 
 /// Checks the request network matches the server network
@@ -102,9 +103,15 @@ pub async fn get_account(
 }
 
 /// Retrieve the timestamp according ot the Rosetta spec (milliseconds)
-pub fn get_timestamp<T>(response: &Response<T>) -> u64 {
+pub fn get_timestamp(block_info: BlockInfo) -> u64 {
     // note: timestamps are in microseconds, so we convert to milliseconds
-    response.state().timestamp_usecs / 1000
+    let mut timestamp = block_info.block_timestamp / 1000;
+
+    // Rosetta doesn't like timestamps before 2000
+    if timestamp < Y2K_SECS {
+        timestamp = Y2K_SECS;
+    }
+    timestamp
 }
 
 /// Strips the `0x` prefix on hex strings
@@ -163,9 +170,8 @@ pub fn string_to_hash(str: &str) -> ApiResult<HashValue> {
 
 /// Determines which block to pull for the request
 pub async fn get_block_index_from_request(
-    rest_client: &aptos_rest_client::Client,
+    server_context: &RosettaContext,
     partial_block_identifier: Option<PartialBlockIdentifier>,
-    block_size: u64,
 ) -> ApiResult<u64> {
     Ok(match partial_block_identifier {
         Some(PartialBlockIdentifier {
@@ -187,31 +193,26 @@ pub async fn get_block_index_from_request(
             if hash == BlockIdentifier::genesis_txn().hash {
                 0
             } else {
-                // Lookup by hash doesn't work since we're faking blocks, need to verify that it's a
-                // block
-                let response = rest_client.get_transaction(string_to_hash(&hash)?).await?;
-                let version = response.inner().version();
-
-                if let Some(version) = version {
-                    let block_index = version_to_block_index(block_size, version);
-                    // If it's not the beginning of a block, then it's invalid
-                    if version != block_index_to_version(block_size, block_index) {
-                        return Err(ApiError::TransactionIsPending);
-                    }
-
-                    block_index
-                } else {
-                    // If the transaction is pending, it's incomplete
-                    return Err(ApiError::BlockIncomplete);
-                }
+                server_context
+                    .block_cache()?
+                    .get_block_index_by_hash(
+                        &aptos_rest_client::aptos_api_types::HashValue::from_str(&hash)?,
+                    )
+                    .await?
             }
         }
         // Lookup latest version
         _ => {
-            let response = rest_client.get_ledger_information().await?;
+            let response = server_context
+                .rest_client()?
+                .get_ledger_information()
+                .await?;
             let state = response.state();
-            // The current version won't be a full block, so we have to go one before it
-            version_to_block_index(block_size, state.version) - 1
+
+            server_context
+                .block_cache()?
+                .get_block_index_by_version(state.version)
+                .await?
         }
     })
 }

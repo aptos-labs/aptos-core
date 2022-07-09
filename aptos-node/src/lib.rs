@@ -12,7 +12,7 @@ use aptos_config::{
 };
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_infallible::RwLock;
-use aptos_logger::prelude::*;
+use aptos_logger::{prelude::*, Level};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -150,7 +150,7 @@ pub fn load_test_environment<R>(
         maybe_config.push("validator_node_template.yaml");
         let mut template = NodeConfig::load_config(maybe_config)
             .unwrap_or_else(|_| NodeConfig::default_for_validator());
-
+        template.logger.level = Level::Debug;
         // enable REST and JSON-RPC API
         template.api.address = format!("0.0.0.0:{}", template.api.address.port())
             .parse()

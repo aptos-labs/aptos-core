@@ -7,7 +7,6 @@
 //!
 
 use crate::{
-    block::block_index_to_version,
     common::{
         check_network, get_block_index_from_request, handle_request, native_coin, native_coin_tag,
         with_context,
@@ -61,28 +60,28 @@ async fn account_balance(
     let network_identifier = request.network_identifier;
 
     check_network(network_identifier, &server_context)?;
-    let block_size = server_context.block_size;
     let rest_client = server_context.rest_client()?;
 
     // Retrieve the block index to read
     let block_index =
-        get_block_index_from_request(rest_client, request.block_identifier.clone(), block_size)
-            .await?;
+        get_block_index_from_request(&server_context, request.block_identifier.clone()).await?;
 
     // Version to grab is the last entry in the block (balance is at end of block)
-    let block_version = block_index_to_version(block_size, block_index);
-    let balance_version =
-        block_index_to_version(block_size, block_index.saturating_add(1)).saturating_sub(1);
+    let block_info = server_context
+        .block_cache()?
+        .get_block_info(block_index)
+        .await?;
+    let balance_version = block_info.end_version;
 
     let balances = get_balances(
-        rest_client,
+        &rest_client,
         request.account_identifier.account_address()?,
         balance_version,
     )
     .await?;
 
     let amounts = convert_balances_to_amounts(
-        rest_client,
+        &rest_client,
         server_context.coin_cache.clone(),
         request.currencies,
         balances,
@@ -91,10 +90,7 @@ async fn account_balance(
     .await?;
 
     // Get the block identifier
-    let response = rest_client
-        .get_transaction_by_version(block_version)
-        .await?;
-    let block_identifier = BlockIdentifier::from_transaction(block_size, response.inner())?;
+    let block_identifier = BlockIdentifier::from_block_info(block_info);
 
     Ok(AccountBalanceResponse {
         block_identifier,

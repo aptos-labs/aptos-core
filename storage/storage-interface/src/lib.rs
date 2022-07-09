@@ -262,6 +262,14 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
+    /// See [AptosDB::get_block_boundaries].
+    ///
+    /// [AptosDB::get_block_boundaries]:
+    /// ../aptosdb/struct.AptosDB.html#method.get_block_boundaries
+    fn get_block_boundaries(&self, version: u64) -> Result<(u64, u64)> {
+        unimplemented!()
+    }
+
     /// Gets the version of the last transaction committed before timestamp,
     /// a committed block at or after the required timestamp must exist (otherwise it's possible
     /// the next block committed as a timestamp smaller than the one in the request).

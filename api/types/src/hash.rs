@@ -4,7 +4,7 @@
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 
-#[derive(Clone, Debug, PartialEq, Copy)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct HashValue(aptos_crypto::hash::HashValue);
 
 impl From<aptos_crypto::hash::HashValue> for HashValue {
