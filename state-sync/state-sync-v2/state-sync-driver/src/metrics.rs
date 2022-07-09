@@ -12,6 +12,23 @@ pub const DRIVER_CONSENSUS_COMMIT_NOTIFICATION: &str = "driver_consensus_commit_
 pub const DRIVER_CONSENSUS_SYNC_NOTIFICATION: &str = "driver_consensus_sync_notification";
 pub const STORAGE_SYNCHRONIZER_PENDING_DATA: &str = "storage_synchronizer_pending_data";
 
+/// An enum representing the component currently executing
+pub enum ExecutingComponent {
+    Bootstrapper,
+    Consensus,
+    ContinuousSyncer,
+}
+
+impl ExecutingComponent {
+    pub fn get_label(&self) -> &'static str {
+        match self {
+            ExecutingComponent::Bootstrapper => "bootstrapper",
+            ExecutingComponent::Consensus => "consensus",
+            ExecutingComponent::ContinuousSyncer => "continuous_syncer",
+        }
+    }
+}
+
 /// An enum of storage synchronizer operations performed by state sync
 pub enum StorageSynchronizerOperations {
     AppliedTransactionOutputs, // Applied a chunk of transactions outputs.
@@ -60,6 +77,16 @@ pub static DRIVER_COUNTERS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_state_sync_driver_counters",
         "Counters related to the state sync driver",
+        &["label"]
+    )
+    .unwrap()
+});
+
+/// Counters related to the currently executing component
+pub static EXECUTING_COMPONENT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_state_sync_executing_component_counters",
+        "Counters related to the currently executing component",
         &["label"]
     )
     .unwrap()
