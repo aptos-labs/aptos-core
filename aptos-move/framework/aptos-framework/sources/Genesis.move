@@ -1,7 +1,9 @@
 module AptosFramework::Genesis {
     use Std::Signer;
+    use Std::Errors;
     use Std::Event;
     use Std::Vector;
+
     use AptosFramework::Account;
     use AptosFramework::Coin;
     use AptosFramework::ConsensusConfig;
@@ -15,6 +17,9 @@ module AptosFramework::Genesis {
     use AptosFramework::Timestamp;
     use AptosFramework::TransactionFee;
     use AptosFramework::VMConfig;
+
+    /// Invalid epoch duration.
+    const EINVALID_EPOCH_DURATION: u64 = 1;
 
     fun initialize(
         core_resource_account: signer,
@@ -36,6 +41,9 @@ module AptosFramework::Genesis {
         rewards_rate: u64,
         rewards_rate_denominator: u64,
     ) {
+        // This can fail genesis but is necessary so that any misconfigurations can be corrected before genesis succeeds
+        assert!(epoch_interval > 0, Errors::invalid_argument(EINVALID_EPOCH_DURATION));
+
         initialize_internal(
             &core_resource_account,
             core_resource_account_auth_key,
@@ -215,13 +223,13 @@ module AptosFramework::Genesis {
             0,
             x"",
             1,
+            1,
             0,
+            1,
             0,
-            0,
-            0,
-            0,
+            1,
             true,
-            0,
+            1,
             1,
         )
     }

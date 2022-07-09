@@ -174,6 +174,10 @@ module AptosFramework::Coin {
         amount: u64,
         burn_cap: &BurnCapability<CoinType>,
     ) acquires CoinInfo, CoinStore {
+        if (amount == 0) {
+            return
+        };
+
         let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
         let coin_to_burn = extract(&mut coin_store.coin, amount);
         burn(coin_to_burn, burn_cap);
@@ -265,6 +269,10 @@ module AptosFramework::Coin {
         amount: u64,
         _cap: &MintCapability<CoinType>,
     ): Coin<CoinType> acquires CoinInfo {
+        if (amount == 0) {
+            return zero<CoinType>()
+        };
+
         let coin_addr = TypeInfo::account_address(&TypeInfo::type_of<CoinType>());
         let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_addr).supply;
         if (Option::is_some(supply)) {

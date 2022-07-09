@@ -65,6 +65,12 @@ module AptosFramework::Stake {
     const ENO_POST_GENESIS_VALIDATOR_SET_CHANGE_ALLOWED: u64 = 15;
     /// Invalid consensus public key
     const EINVALID_PUBLIC_KEY: u64 = 16;
+    /// Invalid required stake range, usually happens if min > max.
+    const EINVALID_STAKE_RANGE: u64 = 17;
+    /// Invalid required stake lockup, usually happens if min > max.
+    const EINVALID_LOCKUP_RANGE: u64 = 18;
+    /// Invalid rewards rate.
+    const EINVALID_REWARDS_RATE: u64 = 19;
 
     /// Capability that represents ownership and can be used to control the validator and the associated stake pool.
     /// Having this be separate from the signer for the account that the validator resources are hosted at allows
@@ -275,6 +281,8 @@ module AptosFramework::Stake {
         minimum_stake: u64,
         maximum_stake: u64,
     ) acquires ValidatorSetConfiguration {
+        validate_required_stake(minimum_stake, maximum_stake);
+
         let validator_set_config = borrow_global_mut<ValidatorSetConfiguration>(@CoreResources);
         validator_set_config.minimum_stake = minimum_stake;
         validator_set_config.maximum_stake = maximum_stake;
@@ -287,6 +295,8 @@ module AptosFramework::Stake {
         min_lockup_duration_secs: u64,
         max_lockup_duration_secs: u64,
     ) acquires ValidatorSetConfiguration {
+        validate_required_lockup(min_lockup_duration_secs, max_lockup_duration_secs);
+
         let validator_set_config = borrow_global_mut<ValidatorSetConfiguration>(@CoreResources);
         validator_set_config.min_lockup_duration_secs = min_lockup_duration_secs;
         validator_set_config.max_lockup_duration_secs = max_lockup_duration_secs;
@@ -299,6 +309,8 @@ module AptosFramework::Stake {
         new_rewards_rate: u64,
         new_rewards_rate_denominator: u64,
     ) acquires ValidatorSetConfiguration {
+        validate_rewards_rate(new_rewards_rate, new_rewards_rate_denominator);
+
         let validator_set_config = borrow_global_mut<ValidatorSetConfiguration>(@CoreResources);
         validator_set_config.rewards_rate = new_rewards_rate;
         validator_set_config.rewards_rate_denominator = new_rewards_rate_denominator;
@@ -316,6 +328,12 @@ module AptosFramework::Stake {
         rewards_rate_denominator: u64,
     ) {
         SystemAddresses::assert_core_resource(core_resources);
+
+        // This can fail genesis but is necessary so that any misconfigurations can be corrected before genesis succeeds
+        validate_required_stake(minimum_stake, maximum_stake);
+        validate_required_lockup(min_lockup_duration_secs, max_lockup_duration_secs);
+        validate_rewards_rate(rewards_rate, rewards_rate_denominator);
+
         move_to(core_resources, ValidatorSet {
             consensus_scheme: 0,
             active_validators: Vector::empty(),
@@ -473,10 +491,16 @@ module AptosFramework::Stake {
     ) acquires StakePool, StakePoolEvents, ValidatorSet, ValidatorSetConfiguration {
         assert!(owner_cap.pool_address == pool_address, Errors::invalid_argument(ENOT_OWNER));
 
-        let stake_pool = borrow_global_mut<StakePool>(pool_address);
+        // Short-circuit if amount added is 0 so we don't emit events.
         let amount = Coin::value<TestCoin>(&coins);
+        if (amount == 0) {
+            Coin::destroy_zero(coins);
+            return
+        };
+
         // Add to pending_active if it's a current validator because the stake is not counted until the next epoch.
         // Otherwise, the delegation can be added to active directly as the validator is also activated in the epoch.
+        let stake_pool = borrow_global_mut<StakePool>(pool_address);
         if (is_current_validator(pool_address)) {
             Coin::merge<TestCoin>(&mut stake_pool.pending_active, coins);
         } else {
@@ -658,6 +682,11 @@ module AptosFramework::Stake {
     ) acquires StakePool, StakePoolEvents, ValidatorSet {
         assert!(owner_cap.pool_address == pool_address, Errors::invalid_argument(ENOT_OWNER));
 
+        // Short-circuit if amount to unlock is 0 so we don't emit events.
+        if (amount == 0) {
+            return
+        };
+
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         let unlocked_stake = Coin::extract<TestCoin>(&mut stake_pool.active, amount);
 
@@ -764,6 +793,8 @@ module AptosFramework::Stake {
         Option::is_some(&find_validator(&validator_set.pending_inactive, addr))
     }
 
+    /// Update the number of missed votes. This is only called by Block::prologue().
+    /// This function cannot abort.
     public(friend) fun update_performance_statistics(missed_votes: vector<u64>) acquires ValidatorPerformance {
         // Validator set cannot change until the end of the epoch, so the validator index in list of missed votes should
         // match with those of the missed vote counts in ValidatorPerformance resource.
@@ -999,8 +1030,29 @@ module AptosFramework::Stake {
             Option::is_some(&find_validator(&validator_set.pending_active, pool_address))
     }
 
+    fun validate_required_stake(minimum_stake: u64, maximum_stake: u64) {
+        assert!(minimum_stake <= maximum_stake && maximum_stake > 0, Errors::invalid_argument(EINVALID_STAKE_RANGE));
+    }
+
+    fun validate_required_lockup(min_lockup_duration_secs: u64, max_lockup_duration_secs: u64) {
+        assert!(
+            min_lockup_duration_secs <= max_lockup_duration_secs && max_lockup_duration_secs > 0,
+            Errors::invalid_argument(EINVALID_LOCKUP_RANGE),
+        );
+    }
+
+    fun validate_rewards_rate(new_rewards_rate: u64, new_rewards_rate_denominator: u64) {
+        assert!(
+            new_rewards_rate > 0 && new_rewards_rate_denominator > 0,
+            Errors::invalid_argument(EINVALID_REWARDS_RATE),
+        );
+    }
+
     #[test_only]
     use AptosFramework::TestCoin;
+
+    #[test_only]
+    use AptosFramework::GovernanceProposal;
 
     #[test_only]
     const CONSENSUS_KEY_1: vector<u8> = x"8a54b92288d4ba5073d3a52e80cc00ae9fbbc1cc5b433b46089b7804c38a76f00fc64746c7685ee628fc2d0b929c2294";
@@ -1383,7 +1435,7 @@ module AptosFramework::Stake {
     public(script) fun test_change_validator_set_configs(core_resources: signer) acquires ValidatorSetConfiguration {
         use AptosFramework::GovernanceProposal;
 
-        initialize_validator_set(&core_resources, 0, 1, 0, 0, false, 0, 1);
+        initialize_validator_set(&core_resources, 0, 1, 0, 1, false, 1, 1);
 
         update_required_stake(GovernanceProposal::create_test_proposal(), 100, 1000);
         update_required_lockup(GovernanceProposal::create_test_proposal(), 1000, 10000);
@@ -1395,6 +1447,30 @@ module AptosFramework::Stake {
         assert!(config.max_lockup_duration_secs == 10000, 3);
         assert!(config.rewards_rate == 10, 4);
         assert!(config.rewards_rate_denominator == 100, 4);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 4359)]
+    public(script) fun test_update_required_stake_invalid_range_should_fail() acquires ValidatorSetConfiguration {
+        update_required_stake(GovernanceProposal::create_test_proposal(), 10, 5);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 4359)]
+    public(script) fun test_update_required_stake_zero_max_stake_should_fail() acquires ValidatorSetConfiguration {
+        update_required_stake(GovernanceProposal::create_test_proposal(), 0, 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 4615)]
+    public(script) fun test_update_required_lockup_invalid_range_should_fail() acquires ValidatorSetConfiguration {
+        update_required_lockup(GovernanceProposal::create_test_proposal(), 10, 5);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 4615)]
+    public(script) fun test_update_required_lockup_zero_max_lockup_should_fail() acquires ValidatorSetConfiguration {
+        update_required_lockup(GovernanceProposal::create_test_proposal(), 0, 0);
     }
 
     #[test_only]

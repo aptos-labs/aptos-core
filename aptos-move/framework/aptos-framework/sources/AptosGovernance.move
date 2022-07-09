@@ -31,6 +31,7 @@ module AptosFramework::AptosGovernance {
     const ENOT_DELEGATED_VOTER: u64 = 2;
     const EINSUFFICIENT_STAKE_LOCKUP: u64 = 3;
     const EALREADY_VOTED: u64 = 4;
+    const ENO_VOTING_POWER: u64 = 5;
 
     /// Configurations of the AptosGovernance, set during Genesis and can be updated by the same process offered
     /// by this AptosGovernance module.
@@ -201,6 +202,13 @@ module AptosFramework::AptosGovernance {
         let voter_address = Signer::address_of(voter);
         assert!(Stake::is_delegated_voter(stake_pool, voter_address), Errors::invalid_argument(ENOT_DELEGATED_VOTER));
 
+        // Voting power does not include pending_active or pending_inactive balances.
+        // In general, the stake pool should not have pending_inactive balance if it still has lockup (requried to vote)
+        // And if pending_active will be added to active in the next epoch.
+        let voting_power = Stake::get_active_staked_balance(stake_pool);
+        // Short-circuit if the voter has no voting power.
+        assert!(voting_power > 0, Errors::invalid_argument(ENO_VOTING_POWER));
+
         // The voter's stake needs to be locked up at least as long as the proposal's expiration.
         let proposal_expiration = Voting::get_proposal_expiration_secs<GovernanceProposal>(@AptosFramework, proposal_id);
         assert!(
@@ -219,10 +227,6 @@ module AptosFramework::AptosGovernance {
             Errors::invalid_argument(EALREADY_VOTED));
         Table::add(&mut voting_records.votes, record_key, true);
 
-        // Voting power does not include pending_active or pending_inactive balances.
-        // In general, the stake pool should not have pending_inactive balance if it still has lockup (requried to vote)
-        // And if pending_active will be added to active in the next epoch.
-        let voting_power = Stake::get_active_staked_balance(stake_pool);
         Voting::vote<GovernanceProposal>(
             &GovernanceProposal::create_proposal(),
             @AptosFramework,
