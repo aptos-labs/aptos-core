@@ -19,7 +19,7 @@ aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 aptosdb = { path = "../../storage/aptosdb" }
 executor = { path = "../executor" }
 storage-interface = { path = "../../storage/storage-interface" }

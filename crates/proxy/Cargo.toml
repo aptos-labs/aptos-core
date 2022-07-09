@@ -12,4 +12,4 @@ edition = "2018"
 [dependencies]
 ipnet = "2.5.0"
 
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }
+

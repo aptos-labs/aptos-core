@@ -33,7 +33,7 @@ aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers", optiona
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 aptosdb = { path = "../../storage/aptosdb", optional = true }
 consensus-notifications = { path = "../inter-component/consensus-notifications" }
 event-notifications = { path = "../../state-sync/inter-component/event-notifications" }

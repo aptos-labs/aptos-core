@@ -21,7 +21,7 @@ aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
 aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive" }
 aptos-types = { path = "../../types", features = ["fuzzing"] }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 consensus = { path = "../../consensus", features = ["fuzzing"] }
 consensus-types = { path = "../../consensus/consensus-types", features = ["fuzzing"] }
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "fuzzing"] }

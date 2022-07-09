@@ -18,4 +18,4 @@ tokio-util = { version = "0.7.2", features = ["compat"] }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }
+

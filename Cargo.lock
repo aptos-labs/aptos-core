@@ -19,7 +19,6 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-types",
- "aptos-workspace-hack",
  "mirai-annotations",
  "proptest",
  "rand 0.7.3",
@@ -81,7 +80,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-vm",
- "aptos-workspace-hack",
  "bcs",
  "cached-framework-packages",
  "clap 3.1.18",
@@ -158,7 +156,6 @@ dependencies = [
  "aptos-transaction-builder",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptosdb",
  "async-trait",
  "base64",
@@ -208,7 +205,6 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptosdb",
  "bcs",
  "bytes",
@@ -247,7 +243,6 @@ dependencies = [
  "aptos-transaction-builder",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "bcs",
  "hex",
  "move-deps",
@@ -260,7 +255,6 @@ dependencies = [
 name = "aptos-bitvec"
 version = "0.1.0"
 dependencies = [
- "aptos-workspace-hack",
  "bcs",
  "proptest",
  "proptest-derive",
@@ -280,7 +274,6 @@ dependencies = [
  "aptos-secure-storage",
  "aptos-temppath",
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "get_if_addrs",
  "mirai-annotations",
@@ -297,7 +290,6 @@ version = "0.0.3"
 dependencies = [
  "anyhow",
  "aptos-crypto-derive",
- "aptos-workspace-hack",
  "bcs",
  "bitvec",
  "blst",
@@ -316,7 +308,6 @@ dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
  "ring",
- "ripemd160",
  "serde 1.0.137",
  "serde-name",
  "serde_bytes",
@@ -335,7 +326,6 @@ name = "aptos-crypto-derive"
 version = "0.0.3"
 dependencies = [
  "anyhow",
- "aptos-workspace-hack",
  "proc-macro2 1.0.39",
  "quote 1.0.18",
  "syn 1.0.95",
@@ -353,7 +343,6 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-time-service",
  "aptos-types",
- "aptos-workspace-hack",
  "async-trait",
  "bcs",
  "channel",
@@ -386,7 +375,6 @@ dependencies = [
  "aptos-logger",
  "aptos-rest-client",
  "aptos-sdk",
- "aptos-workspace-hack",
  "bcs",
  "bytes",
  "futures",
@@ -415,7 +403,6 @@ dependencies = [
  "aptos-logger",
  "aptos-rest-client",
  "aptos-sdk",
- "aptos-workspace-hack",
  "bcs",
  "bytes",
  "clap 3.1.18",
@@ -437,7 +424,6 @@ name = "aptos-fuzz"
 version = "0.1.0"
 dependencies = [
  "aptos-fuzzer",
- "aptos-workspace-hack",
  "libfuzzer-sys",
  "once_cell",
 ]
@@ -454,7 +440,6 @@ dependencies = [
  "aptos-proptest-helpers",
  "aptos-types",
  "aptos-vault-client",
- "aptos-workspace-hack",
  "aptosdb",
  "bcs",
  "byteorder",
@@ -496,7 +481,6 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptosdb",
  "bcs",
  "cached-framework-packages",
@@ -515,7 +499,6 @@ dependencies = [
 name = "aptos-github-client"
 version = "0.1.0"
 dependencies = [
- "aptos-workspace-hack",
  "base64",
  "proxy",
  "serde 1.0.137",
@@ -531,9 +514,6 @@ version = "0.1.0"
 [[package]]
 name = "aptos-id-generator"
 version = "0.1.0"
-dependencies = [
- "aptos-workspace-hack",
-]
 
 [[package]]
 name = "aptos-indexer"
@@ -543,7 +523,6 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-rest-client",
- "aptos-workspace-hack",
  "async-trait",
  "chrono",
  "clap 3.1.18",
@@ -563,9 +542,6 @@ dependencies = [
 [[package]]
 name = "aptos-infallible"
 version = "0.1.0"
-dependencies = [
- "aptos-workspace-hack",
-]
 
 [[package]]
 name = "aptos-jellyfish-merkle"
@@ -577,7 +553,6 @@ dependencies = [
  "aptos-infallible",
  "aptos-metrics-core",
  "aptos-types",
- "aptos-workspace-hack",
  "aptosdb",
  "bcs",
  "byteorder",
@@ -601,7 +576,6 @@ version = "0.1.0"
 dependencies = [
  "aptos-crypto",
  "aptos-types",
- "aptos-workspace-hack",
  "hex",
  "rand 0.7.3",
 ]
@@ -610,7 +584,6 @@ dependencies = [
 name = "aptos-log-derive"
 version = "0.1.0"
 dependencies = [
- "aptos-workspace-hack",
  "proc-macro2 1.0.39",
  "quote 1.0.18",
  "syn 1.0.95",
@@ -622,7 +595,6 @@ version = "0.1.0"
 dependencies = [
  "aptos-infallible",
  "aptos-log-derive",
- "aptos-workspace-hack",
  "backtrace",
  "chrono",
  "erased-serde",
@@ -648,7 +620,6 @@ dependencies = [
  "aptos-time-service",
  "aptos-transaction-builder",
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "hex",
  "serde 1.0.137",
@@ -670,7 +641,6 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-proptest-helpers",
  "aptos-types",
- "aptos-workspace-hack",
  "async-trait",
  "bcs",
  "bounded-executor",
@@ -703,7 +673,6 @@ dependencies = [
 name = "aptos-metrics-core"
 version = "0.1.0"
 dependencies = [
- "aptos-workspace-hack",
  "prometheus",
 ]
 
@@ -711,7 +680,6 @@ dependencies = [
 name = "aptos-module-verifier"
 version = "0.1.0"
 dependencies = [
- "aptos-workspace-hack",
  "move-deps",
 ]
 
@@ -734,7 +702,6 @@ dependencies = [
  "aptos-time-service",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptosdb",
  "backup-service",
  "bcs",
@@ -777,7 +744,6 @@ dependencies = [
  "aptos-logger",
  "aptos-rest-client",
  "aptos-sdk",
- "aptos-workspace-hack",
  "async-trait",
  "clap 3.1.18",
  "const_format",
@@ -813,7 +779,6 @@ dependencies = [
  "aptos-temppath",
  "aptos-transaction-builder",
  "aptos-types",
- "aptos-workspace-hack",
  "base64",
  "bcs",
  "futures",
@@ -839,7 +804,6 @@ name = "aptos-parallel-executor"
 version = "0.1.0"
 dependencies = [
  "aptos-infallible",
- "aptos-workspace-hack",
  "arc-swap",
  "criterion",
  "crossbeam",
@@ -857,7 +821,6 @@ dependencies = [
 name = "aptos-proptest-helpers"
 version = "0.1.0"
 dependencies = [
- "aptos-workspace-hack",
  "crossbeam",
  "proptest",
  "proptest-derive",
@@ -870,7 +833,6 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
- "aptos-workspace-hack",
  "futures",
  "pin-project",
  "tokio",
@@ -884,7 +846,6 @@ dependencies = [
  "anyhow",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "move-deps",
 ]
 
@@ -897,7 +858,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-transaction-builder",
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "hex",
  "move-deps",
@@ -913,7 +873,6 @@ name = "aptos-retrier"
 version = "0.1.0"
 dependencies = [
  "aptos-logger",
- "aptos-workspace-hack",
  "tokio",
 ]
 
@@ -931,7 +890,6 @@ dependencies = [
  "aptos-sdk",
  "aptos-transaction-builder",
  "aptos-types",
- "aptos-workspace-hack",
  "async-trait",
  "bcs",
  "clap 3.1.18",
@@ -961,7 +919,6 @@ dependencies = [
  "aptos-logger",
  "aptos-rosetta",
  "aptos-types",
- "aptos-workspace-hack",
  "clap 3.1.18",
  "hex",
  "serde 1.0.137",
@@ -977,7 +934,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-transaction-builder",
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "move-deps",
  "rand_core 0.5.1",
@@ -991,7 +947,6 @@ dependencies = [
  "aptos-config",
  "aptos-logger",
  "aptos-secure-push-metrics",
- "aptos-workspace-hack",
  "once_cell",
  "serde 1.0.137",
  "thiserror",
@@ -1003,7 +958,6 @@ version = "0.1.0"
 dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
- "aptos-workspace-hack",
  "ureq",
 ]
 
@@ -1019,7 +973,6 @@ dependencies = [
  "aptos-temppath",
  "aptos-time-service",
  "aptos-vault-client",
- "aptos-workspace-hack",
  "base64",
  "bcs",
  "chrono",
@@ -1037,7 +990,6 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "move-core-types",
  "serde 1.0.137",
@@ -1055,7 +1007,6 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
- "aptos-workspace-hack",
  "aptosdb",
  "consensus",
  "futures",
@@ -1080,7 +1031,6 @@ dependencies = [
 name = "aptos-temppath"
 version = "0.1.0"
 dependencies = [
- "aptos-workspace-hack",
  "hex",
  "rand 0.7.3",
 ]
@@ -1090,7 +1040,6 @@ name = "aptos-time-service"
 version = "0.1.0"
 dependencies = [
  "aptos-infallible",
- "aptos-workspace-hack",
  "enum_dispatch",
  "futures",
  "pin-project",
@@ -1106,7 +1055,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "criterion",
  "criterion-cpu-time",
  "language-e2e-tests",
@@ -1120,7 +1068,6 @@ name = "aptos-transaction-builder"
 version = "0.0.3"
 dependencies = [
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "cached-framework-packages",
  "move-deps",
@@ -1139,7 +1086,6 @@ dependencies = [
  "aptos-types",
  "aptos-validator-interface",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptosdb",
  "bcs",
  "difference",
@@ -1154,11 +1100,9 @@ dependencies = [
 name = "aptos-types"
 version = "0.0.3"
 dependencies = [
- "aes-gcm",
  "anyhow",
  "aptos-crypto",
  "aptos-crypto-derive",
- "aptos-workspace-hack",
  "bcs",
  "chrono",
  "hex",
@@ -1188,7 +1132,6 @@ dependencies = [
  "aptos-config",
  "aptos-state-view",
  "aptos-types",
- "aptos-workspace-hack",
  "aptosdb",
  "move-deps",
  "storage-interface",
@@ -1201,7 +1144,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-proptest-helpers",
  "aptos-types",
- "aptos-workspace-hack",
  "base64",
  "chrono",
  "native-tls",
@@ -1226,7 +1168,6 @@ dependencies = [
  "aptos-parallel-executor",
  "aptos-state-view",
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "better_any",
  "fail 0.5.0",
@@ -1245,66 +1186,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-workspace-hack"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "backtrace",
- "byteorder",
- "bytes",
- "cc",
- "chrono",
- "clap 2.34.0",
- "clap 3.1.18",
- "crossbeam-channel",
- "crossbeam-deque",
- "crossbeam-queue",
- "crossbeam-utils",
- "crypto-common",
- "diesel",
- "digest 0.10.3",
- "either",
- "futures-channel",
- "futures-core",
- "futures-io",
- "futures-sink",
- "futures-util",
- "generic-array 0.14.5",
- "hashbrown 0.11.2",
- "hyper",
- "include_dir 0.7.2",
- "itertools",
- "libc",
- "log",
- "memchr",
- "num-bigint 0.2.6",
- "num-integer",
- "num-traits 0.2.15",
- "parking_lot 0.12.0",
- "rand 0.7.3",
- "rand 0.8.5",
- "regex",
- "regex-syntax",
- "reqwest",
- "rusty-fork",
- "serde 1.0.137",
- "serde_json",
- "sha-1 0.10.0",
- "standback",
- "subtle",
- "syn 1.0.95",
- "textwrap 0.15.0",
- "tokio",
- "tokio-util 0.6.10",
- "tokio-util 0.7.2",
- "toml",
- "tracing",
- "tracing-core",
- "url",
- "warp",
-]
-
-[[package]]
 name = "aptos-writeset-generator"
 version = "0.1.0"
 dependencies = [
@@ -1312,13 +1193,9 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-state-view",
- "aptos-transaction-replay",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
- "aptosdb",
  "bcs",
- "cached-framework-packages",
  "framework",
  "handlebars",
  "move-deps",
@@ -1342,7 +1219,6 @@ dependencies = [
  "aptos-state-view",
  "aptos-temppath",
  "aptos-types",
- "aptos-workspace-hack",
  "arc-swap",
  "bcs",
  "byteorder",
@@ -1483,7 +1359,6 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptosdb",
  "async-trait",
  "backup-service",
@@ -1524,7 +1399,6 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-temppath",
  "aptos-types",
- "aptos-workspace-hack",
  "aptosdb",
  "bcs",
  "bytes",
@@ -1621,7 +1495,7 @@ dependencies = [
  "quote 1.0.18",
  "regex",
  "rustc-hash",
- "shlex 1.1.0",
+ "shlex",
 ]
 
 [[package]]
@@ -1729,7 +1603,6 @@ dependencies = [
 name = "bounded-executor"
 version = "0.1.0"
 dependencies = [
- "aptos-workspace-hack",
  "futures",
  "tokio",
 ]
@@ -1806,7 +1679,6 @@ name = "cached-framework-packages"
 version = "0.1.0"
 dependencies = [
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "framework",
  "include_dir 0.7.2",
@@ -1910,7 +1782,6 @@ dependencies = [
  "aptos-infallible",
  "aptos-metrics-core",
  "aptos-types",
- "aptos-workspace-hack",
  "futures",
  "tokio",
 ]
@@ -2133,7 +2004,6 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "async-trait",
  "bcs",
  "byteorder",
@@ -2177,7 +2047,6 @@ version = "0.1.0"
 dependencies = [
  "aptos-crypto",
  "aptos-types",
- "aptos-workspace-hack",
  "async-trait",
  "claim",
  "futures",
@@ -2196,7 +2065,6 @@ dependencies = [
  "aptos-crypto-derive",
  "aptos-infallible",
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "executor-types",
  "futures",
@@ -2330,19 +2198,9 @@ name = "crash-handler"
 version = "0.1.0"
 dependencies = [
  "aptos-logger",
- "aptos-workspace-hack",
  "backtrace",
  "serde 1.0.137",
  "toml",
-]
-
-[[package]]
-name = "crc32fast"
-version = "1.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b540bd8bc810d3885c6ea91e2018302f68baba2129ab3e88f32389ee9370880d"
-dependencies = [
- "cfg-if 1.0.0",
 ]
 
 [[package]]
@@ -2662,7 +2520,6 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-types",
- "aptos-workspace-hack",
  "async-trait",
  "channel",
  "claim",
@@ -2701,7 +2558,6 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptosdb",
  "bcs",
  "executor",
@@ -2851,15 +2707,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dir-diff"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2860407d7d7e2e004bb2128510ad9e8d669e76fa005ccf567977b5d71b8b4a0b"
-dependencies = [
- "walkdir",
-]
-
-[[package]]
 name = "directories"
 version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2917,12 +2764,6 @@ name = "downcast"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
-
-[[package]]
-name = "dtoa"
-version = "0.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56899898ce76aaf4a0f24d914c97ea6ed976d42fec6ad33fcbb0a1103e07b2b0"
 
 [[package]]
 name = "duct"
@@ -3061,7 +2902,6 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptosdb",
  "async-trait",
  "bcs",
@@ -3093,7 +2933,6 @@ dependencies = [
  "aptos-transaction-builder",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptosdb",
  "bcs",
  "consensus-types",
@@ -3129,7 +2968,6 @@ dependencies = [
  "aptos-transaction-builder",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptosdb",
  "chrono",
  "criterion",
@@ -3163,7 +3001,6 @@ dependencies = [
  "aptos-transaction-builder",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptosdb",
  "executor",
  "executor-types",
@@ -3182,7 +3019,6 @@ dependencies = [
  "aptos-secure-net",
  "aptos-state-view",
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "itertools",
  "once_cell",
@@ -3225,7 +3061,6 @@ checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
 name = "fallible"
 version = "0.1.0"
 dependencies = [
- "aptos-workspace-hack",
  "thiserror",
 ]
 
@@ -3292,7 +3127,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "aptos-config",
- "aptos-faucet",
  "aptos-genesis",
  "aptos-logger",
  "aptos-rest-client",
@@ -3300,14 +3134,12 @@ dependencies = [
  "aptos-sdk",
  "aptos-secure-storage",
  "aptos-transaction-builder",
- "aptos-workspace-hack",
  "async-trait",
  "cached-framework-packages",
  "either",
  "futures",
  "hex",
  "hyper",
- "hyper-proxy",
  "hyper-tls",
  "inspection-service",
  "k8s-openapi",
@@ -3316,17 +3148,12 @@ dependencies = [
  "rayon",
  "regex",
  "reqwest",
- "rusoto_core",
- "rusoto_credential",
- "rusoto_eks",
- "rusoto_sts",
  "serde 1.0.137",
  "serde_json",
  "structopt",
  "tempfile",
  "termcolor",
  "tokio",
- "transaction-emitter",
  "transaction-emitter-lib",
  "url",
 ]
@@ -3338,7 +3165,6 @@ dependencies = [
  "aptos-logger",
  "aptos-rest-client",
  "aptos-sdk",
- "aptos-workspace-hack",
  "async-trait",
  "cached-framework-packages",
  "forge",
@@ -3372,11 +3198,8 @@ dependencies = [
  "aptos-crypto",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "bcs",
  "clap 3.1.18",
- "datatest-stable",
- "dir-diff",
  "include_dir 0.7.2",
  "log",
  "move-deps",
@@ -3505,7 +3328,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "consensus",
  "consensus-types",
@@ -3544,7 +3366,6 @@ dependencies = [
  "aptos-resource-viewer",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "cached-framework-packages",
  "move-deps",
  "structopt",
@@ -4000,24 +3821,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hyper-proxy"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca815a891b24fdfb243fa3239c86154392b0953ee584aa1a2a1f66d20cbe75cc"
-dependencies = [
- "bytes",
- "futures",
- "headers",
- "http",
- "hyper",
- "hyper-tls",
- "native-tls",
- "tokio",
- "tokio-native-tls",
- "tower-service",
-]
-
-[[package]]
 name = "hyper-timeout"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4185,7 +3988,6 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-telemetry",
- "aptos-workspace-hack",
  "assert_approx_eq",
  "futures",
  "hyper",
@@ -4388,7 +4190,6 @@ dependencies = [
  "aptos-transaction-builder",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptos-writeset-generator",
  "bcs",
  "cached-framework-packages",
@@ -4416,7 +4217,6 @@ dependencies = [
  "aptos-transaction-builder",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptos-writeset-generator",
  "cached-framework-packages",
  "language-e2e-tests",
@@ -4579,12 +4379,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3e378b66a060d48947b590737b30a1be76706c8dd7b8ba0f2fe3989c68a853f"
 
 [[package]]
-name = "md5"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
-
-[[package]]
 name = "memchr"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4605,7 +4399,6 @@ version = "0.1.0"
 dependencies = [
  "aptos-crypto",
  "aptos-types",
- "aptos-workspace-hack",
  "async-trait",
  "claim",
  "futures",
@@ -4619,7 +4412,6 @@ name = "memsocket"
 version = "0.1.0"
 dependencies = [
  "aptos-infallible",
- "aptos-workspace-hack",
  "bytes",
  "futures",
  "once_cell",
@@ -5045,7 +4837,6 @@ version = "0.1.0"
 dependencies = [
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "clap 3.1.18",
  "move-deps",
  "tempfile",
@@ -5470,7 +5261,6 @@ dependencies = [
 name = "mvhashmap"
 version = "0.1.0"
 dependencies = [
- "aptos-workspace-hack",
  "crossbeam",
  "dashmap",
  "proptest",
@@ -5520,9 +5310,7 @@ checksum = "ca2b420f638f07fe83056b55ea190bb815f609ec5a35e7017884a10f78839c9e"
 name = "netcore"
 version = "0.1.0"
 dependencies = [
- "aptos-logger",
  "aptos-types",
- "aptos-workspace-hack",
  "bytes",
  "futures",
  "memsocket",
@@ -5551,12 +5339,10 @@ dependencies = [
  "aptos-rate-limiter",
  "aptos-time-service",
  "aptos-types",
- "aptos-workspace-hack",
  "async-trait",
  "bcs",
  "bytes",
  "channel",
- "criterion",
  "futures",
  "futures-util",
  "hex",
@@ -5564,7 +5350,6 @@ dependencies = [
  "maplit",
  "memsocket",
  "netcore",
- "network-builder",
  "num-variants",
  "once_cell",
  "pin-project",
@@ -5575,7 +5360,6 @@ dependencies = [
  "serde 1.0.137",
  "serde_bytes",
  "serde_json",
- "serial_test",
  "short-hex-str",
  "thiserror",
  "tokio",
@@ -5594,7 +5378,6 @@ dependencies = [
  "aptos-secure-storage",
  "aptos-time-service",
  "aptos-types",
- "aptos-workspace-hack",
  "async-trait",
  "bcs",
  "channel",
@@ -5621,7 +5404,6 @@ dependencies = [
  "aptos-temppath",
  "aptos-time-service",
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "channel",
  "event-notifications",
@@ -5874,7 +5656,6 @@ dependencies = [
 name = "num-variants"
 version = "0.1.0"
 dependencies = [
- "aptos-workspace-hack",
  "proc-macro2 1.0.39",
  "quote 1.0.18",
  "syn 1.0.95",
@@ -6162,7 +5943,6 @@ version = "0.1.0"
 dependencies = [
  "aptos-config",
  "aptos-types",
- "aptos-workspace-hack",
  "async-trait",
  "channel",
  "network",
@@ -6178,12 +5958,10 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "bounded-executor",
  "bytes",
  "channel",
- "claim",
  "futures",
  "netcore",
  "network",
@@ -6199,7 +5977,6 @@ name = "peer-monitoring-service-types"
 version = "0.1.0"
 dependencies = [
  "aptos-config",
- "aptos-workspace-hack",
  "network",
  "serde 1.0.137",
  "thiserror",
@@ -6414,7 +6191,7 @@ dependencies = [
  "regex",
  "serde 1.0.137",
  "serde_json",
- "serde_urlencoded 0.7.1",
+ "serde_urlencoded",
  "smallvec",
  "tempfile",
  "thiserror",
@@ -6454,7 +6231,7 @@ dependencies = [
  "regex",
  "serde 1.0.137",
  "serde_json",
- "serde_urlencoded 0.7.1",
+ "serde_urlencoded",
  "serde_yaml",
  "thiserror",
  "tokio",
@@ -6665,7 +6442,6 @@ dependencies = [
 name = "proxy"
 version = "0.1.0"
 dependencies = [
- "aptos-workspace-hack",
  "ipnet",
 ]
 
@@ -7046,7 +6822,7 @@ dependencies = [
  "proc-macro-hack",
  "serde 1.0.137",
  "serde_json",
- "serde_urlencoded 0.7.1",
+ "serde_urlencoded",
  "tokio",
  "tokio-native-tls",
  "tokio-util 0.6.10",
@@ -7120,17 +6896,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ripemd160"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2eca4ecc81b7f313189bf73ce724400a07da2a6dac19588b03c8bd76a2dcc251"
-dependencies = [
- "block-buffer 0.9.0",
- "digest 0.9.0",
- "opaque-debug 0.3.0",
-]
-
-[[package]]
 name = "rocksdb"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7138,104 +6903,6 @@ checksum = "7a62eca5cacf2c8261128631bed9f045598d40bfbe4b29f5163f0f802f8f44a7"
 dependencies = [
  "libc",
  "librocksdb-sys",
-]
-
-[[package]]
-name = "rusoto_core"
-version = "0.46.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02aff20978970d47630f08de5f0d04799497818d16cafee5aec90c4b4d0806cf"
-dependencies = [
- "async-trait",
- "base64",
- "bytes",
- "crc32fast",
- "futures",
- "http",
- "hyper",
- "hyper-tls",
- "lazy_static 1.4.0",
- "log",
- "rusoto_credential",
- "rusoto_signature",
- "rustc_version 0.2.3",
- "serde 1.0.137",
- "serde_json",
- "tokio",
- "xml-rs",
-]
-
-[[package]]
-name = "rusoto_credential"
-version = "0.46.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e91e4c25ea8bfa6247684ff635299015845113baaa93ba8169b9e565701b58e"
-dependencies = [
- "async-trait",
- "chrono",
- "dirs-next",
- "futures",
- "hyper",
- "serde 1.0.137",
- "serde_json",
- "shlex 0.1.1",
- "tokio",
- "zeroize",
-]
-
-[[package]]
-name = "rusoto_eks"
-version = "0.46.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91d7e1e577d4102a9d80d5eafc0547064d3e8817d094f00e95ae45d03ae3accb"
-dependencies = [
- "async-trait",
- "bytes",
- "futures",
- "rusoto_core",
- "serde 1.0.137",
- "serde_derive",
- "serde_json",
-]
-
-[[package]]
-name = "rusoto_signature"
-version = "0.46.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5486e6b1673ab3e0ba1ded284fb444845fe1b7f41d13989a54dd60f62a7b2baa"
-dependencies = [
- "base64",
- "bytes",
- "futures",
- "hex",
- "hmac 0.10.1",
- "http",
- "hyper",
- "log",
- "md5",
- "percent-encoding",
- "pin-project-lite",
- "rusoto_credential",
- "rustc_version 0.2.3",
- "serde 1.0.137",
- "sha2 0.9.9",
- "time 0.2.27",
- "tokio",
-]
-
-[[package]]
-name = "rusoto_sts"
-version = "0.46.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f93005e0c3b9e40a424b50ca71886d2445cc19bb6cdac3ac84c2daff482eb59"
-dependencies = [
- "async-trait",
- "bytes",
- "chrono",
- "futures",
- "rusoto_core",
- "serde_urlencoded 0.6.1",
- "xml-rs",
 ]
 
 [[package]]
@@ -7288,12 +6955,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustversion"
-version = "1.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2cc38e8fa666e2de3c4aba7edeb5ffc5246c1c2ed0e3d17e560aeeba736b23f"
-
-[[package]]
 name = "rusty-fork"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7333,7 +6994,6 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vault-client",
- "aptos-workspace-hack",
  "consensus-types",
  "crash-handler",
  "criterion",
@@ -7383,7 +7043,6 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-temppath",
- "aptos-workspace-hack",
  "byteorder",
  "once_cell",
  "proptest",
@@ -7410,15 +7069,12 @@ dependencies = [
  "aptos-infallible",
  "aptos-metrics-core",
  "aptos-types",
- "aptos-workspace-hack",
  "bitvec",
- "criterion",
  "itertools",
  "once_cell",
  "proptest",
  "rand 0.7.3",
  "rayon",
- "storage-interface",
  "thiserror",
 ]
 
@@ -7466,7 +7122,6 @@ dependencies = [
  "aptos-rest-client",
  "aptos-temppath",
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "hex",
  "rand 0.7.3",
@@ -7631,18 +7286,6 @@ dependencies = [
 
 [[package]]
 name = "serde_urlencoded"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ec5d77e2d4c73717816afac02670d5c4f534ea95ed430442cad02e7a6e32c97"
-dependencies = [
- "dtoa",
- "itoa 0.4.8",
- "serde 1.0.137",
- "url",
-]
-
-[[package]]
-name = "serde_urlencoded"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3491c14715ca2294c4d6a88f15e84739788c1d030eed8c110436aafdaa2f3fd"
@@ -7663,30 +7306,6 @@ dependencies = [
  "ryu",
  "serde 1.0.137",
  "yaml-rust",
-]
-
-[[package]]
-name = "serial_test"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5bcc41d18f7a1d50525d080fd3e953be87c4f9f1a974f3c21798ca00d54ec15"
-dependencies = [
- "lazy_static 1.4.0",
- "parking_lot 0.10.2",
- "serial_test_derive",
-]
-
-[[package]]
-name = "serial_test_derive"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2881bccd7d60fb32dfa3d7b3136385312f8ad75e2674aab2852867a09790cae8"
-dependencies = [
- "proc-macro-error",
- "proc-macro2 1.0.39",
- "quote 1.0.18",
- "rustversion",
- "syn 1.0.95",
 ]
 
 [[package]]
@@ -7809,12 +7428,6 @@ dependencies = [
 
 [[package]]
 name = "shlex"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fdf1b9db47230893d76faad238fd6097fd6d6a9245cd7a4d90dbd639536bbd2"
-
-[[package]]
-name = "shlex"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
@@ -7823,7 +7436,6 @@ checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
 name = "short-hex-str"
 version = "0.1.0"
 dependencies = [
- "aptos-workspace-hack",
  "hex",
  "mirai-annotations",
  "proptest",
@@ -7947,7 +7559,6 @@ dependencies = [
  "aptos-transaction-builder",
  "aptos-types",
  "aptos-vault-client",
- "aptos-workspace-hack",
  "aptos-writeset-generator",
  "async-trait",
  "backup-cli",
@@ -8021,7 +7632,6 @@ dependencies = [
  "aptos-time-service",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptosdb",
  "async-trait",
  "bcs",
@@ -8063,7 +7673,6 @@ dependencies = [
  "aptos-time-service",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptosdb",
  "consensus-notifications",
  "data-streaming-service",
@@ -8098,7 +7707,6 @@ dependencies = [
  "aptos-transaction-builder",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptosdb",
  "async-trait",
  "bcs",
@@ -8201,7 +7809,6 @@ dependencies = [
  "aptos-secure-net",
  "aptos-state-view",
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "move-deps",
  "parking_lot 0.12.0",
@@ -8216,7 +7823,6 @@ version = "0.1.0"
 dependencies = [
  "aptos-config",
  "aptos-types",
- "aptos-workspace-hack",
  "async-trait",
  "channel",
  "network",
@@ -8236,7 +7842,6 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-time-service",
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "bounded-executor",
  "bytes",
@@ -8262,7 +7867,6 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-types",
- "aptos-workspace-hack",
  "claim",
  "num-traits 0.2.15",
  "proptest",
@@ -8505,7 +8109,6 @@ dependencies = [
  "aptos-operational-tool",
  "aptos-rest-client",
  "aptos-sdk",
- "aptos-workspace-hack",
  "forge",
  "rand 0.7.3",
  "tokio",
@@ -8944,7 +8547,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-types",
- "aptos-workspace-hack",
  "bcs",
  "cached-framework-packages",
  "heck 0.3.3",
@@ -8966,7 +8568,6 @@ dependencies = [
  "anyhow",
  "aptos-logger",
  "aptos-sdk",
- "aptos-workspace-hack",
  "clap 3.1.18",
  "futures",
  "itertools",
@@ -8990,7 +8591,6 @@ dependencies = [
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-transaction-builder",
- "aptos-workspace-hack",
  "clap 3.1.18",
  "futures",
  "itertools",
@@ -9329,7 +8929,6 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "bcs",
  "cached-framework-packages",
  "framework",
@@ -9351,7 +8950,6 @@ dependencies = [
  "aptos-transaction-builder",
  "aptos-types",
  "aptos-vm",
- "aptos-workspace-hack",
  "aptosdb",
  "executor",
  "executor-test-helpers",
@@ -9435,7 +9033,7 @@ dependencies = [
  "scoped-tls",
  "serde 1.0.137",
  "serde_json",
- "serde_urlencoded 0.7.1",
+ "serde_urlencoded",
  "tokio",
  "tokio-rustls",
  "tokio-stream",
@@ -9742,12 +9340,6 @@ dependencies = [
  "rand_core 0.5.1",
  "zeroize",
 ]
-
-[[package]]
-name = "xml-rs"
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2d7d3948613f75c98fd9328cfdcc45acc4d360655289d0a7d4ec931392200a3"
 
 [[package]]
 name = "yaml-rust"

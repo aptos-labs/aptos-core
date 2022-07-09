@@ -26,7 +26,7 @@ aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 aptos-time-service = { path = "../../crates/aptos-time-service", features = ["async"] }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 netcore = { path = "../../network/netcore" }
 network = { path = "../../network" }
 short-hex-str = { path = "../../crates/short-hex-str" }

@@ -31,7 +31,7 @@ aptos-module-verifier = { path = "../../aptos-move/aptos-module-verifier" }
 aptos-parallel-executor = { path = "../parallel-executor" }
 aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 framework =  { path = "../framework" }
 move-deps = { path = "../move-deps", features = ["address32"] }
 mvhashmap = { path = "../mvhashmap" }

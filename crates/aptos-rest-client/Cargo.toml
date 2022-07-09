@@ -27,5 +27,5 @@ aptos-api-types = { path = "../../api/types" }
 aptos-crypto = { path = "../aptos-crypto" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }
+
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }

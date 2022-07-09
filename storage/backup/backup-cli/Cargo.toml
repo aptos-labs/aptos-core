@@ -38,7 +38,7 @@ aptos-secure-push-metrics = { path = "../../../secure/push-metrics" }
 aptos-temppath = { path = "../../../crates/aptos-temppath" }
 aptos-types = { path = "../../../types" }
 aptos-vm = { path = "../../../aptos-move/aptos-vm" }
-aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
+
 aptosdb = { path = "../../aptosdb" }
 executor = { path = "../../../execution/executor" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers", optional = true }

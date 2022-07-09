@@ -29,7 +29,7 @@ aptos-state-view = { path = "../../storage/state-view" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types", features = ["fuzzing"] }
 aptos-vm = { path = "../aptos-vm" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 aptos-writeset-generator = { path = "../writeset-transaction-generator" }
 cached-framework-packages = { path = "../framework/cached-packages" }
 move-deps = { path = "../move-deps", features = ["address32"] }

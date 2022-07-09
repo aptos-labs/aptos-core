@@ -14,5 +14,5 @@ anyhow = "1.0.57"
 
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 move-deps = { path = "../move-deps", features = ["address32"] }

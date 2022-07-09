@@ -21,7 +21,7 @@ structopt = "0.3.21"
 textwrap = "0.15.0"
 
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 move-deps = { path = "../move-deps", features = ["address32"] }
 
 [dev-dependencies]

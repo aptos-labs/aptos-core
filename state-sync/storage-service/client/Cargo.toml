@@ -15,7 +15,7 @@ thiserror = "1.0.31"
 
 aptos-config = { path = "../../../config" }
 aptos-types = { path = "../../../types" }
-aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
+
 channel = { path = "../../../crates/channel" }
 network = { path = "../../../network" }
 storage-service-types = { path = "../types" }
