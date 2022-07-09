@@ -84,8 +84,10 @@ jobs:
             --image="${AWS_ACCOUNT_NUM}.dkr.ecr.${AWS_REGION}.amazonaws.com/aptos/forge:$IMAGE_TAG" \
             --command -- forge test k8s-swarm --image-tag $IMAGE_TAG --namespace $FORGE_NAMESPACE
 
+          # wait for enough time for the pod to start and potentially new nodes to come online
+          kubectl wait --timeout=5m --for=condition=Ready "pod/${FORGE_POD_NAME}"
+
           # tail the logs to get them in GHA runner. tee them for further parsing
-          kubectl wait --for=condition=Ready "pod/${FORGE_POD_NAME}"
           kubectl logs -f $FORGE_POD_NAME | tee $FORGE_OUTPUT
 
           FORGE_END_TIME_MS="$(date '+%s')000"
