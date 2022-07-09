@@ -2,7 +2,7 @@
 
 This directory contains [Docker](https://www.docker.com/) configuration for building Aptos docker images.
 
-To build these images run this from the repository root: 
+To build these images run this from the repository root:
 
 ```
 docker buildx create --use # creates a buildkit builder and only needs to be run once

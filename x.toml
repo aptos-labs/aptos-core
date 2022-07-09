@@ -131,6 +131,7 @@ whitespace-exceptions = [
     "terraform/**/*",
     "**/*.yaml",
     "**/*.yml",
+    "**/*.md",
 ]
 
 license-exceptions = [
