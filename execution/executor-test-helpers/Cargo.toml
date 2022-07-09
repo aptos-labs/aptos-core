@@ -22,7 +22,7 @@ aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types", features = ["fuzzing"] }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 aptosdb = { path = "../../storage/aptosdb", features = ["fuzzing"] }
 executor = { path = "../executor" }
 executor-types = { path = "../executor-types" }

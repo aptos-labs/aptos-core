@@ -13,4 +13,4 @@ edition = "2018"
 tokio = { version = "1.18.2", features = ["time"] }
 
 aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }
+

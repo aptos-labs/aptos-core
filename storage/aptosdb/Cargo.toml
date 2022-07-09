@@ -34,7 +34,7 @@ aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers", optiona
 aptos-state-view = { path = "../state-view" }
 aptos-temppath = { path = "../../crates/aptos-temppath", optional = true }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 executor-types = { path = "../../execution/executor-types" }
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 num-variants = { path = "../../crates/num-variants" }

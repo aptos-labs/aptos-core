@@ -17,7 +17,6 @@ thiserror = "1.0.31"
 tokio = { version = "1.18.2", features = ["macros", "rt-multi-thread", "time"], optional = true }
 
 aptos-infallible = { path = "../../crates/aptos-infallible" }
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }
 
 [dev-dependencies]
 futures = "0.3.21"

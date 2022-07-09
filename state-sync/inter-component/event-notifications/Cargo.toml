@@ -19,7 +19,7 @@ aptos-id-generator = { path = "../../../crates/aptos-id-generator" }
 aptos-infallible = { path = "../../../crates/aptos-infallible" }
 aptos-state-view = { path = "../../../storage/state-view" }
 aptos-types = { path = "../../../types" }
-aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
+
 channel = { path = "../../../crates/channel" }
 storage-interface = { path = "../../../storage/storage-interface" }
 

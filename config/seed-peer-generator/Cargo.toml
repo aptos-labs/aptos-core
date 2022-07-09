@@ -26,7 +26,6 @@ aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
 aptos-types = { path = "../../types", features = ["fuzzing"] }

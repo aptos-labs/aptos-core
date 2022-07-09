@@ -24,4 +24,4 @@ aptos-crypto = { path = "../aptos-crypto", features = ["fuzzing"] }
 aptos-logger = { path = "../aptos-logger" }
 aptos-rosetta = { path = "../aptos-rosetta" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }
+

@@ -17,7 +17,7 @@ proptest = { version = "1.0.0", optional = true }
 proptest-derive = { version = "0.3.0", optional = true }
 
 aptos-types = { path = "../../../types" }
-aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
+
 move-deps = { path = "../../move-deps", features = ["address32"] }
 
 [build-dependencies]

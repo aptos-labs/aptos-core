@@ -16,7 +16,6 @@ thiserror = "1.0.31"
 
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-secure-push-metrics = { path = "../push-metrics" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
 aptos-config = { path = "../../config" }

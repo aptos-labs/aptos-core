@@ -6,7 +6,6 @@ use camino::{Utf8Path, Utf8PathBuf};
 use debug_ignore::DebugIgnore;
 use graph::PackageGraphPlus;
 use guppy::graph::PackageGraph;
-use hakari::{HakariBuilder, HakariOutputOptions};
 use once_cell::sync::OnceCell;
 
 pub mod core_config;
@@ -113,21 +112,6 @@ impl XCoreContext {
     /// Returns information about the subsets for this workspace.
     pub fn subsets(&self) -> Result<&WorkspaceSubsets> {
         Ok(self.package_graph_plus()?.subsets())
-    }
-
-    /// Returns a Hakari builder for this workspace.
-    pub fn hakari_builder(&self) -> Result<HakariBuilder<'_>> {
-        let graph = self.package_graph()?;
-        self.config
-            .hakari
-            .builder
-            .to_hakari_builder(graph)
-            .map_err(|err| SystemError::guppy("resolving Hakari config", err))
-    }
-
-    /// Returns the default Hakari TOML options for this workspace.
-    pub fn hakari_output_options(&self) -> HakariOutputOptions {
-        self.config.hakari.output.to_options()
     }
 
     // ---

@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use hakari::summaries::HakariConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -11,9 +10,6 @@ use std::collections::BTreeMap;
 pub struct XCoreConfig {
     /// Subsets of this workspace
     pub subsets: BTreeMap<String, SubsetConfig>,
-
-    /// Config for Hakari (workspace-hack management).
-    pub hakari: HakariConfig,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]

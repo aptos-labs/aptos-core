@@ -10,5 +10,5 @@ publish = false
 edition = "2018"
 
 [dependencies]
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 move-deps = { path = "../move-deps", features = ["address32"] }

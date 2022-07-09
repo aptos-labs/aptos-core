@@ -25,14 +25,11 @@ tempfile = "3.3.0"
 
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 move-deps = { path = "../move-deps", features = ["address32"] }
 transaction-builder-generator = { path = "../transaction-builder-generator" }
 
 [dev-dependencies]
-datatest-stable = "0.1.1"
-dir-diff = "0.3.2"
-
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 move-deps = { path = "../move-deps", features = ["table-extension"] }
 

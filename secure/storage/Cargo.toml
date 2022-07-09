@@ -26,7 +26,6 @@ aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-time-service = { path = "../../crates/aptos-time-service" }
 aptos-vault-client = { path = "vault" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
 rand = "0.7.3"

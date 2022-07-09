@@ -21,7 +21,7 @@ aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
 aptos-validator-interface = { path = "../aptos-validator-interface" }
 aptos-vm = { path = "../aptos-vm" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 aptosdb = { path = "../../storage/aptosdb" }
 framework =  { path = "../framework" }
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "table-extension"] }
