@@ -102,7 +102,7 @@ module AptosFramework::Block {
         );
 
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
-        // transition is the last the last in the previous epoch.
+        // transition is the last block in the previous epoch.
         Stake::update_performance_statistics(missed_votes);
 
         if (timestamp - Reconfiguration::last_reconfiguration_time() > block_metadata_ref.epoch_internal) {

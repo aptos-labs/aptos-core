@@ -828,7 +828,7 @@ module AptosFramework::Stake {
         let i = 0;
         let len = Vector::length(&validator_set.active_validators);
         let active_validators = Vector::empty();
-        validator_perf.num_blocks = 1;
+        validator_perf.num_blocks = 0;
         validator_perf.missed_votes = Vector::empty();
         while (i < len) {
             let old_validator_info = Vector::borrow_mut(&mut validator_set.active_validators, i);
@@ -1033,7 +1033,7 @@ module AptosFramework::Stake {
 
         // Join the validator set with enough stake.
         join_validator_set(&validator, validator_address);
-        on_new_epoch();
+        end_epoch();
         assert!(is_current_validator(validator_address), 1);
 
         // Validator adds more stake (validator is already active).
@@ -1043,14 +1043,14 @@ module AptosFramework::Stake {
 
         // pending_active and pending_inactive stakes are processed in the new epoch.
         // Rewards were also distributed.
-        on_new_epoch();
+        end_epoch();
         assert_validator_state(validator_address, 201, 0, 0, 0, 0);
 
         // Unlock the entire stake after lockup expires. Timestamp is in microseconds.
         Timestamp::update_global_time_for_test(MAXIMUM_LOCK_UP_SECS * 1000000);
         unlock(&validator, 100);
         assert_validator_state(validator_address, 101, 0, 0, 100, 0);
-        on_new_epoch();
+        end_epoch();
 
         // Validator withdraws from inactive stake, including rewards on the withdrawn amount.
         withdraw(&validator);
@@ -1083,14 +1083,14 @@ module AptosFramework::Stake {
 
         // Join the validator set with enough stake.
         join_validator_set(&validator, pool_address);
-        on_new_epoch();
+        end_epoch();
         assert!(is_current_validator(pool_address), 0);
 
         // Unlock the entire stake after lockup expires.
         Timestamp::update_global_time_for_test(MAXIMUM_LOCK_UP_SECS * 1000000);
         unlock_with_cap(pool_address, 100, &owner_cap);
         assert_validator_state(pool_address, 0, 0, 0, 100, 0);
-        on_new_epoch();
+        end_epoch();
 
         // Withdraw stake.
         let coins = withdraw_with_cap(pool_address, &owner_cap);
@@ -1139,7 +1139,7 @@ module AptosFramework::Stake {
         // Validator 1 and 2 join the validator set.
         join_validator_set(&validator_2, validator_2_address);
         join_validator_set(&validator_1, validator_1_address);
-        on_new_epoch();
+        end_epoch();
         assert!(is_current_validator(validator_1_address), 0);
         assert!(is_current_validator(validator_2_address), 1);
         // Validator indices should be ordered by validator addresses. In this case, validator 1 has a smaller address.
@@ -1166,7 +1166,7 @@ module AptosFramework::Stake {
         assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).active_validators, 0).config.consensus_pubkey == CONSENSUS_KEY_1, 0);
 
         // Changes applied after new epoch
-        on_new_epoch();
+        end_epoch();
         assert!(is_current_validator(validator_1_address), 5);
         assert_validator_state(validator_1_address, 101, 0, 0, 0, 0);
         assert!(!is_current_validator(validator_2_address), 4);
@@ -1180,23 +1180,53 @@ module AptosFramework::Stake {
         // validators without enough stake will be removed
         Timestamp::update_global_time_for_test(MAXIMUM_LOCK_UP_SECS * 1000000);
         unlock(&validator_1, 50);
-        on_new_epoch();
+        end_epoch();
         assert!(!is_current_validator(validator_1_address), 6);
     }
 
     #[test(core_framework = @0x1, core_resources = @CoreResources, validator = @0x123)]
-    #[expected_failure(abort_code = 257)]
-    public(script) fun test_validator_cannot_join_leave_post_genesis(
+    #[expected_failure(abort_code = 3847)]
+    public(script) fun test_validator_cannot_join_post_genesis(
         core_framework: signer,
         core_resources: signer,
         validator: signer,
     ) acquires OwnerCapability, StakePool, StakePoolEvents, ValidatorConfig, ValidatorSet, ValidatorSetConfiguration {
-        initialize_validator_set(&core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, false, 1, 100);
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        initialize_validator_set(
+            &core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, false, 1, 100);
 
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
         register_mint_stake(&validator, &mint_cap);
         store_test_coin_mint_cap(&core_resources, mint_cap);
         Coin::destroy_burn_cap<TestCoin>(burn_cap);
+
+        // Joining the validator set should fail as post genesis validator set change is not allowed.
+        join_validator_set(&validator, Signer::address_of(&validator));
+    }
+
+    #[test(core_framework = @0x1, core_resources = @CoreResources, validator = @0x123)]
+    #[expected_failure(abort_code = 3847)]
+    public(script) fun test_validator_cannot_leave_post_genesis(
+        core_framework: signer,
+        core_resources: signer,
+        validator: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        initialize_validator_set(
+            &core_resources, 100, 10000, 0, MAXIMUM_LOCK_UP_SECS, false, 1, 100);
+
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+        register_mint_stake(&validator, &mint_cap);
+        store_test_coin_mint_cap(&core_resources, mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+
+        // Bypass the check to join. This is the same function called during Genesis.
+        let validator_address = Signer::address_of(&validator);
+        join_validator_set_internal(&validator, validator_address);
+        end_epoch();
+
+        // Leaving the validator set should fail as post genesis validator set change is not allowed.
+        leave_validator_set(&validator, validator_address);
     }
 
     #[test(
@@ -1237,29 +1267,29 @@ module AptosFramework::Stake {
         Coin::destroy_burn_cap<TestCoin>(burn_cap);
 
         join_validator_set(&validator_3, v3_addr);
-        on_new_epoch();
+        end_epoch();
         assert!(validator_index(v3_addr) == 0, 0);
 
         join_validator_set(&validator_4, v4_addr);
-        on_new_epoch();
+        end_epoch();
         assert!(validator_index(v3_addr) == 0, 1);
         assert!(validator_index(v4_addr) == 1, 2);
 
         join_validator_set(&validator_1, v1_addr);
-        on_new_epoch();
+        end_epoch();
         assert!(validator_index(v1_addr) == 0, 3);
         assert!(validator_index(v3_addr) == 1, 4);
         assert!(validator_index(v4_addr) == 2, 5);
 
         join_validator_set(&validator_2, v2_addr);
-        on_new_epoch();
+        end_epoch();
         assert!(validator_index(v1_addr) == 0, 6);
         assert!(validator_index(v2_addr) == 1, 7);
         assert!(validator_index(v3_addr) == 2, 8);
         assert!(validator_index(v4_addr) == 3, 9);
 
         join_validator_set(&validator_5, v5_addr);
-        on_new_epoch();
+        end_epoch();
         assert!(validator_index(v1_addr) == 0, 10);
         assert!(validator_index(v2_addr) == 1, 11);
         assert!(validator_index(v3_addr) == 2, 12);
@@ -1289,14 +1319,14 @@ module AptosFramework::Stake {
         // Both validators join the set.
         join_validator_set(&validator_1, validator_1_address);
         join_validator_set(&validator_2, validator_2_address);
-        on_new_epoch();
+        end_epoch();
 
         // Validator 2 missed votes.
         let missed_votes = Vector::empty<u64>();
         let validator_2_index = borrow_global<ValidatorConfig>(validator_2_address).validator_index;
         Vector::push_back(&mut missed_votes, validator_2_index);
         update_performance_statistics(missed_votes);
-        on_new_epoch();
+        end_epoch();
 
         // Validator 2 received no rewards. Validator 1 didn't miss votes so it still receives rewards.
         assert_validator_state(validator_1_address, 101, 0, 0, 0, 0);
@@ -1311,7 +1341,7 @@ module AptosFramework::Stake {
         Vector::push_back(&mut missed_votes, validator_1_index);
         Vector::push_back(&mut missed_votes, validator_2_index);
         update_performance_statistics(missed_votes);
-        on_new_epoch();
+        end_epoch();
 
         // Validator 1 and 2 received no additional rewards due to missing votes.
         assert_validator_state(validator_1_address, 101, 0, 0, 0, 0);
@@ -1334,7 +1364,7 @@ module AptosFramework::Stake {
         store_test_coin_mint_cap(&core_resources, mint_cap);
         Coin::destroy_burn_cap<TestCoin>(burn_cap);
         join_validator_set(&validator, validator_address);
-        on_new_epoch();
+        end_epoch();
 
         // Invalid validator index in the missed votes vector should not lead to abort.
         let missed_votes = Vector::empty<u64>();
@@ -1343,7 +1373,7 @@ module AptosFramework::Stake {
         Vector::push_back(&mut missed_votes, valid_validator_index);
         Vector::push_back(&mut missed_votes, out_of_bounds_index);
         update_performance_statistics(missed_votes);
-        on_new_epoch();
+        end_epoch();
 
         // Validator received no rewards due to missing votes.
         assert_validator_state(validator_address, 100, 0, 0, 0, 0);
@@ -1379,6 +1409,13 @@ module AptosFramework::Stake {
         add_stake(account, 100);
         increase_lockup(account, Timestamp::now_seconds() + MAXIMUM_LOCK_UP_SECS);
         assert_validator_state(Signer::address_of(account), 100, 0, 0, 0, 0);
+    }
+
+    #[test_only]
+    fun end_epoch() acquires StakePool, StakePoolEvents, TestCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
+        // Set the number of blocks to 1 so reward distribution doesn't error out with division by zero.
+        borrow_global_mut<ValidatorPerformance>(@CoreResources).num_blocks = 1;
+        on_new_epoch();
     }
 
     #[test_only]
