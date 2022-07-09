@@ -18,3 +18,4 @@
 !ecosystem/indexer/migrations/**/*.sql
 !terraform/helm/aptos-node/
 !terraform/helm/genesis/
+!testsuite/forge/src/backend/k8s/helm-values
