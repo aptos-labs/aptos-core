@@ -167,7 +167,9 @@ Transaction:
         NEWTYPE:
           TYPENAME: BlockMetadata
     3:
-      StateCheckpoint: UNIT
+      StateCheckpoint:
+        NEWTYPE:
+          TYPENAME: HashValue
 TransactionArgument:
   ENUM:
     0:
