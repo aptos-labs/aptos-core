@@ -35,16 +35,16 @@ module AptosFramework::SystemAddresses {
         addr == @CoreResources
     }
 
-    public fun assert_core_framework(account: &signer) {
+    public fun assert_aptos_framework(account: &signer) {
         assert!(Signer::address_of(account) == @AptosFramework, Errors::requires_address(ENOT_CORE_FRAMEWORK_ADDRESS))
     }
-    spec assert_core_framework {
+    spec assert_aptos_framework {
         pragma opaque;
-        include AbortsIfNotCoreFramework;
+        include AbortsIfNotAptosFramework;
     }
 
-    /// Specifies that a function aborts if the account does not have the core framework address.
-    spec schema AbortsIfNotCoreFramework {
+    /// Specifies that a function aborts if the account does not have the aptos framework address.
+    spec schema AbortsIfNotAptosFramework {
         account: signer;
         aborts_if Signer::address_of(account) != @AptosFramework with Errors::REQUIRES_ADDRESS;
     }

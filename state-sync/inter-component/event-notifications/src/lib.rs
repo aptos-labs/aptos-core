@@ -7,12 +7,13 @@ use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_types::{
+    account_config::CORE_CODE_ADDRESS,
     account_view::AccountView,
     contract_event::ContractEvent,
     event::EventKey,
     move_resource::MoveStorage,
     on_chain_config,
-    on_chain_config::{config_address, ConfigID, OnChainConfigPayload},
+    on_chain_config::{ConfigID, OnChainConfigPayload},
     transaction::Version,
 };
 use channel::{aptos_channel, message_queues::QueueStyle};
@@ -280,8 +281,6 @@ impl EventSubscriptionService {
             }
         }
 
-        let config_address = config_address();
-
         let db_state_view = &self
             .storage
             .read()
@@ -293,9 +292,10 @@ impl EventSubscriptionService {
                     error
                 ))
             })?;
-        let config_address_account_view = db_state_view.as_account_with_state_view(&config_address);
+        let aptos_framework_account_view =
+            db_state_view.as_account_with_state_view(&CORE_CODE_ADDRESS);
 
-        let epoch = config_address_account_view
+        let epoch = aptos_framework_account_view
             .get_configuration_resource()
             .map_err(|error| {
                 Error::UnexpectedErrorEncountered(format!(

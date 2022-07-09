@@ -10,7 +10,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     access_path::Path,
     account_address::AccountAddress,
-    account_config::aptos_root_address,
+    account_config::CORE_CODE_ADDRESS,
     account_state::AccountState,
     chain_id::ChainId,
     contract_event::ContractEvent,
@@ -179,7 +179,7 @@ impl Context {
         // Retrieve block height from the transaction outputs
         let height_id = ident_str!("height");
         let block_metadata_type = move_deps::move_core_types::language_storage::StructTag {
-            address: AccountAddress::ONE,
+            address: CORE_CODE_ADDRESS,
             module: ident_str!("Block").into(),
             name: ident_str!("BlockMetadata").into(),
             type_params: vec![],
@@ -195,7 +195,7 @@ impl Context {
                 if let Path::Resource(typ) = path.get_path() {
                     // If it's block metadata, we can convert it to get the block height
                     // And it must be the root address
-                    if path.address == aptos_root_address() && typ == block_metadata_type {
+                    if path.address == CORE_CODE_ADDRESS && typ == block_metadata_type {
                         if let WriteOp::Value(value) = op {
                             if let Ok(mut resource) = converter.try_into_resource(&typ, value) {
                                 if let Some(value) = resource.data.0.remove(height_id) {

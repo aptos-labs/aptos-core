@@ -55,7 +55,7 @@ async fn test_get_events_by_invalid_key() {
 async fn test_get_events_by_account_event_handle() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
-        .get("/accounts/0xa550c18/events/0x1::Reconfiguration::Configuration/events")
+        .get("/accounts/0x1/events/0x1::Reconfiguration::Configuration/events")
         .await;
     context.check_golden_output(resp);
 }
@@ -65,7 +65,7 @@ async fn test_get_events_by_invalid_account_event_handle_struct_address() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
         .expect_status_code(404)
-        .get("/accounts/0xa550c18/events/0x9::Reconfiguration::Configuration/events")
+        .get("/accounts/0x1/events/0x9::Reconfiguration::Configuration/events")
         .await;
     context.check_golden_output(resp);
 }
@@ -75,7 +75,7 @@ async fn test_get_events_by_invalid_account_event_handle_struct_module() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
         .expect_status_code(404)
-        .get("/accounts/0xa550c18/events/0x1::NotFound::Configuration/events")
+        .get("/accounts/0x1/events/0x1::NotFound::Configuration/events")
         .await;
     context.check_golden_output(resp);
 }
@@ -85,7 +85,7 @@ async fn test_get_events_by_invalid_account_event_handle_struct_name() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
         .expect_status_code(404)
-        .get("/accounts/0xa550c18/events/0x1::Reconfiguration::NotFound/events")
+        .get("/accounts/0x1/events/0x1::Reconfiguration::NotFound/events")
         .await;
     context.check_golden_output(resp);
 }
@@ -95,7 +95,7 @@ async fn test_get_events_by_invalid_account_event_handle_field_name() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
         .expect_status_code(404)
-        .get("/accounts/0xa550c18/events/0x1::Reconfiguration::Configuration/not_found")
+        .get("/accounts/0x1/events/0x1::Reconfiguration::Configuration/not_found")
         .await;
     context.check_golden_output(resp);
 }
@@ -106,7 +106,7 @@ async fn test_get_events_by_invalid_account_event_handle_field_type() {
 
     let resp = context
         .expect_status_code(400)
-        .get("/accounts/0xa550c18/events/0x1::Reconfiguration::Configuration/epoch")
+        .get("/accounts/0x1/events/0x1::Reconfiguration::Configuration/epoch")
         .await;
     context.check_golden_output(resp);
 }

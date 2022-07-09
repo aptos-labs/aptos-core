@@ -49,15 +49,16 @@ module AptosFramework::Reconfiguration {
     /// The largest possible u64 value
     const MAX_U64: u64 = 18446744073709551615;
 
-    /// Publishes `Configuration` resource. Can only be invoked by core resource account, and only a single time in Genesis.
+    /// Publishes `Configuration` resource. Can only be invoked by aptos framework account, and only a single time in Genesis.
     public fun initialize(
         account: &signer,
     ) {
         Timestamp::assert_genesis();
-        SystemAddresses::assert_core_resource(account);
-        assert!(!exists<Configuration>(@CoreResources), Errors::already_published(ECONFIGURATION));
+        SystemAddresses::assert_aptos_framework(account);
+        
+        assert!(!exists<Configuration>(@AptosFramework), Errors::already_published(ECONFIGURATION));
         // assert it matches `new_epoch_event_key()`, otherwise the event can't be recognized
-        assert!(GUID::get_next_creation_num(Signer::address_of(account)) == 5, Errors::invalid_state(EINVALID_GUID_FOR_EVENT));
+        assert!(GUID::get_next_creation_num(Signer::address_of(account)) == 2, Errors::invalid_state(EINVALID_GUID_FOR_EVENT));
         move_to<Configuration>(
             account,
             Configuration {
@@ -71,7 +72,8 @@ module AptosFramework::Reconfiguration {
     /// Private function to temporarily halt reconfiguration.
     /// This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
     fun disable_reconfiguration(account: &signer) {
-        SystemAddresses::assert_core_resource(account);
+        SystemAddresses::assert_aptos_framework(account);
+
         assert!(reconfiguration_enabled(), Errors::invalid_state(ECONFIGURATION));
         move_to(account, DisableReconfiguration {} )
     }
@@ -79,19 +81,19 @@ module AptosFramework::Reconfiguration {
     /// Private function to resume reconfiguration.
     /// This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
     fun enable_reconfiguration(account: &signer) acquires DisableReconfiguration {
-        SystemAddresses::assert_core_resource(account);
+        SystemAddresses::assert_aptos_framework(account);
 
         assert!(!reconfiguration_enabled(), Errors::invalid_state(ECONFIGURATION));
         DisableReconfiguration {} = move_from<DisableReconfiguration>(Signer::address_of(account));
     }
 
     fun reconfiguration_enabled(): bool {
-        !exists<DisableReconfiguration>(@CoreResources)
+        !exists<DisableReconfiguration>(@AptosFramework)
     }
 
     /// Force an epoch change.
     public(script) fun force_reconfigure(account: &signer) acquires Configuration {
-        SystemAddresses::assert_core_resource(account);
+        SystemAddresses::assert_aptos_framework(account);
         reconfigure();
     }
 
@@ -102,7 +104,7 @@ module AptosFramework::Reconfiguration {
     }
 
     public fun last_reconfiguration_time(): u64 acquires Configuration {
-        borrow_global<Configuration>(@CoreResources).last_reconfiguration_time
+        borrow_global<Configuration>(@AptosFramework).last_reconfiguration_time
     }
 
     /// Private function to do reconfiguration.  Updates reconfiguration status resource
@@ -113,7 +115,7 @@ module AptosFramework::Reconfiguration {
             return ()
         };
 
-        let config_ref = borrow_global_mut<Configuration>(@CoreResources);
+        let config_ref = borrow_global_mut<Configuration>(@AptosFramework);
         let current_time = Timestamp::now_microseconds();
 
         // Do not do anything if a reconfiguration event is already emitted within this transaction.
@@ -147,8 +149,8 @@ module AptosFramework::Reconfiguration {
     /// Emit a `NewEpochEvent` event. This function will be invoked by genesis directly to generate the very first
     /// reconfiguration event.
     fun emit_genesis_reconfiguration_event() acquires Configuration {
-        assert!(exists<Configuration>(@CoreResources), Errors::not_published(ECONFIGURATION));
-        let config_ref = borrow_global_mut<Configuration>(@CoreResources);
+        assert!(exists<Configuration>(@AptosFramework), Errors::not_published(ECONFIGURATION));
+        let config_ref = borrow_global_mut<Configuration>(@AptosFramework);
         assert!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, Errors::invalid_state(ECONFIGURATION));
         config_ref.epoch = 1;
 

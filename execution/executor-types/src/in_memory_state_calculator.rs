@@ -10,6 +10,7 @@ use crate::{ParsedTransactionOutput, ProofReader};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_state_view::account_with_state_cache::AsAccountWithStateCache;
 use aptos_types::{
+    account_config::CORE_CODE_ADDRESS,
     account_view::AccountView,
     epoch_state::EpochState,
     event::EventKey,
@@ -166,8 +167,7 @@ impl InMemoryStateCalculator {
     }
 
     fn parse_validator_set(state_cache: &HashMap<StateKey, StateValue>) -> Result<EpochState> {
-        let on_chain_config_address = on_chain_config::config_address();
-        let account_state_view = state_cache.as_account_with_state_cache(&on_chain_config_address);
+        let account_state_view = state_cache.as_account_with_state_cache(&CORE_CODE_ADDRESS);
         let validator_set = account_state_view
             .get_validator_set()?
             .ok_or_else(|| anyhow!("ValidatorSet not touched on epoch change"))?;

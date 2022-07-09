@@ -17,11 +17,10 @@ module AptosFramework::Version {
     /// Publishes the Version config.
     public fun initialize(account: &signer, initial_version: u64) {
         Timestamp::assert_genesis();
-
-        SystemAddresses::assert_core_resource(account);
+        SystemAddresses::assert_aptos_framework(account);
 
         assert!(
-            !exists<Version>(@CoreResources),
+            !exists<Version>(@AptosFramework),
             Errors::already_published(ECONFIG)
         );
 
@@ -33,16 +32,16 @@ module AptosFramework::Version {
 
     /// Updates the major version to a larger version.
     public(script) fun set_version(account: signer, major: u64) acquires Version {
-        SystemAddresses::assert_core_resource(&account);
-        assert!(exists<Version>(@CoreResources), Errors::not_published(ECONFIG));
-        let old_major = *&borrow_global<Version>(@CoreResources).major;
+        SystemAddresses::assert_aptos_framework(&account);
+        assert!(exists<Version>(@AptosFramework), Errors::not_published(ECONFIG));
+        let old_major = *&borrow_global<Version>(@AptosFramework).major;
 
         assert!(
             old_major < major,
             Errors::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER)
         );
 
-        let config = borrow_global_mut<Version>(@CoreResources);
+        let config = borrow_global_mut<Version>(@AptosFramework);
         config.major = major;
 
         Reconfiguration::reconfigure();
