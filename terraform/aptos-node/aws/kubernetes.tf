@@ -115,7 +115,7 @@ locals {
         value  = "validators"
         effect = "NoExecute"
       }]
-      remoteLogAddress = var.enable_logger ? "${helm_release.logger[0].name}-aptos-logger:5044" : null
+      remoteLogAddress = var.enable_logger ? "${helm_release.logger[0].name}-aptos-logger.${helm_release.logger[0].namespace}.svc:5044" : null
     }
     fullnode = {
       storage = {
