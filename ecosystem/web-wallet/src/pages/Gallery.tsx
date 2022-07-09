@@ -150,7 +150,7 @@ function Gallery() {
                 galleryItems?.map((item) => (
                   <GalleryItem
                     key={`${item.name}`}
-                    imageSrc={item.metadata?.image || 'https://www.publicdomainpictures.net/pictures/280000/nahled/not-found-image-15383864787lu.jpg'}
+                    imageSrc={item.uri || 'https://www.publicdomainpictures.net/pictures/280000/nahled/not-found-image-15383864787lu.jpg'}
                   />
                 ))
               )
