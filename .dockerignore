@@ -16,4 +16,5 @@
 !aptos-move/framework/
 !api/doc/
 !ecosystem/indexer/migrations/**/*.sql
-!terraform/helm
+!terraform/helm/aptos-node/
+!terraform/helm/genesis/
