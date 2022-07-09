@@ -129,8 +129,6 @@ pub struct WorkspaceConfig {
     pub overlay: OverlayConfig,
     /// Test-only config in this workspace
     pub test_only: TestOnlyConfig,
-    /// Exceptions to whitespace linters
-    pub whitespace_exceptions: Vec<String>,
     /// Move to Aptos dependencies
     pub move_to_aptos_deps: MoveToAptosDepsConfig,
 }

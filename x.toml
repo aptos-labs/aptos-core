@@ -121,19 +121,6 @@ initials-platform = "standard"
 # Regex for allowed characters in paths. Regex must have ^ and $ anchors.
 allowed-paths = "^([a-zA-Z0-9._\\-/@:]|-)+$"
 
-whitespace-exceptions = [
-    ".github/actions/*/dist/*",
-    # TODO: reevaluate skipping whitespace checks in .md files for the website
-    "developer-docs-site/**/*",
-    "**/*.exp",
-    "**/*.errmap",
-    "**/*.abi",
-    "terraform/**/*",
-    "**/*.yaml",
-    "**/*.yml",
-    "**/*.md",
-]
-
 license-exceptions = [
     "terraform/**/*",
 ]
