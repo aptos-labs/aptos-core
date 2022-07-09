@@ -5,6 +5,7 @@ use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema, metrics::PRUNER_LEAST_READABLE_VERSION,
     pruner::db_pruner::DBPruner, stale_node_index::StaleNodeIndexSchema, OTHER_TIMERS_SECONDS,
 };
+use anyhow::Result;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_logger::{error, warn};
@@ -35,11 +36,7 @@ impl DBPruner for StateStorePruner {
         STATE_STORE_PRUNER_NAME
     }
 
-    fn prune(
-        &self,
-        _ledger_db_batch: &mut SchemaBatch,
-        max_versions: u64,
-    ) -> anyhow::Result<Version> {
+    fn prune(&self, _ledger_db_batch: &mut SchemaBatch, max_versions: u64) -> Result<Version> {
         if !self.is_pruning_pending() {
             return Ok(self.min_readable_version());
         }
@@ -73,7 +70,7 @@ impl DBPruner for StateStorePruner {
         };
     }
 
-    fn initialize_min_readable_version(&self) -> anyhow::Result<Version> {
+    fn initialize_min_readable_version(&self) -> Result<Version> {
         let mut iter = self
             .db
             .iter::<StaleNodeIndexSchema>(ReadOptions::default())?;
@@ -129,7 +126,7 @@ impl StateStorePruner {
     ///
     /// We issue (range) deletes on the index only periodically instead of after every pruning batch
     /// to avoid sending too many deletions to the DB, which takes disk space and slows it down.
-    fn maybe_purge_index(&self) -> anyhow::Result<()> {
+    fn maybe_purge_index(&self) -> Result<()> {
         const MIN_INTERVAL: Duration = Duration::from_secs(10);
         const MIN_VERSIONS: u64 = 60000;
 
@@ -175,10 +172,10 @@ pub fn prune_state_store(
     min_readable_version: Version,
     target_version: Version,
     max_versions: usize,
-) -> anyhow::Result<Version> {
+) -> Result<Version> {
     let indices = StaleNodeIndicesByVersionIterator::new(db, min_readable_version, target_version)?
         .take(max_versions) // Iterator<Item = Result<Vec<StaleNodeIndex>>>
-        .collect::<anyhow::Result<Vec<_>>>()? // now Vec<Vec<StaleNodeIndex>>
+        .collect::<Result<Vec<_>>>()? // now Vec<Vec<StaleNodeIndex>>
         .into_iter()
         .flatten()
         .collect::<Vec<_>>();
@@ -209,7 +206,7 @@ impl<'a> StaleNodeIndicesByVersionIterator<'a> {
         db: &'a DB,
         min_readable_version: Version,
         target_min_readable_version: Version,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self> {
         let mut iter = db.iter::<StaleNodeIndexSchema>(ReadOptions::default())?;
         iter.seek(&min_readable_version)?;
 
@@ -219,7 +216,7 @@ impl<'a> StaleNodeIndicesByVersionIterator<'a> {
         })
     }
 
-    fn next_result(&mut self) -> anyhow::Result<Option<Vec<StaleNodeIndex>>> {
+    fn next_result(&mut self) -> Result<Option<Vec<StaleNodeIndex>>> {
         match self.inner.next().transpose()? {
             None => Ok(None),
             Some((index, _)) => {
@@ -247,7 +244,7 @@ impl<'a> StaleNodeIndicesByVersionIterator<'a> {
 }
 
 impl<'a> Iterator for StaleNodeIndicesByVersionIterator<'a> {
-    type Item = anyhow::Result<Vec<StaleNodeIndex>>;
+    type Item = Result<Vec<StaleNodeIndex>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_result().transpose()
