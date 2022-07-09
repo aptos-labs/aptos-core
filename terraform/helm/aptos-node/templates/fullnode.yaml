@@ -83,6 +83,8 @@ spec:
         - name: STRUCT_LOG_TCP_ADDR
           value: {{ $.Values.validator.remoteLogAddress }}
         {{- end }}
+        - name: KUBERNETES_NAMESPACE
+          value: {{ $.Release.Namespace }}
         - name: RUST_BACKTRACE
           value: "0"
         volumeMounts:

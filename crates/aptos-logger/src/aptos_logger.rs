@@ -48,6 +48,8 @@ pub struct LogEntry {
     backtrace: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hostname: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    namespace: Option<&'static str>,
     timestamp: String,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     data: BTreeMap<Key, serde_json::Value>,
@@ -89,7 +91,11 @@ impl LogEntry {
                 .and_then(|name| name.into_string().ok())
         });
 
+        static NAMESPACE: Lazy<Option<String>> =
+            Lazy::new(|| env::var("KUBERNETES_NAMESPACE").ok());
+
         let hostname = HOSTNAME.as_deref();
+        let namespace = NAMESPACE.as_deref();
 
         let backtrace = if enable_backtrace && matches!(metadata.level(), Level::Error) {
             let mut backtrace = Backtrace::new();
@@ -113,6 +119,7 @@ impl LogEntry {
             thread_name,
             backtrace,
             hostname,
+            namespace,
             timestamp: Utc::now().to_rfc3339_opts(SecondsFormat::Micros, true),
             data,
             message,
@@ -133,6 +140,10 @@ impl LogEntry {
 
     pub fn hostname(&self) -> Option<&str> {
         self.hostname
+    }
+
+    pub fn namespace(&self) -> Option<&str> {
+        self.namespace
     }
 
     pub fn timestamp(&self) -> &str {

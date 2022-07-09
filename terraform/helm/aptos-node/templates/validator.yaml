@@ -87,6 +87,8 @@ spec:
           value: {{ .remoteLogAddress }}
         {{- end }}
       {{- end }}
+        - name: KUBERNETES_NAMESPACE
+          value: {{ $.Release.Namespace }}
         - name: RUST_BACKTRACE
           value: "0"
         volumeMounts:
