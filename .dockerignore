@@ -1,37 +1,20 @@
 # list of files to ignore from docker's perspective
 # The more we can exclude the higher likelihood we can reuse cached layers
 
-.assets/
-.circleci/
-.config/
-.github/
-.idea/
-.lintrules/
-developer-docs-site/
-docker/
-!docker/validator/install-tools.sh
-!docker/build-common.sh
+# exclude everything
+**/*
+
+# explicitly include stuff we actually need via negation
+
+!docker/build-rust-all.sh
 !docker/tools/boto.cfg
-documentation/
-ecosystem/
-!ecosystem/indexer/
-!ecosystem/node-checker/
-scripts/
-target/
-terraform/
+
+!**/Cargo.toml
+!**/Cargo.lock
+!**/*.rs
+!config/src/config/test_data
+!aptos-move/framework/
+!api/doc/
+!ecosystem/indexer/migrations/**/*.sql
 !terraform/helm/aptos-node/
 !terraform/helm/genesis/
-
-*~
-*.swp
-**/.terraform/
-**/*.md
-**/*.MD
-**/*Dockerfile
-.git/
-
-clippy.toml
-.gitattributes
-
-# Ignore generated credentials from google-github-actions/auth as per https://github.com/google-github-actions/auth#prerequisites
-gha-creds-*.json

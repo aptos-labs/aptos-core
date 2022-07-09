@@ -63,7 +63,7 @@ aptos genesis set-validator-configuration --keys-dir $user_dir --local-repositor
 done
 
 # get the framework
-# this is the directory the aptos-framework is located in the aptoslabs/init docker image
+# this is the directory the aptos-framework is located in the aptoslabs/tools docker image
 cp -R $MOVE_MODULES_DIR ${WORKSPACE}/framework
 
 # run genesis

@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        IMAGE_NAME: [validator, forge, init, validator_tcb, tools, faucet, txn-emitter, indexer, node-checker]
+        IMAGE_NAME: [validator, forge, tools, faucet, indexer, node-checker]
 
     runs-on: ubuntu-latest
     steps:

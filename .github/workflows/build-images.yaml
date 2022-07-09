@@ -90,9 +90,6 @@ jobs:
   rust-images:
     # trigger only for push events (on protected branches as defined above) OR on PR events with the "CICD:build-images" label.
     needs: [permission-check, determine-last-green-commit]
-    strategy:
-      matrix:
-        IMAGE_TARGET: [release, test]
 
     runs-on: high-perf-docker
     steps:
@@ -117,7 +114,6 @@ jobs:
       - name: Build and Push Rust images
         run: docker/docker-bake-rust-all.sh
         env:
-          IMAGE_TARGET: ${{ matrix.IMAGE_TARGET }}
           LAST_GREEN_COMMIT: ${{ needs.determine-last-green-commit.outputs.lastGreenCommit }}
 
   sdk-integration-test:

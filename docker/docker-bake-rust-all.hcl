@@ -2,19 +2,19 @@
 # It provides a high-level mechenanism to build multiple dockerfiles in one shot.
 # Check https://crazymax.dev/docker-allhands2-buildx-bake and https://docs.docker.com/engine/reference/commandline/buildx_bake/#file-definition for an intro.
 
+variable "CI" {
+  # whether this build runs in aptos-labs' CI environment which makes certain assumptions about certain registries being available to push to cache layers.
+  # for local builds we simply default to relying on dockers local caching.
+  default = "false"
+}
 variable "TARGET_CACHE_ID" {}
-
+variable "TARGET_CACHE_TYPE" {
+  // must be "normalized_branch_or_pr" | "git_sha"
+  default = "normalized_branch_or_pr"
+}
 variable "BUILD_DATE" {}
-
-variable "GITHUB_SHA" {}
 // this is the full GIT_SHA - let's use that as primary identifier going forward
-variable "GIT_SHA" {
-  default = "${GITHUB_SHA}"
-}
-// this is the short GIT_SHA (8 chars). Tagging our docker images with that one is kinda deprecated and we might remove this in future.
-variable "GIT_REV" {
-  default = substr("${GIT_SHA}", 0, 8)
-}
+variable "GIT_SHA" {}
 
 variable "LAST_GREEN_COMMIT" {}
 
@@ -22,36 +22,36 @@ variable "GCP_DOCKER_ARTIFACT_REPO" {}
 
 variable "AWS_ECR_ACCOUNT_NUM" {}
 
+variable "TARGET_REGISTRY" {
+  // must be "aws" | "gcp" | "local", informs which docker tags are being generated
+  default = CI == "true" ? "gcp" : "local"
+}
+
 variable "ecr_base" {
   default = "${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.us-west-2.amazonaws.com/aptos"
 }
 
-variable "gh_image_cache" {
-  default = "ghcr.io/aptos-labs/aptos-core"
-}
-
-variable "normalized_target_cache_id" {
+variable "normalized_branch_or_pr" {
   default = regex_replace("${TARGET_CACHE_ID}", "[^a-zA-Z0-9]", "-")
 }
 
-# images with IMAGE_TARGET=release for rust build
-group "release" {
+target "builder" {
+  target     = "builder"
+  dockerfile = "docker/rust-all.Dockerfile"
+  context    = "."
+  cache-from = generate_cache_from("builder")
+  cache-to   = generate_cache_to("builder")
+  tags       = generate_tags("builder")
+}
+
+group "all" {
   targets = [
     "validator",
     "indexer",
     "node-checker",
-    "safety-rules",
     "tools",
-    "init",
-    "txn-emitter",
-  ]
-}
-
-# images with IMAGE_TARGET=test for rust build
-group "test" {
-  targets = [
     "faucet",
-    "forge",
+    "forge"
   ]
 }
 
@@ -60,23 +60,18 @@ target "_common" {
   context    = "."
   cache-from = flatten([
     // need to repeat all images here until https://github.com/docker/buildx/issues/934 is resolved
+    generate_cache_from("builder"),
     generate_cache_from("validator"),
     generate_cache_from("indexer"),
     generate_cache_from("node-checker"),
-    generate_cache_from("validator_tcb"),
     generate_cache_from("tools"),
-    generate_cache_from("init"),
-    generate_cache_from("txn-emitter"),
     generate_cache_from("faucet"),
     generate_cache_from("forge"),
   ])
   labels = {
     "org.label-schema.schema-version" = "1.0",
     "org.label-schema.build-date"     = "${BUILD_DATE}"
-    "org.label-schema.vcs-ref"        = "${GIT_REV}"
-  }
-  args = {
-    IMAGE_TARGET = "release"
+    "org.label-schema.git-sha"        = "${GIT_SHA}"
   }
 }
 
@@ -101,13 +96,6 @@ target "node-checker" {
   tags     = generate_tags("node-checker")
 }
 
-target "safety-rules" {
-  inherits = ["_common"]
-  target   = "safety-rules"
-  cache-to = generate_cache_to("validator_tcb")
-  tags     = generate_tags("validator_tcb")
-}
-
 target "tools" {
   inherits = ["_common"]
   target   = "tools"
@@ -115,28 +103,11 @@ target "tools" {
   tags     = generate_tags("tools")
 }
 
-target "init" {
-  inherits = ["_common"]
-  target   = "init"
-  cache-to = generate_cache_to("init")
-  tags     = generate_tags("init")
-}
-
-target "txn-emitter" {
-  inherits = ["_common"]
-  target   = "txn-emitter"
-  cache-to = generate_cache_to("txn-emitter")
-  tags     = generate_tags("txn-emitter")
-}
-
 target "faucet" {
   inherits = ["_common"]
   target   = "faucet"
   cache-to = generate_cache_to("faucet")
   tags     = generate_tags("faucet")
-  args = {
-    IMAGE_TARGET = "test"
-  }
 }
 
 target "forge" {
@@ -144,32 +115,32 @@ target "forge" {
   target   = "forge"
   cache-to = generate_cache_to("forge")
   tags     = generate_tags("forge")
-  args = {
-    IMAGE_TARGET = "test"
-  }
 }
 
 function "generate_cache_from" {
   params = [target]
-  result = [
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-main",
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-auto",
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${normalized_target_cache_id}",
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:${LAST_GREEN_COMMIT}",
-  ]
+  result = CI == "true" ? [
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:main",
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:${normalized_branch_or_pr}",
+    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:${GIT_SHA}",
+  ] : []
 }
 
+## we only cache to GCP because AWS ECR doesn't support cache manifests
 function "generate_cache_to" {
   params = [target]
-  result = [
-    "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${normalized_target_cache_id},mode=max",
-  ]
+  result = TARGET_REGISTRY == "gcp" ? ["type=inline"] : []
 }
 
 function "generate_tags" {
   params = [target]
-  result = [
+  result = TARGET_REGISTRY == "gcp" ? [
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${GIT_SHA}",
-    "${ecr_base}/${target}:${GIT_SHA}", // only tag with full GIT_SHA unless it turns out we really need any of the other variations
+    "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${normalized_branch_or_pr}",
+    ] : TARGET_REGISTRY == "aws" ? [
+    "${ecr_base}/${target}:${GIT_SHA}",
+    ] : [
+    "aptos-core/${target}:${GIT_SHA}-from-local",
+    "aptos-core/${target}:from-local",
   ]
 }
