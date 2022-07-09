@@ -269,7 +269,7 @@ pub(crate) fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> Preproce
                 _ => PreprocessedTransaction::UserTransaction(Box::new(checked_txn)),
             }
         }
-        Transaction::StateCheckpoint => PreprocessedTransaction::StateCheckpoint,
+        Transaction::StateCheckpoint(_) => PreprocessedTransaction::StateCheckpoint,
     }
 }
 

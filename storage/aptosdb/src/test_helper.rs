@@ -461,7 +461,7 @@ pub fn verify_committed_transactions(
             txn_info.transaction_hash(),
             txn_to_commit.transaction().hash()
         );
-        if matches!(txn_to_commit.transaction(), Transaction::StateCheckpoint) {
+        if matches!(txn_to_commit.transaction(), Transaction::StateCheckpoint(_)) {
             continue;
         }
 

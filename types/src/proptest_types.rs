@@ -1138,7 +1138,7 @@ impl BlockGen {
             })
             .collect();
         txns_to_commit.push(TransactionToCommit::new(
-            Transaction::StateCheckpoint,
+            Transaction::StateCheckpoint(HashValue::random()),
             TransactionInfo::new_placeholder(0, ExecutionStatus::Success),
             state_updates,
             None,

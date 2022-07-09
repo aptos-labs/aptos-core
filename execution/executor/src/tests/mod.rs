@@ -285,7 +285,7 @@ fn create_transaction_chunks(
         let txn = encode_mint_transaction(gen_address(i), 100);
         txns.push(txn);
     }
-    txns.push(Transaction::StateCheckpoint);
+    txns.push(Transaction::StateCheckpoint(HashValue::random()));
     let id = gen_block_id(1);
 
     let output = executor
@@ -376,7 +376,7 @@ fn apply_transaction_by_writeset(
             )
         })
         .chain(once((
-            Transaction::StateCheckpoint,
+            Transaction::StateCheckpoint(HashValue::random()),
             TransactionOutput::new(
                 WriteSet::default(),
                 Vec::new(),

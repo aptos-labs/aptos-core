@@ -84,7 +84,7 @@ impl VMExecutor for MockVM {
         let mut outputs = vec![];
 
         for txn in transactions {
-            if matches!(txn, Transaction::StateCheckpoint) {
+            if matches!(txn, Transaction::StateCheckpoint(_)) {
                 outputs.push(TransactionOutput::new(
                     WriteSet::default(),
                     vec![],

@@ -47,7 +47,7 @@ fn test_data_strategy() -> impl Strategy<Value = TestData> {
         .into_iter()
         .enumerate()
         .filter_map(|(idx, txn)| match txn {
-            Transaction::GenesisTransaction(..) | Transaction::StateCheckpoint => {
+            Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => {
                 Some(idx as Version)
             }
             _ => None,
