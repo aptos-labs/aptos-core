@@ -11,9 +11,7 @@ mod determinator;
 mod guppy;
 mod license;
 mod toml;
-mod whitespace;
 mod workspace_classify;
-mod workspace_hack;
 
 #[derive(Debug, StructOpt)]
 pub struct Args {
