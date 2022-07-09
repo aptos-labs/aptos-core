@@ -80,6 +80,7 @@ RUN ln -s /usr/bin/python3 /usr/local/bin/python
 COPY --link docker/tools/boto.cfg /etc/boto.cfg
 
 RUN wget https://storage.googleapis.com/pub/gsutil.tar.gz -O- | tar --gzip --directory /opt --extract && ln -s /opt/gsutil/gsutil /usr/local/bin
+RUN cd /usr/local/bin && wget "https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/linux/amd64/kubectl" -O kubectl && chmod +x kubectl
 
 COPY --link --from=builder /aptos/dist/db-bootstrapper /usr/local/bin/db-bootstrapper
 COPY --link --from=builder /aptos/dist/db-backup /usr/local/bin/db-backup
