@@ -113,43 +113,6 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "",
-        "data": {
-          "type": "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>",
-          "data": {
-            "coin": {
-              "value": "18446744073709551614"
-            },
-            "deposit_events": {
-              "counter": "1",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
-              }
-            },
-            "withdraw_events": {
-              "counter": "1",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "2"
-                  }
-                },
-                "len_bytes": 40
-              }
-            }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
         "address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
         "state_key_hash": "",
         "data": {
