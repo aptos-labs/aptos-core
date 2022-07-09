@@ -10,13 +10,13 @@ Do this only if you received the confirmation email from Aptos team for your eli
 
 ## Bootstrapping validator node
 
-Before joining the testnet, you need to bootstrap your node with the genesis blob and waypoint provided by Aptos Labs team. This will convert your node from test mode to prod mode.
+Before joining the testnet, you need to bootstrap your node with the genesis blob and waypoint provided by Aptos Labs team. This will convert your node from test mode to prod mode. AIT2 network Chain ID is 41.
 
 ### Using source code
 
 - Stop your node and remove the data directory.
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- Pull the latest changes on `testnet` branch, make sure you're at commit `898fdc4f4ae7eb2a7dad0b4da9b293d7510b5732`
+- Pull the latest changes on `testnet` branch, make sure you're at commit `6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6`
 - Close the metrics port `9101` and REST API port `80` for your validator (you can leave it open for fullnode).
 - Restarting the node
 
@@ -24,14 +24,15 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 - Stop your node and remove the data volumes, `docker compose down --volumes`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- Update your docker image to use tag `testnet_898fdc4f4ae7eb2a7dad0b4da9b293d7510b5732`. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_898fdc4f4ae7eb2a7dad0b4da9b293d7510b5732/images/sha256-4d41177e917f3f5d5d8ec77dea343160cdcdfdb79ada8e7ac5b7b5151ff9bd53?context=explore)
+- Update your docker image to use tag `testnet_6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6`. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6/images/sha256-5a97797af8dea7465ac011fec3fac11c0d4cdb42f3883292a6e0ed3e27be4b51?context=explore)
 - Close metrics port on 9101 and REST API port `80` for your validator (remove it from the docker compose file), you can leave it open for fullnode.
 - Restarting the node: `docker compose up`
 
 ### Using Terraform
 
 - Increase `era` number in your Terraform config, this will wipe the data once applied.
-- Update your docker image to use tag `testnet_898fdc4f4ae7eb2a7dad0b4da9b293d7510b5732` in the Terraform config. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_898fdc4f4ae7eb2a7dad0b4da9b293d7510b5732/images/sha256-4d41177e917f3f5d5d8ec77dea343160cdcdfdb79ada8e7ac5b7b5151ff9bd53?context=explore)
+- Update `chain_id` to 41.
+- Update your docker image to use tag `testnet_6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6` in the Terraform config. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6/images/sha256-5a97797af8dea7465ac011fec3fac11c0d4cdb42f3883292a6e0ed3e27be4b51?context=explore)
 - Close metrics port and REST API port for validator (you can leave it open for fullnode), add the helm values in your `main.tf ` file, for example:
     ```
     module "aptos-node" {
@@ -108,12 +109,12 @@ All the selected validator node will be receiving sufficient amount of test toke
 
     Please don't add too much stake to make sure you still have sufficient token to pay gas fee.
 
-5. Set lockup time for your stake, minimal of 72 hours is required to join validator set.
+5. Set lockup time for your stake. Longer lockup time will result in more staking reward. Minimal lockup time is 24 hours, and maximal is 5 days.
 
     ```
     aptos node increase-lockup \
     --profile ait2 \
-    --lockup-duration 75h
+    --lockup-duration 72h
     ```
 
 6. Join validator set
