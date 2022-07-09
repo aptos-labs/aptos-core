@@ -148,13 +148,13 @@ jobs:
 
           # report metrics to pushgateway
           echo "forge_job_status {FORGE_EXIT_CODE=\"$FORGE_EXIT_CODE\",FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\"} $GITHUB_RUN_ID" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
-
       - name: Post result as PR comment
         if: env.FORGE_ENABLED == 'true' && env.PR_NUMBER != null
         uses: thollander/actions-comment-pull-request@v1
         with:
           message: |
             ${{ env.FORGE_COMMENT_HEADER }}
+            ${{ env.FORGE_ENABLED == 'true' && 'Forge is not land-blocking' || 'Forge is land-blocking' }}
             * [Test runner output](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
             * [Grafana dashboard](${{ env.FORGE_DASHBOARD_LINK }})
             ```
