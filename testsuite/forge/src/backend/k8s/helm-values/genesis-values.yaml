@@ -1,0 +1,17 @@
+# This file is loaded in by Forge test runner at runtime and templated
+
+imageTag: {image_tag}
+
+chain:
+  era: {era}
+  # expect the root key without 0x prefix
+  root_key: 0x{root_key}
+
+genesis:
+  numValidators: {num_validators}
+  validator:
+    # use non-HAProxy service for validator AptosNet in genesis
+    internal_host_suffix: "validator"
+  fullnode:
+    # use non-HAProxy service for fullnode AptosNet in genesis
+    internal_host_suffix: "fullnode"

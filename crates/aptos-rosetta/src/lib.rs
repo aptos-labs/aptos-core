@@ -5,7 +5,11 @@
 //!
 //! [Rosetta API Spec](https://www.rosetta-api.org/docs/Reference.html)
 
-use crate::{account::CoinCache, error::ApiError};
+use crate::{
+    account::CoinCache,
+    common::{handle_request, with_context},
+    error::{ApiError, ApiResult},
+};
 use aptos_api::runtime::WebServer;
 use aptos_config::config::ApiConfig;
 use aptos_logger::debug;
@@ -29,8 +33,6 @@ pub mod common;
 pub mod error;
 pub mod types;
 
-pub const CURRENCY: &str = "APTOS";
-pub const NUM_DECIMALS: u64 = 6;
 pub const MIDDLEWARE_VERSION: &str = "1.0.0";
 pub const NODE_VERSION: &str = "0.1";
 pub const ROSETTA_VERSION: &str = "1.4.12";
@@ -42,8 +44,9 @@ pub struct RosettaContext {
     rest_client: Option<aptos_rest_client::Client>,
     /// ChainId of the chain to connect to
     pub chain_id: ChainId,
-
+    /// Block size of made up blocks
     pub block_size: u64,
+    /// Coin cache for looking up Currency details
     pub coin_cache: Arc<CoinCache>,
 }
 
@@ -71,21 +74,19 @@ pub fn bootstrap(
         .expect("[rosetta] failed to create runtime");
 
     debug!("Starting up Rosetta server with {:?}", api_config);
-    let api = WebServer::from(api_config);
 
-    runtime.spawn(async move {
-        let context = RosettaContext {
-            block_size,
-            rest_client,
-            chain_id,
-            coin_cache: Arc::new(CoinCache::new()),
-        };
-        api.serve(routes(context)).await;
-    });
+    runtime.spawn(bootstrap_async(
+        block_size,
+        chain_id,
+        api_config,
+        rest_client,
+    ));
     Ok(runtime)
 }
 
+/// Creates HTTP server for Rosetta in an async context
 pub async fn bootstrap_async(
+    block_size: u64,
     chain_id: ChainId,
     api_config: ApiConfig,
     rest_client: Option<aptos_rest_client::Client>,
@@ -94,7 +95,7 @@ pub async fn bootstrap_async(
     let api = WebServer::from(api_config);
     let handle = tokio::spawn(async move {
         let context = RosettaContext {
-            block_size: 1000,
+            block_size,
             rest_client,
             chain_id,
             coin_cache: Arc::new(CoinCache::new()),
@@ -120,8 +121,8 @@ pub fn routes(
         .or(construction::submit_route(context.clone()))
         .or(network::list_route(context.clone()))
         .or(network::options_route(context.clone()))
-        .or(network::status_route(context))
-        // TODO: Add health check?
+        .or(network::status_route(context.clone()))
+        .or(health_check_route(context))
         .with(
             warp::cors()
                 .allow_any_origin()
@@ -130,7 +131,6 @@ pub fn routes(
         )
         .with(aptos_api::log::logger())
         .recover(handle_rejection)
-    // TODO Logger?
     // TODO metrics?
 }
 
@@ -170,4 +170,35 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
     rep.headers_mut()
         .insert("access-control-allow-origin", HeaderValue::from_static("*"));
     Ok(rep)
+}
+
+/// These parameters are directly passed onto the underlying rest server for a healthcheck
+#[derive(serde::Deserialize)]
+struct HealthCheckParams {
+    pub duration_secs: Option<u64>,
+}
+
+/// Default amount of time the fullnode is accepted to be behind (arbitrarily it's 5 minutes)
+const HEALTH_CHECK_DEFAULT_SECS: u64 = 300;
+
+pub fn health_check_route(
+    server_context: RosettaContext,
+) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::path!("-" / "healthy")
+        .and(warp::path::end())
+        .and(warp::query().map(move |params: HealthCheckParams| params))
+        .and(with_context(server_context))
+        .and_then(handle_request(health_check))
+}
+
+/// Calls the underlying REST health check
+async fn health_check(
+    params: HealthCheckParams,
+    server_context: RosettaContext,
+) -> ApiResult<&'static str> {
+    let rest_client = server_context.rest_client()?;
+    let duration_secs = params.duration_secs.unwrap_or(HEALTH_CHECK_DEFAULT_SECS);
+    rest_client.health_check(duration_secs).await?;
+
+    Ok("aptos-node:ok")
 }

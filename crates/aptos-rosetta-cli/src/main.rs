@@ -20,13 +20,24 @@
 mod account;
 mod block;
 mod common;
+mod construction;
 mod network;
 
 use crate::common::{ErrorWrapper, RosettaCliArgs};
+use aptos_logger::Level;
 use clap::Parser;
+use std::process::exit;
 
 #[tokio::main]
 async fn main() {
+    let mut logger = aptos_logger::Logger::new();
+    logger
+        .channel_size(1000)
+        .is_async(false)
+        .level(Level::Warn)
+        .read_env();
+    logger.build();
+
     let args: RosettaCliArgs = RosettaCliArgs::parse();
 
     let result = args.execute().await;
@@ -37,7 +48,8 @@ async fn main() {
             let error = ErrorWrapper {
                 error: error.to_string(),
             };
-            println!("{}", serde_json::to_string_pretty(&error).unwrap())
+            println!("{}", serde_json::to_string_pretty(&error).unwrap());
+            exit(-1)
         }
     }
 }

@@ -218,6 +218,11 @@ impl ScriptFunctionCall {
             .with_external_definitions(external_definitions)
             .with_serialization(!self.local_types);
         rust::CodeGenerator::new(&config)
+            .with_derive_macros(vec![
+                "Clone".to_string(),
+                "Debug".to_string(),
+                "PartialEq".to_string(),
+            ])
             .with_custom_derive_block(custom_derive_block)
             .output(&mut self.out, &script_registry)
             .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", err)))?;
@@ -850,6 +855,10 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
                         "Bytes".into()
                     }
                 }
+                Bool => "Vec<bool>".into(),
+                U64 => "Vec<u64>".into(),
+                U128 => "Vec<u128>".into(),
+                Address => "Vec<AccountAddress>".into(),
                 Vector(type_tag) if type_tag.as_ref() == &U8 => "VecBytes".into(),
                 _ => common::type_not_allowed(type_tag),
             },
@@ -868,6 +877,7 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
             Bool | U8 | U64 | U128 | Address => {}
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => {}
+                Bool | U64 | U128 | Address => {}
                 Vector(type_tag) => {
                     if type_tag.as_ref() != &U8 {
                         common::type_not_allowed(type_tag)

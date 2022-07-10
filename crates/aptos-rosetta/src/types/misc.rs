@@ -31,8 +31,8 @@ pub struct Error {
 /// Error details that are specific to the instance
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ErrorDetails {
-    /// Detailed error message
-    pub error: String,
+    /// Related error details
+    pub details: String,
 }
 
 /// Status of an operation
@@ -77,6 +77,7 @@ pub struct Version {
     pub middleware_version: String,
 }
 
+/// An internal enum to support Operation typing
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum OperationType {
     CreateAccount,
@@ -106,10 +107,10 @@ impl FromStr for OperationType {
             Self::CREATE_ACCOUNT => Ok(OperationType::CreateAccount),
             Self::DEPOSIT => Ok(OperationType::Deposit),
             Self::WITHDRAW => Ok(OperationType::Withdraw),
-            _ => Err(ApiError::DeserializationFailed(format!(
+            _ => Err(ApiError::DeserializationFailed(Some(format!(
                 "Invalid OperationType: {}",
                 s
-            ))),
+            )))),
         }
     }
 }
@@ -124,9 +125,12 @@ impl Display for OperationType {
     }
 }
 
+/// An internal type to support typing of Operation statuses
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum OperationStatusType {
+    /// Operation was part of a successfully committed transaction
     Success,
+    /// Operation was not part of a successfully committed transaction
     Failure,
 }
 
@@ -168,10 +172,10 @@ impl FromStr for OperationStatusType {
         match s.to_lowercase().trim() {
             Self::SUCCESS => Ok(OperationStatusType::Success),
             Self::FAILURE => Ok(OperationStatusType::Failure),
-            _ => Err(ApiError::DeserializationFailed(format!(
+            _ => Err(ApiError::DeserializationFailed(Some(format!(
                 "Invalid OperationStatusType: {}",
                 s
-            ))),
+            )))),
         }
     }
 }

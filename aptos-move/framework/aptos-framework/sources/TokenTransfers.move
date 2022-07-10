@@ -185,7 +185,7 @@ module AptosFramework::TokenTransfers {
             amount,
             Option::none(),
             ASCII::string(b"https://aptos.dev"),
-           0,
+            0,
         )
     }
 }

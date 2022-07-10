@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec,
+    exponential_buckets, register_histogram_vec, register_int_counter_vec, HistogramVec,
+    IntCounterVec,
 };
 use once_cell::sync::Lazy;
 
@@ -13,7 +14,8 @@ pub static APTOS_SCHEMADB_ITER_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|
         // metric description
         "Aptos schemadb iter latency in seconds",
         // metric labels (dimensions)
-        &["cf_name"]
+        &["cf_name"],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
     )
     .unwrap()
 });
@@ -37,7 +39,8 @@ pub static APTOS_SCHEMADB_GET_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(||
         // metric description
         "Aptos schemadb get latency in seconds",
         // metric labels (dimensions)
-        &["cf_name"]
+        &["cf_name"],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
     )
     .unwrap()
 });
@@ -61,7 +64,8 @@ pub static APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS: Lazy<HistogramVec> = Laz
         // metric description
         "Aptos schemadb schema batch commit latency in seconds",
         // metric labels (dimensions)
-        &["db_name"]
+        &["db_name"],
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()
 });
@@ -124,7 +128,8 @@ pub static APTOS_SCHEMADB_BATCH_PUT_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::
         // metric description
         "Aptos schemadb schema batch put latency in seconds",
         // metric labels (dimensions)
-        &["db_name"]
+        &["db_name"],
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
     .unwrap()
 });

@@ -16,7 +16,8 @@ class User < ApplicationRecord
 
   validates :username, uniqueness: { case_sensitive: false }, length: { minimum: 3, maximum: 20 },
                        format: { with: User::USERNAME_REGEX }, allow_nil: true
-  validates :email, uniqueness: { case_sensitive: false }, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_nil: true
+  validate :email_is_unique
+  validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_nil: true
 
   validate_aptos_address :mainnet_address
 
@@ -27,6 +28,8 @@ class User < ApplicationRecord
   has_one :it2_profile, dependent: :destroy
   has_one :it2_survey, dependent: :destroy
   has_many :nfts, dependent: :destroy
+
+  before_save :maybe_enqueue_forum_sync
 
   def self.from_omniauth(auth, current_user = nil)
     # find an existing user or create a user and authorizations
@@ -131,6 +134,22 @@ class User < ApplicationRecord
   end
 
   private
+
+  def email_is_unique
+    return unless email.present?
+
+    other_user = User.where(email:).where.not(id:).first
+    return unless other_user.present?
+
+    other_user_auths = other_user.authorizations.map(&:display_provider).uniq.to_sentence
+    errors.add :email, "has already been taken by an account that logged in with #{other_user_auths}"
+  end
+
+  def maybe_enqueue_forum_sync
+    return unless username_previously_changed? || email_previously_changed? || is_root_previously_changed?
+
+    DiscourseSyncSsoJob.perform_later({ user_id: id })
+  end
 
   # This is to allow username instead of email login in devise (for aptos admins)
   def email_required?

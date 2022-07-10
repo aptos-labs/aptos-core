@@ -8,6 +8,10 @@ module DiscourseHelper
     ENV.fetch('DISCOURSE_URL_BASE', 'https://forum.aptoslabs.com')
   end
 
+  def self.sso_secret
+    ENV.fetch('DISCOURSE_SECRET', nil)
+  end
+
   # @return DiscourseApi::Client
   def self.system_client
     client = DiscourseApi::Client.new(DiscourseHelper.base_url)
@@ -17,6 +21,6 @@ module DiscourseHelper
   end
 
   def self.discourse_url(path)
-    URI.join(base_url, path)
+    URI.join(base_url, path).to_s
   end
 end

@@ -2,16 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::{check_network, handle_request, strip_hex_prefix, with_context},
+    common::{check_network, get_block_index_from_request, handle_request, with_context},
     error::{ApiError, ApiResult},
     types::{Block, BlockIdentifier, BlockRequest, BlockResponse, Transaction},
     RosettaContext,
 };
-use aptos_crypto::HashValue;
 use aptos_logger::{debug, trace};
-use std::str::FromStr;
 use warp::Filter;
 
+/// The year 2000 in seconds, as this is the lower limit for Rosetta API implementations
 const Y2K_SECS: u64 = 946713600000;
 
 pub fn block_route(
@@ -41,66 +40,49 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
     check_network(request.network_identifier, &server_context)?;
 
     let rest_client = server_context.rest_client()?;
+    let block_size = server_context.block_size;
 
     // Retrieve by block or by hash, both or neither is not allowed
+    let block_index =
+        get_block_index_from_request(rest_client, Some(request.block_identifier), block_size)
+            .await?;
+
     let (parent_transaction, transactions): (
         aptos_rest_client::Transaction,
         Vec<aptos_rest_client::Transaction>,
-    ) = match (
-        &request.block_identifier.index,
-        &request.block_identifier.hash,
-    ) {
-        (Some(block_index), None) => {
-            get_block_by_index(rest_client, server_context.block_size, *block_index).await?
-        }
-        (None, Some(hash)) => {
-            // Allow 0x in front of hash
-            let hash = HashValue::from_str(strip_hex_prefix(hash))
-                .map_err(|err| ApiError::AptosError(err.to_string()))?;
-            let response = rest_client.get_transaction(hash).await?;
-            let txn = response.into_inner();
-            let version = txn.version().unwrap();
-            let block_index = version_to_block_index(server_context.block_size, version);
+    ) = get_block_by_index(rest_client, block_size, block_index).await?;
 
-            get_block_by_index(rest_client, server_context.block_size, block_index).await?
-        }
-        (None, None) => {
-            // Get current version
-            let response = rest_client.get_ledger_information().await?;
-            let version = response.state().version;
-            let block_index = version_to_block_index(server_context.block_size, version) - 1;
+    let block = build_block(server_context, parent_transaction, transactions).await?;
 
-            get_block_by_index(rest_client, server_context.block_size, block_index).await?
-        }
-        (_, _) => return Err(ApiError::BadBlockRequest),
-    };
+    Ok(BlockResponse {
+        block: Some(block),
+        other_transactions: None,
+    })
+}
 
-    // Build up the transaction, which should contain the `operations` as the change set
-    let (block_identifier, timestamp) = if let Some(first) = transactions.first() {
-        // note: timestamps are in microseconds, so we convert to milliseconds
-        let mut timestamp = first.timestamp() / 1000;
+/// Build up the transaction, which should contain the `operations` as the change set
+async fn build_block(
+    server_context: RosettaContext,
+    parent_transaction: aptos_rest_client::Transaction,
+    transactions: Vec<aptos_rest_client::Transaction>,
+) -> ApiResult<Block> {
+    let (block_identifier, timestamp) =
+        get_block_id_and_timestamp(server_context.block_size, &transactions)?;
 
-        // Rosetta doesn't like timestamps before 2000
-        if timestamp < Y2K_SECS {
-            timestamp = Y2K_SECS;
-        }
-        (
-            BlockIdentifier::from_transaction(server_context.block_size, first)?,
-            timestamp,
-        )
-    } else {
-        return Err(ApiError::BlockIncomplete);
-    };
-
+    // Convert the transactions and build the block
     let mut txns: Vec<Transaction> = Vec::new();
     for txn in transactions {
         txns.push(
-            Transaction::from_transaction(server_context.coin_cache.clone(), rest_client, txn)
-                .await?,
+            Transaction::from_transaction(
+                server_context.coin_cache.clone(),
+                server_context.rest_client()?,
+                txn,
+            )
+            .await?,
         )
     }
 
-    let block = Block {
+    Ok(Block {
         block_identifier,
         parent_block_identifier: BlockIdentifier::from_transaction(
             server_context.block_size,
@@ -108,16 +90,32 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
         )?,
         timestamp,
         transactions: txns,
-    };
-
-    let response = BlockResponse {
-        block: Some(block),
-        other_transactions: None,
-    };
-
-    Ok(response)
+    })
 }
 
+/// Retrieves the block id and the timestamp from the first transaction in the block
+fn get_block_id_and_timestamp(
+    block_size: u64,
+    transactions: &[aptos_rest_client::Transaction],
+) -> ApiResult<(BlockIdentifier, u64)> {
+    if let Some(first) = transactions.first() {
+        // note: timestamps are in microseconds, so we convert to milliseconds
+        let mut timestamp = first.timestamp() / 1000;
+
+        // Rosetta doesn't like timestamps before 2000
+        if timestamp < Y2K_SECS {
+            timestamp = Y2K_SECS;
+        }
+        Ok((
+            BlockIdentifier::from_transaction(block_size, first)?,
+            timestamp,
+        ))
+    } else {
+        Err(ApiError::BlockIncomplete)
+    }
+}
+
+/// Retrieves a block by its index
 async fn get_block_by_index(
     rest_client: &aptos_rest_client::Client,
     block_size: u64,
@@ -148,12 +146,13 @@ async fn get_block_by_index(
 
         // We can't give an incomplete block, it'll have to be retried
         if txns.len() != block_size as usize {
-            return Err(ApiError::BadBlockRequest);
+            return Err(ApiError::BlockIncomplete);
         }
         Ok((parent_txn, txns))
     }
 }
 
+/// Converts block index to its associated version
 pub fn block_index_to_version(block_size: u64, block_index: u64) -> u64 {
     if block_index == 0 {
         0
@@ -162,6 +161,7 @@ pub fn block_index_to_version(block_size: u64, block_index: u64) -> u64 {
     }
 }
 
+/// Converts ledger version to its associated block index
 pub fn version_to_block_index(block_size: u64, version: u64) -> u64 {
     if version == 0 {
         0

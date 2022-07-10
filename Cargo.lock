@@ -241,6 +241,7 @@ name = "aptos-api-types"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "aptos-config",
  "aptos-crypto",
  "aptos-state-view",
  "aptos-transaction-builder",
@@ -982,29 +983,19 @@ name = "aptos-rosetta-cli"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "aptos-api",
+ "aptos",
  "aptos-config",
  "aptos-crypto",
  "aptos-logger",
- "aptos-metrics-core",
- "aptos-rest-client",
  "aptos-rosetta",
  "aptos-types",
  "aptos-workspace-hack",
- "async-trait",
- "bcs",
  "clap 3.1.18",
- "framework",
- "futures",
  "hex",
- "move-deps",
- "reqwest",
  "serde 1.0.137",
  "serde_json",
- "thiserror",
  "tokio",
  "url",
- "warp",
 ]
 
 [[package]]
@@ -1376,6 +1367,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-proptest-helpers",
+ "aptos-state-view",
  "aptos-temppath",
  "aptos-types",
  "aptos-workspace-hack",
@@ -2316,7 +2308,7 @@ dependencies = [
  "rand 0.8.5",
  "sha2 0.10.2",
  "subtle",
- "time 0.3.11",
+ "time 0.3.9",
  "version_check",
 ]
 
@@ -2800,7 +2792,7 @@ dependencies = [
  "diesel_derives",
  "num-bigint 0.2.6",
  "num-integer",
- "num-traits 0.2.15",
+ "num-traits 0.1.43",
  "pq-sys",
  "r2d2",
  "serde_json",
@@ -4185,12 +4177,12 @@ checksum = "ce23b50ad8242c51a442f3ff322d56b02f08852c77e4c0b4d3fd684abc89c683"
 
 [[package]]
 name = "indexmap"
-version = "1.9.1"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10a35a97730320ffe8e2d410b5d3b69279b98d2c14bdb8b70ea89ecf7888d41e"
+checksum = "e6012d540c5baa3589337a98ce73408de9b5a25ec9fc2c6fd6be8f0d39e0ca5a"
 dependencies = [
  "autocfg",
- "hashbrown 0.12.1",
+ "hashbrown 0.11.2",
 ]
 
 [[package]]
@@ -6454,7 +6446,7 @@ dependencies = [
  "smallvec",
  "tempfile",
  "thiserror",
- "time 0.3.11",
+ "time 0.3.9",
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.2",
@@ -6657,12 +6649,11 @@ dependencies = [
 
 [[package]]
 name = "prometheus-parse"
-version = "0.2.3"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef7a8ed15bcffc55fe0328931ef20d393bb89ad704756a37bd20cffb4804f306"
+checksum = "c996f3caea1c51aa034c0d2dfd8447a12c555f4567b02677ef8a865ac4cce712"
 dependencies = [
  "chrono",
- "itertools",
  "lazy_static 1.4.0",
  "regex",
 ]
@@ -8633,9 +8624,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.11"
+version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72c91f41dcb2f096c05f0873d667dceec1087ce5bcf984ec8ffb19acddbb3217"
+checksum = "c2702e08a7a860f005826c6815dcac101b19b5eb330c27fe4a5928fec1d20ddd"
 dependencies = [
  "itoa 1.0.2",
  "libc",

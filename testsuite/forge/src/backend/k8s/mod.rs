@@ -23,6 +23,7 @@ pub struct K8sFactory {
     base_image_tag: String,
     kube_namespace: String,
     use_port_forward: bool,
+    keep: bool,
 }
 
 // These are test keys for forge ephemeral networks. Do not use these elsewhere!
@@ -37,6 +38,7 @@ impl K8sFactory {
         image_tag: String,
         base_image_tag: String,
         use_port_forward: bool,
+        keep: bool,
     ) -> Result<K8sFactory> {
         let root_key: [u8; ED25519_PRIVATE_KEY_LENGTH] =
             hex::decode(DEFAULT_ROOT_PRIV_KEY)?.try_into().unwrap();
@@ -62,6 +64,7 @@ impl K8sFactory {
             base_image_tag,
             kube_namespace,
             use_port_forward,
+            keep,
         })
     }
 }
@@ -94,7 +97,11 @@ impl Factory for K8sFactory {
             None => None,
         };
 
-        let (_era, validators, fullnodes) = install_testnet_resources(
+        // create the forge-management configmap before installing anything
+        create_management_configmap(self.kube_namespace.clone(), self.keep).await?;
+
+        // try installing testnet resources, but clean up if it fails
+        let (_era, validators, fullnodes) = match install_testnet_resources(
             self.kube_namespace.clone(),
             node_num.get(),
             format!("{}", init_version),
@@ -102,7 +109,14 @@ impl Factory for K8sFactory {
             genesis_modules_path,
             self.use_port_forward,
         )
-        .await?;
+        .await
+        {
+            Ok(res) => res,
+            Err(e) => {
+                uninstall_testnet_resources(self.kube_namespace.clone()).await?;
+                bail!(e);
+            }
+        };
 
         let swarm = K8sSwarm::new(
             &self.root_key,
@@ -111,6 +125,7 @@ impl Factory for K8sFactory {
             &self.kube_namespace,
             validators,
             fullnodes,
+            self.keep,
         )
         .await
         .unwrap();

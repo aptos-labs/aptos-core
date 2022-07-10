@@ -3,8 +3,8 @@
 
 use crate::{
     backend::k8s::node::{K8sNode, REST_API_PORT},
-    create_k8s_client, query_sequence_numbers, set_validator_image_tag, ChainInfo, FullNode, Node,
-    Result, Swarm, Validator, Version,
+    create_k8s_client, query_sequence_numbers, set_validator_image_tag,
+    uninstall_testnet_resources, ChainInfo, FullNode, Node, Result, Swarm, Validator, Version,
 };
 use ::aptos_logger::*;
 use anyhow::{anyhow, bail, format_err};
@@ -21,10 +21,10 @@ use kube::{
     client::Client as K8sClient,
 };
 use std::{collections::HashMap, convert::TryFrom, env, net::TcpListener, str, sync::Arc};
-use tokio::time::Duration;
+use tokio::{runtime::Runtime, time::Duration};
 
-const VALIDATOR_LB: &str = "validator-lb";
-const FULLNODES_LB: &str = "fullnode-lb";
+const VALIDATOR_SERVICE_SUFFIX: &str = "validator";
+const FULLNODE_SERVICE_SUFFIX: &str = "fullnode";
 const LOCALHOST: &str = "127.0.0.1";
 
 pub struct K8sSwarm {
@@ -35,6 +35,7 @@ pub struct K8sSwarm {
     versions: Arc<HashMap<Version, String>>,
     pub chain_id: ChainId,
     kube_namespace: String,
+    keep: bool,
 }
 
 impl K8sSwarm {
@@ -45,6 +46,7 @@ impl K8sSwarm {
         kube_namespace: &str,
         validators: HashMap<AccountAddress, K8sNode>,
         fullnodes: HashMap<AccountAddress, K8sNode>,
+        keep: bool,
     ) -> Result<Self> {
         let kube_client = create_k8s_client().await;
 
@@ -69,7 +71,7 @@ impl K8sSwarm {
         versions.insert(base_version, base_image_tag.to_string());
         versions.insert(cur_version, image_tag.to_string());
 
-        Ok(Self {
+        Ok(K8sSwarm {
             validators,
             fullnodes,
             root_account,
@@ -77,6 +79,7 @@ impl K8sSwarm {
             chain_id: ChainId::new(4),
             versions: Arc::new(versions),
             kube_namespace: kube_namespace.to_string(),
+            keep,
         })
     }
 
@@ -205,7 +208,7 @@ pub fn k8s_wait_genesis_strategy() -> impl Iterator<Item = Duration> {
 
 /// Amount of time to wait for nodes to respond on the REST API
 pub fn k8s_wait_nodes_strategy() -> impl Iterator<Item = Duration> {
-    ExponentWithLimitDelay::new(1000, 10 * 1000, 10 * 60 * 1000)
+    ExponentWithLimitDelay::new(1000, 10 * 1000, 15 * 60 * 1000)
 }
 
 #[derive(Clone, Debug)]
@@ -252,7 +255,7 @@ pub(crate) async fn get_validators(
     let services = list_services(client, kube_namespace).await?;
     let validators = services
         .into_iter()
-        .filter(|s| s.name.contains(VALIDATOR_LB))
+        .filter(|s| s.name.contains(VALIDATOR_SERVICE_SUFFIX))
         .map(|s| {
             let mut port = REST_API_PORT;
             let mut ip = s.host_ip.clone();
@@ -263,7 +266,8 @@ pub(crate) async fn get_validators(
             let node_id = parse_node_id(&s.name).expect("error to parse node id");
             let node = K8sNode {
                 name: format!("aptos-node-{}-validator", node_id),
-                sts_name: parse_node_pod_basename(&s.name).unwrap(),
+                // the base validator service name is the same as that of the StatefulSet
+                sts_name: s.name.clone(),
                 // TODO: fetch this from running node
                 peer_id: PeerId::random(),
                 node_id,
@@ -291,7 +295,7 @@ pub(crate) async fn get_fullnodes(
     let services = list_services(client, kube_namespace).await?;
     let fullnodes = services
         .into_iter()
-        .filter(|s| s.name.contains(FULLNODES_LB))
+        .filter(|s| s.name.contains(FULLNODE_SERVICE_SUFFIX))
         .map(|s| {
             let mut port = REST_API_PORT;
             let mut ip = s.host_ip.clone();
@@ -302,7 +306,8 @@ pub(crate) async fn get_fullnodes(
             let node_id = parse_node_id(&s.name).expect("error to parse node id");
             let node = K8sNode {
                 name: format!("aptos-node-{}-fullnode", node_id),
-                sts_name: format!("{}-e{}", parse_node_pod_basename(&s.name).unwrap(), era),
+                // the base fullnode service name is the same as that of the StatefulSet plus the era
+                sts_name: format!("{}-e{}", &s.name, era),
                 // TODO: fetch this from running node
                 peer_id: PeerId::random(),
                 node_id,
@@ -332,17 +337,6 @@ fn parse_node_id(s: &str) -> Result<usize> {
     let v = v[1].split('-').collect::<Vec<&str>>();
     let idx: usize = v[0].parse().unwrap();
     Ok(idx)
-}
-
-// gets the node's underlying STS name based on its associated LB service name
-// assumes the input is named <RELEASE>-aptos-node-<INDEX>-<validator|fullnode>-lb
-fn parse_node_pod_basename(s: &str) -> Result<String> {
-    // first get rid of the prefixes
-    let v = s.split("-lb").collect::<Vec<&str>>();
-    if v.is_empty() {
-        return Err(format_err!("Failed to parse {:?} sts name format", s));
-    }
-    Ok(v[0].to_string())
 }
 
 fn load_root_key(root_key_bytes: &[u8]) -> Ed25519PrivateKey {
@@ -381,4 +375,17 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
     }
 
     Ok(unhealthy_nodes)
+}
+
+impl Drop for K8sSwarm {
+    fn drop(&mut self) {
+        let runtime = Runtime::new().unwrap();
+        if !self.keep {
+            runtime
+                .block_on(uninstall_testnet_resources(self.kube_namespace.clone()))
+                .unwrap();
+        } else {
+            println!("Keeping kube_namespace {}", self.kube_namespace);
+        }
+    }
 }

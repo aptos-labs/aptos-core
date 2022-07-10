@@ -8,6 +8,7 @@ mod convert;
 mod error;
 mod event_key;
 mod hash;
+mod index;
 mod ledger_info;
 pub mod mime_types;
 mod move_types;
@@ -22,6 +23,7 @@ pub use convert::{new_vm_ascii_string, AsConverter, MoveConverter};
 pub use error::Error;
 pub use event_key::EventKey;
 pub use hash::HashValue;
+pub use index::IndexResponse;
 pub use ledger_info::LedgerInfo;
 pub use move_types::{
     HexEncodedBytes, MoveFunction, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,

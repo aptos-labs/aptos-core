@@ -47,6 +47,7 @@ trait ServerArgs {
     /// Retrieve the chain id
     fn chain_id(&self) -> ChainId;
 
+    /// Size of the imaginary blocks made up for this system
     fn block_size(&self) -> u64;
 }
 
@@ -95,7 +96,7 @@ impl ServerArgs for CommandArgs {
 #[derive(Debug, Parser)]
 pub struct OfflineArgs {
     /// Listen address for the server. e.g. 127.0.0.1:8080
-    #[clap(long, default_value = "127.0.0.1:8080")]
+    #[clap(long, default_value = "127.0.0.1:8082")]
     listen_address: SocketAddr,
     /// Path to TLS cert for HTTPS support
     #[clap(long)]

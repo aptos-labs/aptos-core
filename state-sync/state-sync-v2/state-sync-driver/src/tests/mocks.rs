@@ -38,7 +38,7 @@ use mockall::mock;
 use scratchpad::SparseMerkleTree;
 use std::sync::Arc;
 use storage_interface::{
-    DbReader, DbReaderWriter, DbWriter, Order, StartupInfo, StateSnapshotReceiver, TreeState,
+    DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order, StartupInfo, StateSnapshotReceiver,
 };
 use tokio::task::JoinHandle;
 
@@ -249,7 +249,7 @@ mock! {
             version: Version,
         ) -> Result<(Option<StateValue>, SparseMerkleProof)>;
 
-        fn get_latest_tree_state(&self) -> Result<TreeState>;
+        fn get_latest_executed_trees(&self) -> Result<ExecutedTrees>;
 
         fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures>;
 

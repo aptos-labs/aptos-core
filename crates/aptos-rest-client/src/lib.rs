@@ -3,7 +3,9 @@
 
 use anyhow::{anyhow, Result};
 use aptos_api_types::mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE;
-pub use aptos_api_types::{self, MoveModuleBytecode, PendingTransaction, Transaction};
+pub use aptos_api_types::{
+    self, IndexResponse, MoveModuleBytecode, PendingTransaction, Transaction,
+};
 use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress, account_config::aptos_root_address,
@@ -63,6 +65,11 @@ impl Client {
                 Err(anyhow!("No data returned"))
             }
         })
+    }
+
+    pub async fn get_index(&self) -> Result<Response<IndexResponse>> {
+        self.json(self.inner.get(self.base_url.clone()).send().await?)
+            .await
     }
 
     pub async fn get_ledger_information(&self) -> Result<Response<State>> {

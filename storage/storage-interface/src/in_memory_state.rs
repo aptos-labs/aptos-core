@@ -33,6 +33,7 @@ impl InMemoryState {
         current_version: Option<Version>,
         updated_since_checkpoint: HashSet<StateKey>,
     ) -> Self {
+        assert!(checkpoint_version.map_or(0, |v| v + 1) <= current_version.map_or(0, |v| v + 1));
         Self {
             checkpoint,
             checkpoint_version,
@@ -56,6 +57,11 @@ impl InMemoryState {
             checkpoint_version,
             HashSet::new(),
         )
+    }
+
+    pub fn has_same_current_state(&self, other: &InMemoryState) -> bool {
+        self.current_version == other.current_version
+            && self.current.has_same_root_hash(&other.current)
     }
 
     pub fn checkpoint_root_hash(&self) -> HashValue {

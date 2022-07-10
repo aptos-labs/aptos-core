@@ -6,10 +6,10 @@ use crate::{
     logging::{LogEvent, LogSchema},
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
-    persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
+    persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     state_replication::StateComputer,
 };
-use anyhow::bail;
+use anyhow::{bail, Context};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -71,14 +71,20 @@ impl BlockStore {
         sync_info: &SyncInfo,
         mut retriever: BlockRetriever,
     ) -> anyhow::Result<()> {
-        self.sync_to_highest_commit_cert(sync_info.highest_ledger_info(), &retriever.network)
-            .await;
+        self.sync_to_highest_commit_cert(
+            sync_info.highest_commit_cert().ledger_info(),
+            &retriever.network,
+        )
+        .await;
         self.sync_to_highest_ordered_cert(
             sync_info.highest_ordered_cert().clone(),
-            sync_info.highest_ledger_info().clone(),
+            sync_info.highest_commit_cert().clone(),
             &mut retriever,
         )
         .await?;
+
+        self.insert_quorum_cert(sync_info.highest_commit_cert(), &mut retriever)
+            .await?;
 
         self.insert_quorum_cert(sync_info.highest_ordered_cert(), &mut retriever)
             .await?;
@@ -103,14 +109,13 @@ impl BlockStore {
             _ => (),
         }
         if self.ordered_root().round() < qc.commit_info().round() {
-            let finality_proof = qc.ledger_info();
-            self.commit(finality_proof.clone()).await?;
+            self.commit(qc.clone()).await?;
             if qc.ends_epoch() {
                 retriever
                     .network
                     .broadcast(ConsensusMsg::EpochChangeProof(Box::new(
                         EpochChangeProof::new(
-                            vec![finality_proof.clone()],
+                            vec![qc.ledger_info().clone()],
                             /* more = */ false,
                         ),
                     )))
@@ -162,15 +167,15 @@ impl BlockStore {
     async fn sync_to_highest_ordered_cert(
         &self,
         highest_ordered_cert: QuorumCert,
-        highest_ledger_info: LedgerInfoWithSignatures,
+        highest_commit_cert: QuorumCert,
         retriever: &mut BlockRetriever,
     ) -> anyhow::Result<()> {
-        if !self.need_sync_for_ledger_info(&highest_ledger_info) {
+        if !self.need_sync_for_ledger_info(highest_commit_cert.ledger_info()) {
             return Ok(());
         }
         let (root, root_metadata, blocks, quorum_certs) = Self::fast_forward_sync(
             &highest_ordered_cert,
-            highest_ledger_info.clone(),
+            &highest_commit_cert,
             retriever,
             self.storage.clone(),
             self.state_computer.clone(),
@@ -185,7 +190,7 @@ impl BlockStore {
         self.rebuild(root, root_metadata, blocks, quorum_certs)
             .await;
 
-        if highest_ledger_info.ledger_info().ends_epoch() {
+        if highest_commit_cert.ledger_info().ledger_info().ends_epoch() {
             retriever
                 .network
                 .notify_epoch_change(EpochChangeProof::new(
@@ -199,7 +204,7 @@ impl BlockStore {
 
     pub async fn fast_forward_sync<'a>(
         highest_ordered_cert: &'a QuorumCert,
-        highest_ledger_info: LedgerInfoWithSignatures,
+        highest_commit_cert: &'a QuorumCert,
         retriever: &'a mut BlockRetriever,
         storage: Arc<dyn PersistentLivenessStorage>,
         state_computer: Arc<dyn StateComputer>,
@@ -212,14 +217,17 @@ impl BlockStore {
 
         // we fetch the blocks from
         let num_blocks = highest_ordered_cert.certified_block().round()
-            - highest_ledger_info.ledger_info().round()
+            - highest_commit_cert.ledger_info().ledger_info().round()
             + 1;
 
-        let blocks = retriever
+        // although unlikely, we might wrap num_blocks around on a 32-bit machine
+        assert!(num_blocks < std::usize::MAX as u64);
+
+        let mut blocks = retriever
             .retrieve_block_for_qc(
                 highest_ordered_cert,
                 num_blocks,
-                highest_ledger_info.commit_info().id(),
+                highest_commit_cert.commit_info().id(),
             )
             .await?;
 
@@ -231,28 +239,82 @@ impl BlockStore {
             blocks.first().expect("blocks are empty").id(),
         );
 
+        // Confirm retrival ended when it hit the last block we care about, even if it didn't reach all num_blocks blocks.
         assert_eq!(
             blocks.last().expect("blocks are empty").id(),
-            highest_ledger_info.ledger_info().commit_info().id()
+            highest_commit_cert.commit_info().id()
         );
 
-        // although unlikely, we might wrap num_blocks around on a 32-bit machine
-        assert!(num_blocks < std::usize::MAX as u64);
         let mut quorum_certs = vec![highest_ordered_cert.clone()];
         quorum_certs.extend(
             blocks
                 .iter()
-                .take(num_blocks as usize - 1)
+                .take(blocks.len() - 1)
                 .map(|block| block.quorum_cert().clone()),
         );
+
+        // check if highest_commit_cert comes from a fork
+        // if so, we need to fetch it's block as well, to have a proof of commit.
+        if !blocks
+            .iter()
+            .any(|block| block.id() == highest_commit_cert.certified_block().id())
+        {
+            let mut additional_blocks = retriever
+                .retrieve_block_for_qc(
+                    highest_commit_cert,
+                    1,
+                    highest_commit_cert.commit_info().id(),
+                )
+                .await?;
+
+            assert_eq!(additional_blocks.len(), 1);
+            let block = additional_blocks.pop().expect("blocks are empty");
+            assert_eq!(
+                block.id(),
+                highest_commit_cert.certified_block().id(),
+                "Expecting in the retrieval response, for commit certificate fork, first block should be {}, but got {}",
+                highest_commit_cert.certified_block().id(),
+                block.id(),
+            );
+
+            blocks.push(block);
+            quorum_certs.push(highest_commit_cert.clone());
+        }
+
+        assert_eq!(blocks.len(), quorum_certs.len());
         for (i, block) in blocks.iter().enumerate() {
             assert_eq!(block.id(), quorum_certs[i].certified_block().id());
         }
 
+        // Check early that recovery will succeed, and return before corrupting our state in case it will not.
+        LedgerRecoveryData::new(highest_commit_cert.ledger_info().clone())
+            .find_root(&mut blocks.clone(), &mut quorum_certs.clone())
+            .with_context(|| {
+                // for better readability
+                quorum_certs.sort_by_key(|qc| qc.certified_block().round());
+                format!(
+                    "\nRoot: {:?}\nBlocks in db: {}\nQuorum Certs in db: {}\n",
+                    highest_commit_cert.commit_info(),
+                    blocks
+                        .iter()
+                        .map(|b| format!("\n\t{}", b))
+                        .collect::<Vec<String>>()
+                        .concat(),
+                    quorum_certs
+                        .iter()
+                        .map(|qc| format!("\n\t{}", qc))
+                        .collect::<Vec<String>>()
+                        .concat(),
+                )
+            })?;
+
         // If a node restarts in the middle of state synchronization, it is going to try to catch up
         // to the stored quorum certs as the new root.
         storage.save_tree(blocks.clone(), quorum_certs.clone())?;
-        state_computer.sync_to(highest_ledger_info).await?;
+
+        state_computer
+            .sync_to(highest_commit_cert.ledger_info().clone())
+            .await?;
 
         // we do not need to update block_tree.highest_commit_decision_ledger_info here
         // because the block_tree is going to rebuild itself.

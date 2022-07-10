@@ -261,6 +261,7 @@ impl From<(&BlockMetadata, TransactionInfo, Vec<Event>)> for Transaction {
             events,
             previous_block_votes: txn.previous_block_votes().clone(),
             proposer: txn.proposer().into(),
+            failed_proposer_indices: txn.failed_proposer_indices().clone(),
             timestamp: txn.timestamp_usecs().into(),
         })
     }
@@ -355,6 +356,7 @@ pub struct BlockMetadataTransaction {
     pub events: Vec<Event>,
     pub previous_block_votes: Vec<bool>,
     pub proposer: Address,
+    pub failed_proposer_indices: Vec<u32>,
     pub timestamp: U64,
 }
 

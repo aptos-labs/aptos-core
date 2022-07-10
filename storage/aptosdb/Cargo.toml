@@ -31,10 +31,11 @@ aptos-jellyfish-merkle = { path = "../jellyfish-merkle" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers", optional = true }
+aptos-state-view = { path = "../state-view" }
 aptos-temppath = { path = "../../crates/aptos-temppath", optional = true }
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
-executor-types = { path = "../../execution/executor-types", optional = true }
+executor-types = { path = "../../execution/executor-types" }
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 num-variants = { path = "../../crates/num-variants" }
 schemadb = { path = "../schemadb" }

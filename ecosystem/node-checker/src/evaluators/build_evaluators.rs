@@ -7,7 +7,7 @@ use crate::{
     evaluators::{
         direct::{
             ApiEvaluatorError, DirectEvaluatorInput, LatencyEvaluator, TpsEvaluator,
-            TpsEvaluatorError, TransactionPresenceEvaluator,
+            TpsEvaluatorError, TransactionAvailabilityEvaluator,
         },
         metrics::{
             ConsensusProposalsEvaluator, ConsensusRoundEvaluator, ConsensusTimeoutsEvaluator,
@@ -143,7 +143,7 @@ pub fn build_evaluators(
         &mut evaluator_identifiers,
         evaluator_args,
     )?;
-    TransactionPresenceEvaluator::add_from_evaluator_args(
+    TransactionAvailabilityEvaluator::add_from_evaluator_args(
         &mut evaluators,
         &mut evaluator_identifiers,
         evaluator_args,

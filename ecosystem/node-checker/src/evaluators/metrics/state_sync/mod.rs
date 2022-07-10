@@ -5,4 +5,4 @@ mod version;
 
 pub use version::*;
 
-pub const CATEGORY: &str = "consensus";
+pub const CATEGORY: &str = "state_sync";

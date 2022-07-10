@@ -236,7 +236,7 @@
             "missed_votes": [
               "13"
             ],
-            "num_blocks": "14"
+            "num_blocks": "13"
           }
         }
       },
@@ -276,6 +276,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "13"
   },
   {
@@ -515,7 +516,7 @@
             "missed_votes": [
               "14"
             ],
-            "num_blocks": "15"
+            "num_blocks": "14"
           }
         }
       },
@@ -555,6 +556,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "14"
   },
   {
@@ -794,7 +796,7 @@
             "missed_votes": [
               "15"
             ],
-            "num_blocks": "16"
+            "num_blocks": "15"
           }
         }
       },
@@ -834,6 +836,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "15"
   },
   {
@@ -1073,7 +1076,7 @@
             "missed_votes": [
               "16"
             ],
-            "num_blocks": "17"
+            "num_blocks": "16"
           }
         }
       },
@@ -1113,6 +1116,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "16"
   },
   {
@@ -1352,7 +1356,7 @@
             "missed_votes": [
               "17"
             ],
-            "num_blocks": "18"
+            "num_blocks": "17"
           }
         }
       },
@@ -1392,6 +1396,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "17"
   },
   {
@@ -1631,7 +1636,7 @@
             "missed_votes": [
               "18"
             ],
-            "num_blocks": "19"
+            "num_blocks": "18"
           }
         }
       },
@@ -1671,6 +1676,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "18"
   },
   {
@@ -1910,7 +1916,7 @@
             "missed_votes": [
               "19"
             ],
-            "num_blocks": "20"
+            "num_blocks": "19"
           }
         }
       },
@@ -1950,6 +1956,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "19"
   },
   {
@@ -2189,7 +2196,7 @@
             "missed_votes": [
               "20"
             ],
-            "num_blocks": "21"
+            "num_blocks": "20"
           }
         }
       },
@@ -2229,6 +2236,7 @@
       false
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+    "failed_proposer_indices": [],
     "timestamp": "20"
   },
   {

@@ -1,10 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{account, block, network};
+use crate::{account, block, construction, network};
 use aptos_rosetta::{
     client::RosettaClient,
-    types::{NetworkIdentifier, NetworkRequest},
+    types::{NetworkIdentifier, NetworkRequest, PartialBlockIdentifier},
 };
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
@@ -21,15 +21,19 @@ pub enum RosettaCliArgs {
     #[clap(subcommand)]
     Block(block::BlockCommand),
     #[clap(subcommand)]
+    Construction(construction::ConstructionCommand),
+    #[clap(subcommand)]
     Network(network::NetworkCommand),
 }
 
 impl RosettaCliArgs {
     pub async fn execute(self) -> anyhow::Result<String> {
+        use RosettaCliArgs::*;
         match self {
-            RosettaCliArgs::Account(inner) => inner.execute().await,
-            RosettaCliArgs::Block(inner) => inner.execute().await,
-            RosettaCliArgs::Network(inner) => inner.execute().await,
+            Account(inner) => inner.execute().await,
+            Block(inner) => inner.execute().await,
+            Construction(inner) => inner.execute().await,
+            Network(inner) => inner.execute().await,
         }
     }
 }
@@ -41,12 +45,13 @@ pub fn format_output<T: Serialize>(input: anyhow::Result<T>) -> anyhow::Result<S
 
 #[derive(Debug, Parser)]
 pub struct UrlArgs {
-    /// URL for the Aptos Rosetta API. e.g. http://localhost:8080
-    #[clap(long, default_value = "http://localhost:8080")]
+    /// URL for the Aptos Rosetta API. e.g. http://localhost:8082
+    #[clap(long, default_value = "http://localhost:8082")]
     rosetta_api_url: url::Url,
 }
 
 impl UrlArgs {
+    /// Retrieve a [`RosettaClient`]
     pub fn client(self) -> RosettaClient {
         RosettaClient::new(self.rosetta_api_url)
     }
@@ -75,4 +80,30 @@ impl NetworkArgs {
 #[derive(Serialize)]
 pub struct ErrorWrapper {
     pub error: String,
+}
+
+/// Arguments for requesting a block
+#[derive(Debug, Parser)]
+pub struct BlockArgs {
+    /// The index of the block to request
+    #[clap(long)]
+    block_index: Option<u64>,
+    /// The hash of the block to request
+    #[clap(long)]
+    block_hash: Option<String>,
+}
+
+impl From<BlockArgs> for Option<PartialBlockIdentifier> {
+    fn from(args: BlockArgs) -> Self {
+        Some(args.into())
+    }
+}
+
+impl From<BlockArgs> for PartialBlockIdentifier {
+    fn from(args: BlockArgs) -> Self {
+        PartialBlockIdentifier {
+            index: args.block_index,
+            hash: args.block_hash,
+        }
+    }
 }

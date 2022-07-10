@@ -6,7 +6,10 @@ use crate::{
     configuration::NodeAddress,
     evaluator::{EvaluationResult, EvaluationSummary, Evaluator},
     evaluators::{
-        direct::{DirectEvaluatorInput, NodeIdentityEvaluator},
+        direct::{
+            get_index_response, get_index_response_or_evaluation_result, DirectEvaluatorInput,
+            NodeIdentityEvaluator,
+        },
         metrics::{parse_metrics, MetricsEvaluatorInput},
         system_information::SystemInformationEvaluatorInput,
         EvaluatorSet, EvaluatorType,
@@ -28,6 +31,9 @@ use tokio::{time::Duration, try_join};
 pub struct BlockingRunnerArgs {
     #[clap(long, default_value = "5")]
     pub metrics_fetch_delay_secs: u64,
+
+    #[clap(long, default_value_t = 4)]
+    pub api_client_timeout_secs: u64,
 }
 
 #[derive(Debug)]
@@ -157,26 +163,21 @@ impl<M: MetricCollector> BlockingRunner<M> {
 
     async fn run_direct_evaluators(
         &self,
-        target_node_address: &NodeAddress,
+        direct_evaluator_input: &DirectEvaluatorInput,
     ) -> Result<Vec<EvaluationResult>, RunnerError> {
         let evaluators = self.evaluator_set.get_direct_evaluators();
-
-        let direct_evaluator_input = DirectEvaluatorInput {
-            baseline_node_information: self.baseline_node_information.clone(),
-            target_node_address: target_node_address.clone(),
-        };
 
         let mut futures: Vec<BoxFuture<_>> = vec![];
         for evaluator in &evaluators {
             futures.push(match evaluator {
                 EvaluatorType::Tps(evaluator) => Box::pin(
                     evaluator
-                        .evaluate(&direct_evaluator_input)
+                        .evaluate(direct_evaluator_input)
                         .err_into::<RunnerError>(),
                 ),
                 EvaluatorType::Api(evaluator) => Box::pin(
                     evaluator
-                        .evaluate(&direct_evaluator_input)
+                        .evaluate(direct_evaluator_input)
                         .err_into::<RunnerError>(),
                 ),
                 _ => continue,
@@ -204,9 +205,34 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
     ) -> Result<EvaluationSummary, RunnerError> {
         info!("Running evaluation for {}", target_node_address.url);
 
+        let api_client_timeout = Duration::from_secs(self.args.api_client_timeout_secs);
+
+        let baseline_index_response = get_index_response(
+            &self.baseline_node_information.node_address,
+            api_client_timeout,
+        )
+        .await
+        .context(format!(
+            "Failed to read index response from baseline node. Make sure its API is open (port {})",
+            self.baseline_node_information.node_address.api_port
+        ))
+        .map_err(RunnerError::BaselineMissingDataError)?;
+
+        let target_index_response =
+            match get_index_response_or_evaluation_result(target_node_address, api_client_timeout)
+                .await
+            {
+                Ok(response) => response,
+                Err(evaluation_result) => {
+                    return Ok(EvaluationSummary::from(vec![evaluation_result]))
+                }
+            };
+
         let direct_evaluator_input = DirectEvaluatorInput {
             baseline_node_information: self.baseline_node_information.clone(),
             target_node_address: target_node_address.clone(),
+            baseline_index_response,
+            target_index_response,
         };
 
         debug!("Confirming node identity matches");
@@ -231,7 +257,7 @@ impl<M: MetricCollector> Runner for BlockingRunner<M> {
         let (mut metrics_results, mut system_information_results, mut direct_results) = try_join!(
             self.run_metrics_evaluators(target_metric_collector, target_node_address),
             self.run_system_information_evaluators(target_metric_collector, target_node_address),
-            self.run_direct_evaluators(target_node_address)
+            self.run_direct_evaluators(&direct_evaluator_input)
         )?;
         evaluation_results.append(&mut metrics_results);
         evaluation_results.append(&mut system_information_results);

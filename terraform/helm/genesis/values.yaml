@@ -18,7 +18,7 @@ imageTag: testnet
 
 genesis:
   image:
-    repo: aptoslabs/init
+    repo: aptoslabs/tools
     tag:
     pullPolicy: IfNotPresent
   # Number of validators to include in genesis
@@ -35,7 +35,7 @@ genesis:
     enable_onchain_discovery: true
     internal_host_suffix: fullnode-lb
   # The path or move modules in the docker image to pull
-  # Defaults to the aptos-framework in the aptoslabs/init docker image
+  # Defaults to the aptos-framework in the aptoslabs/tools docker image
   moveModulesDir: /aptos-framework/move/modules
 
 serviceAccount:

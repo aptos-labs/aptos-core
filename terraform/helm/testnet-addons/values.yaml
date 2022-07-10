@@ -8,11 +8,40 @@ aws:
 genesis:
   # prefix used to get the genesis configuration
   username_prefix: aptos-node
+  numValidators:
+  chain_id:
 
 waypoint:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+
+load_test:
+  enabled: false
+  image:
+    repo: aptoslabs/txn-emitter
+    tag:
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 1
+      memory: 512Mi
+    requests:
+      cpu: 1
+      memory: 512Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  intervalMins: 15
+  config:
+    mint_key:
+    duration: 300
+    accounts_per_client: 12
+    workers_per_ac: 64
+    enableBurst: false
+    waitMillis: 1000
+    txn_expiration_time_secs: 30
+    use_validators: false
 
 serviceAccount:
   # Specifies whether a service account should be created

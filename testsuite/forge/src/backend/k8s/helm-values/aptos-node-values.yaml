@@ -1,0 +1,30 @@
+# This file is loaded in by Forge test runner at runtime and templated
+
+numValidators: {num_validators}
+imageTag: {image_tag}
+chain:
+  era: {era}
+
+# disable NetworkPolicy and HAProxy so test can hit validators directly
+validator:
+  enableNetworkPolicy: false
+haproxy:
+  enabled: false
+
+# no VFNs in forge for now
+fullnode:
+  groups: []
+
+# make all services internal ClusterIP and open all ports
+service:
+  validator:
+    external:
+      type: "ClusterIP"
+    enableRestApi: true
+    enableMetricsPort: true
+
+  fullnode:
+    external:
+      type: "ClusterIP"
+    enableRestApi: true
+    enableMetricsPort: true

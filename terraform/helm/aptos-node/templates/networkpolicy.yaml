@@ -1,3 +1,4 @@
+{{- if .Values.validator.enableNetworkPolicy }}
 {{- range $i, $e := until (int .Values.numValidators) }}
 ---
 apiVersion: networking.k8s.io/v1
@@ -73,4 +74,5 @@ spec:
   - ports:
     - protocol: TCP
       port: 5044
+{{- end }}
 {{- end }}

@@ -1,23 +1,29 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+//! Objects of the Rosetta spec
+//!
+//! [Spec](https://www.rosetta-api.org/docs/api_objects.html)
+
 use crate::{
+    common::{is_native_coin, native_coin},
     error::ApiResult,
     types::{
-        AccountIdentifier, BlockIdentifier, Error, NetworkIdentifier, OperationIdentifier,
-        OperationStatus, OperationStatusType, OperationType, TransactionIdentifier,
+        account_identifier, coin_identifier, coin_store_identifier, deposit_events_identifier,
+        sequence_number_identifier, withdraw_events_identifier, AccountIdentifier, BlockIdentifier,
+        Error, NetworkIdentifier, OperationIdentifier, OperationStatus, OperationStatusType,
+        OperationType, TransactionIdentifier,
     },
     ApiError, CoinCache,
 };
-use aptos_logger::info;
+use anyhow::anyhow;
+use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
 use aptos_rest_client::{
     aptos::Balance,
     aptos_api_types::{WriteSetChange, U64},
 };
-use aptos_sdk::move_types::{ident_str, identifier::Identifier};
 use aptos_types::{account_address::AccountAddress, event::EventKey};
-use itertools::Itertools;
-use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
+use move_deps::move_core_types::language_storage::TypeTag;
 use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
 use std::{
     collections::HashMap,
@@ -43,7 +49,6 @@ pub struct Allow {
     /// If the server is allowed to lookup historical transactions
     pub historical_balance_lookup: bool,
     /// All times after this are valid timestamps
-    /// TODO: Determine if we even need to bother with this
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp_start_index: Option<u64>,
     /// All call methods supported
@@ -78,7 +83,7 @@ impl From<Balance> for Amount {
         Amount {
             value: balance.coin.value.to_string(),
             // TODO: Support other currencies
-            currency: SupportedCurrencies::NativeCoin.into(),
+            currency: native_coin(),
         }
     }
 }
@@ -174,42 +179,6 @@ pub struct Currency {
     pub decimals: u64,
 }
 
-pub const APTOS: &str = "aptos";
-pub const APTOS_DECIMALS: u64 = 6;
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum SupportedCurrencies {
-    NativeCoin,
-}
-
-impl From<SupportedCurrencies> for Currency {
-    fn from(currency: SupportedCurrencies) -> Self {
-        match currency {
-            SupportedCurrencies::NativeCoin => Currency {
-                symbol: APTOS.to_string(),
-                decimals: APTOS_DECIMALS,
-            },
-        }
-    }
-}
-
-impl TryFrom<&Currency> for SupportedCurrencies {
-    type Error = ApiError;
-
-    fn try_from(value: &Currency) -> Result<Self, Self::Error> {
-        match value.symbol.as_str() {
-            APTOS => {
-                if value.decimals != APTOS_DECIMALS {
-                    Err(ApiError::BadCoin)
-                } else {
-                    Ok(Self::NativeCoin)
-                }
-            }
-            _ => Err(ApiError::BadCoin),
-        }
-    }
-}
-
 /// Various signing curves supported by Rosetta.  We only use [`CurveType::Edwards25519`]
 /// [API Spec](https://www.rosetta-api.org/docs/models/CurveType.html)
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -235,7 +204,10 @@ pub enum Direction {
 }
 
 /// Tells how balances can change without a specific transaction on the account
-/// TODO: Determine if we need to set these for staking
+///
+/// Balance exemptions are not necessary, because staking rewards go to the staking
+/// pool and not to the account.  When they are removed from the pool, normal events
+/// for transfer will occur.
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/ExemptionType.html)
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -271,9 +243,89 @@ pub struct Operation {
     pub account: Option<AccountIdentifier>,
     /// Amount in the operation
     ///
-    /// TODO: Determine if this is required
     #[serde(skip_serializing_if = "Option::is_none")]
     pub amount: Option<Amount>,
+    /// Operation specific metadata for any operation that's missing information it needs
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<OperationSpecificMetadata>,
+}
+
+impl Operation {
+    pub fn create_account(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        address: AccountAddress,
+        sender: AccountAddress,
+    ) -> Operation {
+        Operation {
+            operation_identifier: OperationIdentifier {
+                index: operation_index,
+                network_index: None,
+            },
+            related_operations: None,
+            operation_type: OperationType::CreateAccount.to_string(),
+            status: status.map(|inner| inner.to_string()),
+            account: Some(address.into()),
+            amount: None,
+            metadata: Some(OperationSpecificMetadata {
+                sender: sender.into(),
+            }),
+        }
+    }
+
+    pub fn deposit(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        address: AccountAddress,
+        currency: Currency,
+        amount: u64,
+    ) -> Operation {
+        Operation {
+            operation_identifier: OperationIdentifier {
+                index: operation_index,
+                network_index: None,
+            },
+            related_operations: None,
+            operation_type: OperationType::Deposit.to_string(),
+            status: status.map(|inner| inner.to_string()),
+            account: Some(address.into()),
+            amount: Some(Amount {
+                value: amount.to_string(),
+                currency,
+            }),
+            metadata: None,
+        }
+    }
+
+    pub fn withdraw(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        address: AccountAddress,
+        currency: Currency,
+        amount: u64,
+    ) -> Operation {
+        Operation {
+            operation_identifier: OperationIdentifier {
+                index: operation_index,
+                network_index: None,
+            },
+            related_operations: None,
+            operation_type: OperationType::Withdraw.to_string(),
+            status: status.map(|inner| inner.to_string()),
+            account: Some(address.into()),
+            amount: Some(Amount {
+                value: format!("-{}", amount),
+                currency,
+            }),
+            metadata: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct OperationSpecificMetadata {
+    /// Sender for operations that affect accounts other than the sender
+    pub sender: AccountIdentifier,
 }
 
 /// Used for query operations to apply conditions.  Defaults to [`Operator::And`] if no value is
@@ -303,6 +355,31 @@ pub struct PublicKey {
     pub hex_bytes: String,
     /// Curve type associated with the key
     pub curve_type: CurveType,
+}
+
+impl TryFrom<Ed25519PublicKey> for PublicKey {
+    type Error = anyhow::Error;
+
+    fn try_from(public_key: Ed25519PublicKey) -> Result<Self, Self::Error> {
+        Ok(PublicKey {
+            hex_bytes: public_key.to_encoded_string()?,
+            curve_type: CurveType::Edwards25519,
+        })
+    }
+}
+
+impl TryFrom<PublicKey> for Ed25519PublicKey {
+    type Error = anyhow::Error;
+
+    fn try_from(public_key: PublicKey) -> Result<Self, Self::Error> {
+        if public_key.curve_type != CurveType::Edwards25519 {
+            return Err(anyhow!("Invalid curve type"));
+        }
+
+        Ok(Ed25519PublicKey::from_encoded_string(
+            &public_key.hex_bytes,
+        )?)
+    }
 }
 
 /// Related Transaction allows for connecting related transactions across shards, networks or
@@ -391,18 +468,12 @@ impl Transaction {
         use aptos_rest_client::Transaction::*;
         let (maybe_sender, txn_info, events) = match txn {
             // Pending transactions aren't supported by Rosetta (for now)
-            PendingTransaction(_) => return Err(ApiError::BadBlockRequest),
+            PendingTransaction(_) => return Err(ApiError::TransactionIsPending),
             UserTransaction(txn) => (Some(txn.request.sender), txn.info, txn.events),
             GenesisTransaction(txn) => (None, txn.info, txn.events),
             BlockMetadataTransaction(txn) => (None, txn.info, txn.events),
             StateCheckpointTransaction(txn) => (None, txn.info, vec![]),
         };
-
-        info!(
-            "TRANSACTION: \n====\nTransaction: {}\n---\n Events: {}",
-            serde_json::to_string_pretty(&txn_info).unwrap(),
-            serde_json::to_string_pretty(&events).unwrap()
-        );
 
         let mut operations = vec![];
         let mut operation_index: u64 = 0;
@@ -411,17 +482,6 @@ impl Transaction {
         } else {
             OperationStatusType::Failure
         };
-
-        // TODO: put these somewhere better
-        let account: Identifier = ident_str!("Account").into();
-        let coin_info: Identifier = ident_str!("CoinInfo").into();
-        let coin_id: Identifier = ident_str!("Coin").into();
-        let coin_store: Identifier = ident_str!("CoinStore").into();
-        let sequence_number: Identifier = ident_str!("sequence_number").into();
-        let deposit_events: Identifier = ident_str!("deposit_events").into();
-        let withdraw_events: Identifier = ident_str!("withdraw_events").into();
-        let decimals_id: Identifier = ident_str!("decimals").into();
-        let symbol_id: Identifier = ident_str!("symbol").into();
 
         for change in &txn_info.changes {
             // TODO: Handle delete resource ?
@@ -435,46 +495,18 @@ impl Transaction {
                 // Only handle framework events for now
                 let op_details = if *data.typ.address.inner() == AccountAddress::ONE {
                     let mut op_details = None;
-                    if module == account && name == account {
+                    if module == account_identifier() && name == account_identifier() {
                         // Account sequence number increase (possibly creation)
                         // Find out if it's the 0th sequence number (creation)
                         for (id, value) in data.data.0.iter() {
-                            if id == &sequence_number {
+                            if id == &sequence_number_identifier() {
                                 if let Ok(U64(0)) = serde_json::from_value::<U64>(value.clone()) {
                                     op_details = Some(OperationDetails::CreateAccount);
                                     break;
                                 }
                             }
                         }
-                    } else if module == coin_id && name == coin_info {
-                        // Coin creation
-                        let mut decimals: Option<u64> = None;
-                        let mut symbol = None;
-
-                        // Find the coin details
-                        for (id, value) in data.data.0.iter() {
-                            if id == &decimals_id {
-                                if let Ok(U64(dec)) = serde_json::from_value::<U64>(value.clone()) {
-                                    decimals = Some(dec);
-                                }
-                            } else if id == &symbol_id {
-                                if let Ok(sym) = serde_json::from_value::<String>(value.clone()) {
-                                    symbol = Some(sym);
-                                }
-                            }
-                        }
-
-                        // Only if we got all the fields do we use it
-                        if let (Some(decimals), Some(symbol), Some(coin_type)) =
-                            (decimals, symbol, generic_type_params.first())
-                        {
-                            op_details = Some(OperationDetails::CreateCoin {
-                                coin_type: coin_type.to_string(),
-                                symbol,
-                                decimals,
-                            })
-                        }
-                    } else if module == coin_id && name == coin_store {
+                    } else if module == coin_identifier() && name == coin_store_identifier() {
                         if let Some(coin) = generic_type_params.first() {
                             // Account balance change
                             let mut withdraw_event = None;
@@ -482,7 +514,7 @@ impl Transaction {
 
                             // Find the coin details
                             for (id, value) in data.data.0.iter() {
-                                if id == &withdraw_events {
+                                if id == &withdraw_events_identifier() {
                                     serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
                                     if let Ok(event) =
                                         serde_json::from_value::<CoinEventId>(value.clone())
@@ -492,7 +524,7 @@ impl Transaction {
                                             event.guid.guid.id.creation_num.0,
                                         ));
                                     }
-                                } else if id == &deposit_events {
+                                } else if id == &deposit_events_identifier() {
                                     if let Ok(event) =
                                         serde_json::from_value::<CoinEventId>(value.clone())
                                     {
@@ -510,7 +542,7 @@ impl Transaction {
                                     if let Some(currency) = coin_cache
                                         .get_currency(
                                             rest_client,
-                                            coin_type,
+                                            coin_type.clone(),
                                             Some(txn_info.version.0),
                                         )
                                         .await?
@@ -521,7 +553,10 @@ impl Transaction {
                                             deposit_event_key: deposit_event,
                                         });
                                     } else {
-                                        return Err(ApiError::BadCoin);
+                                        return Err(ApiError::UnsupportedCurrency(Some(format!(
+                                            "Currency {} is not supported",
+                                            coin_type
+                                        ))));
                                     }
                                 }
                             }
@@ -535,17 +570,14 @@ impl Transaction {
                 // TODO: support coin creation?
                 match op_details {
                     Some(OperationDetails::CreateAccount) => {
-                        operations.push(Operation {
-                            operation_identifier: OperationIdentifier {
-                                index: operation_index,
-                                network_index: None,
-                            },
-                            related_operations: None,
-                            operation_type: OperationType::CreateAccount.to_string(),
-                            status: Some(status.to_string()),
-                            account: Some(AccountIdentifier::from(address)),
-                            amount: None,
-                        });
+                        operations.push(Operation::create_account(
+                            operation_index,
+                            Some(status),
+                            address,
+                            maybe_sender
+                                .map(|inner| *inner.inner())
+                                .unwrap_or(AccountAddress::ONE),
+                        ));
                         operation_index += 1;
                     }
                     Some(OperationDetails::TransferCoin {
@@ -562,20 +594,13 @@ impl Transaction {
                                 if let Ok(CoinEvent { amount }) =
                                     serde_json::from_value::<CoinEvent>(event.data.clone())
                                 {
-                                    operations.push(Operation {
-                                        operation_identifier: OperationIdentifier {
-                                            index: operation_index,
-                                            network_index: None,
-                                        },
-                                        related_operations: None,
-                                        operation_type: OperationType::Deposit.to_string(),
-                                        status: Some(status.to_string()),
-                                        account: Some(AccountIdentifier::from(address)),
-                                        amount: Some(Amount {
-                                            value: amount.to_string(),
-                                            currency: currency.clone(),
-                                        }),
-                                    });
+                                    operations.push(Operation::deposit(
+                                        operation_index,
+                                        Some(status),
+                                        address,
+                                        currency.clone(),
+                                        amount.0,
+                                    ));
                                     operation_index += 1;
                                 }
                             }
@@ -589,25 +614,19 @@ impl Transaction {
                                 if let Ok(CoinEvent { amount }) =
                                     serde_json::from_value::<CoinEvent>(event.data.clone())
                                 {
-                                    operations.push(Operation {
-                                        operation_identifier: OperationIdentifier {
-                                            index: operation_index,
-                                            network_index: None,
-                                        },
-                                        related_operations: None,
-                                        operation_type: OperationType::Withdraw.to_string(),
-                                        status: Some(status.to_string()),
-                                        account: Some(AccountIdentifier::from(address)),
-                                        amount: Some(Amount {
-                                            value: format!("-{}", amount),
-                                            currency: currency.clone(),
-                                        }),
-                                    });
+                                    operations.push(Operation::withdraw(
+                                        operation_index,
+                                        Some(status),
+                                        address,
+                                        currency.clone(),
+                                        amount.0,
+                                    ));
                                     operation_index += 1;
                                 }
                             }
                         }
                     }
+                    // No operation was found
                     _ => {}
                 }
             }
@@ -615,32 +634,13 @@ impl Transaction {
 
         // Also add a gas removal
         if let Some(sender) = maybe_sender {
-            let gas_tag = TypeTag::Struct(StructTag {
-                address: AccountAddress::ONE,
-                module: ident_str!("TestCoin").into(),
-                name: ident_str!("TestCoin").into(),
-                type_params: vec![],
-            });
-            if let Some(gas_currency) = coin_cache.get_currency(rest_client, gas_tag, None).await? {
-                operations.push(Operation {
-                    operation_identifier: OperationIdentifier {
-                        index: operation_index,
-                        network_index: None,
-                    },
-                    related_operations: None,
-                    operation_type: OperationType::Withdraw.to_string(),
-                    status: Some(status.to_string()),
-                    account: Some(AccountIdentifier::from(*sender.inner())),
-                    amount: Some(Amount {
-                        value: format!("-{}", txn_info.gas_used),
-                        currency: gas_currency,
-                    }),
-                });
-            } else {
-                return Err(ApiError::AptosError(
-                    "Failed to load gas currency".to_string(),
-                ));
-            }
+            operations.push(Operation::withdraw(
+                operation_index,
+                Some(status),
+                *sender.inner(),
+                native_coin(),
+                txn_info.gas_used.0,
+            ));
         }
 
         Ok(Transaction {
@@ -651,13 +651,9 @@ impl Transaction {
     }
 }
 
+/// An enum for processing which operation is in a transaction
 pub enum OperationDetails {
     CreateAccount,
-    CreateCoin {
-        coin_type: String,
-        symbol: String,
-        decimals: u64,
-    },
     TransferCoin {
         currency: Currency,
         withdraw_event_key: Option<EventKey>,
@@ -665,23 +661,56 @@ pub enum OperationDetails {
     },
 }
 
+/// A holder for all information related to a specific transaction
+/// built from [`Operation`]s
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum InternalOperation {
+    CreateAccount(CreateAccount),
     Transfer(Transfer),
 }
 
 impl InternalOperation {
-    pub fn extract_transfer(operations: &Vec<Operation>) -> ApiResult<InternalOperation> {
-        Ok(Self::Transfer(Transfer::extract_transfer(operations)?))
+    /// Pulls the [`InternalOperation`] from the set of [`Operation`]
+    pub fn extract(operations: &Vec<Operation>) -> ApiResult<InternalOperation> {
+        match operations.len() {
+            1 => {
+                if let Some(operation) = operations.first() {
+                    if operation.operation_type == OperationType::CreateAccount.to_string() {
+                        if let (Some(OperationSpecificMetadata { sender }), Some(account)) =
+                            (&operation.metadata, &operation.account)
+                        {
+                            return Ok(Self::CreateAccount(CreateAccount {
+                                sender: sender.account_address()?,
+                                new_account: account.account_address()?,
+                            }));
+                        }
+                    }
+                }
+
+                Err(ApiError::InvalidOperations)
+            }
+            2 => Ok(Self::Transfer(Transfer::extract_transfer(operations)?)),
+            _ => Err(ApiError::InvalidOperations),
+        }
     }
 
+    /// The sender of the transaction
     pub fn sender(&self) -> AccountAddress {
         match self {
-            Self::Transfer(transfer) => transfer.sender,
+            Self::CreateAccount(inner) => inner.sender,
+            Self::Transfer(inner) => inner.sender,
         }
     }
 }
 
+/// Operation to create an account
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct CreateAccount {
+    pub sender: AccountAddress,
+    pub new_account: AccountAddress,
+}
+
+/// Operation to transfer coins between accounts
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Transfer {
     pub sender: AccountAddress,
@@ -694,18 +723,10 @@ impl Transfer {
     pub fn extract_transfer(operations: &Vec<Operation>) -> ApiResult<Transfer> {
         // Only support 1:1 P2P transfer
         // This is composed of a Deposit and a Withdraw operation
-        if operations.len() != 2
-            && (!operations.iter().any(|op| {
-                OperationType::from_str(&op.operation_type).unwrap_or(OperationType::Withdraw)
-                    == OperationType::Deposit
-            }) || !operations.iter().any(|op| {
-                OperationType::from_str(&op.operation_type).unwrap_or(OperationType::Deposit)
-                    == OperationType::Withdraw
-            }))
-        {
-            return Err(ApiError::BadTransferOperations(
-                "Must have exactly 1 withdraw and 1 deposit".to_string(),
-            ));
+        if operations.len() != 2 {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Must have exactly 2 operations a withdraw and a deposit",
+            )));
         }
 
         let mut op_map = HashMap::new();
@@ -713,11 +734,16 @@ impl Transfer {
             let op_type = OperationType::from_str(&op.operation_type)?;
             op_map.insert(op_type, op);
         }
-        let mut keys = op_map.keys();
-        if !keys.contains(&OperationType::Withdraw) || !keys.contains(&OperationType::Deposit) {
-            return Err(ApiError::BadTransferOperations(
-                "Must have exactly 1 withdraw and 1 deposit".to_string(),
-            ));
+        if !op_map.contains_key(&OperationType::Withdraw) {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Must have a withdraw",
+            )));
+        }
+
+        if !op_map.contains_key(&OperationType::Deposit) {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Must have a deposit",
+            )));
         }
 
         // Verify accounts and amounts
@@ -725,14 +751,18 @@ impl Transfer {
         let sender = if let Some(ref account) = withdraw.account {
             account.try_into()?
         } else {
-            return Err(ApiError::AccountNotFound);
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Invalid withdraw account provided",
+            )));
         };
 
         let deposit = op_map.get(&OperationType::Deposit).unwrap();
         let receiver = if let Some(ref account) = deposit.account {
             account.try_into()?
         } else {
-            return Err(ApiError::AccountNotFound);
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Invalid deposit account provided",
+            )));
         };
 
         let (amount, currency): (u64, Currency) =
@@ -741,26 +771,34 @@ impl Transfer {
             {
                 // Currencies have to be the same
                 if withdraw_amount.currency != deposit_amount.currency {
-                    return Err(ApiError::BadCoin);
+                    return Err(ApiError::InvalidTransferOperations(Some(
+                        "Currency mismatch between withdraw and deposit",
+                    )));
                 }
 
                 // Check that the currency is supported
                 // TODO: in future use currency, since there's more than just 1
-                let _ = SupportedCurrencies::try_from(&withdraw_amount.currency)?;
+                let _ = is_native_coin(&withdraw_amount.currency)?;
 
-                let withdraw_value = i64::from_str(&withdraw_amount.value)
-                    .map_err(|_| ApiError::BadTransactionPayload)?;
-                let deposit_value = i64::from_str(&deposit_amount.value)
-                    .map_err(|_| ApiError::BadTransactionPayload)?;
+                let withdraw_value = i64::from_str(&withdraw_amount.value).map_err(|_| {
+                    ApiError::InvalidTransferOperations(Some("Withdraw amount is invalid"))
+                })?;
+                let deposit_value = i64::from_str(&deposit_amount.value).map_err(|_| {
+                    ApiError::InvalidTransferOperations(Some("Deposit amount is invalid"))
+                })?;
 
                 // We can't create or destroy coins, they must be negatives of each other
                 if -withdraw_value != deposit_value {
-                    return Err(ApiError::BadTransactionPayload);
+                    return Err(ApiError::InvalidTransferOperations(Some(
+                        "Withdraw amount must be equal to negative of deposit amount",
+                    )));
                 }
 
                 (deposit_value as u64, deposit_amount.currency.clone())
             } else {
-                return Err(ApiError::BadTransactionPayload);
+                return Err(ApiError::InvalidTransferOperations(Some(
+                    "Must have exactly 1 withdraw and 1 deposit with amounts",
+                )));
             };
 
         Ok(Transfer {

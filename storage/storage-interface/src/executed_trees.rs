@@ -41,8 +41,11 @@ impl ExecutedTrees {
     }
 
     pub fn version(&self) -> Option<Version> {
-        let num_elements = self.txn_accumulator().num_leaves() as u64;
-        num_elements.checked_sub(1)
+        self.num_transactions().checked_sub(1)
+    }
+
+    pub fn num_transactions(&self) -> u64 {
+        self.txn_accumulator().num_leaves() as u64
     }
 
     pub fn state_id(&self) -> HashValue {
@@ -53,6 +56,10 @@ impl ExecutedTrees {
         state: InMemoryState,
         transaction_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
     ) -> Self {
+        assert_eq!(
+            state.current_version.map_or(0, |v| v + 1),
+            transaction_accumulator.num_leaves()
+        );
         Self {
             state,
             transaction_accumulator,
@@ -84,7 +91,8 @@ impl ExecutedTrees {
     }
 
     pub fn is_same_view(&self, rhs: &Self) -> bool {
-        self.transaction_accumulator.root_hash() == rhs.transaction_accumulator.root_hash()
+        self.state().has_same_current_state(rhs.state())
+            && self.transaction_accumulator.root_hash() == rhs.transaction_accumulator.root_hash()
     }
 
     pub fn verified_state_view(

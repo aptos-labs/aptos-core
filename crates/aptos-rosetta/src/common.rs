@@ -2,21 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    block::{block_index_to_version, version_to_block_index},
     error::{ApiError, ApiResult},
-    types::NetworkIdentifier,
+    types::{
+        test_coin_identifier, BlockIdentifier, Currency, MetadataRequest, NetworkIdentifier,
+        PartialBlockIdentifier,
+    },
     RosettaContext,
 };
-use aptos_crypto::ValidCryptoMaterial;
+use aptos_crypto::{HashValue, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_logger::debug;
-use aptos_rest_client::{aptos::Balance, Account, Response};
+use aptos_rest_client::{Account, Response};
+use aptos_sdk::move_types::language_storage::{StructTag, TypeTag};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{
-    convert::{Infallible, TryInto},
-    future::Future,
-    str::FromStr,
-};
+use std::{convert::Infallible, future::Future, str::FromStr};
 use warp::Filter;
 
 pub const BLOCKCHAIN: &str = "aptos";
@@ -27,12 +28,13 @@ pub fn check_network(
     server_context: &RosettaContext,
 ) -> ApiResult<()> {
     if network_identifier.blockchain == BLOCKCHAIN
-        || ChainId::from_str(network_identifier.network.trim()).map_err(|_| ApiError::BadNetwork)?
+        || ChainId::from_str(network_identifier.network.trim())
+            .map_err(|_| ApiError::NetworkIdentifierMismatch)?
             == server_context.chain_id
     {
         Ok(())
     } else {
-        Err(ApiError::BadNetwork)
+        Err(ApiError::NetworkIdentifierMismatch)
     }
 }
 
@@ -43,11 +45,9 @@ pub fn with_context(
     warp::any().map(move || context.clone())
 }
 
-#[derive(Deserialize, Serialize)]
-pub struct EmptyRequest;
-
-pub fn with_empty_request() -> impl Filter<Extract = (EmptyRequest,), Error = Infallible> + Clone {
-    warp::any().map(move || EmptyRequest)
+pub fn with_empty_request() -> impl Filter<Extract = (MetadataRequest,), Error = Infallible> + Clone
+{
+    warp::any().map(move || MetadataRequest {})
 }
 
 /// Handles a generic request to warp
@@ -98,17 +98,7 @@ pub async fn get_account(
     rest_client
         .get_account(address)
         .await
-        .map_err(|_| ApiError::AccountNotFound)
-}
-
-pub async fn get_account_balance(
-    rest_client: &aptos_rest_client::Client,
-    address: AccountAddress,
-) -> ApiResult<Response<Balance>> {
-    rest_client
-        .get_account_balance(address)
-        .await
-        .map_err(|_| ApiError::AccountNotFound)
+        .map_err(|_| ApiError::AccountNotFound(Some(address.to_string())))
 }
 
 /// Retrieve the timestamp according ot the Rosetta spec (milliseconds)
@@ -136,8 +126,92 @@ pub fn decode_key<T: DeserializeOwned + ValidCryptoMaterial>(
     str: &str,
     type_name: &'static str,
 ) -> ApiResult<T> {
-    hex::decode(str)?
-        .as_slice()
-        .try_into()
-        .map_err(|_| ApiError::deserialization_failed(type_name))
+    T::from_encoded_string(str).map_err(|_| ApiError::deserialization_failed(type_name))
+}
+
+const DEFAULT_COIN: &str = "TC";
+const DEFAULT_DECIMALS: u64 = 6;
+
+pub fn native_coin() -> Currency {
+    Currency {
+        symbol: DEFAULT_COIN.to_string(),
+        decimals: DEFAULT_DECIMALS,
+    }
+}
+
+pub fn native_coin_tag() -> TypeTag {
+    TypeTag::Struct(StructTag {
+        address: AccountAddress::ONE,
+        module: test_coin_identifier(),
+        name: test_coin_identifier(),
+        type_params: vec![],
+    })
+}
+
+pub fn is_native_coin(currency: &Currency) -> ApiResult<()> {
+    if currency == &native_coin() {
+        Ok(())
+    } else {
+        Err(ApiError::UnsupportedCurrency(Some(currency.symbol.clone())))
+    }
+}
+
+pub fn string_to_hash(str: &str) -> ApiResult<HashValue> {
+    HashValue::from_str(strip_hex_prefix(str))
+        .map_err(|err| ApiError::DeserializationFailed(Some(err.to_string())))
+}
+
+/// Determines which block to pull for the request
+pub async fn get_block_index_from_request(
+    rest_client: &aptos_rest_client::Client,
+    partial_block_identifier: Option<PartialBlockIdentifier>,
+    block_size: u64,
+) -> ApiResult<u64> {
+    Ok(match partial_block_identifier {
+        Some(PartialBlockIdentifier {
+            index: Some(_),
+            hash: Some(_),
+        }) => {
+            return Err(ApiError::BlockParameterConflict);
+        }
+        // Lookup by block index
+        Some(PartialBlockIdentifier {
+            index: Some(block_index),
+            hash: None,
+        }) => block_index,
+        // Lookup by block hash
+        Some(PartialBlockIdentifier {
+            index: None,
+            hash: Some(hash),
+        }) => {
+            if hash == BlockIdentifier::genesis_txn().hash {
+                0
+            } else {
+                // Lookup by hash doesn't work since we're faking blocks, need to verify that it's a
+                // block
+                let response = rest_client.get_transaction(string_to_hash(&hash)?).await?;
+                let version = response.inner().version();
+
+                if let Some(version) = version {
+                    let block_index = version_to_block_index(block_size, version);
+                    // If it's not the beginning of a block, then it's invalid
+                    if version != block_index_to_version(block_size, block_index) {
+                        return Err(ApiError::TransactionIsPending);
+                    }
+
+                    block_index
+                } else {
+                    // If the transaction is pending, it's incomplete
+                    return Err(ApiError::BlockIncomplete);
+                }
+            }
+        }
+        // Lookup latest version
+        _ => {
+            let response = rest_client.get_ledger_information().await?;
+            let state = response.state();
+            // The current version won't be a full block, so we have to go one before it
+            version_to_block_index(block_size, state.version) - 1
+        }
+    })
 }
