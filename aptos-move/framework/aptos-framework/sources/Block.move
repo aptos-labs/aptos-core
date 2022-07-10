@@ -2,6 +2,8 @@
 module AptosFramework::Block {
     use Std::Errors;
     use Std::Event;
+
+    use AptosFramework::GovernanceProposal::GovernanceProposal;
     use AptosFramework::Timestamp;
     use AptosFramework::SystemAddresses;
     use AptosFramework::Reconfiguration;
@@ -31,11 +33,9 @@ module AptosFramework::Block {
     /// An invalid signer was provided. Expected the signer to be the VM or a Validator.
     const EVM_OR_VALIDATOR: u64 = 1;
 
-    /// This can only be invoked by the Association address, and only a single time.
-    /// Currently, it is invoked in the genesis transaction
+    /// This can only be called during Genesis.
     public fun initialize_block_metadata(account: &signer, epoch_internal: u64) {
         Timestamp::assert_genesis();
-        // Operational constraint, only callable by the Association address
         SystemAddresses::assert_core_resource(account);
 
         assert!(!is_initialized(), Errors::already_published(EBLOCK_METADATA));
@@ -47,6 +47,16 @@ module AptosFramework::Block {
                 new_block_events: Event::new_event_handle<Self::NewBlockEvent>(account),
             }
         );
+    }
+
+    /// Update the epoch interval.
+    /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+    public fun update_epoch_interval(
+        _gov_proposal: GovernanceProposal,
+        new_epoch_interval: u64,
+    ) acquires BlockMetadata {
+        let block_metadata = borrow_global_mut<BlockMetadata>(@CoreResources);
+        block_metadata.epoch_internal = new_epoch_interval;
     }
 
     /// Helper function to determine whether this module has been initialized.

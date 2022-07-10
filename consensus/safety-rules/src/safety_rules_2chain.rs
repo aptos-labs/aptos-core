@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error::Error, safety_rules::next_round, SafetyRules};
-use aptos_crypto::{ed25519::Ed25519Signature, hash::CryptoHash, HashValue};
+use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
 use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfo};
 use consensus_types::{
     block::Block,
     safety_data::SafetyData,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
-    vote_proposal::MaybeSignedVoteProposal,
+    vote_proposal::VoteProposal,
 };
 
 /// 2-chain safety rules implementation
@@ -18,7 +18,7 @@ impl SafetyRules {
         &mut self,
         timeout: &TwoChainTimeout,
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
-    ) -> Result<Ed25519Signature, Error> {
+    ) -> Result<bls12381::Signature, Error> {
         self.signer()?;
         let mut safety_data = self.persistent_storage.safety_data()?;
         self.verify_epoch(timeout.epoch(), &safety_data)?;
@@ -47,17 +47,17 @@ impl SafetyRules {
 
     pub(crate) fn guarded_construct_and_sign_vote_two_chain(
         &mut self,
-        maybe_signed_vote_proposal: &MaybeSignedVoteProposal,
+        vote_proposal: &VoteProposal,
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
     ) -> Result<Vote, Error> {
         // Exit early if we cannot sign
         self.signer()?;
 
-        let vote_data = self.verify_proposal(maybe_signed_vote_proposal)?;
+        let vote_data = self.verify_proposal(vote_proposal)?;
         if let Some(tc) = timeout_cert {
             self.verify_tc(tc)?;
         }
-        let proposed_block = maybe_signed_vote_proposal.vote_proposal.block();
+        let proposed_block = vote_proposal.block();
         let mut safety_data = self.persistent_storage.safety_data()?;
 
         // if already voted on this round, send back the previous vote

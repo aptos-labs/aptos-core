@@ -31,7 +31,7 @@ Block:
         TYPENAME: BlockData
     - signature:
         OPTION:
-          TYPENAME: Ed25519Signature
+          TYPENAME: Signature
 BlockData:
   STRUCT:
     - epoch: U64
@@ -136,7 +136,7 @@ CommitVote:
     - ledger_info:
         TYPENAME: LedgerInfo
     - signature:
-        TYPENAME: Ed25519Signature
+        TYPENAME: Signature
 ConsensusMsg:
   ENUM:
     0:
@@ -235,7 +235,7 @@ LedgerInfoWithV0:
           KEY:
             TYPENAME: AccountAddress
           VALUE:
-            TYPENAME: Ed25519Signature
+            TYPENAME: Signature
 Module:
   STRUCT:
     - code: BYTES
@@ -275,6 +275,8 @@ ProposalMsg:
         TYPENAME: Block
     - sync_info:
         TYPENAME: SyncInfo
+PublicKey:
+  NEWTYPESTRUCT: BYTES
 QuorumCert:
   STRUCT:
     - vote_data:
@@ -313,6 +315,8 @@ ScriptFunction:
           TYPENAME: TypeTag
     - args:
         SEQ: BYTES
+Signature:
+  NEWTYPESTRUCT: BYTES
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -456,7 +460,7 @@ TwoChainTimeoutCertificate:
           VALUE:
             TUPLE:
               - U64
-              - TYPENAME: Ed25519Signature
+              - TYPENAME: Signature
 TypeTag:
   ENUM:
     0:
@@ -482,7 +486,7 @@ TypeTag:
 ValidatorConsensusInfo:
   STRUCT:
     - public_key:
-        TYPENAME: Ed25519PublicKey
+        TYPENAME: PublicKey
     - voting_power: U64
 ValidatorVerifier:
   STRUCT:
@@ -503,12 +507,12 @@ Vote:
     - ledger_info:
         TYPENAME: LedgerInfo
     - signature:
-        TYPENAME: Ed25519Signature
+        TYPENAME: Signature
     - two_chain_timeout:
         OPTION:
           TUPLE:
             - TYPENAME: TwoChainTimeout
-            - TYPENAME: Ed25519Signature
+            - TYPENAME: Signature
 VoteData:
   STRUCT:
     - proposed:

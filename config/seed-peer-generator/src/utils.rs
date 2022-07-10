@@ -92,7 +92,7 @@ fn to_seed_peer<T: Fn(&ValidatorInfo) -> Result<Vec<NetworkAddress>, bcs::Error>
 mod tests {
     use super::*;
     use aptos_config::config::HANDSHAKE_VERSION;
-    use aptos_crypto::{ed25519::Ed25519PrivateKey, x25519, PrivateKey as PK, Uniform};
+    use aptos_crypto::{bls12381, x25519, PrivateKey as PK, Uniform};
     use aptos_types::validator_config::ValidatorConfig;
     use rand::{prelude::StdRng, SeedableRng};
 
@@ -100,7 +100,7 @@ mod tests {
         peer_id: PeerId,
         fullnode_network_addresses: &[NetworkAddress],
     ) -> ValidatorSet {
-        let consensus_private_key = Ed25519PrivateKey::generate_for_testing();
+        let consensus_private_key = bls12381::PrivateKey::generate_for_testing();
         let consensus_pubkey = consensus_private_key.public_key();
         let validator_config = ValidatorConfig::new(
             consensus_pubkey,

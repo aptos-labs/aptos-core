@@ -14,16 +14,16 @@ use warp::Filter;
 
 const Y2K_SECS: u64 = 946713600000;
 
-pub fn routes(
+pub fn block_route(
     server_context: RosettaContext,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::post().and(
-        warp::path!("block")
-            .and(warp::body::json())
-            .and(with_context(server_context))
-            .and_then(handle_request(block)),
-    )
+    warp::path!("block")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_context(server_context))
+        .and_then(handle_request(block))
 }
+
 /// Retrieves a block (in this case a single transaction) given it's identifier.
 ///
 /// Our implementation allows for by `index`, which is the ledger `version` or by

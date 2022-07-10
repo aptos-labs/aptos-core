@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{counters, logging::LogEntry, ConsensusState, Error, SafetyRules, TSafetyRules};
-use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_crypto::bls12381;
 use aptos_infallible::RwLock;
 use aptos_types::{
     epoch_change::EpochChangeProof,
@@ -12,7 +12,7 @@ use consensus_types::{
     block_data::BlockData,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
-    vote_proposal::MaybeSignedVoteProposal,
+    vote_proposal::VoteProposal,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -26,10 +26,7 @@ pub enum SafetyRulesInput {
         Box<TwoChainTimeout>,
         Box<Option<TwoChainTimeoutCertificate>>,
     ),
-    ConstructAndSignVoteTwoChain(
-        Box<MaybeSignedVoteProposal>,
-        Box<Option<TwoChainTimeoutCertificate>>,
-    ),
+    ConstructAndSignVoteTwoChain(Box<VoteProposal>, Box<Option<TwoChainTimeoutCertificate>>),
     SignCommitVote(Box<LedgerInfoWithSignatures>, Box<LedgerInfo>),
 }
 
@@ -109,7 +106,7 @@ impl TSafetyRules for SerializerClient {
         serde_json::from_slice(&response)?
     }
 
-    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<Ed25519Signature, Error> {
+    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<bls12381::Signature, Error> {
         let _timer = counters::start_timer("external", LogEntry::SignProposal.as_str());
         let response =
             self.request(SafetyRulesInput::SignProposal(Box::new(block_data.clone())))?;
@@ -120,7 +117,7 @@ impl TSafetyRules for SerializerClient {
         &mut self,
         timeout: &TwoChainTimeout,
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
-    ) -> Result<Ed25519Signature, Error> {
+    ) -> Result<bls12381::Signature, Error> {
         let _timer = counters::start_timer("external", LogEntry::SignTimeoutWithQC.as_str());
         let response = self.request(SafetyRulesInput::SignTimeoutWithQC(
             Box::new(timeout.clone()),
@@ -131,7 +128,7 @@ impl TSafetyRules for SerializerClient {
 
     fn construct_and_sign_vote_two_chain(
         &mut self,
-        vote_proposal: &MaybeSignedVoteProposal,
+        vote_proposal: &VoteProposal,
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
     ) -> Result<Vote, Error> {
         let _timer =
@@ -147,7 +144,7 @@ impl TSafetyRules for SerializerClient {
         &mut self,
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
-    ) -> Result<Ed25519Signature, Error> {
+    ) -> Result<bls12381::Signature, Error> {
         let _timer = counters::start_timer("external", LogEntry::SignCommitVote.as_str());
         let response = self.request(SafetyRulesInput::SignCommitVote(
             Box::new(ledger_info),

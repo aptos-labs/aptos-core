@@ -192,7 +192,10 @@ fn test_new_genesis() {
     let tmp_dir = TempPath::new();
     let db = DbReaderWriter::new(AptosDB::new_for_test(&tmp_dir));
     let waypoint = bootstrap_genesis::<AptosVM>(&db, &genesis_txn).unwrap();
-    let signer = ValidatorSigner::new(genesis.1[0].data.address, genesis.1[0].key.clone());
+    let signer = ValidatorSigner::new(
+        genesis.1[0].data.address,
+        genesis.1[0].consensus_key.clone(),
+    );
 
     // Mint for 2 demo accounts.
     let (account1, account1_key, account2, account2_key) = get_demo_accounts();

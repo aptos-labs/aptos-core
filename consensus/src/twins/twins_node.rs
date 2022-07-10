@@ -234,7 +234,6 @@ impl SMRNode {
                 .unwrap()
                 .waypoint = Some(waypoint);
             config.base.waypoint = WaypointConfig::FromConfig(waypoint);
-            config.consensus.safety_rules.verify_vote_proposal_signature = false;
             // Disable timeout in twins test to avoid flakiness
             config.consensus.round_initial_timeout_ms = 2_000_000;
 

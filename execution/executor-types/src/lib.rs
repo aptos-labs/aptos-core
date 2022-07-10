@@ -9,7 +9,6 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use aptos_crypto::{
-    ed25519::Ed25519Signature,
     hash::{EventAccumulatorHasher, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
 };
@@ -182,9 +181,6 @@ pub struct StateComputeResult {
     /// The transaction info hashes of all success txns.
     transaction_info_hashes: Vec<HashValue>,
 
-    /// The signature of the VoteProposal corresponding to this block.
-    signature: Option<Ed25519Signature>,
-
     reconfig_events: Vec<ContractEvent>,
 }
 
@@ -210,7 +206,6 @@ impl StateComputeResult {
             compute_status,
             transaction_info_hashes,
             reconfig_events,
-            signature: None,
         }
     }
 
@@ -228,7 +223,6 @@ impl StateComputeResult {
             compute_status: vec![],
             transaction_info_hashes: vec![],
             reconfig_events: vec![],
-            signature: None,
         }
     }
 
@@ -294,14 +288,6 @@ impl StateComputeResult {
 
     pub fn reconfig_events(&self) -> &[ContractEvent] {
         &self.reconfig_events
-    }
-
-    pub fn signature(&self) -> &Option<Ed25519Signature> {
-        &self.signature
-    }
-
-    pub fn set_signature(&mut self, sig: Ed25519Signature) {
-        self.signature = Some(sig);
     }
 }
 

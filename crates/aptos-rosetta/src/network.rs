@@ -17,24 +17,34 @@ use crate::{
 use aptos_logger::{debug, trace};
 use warp::Filter;
 
-pub fn routes(
+pub fn list_route(
     server_context: RosettaContext,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::post()
-        .and(
-            warp::path!("network" / "list")
-                .and(with_empty_request())
-                .and(with_context(server_context.clone()))
-                .and_then(handle_request(network_list)),
-        )
-        .or(warp::path!("network" / "options")
-            .and(warp::body::json())
-            .and(with_context(server_context.clone()))
-            .and_then(handle_request(network_options)))
-        .or(warp::path!("network" / "status")
-            .and(warp::body::json())
-            .and(with_context(server_context))
-            .and_then(handle_request(network_status)))
+    warp::path!("network" / "list")
+        .and(warp::post())
+        .and(with_empty_request())
+        .and(with_context(server_context))
+        .and_then(handle_request(network_list))
+}
+
+pub fn options_route(
+    server_context: RosettaContext,
+) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::path!("network" / "options")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_context(server_context))
+        .and_then(handle_request(network_options))
+}
+
+pub fn status_route(
+    server_context: RosettaContext,
+) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::path!("network" / "status")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_context(server_context))
+        .and_then(handle_request(network_status))
 }
 
 /// List [`NetworkIdentifier`]s supported by this proxy aka [`ChainId`]s
