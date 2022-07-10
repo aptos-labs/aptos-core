@@ -29,6 +29,8 @@ import { secondaryBgColor, secondaryErrorMessageColor } from 'core/constants';
 import { getAccountResources } from 'core/queries/account';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
+import Analytics from 'core/utils/analytics/analytics';
+import { loginEvents } from 'core/utils/analytics/events';
 
 export const secondaryTextColor = {
   dark: 'gray.400',
@@ -58,13 +60,31 @@ function Login() {
         address: account.address().hex(),
         nodeUrl: aptosNetwork,
       });
+      const analyticsParams = {
+        address: account.address().hex(),
+        network: aptosNetwork,
+      };
       if (!response) {
         setError('privateKey', { message: 'Account not found', type: 'custom' });
+        Analytics.event({
+          eventType: loginEvents.ERROR_LOGIN_WITH_PRIVATE_KEY,
+          params: analyticsParams,
+        });
         return;
       }
+      Analytics.event({
+        eventType: loginEvents.LOGIN_WITH_PRIVATE_KEY,
+        params: analyticsParams,
+      });
       updateWalletState({ aptosAccountState: account });
       navigate('/wallet');
     } catch (err) {
+      Analytics.event({
+        eventType: loginEvents.ERROR_LOGIN_WITH_PRIVATE_KEY,
+        params: {
+          network: aptosNetwork,
+        },
+      });
       setError('privateKey', { message: 'Invalid private key', type: 'custom' });
     }
   };

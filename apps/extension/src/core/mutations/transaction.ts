@@ -14,6 +14,8 @@ import {
 } from 'core/queries/account';
 import queryKeys from 'core/queries/queryKeys';
 import { getUserTransaction } from 'core/queries/transaction';
+import Analytics from 'core/utils/analytics/analytics';
+import { coinEvents } from 'core/utils/analytics/events';
 import { useMutation, useQueryClient } from 'react-query';
 
 export interface SubmitTransactionProps {
@@ -177,7 +179,13 @@ export const submitTestCoinTransferTransaction = async ({
     toAddress,
   });
   onClose();
-  return txnHash;
+  return {
+    amount,
+    fromAccount,
+    nodeUrl,
+    toAddress,
+    txnHash,
+  };
 };
 
 export const useSubmitTestCoinTransfer = () => {
@@ -186,7 +194,8 @@ export const useSubmitTestCoinTransfer = () => {
   const toast = useToast();
 
   return useMutation(submitTestCoinTransferTransaction, {
-    onSettled: async (txnHash) => {
+    onSettled: async (data) => {
+      const txnHash = data?.txnHash;
       if (!txnHash) {
         return;
       }
@@ -195,6 +204,18 @@ export const useSubmitTestCoinTransfer = () => {
       const amount = (txn?.payload)
         ? (txn.payload as { arguments: string[] }).arguments[1]
         : undefined;
+      Analytics.event({
+        eventType: (txn?.success)
+          ? coinEvents.TRANSFER_APTOS_COIN
+          : coinEvents.ERROR_TRANSFER_APTOS_COIN,
+        params: {
+          coinType: '0x1::TestCoin::TestCoin',
+          fromAddress: data.fromAccount.address().hex(),
+          network: aptosNetwork,
+          ...data,
+          amount: Number(data?.amount),
+        },
+      });
       toast({
         description: (txn?.success) ? `Amount transferred: ${amount}, gas consumed: ${txn?.gas_used}` : `Transfer failed, gas consumed: ${txn?.gas_used}`,
         duration: 5000,

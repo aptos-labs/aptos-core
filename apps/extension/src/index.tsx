@@ -11,6 +11,15 @@ import { Route, MemoryRouter, Routes } from 'react-router-dom';
 import { ChakraProvider, extendTheme, type ThemeConfig } from '@chakra-ui/react';
 import { Routes as PageRoutes } from 'core/routes';
 import { WalletStateProvider } from 'core/hooks/useWalletState';
+import ReactGA from 'react-ga4';
+import { getLocalStorageNetworkState } from 'core/utils/network';
+
+ReactGA.initialize('G-VFLV1PF59M');
+ReactGA.send({
+  hitType: 'pageview',
+  network: getLocalStorageNetworkState(),
+  page: window.location.pathname + window.location.search,
+});
 
 const theme: ThemeConfig = extendTheme({
   initialColorMode: 'light',

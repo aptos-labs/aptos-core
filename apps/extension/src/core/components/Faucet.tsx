@@ -11,6 +11,8 @@ import useWalletState from 'core/hooks/useWalletState';
 import { fundAccountWithFaucet } from 'core/queries/faucet';
 import { useMutation, useQueryClient } from 'react-query';
 import { LOCAL_FAUCET_URL } from 'core/constants';
+import Analytics from 'core/utils/analytics/analytics';
+import { faucetEvents } from 'core/utils/analytics/events';
 
 export default function Faucet() {
   const { aptosAccount, aptosNetwork, faucetNetwork } = useWalletState();
@@ -22,6 +24,15 @@ export default function Faucet() {
   } = useMutation(fundAccountWithFaucet, {
     onSettled: () => {
       queryClient.invalidateQueries('getAccountResources');
+      Analytics.event({
+        eventType: faucetEvents.RECEIVE_FAUCET,
+        params: {
+          address: aptosAccount?.address().hex(),
+          amount: 5000,
+          coinType: '0x1::TestCoin::TestCoin',
+          network: aptosNetwork,
+        },
+      });
     },
   });
 

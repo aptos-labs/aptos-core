@@ -13,7 +13,7 @@ import {
 } from '@chakra-ui/react';
 import React from 'react';
 import SquareBox from 'core/components/SquareBox';
-import CreateNFTModal from 'core/components/CreateNFTDrawer';
+import CreateNFTDrawer from 'core/components/CreateNFTDrawer';
 import GalleryItem from 'core/components/GalleryItem';
 import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import WalletLayout from 'core/layouts/WalletLayout';
@@ -39,7 +39,7 @@ function Gallery() {
           <Grid pb={4} templateColumns="1fr 72px" width="100%">
             <Heading fontSize="xl">Collectibles</Heading>
             <Flex justifyContent="right">
-              <CreateNFTModal />
+              <CreateNFTDrawer />
             </Flex>
           </Grid>
           <Flex alignItems="flex-start" width="100%">

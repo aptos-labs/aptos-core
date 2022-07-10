@@ -24,6 +24,8 @@ import { secondaryBgColor } from 'core/constants';
 import { ChevronRightIcon } from '@chakra-ui/icons';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
+import Analytics from 'core/utils/analytics/analytics';
+import { createAccountEvents } from 'core/utils/analytics/events';
 
 export interface CredentialHeaderAndBodyProps {
   body?: string;
@@ -64,6 +66,7 @@ function NewAccountState() {
     const faucetClient = new FaucetClient(aptosNetwork, faucetNetwork);
     const account = createNewAccount();
     await faucetClient.fundAccount(account.address(), 0);
+    Analytics.event({ eventType: createAccountEvents.CREATE_ACCOUNT });
     updateWalletState({ aptosAccountState: account });
     setIsAccountBeingCreated(false);
   };

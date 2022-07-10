@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosClient, TokenClient, RequestError } from 'aptos';
+import useWalletState from 'core/hooks/useWalletState';
 import { getIsValidMetadataStructure } from 'core/queries/collectibles';
 import queryKeys from 'core/queries/queryKeys';
 import { AptosAccountState } from 'core/types';
+import Analytics from 'core/utils/analytics/analytics';
+import { collectiblesEvents, CombinedEventParams } from 'core/utils/analytics/events';
 import { AptosNetwork } from 'core/utils/network';
 import { useCallback } from 'react';
 import { useMutation, useQueryClient } from 'react-query';
@@ -68,9 +71,9 @@ export const createTokenAndCollection = async ({
   royalty_points_per_million = 0,
   supply,
   uri,
-}: CreateTokenAndCollectionProps): Promise<void> => {
+}: CreateTokenAndCollectionProps) => {
   if (!account || !(collectionName && description && uri && name)) {
-    return;
+    return undefined;
   }
   const isValidUri = await getIsValidMetadataStructure({ uri });
   raiseForError({
@@ -105,17 +108,39 @@ export const createTokenAndCollection = async ({
   const tokenTxn: any = await aptosClient.getTransaction(tokenTxnHash);
   vmStatus = tokenTxn.vm_status;
   raiseForError({ vmStatus });
+
+  return {
+    address: account.address().hex(),
+    amount: 1,
+    collection: collectionName,
+    description,
+    name,
+    uri,
+  };
 };
 
 export const useCreateTokenAndCollection = () => {
   const queryClient = useQueryClient();
+  const { aptosNetwork } = useWalletState();
 
-  const createTokenAndCollectionOnSettled = useCallback(async () => {
+  const createTokenAndCollectionOnSettled = useCallback(async (
+    data: CombinedEventParams | undefined,
+  ) => {
     queryClient.invalidateQueries(queryKeys.getGalleryItems);
     queryClient.invalidateQueries(queryKeys.getAccountResources);
+    Analytics.event({
+      eventType: collectiblesEvents.CREATE_NFT,
+      params: {
+        network: aptosNetwork,
+        ...data,
+      },
+    });
   }, [queryClient]);
 
-  return useMutation<void, RequestError, CreateTokenAndCollectionProps>(createTokenAndCollection, {
+  return useMutation<
+  CombinedEventParams | undefined,
+  RequestError,
+  CreateTokenAndCollectionProps>(createTokenAndCollection, {
     onSettled: createTokenAndCollectionOnSettled,
   });
 };
