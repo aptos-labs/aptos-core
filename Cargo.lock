@@ -512,34 +512,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-genesis-tool"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-crypto",
- "aptos-global-constants",
- "aptos-management",
- "aptos-secure-storage",
- "aptos-state-view",
- "aptos-temppath",
- "aptos-types",
- "aptos-vm",
- "aptos-workspace-hack",
- "aptosdb",
- "bcs",
- "cached-framework-packages",
- "consensus-types",
- "executor",
- "rand 0.7.3",
- "serde 1.0.137",
- "storage-interface",
- "structopt",
- "toml",
- "vm-genesis",
-]
-
-[[package]]
 name = "aptos-github-client"
 version = "0.1.0"
 dependencies = [
