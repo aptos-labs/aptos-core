@@ -8,6 +8,7 @@ use crate::{
     error::Error,
     logging::{LogEntry, LogSchema},
     metrics,
+    metrics::ExecutingComponent,
     notification_handlers::{
         CommitNotification, CommitNotificationListener, CommittedStates, CommittedTransactions,
         ConsensusNotificationHandler, ErrorNotification, ErrorNotificationListener,
@@ -524,6 +525,10 @@ impl<
         if self.check_if_consensus_executing() {
             trace!(LogSchema::new(LogEntry::Driver)
                 .message("Consensus is executing. There's nothing to do."));
+            metrics::increment_counter(
+                &metrics::EXECUTING_COMPONENT,
+                ExecutingComponent::Consensus.get_label(),
+            );
             return;
         }
 
@@ -535,6 +540,10 @@ impl<
                 .get_consensus_sync_request();
 
             // Attempt to continuously sync
+            metrics::increment_counter(
+                &metrics::EXECUTING_COMPONENT,
+                ExecutingComponent::ContinuousSyncer.get_label(),
+            );
             if let Err(error) = self
                 .continuous_syncer
                 .drive_progress(consensus_sync_request)
@@ -548,14 +557,20 @@ impl<
                 );
                 metrics::increment_counter(&metrics::CONTINUOUS_SYNCER_ERRORS, error.get_label());
             }
-        } else if let Err(error) = self.bootstrapper.drive_progress(&global_data_summary).await {
-            sample!(
-                    SampleRate::Duration(Duration::from_secs(DRIVER_ERROR_LOG_FREQ_SECS)),
-                    error!(LogSchema::new(LogEntry::Driver)
-                        .error(&error)
-                        .message("Error found when checking the bootstrapper progress!"));
+        } else {
+            metrics::increment_counter(
+                &metrics::EXECUTING_COMPONENT,
+                ExecutingComponent::Bootstrapper.get_label(),
             );
-            metrics::increment_counter(&metrics::BOOTSTRAPPER_ERRORS, error.get_label());
+            if let Err(error) = self.bootstrapper.drive_progress(&global_data_summary).await {
+                sample!(
+                        SampleRate::Duration(Duration::from_secs(DRIVER_ERROR_LOG_FREQ_SECS)),
+                        error!(LogSchema::new(LogEntry::Driver)
+                            .error(&error)
+                            .message("Error found when checking the bootstrapper progress!"));
+                );
+                metrics::increment_counter(&metrics::BOOTSTRAPPER_ERRORS, error.get_label());
+            }
         };
     }
 }
