@@ -12,20 +12,14 @@ class It2FinalCheckJob < ApplicationJob
     sentry_scope.set_user(id: it2_profile.user_id)
     sentry_scope.set_context(:job_info, { validator_address: it2_profile.validator_address })
 
-    node_verifier = NodeHelper::NodeVerifier.new(it2_profile.validator_address, it2_profile.validator_metrics_port, 0)
-
-    unless node_verifier.ip.ok
+    v = NodeHelper::IPResolver.new(it2_profile.validator_address)
+    unless v.ip.ok
       it2_profile.update(validator_verified_final: false)
       raise It2FinalCheckError,
-            "Error fetching IP for #{it2_profile.validator_address}: #{node_verifier.ip.message}"
+            "Error fetching IP for #{it2_profile.validator_address}: #{v.ip.message}"
     end
 
-    res = node_verifier.fetch_json_metrics
-    unless res.ok
-      it2_profile.update(validator_verified_final: false)
-      raise It2FinalCheckError, "Error fetching metrics json for '#{it2_profile.validator_ip}': #{res.message}"
-    end
-
-    it2_profile.update(validator_verified_final: true, metrics_data: res.data)
+    results = NhcJob.perform_now({ it2_profile_id: it2_profile.id, do_location: false })
+    it2_profile.update(metrics_data: results)
   end
 end

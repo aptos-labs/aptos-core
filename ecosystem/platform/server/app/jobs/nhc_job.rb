@@ -28,7 +28,7 @@ class NhcJob < ApplicationJob
 
     unless results.ok
       write_status(results.message)
-      return
+      return results.message
     end
 
     # Save without validation to avoid needless uniqueness checks
@@ -39,7 +39,7 @@ class NhcJob < ApplicationJob
       write_status('Node validated successfully!')
       @it2_profile.user.maybe_send_ait2_registration_complete_email
       LocationJob.perform_later({ it2_profile_id: @it2_profile.id }) if do_location
-      return
+      return results.evaluation_results
     end
 
     failures = []
@@ -54,6 +54,7 @@ class NhcJob < ApplicationJob
     end
 
     write_status(failures.join("\n\n"))
+    results.evaluation_results
   end
 
   def write_status(status)
