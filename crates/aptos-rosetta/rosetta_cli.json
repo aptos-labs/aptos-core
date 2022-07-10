@@ -3,12 +3,12 @@
         "blockchain": "aptos",
         "network": "TESTING"
     },
-    "online_url": "http://192.168.1.126:8082",
-    "data_directory": "",
+    "online_url": "http://localhost:8082",
+    "data_directory": "data",
     "http_timeout": 30,
     "max_retries": 5,
     "retry_elapsed_time": 0,
-    "max_online_connections": 500,
+    "max_online_connections": 100,
     "max_sync_concurrency": 64,
     "tip_delay": 120,
     "max_reorg_depth": 100,
@@ -18,9 +18,9 @@
     "error_stack_trace_disabled": false,
     "coin_supported": false,
     "construction": {
-        "offline_url": "http://192.168.1.126:8083",
-        "max_offline_connections": 500,
-        "stale_depth": 100000,
+        "offline_url": "http://localhost:8083",
+        "max_offline_connections": 100,
+        "stale_depth": 1000,
         "broadcast_limit": 5,
         "ignore_broadcast_failures": false,
         "clear_broadcasts": false,
@@ -29,10 +29,13 @@
         "rebroadcast_all": false,
         "constructor_dsl_file": "aptos.ros",
         "status_port": 9090,
+        "force_retry": true,
         "end_conditions": {
             "create_account": 10,
             "transfer": 20
-        }
+        },
+        "prefunded_accounts": [
+        ]
     },
     "data": {
         "active_reconciliation_concurrency": 16,
@@ -60,7 +63,6 @@
             "tip": true,
             "reconciliation_coverage": {
                 "coverage": 0.95,
-                "from_tip": true,
                 "tip": true
             }
         }
