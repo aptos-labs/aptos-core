@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::account_generator::{AccountCache, AccountGenerator};
-use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_types::{
@@ -279,7 +279,7 @@ impl TransactionGenerator {
                     vec![create, mint]
                 })
                 .map(Transaction::UserTransaction)
-                .chain(once(Transaction::StateCheckpoint))
+                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
             self.version += transactions.len() as Version;
             bar.inc(transactions.len() as u64 - 1);
@@ -331,7 +331,7 @@ impl TransactionGenerator {
                         )
                 })
                 .map(Transaction::UserTransaction)
-                .chain(once(Transaction::StateCheckpoint))
+                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
             self.version += transactions.len() as Version;
             if let Some(sender) = &self.block_sender {
@@ -366,7 +366,7 @@ impl TransactionGenerator {
                     )
                 })
                 .map(Transaction::UserTransaction)
-                .chain(once(Transaction::StateCheckpoint))
+                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
             self.version += transactions.len() as Version;
 

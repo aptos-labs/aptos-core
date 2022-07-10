@@ -127,7 +127,7 @@ impl ExecutedChunk {
                 || self
                     .to_commit
                     .last()
-                    .map_or(true, |(t, _)| matches!(t, Transaction::StateCheckpoint)),
+                    .map_or(true, |(t, _)| matches!(t, Transaction::StateCheckpoint(_))),
             "Chunk not ending with a state checkpoint.",
         );
         Ok(())

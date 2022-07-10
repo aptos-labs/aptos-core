@@ -1492,7 +1492,8 @@ pub enum Transaction {
 
     /// Transaction to let the executor update the global state tree and record the root hash
     /// in the TransactionInfo
-    StateCheckpoint,
+    /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
+    StateCheckpoint(HashValue),
 }
 
 impl Transaction {
@@ -1513,7 +1514,7 @@ impl Transaction {
             // TODO: display proper information for client
             Transaction::BlockMetadata(_block_metadata) => String::from("block_metadata"),
             // TODO: display proper information for client
-            Transaction::StateCheckpoint => String::from("state_checkpoint"),
+            Transaction::StateCheckpoint(_) => String::from("state_checkpoint"),
         }
     }
 }

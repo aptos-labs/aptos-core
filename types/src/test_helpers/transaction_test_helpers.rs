@@ -10,7 +10,7 @@ use crate::{
     },
     write_set::WriteSet,
 };
-use aptos_crypto::{ed25519::*, traits::*};
+use aptos_crypto::{ed25519::*, traits::*, HashValue};
 
 const MAX_GAS_AMOUNT: u64 = 1_000_000;
 const TEST_GAS_PRICE: u64 = 0;
@@ -253,6 +253,6 @@ pub fn get_write_set_txn(
 }
 
 pub fn block(mut user_txns: Vec<Transaction>) -> Vec<Transaction> {
-    user_txns.push(Transaction::StateCheckpoint);
+    user_txns.push(Transaction::StateCheckpoint(HashValue::random()));
     user_txns
 }

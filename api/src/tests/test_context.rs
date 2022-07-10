@@ -229,7 +229,7 @@ impl TestContext {
                     .cloned()
                     .map(Transaction::UserTransaction),
             )
-            .chain(once(Transaction::StateCheckpoint))
+            .chain(once(Transaction::StateCheckpoint(metadata.id())))
             .collect();
 
         // Check that txn execution was successful.

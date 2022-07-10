@@ -150,7 +150,7 @@ impl InMemoryStateCalculator {
                 Transaction::BlockMetadata(_) | Transaction::UserTransaction(_) => {
                     Ok((HashMap::new(), HashMap::new(), None))
                 }
-                Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint => {
+                Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => {
                     self.checkpoint()
                 }
             }
@@ -340,7 +340,7 @@ fn ensure_txn_valid_for_vacant_entry(transaction: &Transaction) -> Result<()> {
             }
             TransactionPayload::WriteSet(_) => (),
         },
-        Transaction::StateCheckpoint => {}
+        Transaction::StateCheckpoint(_) => {}
     }
     Ok(())
 }

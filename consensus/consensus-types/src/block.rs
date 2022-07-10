@@ -341,7 +341,7 @@ impl Block {
                 .into_iter()
                 .map(Transaction::UserTransaction),
         )
-        .chain(once(Transaction::StateCheckpoint))
+        .chain(once(Transaction::StateCheckpoint(self.id)))
         .collect()
     }
 

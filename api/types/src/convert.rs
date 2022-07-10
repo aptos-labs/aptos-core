@@ -99,7 +99,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 (info, payload, events).into()
             }
             BlockMetadata(txn) => (&txn, info, events).into(),
-            StateCheckpoint => {
+            StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,
                     timestamp: timestamp.into(),
