@@ -8,6 +8,7 @@ use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_state_view::{StateView, StateViewId};
+use aptos_types::multi_signature::MultiSignature;
 use aptos_types::{
     access_path::AccessPath,
     account_config::CORE_CODE_ADDRESS,
@@ -22,7 +23,7 @@ use aptos_types::{
 use aptos_vm::VMExecutor;
 use executor_types::ExecutedChunk;
 use move_deps::move_core_types::move_resource::MoveResource;
-use std::{collections::btree_map::BTreeMap, sync::Arc};
+use std::sync::Arc;
 use storage_interface::{
     cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
     DbWriter, ExecutedTrees,
@@ -178,7 +179,7 @@ pub fn calculate_genesis<V: VMExecutor>(
             ),
             genesis_block_id(), /* consensus_data_hash */
         ),
-        BTreeMap::default(), /* signatures */
+        MultiSignature::empty(), /* signatures */
     );
     output.ledger_info = Some(ledger_info_with_sigs);
 

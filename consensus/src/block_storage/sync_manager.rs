@@ -386,13 +386,19 @@ impl BlockStore {
 pub struct BlockRetriever {
     network: NetworkSender,
     preferred_peer: Author,
+    validator_addresses: Vec<AccountAddress>,
 }
 
 impl BlockRetriever {
-    pub fn new(network: NetworkSender, preferred_peer: Author) -> Self {
+    pub fn new(
+        network: NetworkSender,
+        preferred_peer: Author,
+        validator_addresses: Vec<AccountAddress>,
+    ) -> Self {
         Self {
             network,
             preferred_peer,
+            validator_addresses,
         }
     }
 
@@ -409,7 +415,7 @@ impl BlockRetriever {
         &mut self,
         block_id: HashValue,
         target_block_id: HashValue,
-        peers: &mut Vec<&AccountAddress>,
+        peers: &mut Vec<AccountAddress>,
         num_blocks: u64,
     ) -> anyhow::Result<Vec<Block>> {
         info!(
@@ -501,11 +507,7 @@ impl BlockRetriever {
         num_blocks: u64,
         target_block_id: HashValue,
     ) -> anyhow::Result<Vec<Block>> {
-        let mut peers = qc
-            .ledger_info()
-            .signatures()
-            .keys()
-            .collect::<Vec<&AccountAddress>>();
+        let mut peers = qc.ledger_info().get_voters(&self.validator_addresses);
         self.retrieve_block_for_id(
             qc.certified_block().id(),
             target_block_id,
@@ -515,14 +517,14 @@ impl BlockRetriever {
         .await
     }
 
-    fn pick_peer(&self, attempt: u32, peers: &mut Vec<&AccountAddress>) -> AccountAddress {
+    fn pick_peer(&self, attempt: u32, peers: &mut Vec<AccountAddress>) -> AccountAddress {
         assert!(!peers.is_empty(), "pick_peer on empty peer list");
 
         if attempt == 0 {
             // remove preferred_peer if its in list of peers
             // (strictly speaking it is not required to be there)
             for i in 0..peers.len() {
-                if *peers[i] == self.preferred_peer {
+                if peers[i] == self.preferred_peer {
                     peers.remove(i);
                     break;
                 }
@@ -531,7 +533,7 @@ impl BlockRetriever {
         }
 
         let peer_idx = thread_rng().gen_range(0, peers.len());
-        *peers.remove(peer_idx)
+        peers.remove(peer_idx)
     }
 }
 

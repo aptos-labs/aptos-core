@@ -11,6 +11,8 @@ use aptos_crypto::{
 use aptos_infallible::RwLock;
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_time_service::TimeService;
+use aptos_types::ledger_info::generate_ledger_info_with_sig;
+use aptos_types::multi_signature::PartialSignatures;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -64,7 +66,7 @@ use state_sync_v1::{
 };
 use std::{
     cell::{Ref, RefCell},
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     ops::DerefMut,
     sync::Arc,
     time::Duration,
@@ -751,17 +753,30 @@ impl MockStorage {
                 HashValue::zero(),
                 self.version(),
                 0,
-                epoch_state,
+                epoch_state.clone(),
             ),
             HashValue::zero(),
         );
         let signature = self.signer.sign(&ledger_info);
-        let mut signatures = BTreeMap::new();
-        signatures.insert(self.signer.author(), signature);
-        self.ledger_infos.insert(
-            self.epoch_num(),
-            LedgerInfoWithSignatures::new(ledger_info, signatures),
-        );
+        let mut partial_signatures = PartialSignatures::empty();
+        partial_signatures.add_signature(self.signer.author(), signature);
+        if let Some(verfier) = epoch_state.map(|x| x.verifier) {
+            self.ledger_infos.insert(
+                self.epoch_num(),
+                LedgerInfoWithSignatures::new(
+                    ledger_info,
+                    verfier
+                        .generate_multi_signature(&partial_signatures)
+                        .unwrap()
+                        .0,
+                ),
+            );
+        } else {
+            self.ledger_infos.insert(
+                self.epoch_num(),
+                generate_ledger_info_with_sig(&[self.signer.clone()], ledger_info),
+            );
+        }
     }
 
     // This function is applying the LedgerInfo with the next epoch info to the existing version

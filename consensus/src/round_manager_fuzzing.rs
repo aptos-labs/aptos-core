@@ -17,6 +17,7 @@ use crate::{
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
 use aptos_infallible::Mutex;
+use aptos_types::multi_signature::MultiSignature;
 use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
@@ -35,7 +36,7 @@ use network::{
 };
 use once_cell::sync::Lazy;
 use safety_rules::{test_utils, SafetyRules, TSafetyRules};
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::runtime::Runtime;
 
 // This generates a proposal for round 1
@@ -81,7 +82,7 @@ fn make_initial_epoch_change_proof(signer: &ValidatorSigner) -> EpochChangeProof
         ValidatorInfo::new_with_test_network_keys(signer.author(), signer.public_key(), 1);
     let validator_set = ValidatorSet::new(vec![validator_info]);
     let li = LedgerInfo::mock_genesis(Some(validator_set));
-    let lis = LedgerInfoWithSignatures::new(li, BTreeMap::new());
+    let lis = LedgerInfoWithSignatures::new(li, MultiSignature::empty());
     EpochChangeProof::new(vec![lis], false)
 }
 

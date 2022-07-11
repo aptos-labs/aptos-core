@@ -1758,6 +1758,7 @@ mod tests {
         ed25519::{Ed25519PrivateKey, Ed25519Signature},
         HashValue, PrivateKey, Uniform,
     };
+    use aptos_types::multi_signature::MultiSignature;
     use aptos_types::{
         account_address::AccountAddress,
         block_info::BlockInfo,
@@ -1781,7 +1782,6 @@ mod tests {
     use mempool_notifications::MempoolNotifier;
     use netcore::transport::ConnectionOrigin;
     use network::transport::ConnectionMetadata;
-    use std::collections::BTreeMap;
 
     #[test]
     fn test_process_sync_request() {
@@ -2372,7 +2372,7 @@ mod tests {
         let block_info =
             BlockInfo::new(0, 0, HashValue::zero(), HashValue::zero(), version, 0, None);
         let ledger_info = LedgerInfo::new(block_info, HashValue::random());
-        LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
+        LedgerInfoWithSignatures::new(ledger_info, MultiSignature::empty())
     }
 
     fn create_commit_notification(

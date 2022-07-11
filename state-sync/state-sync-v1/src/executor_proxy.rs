@@ -763,7 +763,7 @@ mod tests {
 
         // Commit block
         let ledger_info_with_sigs =
-            gen_ledger_info_with_sigs(block_id.into(), &output, block_hash, vec![]);
+            gen_ledger_info_with_sigs(block_id.into(), &output, block_hash, &[]);
         assert_ok!(block_executor.commit_blocks(vec![block_hash], ledger_info_with_sigs.clone()));
 
         (output.reconfig_events().to_vec(), ledger_info_with_sigs)
