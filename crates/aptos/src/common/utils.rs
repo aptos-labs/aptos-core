@@ -5,6 +5,7 @@ use crate::{
     common::types::{CliError, CliTypedResult, PromptOptions},
     CliResult,
 };
+use aptos_logger::Level;
 use aptos_rest_client::Client;
 use aptos_telemetry::collect_build_information;
 use aptos_types::chain_id::ChainId;
@@ -22,6 +23,16 @@ use std::{
     str::FromStr,
     time::{Duration, Instant},
 };
+
+pub fn init_logger() {
+    let mut logger = aptos_logger::Logger::new();
+    logger
+        .channel_size(1000)
+        .is_async(false)
+        .level(Level::Warn)
+        .read_env();
+    logger.build();
+}
 
 /// Prompts for confirmation until a yes or no is given explicitly
 pub fn prompt_yes(prompt: &str) -> bool {

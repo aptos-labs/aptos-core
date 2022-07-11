@@ -9,7 +9,7 @@ use crate::{
             load_account_arg, AccountAddressWrapper, CliError, CliTypedResult, MovePackageDir,
             PromptOptions, TransactionOptions, TransactionSummary,
         },
-        utils::check_if_file_exists,
+        utils::{check_if_file_exists, init_logger},
     },
     CliCommand, CliResult,
 };
@@ -55,6 +55,7 @@ pub enum MoveTool {
 
 impl MoveTool {
     pub async fn execute(self) -> CliResult {
+        init_logger();
         match self {
             MoveTool::Compile(tool) => tool.execute_serialized().await,
             MoveTool::Init(tool) => tool.execute_serialized_success().await,

@@ -7,7 +7,7 @@ use crate::{
             CliError, CliTypedResult, EncodingOptions, EncodingType, ExtractPublicKey, KeyType,
             PrivateKeyInputOptions, ProfileOptions, RngArgs, SaveFile,
         },
-        utils::{append_file_extension, check_if_file_exists, write_to_file},
+        utils::{append_file_extension, check_if_file_exists, init_logger, write_to_file},
     },
     CliCommand, CliResult,
 };
@@ -32,6 +32,7 @@ pub enum KeyTool {
 
 impl KeyTool {
     pub async fn execute(self) -> CliResult {
+        init_logger();
         match self {
             KeyTool::Generate(tool) => tool.execute_serialized().await,
             KeyTool::ExtractPeer(tool) => tool.execute_serialized().await,

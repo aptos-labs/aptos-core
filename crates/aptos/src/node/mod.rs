@@ -7,7 +7,7 @@ use crate::{
             CliCommand, CliError, CliResult, CliTypedResult, ProfileOptions, RestOptions,
             TransactionOptions,
         },
-        utils::read_from_file,
+        utils::{init_logger, read_from_file},
     },
     genesis::git::from_yaml,
 };
@@ -41,6 +41,7 @@ pub enum NodeTool {
 impl NodeTool {
     pub async fn execute(self) -> CliResult {
         use NodeTool::*;
+        init_logger();
         match self {
             AddStake(tool) => tool.execute_serialized().await,
             UnlockStake(tool) => tool.execute_serialized().await,
