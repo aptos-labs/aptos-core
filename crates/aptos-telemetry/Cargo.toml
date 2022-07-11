@@ -8,6 +8,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 edition = "2018"
+build = "build.rs"
 
 [build-dependencies]
 shadow-rs = "0.11.0"

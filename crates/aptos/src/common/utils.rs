@@ -6,12 +6,12 @@ use crate::{
     CliResult,
 };
 use aptos_rest_client::Client;
+use aptos_telemetry::collect_build_information;
 use aptos_types::chain_id::ChainId;
 use itertools::Itertools;
 use move_deps::move_core_types::account_address::AccountAddress;
 use reqwest::Url;
 use serde::Serialize;
-use shadow_rs::shadow;
 use std::{
     collections::BTreeMap,
     env,
@@ -20,10 +20,8 @@ use std::{
     os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
     str::FromStr,
-    time::Instant,
+    time::{Duration, Instant},
 };
-
-shadow!(build);
 
 /// Prompts for confirmation until a yes or no is given explicitly
 pub fn prompt_yes(prompt: &str) -> bool {
@@ -67,8 +65,7 @@ pub async fn to_common_result<T: Serialize>(
     } else {
         None
     };
-    aptos_telemetry::cli_metrics::send_cli_telemetry_event(command.into(), latency, !is_err, error)
-        .await;
+    send_telemetry_event(command, latency, !is_err, error).await;
     let result: ResultWrapper<T> = result.into();
     let string = serde_json::to_string_pretty(&result).unwrap();
     if is_err {
@@ -76,6 +73,27 @@ pub async fn to_common_result<T: Serialize>(
     } else {
         Ok(string)
     }
+}
+
+/// Sends a telemetry event about the CLI build, command and result
+async fn send_telemetry_event(
+    command: &str,
+    latency: Duration,
+    success: bool,
+    error: Option<String>,
+) {
+    // Collect the build information
+    let build_information = collect_build_information!();
+
+    // Send the event
+    aptos_telemetry::cli_metrics::send_cli_telemetry_event(
+        build_information,
+        command.into(),
+        latency,
+        success,
+        error,
+    )
+    .await;
 }
 
 /// A result wrapper for displaying either a correct execution result or an error.
