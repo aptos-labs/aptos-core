@@ -7987,6 +7987,7 @@ dependencies = [
  "reqwest",
  "serde_json",
  "serde_yaml 0.8.26",
+ "state-sync-driver",
  "tokio",
 ]
 
@@ -8051,6 +8052,7 @@ dependencies = [
  "move-deps",
  "network",
  "once_cell",
+ "schemadb",
  "scratchpad",
  "serde 1.0.141",
  "storage-interface",
