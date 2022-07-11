@@ -59,7 +59,7 @@ Start by cloning the `aptos-core` GitHub repo from [[GitHub](https://github.com/
     </Tabs>
 
 
-Now your basic Aptos development environment ready.
+Now your basic Aptos development environment is ready.
 
 ## IDE plugins for Move
 
