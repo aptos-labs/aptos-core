@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 require 'test_helper'
-require 'minitest/autorun'
+require 'mocha/setup'
 
 class It2ProfilesControllerTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
@@ -13,6 +13,8 @@ class It2ProfilesControllerTest < ActionDispatch::IntegrationTest
     @user = FactoryBot.create(:user)
     sign_in @user
     Flipper.enable(:it2_registration_open)
+    It2ProfilesController.any_instance.stubs(:verify_recaptcha).returns(true)
+    It2ProfilesController.any_instance.stubs(:validate_node).returns([])
   end
 
   test 'new profile page' do
