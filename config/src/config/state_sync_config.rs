@@ -64,6 +64,7 @@ pub struct StateSyncDriverConfig {
     pub max_consecutive_stream_notifications: u64, // The max number of notifications to process per driver loop
     pub max_pending_data_chunks: u64, // The max number of data chunks pending execution or commit
     pub max_stream_wait_time_ms: u64, // The max time (ms) to wait for a data stream notification
+    pub num_versions_to_skip_snapshot_sync: u64, // The version lag we'll tolerate before snapshot syncing
 }
 
 /// The default state sync driver config will be the one that gets (and keeps)
@@ -79,6 +80,7 @@ impl Default for StateSyncDriverConfig {
             max_consecutive_stream_notifications: 10,
             max_pending_data_chunks: 100,
             max_stream_wait_time_ms: 5000,
+            num_versions_to_skip_snapshot_sync: 1_000_000,
         }
     }
 }
