@@ -376,6 +376,7 @@ dependencies = [
 name = "aptos-extensions"
 version = "0.1.0"
 dependencies = [
+ "aptos-types",
  "better_any",
  "move-deps",
  "smallvec",

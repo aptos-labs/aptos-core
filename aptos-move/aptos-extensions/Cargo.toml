@@ -14,4 +14,5 @@ better_any = "0.1.1"
 tiny-keccak = { version = "2.0.2", features = ["sha3"] }
 smallvec = "1.8.0"
 
+aptos-types = { path = "../../types" }
 move-deps = { path = "../move-deps", features = ["address32"] }

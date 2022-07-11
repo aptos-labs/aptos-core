@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use better_any::{Tid, TidAble};
+use aptos_types::write_set::WriteOp;
 use move_deps::{
     move_binary_format::errors::{PartialVMResult, PartialVMError},
     move_core_types::{
         account_address::AccountAddress,
         gas_schedule::GasCost,
-        vm_status::StatusCode,
+        vm_status::StatusCode, value::MoveTypeLayout,
     },
     move_vm_runtime::{
         native_functions,
@@ -25,114 +26,131 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, VecDeque};
 use tiny_keccak::{Hasher, Sha3};
 
-trait CheckedAdd: Sized {
-    fn checked_add(&self, v: &Self) -> Option<Self>;
+/// Specifies operations on aggregatable values: they can be added, subtracted
+/// (both checking for over and underflow), and serialized. 
+trait AggregatableValue: Sized + PartialOrd {
+    fn add(&self, v: &Self) -> Option<Self>;
+
+    fn sub(&self, v: &Self) -> Option<Self>;
+
+    fn serialize(&self, layout: &MoveTypeLayout) -> Option<Vec<u8>>;
 }
 
-impl CheckedAdd for u8 {
-    #[inline]
-    fn checked_add(&self, v: &u8) -> Option<u8> {
-        u8::checked_add(*self, *v)
+macro_rules! aggregatable_value_impl {
+    ($t:ty, $method:ident) => {
+        impl AggregatableValue for $t {
+            #[inline]
+            fn add(&self, v: &$t) -> Option<$t> {
+                <$t>::checked_add(*self, *v)
+            }
+
+            #[inline]
+            fn sub(&self, v: &$t) -> Option<$t> {
+                <$t>::checked_sub(*self, *v)
+            }
+
+            #[inline]
+            fn serialize(&self, layout: &MoveTypeLayout) -> Option<Vec<u8>> {
+                Value::$method(*self).simple_serialize(layout)
+            }
+        }
     }
 }
 
-impl CheckedAdd for u64 {
-    #[inline]
-    fn checked_add(&self, v: &u64) -> Option<u64> {
-        u64::checked_add(*self, *v)
-    }
+aggregatable_value_impl!(u8, u8);
+aggregatable_value_impl!(u64, u64);
+aggregatable_value_impl!(u128, u128);
+
+/// State of aggregator. `Data` means that the aggregator's value is known,
+/// `PositiveDelta` means that the actual value is not known, and all updates
+/// must be accumulated together as deltas.
+enum AggregatorState {
+    Data,
+    PositiveDelta,
 }
 
-impl CheckedAdd for u128 {
-    #[inline]
-    fn checked_add(&self, v: &u128) -> Option<u128> {
-        u128::checked_add(*self, *v)
-    }
+/// Error code for aggregator's value overflow (both for data or delta).
+const E_AGGREGATOR_OVERFLOW: u64 = 1500;
+
+struct Aggregator<T: AggregatableValue> {
+    state: AggregatorState,
+    layout: MoveTypeLayout,
+    value: T,
 }
 
-/// Error code for overflow.
-const E_OVERFLOW: u64 = 1500;
-
-/// Value of a single aggregator instance. `Data(val)` means that the value is
-/// known and equals to `val`, `PositiveDelta(val)` means that the actual value
-/// is not known and `val` should be added. `NegativeDelta(val)` is similar but
-/// `val` should be subtracted instead.
-enum AggregatorValue<T: CheckedAdd + PartialOrd> {
-    Data(T),
-    NegativeDelta(T),
-    PositiveDelta(T),
-}
-
-impl<T> AggregatorValue<T>
-where
-    T: CheckedAdd + PartialOrd
+impl<T> Aggregator<T>
+where 
+    T: AggregatableValue
 {
-    /// Returns a new aggrerated value or error on overflow.
-    fn checked_add(&mut self, v: &T) -> PartialVMResult<()> {
-        *self = match self {
-            AggregatorValue::Data(u) => {
-                let result = u.checked_add(v);
-                if result.is_some() {
-                    AggregatorValue::Data(result.unwrap())
-                } else {
-                    return Err(partial_error(
-                        "aggregator data overflowed",
-                        E_OVERFLOW,
-                    ));
-                }
-            }
-            AggregatorValue::PositiveDelta(u) => {
-                let result = u.checked_add(v);
-                if result.is_some() {
-                    AggregatorValue::PositiveDelta(result.unwrap())
-                } else {
-                    return Err(partial_error(
-                        "aggregator delta overflowed",
-                        E_OVERFLOW,
-                    ));
-                }
-            }
-            _ => unimplemented!() 
-        };
-        Ok(())
-    }
-}
-
-/// Typed aggregator instance.
-enum Aggregator {
-    AggregatorU8(AggregatorValue<u8>),
-    AggregatorU64(AggregatorValue<u64>),
-    AggregatorU128(AggregatorValue<u128>),
-}
-
-impl Aggregator {
-    /// Creates aggregator with a known value, initialized to 0.
-    fn new_known(ty: Type) -> Self {
-        match ty {
-            Type::U8 => Aggregator::AggregatorU8(AggregatorValue::Data(0)),
-            Type::U64 => Aggregator::AggregatorU64(AggregatorValue::Data(0)),
-            Type::U128 => Aggregator::AggregatorU128(AggregatorValue::Data(0)),
-            _ => unreachable!(),
+    /// Creates a new aggregator with given state and value.
+    fn new(state: AggregatorState, layout: MoveTypeLayout, value: T) -> Self {
+        Aggregator {
+            state,
+            layout,
+            value,
         }
     }
 
-    /// Creates aggregator with a unknown value.
-    fn new_unknown(ty: Type) -> Self {
-        match ty {
-            Type::U8 => Aggregator::AggregatorU8(AggregatorValue::PositiveDelta(0)),
-            Type::U64 => Aggregator::AggregatorU64(AggregatorValue::PositiveDelta(0)),
-            Type::U128 => Aggregator::AggregatorU128(AggregatorValue::PositiveDelta(0)),
-            _ => unreachable!(),
+    /// Adds `other_value` to currently aggregated value, aborting on overflow.
+    fn add(&mut self, other_value: &T) -> PartialVMResult<()>{
+        match self.state {
+            AggregatorState::Data | AggregatorState::PositiveDelta => {
+                let result = self.value.add(other_value);
+                if result.is_some() {
+                    self.value = result.unwrap();
+                    Ok(())
+                } else {
+                    Err(partial_error(
+                        "aggregator's value overflowed",
+                        E_AGGREGATOR_OVERFLOW,
+                    ))
+                }
+
+            }
         }
     }
 
-    /// Adds a value to aggregator.
-    fn add(&mut self, value: IntegerValue) -> PartialVMResult<()> {
-        match (self, value) {
-            (Aggregator::AggregatorU8(a), IntegerValue::U8(v)) => a.checked_add(&v),
-            (Aggregator::AggregatorU64(a), IntegerValue::U64(v)) => a.checked_add(&v),
-            (Aggregator::AggregatorU128(a), IntegerValue::U128(v)) => a.checked_add(&v),
-            _ => unreachable!()
+    /// Converts aggregator into a write operation.
+    fn into_write_op(self) -> PartialVMResult<WriteOp> {
+        unimplemented!()
+    }
+}
+
+/// Top-level wrapper to allow aggregators of different types.
+enum AggregatorWrapper {
+    AggregatorU8(Aggregator<u8>),
+    AggregatorU64(Aggregator<u64>),
+    AggregatorU128(Aggregator<u128>),
+}
+
+impl AggregatorWrapper {
+    fn new(
+        state: AggregatorState,
+        layout: MoveTypeLayout,
+        ty: &Type,
+    ) -> Self {
+        match ty {
+            Type::U8 => AggregatorWrapper::AggregatorU8(Aggregator::new(state, layout, 0)),
+            Type::U64 => AggregatorWrapper::AggregatorU64(Aggregator::new(state, layout, 0)),
+            Type::U128 => AggregatorWrapper::AggregatorU128(Aggregator::new(state, layout, 0)),
+            _ => unreachable!("aggregator uses only integer types"),
+        }
+    }
+
+    fn add(&mut self, other: IntegerValue) -> PartialVMResult<()> {
+        match (self, other) {
+            (AggregatorWrapper::AggregatorU8(a), IntegerValue::U8(v)) => a.add(&v),
+            (AggregatorWrapper::AggregatorU64(a), IntegerValue::U64(v)) => a.add(&v),
+            (AggregatorWrapper::AggregatorU128(a), IntegerValue::U128(v)) => a.add(&v),
+            _ => unreachable!("aggregator operates on a single type"),
+        }
+    }
+
+    fn into_write_op(self) -> PartialVMResult<WriteOp> {
+        match self {
+            AggregatorWrapper::AggregatorU8(a) => a.into_write_op(),
+            AggregatorWrapper::AggregatorU64(a) => a.into_write_op(),
+            AggregatorWrapper::AggregatorU128(a) => a.into_write_op(),
         }
     }
 }
@@ -141,16 +159,15 @@ impl Aggregator {
 type AggregatorHandle = u128;
 const HANDLE_FIELD_IDX: usize = 0;
 
-/// Native context of aggregator that can be passed to VM extensions.
-/// Aggregators are wrapped in RefCell for internal mutability.
+/// Native context that can be passed to VM extensions.
 #[derive(Tid)]
 pub struct NativeAggregatorContext {
     txn_hash: u128,
-    aggregators: RefCell<BTreeMap<AggregatorHandle, Aggregator>>,
+    aggregators: RefCell<BTreeMap<AggregatorHandle, AggregatorWrapper>>,
 }
 
 impl NativeAggregatorContext {
-    /// Creates new aggregator context.
+    /// Creates new context.
     pub fn new(txn_hash: u128) -> Self {
         Self {
             // TODO: add resolver once we suppord read and need to go to
@@ -206,7 +223,7 @@ fn native_new_handle(
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregators = aggregator_context.aggregators.borrow_mut();
 
-    // Every Aggregator instance has a unique handle. Here we can reuse the
+    // Every aggregator instance has a unique handle. Here we can reuse the
     // strategy from Table implementation: taking hash of transaction and
     // number of aggregator instances created so far and truncating them to
     // 128 bits.
@@ -224,7 +241,8 @@ fn native_new_handle(
     // If transaction initializes aggregator, then the actual value is known,
     // and Data(0) is produced.
     let int_ty = ty_args.pop().unwrap();
-    aggregators.insert(handle, Aggregator::new_known(int_ty));
+    let layout = context.type_to_type_layout(&int_ty).unwrap().unwrap();
+    aggregators.insert(handle, AggregatorWrapper::new(AggregatorState::Data, layout, &int_ty));
 
     // TODO: charge gas properly.
     let cost = GasCost::new(0, 0).total();
@@ -250,7 +268,8 @@ fn native_add(
     // with unkown value, i.e. with Delta(0).
     if !aggregators.contains_key(&handle) {
         let int_ty = ty_args.pop().unwrap();
-        aggregators.insert(handle, Aggregator::new_unknown(int_ty));
+        let layout = context.type_to_type_layout(&int_ty).unwrap().unwrap();
+        aggregators.insert(handle, AggregatorWrapper::new(AggregatorState::PositiveDelta, layout, &int_ty));
     }
 
     // Add a value to aggregator, and check for errors. 
@@ -289,7 +308,8 @@ mod tests {
     #[test]
     #[should_panic(expected = "overflow")]
     fn test_aggregator_data_overflow() {
-        let mut a = Aggregator::new_known(Type::U8);
+        let int_ty = Type::U8;
+        let mut a = AggregatorWrapper::new(AggregatorState::Data, MoveTypeLayout::U8, &int_ty);
         _ = a.add(IntegerValue::U8(200));
         let status = a.add(IntegerValue::U8(200));
 
@@ -301,25 +321,13 @@ mod tests {
     #[test]
     #[should_panic(expected = "overflow")]
     fn test_aggregator_delta_overflow() {
-        let mut a = Aggregator::new_unknown(Type::U8);
+        let int_ty = Type::U8;
+        let mut a = AggregatorWrapper::new(AggregatorState::PositiveDelta, MoveTypeLayout::U8, &int_ty);
         _ = a.add(IntegerValue::U8(200));
         let status = a.add(IntegerValue::U8(200));
 
         if status.is_err() {
             panic!("overflow")
-        }
-    }
-
-    #[test]
-    fn test_aggregator_can_add() {
-        let mut a_unkwon = Aggregator::new_unknown(Type::U8);
-        _ = a_unkwon.add(IntegerValue::U8(1));
-        let status = a_unkwon.add(IntegerValue::U8(2));
-        assert!(status.is_ok());
-
-        // TODO: what would be a better way to test this?
-        if let Aggregator::AggregatorU8(AggregatorValue::PositiveDelta(v)) = a_unkwon {
-            assert!(v == 3)
         }
     }
 }
