@@ -57,6 +57,7 @@ spec:
   {{- end }}
 
 {{- range $index, $config := $.Values.fullnode.groups }}
+{{- if lt $i (int $.Values.numFullnodeGroups) }}
 ---
 apiVersion: v1
 kind: Service
@@ -104,6 +105,7 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 
+{{- end }}
 {{- end }}
 
 ---

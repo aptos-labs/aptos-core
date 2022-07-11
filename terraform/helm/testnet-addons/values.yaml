@@ -33,7 +33,11 @@ load_test:
   tolerations: []
   affinity: {}
   intervalMins: 15
+  fullnode:
+    groups:
+    - name: fullnode
   config:
+    numFullnodeGroups:
     mint_key:
     duration: 300
     accounts_per_client: 12
