@@ -134,7 +134,7 @@ module AptosFramework::SimpleMap {
         }
     }
 
-    fun get_entry<Key: store, Value: store>(
+    public fun get_entry<Key: store, Value: store>(
         map: &SimpleMap<Key, Value>,
         index: u64,
     ) : (&Key, &Value) {
