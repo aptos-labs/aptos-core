@@ -1,0 +1,120 @@
+gcp_credentials: ENCRYPTED[!5ff02fd27fc6c3255c96ec64c3f7e9ce650b306988e2ff6f8aa22d7ddd5d786dc0b7d0edc72c103c1b0437d8342502a5!]
+
+rust_nextest_vm_task:
+  gce_instance:
+    image_project: ubuntu-os-cloud
+    image_name: ubuntu-2204-jammy-arm64-v20220712a
+    location: us-central1
+    type: t2a-standard-48
+    disk: 200
+    preemptible: true
+    use_ssd: true
+  env:
+    CARGO_INCREMENTAL: "0"
+    INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+    CIRRUS_SHELL: bash
+    PATH: /root/.cargo/bin:$PATH
+    # CIRRUS_CLONE_DEPTH: "0"
+    # matrix:
+    #   - BATCH: 0
+    #   - BATCH: 1
+  prepare_script:
+    docker ps
+#   # clone_script: |
+#   #   git clone https://x-access-token:${CIRRUS_REPO_CLONE_TOKEN}@github.com/${CIRRUS_REPO_FULL_NAME}.git $CIRRUS_WORKING_DIR
+#   #   git checkout $CIRRUS_BRANCH
+#   install_script: |
+#     apt-get update
+#     apt-get install gnupg lsb-release build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config --no-install-recommends --assume-yes
+
+#     mkdir -p /etc/apt/keyrings
+#     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+#     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+#     apt-get update -y
+#     apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
+#     curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
+#   prepare_script: docker run --detach -p 5432:5432 cimg/postgres:14.2
+#   # registry_cache:
+#   #   folder: $CARGO_HOME/registry
+#   #   fingerprint_script: cat Cargo.lock
+#   # target_cache:
+#   #   folder: target
+#   #   fingerprint_script:
+#   #     - rustc --version
+#   #     - cat Cargo.lock
+#   test_script: |
+#     cargo nextest --nextest-profile ci --partition hash:1/1 --unit --exclude backup-cli
+#   # before_cache_script:
+#   #   #  # Delete loose files in the debug directory
+#   #   - find ./target/debug -maxdepth 1 -type f -delete
+#   #   # Delete the test and benchmark executables. Finding these all might take some
+#   #   # experimentation.
+#   #   - rm -rf ./target/debug/deps/*aptos*
+#   #   # Delete the associated metadata files for those executables
+#   #   - rm -rf ./target/debug/.fingerprint/*aptos*
+#   #   # Note that all of the above need to be repeated for `debug/` instead of
+#   #   # `debug/` if your build script builds artifacts in debug mode.
+#   #   # This is just more metadata
+#   #   - rm -f  ./target/.rustc_info.json
+#   #   # Also delete the saved benchmark data from the test benchmarks. If you
+#   #   # have Criterion.rs benchmarks, you'll probably want to do this as well, or set
+#   #   # the CRITERION_HOME environment variable to move that data out of the
+#   #   # `target/` directory.
+#   #   # Also delete cargo's registry index. This is updated on every build, but it's
+#   #   # way cheaper to re-download than the whole cache is.
+#   #   - rm -rf $CARGO_HOME/registry/index/
+
+
+
+
+
+
+
+# macos_instance:
+#   image: ghcr.io/cirruslabs/macos-monterey-xcode:14-beta-3
+
+# build_mac_images_task:
+  # env:
+  #   # CARGO_INCREMENTAL: "0"
+  #   CIRRUS_SHELL: bash
+  #   # PATH: /root/.cargo/bin:$PATH
+  # docker_install_script: |
+  #   brew install --cask docker
+  #   sudo /Applications/Docker.app/Contents/MacOS/Docker --unattended --install-privileged-components
+  #   open -a /Applications/Docker.app --args --unattended --accept-license
+  #   sleep 60
+  #   # while ! /Applications/Docker.app/Contents/Resources/bin/docker info &>/dev/null; do sleep 1; done
+  #   /Applications/Docker.app/Contents/Resources/bin/docker info
+  #   docker --version
+  # build_script: docker/docker-bake-rust-all.sh
+  #   # apt-get update
+    # apt-get install gnupg lsb-release build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config --no-install-recommends --assume-yes
+
+    # mkdir -p /etc/apt/keyrings
+    # curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    # echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    # apt-get update -y
+    # apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
+    # curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
+  # install_script: |
+  #   apt-get update
+  #   apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config --no-install-recommends --assume-yes
+
+  #   # mkdir -p /etc/apt/keyrings
+  #   # curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  #   # echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  #   # apt-get update -y
+  #   # apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
+  #   # curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
+  # prepare_script: docker run --detach -p 5432:5432 cimg/postgres:14.2
+  # registry_cache:
+  #   folder: $CARGO_HOME/registry
+  #   fingerprint_script: cat Cargo.lock
+  # target_cache:
+  #   folder: target
+  #   fingerprint_script:
+  #     - rustc --version
+  #     - cat Cargo.lock
+  # test_script: |
+  #   cargo nextest --nextest-profile ci --test-threads=16 --unit --exclude backup-cli
+ 
