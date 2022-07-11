@@ -12,6 +12,10 @@ variable "num_validators" {
   default = 1
 }
 
+variable "num_fullnode_groups" {
+  default = 1
+}
+
 variable "era" {
   description = "Chain era, used to start a clean chain"
   default     = 1
