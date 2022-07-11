@@ -178,6 +178,11 @@ resource "helm_release" "testnet-addons" {
         acm_certificate          = length(aws_acm_certificate.ingress) > 0 ? aws_acm_certificate.ingress[0].arn : null
         loadBalancerSourceRanges = var.client_sources_ipv4
       }
+      load_test = {
+        image = {
+          tag = var.image_tag
+        }
+      }
     }),
     jsonencode(var.testnet_addons_helm_values)
   ]

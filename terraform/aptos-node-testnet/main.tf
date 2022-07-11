@@ -48,6 +48,7 @@ module "validator" {
   validator_name = "aptos-node"
 
   num_validators = var.num_validators
+  num_fullnodes  = var.num_fullnodes
   helm_values    = var.aptos_node_helm_values
 
   # allow all nodegroups to surge to 2x their size, in case of total nodes replacement

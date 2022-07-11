@@ -7,6 +7,7 @@ imageTag: testnet
 
 # Number of validators to deploy
 numValidators: 1
+numFullnodes: 1
 
 validator:
   name:
