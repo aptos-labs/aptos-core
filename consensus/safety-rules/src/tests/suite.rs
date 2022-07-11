@@ -2,12 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{test_utils, test_utils::make_timeout_cert, Error, TSafetyRules};
-use aptos_crypto::{
-    bls12381,
-    hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH},
-};
+use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
+use aptos_types::aggregated_signature::AggregatedSignature;
 use aptos_types::{
-    account_address::AccountAddress,
     block_info::BlockInfo,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -21,7 +18,6 @@ use consensus_types::{
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote_proposal::VoteProposal,
 };
-use std::collections::BTreeMap;
 
 type Proof = test_utils::Proof;
 
@@ -638,7 +634,7 @@ fn test_sign_commit_vote(constructor: &Callback) {
                         ),
                         ledger_info_with_sigs.ledger_info().consensus_data_hash()
                     ),
-                    BTreeMap::<AccountAddress, bls12381::Signature>::new()
+                    AggregatedSignature::empty(),
                 ),
                 ledger_info_with_sigs.ledger_info().clone()
             )
@@ -652,7 +648,7 @@ fn test_sign_commit_vote(constructor: &Callback) {
             .sign_commit_vote(
                 LedgerInfoWithSignatures::new(
                     ledger_info_with_sigs.ledger_info().clone(),
-                    BTreeMap::<AccountAddress, bls12381::Signature>::new()
+                    AggregatedSignature::empty(),
                 ),
                 ledger_info_with_sigs.ledger_info().clone()
             )

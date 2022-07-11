@@ -5,6 +5,7 @@ use crate::{metrics_safety_rules::MetricsSafetyRules, test_utils::MockStorage};
 use aptos_crypto::{bls12381, hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::Mutex;
 use aptos_secure_storage::Storage;
+use aptos_types::ledger_info::LedgerInfoWithPartialSignatures;
 use aptos_types::{
     account_address::AccountAddress,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -24,6 +25,7 @@ use safety_rules::{
     test_utils::{make_proposal_with_parent, make_proposal_with_qc},
     PersistentSafetyStorage, SafetyRulesManager,
 };
+use std::collections::HashMap;
 use std::{collections::BTreeMap, sync::Arc};
 
 pub fn prepare_safety_rules() -> (Arc<Mutex<MetricsSafetyRules>>, Vec<ValidatorSigner>) {
@@ -64,7 +66,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
     init_round: Round,
 ) -> (
     Vec<ExecutedBlock>,
-    LedgerInfoWithSignatures,
+    LedgerInfoWithPartialSignatures,
     Vec<VoteProposal>,
 ) {
     assert!(num_blocks > 0);
@@ -106,9 +108,9 @@ pub fn prepare_executed_blocks_with_ledger_info(
         consensus_hash,
     );
 
-    let mut li_sig = LedgerInfoWithSignatures::new(
+    let mut li_sig = LedgerInfoWithPartialSignatures::new(
         li.clone(),
-        BTreeMap::<AccountAddress, bls12381::Signature>::new(),
+        HashMap::<AccountAddress, bls12381::Signature>::new(),
     );
 
     li_sig.add_signature(signer.author(), signer.sign(&li));

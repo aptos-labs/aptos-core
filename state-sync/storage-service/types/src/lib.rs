@@ -650,10 +650,10 @@ where
 mod tests {
     use super::*;
     use aptos_crypto::hash::HashValue;
+    use aptos_types::aggregated_signature::AggregatedSignature;
     use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfo};
     use claim::{assert_err, assert_ok};
     use proptest::prelude::*;
-    use std::collections::BTreeMap;
 
     fn mock_ledger_info(version: Version) -> LedgerInfoWithSignatures {
         LedgerInfoWithSignatures::new(
@@ -661,7 +661,7 @@ mod tests {
                 BlockInfo::new(0, 0, HashValue::zero(), HashValue::zero(), version, 0, None),
                 HashValue::zero(),
             ),
-            BTreeMap::new(),
+            AggregatedSignature::default(),
         )
     }
 

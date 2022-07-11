@@ -8,6 +8,7 @@ use aptos_data_client::{
     ResponseCallback, ResponseContext, ResponseError,
 };
 use aptos_logger::Level;
+use aptos_types::aggregated_signature::AggregatedSignature;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -29,11 +30,7 @@ use aptos_types::{
 use async_trait::async_trait;
 use futures::StreamExt;
 use rand::{rngs::OsRng, Rng};
-use std::{
-    collections::{BTreeMap, HashMap},
-    thread,
-    time::Duration,
-};
+use std::{collections::HashMap, thread, time::Duration};
 use storage_service_types::{CompleteDataRange, Epoch};
 use tokio::time::timeout;
 
@@ -387,7 +384,7 @@ pub fn create_ledger_info(
     );
     LedgerInfoWithSignatures::new(
         LedgerInfo::new(block_info, HashValue::zero()),
-        BTreeMap::new(),
+        AggregatedSignature::empty(),
     )
 }
 

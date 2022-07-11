@@ -4,16 +4,14 @@
 use crate::vote_data::VoteData;
 use anyhow::{ensure, Context};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_types::aggregated_signature::AggregatedSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_verifier::ValidatorVerifier,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeMap,
-    fmt::{Display, Formatter},
-};
+use std::fmt::{Display, Formatter};
 
 #[derive(Deserialize, Serialize, Clone, Debug, Eq, PartialEq)]
 pub struct QuorumCert {
@@ -92,7 +90,7 @@ impl QuorumCert {
 
         QuorumCert::new(
             vote_data,
-            LedgerInfoWithSignatures::new(li, BTreeMap::new()),
+            LedgerInfoWithSignatures::new(li, AggregatedSignature::default()),
         )
     }
 
@@ -115,7 +113,7 @@ impl QuorumCert {
                 "Genesis QC has inconsistent commit block with certified block"
             );
             ensure!(
-                self.ledger_info().signatures().is_empty(),
+                self.ledger_info().get_num_voters() == 0,
                 "Genesis QC should not carry signatures"
             );
             return Ok(());
