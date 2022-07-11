@@ -5,7 +5,6 @@ use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_api_types::{AsConverter, BlockInfo, Error, LedgerInfo, TransactionOnChainData, U64};
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
-use aptos_logger::debug;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -131,14 +130,13 @@ impl Context {
     }
 
     /// Retrieves information about a block
-    pub fn get_block_info(&self, version: u64, ledger_version: u64) -> Result<Option<BlockInfo>> {
+    pub fn get_block_info(&self, version: u64, ledger_version: u64) -> Result<BlockInfo> {
         // We scan the DB to get the block boundaries
         let (start, end) = match self.db.get_block_boundaries(version, ledger_version) {
             Ok(inner) => inner,
             Err(error) => {
-                debug!("Failed to get block boundaries {}", error);
                 // None means we can't find the block
-                return Ok(None);
+                return Err(anyhow!("Failed to find block boundaries {}", error));
             }
         };
 
@@ -168,14 +166,14 @@ impl Context {
 
         // If timestamp is 0, it's the genesis transaction, and we can stop now
         if timestamp == 0 {
-            return Ok(Some(BlockInfo {
+            return Ok(BlockInfo {
                 block_height: 0,
                 start_version: start,
                 end_version: end,
                 block_hash: block_hash.into(),
                 block_timestamp: timestamp,
                 num_transactions: end.saturating_sub(start).saturating_add(1) as u16,
-            }));
+            });
         }
 
         // Retrieve block height from the transaction outputs
@@ -216,14 +214,14 @@ impl Context {
 
         // This should always work unless there's something unexpected in the block format
         if let Some(block_height) = maybe_block_height {
-            Ok(Some(BlockInfo {
+            Ok(BlockInfo {
                 block_height,
                 start_version: start,
                 end_version: end,
                 block_hash: block_hash.into(),
                 block_timestamp: timestamp,
                 num_transactions: end.saturating_sub(start).saturating_add(1) as u16,
-            }))
+            })
         } else {
             Err(anyhow!(
                 "Unable to find block height in metadata transaction {}:{}",

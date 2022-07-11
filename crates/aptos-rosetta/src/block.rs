@@ -151,14 +151,12 @@ impl BlockCache {
         let mut versions = BTreeMap::new();
         // Genesis is always index 0
         // TODO: Ensure that this won't fail if it's been pruned
-        if let Some(genesis_block_info) = rest_client.get_block_info(0).await?.into_inner() {
-            let hash = genesis_block_info.block_hash;
-            blocks.insert(0, genesis_block_info);
-            hashes.insert(hash, 0);
-            versions.insert(0, 0);
-        } else {
-            return Err(ApiError::BlockIncomplete);
-        }
+        let genesis_block_info = rest_client.get_block_info(0).await?.into_inner();
+        let hash = genesis_block_info.block_hash;
+        blocks.insert(0, genesis_block_info);
+        hashes.insert(hash, 0);
+        versions.insert(0, 0);
+
         Ok(BlockCache {
             blocks: RwLock::new(blocks),
             hashes: RwLock::new(hashes),
@@ -204,12 +202,7 @@ impl BlockCache {
     /// Retrieve block info, and add it to the index
     async fn add_block(&self, block_version: u64) -> ApiResult<BlockInfo> {
         let info_response = self.rest_client.get_block_info(block_version).await?;
-        let info = if let Some(info) = info_response.into_inner() {
-            info
-        } else {
-            // If we can't find the boundaries, provide a retriable error since the block isn't ready
-            return Err(ApiError::BlockIncomplete);
-        };
+        let info = info_response.into_inner();
 
         // Add into the cache (keeping the write lock short)
         let info = {

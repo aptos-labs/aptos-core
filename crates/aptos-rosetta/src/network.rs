@@ -11,7 +11,6 @@ use crate::{
     RosettaContext, MIDDLEWARE_VERSION, NODE_VERSION, ROSETTA_VERSION,
 };
 use aptos_logger::{debug, trace};
-use std::time::Duration;
 use warp::Filter;
 
 pub fn list_route(
@@ -148,38 +147,22 @@ async fn network_status(
     let response = rest_client.get_ledger_information().await?;
     let state = response.state();
 
-    // Get the latest block (but be one behind)
-    let latest_version = state.version;
-    let mut block_info = None;
-    // Try for 10 times to get the latest block
-    // TODO: Improve this performance
-    for _ in 1..10 {
-        if let Ok(info) = block_cache.get_block_info_by_version(latest_version).await {
-            block_info = Some(info);
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-    // If we don't have the block info, fail
-    let block_info = if let Some(block_info) = block_info {
-        block_info
-    } else {
-        return Err(ApiError::BlockIncomplete);
-    };
-
-    let block_info = block_cache
-        .get_block_info(block_info.block_height - 1)
-        .await?;
-    let current_block_identifier = BlockIdentifier::from_block_info(block_info);
-    let current_block_timestamp = get_timestamp(block_info);
-
+    // Get the oldest block
     let oldest_block_identifier = if let Some(version) = state.oldest_ledger_version {
         let block_info = block_cache.get_block_info_by_version(version).await?;
-
         Some(BlockIdentifier::from_block_info(block_info))
     } else {
         None
     };
+
+    // Get the latest block
+    let latest_version = state.version;
+    // Get the latest block
+    let block_info = block_cache
+        .get_block_info_by_version(latest_version)
+        .await?;
+    let current_block_identifier = BlockIdentifier::from_block_info(block_info);
+    let current_block_timestamp = get_timestamp(block_info);
 
     // TODO: add peers
     let peers: Vec<Peer> = vec![];
