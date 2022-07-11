@@ -486,6 +486,7 @@ impl Transaction {
         let status = if txn_info.success {
             OperationStatusType::Success
         } else {
+            // TODO: Pull failed operations from transaction payload
             OperationStatusType::Failure
         };
 
@@ -642,7 +643,8 @@ impl Transaction {
         if let Some(sender) = maybe_sender {
             operations.push(Operation::withdraw(
                 operation_index,
-                Some(status),
+                // Gas charging is always successful if it's been committed
+                Some(OperationStatusType::Success),
                 *sender.inner(),
                 native_coin(),
                 txn_info.gas_used.0,
