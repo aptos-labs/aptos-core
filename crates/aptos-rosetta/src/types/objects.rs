@@ -177,6 +177,12 @@ pub struct Currency {
     pub symbol: String,
     /// Number of decimals to be considered in the currency
     pub decimals: u64,
+    pub metadata: Option<CurrencyMetadata>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct CurrencyMetadata {
+    pub move_type: String,
 }
 
 /// Various signing curves supported by Rosetta.  We only use [`CurveType::Edwards25519`]
