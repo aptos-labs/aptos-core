@@ -150,8 +150,12 @@ impl TransactionStore {
         Err(AptosDbError::NotFound(format!("BlockMetadata preceding version {}", version)).into())
     }
 
-    /// Searches forward from the version to find the state checkpoint transaction
-    pub fn get_block_boundaries(&self, version: Version) -> Result<(Version, Version)> {
+    /// Searches around the version to find the block's transactions
+    pub fn get_block_boundaries(
+        &self,
+        version: Version,
+        latest_ledger_version: Version,
+    ) -> Result<(Version, Version)> {
         // Must be larger than a block size, otherwise a NotFound error will be raised wrongly.
         const MAX_VERSIONS_TO_SEARCH: usize = 1000 * 100;
 
@@ -193,11 +197,13 @@ impl TransactionStore {
                         break;
                     }
                 }
-                Transaction::StateCheckpoint => {
-                    end_version = Some(v);
-                    break;
+                // Every txn up to the end or the block metadata should be included in the block
+                _ => {
+                    if v == latest_ledger_version {
+                        end_version = Some(v);
+                        break;
+                    }
                 }
-                _ => {}
             }
         }
 

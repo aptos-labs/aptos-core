@@ -133,7 +133,7 @@ impl Context {
     /// Retrieves information about a block
     pub fn get_block_info(&self, version: u64, ledger_version: u64) -> Result<Option<BlockInfo>> {
         // We scan the DB to get the block boundaries
-        let (start, end) = match self.db.get_block_boundaries(version) {
+        let (start, end) = match self.db.get_block_boundaries(version, ledger_version) {
             Ok(inner) => inner,
             Err(error) => {
                 debug!("Failed to get block boundaries {}", error);
