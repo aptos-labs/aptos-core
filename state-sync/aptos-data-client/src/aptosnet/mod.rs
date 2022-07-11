@@ -58,7 +58,7 @@ const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 5;
 const GLOBAL_DATA_METRIC_FREQ_SECS: u64 = 1;
 const IN_FLIGHT_METRICS_SAMPLE_FREQ: u64 = 5;
 const PEER_LOG_FREQ_SECS: u64 = 10;
-const POLLER_LOG_FREQ_SECS: u64 = 1;
+const POLLER_LOG_FREQ_SECS: u64 = 2;
 const REGULAR_PEER_SAMPLE_FREQ: u64 = 3;
 
 /// An [`AptosDataClient`] that fulfills requests from remote peers' Storage Service
@@ -685,7 +685,7 @@ impl DataSummaryPoller {
 fn log_poller_error(error: Error) {
     sample!(
         SampleRate::Duration(Duration::from_secs(POLLER_LOG_FREQ_SECS)),
-        error!(
+        warn!(
             (LogSchema::new(LogEntry::StorageSummaryRequest)
                 .event(LogEvent::PeerPollingError)
                 .message("Unable to fetch peers to poll!")
