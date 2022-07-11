@@ -94,7 +94,7 @@ pub static COMMITTED_PROPOSALS_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
 pub static FAILED_PROPOSALS_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_failed_proposals_in_window",
-        "Total number of this validator's committed proposals in the current reputation window"
+        "Total number of this validator's failed proposals in the current reputation window"
     )
     .unwrap()
 });

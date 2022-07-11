@@ -10,7 +10,7 @@ use crate::{
 };
 use aptos_infallible::{Mutex, MutexGuard};
 use aptos_logger::prelude::*;
-use aptos_types::block_metadata::{new_block_event_key, NewBlockEvent};
+use aptos_types::{account_config::NewBlockEvent, block_metadata::new_block_event_key};
 use consensus_types::common::{Author, Round};
 use std::{cmp::Ordering, collections::HashMap, convert::TryFrom, sync::Arc};
 use storage_interface::{DbReader, Order};
@@ -406,7 +406,7 @@ impl ReputationHeuristic for ProposerAndVoterHeuristic {
             .count_failed_proposals(epoch, candidates, history);
 
         COMMITTED_PROPOSALS_IN_WINDOW.set(*proposals.get(&self.author).unwrap_or(&0) as i64);
-        FAILED_PROPOSALS_IN_WINDOW.set(*proposals.get(&self.author).unwrap_or(&0) as i64);
+        FAILED_PROPOSALS_IN_WINDOW.set(*failed_proposals.get(&self.author).unwrap_or(&0) as i64);
         COMMITTED_VOTES_IN_WINDOW.set(*votes.get(&self.author).unwrap_or(&0) as i64);
         LEADER_REPUTATION_HISTORY_SIZE.set(proposals.values().sum::<u32>() as i64);
 
