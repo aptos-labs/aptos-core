@@ -12,7 +12,7 @@ To kick-start your journey as a developer in the Aptos ecosystem, set up your de
 
 ## Clone the Aptos-core repo
 
-Start by cloning the `aptos-core` GitHub repo from [\[GitHub\](https://github.com/aptos-labs/aptos-core)](https://github.com/aptos-labs/aptos-core).
+Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/aptos-labs/aptos-core).
 
 1. Clone the Aptos repo.
 
@@ -41,7 +41,7 @@ Start by cloning the `aptos-core` GitHub repo from [\[GitHub\](https://github.co
     <Tabs> <TabItem value="devnet" label="Devnet" default> Checkout the `devnet` branch using: B5B </TabItem> <TabItem value="testnet" label="Testnet" default> Checkout the `testnet` branch using: !!crwd_FC_5_CF_dwrc!! </TabItem> </Tabs>
 
 
-Now your basic Aptos development environment ready.
+Now your basic Aptos development environment is ready.
 
 ## IDE plugins for Move
 
