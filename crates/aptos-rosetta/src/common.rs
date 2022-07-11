@@ -4,8 +4,8 @@
 use crate::{
     error::{ApiError, ApiResult},
     types::{
-        test_coin_identifier, BlockIdentifier, Currency, MetadataRequest, NetworkIdentifier,
-        PartialBlockIdentifier,
+        test_coin_identifier, BlockIdentifier, Currency, CurrencyMetadata, MetadataRequest,
+        NetworkIdentifier, PartialBlockIdentifier,
     },
     RosettaContext,
 };
@@ -143,6 +143,9 @@ pub fn native_coin() -> Currency {
     Currency {
         symbol: DEFAULT_COIN.to_string(),
         decimals: DEFAULT_DECIMALS,
+        metadata: Some(CurrencyMetadata {
+            move_type: native_coin_tag().to_string(),
+        }),
     }
 }
 
