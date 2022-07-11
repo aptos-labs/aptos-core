@@ -64,7 +64,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 ## Joining Validator Set
 
-All the selected validator node will be receiving sufficient amount of test token (100,100,000) airdrop from Aptos Labs team to stake their node.
+All the selected validator node will be receiving sufficient amount of test coin (100,100,000) airdrop from Aptos Labs team to stake their node. The coin airdrop will happen in batches to make sure we don't have too many nodes joining at the same time, please check your balance before exeucting those steps. You can see your balance on explorer: `https://explorer.devnet.aptos.dev/account/<Your-Account-Address>?network=ait2`
 
 1. Initialize Aptos CLI
 
