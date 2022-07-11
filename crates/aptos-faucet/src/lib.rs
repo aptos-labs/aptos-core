@@ -20,7 +20,6 @@
 //! ```
 
 use anyhow::Result;
-use aptos::common::types::EncodingType;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
@@ -34,7 +33,7 @@ use aptos_sdk::{
 };
 use futures::lock::Mutex;
 use reqwest::StatusCode;
-use std::{convert::Infallible, fmt, path::Path, sync::Arc};
+use std::{convert::Infallible, fmt, path::PathBuf, sync::Arc};
 use structopt::StructOpt;
 use url::Url;
 use warp::{http, Filter, Rejection, Reply};
@@ -62,7 +61,7 @@ pub struct FaucetArgs {
     /// To manually generate a keypair, use generate-key:
     /// `cargo run -p generate-keypair -- -o <output_file_path>`
     #[structopt(short = "m", long, default_value = "/opt/aptos/etc/mint.key")]
-    pub mint_key_file_path: String,
+    pub mint_key_file_path: PathBuf,
     /// Ed25519PrivateKey for minting coins
     #[structopt(long, parse(try_from_str = ConfigKey::from_encoded_string))]
     pub mint_key: Option<ConfigKey<Ed25519PrivateKey>>,
@@ -100,9 +99,7 @@ impl FaucetArgs {
         let key = if let Some(ref key) = self.mint_key {
             key.private_key()
         } else {
-            EncodingType::BCS
-                .load_key::<Ed25519PrivateKey>("mint key", Path::new(&self.mint_key_file_path))
-                .unwrap()
+            bcs::from_bytes(&std::fs::read(&self.mint_key_file_path).unwrap()).unwrap()
         };
 
         let faucet_address: AccountAddress =

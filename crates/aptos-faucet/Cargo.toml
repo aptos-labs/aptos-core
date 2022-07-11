@@ -24,7 +24,6 @@ tokio = { version = "1.18.2", features = ["full"] }
 url = "2.2.2"
 warp = "0.3.2"
 
-aptos = { path = "../aptos" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }
 aptos-keygen = { path = "../aptos-keygen" }

@@ -33,6 +33,8 @@ pub enum Tool {
     Move(move_tool::MoveTool),
     #[clap(subcommand)]
     Node(node::NodeTool),
+    #[clap(subcommand)]
+    LocalTestnet(node::LocalTestnetTool),
 }
 
 impl Tool {
@@ -47,6 +49,7 @@ impl Tool {
             Key(tool) => tool.execute().await,
             Move(tool) => tool.execute().await,
             Node(tool) => tool.execute().await,
+            LocalTestnet(tool) => tool.execute().await,
         }
     }
 }

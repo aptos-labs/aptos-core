@@ -145,11 +145,13 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
+ "aptos-faucet",
  "aptos-genesis",
  "aptos-github-client",
  "aptos-keygen",
  "aptos-logger",
  "aptos-module-verifier",
+ "aptos-node",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-secure-storage",
@@ -378,7 +380,6 @@ name = "aptos-faucet"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos",
  "aptos-config",
  "aptos-crypto",
  "aptos-infallible",

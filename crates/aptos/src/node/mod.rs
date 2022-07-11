@@ -4,21 +4,29 @@
 use crate::{
     common::{
         types::{
-            CliCommand, CliError, CliResult, CliTypedResult, ProfileOptions, RestOptions,
-            TransactionOptions,
+            load_account_arg, CliCommand, CliError, CliResult, CliTypedResult, EncodingType,
+            ProfileOptions, RestOptions, TransactionOptions,
         },
         utils::read_from_file,
     },
     genesis::git::from_yaml,
 };
-use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
+use aptos_config::keys::ConfigKey;
+use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, ValidCryptoMaterialStringExt};
+use aptos_faucet::{mint, mint::MintParams, Service};
 use aptos_genesis::config::{HostAndPort, ValidatorConfiguration};
 use aptos_rest_client::Transaction;
-use aptos_types::{account_address::AccountAddress, account_config::aptos_root_address};
+use aptos_sdk::types::LocalAccount;
+use aptos_types::{
+    account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
+};
 use async_trait::async_trait;
 use clap::Parser;
+use hex::FromHex;
+use rand::{rngs::StdRng, SeedableRng};
 use std::{
-    path::PathBuf,
+    collections::HashSet,
+    path::{Path, PathBuf},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -484,5 +492,176 @@ impl CliCommand<serde_json::Value> for ShowValidatorSet {
             .get_resource(aptos_root_address(), "0x1::Stake::ValidatorSet")
             .await?;
         Ok(response.into_inner())
+    }
+}
+
+/// Tool for running a local testnet
+///
+#[derive(Parser)]
+pub enum LocalTestnetTool {
+    Node(RunTestNode),
+    MintCoins(MintCoins),
+}
+
+impl LocalTestnetTool {
+    pub async fn execute(self) -> CliResult {
+        use LocalTestnetTool::*;
+        match self {
+            Node(tool) => tool.execute_serialized().await,
+            MintCoins(tool) => tool.execute_serialized().await,
+        }
+    }
+}
+
+/// Mint coins to a set of accounts
+#[derive(Parser)]
+pub struct MintCoins {
+    /// Rest API server URL
+    #[clap(long, default_value = "http://localhost:8080")]
+    pub server_url: String,
+    /// Path to the private key for creating test account and minting coins.
+    /// To keep Testnet simple, we used one private key for aptos root account
+    /// To manually generate a keypair, use generate-key:
+    /// `cargo run -p generate-keypair -- -o <output_file_path>`
+    #[clap(long, default_value = "/opt/aptos/mint.key")]
+    pub mint_key_file_path: String,
+    /// Ed25519PrivateKey for minting coins
+    #[clap(long, parse(try_from_str = ConfigKey::from_encoded_string))]
+    pub mint_key: Option<ConfigKey<Ed25519PrivateKey>>,
+    /// Address of the account to send transactions from.
+    /// On Testnet, for example, this is a550c18.
+    /// If not present, the mint key's address is used
+    #[clap(long, parse(try_from_str = AccountAddress::from_hex_literal))]
+    pub mint_account_address: Option<AccountAddress>,
+    /// Chain ID of the network this client is connecting to.
+    /// For mainnet: "MAINNET" or 1, testnet: "TESTNET" or 2, devnet: "DEVNET" or 3,
+    /// local swarm: "TESTING" or 4
+    /// Note: Chain ID of 0 is not allowed; Use number if chain id is not predefined.
+    #[clap(long, default_value = "TESTING")]
+    pub chain_id: ChainId,
+    /// Amount of coins to mint
+    #[clap(long)]
+    pub amount: u64,
+    /// Addresses of accounts to mint coins to, split by commas e.g. 0x1337,0x2,3
+    #[clap(long, group = "account-group")]
+    pub accounts: Option<String>,
+    /// File of addresses of account to mint coins to.  Formatted in YAML
+    #[clap(long, group = "account-group", parse(from_os_str))]
+    pub account_file: Option<PathBuf>,
+}
+
+#[async_trait]
+impl CliCommand<String> for MintCoins {
+    fn command_name(&self) -> &'static str {
+        "MintCoins"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<String> {
+        let mint_account_address = self.mint_account_address.unwrap_or_else(aptos_root_address);
+        let mint_key = if let Some(ref key) = self.mint_key {
+            key.private_key()
+        } else {
+            EncodingType::BCS
+                .load_key::<Ed25519PrivateKey>("mint key", Path::new(&self.mint_key_file_path))
+                .unwrap()
+        };
+        let faucet_account = LocalAccount::new(mint_account_address, mint_key, 0);
+        let service = Service::new(self.server_url, self.chain_id, faucet_account, None);
+
+        let accounts: HashSet<AccountAddress> = if let Some(accounts) = self.accounts {
+            accounts
+                .trim()
+                .split(',')
+                .map(|str| load_account_arg(str).unwrap())
+                .collect()
+        } else if let Some(path) = self.account_file {
+            let strings: Vec<String> =
+                serde_yaml::from_str(&std::fs::read_to_string(path.as_path()).unwrap()).unwrap();
+            strings
+                .into_iter()
+                .map(|str| load_account_arg(&str).unwrap())
+                .collect()
+        } else {
+            panic!("Either --accounts or --account-file must be specified");
+        };
+
+        let mut successes = vec![];
+        let mut failures = vec![];
+
+        // Iterate through accounts to mint the tokens
+        for account in accounts {
+            let response = mint::process(
+                &service,
+                MintParams {
+                    amount: self.amount,
+                    auth_key: None,
+                    address: Some(account.to_hex_literal()),
+                    pub_key: None,
+                    return_txns: None,
+                },
+            )
+            .await;
+            match response {
+                Ok(_) => successes.push(account),
+                Err(response) => {
+                    println!(
+                        "FAILURE: Account: {} Response: {:?}",
+                        account.to_hex_literal(),
+                        response
+                    );
+                    failures.push(account);
+                }
+            }
+        }
+
+        Ok(format!(
+            "Successes: {:?} Failures: {:?}",
+            successes, failures
+        ))
+    }
+}
+
+/// Show validator details of the validator set
+#[derive(Parser)]
+pub struct RunTestNode {
+    /// An overridable config for the test node
+    #[clap(long, parse(from_os_str))]
+    config_path: Option<PathBuf>,
+    /// The directory to save all files for the node
+    #[clap(long, parse(from_os_str), default_value = "/opt/aptos")]
+    node_dir: PathBuf,
+    /// Randomize ports rather than using defaults of 8080
+    #[clap(long)]
+    random_ports: bool,
+    /// Random seed for key generation in test mode
+    #[clap(
+    long,
+    parse(try_from_str = FromHex::from_hex)
+    )]
+    seed: Option<[u8; 32]>,
+}
+
+#[async_trait]
+impl CliCommand<()> for RunTestNode {
+    fn command_name(&self) -> &'static str {
+        "RunTestNode"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<()> {
+        let rng = self
+            .seed
+            .map(StdRng::from_seed)
+            .unwrap_or_else(StdRng::from_entropy);
+
+        aptos_node::load_test_environment(
+            self.config_path,
+            self.node_dir,
+            self.random_ports,
+            false,
+            cached_framework_packages::module_blobs().to_vec(),
+            rng,
+        );
+
+        Ok(())
     }
 }

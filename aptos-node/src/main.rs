@@ -64,7 +64,7 @@ fn main() {
         } else {
             cached_framework_packages::module_blobs().to_vec()
         };
-        aptos_node::load_test_environment(
+        aptos_node::load_test_environment_bin(
             args.config,
             args.random_ports,
             args.lazy,
