@@ -154,6 +154,16 @@ Now we return to our application to deploy and interact with the module on the A
   </TabItem>
 </Tabs>
 
+Note: to initialize module, you can write a `init_module` function. This private function is executed automatically when the module is published. The format of this function has to be private, no return value and only take signer or signer reference as parameters.  Here is an example:
+```asm
+ fun init_module(creator: &signer) {
+        move_to(
+            creator,
+            ModuleData { global_counter: 0 }
+        );
+    }
+```
+
 ### Step 2.2) Reading a resource
 
 The module is published at an address. This is the `contract_address` below. This is similar to the previous example, where the `Coin` is at `0x1`. The `contract_address` will be the same as the account that publishes it.
