@@ -463,7 +463,7 @@ fn sync_info_carried_on_timeout_vote() {
         let parent_block_info = block_0.quorum_cert().certified_block();
         // Populate block_0 and a quorum certificate for block_0 on non_proposer
         let block_0_quorum_cert = gen_test_certificate(
-            vec![&node.signer],
+            &[node.signer.clone()],
             // Follow MockStateComputer implementation
             block_0.gen_block_info(
                 parent_block_info.executed_state_id(),
@@ -915,7 +915,6 @@ fn vote_resent_on_timeout() {
     });
 }
 
-#[test]
 fn sync_on_partial_newer_sync_info() {
     let mut runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
@@ -947,7 +946,7 @@ fn sync_on_partial_newer_sync_info() {
         let vote_msg = node.next_vote().await;
         let vote_data = vote_msg.vote().vote_data();
         let block_4_qc = gen_test_certificate(
-            vec![&node.signer],
+            &[node.signer.clone()],
             vote_data.proposed().clone(),
             vote_data.parent().clone(),
             None,

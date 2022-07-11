@@ -166,7 +166,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let output1 = executor
         .execute_block((block1_id, block1.clone()), parent_block_id)
         .unwrap();
-    let li1 = gen_ledger_info_with_sigs(1, &output1, block1_id, vec![&signer]);
+    let li1 = gen_ledger_info_with_sigs(1, &output1, block1_id, &[signer.clone()]);
     let epoch2_genesis_id = Block::make_genesis_block_from_ledger_info(li1.ledger_info()).id();
     executor.commit_blocks(vec![block1_id], li1).unwrap();
 
@@ -365,6 +365,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let output2 = executor
         .execute_block((block2_id, block2), epoch2_genesis_id)
         .unwrap();
+<<<<<<< HEAD
     let li2 = gen_ledger_info_with_sigs(2, &output2, block2_id, vec![&signer]);
     let epoch3_genesis_id = Block::make_genesis_block_from_ledger_info(li2.ledger_info()).id();
     executor.commit_blocks(vec![block2_id], li2).unwrap();
@@ -379,6 +380,11 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     let output3 = executor
         .execute_block((block3_id, block3.clone()), epoch3_genesis_id)
+=======
+    let ledger_info_with_sigs = gen_ledger_info_with_sigs(1, &output2, block2_id, &[signer]);
+    executor
+        .commit_blocks(vec![block2_id], ledger_info_with_sigs)
+>>>>>>> 98d3754a39 ([Consensus] Support for BLS signature aggregate)
         .unwrap();
     let li3 = gen_ledger_info_with_sigs(3, &output3, block3_id, vec![&signer]);
     executor.commit_blocks(vec![block3_id], li3).unwrap();

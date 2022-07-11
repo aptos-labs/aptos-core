@@ -1,12 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeMap, iter::once, sync::Arc};
+use std::{iter::once, sync::Arc};
 
 use proptest::prelude::*;
 
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_state_view::StateViewId;
+use aptos_types::multi_signature::MultiSignature;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -128,7 +129,7 @@ fn gen_ledger_info(
         ),
         HashValue::zero(),
     );
-    LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
+    LedgerInfoWithSignatures::new(ledger_info, MultiSignature::empty())
 }
 
 #[test]
