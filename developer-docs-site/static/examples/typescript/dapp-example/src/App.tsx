@@ -21,7 +21,7 @@ function App() {
     if (urlAddress) {
       setAddress(urlAddress);
     } else {
-      window.aptos.account().then(setAddress);
+      window.aptos.account().then((data : {address: string}) => setAddress(data.address));
     }
   }, [urlAddress]);
 
