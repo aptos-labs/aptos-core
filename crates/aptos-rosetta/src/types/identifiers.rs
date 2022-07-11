@@ -52,7 +52,7 @@ impl TryFrom<&AccountIdentifier> for AccountAddress {
 impl From<AccountAddress> for AccountIdentifier {
     fn from(address: AccountAddress) -> Self {
         AccountIdentifier {
-            address: format!("{:#x}", address),
+            address: format!("{:x}", address),
             sub_account: None,
         }
     }
@@ -207,7 +207,7 @@ pub struct TransactionIdentifier {
 impl From<&TransactionInfo> for TransactionIdentifier {
     fn from(txn: &TransactionInfo) -> Self {
         TransactionIdentifier {
-            hash: txn.accumulator_root_hash.to_string(),
+            hash: strip_hex_prefix(&txn.hash.to_string()).to_string(),
         }
     }
 }
