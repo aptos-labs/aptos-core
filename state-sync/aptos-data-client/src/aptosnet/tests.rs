@@ -9,6 +9,7 @@ use aptos_config::{
 };
 use aptos_crypto::HashValue;
 use aptos_time_service::{MockTimeService, TimeService};
+use aptos_types::multi_signature::MultiSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -26,11 +27,7 @@ use network::{
     protocols::{network::NewNetworkSender, wire::handshake::v1::ProtocolId},
     transport::ConnectionMetadata,
 };
-use std::{
-    collections::{hash_map::Entry, BTreeMap},
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::hash_map::Entry, sync::Arc, time::Duration};
 use storage_service_client::{StorageServiceClient, StorageServiceNetworkSender};
 use storage_service_server::network::{NetworkRequest, ResponseSender};
 use storage_service_types::requests::{
@@ -49,7 +46,7 @@ fn mock_ledger_info(version: Version) -> LedgerInfoWithSignatures {
             BlockInfo::new(0, 0, HashValue::zero(), HashValue::zero(), version, 0, None),
             HashValue::zero(),
         ),
-        BTreeMap::new(),
+        MultiSignature::empty(),
     )
 }
 
