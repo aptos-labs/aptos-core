@@ -73,6 +73,11 @@ pub struct AptosNodeArgs {
     /// Path to node configuration file
     #[clap(short = 'f', long, required_unless = "test")]
     config: Option<PathBuf>,
+
+    /// Path to run the node out of
+    #[clap(long)]
+    node_dir: Option<PathBuf>,
+
     /// Enable to run a single validator node testnet
     #[clap(long)]
     test: bool,
@@ -112,8 +117,11 @@ impl AptosNodeArgs {
             } else {
                 cached_framework_packages::module_blobs().to_vec()
             };
+
             load_test_environment(
                 self.config,
+                self.node_dir
+                    .unwrap_or_else(|| aptos_temppath::TempPath::new().as_ref().to_path_buf()),
                 self.random_ports,
                 self.lazy,
                 genesis_modules,
@@ -189,8 +197,10 @@ pub fn start(config: NodeConfig, log_file: Option<PathBuf>) {
 
 const EPOCH_LENGTH_SECS: u64 = 60;
 
+// Loads the test environment, and loads the previous run if it already exists
 pub fn load_test_environment<R>(
     config_path: Option<PathBuf>,
+    node_dir: PathBuf,
     random_ports: bool,
     lazy: bool,
     genesis_modules: Vec<Vec<u8>>,
@@ -198,32 +208,24 @@ pub fn load_test_environment<R>(
 ) where
     R: ::rand::RngCore + ::rand::CryptoRng,
 {
-    let config_temp_path = aptos_temppath::TempPath::new();
-
-    let (try_load, config_path) = if let Some(config_path) = config_path {
-        (
-            config_path.join("0").join("node.yaml").exists(),
-            config_path,
-        )
-    } else {
-        (false, config_temp_path.as_ref().to_path_buf())
-    };
-
     std::fs::DirBuilder::new()
         .recursive(true)
-        .create(&config_path)
+        .create(&node_dir)
         .unwrap();
 
-    let config_path = config_path.canonicalize().unwrap();
+    let node_dir = node_dir.canonicalize().unwrap();
 
-    let validator_config_path = config_path.join("0").join("node.yaml");
-    let aptos_root_key_path = config_path.join("mint.key");
+    let validator_config_path = node_dir.join("0").join("node.yaml");
+    let aptos_root_key_path = node_dir.join("mint.key");
 
-    let config = if try_load {
-        NodeConfig::load(&validator_config_path).expect("Unable to load config:")
+    let config = if let Some(config_path) = config_path {
+        let config = NodeConfig::load(&config_path).expect("Unable to load config:");
+        std::fs::copy(config_path, validator_config_path.as_path())
+            .expect("Should be able to copy config");
+        config
     } else {
         // Build a single validator network
-        let mut maybe_config = PathBuf::from(&config_path);
+        let mut maybe_config = PathBuf::from(&node_dir);
         maybe_config.push("validator_node_template.yaml");
         let mut template = NodeConfig::load_config(maybe_config)
             .unwrap_or_else(|_| NodeConfig::default_for_validator());
@@ -239,7 +241,7 @@ pub fn load_test_environment<R>(
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        let builder = aptos_genesis::builder::Builder::new(&config_path, genesis_modules)
+        let builder = aptos_genesis::builder::Builder::new(&node_dir, genesis_modules)
             .unwrap()
             .with_allow_new_validators(true)
             .with_epoch_duration_secs(EPOCH_LENGTH_SECS)
@@ -254,7 +256,7 @@ pub fn load_test_environment<R>(
         key_file.write_all(&serialized_keys).unwrap();
 
         // Build a waypoint file so that clients / docker can grab it easily
-        let waypoint_file_path = config_path.join("waypoint.txt");
+        let waypoint_file_path = node_dir.join("waypoint.txt");
         std::io::Write::write_all(
             &mut std::fs::File::create(&waypoint_file_path).unwrap(),
             genesis_waypoint.to_string().as_bytes(),
@@ -265,11 +267,12 @@ pub fn load_test_environment<R>(
     };
 
     // Prepare log file since we cannot automatically route logs to stderr
-    let log_file = config_path.join("validator.log");
+    let log_file = node_dir.join("validator.log");
 
     println!("Completed generating configuration:");
     println!("\tLog file: {:?}", log_file);
-    println!("\tConfig path: {:?}", config_path);
+    println!("\tNode dir: {:?}", node_dir);
+    println!("\tConfig file: {:?}", validator_config_path);
     println!("\tAptos root key path: {:?}", aptos_root_key_path);
     println!("\tWaypoint: {}", config.base.waypoint.genesis_waypoint());
     println!("\tChainId: {}", ChainId::test());

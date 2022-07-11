@@ -1,7 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{CliCommand, CliResult};
+use crate::common::{
+    types::{CliCommand, CliResult},
+    utils::init_logger,
+};
 use clap::Subcommand;
 
 pub mod create;
@@ -21,6 +24,7 @@ pub enum AccountTool {
 
 impl AccountTool {
     pub async fn execute(self) -> CliResult {
+        init_logger();
         match self {
             AccountTool::Create(tool) => tool.execute_serialized().await,
             AccountTool::Fund(tool) => tool.execute_serialized().await,

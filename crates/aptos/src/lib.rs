@@ -7,6 +7,7 @@ pub mod account;
 pub mod common;
 pub mod config;
 pub mod genesis;
+pub mod local_testnet;
 pub mod move_tool;
 pub mod node;
 pub mod op;
@@ -33,6 +34,8 @@ pub enum Tool {
     Move(move_tool::MoveTool),
     #[clap(subcommand)]
     Node(node::NodeTool),
+    #[clap(subcommand)]
+    LocalTestnet(local_testnet::LocalTestnetTool),
 }
 
 impl Tool {
@@ -47,6 +50,7 @@ impl Tool {
             Key(tool) => tool.execute().await,
             Move(tool) => tool.execute().await,
             Node(tool) => tool.execute().await,
+            LocalTestnet(tool) => tool.execute().await,
         }
     }
 }

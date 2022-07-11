@@ -9,7 +9,7 @@ mod tests;
 use crate::{
     common::{
         types::{CliError, CliTypedResult, PromptOptions},
-        utils::{check_if_file_exists, write_to_file},
+        utils::{check_if_file_exists, init_logger, write_to_file},
     },
     genesis::git::{Client, GitOptions, LAYOUT_NAME},
     CliCommand, CliResult,
@@ -40,6 +40,7 @@ pub enum GenesisTool {
 
 impl GenesisTool {
     pub async fn execute(self) -> CliResult {
+        init_logger();
         match self {
             GenesisTool::GenerateGenesis(tool) => tool.execute_serialized().await,
             GenesisTool::GenerateKeys(tool) => tool.execute_serialized().await,
