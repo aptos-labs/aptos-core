@@ -11,8 +11,8 @@
   </nav>
 
   <% if @user %>
-    <div class="group relative">
-      <button class="w-8 h-8 bg-transparent border border-1 border-neutral-300 hover:bg-neutral-800 text-neutral-300 font-semibold rounded-lg inline-flex items-center justify-center group-hover:border-2 group-hover:border-teal-400 overflow-hidden">
+    <div class="relative">
+      <button data-action="click->header#toggleUser" class="w-8 h-8 bg-transparent border border-1 border-neutral-300 hover:bg-neutral-800 text-neutral-300 font-semibold rounded-lg inline-flex items-center justify-center hover:border-2 hover:border-teal-400 overflow-hidden">
         <span>
         <% if @user&.username? %>
         <%= @user.username&.first&.upcase %>
@@ -21,7 +21,7 @@
         <% end %>
         </span>
       </button>
-      <div class="-translate-y-4 pt-8 absolute right-0 z-10 scale-0 opacity-0 group-hover:scale-100 group-focus-within:scale-100 group-hover:opacity-100 group-focus-within:opacity-100 origin-top-right transition-opacity duration-150 cursor-default">
+      <div data-header-target="user" class="hidden open:flex absolute top-full right-0 mt-4 z-10 origin-top-right transition-opacity duration-150 cursor-default">
         <div class="text-gray-700 p-2 bg-black/95 border-neutral-800 border-t rounded-b-lg min-w-fit shadow-xl whitespace-nowrap w-48 flex flex-col gap-2">
         <% if @user&.username? %>
           <div class="text-teal-400 px-3 py-2 font-mono"><%= @user.username %></div>
