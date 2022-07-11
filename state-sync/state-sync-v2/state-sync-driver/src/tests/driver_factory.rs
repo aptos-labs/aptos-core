@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::driver_factory::DriverFactory;
+use crate::metadata_storage::PersistentMetadataStorage;
 use aptos_config::config::TARGET_SNAPSHOT_SIZE;
 use aptos_config::{
     config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG},
@@ -78,6 +79,7 @@ fn test_new_initialized_configs() {
 
     // Create the state sync driver factory
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
+    let metadata_storage = PersistentMetadataStorage::new(tmp_dir.path());
     let _ = DriverFactory::create_and_spawn_driver(
         true,
         &node_config,
@@ -85,6 +87,7 @@ fn test_new_initialized_configs() {
         db_rw,
         chunk_executor,
         mempool_notifier,
+        metadata_storage,
         consensus_listener,
         event_subscription_service,
         aptos_data_client,
