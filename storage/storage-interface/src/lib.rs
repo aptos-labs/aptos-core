@@ -266,7 +266,7 @@ pub trait DbReader: Send + Sync {
     ///
     /// [AptosDB::get_block_boundaries]:
     /// ../aptosdb/struct.AptosDB.html#method.get_block_boundaries
-    fn get_block_boundaries(&self, version: u64) -> Result<(u64, u64)> {
+    fn get_block_boundaries(&self, version: u64, latest_ledger_version: u64) -> Result<(u64, u64)> {
         unimplemented!()
     }
 

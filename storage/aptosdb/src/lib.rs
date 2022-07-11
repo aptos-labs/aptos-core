@@ -1184,9 +1184,10 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_block_boundaries(&self, version: u64) -> Result<(u64, u64)> {
+    fn get_block_boundaries(&self, version: u64, latest_ledger_version: u64) -> Result<(u64, u64)> {
         gauged_api("get_block_boundaries", || {
-            self.transaction_store.get_block_boundaries(version)
+            self.transaction_store
+                .get_block_boundaries(version, latest_ledger_version)
         })
     }
 
