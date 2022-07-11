@@ -404,17 +404,14 @@ impl Transactions {
             return Response::new(self.ledger_info, &Vec::<Transaction>::new());
         }
 
-        let first_version = data[0].version;
-        let mut timestamp = self.context.get_block_timestamp(first_version)?;
         let resolver = self.context.move_resolver()?;
         let converter = resolver.as_converter();
         let txns: Vec<Transaction> = data
             .into_iter()
             .map(|t| {
+                let version = t.version;
+                let timestamp = self.context.get_block_timestamp(version)?;
                 let txn = converter.try_into_onchain_transaction(timestamp, t)?;
-                // update timestamp, when txn is metadata block transaction
-                // new timestamp is used for the following transactions
-                timestamp = txn.timestamp();
                 Ok(txn)
             })
             .collect::<Result<_>>()?;
