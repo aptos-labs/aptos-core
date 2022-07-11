@@ -208,14 +208,15 @@ impl TransactionStore {
         }
 
         // If we've found both, we have the whole block
-        if let (Some(start), Some(end)) = (start_version, end_version) {
-            Ok((start, end))
-        } else {
-            Err(AptosDbError::NotFound(format!(
+        match (start_version, end_version) {
+            (Some(start), Some(end)) => Ok((start, end)),
+            // If we didn't find the end, it's a single transaction block (reconfig)
+            (Some(start), None) => Ok((start, start)),
+            _ => Err(AptosDbError::NotFound(format!(
                 "Block boundaries not found for version {}",
                 version
             ))
-            .into())
+            .into()),
         }
     }
 

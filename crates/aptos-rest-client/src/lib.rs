@@ -54,7 +54,7 @@ impl Client {
             .await
     }
 
-    pub async fn get_block_info(&self, version: u64) -> Result<Response<Option<BlockInfo>>> {
+    pub async fn get_block_info(&self, version: u64) -> Result<Response<BlockInfo>> {
         self.get(self.base_url.join(&format!("blocks/{}", version))?)
             .await
     }
