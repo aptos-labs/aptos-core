@@ -10,7 +10,7 @@ use crate::{
 };
 use aptos_infallible::{Mutex, MutexGuard};
 use aptos_logger::prelude::*;
-use aptos_types::block_metadata::{new_block_event_key, NewBlockEvent};
+use aptos_types::{account_config::NewBlockEvent, block_metadata::new_block_event_key};
 use consensus_types::common::{Author, Round};
 use std::{cmp::Ordering, collections::HashMap, convert::TryFrom, sync::Arc};
 use storage_interface::{DbReader, Order};
