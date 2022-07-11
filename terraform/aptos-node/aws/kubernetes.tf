@@ -96,6 +96,7 @@ resource "helm_release" "calico" {
 locals {
   helm_values = jsonencode({
     numValidators = var.num_validators
+    numFullnodes  = var.num_fullnodes
     imageTag      = var.image_tag
     chain = {
       era        = var.era

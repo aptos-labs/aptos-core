@@ -121,6 +121,10 @@ variable "num_validators" {
   default = 4
 }
 
+variable "num_fullnodes" {
+  default = 1
+}
+
 variable "num_utility_instance" {
   description = "Number of instances for utilities node pool, when it's 0, it will be set to var.num_validators"
   default     = 0
