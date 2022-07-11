@@ -154,7 +154,7 @@ Now we return to our application to deploy and interact with the module on the A
   </TabItem>
 </Tabs>
 
-Note: to initialize module, you can write a `init_module` function. This private function is executed automatically when the module is published. The format of this function has to be private, no return value and only take signer or signer reference as parameters.  Here is an example:
+:::tip To initialize the module, you can write a `init_module` function. This private function is executed automatically when the module is published. This `init_module` function must be private, it must only take signer or signer reference as a parameter, and it must not return any value. Here is an example:
 ```asm
  fun init_module(creator: &signer) {
         move_to(
@@ -163,6 +163,7 @@ Note: to initialize module, you can write a `init_module` function. This private
         );
     }
 ```
+:::
 
 ### Step 2.2) Reading a resource
 
