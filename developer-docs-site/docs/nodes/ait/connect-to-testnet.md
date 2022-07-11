@@ -163,10 +163,12 @@ You can check the details about node liveness definition [here](https://aptos.de
     curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_network_peer_connected{.*remote_peer_id=\"<Aptos Peer ID>\".*}"
     ```
 
-3. Once your node state sync to the latest version, you can also check if consensus is making progress
+3. Once your node state sync to the latest version, you can also check if consensus is making progress, and your node is proposing
 
     ```
     curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_consensus_current_round"
+
+    curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_consensus_proposals_count"
     ```
 
     You should expect to see this number keep increasing.

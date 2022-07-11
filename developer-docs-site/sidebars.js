@@ -77,7 +77,12 @@ const sidebars = {
           link: { type: "doc", id: "nodes/ait/index" },
           collapsible: true,
           collapsed: true,
-          items: ["nodes/ait/node-requirements", "nodes/ait/node-liveness-criteria", "nodes/ait/connect-to-testnet"],
+          items: [
+            "nodes/ait/node-requirements",
+            "nodes/ait/node-liveness-criteria",
+            "nodes/ait/connect-to-testnet",
+            "nodes/ait/additional-doc",
+          ],
         },
         {
           type: "category",
