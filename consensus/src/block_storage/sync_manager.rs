@@ -255,10 +255,22 @@ impl BlockStore {
 
         // check if highest_commit_cert comes from a fork
         // if so, we need to fetch it's block as well, to have a proof of commit.
-        if !blocks
-            .iter()
-            .any(|block| block.id() == highest_commit_cert.certified_block().id())
-        {
+        
+        let highest_commit_cert_index = blocks.iter().position(|block| block.id() == highest_commit_cert.certified_block().id());
+        let highest_commit_cert = if let Some(position) = highest_commit_cert_index {
+            let fetched_highest_commit_cert = quorum_certs.get(position).expect("quorum certs and blocks must have the same length").clone();
+
+            if highest_commit_cert.certified_block().version() == 0 {
+                error!("highest_commit_cert has version = 0, must be executed, {}", highest_commit_cert)
+            }
+    
+            if highest_commit_cert.vote_data() != fetched_highest_commit_cert.vote_data() || !highest_commit_cert.commit_info().match_ordered_only(fetched_highest_commit_cert.commit_info()) {
+                error!("Sync fetched highest commit cert that doesn't match local one {} {}", highest_commit_cert, fetched_highest_commit_cert);
+                return Err(anyhow::anyhow!("Sync fetched highest commit cert that doesn't match local one"));
+            } 
+
+            fetched_highest_commit_cert
+        } else {
             let mut additional_blocks = retriever
                 .retrieve_block_for_qc(
                     highest_commit_cert,
@@ -279,6 +291,13 @@ impl BlockStore {
 
             blocks.push(block);
             quorum_certs.push(highest_commit_cert.clone());
+
+            highest_commit_cert.clone()
+        };
+
+        if highest_commit_cert.certified_block().version() == 0 {
+            error!("Sync couldn't fetch the highest committed block properly, must be executed, {}", highest_commit_cert);
+            return Err(anyhow::anyhow!("Sync couldn't fetch the highest committed block properly, must be executed"));
         }
 
         assert_eq!(blocks.len(), quorum_certs.len());
