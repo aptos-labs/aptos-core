@@ -10,6 +10,7 @@ use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::LocalAccount;
 use aptos_types::{account_address::AccountAddress, PeerId};
+use aptosdb::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
 use std::{
     fs,
@@ -489,12 +490,15 @@ fn stop_validator_and_delete_storage(swarm: &mut LocalSwarm, validator: AccountA
 
     // Delete the validator storage
     let node_config = swarm.validator_mut(validator).unwrap().config().clone();
-    let state_db_path = node_config.storage.dir();
+    let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
+    let state_db_path = node_config.storage.dir().join(STATE_MERKLE_DB_NAME);
     info!(
-        "Deleting state db path {:?} for validator {:?}",
+        "Deleting ledger and state db paths ({:?}, {:?}) for validator {:?}",
+        ledger_db_path.as_path(),
         state_db_path.as_path(),
         validator
     );
-    assert!(state_db_path.as_path().exists());
+    assert!(ledger_db_path.as_path().exists() && state_db_path.as_path().exists());
+    fs::remove_dir_all(ledger_db_path).unwrap();
     fs::remove_dir_all(state_db_path).unwrap();
 }
