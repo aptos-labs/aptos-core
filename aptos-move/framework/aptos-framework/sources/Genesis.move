@@ -170,6 +170,7 @@ module AptosFramework::Genesis {
         validator_network_addresses: vector<vector<u8>>,
         full_node_network_addresses: vector<vector<u8>>,
         staking_distribution: vector<u64>,
+        initial_lockup_timestamp: u64,
     ) {
         let num_owners = Vector::length(&owners);
         let num_validator_network_addresses = Vector::length(&validator_network_addresses);
@@ -196,7 +197,7 @@ module AptosFramework::Genesis {
                 cur_validator_network_addresses,
                 cur_full_node_network_addresses,
             );
-            Stake::increase_lockup(&owner_account, 100000);
+            Stake::increase_lockup(&owner_account, initial_lockup_timestamp);
             let amount = *Vector::borrow(&staking_distribution, i);
             // Transfer coins from the root account to the validator, so they can stake and have non-zero voting power
             // and can complete consensus on the genesis block.
