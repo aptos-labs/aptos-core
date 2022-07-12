@@ -90,3 +90,6 @@ target-out-docker
 # Typescript
 *.env
 node_modules
+
+# local /data dir sometimes used for testing
+/data
