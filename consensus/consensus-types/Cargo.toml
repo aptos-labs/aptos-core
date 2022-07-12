@@ -22,7 +22,7 @@ aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 executor-types = { path = "../../execution/executor-types" }
 short-hex-str = { path = "../../crates/short-hex-str" }
 

@@ -30,11 +30,29 @@ spec:
             - emit-tx
             - --mint-key={{ .Values.load_test.config.mint_key }}
             - --chain-id={{ .Values.genesis.chain_id }}
-            {{- range $i := until (int $.Values.genesis.numValidators) }}
+            {{- $numTargets := 0 }}
+            {{- $targetSuffix := "" }}
+            {{- $targetGroups := list }}
+            {{- if $.Values.load_test.config.use_validators }}
+              {{- $numTargets = $.Values.genesis.numValidators }}
+              {{- $targetSuffix = "validator" }}
+              {{- $targetGroups = list }}
+            {{- else }}
+              {{- $numTargets = $.Values.load_test.config.numFullnodeGroups }}
+              {{- $targetSuffix = "fullnode" }}
+              {{- $targetGroups = $.Values.load_test.fullnodeGroups }}
+            {{- end }}
+            {{- range $i := until (int $numTargets) }}
               {{- $port := 80 }}
-              {{- $nodeType := ternary "validator" "fullnode" $.Values.load_test.config.use_validators }}
-              {{- $nodeName := join "-" (list $.Values.genesis.username_prefix $i $nodeType "lb") }}
+              {{- if $targetGroups }}
+              {{- range $group := $targetGroups }}
+              {{- $nodeName := join "-" (list $.Values.genesis.username_prefix $i $group.name "lb") }}
             - --targets=http://{{ $nodeName }}:{{ $port }}
+              {{- end }}
+              {{- else }}
+              {{- $nodeName := join "-" (list $.Values.genesis.username_prefix $i $targetSuffix "lb") }}
+            - --targets=http://{{ $nodeName }}:{{ $port }}
+              {{- end }}
             {{- end }}
           # This with terminates on line 77
           {{- with .Values.load_test }}

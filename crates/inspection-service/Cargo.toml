@@ -25,7 +25,6 @@ aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics-core = { path = "../aptos-metrics-core" }
 aptos-telemetry = { path = "../aptos-telemetry" }
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }
 
 [dev-dependencies]
 assert_approx_eq = "1.1.0"

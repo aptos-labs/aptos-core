@@ -16,7 +16,6 @@ either = "1.6.1"
 futures = "0.3.21"
 hex = "0.4.3"
 hyper = { version = "0.14.18", features = ["full"] }
-hyper-proxy = "0.9.1"
 hyper-tls = "0.5.0"
 k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_15"] }
 kube = "0.51.0"
@@ -24,10 +23,6 @@ rand = "0.7.3"
 rayon = "1.5.2"
 regex = "1.5.5"
 reqwest = { version = "0.11.10", features = ["blocking", "json"] }
-rusoto_core = "0.46.0"
-rusoto_credential = "0.46.0"
-rusoto_eks = "0.46.0"
-rusoto_sts = "0.46.0"
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
 structopt = "0.3.21"
@@ -37,7 +32,6 @@ tokio = { version = "1.18.2", features = ["full"] }
 url = "2.2.2"
 
 aptos-config = { path = "../../config" }
-aptos-faucet = { path = "../../crates/aptos-faucet" }
 aptos-genesis = { path = "../../crates/aptos-genesis" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
@@ -45,8 +39,7 @@ aptos-retrier = { path = "../../crates/aptos-retrier" }
 aptos-sdk = { path = "../../sdk" }
 aptos-secure-storage = { path = "../../secure/storage" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 cached-framework-packages = { path = "../../aptos-move/framework/cached-packages" }
 inspection-service = { path = "../../crates/inspection-service" }
-transaction-emitter = { path = "../../crates/transaction-emitter" }
 transaction-emitter-lib = { path = "../../crates/transaction-emitter-lib" }

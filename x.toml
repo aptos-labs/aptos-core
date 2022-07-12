@@ -50,7 +50,7 @@ warn = [
 
 [hakari]
 resolver = "2"
-hakari-package = "aptos-workspace-hack"
+
 exact-versions = true
 platforms = [
     "x86_64-unknown-linux-gnu",
@@ -107,7 +107,7 @@ target-features = "all"
 
 [summaries.default.omitted-packages]
 workspace-members = [
-    "aptos-workspace-hack",
+
 ]
 
 [summaries.full]
@@ -120,19 +120,6 @@ initials-platform = "standard"
 
 # Regex for allowed characters in paths. Regex must have ^ and $ anchors.
 allowed-paths = "^([a-zA-Z0-9._\\-/@:]|-)+$"
-
-whitespace-exceptions = [
-    ".github/actions/*/dist/*",
-    # TODO: reevaluate skipping whitespace checks in .md files for the website
-    "developer-docs-site/**/*",
-    "**/*.exp",
-    "**/*.errmap",
-    "**/*.abi",
-    "terraform/**/*",
-    "**/*.yaml",
-    "**/*.yml",
-    "**/*.md",
-]
 
 license-exceptions = [
     "terraform/**/*",
@@ -222,7 +209,7 @@ aptos_crates_in_language = [
 # about Move crates depending on Aptos ones. Again, you should instead fix
 # the design of your crate so it doesn't have to depend on Aptos.
 exclude = [
-    "aptos-workspace-hack",
+
 ]
 
 # Interesting subsets of the workspace, These are used for generating and

@@ -4,6 +4,7 @@
 
 class TableHeaderColumnComponent < ViewComponent::Base
   include ApplicationHelper
+  include Memery
 
   renders_one :tooltip, IconTooltipComponent
 
@@ -25,7 +26,7 @@ class TableHeaderColumnComponent < ViewComponent::Base
 
   private
 
-  def sort_direction
+  memoize def sort_direction
     sort = parse_sort(request.params).find do |key, _direction|
       key == @id.to_s
     end

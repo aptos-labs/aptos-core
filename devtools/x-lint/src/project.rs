@@ -4,7 +4,6 @@
 use crate::{prelude::*, LintContext};
 use camino::{Utf8Path, Utf8PathBuf};
 use guppy::graph::PackageGraph;
-use hakari::Hakari;
 use x_core::{WorkspaceSubset, XCoreContext};
 
 /// Represents a linter that checks some property for the overall project.
@@ -59,22 +58,6 @@ impl<'l> ProjectContext<'l> {
     /// those that Cargo would ignore.
     pub fn default_members(&self) -> Result<&WorkspaceSubset> {
         Ok(self.core.subsets()?.default_members())
-    }
-
-    /// Returns the name of the workspace-hack package.
-    pub fn workspace_hack_name(&self) -> &'l str {
-        self.core
-            .config()
-            .hakari
-            .builder
-            .hakari_package
-            .as_deref()
-            .expect("hakari package is specified")
-    }
-
-    /// Returns Hakari information.
-    pub fn hakari(&self) -> Result<Hakari<'l>> {
-        Ok(self.core.hakari_builder()?.compute())
     }
 }
 

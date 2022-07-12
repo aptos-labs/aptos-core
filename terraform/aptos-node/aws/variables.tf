@@ -9,7 +9,13 @@ variable "k8s_api_sources" {
 }
 
 variable "num_validators" {
-  default = 1
+  description = "The number of validator nodes to create"
+  default     = 1
+}
+
+variable "num_fullnode_groups" {
+  description = "The number of fullnode groups to create"
+  default     = 1
 }
 
 variable "era" {

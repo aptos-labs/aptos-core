@@ -35,6 +35,7 @@ module AptosFramework::TokenV1 {
     const ETOKEN_ALREADY_EXISTS: u64 = 12;
     const ETOKEN_NOT_PUBLISHED: u64 = 13;
     const ETOKEN_STORE_NOT_PUBLISHED: u64 = 14;
+    const ETOKEN_SPLIT_AMOUNT_LARGER_THEN_TOKEN_AMOUNT: u64 = 15;
 
     //
     // Core data structures for holding tokens
@@ -377,6 +378,15 @@ module AptosFramework::TokenV1 {
         let Token { id: _, value: _ } = source_token;
     }
 
+    public fun split(dst_token: &mut Token, amount: u64): Token {
+        assert!(dst_token.value >= amount, ETOKEN_SPLIT_AMOUNT_LARGER_THEN_TOKEN_AMOUNT);
+        dst_token.value = dst_token.value - amount;
+        Token {
+            id: dst_token.id,
+            value: amount
+        }
+    }
+
     public fun token_id(token: &Token): &TokenId {
         &token.id
     }
@@ -698,7 +708,6 @@ module AptosFramework::TokenV1 {
         }
     }
 
-
     public fun balance_of(owner: address, id: TokenId): u64 acquires TokenStore {
         let token_store = borrow_global<TokenStore>(owner);
         if (Table::contains(&token_store.tokens, id)) {
@@ -707,6 +716,30 @@ module AptosFramework::TokenV1 {
             0
         }
     }
+
+    public fun get_royalty(token_id: TokenId): Royalty acquires Collections {
+        let token_data_id = token_id.token_data_id;
+        let creator_addr = token_data_id.creator;
+        assert!(exists<Collections>(creator_addr), ECOLLECTIONS_NOT_PUBLISHED);
+        let all_token_data = &borrow_global<Collections>(creator_addr).token_data;
+        assert!(Table::contains(all_token_data, token_data_id), ETOKEN_NOT_PUBLISHED);
+
+        let token_data = Table::borrow(all_token_data, token_data_id);
+        token_data.royalty
+    }
+
+    public fun get_royalty_nominator(royalty: &Royalty): u64 {
+        royalty.royalty_points_nominator
+    }
+
+    public fun get_royalty_denominator(royalty: &Royalty): u64 {
+        royalty.royalty_points_denominator
+    }
+
+    public fun get_royalty_payee(royalty: &Royalty): address {
+        royalty.payee_address
+    }
+
 
 
     // ****************** TEST-ONLY FUNCTIONS **************

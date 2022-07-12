@@ -25,7 +25,7 @@ aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-secure-storage = { path = "../../secure/storage" }
 aptos-time-service = { path = "../../crates/aptos-time-service", features = ["async"] }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 channel = { path = "../../crates/channel" }
 event-notifications = { path = "../../state-sync/inter-component/event-notifications" }
 netcore = { path = "../netcore" }

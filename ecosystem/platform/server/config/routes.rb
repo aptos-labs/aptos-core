@@ -42,7 +42,6 @@ Rails.application.routes.draw do
 
   resources :it2_profiles, except: %i[index destroy]
   resources :it2_surveys, except: %i[index destroy]
-  resource :it2, only: %i[show]
 
   resources :nfts, only: %i[show update]
   resources :nft_offers, only: %i[show update]
@@ -50,8 +49,10 @@ Rails.application.routes.draw do
   get 'nft-nyc', to: 'nft_nyc#show'
 
   get 'leaderboard/it1', to: redirect('/it1')
-  get 'leaderboard/it2', to: 'leaderboard#it2'
+  get 'leaderboard/it2', to: redirect('/it2')
 
   get 'it1', to: 'leaderboard#it1'
+  get 'it2', to: 'leaderboard#it2'
+
   root 'static_page#community'
 end

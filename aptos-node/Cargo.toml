@@ -35,7 +35,7 @@ aptos-temppath = { path = "../crates/aptos-temppath" }
 aptos-time-service = { path = "../crates/aptos-time-service" }
 aptos-types = { path = "../types" }
 aptos-vm = { path = "../aptos-move/aptos-vm" }
-aptos-workspace-hack = { path = "../crates/aptos-workspace-hack" }
+
 aptosdb = { path = "../storage/aptosdb" }
 backup-service = { path = "../storage/backup/backup-service" }
 cached-framework-packages = { path = "../aptos-move/framework/cached-packages" }

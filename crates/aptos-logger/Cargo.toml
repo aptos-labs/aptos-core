@@ -25,4 +25,4 @@ tracing-subscriber = "0.3.11"
 
 aptos-infallible = { path = "../aptos-infallible" }
 aptos-log-derive = { path = "../aptos-log-derive" }
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }
+

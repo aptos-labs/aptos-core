@@ -19,12 +19,11 @@ tokio-util = { version = "0.7.2", features = ["compat"] }
 url = { version = "2.2.2" }
 
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 memsocket = { path = "../memsocket", optional = true }
 proxy = { path = "../../crates/proxy" }
 
 [dev-dependencies]
-aptos-logger = { path = "../../crates/aptos-logger" }
 memsocket = { path = "../memsocket" }
 
 [features]

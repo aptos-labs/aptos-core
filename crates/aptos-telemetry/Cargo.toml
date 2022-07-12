@@ -34,7 +34,7 @@ aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-mempool = { path = "../../mempool" }
 aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }
+
 aptosdb = { path = "../../storage/aptosdb" }
 consensus = { path = "../../consensus" }
 network = { path = "../../network" }

@@ -31,7 +31,7 @@ aptos-sdk = { path = "../../sdk" }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 cached-framework-packages =  { path = "../../aptos-move/framework/cached-packages" }
 forge = { path = "../forge" }
 move-deps = { path = "../../aptos-move/move-deps" }

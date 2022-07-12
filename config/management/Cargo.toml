@@ -26,7 +26,6 @@ aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-time-service = { path = "../../crates/aptos-time-service" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
 aptos-config = { path = "..", features = ["fuzzing"] }

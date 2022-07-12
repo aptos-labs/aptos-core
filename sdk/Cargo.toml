@@ -17,5 +17,5 @@ serde = { version = "1.0.137", features = ["derive"] }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-transaction-builder = { path = "./transaction-builder" }
 aptos-types = { path = "../types" }
-aptos-workspace-hack = { path = "../crates/aptos-workspace-hack" }
+
 move-deps = { path = "../aptos-move/move-deps", features = ["address32"] }

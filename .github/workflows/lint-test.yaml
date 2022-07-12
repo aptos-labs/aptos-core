@@ -123,8 +123,6 @@ jobs:
       - run: cargo xclippy --workspace --all-targets
       - run: cargo xfmt --check
       - run: cargo install cargo-sort
-      # Temporary workaround for unsorted hakari generated Cargo files (https://github.com/DevinR528/cargo-sort/issues/38).
-      - run: cargo sort --grouped crates/aptos-workspace-hack
       - run: cargo sort --grouped --check --workspace
 
   rust-unit-xtest:
