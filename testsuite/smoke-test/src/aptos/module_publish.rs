@@ -1,9 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::transaction::{ModuleBundle, TransactionPayload};
+use crate::aptos::move_test_helpers;
 use forge::{AptosContext, AptosTest, Result, Test};
-use move_deps::move_package;
 
 pub struct ModulePublish;
 
@@ -19,36 +18,8 @@ impl AptosTest for ModulePublish {
         let base_path =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/aptos/move_modules/");
 
-        let build_config = move_package::BuildConfig {
-            generate_docs: true,
-            generate_abis: true,
-            install_dir: Some(base_path.clone()),
-            ..Default::default()
-        };
-
-        let compiled_package = build_config
-            .clone()
-            .compile_package(&base_path, &mut std::io::stdout())
-            .unwrap();
-
-        let mut blobs = vec![];
-        compiled_package
-            .root_modules_map()
-            .iter_modules()
-            .first()
-            .unwrap()
-            .serialize(&mut blobs)
-            .unwrap();
-
-        let txn_factory = ctx.aptos_transaction_factory();
-        let publish_txn = ctx
-            .root_account()
-            .sign_with_transaction_builder(txn_factory.payload(TransactionPayload::ModuleBundle(
-                ModuleBundle::singleton(blobs.clone()),
-            )));
-        ctx.client().submit_and_wait(&publish_txn).await?;
-
         // module publish should call init_module by default to create the resource
+        move_test_helpers::publish_code(ctx, base_path.clone()).await?;
         ctx.client()
             .get_account_resource(
                 ctx.root_account().address(),
@@ -57,16 +28,11 @@ impl AptosTest for ModulePublish {
             .await
             .unwrap();
 
-        let publish_txn = ctx
-            .root_account()
-            .sign_with_transaction_builder(txn_factory.payload(TransactionPayload::ModuleBundle(
-                ModuleBundle::singleton(blobs),
-            )));
         // republish should fail
-        ctx.client()
-            .submit_and_wait(&publish_txn)
+        move_test_helpers::publish_code(ctx, base_path.clone())
             .await
             .unwrap_err();
+
         Ok(())
     }
 }
