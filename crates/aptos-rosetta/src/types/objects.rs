@@ -28,6 +28,8 @@ use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
+    fmt::{Display, Formatter},
+    hash::Hash,
     str::FromStr,
     sync::Arc,
 };
@@ -177,6 +179,7 @@ pub struct Currency {
     pub symbol: String,
     /// Number of decimals to be considered in the currency
     pub decimals: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<CurrencyMetadata>,
 }
 
@@ -463,6 +466,34 @@ pub struct Transaction {
     /// Related transactions
     #[serde(skip_serializing_if = "Option::is_none")]
     pub related_transactions: Option<Vec<RelatedTransaction>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<TransactionMetadata>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct TransactionMetadata {
+    pub transaction_type: TransactionType,
+    pub version: U64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum TransactionType {
+    User,
+    Genesis,
+    BlockMetadata,
+    StateCheckpoint,
+}
+
+impl Display for TransactionType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use TransactionType::*;
+        f.write_str(match self {
+            User => "User",
+            Genesis => "Genesis",
+            BlockMetadata => "BlockMetadata",
+            StateCheckpoint => "StateCheckpoint",
+        })
+    }
 }
 
 impl Transaction {
@@ -472,13 +503,22 @@ impl Transaction {
         txn: aptos_rest_client::Transaction,
     ) -> ApiResult<Transaction> {
         use aptos_rest_client::Transaction::*;
-        let (maybe_sender, txn_info, events) = match txn {
+        let (txn_type, maybe_sender, txn_info, events) = match txn {
             // Pending transactions aren't supported by Rosetta (for now)
             PendingTransaction(_) => return Err(ApiError::TransactionIsPending),
-            UserTransaction(txn) => (Some(txn.request.sender), txn.info, txn.events),
-            GenesisTransaction(txn) => (None, txn.info, txn.events),
-            BlockMetadataTransaction(txn) => (None, txn.info, txn.events),
-            StateCheckpointTransaction(txn) => (None, txn.info, vec![]),
+            UserTransaction(txn) => (
+                TransactionType::User,
+                Some(txn.request.sender),
+                txn.info,
+                txn.events,
+            ),
+            GenesisTransaction(txn) => (TransactionType::Genesis, None, txn.info, txn.events),
+            BlockMetadataTransaction(txn) => {
+                (TransactionType::BlockMetadata, None, txn.info, txn.events)
+            }
+            StateCheckpointTransaction(txn) => {
+                (TransactionType::StateCheckpoint, None, txn.info, vec![])
+            }
         };
 
         let mut operations = vec![];
@@ -655,6 +695,10 @@ impl Transaction {
             transaction_identifier: (&txn_info).into(),
             operations,
             related_transactions: None,
+            metadata: Some(TransactionMetadata {
+                transaction_type: txn_type,
+                version: txn_info.version,
+            }),
         })
     }
 }

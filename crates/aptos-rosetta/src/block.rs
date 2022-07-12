@@ -47,7 +47,7 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
 
     // Retrieve by block or by hash, both or neither is not allowed
     let block_index =
-        get_block_index_from_request(&server_context, Some(request.block_identifier)).await?;
+        get_block_index_from_request(&server_context, request.block_identifier).await?;
 
     let (parent_transaction, block_info, transactions) = get_block_by_index(
         server_context.block_cache()?.as_ref(),
