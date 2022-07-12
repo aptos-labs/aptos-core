@@ -8,21 +8,21 @@
     <div class="flex flex-col md:flex-row md:justify-evenly gap-8 mb-16 md:mb-24">
       <div class="flex-1 md:max-w-sm">
         <%= render CardOutlineComponent.new(class: 'h-full') do %>
-          <p class="font-mono uppercase text-6xl font-light">200</p>
+          <p class="font-mono uppercase text-6xl font-light">226</p>
           <div class="my-4"><%= render DividerComponent.new %></div>
           <h3 class="font-mono uppercase text-xl">Nodes</h3>
         <% end %>
       </div>
       <div class="flex-1 md:max-w-sm">
         <%= render CardOutlineComponent.new(class: 'h-full') do %>
-          <p class="font-mono uppercase text-6xl font-light">100</p>
+          <p class="font-mono uppercase text-6xl font-light">44</p>
           <div class="my-4"><%= render DividerComponent.new %></div>
           <h3 class="font-mono uppercase text-xl">Countries</h3>
         <% end %>
       </div>
       <div class="flex-1 md:max-w-sm">
         <%= render CardOutlineComponent.new(class: 'h-full') do %>
-          <p class="font-mono uppercase text-6xl font-light">200</p>
+          <p class="font-mono uppercase text-6xl font-light">110</p>
           <div class="my-4"><%= render DividerComponent.new %></div>
           <h3 class="font-mono uppercase text-xl">Cities</h3>
         <% end %>
@@ -32,7 +32,7 @@
       <%= content_tag :div, class: 'overflow-x-auto' do %>
         <%= render TableComponent.new(class: 'w-full table-auto') do |t| %>
           <%= t.with_column(:rank, '#', align: 'right') %>
-          <%= t.with_column('Account Address', align: 'left') %>
+          <%= t.with_column(:validator, 'Account Address', align: 'left') %>
           <%= t.with_column(:liveness, 'Liveness', align: 'left') do |column| %>
             <%= column.with_tooltip(:info) do |tooltip| %>
               <%= tooltip.with_header do %>
@@ -106,8 +106,8 @@
                 <%= tr.with_column(align: 'right') do %>
                   <%= metric.rank %>
                 <% end %>
-                <%= tr.with_column(class: 'max-w-0 2xl:max-w-full w-full 2xl:w-auto truncate', title: metric.proposer) do %>
-                  <%= metric.proposer %>
+                <%= tr.with_column(class: 'max-w-0 2xl:max-w-full w-full 2xl:w-auto truncate', title: metric.validator) do %>
+                  <%= "0x#{metric.validator}" %>
                 <% end %>
                 <%= tr.with_column(align: 'left') do %>
                   <div class="flex items-center gap-2">
