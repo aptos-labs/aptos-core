@@ -123,7 +123,8 @@ async fn wait_node_stateful_set(
                                 "StatefulSet {} has {}/{} ready_replicas",
                                 sts_name, ready_replicas, replicas
                             );
-                            if ready_replicas == replicas {
+                            if ready_replicas == replicas && replicas > 0 {
+                                info!("StatefulSet {} ready", sts_name);
                                 continue;
                             }
                         }
