@@ -25,7 +25,8 @@ pub struct Worker {
     /// Indicates if there's NOT any pending work to do currently, to hint
     /// `Self::receive_commands()` to `recv()` blocking-ly.
     blocking_recv: bool,
-    max_version_to_prune_per_batch: u64,
+    // Max items to prune per batch. For the ledger pruner, this means the max versions to prune and for the state pruner, this means the max stale nodes to prune.
+    max_items_to_prune_per_batch: u64,
 }
 
 impl Worker {
@@ -44,7 +45,7 @@ impl Worker {
             command_receiver,
             min_readable_versions,
             blocking_recv: true,
-            max_version_to_prune_per_batch: storage_pruner_config.pruning_batch_size as u64,
+            max_items_to_prune_per_batch: storage_pruner_config.pruning_batch_size as u64,
         }
     }
 
@@ -57,7 +58,7 @@ impl Worker {
             for db_pruner in self.db_pruners.iter().flatten() {
                 let result = db_pruner
                     .lock()
-                    .prune(&mut ledger_db_batch, self.max_version_to_prune_per_batch);
+                    .prune(&mut ledger_db_batch, self.max_items_to_prune_per_batch);
                 result.map_err(|_| error_in_pruning = true).ok();
             }
             // Commit all the changes to DB atomically
