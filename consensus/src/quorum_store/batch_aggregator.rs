@@ -3,7 +3,6 @@
 
 use crate::quorum_store::types::{BatchId, Data};
 use aptos_crypto::{hash::DefaultHasher, HashValue};
-// use aptos_logger::debug;
 use bcs::to_bytes;
 
 struct IncrementalBatchState {

@@ -30,11 +30,11 @@ use futures::{
     stream::FuturesUnordered,
     StreamExt,
 };
+use std::collections::HashMap;
 use std::{
-    collections::{HashSet},
+    collections::HashSet,
     time::{Duration, Instant},
 };
-use std::collections::HashMap;
 use tokio::{sync::mpsc::Sender as TokioSender, time};
 
 type ProofReceiveChannel = oneshot::Receiver<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
@@ -224,9 +224,11 @@ impl QuorumStoreWrapper {
                         break;
                     }
 
-                    if proof.expiration() < LogicalTime::new(self.latest_logical_time.epoch(), round){
+                    if proof.expiration()
+                        < LogicalTime::new(self.latest_logical_time.epoch(), round)
+                    {
                         expired.push(proof.digest().clone());
-                    } else  if !excluded_proofs.contains(proof.digest()) {
+                    } else if !excluded_proofs.contains(proof.digest()) {
                         proof_block.push(proof.clone());
                     }
                 }
@@ -249,9 +251,11 @@ impl QuorumStoreWrapper {
             }
             WrapperCommand::CleanRequest(logical_time, digests) => {
                 debug!("QS: got clean request from execution");
-                assert_eq!(self.latest_logical_time.epoch(),
+                assert_eq!(
+                    self.latest_logical_time.epoch(),
                     logical_time.epoch(),
-                    "Wrong epoch");
+                    "Wrong epoch"
+                );
                 assert!(
                     self.latest_logical_time < logical_time,
                     "Non-increasing logical time"

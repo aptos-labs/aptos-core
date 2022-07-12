@@ -14,7 +14,9 @@ use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
 };
-use consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlock};
+use consensus_types::{
+    block::Block, common::Payload, executed_block::ExecutedBlock, proof_of_store::LogicalTime,
+};
 use executor_types::{Error, StateComputeResult};
 use futures::channel::mpsc;
 use std::{collections::HashMap, sync::Arc};
@@ -76,7 +78,10 @@ impl StateComputer for MockStateComputer {
                 .lock()
                 .remove(&block.id())
                 .ok_or_else(|| format_err!("Cannot find block"))?;
-            let mut payload_txns = self.data_manager.get_data(payload).await?;
+            let mut payload_txns = self
+                .data_manager
+                .get_data(payload, LogicalTime::new(block.epoch(), block.round()))
+                .await?;
             txns.append(&mut payload_txns);
         }
         // they may fail during shutdown

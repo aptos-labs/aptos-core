@@ -1,26 +1,29 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::data_manager::DummyDataManager;
-use crate::quorum_store::quorum_store::QuorumStoreCommand;
-use crate::quorum_store::quorum_store_wrapper::QuorumStoreWrapper;
-use crate::quorum_store::tests::utils::{
-    create_vec_signed_transactions, size_of_signed_transaction,
+use crate::quorum_store::{
+    quorum_store::QuorumStoreCommand,
+    quorum_store_wrapper::QuorumStoreWrapper,
+    tests::utils::{create_vec_signed_transactions, size_of_signed_transaction},
 };
 use aptos_crypto::HashValue;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
 use bcs::to_bytes;
-use consensus_types::common::{Payload, PayloadFilter, TransactionSummary};
-use consensus_types::proof_of_store::{LogicalTime, ProofOfStore, SignedDigestInfo};
-use consensus_types::request_response::{ConsensusResponse, WrapperCommand};
-use futures::channel::mpsc::Receiver;
-use futures::channel::{mpsc, oneshot};
-use futures::StreamExt;
-use std::collections::HashSet;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::time::timeout;
+use consensus_types::{
+    common::{Payload, PayloadFilter, TransactionSummary},
+    proof_of_store::{LogicalTime, ProofOfStore, SignedDigestInfo},
+    request_response::{ConsensusResponse, WrapperCommand},
+};
+use futures::{
+    channel::{
+        mpsc::{channel, Receiver},
+        oneshot,
+    },
+    StreamExt,
+};
+use std::{collections::HashSet, time::Duration};
+use tokio::{sync::mpsc::channel as TokioChannel, time::timeout};
 
 async fn queue_mempool_batch_response(
     txns: Vec<SignedTransaction>,
@@ -44,12 +47,11 @@ async fn queue_mempool_batch_response(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_batch_creation() {
-    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = mpsc::channel(1_024);
-    let (wrapper_quorum_store_tx, mut wrapper_quorum_store_rx) = tokio::sync::mpsc::channel(100);
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+    let (wrapper_quorum_store_tx, mut wrapper_quorum_store_rx) = TokioChannel(100);
 
     let mut wrapper = QuorumStoreWrapper::new(
         0,
-        Arc::new(DummyDataManager::new()),
         quorum_store_to_mempool_tx,
         wrapper_quorum_store_tx,
         10_000,
@@ -73,7 +75,7 @@ async fn test_batch_creation() {
         .await;
         // Expect AppendToBatch for 1 txn
         let quorum_store_command = wrapper_quorum_store_rx.recv().await.unwrap();
-        if let QuorumStoreCommand::AppendToBatch(data) = quorum_store_command {
+        if let QuorumStoreCommand::AppendToBatch(data, 0) = quorum_store_command {
             assert_eq!(data.len(), signed_txns.len());
             assert_eq!(data, signed_txns);
         } else {
@@ -89,10 +91,9 @@ async fn test_batch_creation() {
         assert_eq!(exclude_txns.len(), num_txns);
         // Expect EndBatch for 1 + 9 = 10 txns. The last txn pulled is not included in the batch.
         let quorum_store_command = wrapper_quorum_store_rx.recv().await.unwrap();
-        if let QuorumStoreCommand::EndBatch(data, _, digest_tx, _) = quorum_store_command {
+        if let QuorumStoreCommand::EndBatch(data, _, _, _) = quorum_store_command {
             assert_eq!(data.len(), signed_txns.len() - 1);
             assert_eq!(data, signed_txns[0..8]);
-            digest_tx.send(Ok(HashValue::random())).unwrap();
         } else {
             panic!("Unexpected variant")
         }
@@ -106,7 +107,7 @@ async fn test_batch_creation() {
         assert_eq!(exclude_txns.len(), num_txns);
         // Expect AppendBatch for 9 txns
         let quorum_store_command = wrapper_quorum_store_rx.recv().await.unwrap();
-        if let QuorumStoreCommand::AppendToBatch(data) = quorum_store_command {
+        if let QuorumStoreCommand::AppendToBatch(data, 1) = quorum_store_command {
             assert_eq!(data.len(), signed_txns.len());
             assert_eq!(data, signed_txns);
         } else {
@@ -129,12 +130,11 @@ async fn test_batch_creation() {
 
 #[tokio::test]
 async fn test_block_request() {
-    let (quorum_store_to_mempool_tx, mut _quorum_store_to_mempool_rx) = mpsc::channel(1_024);
-    let (wrapper_quorum_store_tx, mut _wrapper_quorum_store_rx) = tokio::sync::mpsc::channel(100);
+    let (quorum_store_to_mempool_tx, mut _quorum_store_to_mempool_rx) = channel(1_024);
+    let (wrapper_quorum_store_tx, mut _wrapper_quorum_store_rx) = TokioChannel(100);
 
     let mut wrapper = QuorumStoreWrapper::new(
         0,
-        Arc::new(DummyDataManager::new()),
         quorum_store_to_mempool_tx,
         wrapper_quorum_store_tx,
         10_000,
@@ -148,6 +148,7 @@ async fn test_block_request() {
 
     let (callback_tx, callback_rx) = oneshot::channel();
     let req = WrapperCommand::GetBlockRequest(
+        1,
         100,
         PayloadFilter::InQuorumStore(HashSet::new()),
         callback_tx,
