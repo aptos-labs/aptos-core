@@ -26,7 +26,7 @@ class ApplicationController < ActionController::Base
     elsif Flipper.enabled?(:it2_registration_open)
       it2_path
     else
-      it1_path
+      leaderboard_it2_path
     end
   end
 
