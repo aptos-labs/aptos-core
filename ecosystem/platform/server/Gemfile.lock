@@ -206,6 +206,7 @@ GEM
       actionpack (>= 5.2)
       activesupport (>= 5.2)
     hashie (5.0.0)
+    hiredis (0.6.3)
     html_tokenizer (0.0.7)
     http (5.1.0)
       addressable (~> 2.8)
@@ -386,6 +387,7 @@ GEM
       i18n
     recaptcha (5.10.0)
       json
+    redis (4.7.1)
     regexp_parser (2.5.0)
     reline (0.3.1)
       io-console (~> 0.5)
@@ -509,6 +511,7 @@ DEPENDENCIES
   faker
   flipper (~> 0.24.1)
   flipper-active_record (~> 0.24.1)
+  hiredis (~> 0.6.3)
   httparty
   jbuilder
   jsbundling-rails
@@ -527,6 +530,7 @@ DEPENDENCIES
   rack-cors
   rails (~> 7.0.2, >= 7.0.2.3)
   recaptcha (~> 5.10)
+  redis (~> 4.7)
   rspec-rails
   rubocop
   rubocop-rails
