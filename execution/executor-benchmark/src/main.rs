@@ -19,7 +19,10 @@ struct PrunerOpt {
     ledger_prune_window: i64,
 
     #[structopt(long, default_value = "500")]
-    pruning_batch_size: usize,
+    ledger_pruning_batch_size: usize,
+
+    #[structopt(long, default_value = "500")]
+    state_store_pruning_batch_size: usize,
 }
 
 impl PrunerOpt {
@@ -35,7 +38,8 @@ impl PrunerOpt {
             } else {
                 Some(self.ledger_prune_window as u64)
             },
-            pruning_batch_size: self.pruning_batch_size,
+            ledger_pruning_batch_size: self.ledger_pruning_batch_size,
+            state_store_pruning_batch_size: self.state_store_pruning_batch_size,
         }
     }
 }

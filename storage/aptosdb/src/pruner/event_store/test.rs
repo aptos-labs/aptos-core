@@ -61,7 +61,8 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
             ledger_prune_window: Some(0),
-            pruning_batch_size: 1,
+            ledger_pruning_batch_size: 1,
+            state_store_pruning_batch_size: 100,
         },
     );
 
@@ -108,7 +109,8 @@ fn verify_event_store_pruner_disabled(events: Vec<Vec<ContractEvent>>) {
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
             ledger_prune_window: None,
-            pruning_batch_size: 1,
+            ledger_pruning_batch_size: 1,
+            state_store_pruning_batch_size: 100,
         },
     );
 
