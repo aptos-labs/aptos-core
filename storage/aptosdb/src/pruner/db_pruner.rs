@@ -41,7 +41,7 @@ pub trait DBPruner {
     fn prune(
         &self,
         ledger_db_batch: &mut SchemaBatch,
-        max_versions: u64,
+        max_versions: usize,
     ) -> anyhow::Result<Version>;
 
     /// Initializes the least readable version stored in underlying DB storage

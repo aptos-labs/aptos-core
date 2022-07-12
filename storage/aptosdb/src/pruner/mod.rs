@@ -13,7 +13,7 @@ pub(crate) mod transaction_store;
 pub mod utils;
 pub(crate) mod worker;
 
-use crate::metrics::{PRUNER_BATCH_SIZE, PRUNER_WINDOW};
+use crate::metrics::{LEDGER_PRUNER_BATCH_SIZE, PRUNER_WINDOW, STATE_STORE_PRUNER_BATCH_SIZE};
 
 use aptos_config::config::StoragePrunerConfig;
 use aptos_infallible::Mutex;
@@ -92,7 +92,10 @@ impl Pruner {
             .with_label_values(&["ledger_pruner"])
             .set((storage_pruner_config.ledger_prune_window.unwrap_or(0)) as i64);
 
-        PRUNER_BATCH_SIZE.set(storage_pruner_config.pruning_batch_size as i64);
+        LEDGER_PRUNER_BATCH_SIZE.set(storage_pruner_config.ledger_pruning_batch_size as i64);
+
+        STATE_STORE_PRUNER_BATCH_SIZE
+            .set(storage_pruner_config.state_store_pruning_batch_size as i64);
 
         let worker = Worker::new(
             ledger_rocksdb,
@@ -113,7 +116,7 @@ impl Pruner {
             command_sender: Mutex::new(command_sender),
             min_readable_versions: worker_progress_clone,
             last_version_sent_to_pruners: Arc::new(Mutex::new(0)),
-            pruning_batch_size: storage_pruner_config.pruning_batch_size,
+            pruning_batch_size: storage_pruner_config.ledger_pruning_batch_size,
             latest_version: Arc::new(Mutex::new(0)),
         }
     }
@@ -139,6 +142,10 @@ impl Pruner {
     /// Sends pruning command to the worker thread when necessary.
     pub fn maybe_wake_pruner(&self, latest_version: Version) {
         *self.latest_version.lock() = latest_version;
+        // TODO(zcc): Right now we will still wake up the state store pruner once per pruning batch
+        // size even though state store pruner not necessarily prune one single version of nodes
+        // each time. We should make ledger pruner and state store separate and wake up them
+        // separately.
         if latest_version
             >= *self.last_version_sent_to_pruners.as_ref().lock() + self.pruning_batch_size as u64
         {
