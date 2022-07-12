@@ -414,7 +414,7 @@ impl<
     }
 
     /// Resets the currently active data stream and speculative state
-    fn reset_active_stream(&mut self) {
+    pub fn reset_active_stream(&mut self) {
         self.speculative_stream_state = None;
         self.active_data_stream = None;
     }

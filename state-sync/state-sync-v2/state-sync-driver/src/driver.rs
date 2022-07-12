@@ -16,6 +16,7 @@ use crate::{
     },
     storage_synchronizer::StorageSynchronizerInterface,
     utils,
+    utils::PENDING_DATA_LOG_FREQ_SECS,
 };
 use aptos_config::config::{RoleType, StateSyncDriverConfig};
 use aptos_data_client::AptosDataClient;
@@ -97,6 +98,9 @@ pub struct StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer, Streaming
 
     // The interface to read from storage
     storage: Arc<dyn DbReader>,
+
+    // The storage synchronizer used to update local storage
+    storage_synchronizer: StorageSyncer,
 }
 
 impl<
@@ -129,7 +133,7 @@ impl<
             driver_configuration.clone(),
             streaming_client,
             storage.clone(),
-            storage_synchronizer,
+            storage_synchronizer.clone(),
         );
 
         Self {
@@ -145,6 +149,7 @@ impl<
             mempool_notification_handler,
             start_time: None,
             storage,
+            storage_synchronizer,
         }
     }
 
@@ -444,15 +449,38 @@ impl<
 
     /// Checks if the node has successfully reached the sync target
     async fn check_sync_request_progress(&mut self) -> Result<(), Error> {
-        if !self.consensus_notification_handler.active_sync_request() {
+        if !self.active_sync_request() {
             return Ok(());
         }
 
+        // There's an active sync request. Before checking if we've hit the target,
+        // wait for the storage synchronizer to drain first (to avoid preemptively
+        // notifying consensus).
+        while self.storage_synchronizer.pending_storage_data() {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(PENDING_DATA_LOG_FREQ_SECS)),
+                info!("Waiting for the storage synchronizer to handle pending data!")
+            );
+        }
+
+        // Check if we've hit the target
         let latest_synced_ledger_info =
             utils::fetch_latest_synced_ledger_info(self.storage.clone())?;
         self.consensus_notification_handler
             .check_sync_request_progress(latest_synced_ledger_info)
-            .await
+            .await?;
+
+        // If the sync request was successfully handled, reset the continuous syncer
+        // so that in the event another sync request occurs, we have a fresh state.
+        if !self.active_sync_request() {
+            self.continuous_syncer.reset_active_stream();
+        }
+        Ok(())
+    }
+
+    /// Returns true iff there's an active sync request from consensus
+    fn active_sync_request(&self) -> bool {
+        self.consensus_notification_handler.active_sync_request()
     }
 
     /// Returns true iff this node is a validator
@@ -462,9 +490,7 @@ impl<
 
     /// Returns true iff consensus is currently executing
     fn check_if_consensus_executing(&self) -> bool {
-        self.is_validator()
-            && self.bootstrapper.is_bootstrapped()
-            && !self.consensus_notification_handler.active_sync_request()
+        self.is_validator() && self.bootstrapper.is_bootstrapped() && !self.active_sync_request()
     }
 
     /// Checks if the connection deadline has passed. If so, validators with
