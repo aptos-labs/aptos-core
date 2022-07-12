@@ -1,4 +1,4 @@
-{{- range $i, $e := until (int .Values.numValidators) }}
+{{- range $i, $e := until (int .Values.numFullnodeGroups) }}
 {{- range $.Values.fullnode.groups }}
 ---
 
