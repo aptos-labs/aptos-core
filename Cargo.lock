@@ -886,6 +886,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-node",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-transaction-builder",

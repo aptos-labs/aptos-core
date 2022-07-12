@@ -31,6 +31,7 @@ aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }
 aptos-logger = { path = "../aptos-logger" }
 aptos-metrics-core = { path = "../aptos-metrics-core" }
+aptos-node = { path = "../../aptos-node" }
 aptos-rest-client = { path = "../aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
