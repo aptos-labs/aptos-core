@@ -6,8 +6,9 @@ use crate::U64;
 use aptos_types::{chain_id::ChainId, ledger_info::LedgerInfoWithSignatures};
 
 use serde::{Deserialize, Serialize};
+use utoipa::Component;
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Component)]
 pub struct LedgerInfo {
     pub chain_id: u8,
     pub epoch: u64,

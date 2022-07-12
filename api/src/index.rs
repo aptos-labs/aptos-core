@@ -10,8 +10,10 @@ use crate::{
     metrics::{metrics, status_metrics},
     state, transactions,
 };
-use aptos_api_types::{Error, IndexResponse, Response};
+use aptos_api_types::{Error, IndexResponse, LedgerInfo, Response, U64};
+use aptos_config::config::RoleType;
 use std::convert::Infallible;
+use utoipa::OpenApi;
 use warp::{
     body::BodyDeserializeError,
     cors::CorsForbidden,
@@ -60,9 +62,16 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .with(status_metrics())
 }
 
-// GET /openapi.yaml
-// GET /spec.html
+#[derive(OpenApi)]
+#[openapi(handlers(index), components(IndexResponse, RoleType, LedgerInfo, U64))]
+struct ApiDoc;
+
 pub fn openapi_spec() -> BoxedFilter<(impl Reply,)> {
+    let json_spec = warp::path!("openapi.json")
+        .and(warp::get())
+        .map(|| warp::reply::json(&ApiDoc::openapi()))
+        .with(metrics("openapi_yaml"))
+        .boxed();
     let spec = warp::path!("openapi.yaml")
         .and(warp::get())
         .map(|| OPEN_API_SPEC)
@@ -73,10 +82,18 @@ pub fn openapi_spec() -> BoxedFilter<(impl Reply,)> {
         .map(|| reply::html(open_api_html()))
         .with(metrics("spec_html"))
         .boxed();
-    spec.or(html).boxed()
+    json_spec.or(spec.or(html)).boxed()
 }
 
 // GET /
+#[utoipa::path(
+    get,
+    path = "/",
+    responses(
+        (status = 200, description = "Success", body = IndexResponse),
+        (status = 500, description = "Error")
+    ),
+)]
 pub fn index(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path::end()
         .and(warp::get())

@@ -44,6 +44,7 @@ mod api_config;
 pub use api_config::*;
 use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519};
 use aptos_types::account_address::AccountAddress;
+use utoipa::Component;
 
 /// Represents a deprecated config that provides no field verification.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
@@ -189,7 +190,7 @@ impl IdentityBlob {
     }
 }
 
-#[derive(Clone, Copy, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Deserialize, Eq, PartialEq, Serialize, Component)]
 #[serde(rename_all = "snake_case")]
 pub enum RoleType {
     Validator,

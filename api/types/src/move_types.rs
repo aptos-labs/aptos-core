@@ -31,6 +31,7 @@ use std::{
     result::Result,
     str::FromStr,
 };
+use utoipa::Component;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MoveResource {
@@ -50,7 +51,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveResource {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Copy)]
+#[derive(Clone, Debug, PartialEq, Copy, Component)]
 pub struct U64(pub u64);
 
 impl U64 {

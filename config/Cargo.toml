@@ -18,6 +18,7 @@ rand = "0.7.3"
 serde = { version = "1.0.137", features = ["rc"], default-features = false }
 serde_yaml = "0.8.24"
 thiserror = "1.0.31"
+utoipa = "1"
 
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-crypto-derive = { path = "../crates/aptos-crypto-derive" }
