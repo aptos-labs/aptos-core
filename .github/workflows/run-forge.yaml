@@ -51,60 +51,7 @@ jobs:
       - name: Set kubectl context
         if: env.FORGE_ENABLED == 'true'
         run: aws eks update-kubeconfig --name $FORGE_CLUSTER_NAME
-      - name: Set Forge Namespace
-        if: env.FORGE_ENABLED == 'true'
-        shell: bash
-        run: |
-          # replace non alphanumeric chars with dash
-          FORGE_NAMESPACE="${FORGE_NAMESPACE_BASE//[^[:alnum:]]/-}"
-          # use the first 64 chars only for namespace, as it is the maximum for k8s resources
-          FORGE_NAMESPACE=${FORGE_NAMESPACE:0:64}
-          # forge test runner will run in a pod that matches the namespace
-          FORGE_POD_NAME=$FORGE_NAMESPACE
-          # export env vars for next step
-          echo "FORGE_NAMESPACE=$FORGE_NAMESPACE" >> $GITHUB_ENV
-          echo "FORGE_POD_NAME=$FORGE_POD_NAME" >> $GITHUB_ENV
-      - name: Terminate old Forge test runners with same ref
-        if: env.FORGE_ENABLED == 'true'
-        shell: bash
-        run: |
-          kubectl delete pod $FORGE_POD_NAME || true
-          kubectl wait --for=delete "pod/${FORGE_POD_NAME}" || true
       - name: Run Forge
-        if: env.FORGE_ENABLED == 'true'
-        shell: bash
-        run: |
-          set +e
-          FORGE_START_TIME_MS="$(date '+%s')000"
-
-          # Run forge with test runner in k8s
-          kubectl run $FORGE_POD_NAME \
-            --overrides='{ "spec": { "serviceAccount": "forge" }  }' \
-            --restart=Never \
-            --image="${AWS_ACCOUNT_NUM}.dkr.ecr.${AWS_REGION}.amazonaws.com/aptos/forge:$IMAGE_TAG" \
-            --command -- forge test k8s-swarm --image-tag $IMAGE_TAG --namespace $FORGE_NAMESPACE
-
-          # wait for enough time for the pod to start and potentially new nodes to come online
-          kubectl wait --timeout=5m --for=condition=Ready "pod/${FORGE_POD_NAME}"
-
-          # tail the logs to get them in GHA runner. tee them for further parsing
-          kubectl logs -f $FORGE_POD_NAME | tee $FORGE_OUTPUT
-
-          FORGE_END_TIME_MS="$(date '+%s')000"
-
-          # parse the pod status: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
-          forge_pod_status=$(kubectl get pod $FORGE_POD_NAME -o jsonpath="{.status.phase}")
-          if [ "$forge_pod_status" = "Succeeded" ]; then
-            FORGE_EXIT_CODE=0
-          else
-            FORGE_EXIT_CODE=1
-          fi
-
-          # export env vars for next step
-          echo "FORGE_EXIT_CODE=$FORGE_EXIT_CODE" >> $GITHUB_ENV
-          echo "FORGE_START_TIME_MS=$FORGE_START_TIME_MS" >> $GITHUB_ENV
-          echo "FORGE_END_TIME_MS=$FORGE_END_TIME_MS" >> $GITHUB_ENV
-      - name: Post Forge test results
         if: env.FORGE_ENABLED == 'true'
         shell: bash
         env:
@@ -113,30 +60,10 @@ jobs:
           PUSH_GATEWAY_PASSWORD: ${{ secrets.PUSH_GATEWAY_PASSWORD }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -x
+          set +e
 
-          # parse the JSON report
-          cat $FORGE_OUTPUT | awk '/====json-report-begin===/{f=1;next} /====json-report-end===/{f=0} f' > "${FORGE_REPORT}"
-          # If no report was generated, fill with default report
-          if [ ! -s "${FORGE_REPORT}" ]; then
-            echo '{"text": "Forge test runner terminated"}' > "${FORGE_REPORT}"
-          fi
-
-          # If no report text was generated, fill with default text
-          FORGE_REPORT_TXT=$(cat $FORGE_REPORT | jq -r .text)
-          if [ -z "$FORGE_REPORT_TXT" ]; then
-            FORGE_REPORT_TXT="Forge report text empty. See test runner output."
-          fi
-
-          if [ "$FORGE_EXIT_CODE" == "0" ]; then
-            FORGE_COMMENT_HEADER='### :white_check_mark: Forge test success'
-          else
-            FORGE_COMMENT_HEADER='### :x: Forge test failure'
-          fi
-
-          # remove the "aptos-" prefix to get the chain name as reported to Prometheus
-          FORGE_CHAIN_NAME=${FORGE_CLUSTER_NAME#"aptos-"} 
-          FORGE_DASHBOARD_LINK="${GRAFANA_BASE_URL}&var-namespace=${FORGE_NAMESPACE}&var-chain_name=${FORGE_CHAIN_NAME}&from=${FORGE_START_TIME_MS}&to=${FORGE_END_TIME_MS}"
+          # source this script to run and get environment variables
+          . scripts/run_forge.sh
 
           # attempt to get the PR number
           # If this workflow was not triggered by PR, then the result is null and will not comment on PR
@@ -144,9 +71,12 @@ jobs:
 
           # export env vars for next step
           echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+          echo "FORGE_EXIT_CODE=$FORGE_EXIT_CODE" >> $GITHUB_ENV
+
+          # env vars to form the comment
           echo "FORGE_COMMENT_HEADER=$FORGE_COMMENT_HEADER" >> $GITHUB_ENV
-          echo "FORGE_REPORT_TXT=$FORGE_REPORT_TXT" >> $GITHUB_ENV
           echo "FORGE_DASHBOARD_LINK=$FORGE_DASHBOARD_LINK" >> $GITHUB_ENV
+          echo "FORGE_REPORT_TXT=$FORGE_REPORT_TXT" >> $GITHUB_ENV
 
           # report metrics to pushgateway
           echo "forge_job_status {FORGE_EXIT_CODE=\"$FORGE_EXIT_CODE\",FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\"} $GITHUB_RUN_ID" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
