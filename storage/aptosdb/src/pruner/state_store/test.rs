@@ -72,7 +72,8 @@ fn test_state_store_pruner() {
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
             ledger_prune_window: Some(0),
-            pruning_batch_size: prune_batch_size,
+            ledger_pruning_batch_size: prune_batch_size,
+            state_store_pruning_batch_size: prune_batch_size,
         },
     );
 
@@ -159,7 +160,8 @@ fn test_state_store_pruner_disabled() {
         StoragePrunerConfig {
             state_store_prune_window: None,
             ledger_prune_window: Some(0),
-            pruning_batch_size: prune_batch_size,
+            ledger_pruning_batch_size: prune_batch_size,
+            state_store_pruning_batch_size: prune_batch_size,
         },
     );
 
@@ -258,7 +260,8 @@ fn test_worker_quit_eagerly() {
             StoragePrunerConfig {
                 state_store_prune_window: Some(1),
                 ledger_prune_window: Some(1),
-                pruning_batch_size: 100,
+                ledger_pruning_batch_size: 100,
+                state_store_pruning_batch_size: 100,
             },
         );
         command_sender
