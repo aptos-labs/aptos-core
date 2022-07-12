@@ -114,7 +114,7 @@ function App() {
   // Retrieve aptos.account on initial render and store it.
   const [address, setAddress] = React.useState<string | null>(null);
   React.useEffect(() => {
-    window.aptos.account().then(setAddress);
+    window.aptos.account().then((data : {address: string}) => setAddress(data.address));
   }, []);
 
   return (
@@ -527,7 +527,7 @@ function App() {
     if (urlAddress) {
       setAddress(urlAddress);
     } else {
-      window.aptos.account().then(setAddress);
+      window.aptos.account().then((data : {address: string}) => setAddress(data.address));
     }
   }, [urlAddress]);
 
