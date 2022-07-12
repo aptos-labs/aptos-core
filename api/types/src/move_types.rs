@@ -23,6 +23,7 @@ use move_deps::{
     move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue},
 };
 
+use poem_openapi::NewType as PoemNewType;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
@@ -50,7 +51,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveResource {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Copy)]
+#[derive(Clone, Debug, Eq, PartialEq, Copy, PoemNewType)]
 pub struct U64(pub u64);
 
 impl U64 {
