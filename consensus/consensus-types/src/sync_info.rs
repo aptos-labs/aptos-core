@@ -31,11 +31,11 @@ impl Display for SyncInfo {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
-            "SyncInfo[certified_round: {}, ordered_round: {}, timeout round: {}, commit round: {}]",
+            "SyncInfo[certified_round: {}, ordered_round: {}, timeout round: {}, commit info: {}]",
             self.highest_certified_round(),
             self.highest_ordered_round(),
             self.highest_timeout_round(),
-            self.highest_commit_round(),
+            self.highest_commit_cert().commit_info(),
         )
     }
 }
@@ -53,6 +53,12 @@ impl SyncInfo {
 
         let highest_ordered_cert =
             Some(highest_ordered_cert).filter(|hoc| hoc != &highest_quorum_cert);
+        assert!(
+            highest_commit_cert.commit_info().round() == 0
+                || highest_commit_cert.commit_info().version() > 0,
+            "{:?}",
+            highest_commit_cert
+        );
 
         Self {
             highest_quorum_cert,

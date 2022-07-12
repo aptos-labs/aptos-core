@@ -427,6 +427,11 @@ impl BlockTree {
         let commit_proof = finality_proof
             .create_merged_with_executed_state(commit_decision)
             .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
+        assert!(
+            commit_proof.commit_info().version() > 0,
+            "{:?}",
+            commit_proof
+        );
 
         let block_to_commit = blocks_to_commit.last().unwrap().clone();
         update_counters_for_committed_blocks(blocks_to_commit);
