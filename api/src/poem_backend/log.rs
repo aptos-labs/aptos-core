@@ -3,6 +3,7 @@
 
 use std::time::Duration;
 
+use crate::metrics::RESPONSE_STATUS;
 use aptos_logger::{
     debug, error,
     prelude::{sample, SampleRate},
@@ -13,6 +14,7 @@ use poem::{http::header, Endpoint, Request, Response, Result};
 
 /// Logs information about the request and response if the response status code
 /// is >= 500, to help us debug since this will be an error on our side.
+/// We also do general logging of the status code alone regardless of what it is.
 pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Response> {
     let start = std::time::Instant::now();
 
@@ -48,6 +50,10 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
     } else {
         debug!(log);
     }
+
+    RESPONSE_STATUS
+        .with_label_values(&[log.status.to_string().as_str()])
+        .observe(elapsed.as_secs_f64());
 
     Ok(response)
 }
