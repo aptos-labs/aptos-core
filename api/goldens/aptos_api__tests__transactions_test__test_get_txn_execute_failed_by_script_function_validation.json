@@ -21,43 +21,6 @@
           "sequence_number": "1"
         }
       }
-    },
-    {
-      "type": "write_resource",
-      "address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
-      "state_key_hash": "",
-      "data": {
-        "type": "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>",
-        "data": {
-          "coin": {
-            "value": "0"
-          },
-          "deposit_events": {
-            "counter": "0",
-            "guid": {
-              "guid": {
-                "id": {
-                  "addr": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
-                  "creation_num": "1"
-                }
-              },
-              "len_bytes": 40
-            }
-          },
-          "withdraw_events": {
-            "counter": "0",
-            "guid": {
-              "guid": {
-                "id": {
-                  "addr": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
-                  "creation_num": "2"
-                }
-              },
-              "len_bytes": 40
-            }
-          }
-        }
-      }
     }
   ],
   "sender": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",

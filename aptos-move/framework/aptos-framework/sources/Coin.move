@@ -37,6 +37,8 @@ module AptosFramework::Coin {
     /// Total supply of the coin overflows. No additional coins can be minted.
     const ETOTAL_SUPPLY_OVERFLOW: u64 = 7;
 
+    const EINVALID_COIN_AMOUNT: u64 = 8;
+
     const MAX_U128: u128 = 340282366920938463463374607431768211455;
 
     /// Core data structures
@@ -158,6 +160,7 @@ module AptosFramework::Coin {
         _cap: &BurnCapability<CoinType>,
     ) acquires CoinInfo {
         let Coin { value: amount } = coin;
+        assert!(amount > 0, Errors::invalid_argument(EINVALID_COIN_AMOUNT));
 
         let coin_addr = TypeInfo::account_address(&TypeInfo::type_of<CoinType>());
         let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_addr).supply;
@@ -169,11 +172,17 @@ module AptosFramework::Coin {
 
     /// Burn `coin` from the specified `account` with capability.
     /// The capability `burn_cap` should be passed as a reference to `BurnCapability<CoinType>`.
+    /// This function shouldn't fail as it's called as part of transaction fee burning.
     public fun burn_from<CoinType>(
         account_addr: address,
         amount: u64,
         burn_cap: &BurnCapability<CoinType>,
     ) acquires CoinInfo, CoinStore {
+        // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
+        if (amount == 0) {
+            return
+        };
+
         let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
         let coin_to_burn = extract(&mut coin_store.coin, amount);
         burn(coin_to_burn, burn_cap);
@@ -265,6 +274,10 @@ module AptosFramework::Coin {
         amount: u64,
         _cap: &MintCapability<CoinType>,
     ): Coin<CoinType> acquires CoinInfo {
+        if (amount == 0) {
+            return zero<CoinType>()
+        };
+
         let coin_addr = TypeInfo::account_address(&TypeInfo::type_of<CoinType>());
         let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_addr).supply;
         if (Option::is_some(supply)) {
