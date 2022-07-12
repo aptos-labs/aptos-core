@@ -8,7 +8,7 @@ class LeaderboardController < ApplicationController
   IT1_RESULTS = File.read(File.join(Rails.root, 'public/it1_leaderboard_final.json'))
   It1Metric = Struct.new(*IT1_METRIC_KEYS)
 
-  IT2_METRIC_KEYS = %i[rank validator liveness participation num_votes last_metrics_update].freeze
+  IT2_METRIC_KEYS = %i[rank validator liveness participation num_votes latest_reported_timestamp].freeze
   It2Metric = Struct.new(*IT2_METRIC_KEYS)
 
   def it1
@@ -42,12 +42,13 @@ class LeaderboardController < ApplicationController
   end
 
   def it2
-    expires_in 1.minute, public: true
-    default_sort = [[:num_votes, -1], [:participation, -1], [:liveness, -1], [:last_metrics_update, -1]]
-    @metrics, @last_updated = Rails.cache.fetch(:it2_leaderboard, expires_in: 1.minute) do
+    expires_in 5.minutes, public: true
+    default_sort = [[:num_votes, -1], [:participation, -1], [:liveness, -1], [:latest_reported_timestamp, -1]]
+    @metrics, @last_updated = Rails.cache.fetch(:it2_leaderboard, expires_in: 5.minutes) do
       response = HTTParty.get(ENV.fetch('LEADERBOARD_IT2_URL'))
       metrics = JSON.parse(response.body).map do |metric|
-        timestamp = if metric['latest_reported_timestamp'].blank?
+        timestamp = if metric['latest_reported_timestamp'].blank? ||
+                       metric['latest_reported_timestamp'] == '1970-01-01 00:00:00+00:00'
                       nil
                     else
                       DateTime.parse(metric['latest_reported_timestamp']).to_f
@@ -69,7 +70,7 @@ class LeaderboardController < ApplicationController
       [metrics, Time.now]
     end
 
-    @sort_columns = %w[rank liveness participation num_votes last_metrics_update]
+    @sort_columns = %w[rank liveness participation num_votes latest_reported_timestamp]
     sort = sort_params(@sort_columns)
     sort_metrics!(@metrics, sort) if sort.present?
   end

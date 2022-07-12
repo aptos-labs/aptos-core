@@ -1,10 +1,10 @@
+# frozen_string_literal: true
+
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
-# frozen_string_literal: true
 
 class TableHeaderColumnComponent < ViewComponent::Base
   include ApplicationHelper
-  include Memery
 
   renders_one :tooltip, IconTooltipComponent
 
@@ -26,7 +26,7 @@ class TableHeaderColumnComponent < ViewComponent::Base
 
   private
 
-  memoize def sort_direction
+  def sort_direction
     sort = parse_sort(request.params).find do |key, _direction|
       key == @id.to_s
     end

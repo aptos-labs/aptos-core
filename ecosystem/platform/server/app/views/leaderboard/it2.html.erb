@@ -32,7 +32,7 @@
       <%= content_tag :div, class: 'overflow-x-auto' do %>
         <%= render TableComponent.new(class: 'w-full table-auto') do |t| %>
           <%= t.with_column(:rank, '#', align: 'right') %>
-          <%= t.with_column(:validator, 'Account Address', align: 'left') %>
+          <%= t.with_column('Account Address', align: 'left') %>
           <%= t.with_column(:liveness, 'Liveness', align: 'left') do |column| %>
             <%= column.with_tooltip(:info) do |tooltip| %>
               <%= tooltip.with_header do %>
@@ -98,7 +98,7 @@
             <% end %>
           <% end %>
           <%= t.with_column(:num_votes, 'Votes', align: 'left') %>
-          <%= t.with_column(:last_metrics_update, 'Last Metrics Update', align: 'right') %>
+          <%= t.with_column(:latest_reported_timestamp, 'Last Metrics Update', align: 'right') %>
 
           <%= t.with_body do %>
             <% @metrics.each_with_index do |metric, i| %>
@@ -125,8 +125,8 @@
                   <%= metric.num_votes %>
                 <% end %>
                 <%= tr.with_column(align: 'right') do %>
-                  <% if metric.last_metrics_update %>
-                    <%= Time.at(metric.last_metrics_update).utc.to_fs(:db) %>
+                  <% if metric.latest_reported_timestamp %>
+                    <%= Time.at(metric.latest_reported_timestamp).utc.to_fs(:db) %>
                   <% end %>
                 <% end %>
               <% end %>
@@ -135,5 +135,7 @@
         <% end %>
       <% end %>
     <% end %>
+    <p class="text-neutral-400 text-xs mt-6 font-light">This page refreshes every 15 minutes.</p>
+    <p class="text-neutral-400 text-xs font-light">Data last updated <%= @last_updated.utc.to_fs(:db) %> UTC</p>
   </div>
 </div>
