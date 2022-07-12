@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+#![forbid(unsafe_code)]
+
 use aptos_api::runtime::bootstrap as bootstrap_api;
 use aptos_config::{
     config::{
@@ -22,6 +24,7 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use backup_service::start_backup_service;
+use clap::Parser;
 use consensus::consensus_provider::start_consensus;
 use consensus_notifications::ConsensusNotificationListener;
 use data_streaming_service::{
@@ -31,9 +34,11 @@ use data_streaming_service::{
 use event_notifications::EventSubscriptionService;
 use executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
 use futures::channel::mpsc::channel;
+use hex::FromHex;
 use mempool_notifications::MempoolNotificationSender;
 use network::application::storage::PeerMetadataStorage;
 use network_builder::builder::NetworkBuilder;
+use rand::{rngs::StdRng, SeedableRng};
 use state_sync_multiplexer::{
     state_sync_v1_network_config, StateSyncMultiplexer, StateSyncRuntimes,
 };
@@ -61,6 +66,77 @@ const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
 const MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE: usize = 1_024;
 
+/// Runs an aptos fullnode or validator
+#[derive(Debug, Parser)]
+#[clap(name = "Aptos Node", author, version)]
+pub struct AptosNodeArgs {
+    /// Path to node configuration file
+    #[clap(short = 'f', long, required_unless = "test")]
+    config: Option<PathBuf>,
+    /// Enable to run a single validator node testnet
+    #[clap(long)]
+    test: bool,
+
+    /// Random number generator seed to use when starting a single validator testnet
+    #[clap(long, parse(try_from_str = FromHex::from_hex), requires("test"))]
+    seed: Option<[u8; 32]>,
+
+    /// Enable using random ports instead of ports from the node configuration
+    #[clap(long, requires("test"))]
+    random_ports: bool,
+
+    /// Paths to Aptos framework module blobs to be included in genesis.
+    ///
+    /// Can be both files and directories
+    #[clap(long, requires("test"))]
+    genesis_modules: Option<Vec<PathBuf>>,
+
+    /// Enable lazy mode
+    ///
+    /// Setting this flag will set `consensus#mempool_poll_count` config to `u64::MAX` and
+    /// only commit a block when there is user transaction in mempool.
+    #[clap(long, requires("test"))]
+    lazy: bool,
+}
+
+impl AptosNodeArgs {
+    pub fn run(self) {
+        if self.test {
+            println!("Entering test mode, this should never be used in production!");
+            let rng = self
+                .seed
+                .map(StdRng::from_seed)
+                .unwrap_or_else(StdRng::from_entropy);
+            let genesis_modules = if let Some(module_paths) = self.genesis_modules {
+                framework::load_modules_from_paths(&module_paths)
+            } else {
+                cached_framework_packages::module_blobs().to_vec()
+            };
+            load_test_environment(
+                self.config,
+                self.random_ports,
+                self.lazy,
+                genesis_modules,
+                rng,
+            );
+        } else {
+            // Load the config file
+            let config_path = self.config.unwrap();
+            let config = NodeConfig::load(config_path.clone()).unwrap_or_else(|error| {
+                panic!(
+                    "Failed to load node config file! Given file path: {:?}. Error: {:?}",
+                    config_path, error
+                )
+            });
+            println!("Using node config {:?}", &config);
+
+            // Start the node
+            start(config, None);
+        };
+    }
+}
+
+/// Runtime handle to ensure that all inner runtimes stay in scope
 pub struct AptosHandle {
     _api: Runtime,
     _backup: Runtime,
@@ -71,6 +147,7 @@ pub struct AptosHandle {
     _telemetry_runtime: Option<Runtime>,
 }
 
+/// Start an aptos node
 pub fn start(config: NodeConfig, log_file: Option<PathBuf>) {
     crash_handler::setup_panic_handler();
 
