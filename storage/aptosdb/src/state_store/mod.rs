@@ -146,9 +146,14 @@ impl StateStore {
     }
 
     fn initialize(self: &Arc<Self>, hack_for_tests: bool) -> Result<()> {
+        let num_transactions = LedgerStore::new(Arc::clone(&self.ledger_db))
+            .get_latest_transaction_info_option()?
+            .map(|(version, _)| version + 1)
+            .unwrap_or(0);
+
         let latest_snapshot_version = self
             .state_merkle_db
-            .get_state_snapshot_version_before(Version::MAX)
+            .get_state_snapshot_version_before(num_transactions)
             .expect("Failed to query latest node on initialization.");
         let latest_snapshot_root_hash = if let Some(version) = latest_snapshot_version {
             self.state_merkle_db
@@ -169,10 +174,6 @@ impl StateStore {
             return Ok(());
         }
 
-        let num_transactions = LedgerStore::new(Arc::clone(&self.ledger_db))
-            .get_latest_transaction_info_option()?
-            .map(|(version, _)| version + 1)
-            .unwrap_or(0);
         ensure!(
             snapshot_next_version <= num_transactions,
             "snapshot is after latest version. snapshot_next_version: {}, num_transactions: {}",

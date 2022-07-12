@@ -1210,7 +1210,12 @@ impl DbReader for AptosDB {
 
     fn get_latest_state_checkpoint(&self) -> Result<Option<(Version, HashValue)>> {
         gauged_api("get_latest_state_checkpoint_version", || {
-            self.state_store.get_state_snapshot_before(Version::MAX)
+            let num_txns = self
+                .ledger_store
+                .get_latest_transaction_info_option()?
+                .map(|(version, _)| version + 1)
+                .unwrap_or(0);
+            self.state_store.get_state_snapshot_before(num_txns)
         })
     }
 
