@@ -354,12 +354,17 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
             Box::pin(async move {
                 info!("Attempting health check: {:?}", node);
                 match node.rest_client().get_ledger_information().await {
-                    Ok(_) => {
-                        info!("Node {} healthy", node.name());
-                        Ok(())
+                    Ok(res) => {
+                        let version = res.inner().version;
+                        info!("Node {} @ version {}", node.name(), version);
+                        if version > 100 {
+                            info!("Node {} healthy @ version {} > 100", node.name(), version);
+                            return Ok(());
+                        } 
+                        bail!("Node {} unhealthy: REST API returned version 0", node.name());
                     }
                     Err(x) => {
-                        info!("K8s Node {} unhealthy: {}", node.name(), &x);
+                        info!("Node {} unhealthy: {}", node.name(), &x);
                         Err(x)
                     }
                 }
