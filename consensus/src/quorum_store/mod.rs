@@ -19,3 +19,4 @@ pub(crate) mod utils;
 mod counters;
 #[cfg(test)]
 mod tests;
+mod schema;

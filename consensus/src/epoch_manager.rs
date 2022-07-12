@@ -420,6 +420,7 @@ impl EpochManager {
 
         let quorum_store_wrapper = QuorumStoreWrapper::new(
             self.epoch(),
+            self.quorum_store_storage.clone(),
             self.quorum_store_to_mempool_tx.clone(),
             wrapper_to_quorum_store_tx,
             self.config.mempool_txn_pull_timeout_ms,

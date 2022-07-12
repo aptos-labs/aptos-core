@@ -84,7 +84,7 @@ impl BatchStore {
         memory_quota: usize,
         db_quota: usize,
     ) -> (Self, Arc<BatchReader>) {
-        let db_content = db.get_data().expect("failed to read data from db");
+        let db_content = db.get_all_batches().expect("failed to read data from db");
 
         let (batch_reader, expired_keys) = BatchReader::new(
             epoch,
@@ -97,7 +97,7 @@ impl BatchStore {
             memory_quota,
             db_quota,
         );
-        if let Err(_) = db.delete(expired_keys) {
+        if let Err(_) = db.delete_batches(expired_keys) {
             // TODO: do something
         }
         let batch_reader: Arc<BatchReader> = Arc::new(batch_reader);
@@ -195,7 +195,7 @@ impl BatchStore {
                     }
                 }
                 BatchStoreCommand::Clean(digests) => {
-                    if let Err(_) = self.db.delete(digests) {
+                    if let Err(_) = self.db.delete_batches(digests) {
                         //TODO: do something
                     }
                 }
