@@ -4,7 +4,6 @@
   "dependencies": {
     "@hotwired/stimulus": "^3.0.1",
     "@hotwired/turbo-rails": "^7.1.1",
-    "@tailwindcss/aspect-ratio": "^0.4.0",
     "@tailwindcss/forms": "^0.5.1",
     "@tailwindcss/typography": "^0.5.2",
     "aptos": "^1.0.0",
@@ -12,7 +11,7 @@
     "dialog-polyfill": "^0.5.6",
     "esbuild": "^0.14.39",
     "postcss": "^8.4.13",
-    "tailwindcss": "^3.0.24"
+    "tailwindcss": "^3.1.0"
   },
   "scripts": {
     "build": "esbuild app/javascript/application.ts --bundle --minify --target=es2020 --sourcemap --outdir=app/assets/builds",

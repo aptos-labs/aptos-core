@@ -412,6 +412,8 @@ GEM
       rspec-mocks (~> 3.10)
       rspec-support (~> 3.10)
     rspec-support (3.11.0)
+    rss (0.2.9)
+      rexml
     rubocop (1.31.0)
       parallel (~> 1.10)
       parser (>= 3.1.0.0)
@@ -528,6 +530,7 @@ DEPENDENCIES
   rails (~> 7.0.2, >= 7.0.2.3)
   recaptcha (~> 5.10)
   rspec-rails
+  rss
   rubocop
   rubocop-rails
   rubyzip

@@ -5,7 +5,7 @@
 
 require 'test_helper'
 
-class SettingsControllerTest < ActionDispatch::IntegrationTest
+class StaticPageControllerTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
 
   ROUTES = Rails.application.routes.routes.collect do |route|
@@ -16,12 +16,12 @@ class SettingsControllerTest < ActionDispatch::IntegrationTest
     test "static_page##{route.action} is static" do
       skip('Disabling this temporarily to unblock flash on main page') and return nil
       sign_out @controller.current_user if @controller&.current_user
-      get route.path
+      get route.format({})
       signed_out = @response.body
 
       user = FactoryBot.create(:user)
       sign_in user
-      get route.path
+      get route.format({})
       signed_in = @response.body
 
       assert_equal signed_out, signed_in
