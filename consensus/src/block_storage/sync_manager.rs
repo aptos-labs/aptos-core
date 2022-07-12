@@ -83,9 +83,6 @@ impl BlockStore {
         )
         .await?;
 
-        self.insert_quorum_cert(sync_info.highest_commit_cert(), &mut retriever)
-            .await?;
-
         self.insert_quorum_cert(sync_info.highest_ordered_cert(), &mut retriever)
             .await?;
 
@@ -211,8 +208,9 @@ impl BlockStore {
     ) -> anyhow::Result<RecoveryData> {
         info!(
             LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
-            "Start state sync with peer to block: {}",
-            highest_ordered_cert.commit_info(),
+            "Start state sync to commit cert: {}, ordered cert: {}",
+            highest_commit_cert,
+            highest_ordered_cert,
         );
 
         // we fetch the blocks from
