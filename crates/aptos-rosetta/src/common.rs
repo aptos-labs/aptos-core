@@ -4,19 +4,19 @@
 use crate::{
     error::{ApiError, ApiResult},
     types::{
-        test_coin_identifier, BlockIdentifier, Currency, CurrencyMetadata, MetadataRequest,
-        NetworkIdentifier, PartialBlockIdentifier,
+        test_coin_identifier, Currency, CurrencyMetadata, MetadataRequest, NetworkIdentifier,
+        PartialBlockIdentifier,
     },
     RosettaContext,
 };
-use aptos_crypto::{HashValue, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
+use aptos_crypto::{ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_logger::debug;
 use aptos_rest_client::{aptos_api_types::BlockInfo, Account, Response};
 use aptos_sdk::move_types::language_storage::{StructTag, TypeTag};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{convert::Infallible, future::Future, str::FromStr};
+use std::{convert::Infallible, fmt::LowerHex, future::Future, str::FromStr};
 use warp::Filter;
 
 /// The year 2000 in seconds, as this is the lower limit for Rosetta API implementations
@@ -166,11 +166,6 @@ pub fn is_native_coin(currency: &Currency) -> ApiResult<()> {
     }
 }
 
-pub fn string_to_hash(str: &str) -> ApiResult<HashValue> {
-    HashValue::from_str(strip_hex_prefix(str))
-        .map_err(|err| ApiError::DeserializationFailed(Some(err.to_string())))
-}
-
 /// Determines which block to pull for the request
 pub async fn get_block_index_from_request(
     server_context: &RosettaContext,
@@ -193,16 +188,12 @@ pub async fn get_block_index_from_request(
             index: None,
             hash: Some(hash),
         }) => {
-            if hash == BlockIdentifier::genesis_txn().hash {
-                0
-            } else {
-                server_context
-                    .block_cache()?
-                    .get_block_index_by_hash(
-                        &aptos_rest_client::aptos_api_types::HashValue::from_str(&hash)?,
-                    )
-                    .await?
-            }
+            server_context
+                .block_cache()?
+                .get_block_index_by_hash(&aptos_rest_client::aptos_api_types::HashValue::from_str(
+                    &hash,
+                )?)
+                .await?
         }
         // Lookup latest version
         _ => {
@@ -218,4 +209,8 @@ pub async fn get_block_index_from_request(
                 .await?
         }
     })
+}
+
+pub fn to_hex_lower<T: LowerHex>(obj: &T) -> String {
+    format!("{:x}", obj)
 }
