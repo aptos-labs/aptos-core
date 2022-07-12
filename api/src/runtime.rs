@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{context::Context, index, poem_backend::runtime::attach_poem_to_runtime};
+use crate::{context::Context, index, poem_backend::attach_poem_to_runtime};
 use anyhow::Context as AnyhowContext;
 use aptos_config::config::{ApiConfig, NodeConfig};
 use aptos_mempool::MempoolClientSender;
