@@ -1,14 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::api::Api;
+use crate::context::Context;
+use anyhow::Context as AnyhowContext;
 use aptos_config::config::NodeConfig;
-use poem::{listener::TcpListener, Route, Server};
+use aptos_logger::info;
+use poem::{
+    listener::{Listener, RustlsCertificate, RustlsConfig, TcpListener},
+    Route, Server,
+};
 use poem_openapi::{ContactObject, LicenseObject, OpenApiService};
 use tokio::runtime::Runtime;
-
-use crate::context::Context;
-
-use super::api::Api;
 
 pub fn attach_poem_to_runtime(
     runtime: &Runtime,
@@ -23,8 +26,29 @@ pub fn attach_poem_to_runtime(
 
     let address = config.api.address;
 
+    let listener = match (&config.api.tls_cert_path, &config.api.tls_key_path) {
+        (Some(tls_cert_path), Some(tls_key_path)) => {
+            info!("Using TLS for API");
+            let cert = std::fs::read_to_string(tls_cert_path).context(format!(
+                "Failed to read TLS cert from path: {}",
+                tls_cert_path
+            ))?;
+            let key = std::fs::read_to_string(tls_key_path).context(format!(
+                "Failed to read TLS key from path: {}",
+                tls_key_path
+            ))?;
+            let rustls_certificate = RustlsCertificate::new().cert(cert).key(key);
+            let rustls_config = RustlsConfig::new().fallback(rustls_certificate);
+            TcpListener::bind(address).rustls(rustls_config).boxed()
+        }
+        _ => {
+            info!("Not using TLS for API");
+            TcpListener::bind(address).boxed()
+        }
+    };
+
     runtime.spawn(async move {
-        Server::new(TcpListener::bind(address))
+        Server::new(listener)
             .run(
                 Route::new()
                     .nest("/", api_service)
