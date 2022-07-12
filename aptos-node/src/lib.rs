@@ -67,7 +67,7 @@ const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
 const MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE: usize = 1_024;
 
 /// Runs an aptos fullnode or validator
-#[derive(Debug, Parser)]
+#[derive(Clone, Debug, Parser)]
 #[clap(name = "Aptos Node", author, version)]
 pub struct AptosNodeArgs {
     /// Path to node configuration file
