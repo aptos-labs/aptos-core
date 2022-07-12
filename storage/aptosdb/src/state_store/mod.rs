@@ -177,10 +177,10 @@ impl StateStore {
         // For non-restore cases, always snapshot_next_version <= num_transactions.
         if snapshot_next_version > num_transactions {
             info!(
-            snapshot_next_version = snapshot_next_version,
+                snapshot_next_version = snapshot_next_version,
                 num_transactions = num_transactions,
-            "snapshot is after latest transaction version. It should only happen in restore mode",
-           );
+                "snapshot is after latest transaction version. It should only happen in restore mode",
+            );
         }
 
         // Replaying the committed write sets after the latest snapshot.

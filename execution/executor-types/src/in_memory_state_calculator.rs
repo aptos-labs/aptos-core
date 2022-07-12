@@ -30,7 +30,7 @@ pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_
 ///   2. a transaction chunk or block ended (where `finish()` is called)
 ///
 /// | ------------------------------------------ | -------------------------- |
-/// |  (updated_between_checkpoint_and_latest)   |  (updates_after_latest)    |
+/// |  (updates_between_checkpoint_and_latest)   |  (updates_after_latest)    |
 /// \                                            \                            |
 ///  checkpoint SMT                               latest SMT                  |
 ///                                                                          /
@@ -51,7 +51,7 @@ pub struct InMemoryStateCalculator {
     latest: FrozenSparseMerkleTree<StateValue>,
 
     next_version: Version,
-    updated_between_checkpoint_and_latest: HashMap<StateKey, StateValue>,
+    updates_between_checkpoint_and_latest: HashMap<StateKey, StateValue>,
     updates_after_latest: HashMap<StateKey, StateValue>,
 }
 
@@ -78,7 +78,7 @@ impl InMemoryStateCalculator {
             checkpoint_version,
             latest: current.freeze(),
             next_version: current_version.map_or(0, |v| v + 1),
-            updated_between_checkpoint_and_latest: updated_since_checkpoint,
+            updates_between_checkpoint_and_latest: updated_since_checkpoint,
             updates_after_latest: HashMap::new(),
         }
     }
@@ -132,20 +132,20 @@ impl InMemoryStateCalculator {
         self.next_version += 1;
 
         if txn_output.is_reconfig() {
-            Ok((updated_state_kvs, Some(self.checkpoint_root_hash()?)))
+            Ok((updated_state_kvs, Some(self.make_checkpoint()?)))
         } else {
             match txn {
                 Transaction::BlockMetadata(_) | Transaction::UserTransaction(_) => {
                     Ok((updated_state_kvs, None))
                 }
                 Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => {
-                    Ok((updated_state_kvs, Some(self.checkpoint_root_hash()?)))
+                    Ok((updated_state_kvs, Some(self.make_checkpoint()?)))
                 }
             }
         }
     }
 
-    fn checkpoint_root_hash(&mut self) -> Result<HashValue> {
+    fn make_checkpoint(&mut self) -> Result<HashValue> {
         // Update SMT.
         let smt_updates: Vec<_> = self
             .updates_after_latest
@@ -159,7 +159,7 @@ impl InMemoryStateCalculator {
         self.latest = new_checkpoint.clone();
         self.checkpoint = new_checkpoint.unfreeze();
         self.checkpoint_version = self.next_version.checked_sub(1);
-        self.updated_between_checkpoint_and_latest = HashMap::new();
+        self.updates_between_checkpoint_and_latest = HashMap::new();
         self.updates_after_latest = HashMap::new();
 
         Ok(root_hash)
@@ -189,7 +189,7 @@ impl InMemoryStateCalculator {
             .collect();
         let latest = self.latest.batch_update(smt_updates, &self.proof_reader)?;
 
-        self.updated_between_checkpoint_and_latest
+        self.updates_between_checkpoint_and_latest
             .extend(self.updates_after_latest);
 
         let result_state = InMemoryState::new(
@@ -197,7 +197,7 @@ impl InMemoryStateCalculator {
             self.checkpoint_version,
             latest.unfreeze(),
             self.next_version.checked_sub(1),
-            self.updated_between_checkpoint_and_latest,
+            self.updates_between_checkpoint_and_latest,
         );
 
         Ok((result_state, self.state_cache))
