@@ -92,10 +92,7 @@ impl Evaluator for TpsEvaluator {
     /// This test runs a TPS (transactions per second) evaluation on the target
     /// node, in which it passes if it meets some preconfigured minimum.
     async fn evaluate(&self, input: &Self::Input) -> Result<Vec<EvaluationResult>, Self::Error> {
-        let mut target_url = input.target_node_address.url.clone();
-        target_url
-            .set_port(Some(input.target_node_address.api_port))
-            .unwrap();
+        let target_url = input.target_node_address.get_api_url();
 
         let cluster_args = ClusterArgs {
             targets: vec![target_url; self.args.repeat_target_count],
@@ -123,7 +120,7 @@ impl Evaluator for TpsEvaluator {
 
         let mut description = format!("The minimum TPS (transactions per second) \
             required of nodes is {}, your node hit: {} (out of {} transactions submitted per second).", self.args.minimum_tps, rate.committed, rate.submitted);
-        let evaluation_result = if rate.committed > self.args.minimum_tps {
+        let evaluation_result = if rate.committed >= self.args.minimum_tps {
             if stats.committed == stats.submitted {
                 description.push_str(
                     " Your node could theoretically hit \
