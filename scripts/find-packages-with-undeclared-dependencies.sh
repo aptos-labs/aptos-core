@@ -12,4 +12,4 @@
 # $ git commit --all -m "Update dependencies"
 set -ex
 
-cargo install cargo-workspaces && for package in $(cargo workspaces list --all --json | jq ".[].name" -r); do cargo build -p $package || true; done
+cargo install cargo-workspaces && for package in $(cargo workspaces list --all --json | jq ".[].name" -r); do cargo build -p $package; done
