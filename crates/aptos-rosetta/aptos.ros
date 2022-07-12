@@ -1,0 +1,167 @@
+
+create_account(1){
+    create_account{
+        create_account.network = {"network":"TESTING", "blockchain":"aptos"};
+        key = generate_key({"curve_type":"edwards25519"});
+        account = derive({
+            "network_identifier": {{create_account.network}},
+            "public_key": {{key.public_key}}
+        });
+        save_account({
+            "account_identifier": {{account.account_identifier}},
+            "keypair": {{key}}
+        });
+
+        faucet = {"address":"ec47493b32bc667d3116d0a62cc462416361adab4817c737fbe3c06955ebc0de"};
+        print_message({"Create address":{{account.account_identifier}}});
+        create_account.operations = [
+            {
+                "operation_identifier": {"index":0},
+                "type":"create_account",
+                "account":{{account.account_identifier}},
+                "metadata":{
+                    "sender": {{faucet}}
+                }
+            }
+        ];
+        create_account.confirmation_depth = 2;
+    }
+}
+
+request_funds(1){
+  find_account{
+    currency = {
+      "symbol":"TC",
+      "decimals": 6,
+      "metadata": {
+        "move_type": "0x1::TestCoin::TestCoin"
+      }
+    };
+    random_account = find_balance({
+      "minimum_balance":{
+        "value": "0",
+        "currency": {{currency}}
+      },
+      "create_limit":1
+    });
+  },
+  request{
+    loaded_account = find_balance({
+      "account_identifier": {{random_account.account_identifier}},
+      "minimum_balance":{
+        "value": "10000000",
+        "currency": {{currency}}
+      }
+    });
+    print_message({"Account":{{loaded_account.balance}}});
+  }
+}
+
+return_funds(10){
+    transfer{
+        transfer.network = {"network":"TESTING", "blockchain":"aptos"};
+        currency = {
+            "symbol":"TC",
+            "decimals":6,
+            "metadata":{
+                "move_type":"0x1::TestCoin::TestCoin"
+            }
+        };
+        max_fee = "100";
+        sender = find_balance({
+            "minimum_balance":{
+                "value": {{max_fee}},
+                "currency": {{currency}}
+            }
+        });
+
+        // Set the recipient_amount as some sender.balance-max_fee
+        available_amount = {{sender.balance.value}} - {{max_fee}};
+        print_message({"available_amount":{{available_amount}}});
+        sender_amount = 0 - {{available_amount}};
+
+        // Provide a static address as the recipient and construct operations
+        faucet = {"address":"ec47493b32bc667d3116d0a62cc462416361adab4817c737fbe3c06955ebc0de"};
+        transfer.operations = [
+            {
+                "operation_identifier":{"index":0},
+                "type":"withdraw",
+                "account":{{sender.account_identifier}},
+                "amount":{
+                    "value":{{sender_amount}},
+                    "currency":{{currency}}
+                }
+            },
+            {
+                "operation_identifier":{"index":1},
+                "type":"deposit",
+                "account":{{faucet}},
+                "amount":{
+                    "value":{{available_amount}},
+                    "currency":{{currency}}
+                }
+            }
+        ];
+        transfer.confirmation_depth = 2;
+    }
+}
+
+
+transfer(10){
+    transfer{
+        transfer.network = {"network":"TESTING", "blockchain":"aptos"};
+        currency = {
+          "symbol":"TC",
+          "decimals": 6,
+          "metadata": {
+            "move_type": "0x1::TestCoin::TestCoin"
+          }
+        };
+        sender = find_balance({
+            "minimum_balance":{
+                "value": "20000",
+                "currency": {{currency}}
+            }
+        });
+
+        // Set the recipient_amount as some value <= sender.balance-max_fee
+        max_fee = "2200";
+        max_amount = "10000";
+        available_amount = {{sender.balance.value}} - {{max_fee}};
+        recipient_amount = random_number({"minimum": "1", "maximum": {{available_amount}}});
+
+        // Find recipient and construct operations
+        sender_amount = "0" - {{recipient_amount}};
+        recipient = find_balance({
+            "not_account_identifier":[{{sender.account_identifier}}],
+            "minimum_balance":{
+                "value": "0",
+                "currency": {{currency}}
+            },
+            "create_limit": 100,
+            "create_probability": 50
+        });
+        print_message({"Transfer from":{{sender.account_identifier}}, "Transfer to":{{recipient.account_identifier}}});
+        transfer.operations = [
+            {
+                "operation_identifier":{"index":0},
+                "type":"withdraw",
+                "account":{{sender.account_identifier}},
+                "amount":{
+                    "value":{{sender_amount}},
+                    "currency":{{currency}}
+                }
+            },
+            {
+                "operation_identifier":{"index":1},
+                "type":"deposit",
+                "account":{{recipient.account_identifier}},
+                "amount":{
+                    "value":{{recipient_amount}},
+                    "currency":{{currency}}
+                }
+            }
+        ];
+        transfer.confirmation_depth = 2;
+    }
+}
