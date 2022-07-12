@@ -27,14 +27,14 @@ pub fn bootstrap(
         .enable_all()
         .build()
         .context("[api] failed to create runtime")?;
+    let context = Context::new(chain_id, db, mp_sender, config.clone());
 
     if config.api.use_poem_backend {
-        attach_poem_to_runtime(&runtime, config).context("Failed to attach poem to runtime")?;
+        attach_poem_to_runtime(&runtime, context, config)
+            .context("Failed to attach poem to runtime")?;
     } else {
         let api = WebServer::from(config.api.clone());
-        let node_config = config.clone();
         runtime.spawn(async move {
-            let context = Context::new(chain_id, db, mp_sender, node_config);
             let routes = index::routes(context);
             api.serve(routes).await;
         });

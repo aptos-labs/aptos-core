@@ -1,6 +1,6 @@
 [package]
 name = "aptos-api"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos REST API"
 repository = "https://github.com/aptos-labs/aptos-core"
