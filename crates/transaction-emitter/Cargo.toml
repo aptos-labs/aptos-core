@@ -17,7 +17,7 @@ itertools = "0.10.3"
 rand = "0.7.3"
 rand_core = "0.5.1"
 termion = "1.5.6"
-tokio = { version = "1.18.2", features = ["full","tracing"] }
+tokio = { version = "1.18.2", features = ["full"] }
 
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-sdk = { path = "../../sdk" }

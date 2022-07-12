@@ -24,7 +24,7 @@ rayon = "1.5.2"
 serde = { version = "1.0.137", default-features = false }
 serde_json = "1.0.81"
 thiserror = "1.0.31"
-tokio = { version = "1.18.2", features = ["full","tracing"] }
+tokio = { version = "1.18.2", features = ["full"] }
 tokio-stream = "0.1.8"
 
 aptos-config = { path = "../config" }
