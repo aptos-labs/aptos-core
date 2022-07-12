@@ -16,7 +16,6 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    nibble::nibble_path::NibblePath,
     proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
@@ -319,10 +318,6 @@ pub struct TransactionData {
     /// transaction.
     state_updates: HashMap<StateKey, StateValue>,
 
-    /// Each entry in this map represents the the hash of a newly generated jellyfish node
-    /// and its corresponding nibble path.
-    jf_node_hashes: HashMap<NibblePath, HashValue>,
-
     /// The writeset generated from this transaction.
     write_set: WriteSet,
 
@@ -351,7 +346,6 @@ pub struct TransactionData {
 impl TransactionData {
     pub fn new(
         state_updates: HashMap<StateKey, StateValue>,
-        jf_node_hashes: HashMap<NibblePath, HashValue>,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
         reconfig_events: Vec<ContractEvent>,
@@ -363,7 +357,6 @@ impl TransactionData {
     ) -> Self {
         TransactionData {
             state_updates,
-            jf_node_hashes,
             write_set,
             events,
             reconfig_events,
@@ -377,10 +370,6 @@ impl TransactionData {
 
     pub fn state_updates(&self) -> &HashMap<StateKey, StateValue> {
         &self.state_updates
-    }
-
-    pub fn jf_node_hashes(&self) -> &HashMap<NibblePath, HashValue> {
-        &self.jf_node_hashes
     }
 
     pub fn write_set(&self) -> &WriteSet {
