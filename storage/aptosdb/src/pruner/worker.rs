@@ -4,6 +4,7 @@ use aptos_types::transaction::Version;
 use schemadb::DB;
 
 use crate::pruner::{db_pruner::DBPruner, utils};
+use crate::PrunerIndex;
 use aptos_config::config::StoragePrunerConfig;
 use aptos_infallible::Mutex;
 use itertools::zip_eq;
@@ -24,7 +25,10 @@ pub struct Worker {
     /// Indicates if there's NOT any pending work to do currently, to hint
     /// `Self::receive_commands()` to `recv()` blocking-ly.
     blocking_recv: bool,
-    max_version_to_prune_per_batch: u64,
+    /// Max items to prune per batch. For the ledger pruner, this means the max versions to prune
+    /// and for the state pruner, this means the max stale nodes to prune.
+    ledger_store_max_versions_to_prune_per_batch: u64,
+    state_store_max_nodes_to_prune_per_batch: u64,
 }
 
 impl Worker {
@@ -42,26 +46,51 @@ impl Worker {
             command_receiver,
             min_readable_versions,
             blocking_recv: true,
-            max_version_to_prune_per_batch: storage_pruner_config.pruning_batch_size as u64,
+            ledger_store_max_versions_to_prune_per_batch: storage_pruner_config
+                .ledger_pruning_batch_size
+                as u64,
+            state_store_max_nodes_to_prune_per_batch: storage_pruner_config
+                .state_store_pruning_batch_size
+                as u64,
         }
     }
 
     pub(crate) fn work(mut self) {
+        assert_eq!(self.db_pruners.len(), 2);
         while self.receive_commands() {
             // Process a reasonably small batch of work before trying to receive commands again,
             // in case `Command::Quit` is received (that's when we should quit.)
             let mut error_in_pruning = false;
-            for db_pruner in self.db_pruners.iter().flatten() {
-                let result = db_pruner.lock().prune(self.max_version_to_prune_per_batch);
-                result.map_err(|_| error_in_pruning = true).ok();
-            }
             let mut pruning_pending = false;
-            for db_pruner in self.db_pruners.iter().flatten() {
-                // if any of the pruner has pending pruning, then we don't block on receive
-                if db_pruner.lock().is_pruning_pending() {
+
+            if let Some(state_store_pruner_locked) =
+                &self.db_pruners[PrunerIndex::StateStorePrunerIndex as usize]
+            {
+                let state_store_pruner = state_store_pruner_locked.lock();
+                state_store_pruner
+                    .prune(self.state_store_max_nodes_to_prune_per_batch as usize)
+                    .map_err(|_| error_in_pruning = true)
+                    .ok();
+
+                if state_store_pruner.is_pruning_pending() {
                     pruning_pending = true;
                 }
             }
+
+            if let Some(ledger_pruner_locked) =
+                &self.db_pruners[PrunerIndex::LedgerPrunerIndex as usize]
+            {
+                let ledger_pruner = ledger_pruner_locked.lock();
+                ledger_pruner
+                    .prune(self.ledger_store_max_versions_to_prune_per_batch as usize)
+                    .map_err(|_| error_in_pruning = true)
+                    .ok();
+
+                if ledger_pruner.is_pruning_pending() {
+                    pruning_pending = true;
+                }
+            }
+
             if !pruning_pending || error_in_pruning {
                 self.blocking_recv = true;
             } else {

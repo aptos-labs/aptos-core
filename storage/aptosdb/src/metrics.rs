@@ -84,8 +84,19 @@ pub static PRUNER_LEAST_READABLE_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static PRUNER_BATCH_SIZE: Lazy<IntGauge> =
-    Lazy::new(|| register_int_gauge!("pruner_batch_size", "Aptos pruner batch size").unwrap());
+/// Pruner batch size. For ledger pruner, this means the number of versions to be pruned at a time.
+/// For state store pruner, this means the number of stale nodes to be pruned at a time.
+pub static PRUNER_BATCH_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        // metric name
+        "pruner_batch_size",
+        // metric description
+        "Aptos pruner batch size",
+        // metric labels (dimensions)
+        &["pruner_name",]
+    )
+    .unwrap()
+});
 
 pub static API_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
