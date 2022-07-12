@@ -7,8 +7,10 @@ use anyhow::Context as AnyhowContext;
 use aptos_config::config::NodeConfig;
 use aptos_logger::info;
 use poem::{
+    http::{header, Method},
     listener::{Listener, RustlsCertificate, RustlsConfig, TcpListener},
-    Route, Server,
+    middleware::Cors,
+    EndpointExt, Route, Server,
 };
 use poem_openapi::{ContactObject, LicenseObject, OpenApiService};
 use tokio::runtime::Runtime;
@@ -48,16 +50,19 @@ pub fn attach_poem_to_runtime(
     };
 
     runtime.spawn(async move {
+        let cors = Cors::new()
+            .allow_methods(vec![Method::GET, Method::POST])
+            .allow_headers(vec![header::CONTENT_TYPE]);
+        let route = Route::new()
+            .nest("/", api_service)
+            // TODO: I prefer "spec" here but it's not backwards compatible.
+            // Consider doing it later if we cut over to this entirely.
+            // TODO: Consider making these part of the API itself.
+            .at("/openapi.json", spec_json)
+            .at("/openapi.yaml", spec_yaml)
+            .with(cors);
         Server::new(listener)
-            .run(
-                Route::new()
-                    .nest("/", api_service)
-                    // TODO: I prefer "spec" here but it's not backwards compatible.
-                    // Consider doing it later if we cut over to this entirely.
-                    // TODO: Consider making these part of the API itself.
-                    .at("/openapi.json", spec_json)
-                    .at("/openapi.yaml", spec_yaml),
-            )
+            .run(route)
             .await
             .map_err(anyhow::Error::msg)
     });
