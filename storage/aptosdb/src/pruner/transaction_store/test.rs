@@ -53,7 +53,8 @@ fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
             ledger_prune_window: Some(0),
-            pruning_batch_size: 1,
+            ledger_pruning_batch_size: 1,
+            state_store_pruning_batch_size: 100,
         },
     );
 
@@ -102,7 +103,8 @@ fn verify_txn_store_pruner(
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
             ledger_prune_window: Some(0),
-            pruning_batch_size: 1,
+            ledger_pruning_batch_size: 1,
+            state_store_pruning_batch_size: 100,
         },
     );
 
