@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 FactoryBot.define do
-  factory :it1_profile do
+  factory :it2_profile do
     user { nil }
     consensus_key { "0x#{Faker::Crypto.sha256}" }
     account_key { "0x#{Faker::Crypto.sha256}" }
