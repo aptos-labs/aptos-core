@@ -21,6 +21,7 @@ percent-encoding = "2.1.0"
 reqwest = { version = "0.11.10", features = ["json", "cookies"] }
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
+shadow-rs = "0.11.0"
 thiserror = "1.0.31"
 tokio = { version = "1.18.2", features = ["full", "time"] }
 url = "2.2.2"
@@ -38,3 +39,6 @@ aptos-types = { path = "../../types" }
 
 framework = { path = "../../aptos-move/framework" }
 move-deps = { path = "../../aptos-move/move-deps" }
+
+[build-dependencies]
+shadow-rs = "0.11.0"
