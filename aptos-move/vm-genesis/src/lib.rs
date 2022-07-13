@@ -49,6 +49,17 @@ const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
 const FIXED_REWARDS_APY: u64 = 10;
 
+pub struct GenesisConfigurations {
+    pub min_price_per_gas_unit: u64,
+    pub epoch_duration_secs: u64,
+    pub min_stake: u64,
+    pub max_stake: u64,
+    pub min_lockup_duration_secs: u64,
+    pub max_lockup_duration_secs: u64,
+    pub allow_new_validators: bool,
+    pub initial_lockup_timestamp: u64,
+}
+
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
     let mut rng = StdRng::from_seed(GENESIS_SEED);
     let private_key = Ed25519PrivateKey::generate(&mut rng);
@@ -61,13 +72,7 @@ pub fn encode_genesis_transaction(
     validators: &[Validator],
     stdlib_module_bytes: &[Vec<u8>],
     chain_id: ChainId,
-    min_price_per_gas_unit: u64,
-    epoch_duration_secs: u64,
-    min_stake: u64,
-    max_stake: u64,
-    min_lockup_duration_secs: u64,
-    max_lockup_duration_secs: u64,
-    allow_new_validators: bool,
+    genesis_configs: GenesisConfigurations,
 ) -> Transaction {
     let consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1::default());
 
@@ -78,13 +83,7 @@ pub fn encode_genesis_transaction(
         VMPublishingOption::open(),
         consensus_config,
         chain_id,
-        min_price_per_gas_unit,
-        epoch_duration_secs,
-        min_stake,
-        max_stake,
-        min_lockup_duration_secs,
-        max_lockup_duration_secs,
-        allow_new_validators,
+        &genesis_configs,
     )))
 }
 
@@ -95,13 +94,7 @@ pub fn encode_genesis_change_set(
     vm_publishing_option: VMPublishingOption,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
-    min_price_per_gas_unit: u64,
-    epoch_duration_secs: u64,
-    min_stake: u64,
-    max_stake: u64,
-    min_lockup_duration_secs: u64,
-    max_lockup_duration_secs: u64,
-    allow_new_validators: bool,
+    genesis_configs: &GenesisConfigurations,
 ) -> ChangeSet {
     let mut stdlib_modules = Vec::new();
     // create a data view for move_vm
@@ -123,16 +116,14 @@ pub fn encode_genesis_change_set(
         vm_publishing_option,
         consensus_config,
         chain_id,
-        min_price_per_gas_unit,
-        epoch_duration_secs,
-        min_stake,
-        max_stake,
-        min_lockup_duration_secs,
-        max_lockup_duration_secs,
-        allow_new_validators,
+        genesis_configs,
     );
     // generate the genesis WriteSet
-    create_and_initialize_validators(&mut session, validators);
+    create_and_initialize_validators(
+        &mut session,
+        validators,
+        genesis_configs.initial_lockup_timestamp,
+    );
     reconfigure(&mut session);
 
     // TODO: Make on chain governance parameters configurable in the genesis blob.
@@ -201,13 +192,7 @@ fn create_and_initialize_main_accounts(
     publishing_option: VMPublishingOption,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
-    min_price_per_gas_unit: u64,
-    epoch_duration_secs: u64,
-    min_stake: u64,
-    max_stake: u64,
-    min_lockup_duration_secs: u64,
-    max_lockup_duration_secs: u64,
-    allow_new_validators: bool,
+    genesis_configs: &GenesisConfigurations,
 ) {
     let aptos_root_auth_key = AuthenticationKey::ed25519(aptos_root_key);
 
@@ -232,17 +217,18 @@ fn create_and_initialize_main_accounts(
 
     // TODO: Make reward rate numerator/denominator configurable in the genesis blob.
     // We're aiming for roughly 10% APY.
-    let num_epochs_in_a_year = NUM_SECONDS_PER_YEAR / epoch_duration_secs;
-    let rewards_rate_per_epoch = (FIXED_REWARDS_APY / 100) / num_epochs_in_a_year;
     // This represents the rewards rate fraction (numerator / denominator).
-    // For an APY=0.1 (10%) and epoch interval = 1 hour, the numerator = 1M * 0.1 / (365 * 24) ~ 11.
-    // Rewards rate = 11 / 1M ~ 0.0011% per 1 hour. This compounds to ~10.12% per year.
-    let rewards_rate_denominator = 1_000_000;
-    let rewards_rate_numerator = rewards_rate_per_epoch * rewards_rate_denominator;
+    // For an APY=0.1 (10%) and epoch interval = 1 hour, the numerator = 1B * 10 / 100 / (365 * 24) ~ 1141.
+    // Rewards rate = 1141 / 1B ~ 0.0011% per 1 hour. This compounds to ~10.12% per year.
+    let rewards_rate_denominator = 1_000_000_000;
+    let num_epochs_in_a_year = NUM_SECONDS_PER_YEAR / genesis_configs.epoch_duration_secs;
+    // Multiplication before division to minimize rounding errors due to integer division.
+    let rewards_rate_numerator =
+        (FIXED_REWARDS_APY * rewards_rate_denominator / 100) / num_epochs_in_a_year;
 
     // Block timestamps are in microseconds and epoch_interval is used to check if a block timestamp
     // has crossed into a new epoch. So epoch_interval also needs to be in micro seconds.
-    let epoch_interval_usecs = epoch_duration_secs * MICRO_SECONDS_PER_SECOND;
+    let epoch_interval_usecs = genesis_configs.epoch_duration_secs * MICRO_SECONDS_PER_SECOND;
     exec_function(
         session,
         GENESIS_MODULE_NAME,
@@ -258,13 +244,13 @@ fn create_and_initialize_main_accounts(
             MoveValue::U8(chain_id.id()),
             MoveValue::U64(APTOS_MAX_KNOWN_VERSION.major),
             MoveValue::vector_u8(consensus_config_bytes),
-            MoveValue::U64(min_price_per_gas_unit),
+            MoveValue::U64(genesis_configs.min_price_per_gas_unit),
             MoveValue::U64(epoch_interval_usecs),
-            MoveValue::U64(min_stake),
-            MoveValue::U64(max_stake),
-            MoveValue::U64(min_lockup_duration_secs),
-            MoveValue::U64(max_lockup_duration_secs),
-            MoveValue::Bool(allow_new_validators),
+            MoveValue::U64(genesis_configs.min_stake),
+            MoveValue::U64(genesis_configs.max_stake),
+            MoveValue::U64(genesis_configs.min_lockup_duration_secs),
+            MoveValue::U64(genesis_configs.max_lockup_duration_secs),
+            MoveValue::Bool(genesis_configs.allow_new_validators),
             MoveValue::U64(rewards_rate_numerator),
             MoveValue::U64(rewards_rate_denominator),
         ]),
@@ -297,6 +283,7 @@ fn initialize_on_chain_governance(session: &mut SessionExt<impl MoveResolver>) {
 fn create_and_initialize_validators(
     session: &mut SessionExt<impl MoveResolver>,
     validators: &[Validator],
+    initial_lockup_timestamp: u64,
 ) {
     let aptos_root_address = account_config::aptos_root_address();
     let mut owners = vec![];
@@ -328,6 +315,7 @@ fn create_and_initialize_validators(
             MoveValue::Vector(validator_network_addresses),
             MoveValue::Vector(full_node_network_addresses),
             MoveValue::Vector(staking_distribution),
+            MoveValue::U64(initial_lockup_timestamp),
         ]),
     );
 }
@@ -499,13 +487,16 @@ pub fn generate_test_genesis(
         vm_publishing_option,
         OnChainConsensusConfig::default(),
         ChainId::test(),
-        0,
-        86400,
-        0,
-        1000000,
-        0,
-        86400 * 365,
-        false,
+        &GenesisConfigurations {
+            min_price_per_gas_unit: 0,
+            epoch_duration_secs: 86400,
+            min_stake: 0,
+            max_stake: 1000000,
+            min_lockup_duration_secs: 0,
+            max_lockup_duration_secs: 86400 * 365,
+            allow_new_validators: false,
+            initial_lockup_timestamp: 0,
+        },
     );
     (genesis, test_validators)
 }

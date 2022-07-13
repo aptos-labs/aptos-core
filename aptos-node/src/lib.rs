@@ -168,7 +168,10 @@ pub fn load_test_environment<R>(
             .with_epoch_duration_secs(EPOCH_LENGTH_SECS)
             .with_template(template)
             .with_randomize_first_validator_ports(random_ports)
-            .with_initial_lockup_timestamp(now_secs + EPOCH_LENGTH_SECS);
+            .with_initial_lockup_timestamp(now_secs + EPOCH_LENGTH_SECS)
+            .with_min_lockup_duration_secs(0)
+            .with_max_lockup_duration_secs(86400)
+            .with_initial_lockup_timestamp(0);
 
         let (root_key, _genesis, genesis_waypoint, validators) = builder.build(rng).unwrap();
 

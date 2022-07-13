@@ -104,13 +104,16 @@ impl GenesisInfo {
             &self.validators,
             &self.modules,
             self.chain_id,
-            self.min_price_per_gas_unit,
-            self.epoch_duration_secs,
-            self.min_stake,
-            self.max_stake,
-            self.min_lockup_duration_secs,
-            self.max_lockup_duration_secs,
-            self.allow_new_validators,
+            vm_genesis::GenesisConfigurations {
+                min_price_per_gas_unit: self.min_price_per_gas_unit,
+                epoch_duration_secs: self.epoch_duration_secs,
+                min_stake: self.min_stake,
+                max_stake: self.max_stake,
+                min_lockup_duration_secs: self.min_lockup_duration_secs,
+                max_lockup_duration_secs: self.max_lockup_duration_secs,
+                allow_new_validators: self.allow_new_validators,
+                initial_lockup_timestamp: self.initial_lockup_timestamp,
+            },
         )
     }
 

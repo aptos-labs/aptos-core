@@ -58,6 +58,9 @@ pub fn new_test_context(test_name: &'static str) -> TestContext {
     )
     .unwrap()
     .with_min_price_per_gas_unit(0)
+    .with_min_lockup_duration_secs(0)
+    .with_max_lockup_duration_secs(86400)
+    .with_initial_lockup_timestamp(0)
     .with_randomize_first_validator_ports(false);
 
     let (root_key, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();
