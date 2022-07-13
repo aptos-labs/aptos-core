@@ -11,8 +11,32 @@ import {
   TransactionAuthenticatorMultiEd25519,
   SigningMessage,
   MultiAgentRawTransaction,
+  TypeTag,
+  TypeTagBool,
+  TypeTagU8,
+  TypeTagU64,
+  TypeTagU128,
+  TypeTagAddress,
+  AccountAddress,
+  TypeTagVector,
+  ScriptFunction,
+  TypeTagStruct,
+  StructTag,
+  Identifier,
+  ChainId,
+  Script,
+  TransactionArgument,
+  TransactionArgumentBool,
+  TransactionArgumentU64,
+  TransactionArgumentU128,
+  TransactionArgumentAddress,
+  TransactionArgumentU8,
+  TransactionArgumentU8Vector,
+  TransactionPayload,
 } from "./aptos_types";
-import { bcsToBytes, Bytes } from "./bcs";
+import { bcsToBytes, Bytes, Deserializer, Serializer, Uint64, Uint8 } from "./bcs";
+import { ScriptABI, ScriptFunctionABI, TransactionScriptABI } from "./aptos_types/abi";
+import { HexString } from "../hex_string";
 
 const RAW_TRANSACTION_SALT = "APTOS::RawTransaction";
 const RAW_TRANSACTION_WITH_DATA_SALT = "APTOS::RawTransactionWithData";
@@ -101,5 +125,266 @@ export class TransactionBuilderMultiEd25519 extends TransactionBuilder<SigningFn
   /** Signs a raw transaction and returns a bcs serialized transaction. */
   sign(rawTxn: RawTransaction): Bytes {
     return bcsToBytes(this.signInternal(rawTxn));
+  }
+}
+
+/**
+ * Config for creating raw transactions.
+ */
+interface ABIBuilderConfig {
+  sender: HexString | AccountAddress;
+  sequenceNumber: Uint64 | string;
+  gasUnitPrice?: Uint64 | string;
+  maxGasAmount?: Uint64 | string;
+  expSecFromNow?: number | string;
+  chainId: Uint8 | string;
+}
+
+/**
+ * Builds raw transactions based on ABI
+ */
+export class TransactionBuilderABI {
+  private readonly abiMap: Map<string, ScriptABI>;
+
+  private readonly builderConfig: ABIBuilderConfig;
+
+  /**
+   * Constructs a TransactionBuilderABI instance
+   * @param abis List of binary ABIs.
+   * @param builderConfig Configs for creating a raw transaction.
+   */
+  constructor(abis: Bytes[], builderConfig: ABIBuilderConfig) {
+    abis.forEach((abi) => {
+      const deserializer = new Deserializer(abi);
+      const scriptABI = ScriptABI.deserialize(deserializer);
+      let k: string;
+      if (scriptABI instanceof ScriptFunctionABI) {
+        const funcABI = scriptABI as ScriptFunctionABI;
+        const { address: addr, name: moduleName } = funcABI.module_name;
+        k = `${HexString.fromUint8Array(addr.address).toShortString()}::${moduleName.value}::${funcABI.name}`;
+      } else {
+        const funcABI = scriptABI as TransactionScriptABI;
+        k = funcABI.name;
+      }
+
+      if (this.abiMap.has(k)) {
+        throw new Error("Found conflicting ABI interfaces");
+      }
+
+      this.abiMap.set(k, scriptABI);
+    });
+
+    this.builderConfig = {
+      gasUnitPrice: 1n,
+      maxGasAmount: 1000n,
+      expSecFromNow: 10,
+      ...builderConfig,
+    };
+  }
+
+  /**
+   * Parses a tag string
+   * @param typeTagStr A string represented tag, e.g. bool
+   * @returns
+   */
+  static parseTypeTag(typeTagStr: string): TypeTag {
+    const typeTag = typeTagStr.trim();
+
+    if (typeTag.startsWith("vector")) {
+      return new TypeTagVector(
+        // 7 is the offset of the first char after "vector<".
+        TransactionBuilderABI.parseTypeTag(typeTag.substring(7, typeTag.length - 1)),
+      );
+    }
+    if (typeTag.includes("::")) {
+      if (!typeTag.includes("<")) {
+        return new TypeTagStruct(StructTag.fromString(typeTag));
+      }
+
+      const [structStr, tempStrNotTrimmed] = typeTag.split("<", 2);
+
+      if ((structStr.match(/::/g) || []).length !== 3) {
+        throw new Error("Invalid type arg.");
+      }
+
+      const [address, module, name] = structStr.split("::");
+
+      const pos = tempStrNotTrimmed.lastIndexOf(">");
+      if (pos === -1) {
+        throw new Error("Invalid type arg.");
+      }
+
+      const tempStr = tempStrNotTrimmed.substring(0, pos);
+
+      const tempStrParts = tempStr.split(",");
+
+      const typeArgs = tempStrParts.map((temp) => TransactionBuilderABI.parseTypeTag(temp));
+      const structTag = new StructTag(
+        AccountAddress.fromHex(address),
+        new Identifier(module),
+        new Identifier(name),
+        typeArgs,
+      );
+
+      return new TypeTagStruct(structTag);
+    }
+
+    switch (typeTag) {
+      case "bool":
+        return new TypeTagBool();
+      case "u8":
+        return new TypeTagU8();
+      case "u64":
+        return new TypeTagU64();
+      case "u128":
+        return new TypeTagU128();
+      case "address":
+        return new TypeTagAddress();
+      default:
+        throw new Error("Unknown type tag.");
+    }
+  }
+
+  private static serializeArg(argVal: any, argType: TypeTag, serializer: Serializer) {
+    if (argType instanceof TypeTagBool) {
+      serializer.serializeBool(argVal);
+    }
+    if (argType instanceof TypeTagU8) {
+      serializer.serializeU8(argVal);
+    }
+    if (argType instanceof TypeTagU64) {
+      serializer.serializeU64(argVal);
+    }
+    if (argType instanceof TypeTagU128) {
+      serializer.serializeU128(argVal);
+    }
+    if (argType instanceof TypeTagAddress) {
+      let addr: AccountAddress;
+      if (typeof argVal === "string") {
+        addr = AccountAddress.fromHex(argVal);
+      } else if (argVal instanceof AccountAddress) {
+        addr = argVal;
+      } else {
+        throw new Error("Invalid account address.");
+      }
+      addr.serialize(serializer);
+    }
+    if (argType instanceof TypeTagVector) {
+      if (!(argVal instanceof Array)) {
+        throw new Error("Invalid vector args.");
+      }
+
+      serializer.serializeU32AsUleb128(argVal.length);
+
+      argVal.forEach((arg) => TransactionBuilderABI.serializeArg(arg, argType, serializer));
+    }
+    throw new Error("Unsupported arg type.");
+  }
+
+  private static toBCSArgs(abiArgs: any[], args: any[]): Bytes[] {
+    if (abiArgs.length !== args.length) {
+      throw new Error("Wrong number of args provided.");
+    }
+
+    return args.map((arg, i) => {
+      const serializer = new Serializer();
+      TransactionBuilderABI.serializeArg(arg, abiArgs[i].type_tag, serializer);
+      return serializer.getBytes();
+    });
+  }
+
+  private static argToTransactionArgument(argVal: any, argType: TypeTag): TransactionArgument {
+    if (argType instanceof TypeTagBool) {
+      return new TransactionArgumentBool(argVal);
+    }
+    if (argType instanceof TypeTagU8) {
+      return new TransactionArgumentU8(argVal);
+    }
+    if (argType instanceof TypeTagU64) {
+      return new TransactionArgumentU64(argVal);
+    }
+    if (argType instanceof TypeTagU128) {
+      return new TransactionArgumentU128(argVal);
+    }
+    if (argType instanceof TypeTagAddress) {
+      return new TransactionArgumentAddress(argVal);
+    }
+    if (argType instanceof Uint8Array) {
+      return new TransactionArgumentU8Vector(argVal);
+    }
+
+    throw new Error("Unknown type for TransactionArgument.");
+  }
+
+  private static toTransactionArgument(abiArgs: any[], args: any[]): TransactionArgument[] {
+    if (abiArgs.length !== args.length) {
+      throw new Error("Wrong number of args provided.");
+    }
+
+    return args.map((arg, i) => TransactionBuilderABI.argToTransactionArgument(arg, abiArgs[i].type_tag));
+  }
+
+  /**
+   * Builds a RawTransaction
+   * @param func Fully qualified func names, e.g. 0x1::Coin::transfer
+   * @param ty_tags TypeTag strings.
+   * @example Below are valid value examples
+   * ```
+   * // Structs are in format `AccountAddress::ModuleName::StructName`
+   * 0x1::TestCoin::TestCoin
+   * // Vectors are in format `vector<other_tag_string>`
+   * vector<0x1::TestCoin::TestCoin>
+   * bool
+   * u8
+   * u64
+   * u128
+   * address
+   * ```
+   * @param args Function arguments
+   * @returns RawTransaction
+   */
+  build(func: string, ty_tags: string[], args: any[]): RawTransaction {
+    const { sender, sequenceNumber, gasUnitPrice, maxGasAmount, expSecFromNow, chainId } = this.builderConfig;
+
+    const senderAccount = sender instanceof HexString ? AccountAddress.fromHex(sender) : sender;
+
+    const typeTags = ty_tags.map((ty_arg) => TransactionBuilderABI.parseTypeTag(ty_arg));
+
+    const expTimetampSec = BigInt(Math.floor(Date.now() / 1000) + Number(expSecFromNow));
+
+    let payload: TransactionPayload;
+
+    if (!this.abiMap.has(func)) {
+      throw new Error(`Cannot find function: ${func}`);
+    }
+
+    const scriptABI = this.abiMap.get(func);
+
+    if (scriptABI instanceof ScriptFunctionABI) {
+      const funcABI = scriptABI as ScriptFunctionABI;
+      const bcsArgs = TransactionBuilderABI.toBCSArgs(funcABI.args, args);
+      payload = new ScriptFunction(funcABI.module_name, new Identifier(funcABI.name), typeTags, bcsArgs);
+    }
+
+    if (scriptABI instanceof TransactionScriptABI) {
+      const funcABI = scriptABI as TransactionScriptABI;
+      const scriptArgs = TransactionBuilderABI.toTransactionArgument(funcABI.args, args);
+
+      payload = new Script(funcABI.code, typeTags, scriptArgs);
+    }
+
+    if (payload) {
+      return new RawTransaction(
+        senderAccount,
+        BigInt(sequenceNumber),
+        payload,
+        BigInt(maxGasAmount),
+        BigInt(gasUnitPrice),
+        expTimetampSec,
+        new ChainId(Number(chainId)),
+      );
+    }
+
+    throw new Error("Invalid ABI.");
   }
 }
