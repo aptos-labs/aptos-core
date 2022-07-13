@@ -70,3 +70,6 @@ mobile/vendor/bundle/
 # Webpack profiler
 stats.json
 apps/extension/dist
+
+# JetBrains IDE
+.idea

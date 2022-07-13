@@ -6,16 +6,16 @@ module.exports = {
     webextensions: true,
   },
   extends: [
-    '@aptos-wallet/eslint-config'
+    '@aptos-wallet/eslint-config',
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {
     ecmaFeatures: {
-      jsx: true
+      jsx: true,
     },
-    tsconfigRootDir: __dirname,
-    project: ["tsconfig.json"],
     ecmaVersion: 'latest',
-    sourceType: 'module'
+    project: ['tsconfig.json'],
+    sourceType: 'module',
+    tsconfigRootDir: __dirname,
   },
-}
+};

@@ -7,19 +7,19 @@ module.exports = {
   },
   extends: [
     '@aptos-wallet/eslint-config',
-    'next/core-web-vitals'
+    'next/core-web-vitals',
   ],
-  rules: {
-    "react/function-component-definition": 0,
-  },
   parser: '@typescript-eslint/parser',
   parserOptions: {
     ecmaFeatures: {
-      jsx: true
+      jsx: true,
     },
-    tsconfigRootDir: __dirname,
-    project: ["tsconfig.json"],
     ecmaVersion: 'latest',
-    sourceType: 'module'
+    project: ['tsconfig.json'],
+    sourceType: 'module',
+    tsconfigRootDir: __dirname,
   },
-}
+  rules: {
+    'react/function-component-definition': 0,
+  },
+};
