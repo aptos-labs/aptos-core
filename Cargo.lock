@@ -902,6 +902,7 @@ dependencies = [
  "reqwest",
  "serde 1.0.137",
  "serde_json",
+ "shadow-rs",
  "thiserror",
  "tokio",
  "url",

@@ -166,30 +166,73 @@ impl BlockCache {
     }
 
     /// Retrieve the block info for the index
-    ///
-    /// TODO: Improve parallelism and performance
     pub async fn get_block_info(&self, block_index: u64) -> ApiResult<BlockInfo> {
         // If we already have the block info, let's roll with it
-        let (closest_known_block, closest_block_info): (u64, BlockInfo) = {
+        let (start_version, range, traverse_right) = {
             let map = self.blocks.read().unwrap();
             if let Some(block_info) = map.get(&block_index) {
                 return Ok(*block_info);
             }
 
-            // There will always be an index less than the index, since it starts with 0 set
-            let (index, block_info) = map.iter().rev().find(|(i, _)| **i < block_index).unwrap();
-            (*index, *block_info)
+            // Find the closest, left or right, and build up blocks from there
+            let search_left = map.iter().rev().find_map(|(i, info)| {
+                if *i < block_index {
+                    Some((i, info, block_index - i))
+                } else {
+                    None
+                }
+            });
+
+            let search_right = map.iter().find_map(|(i, info)| {
+                if *i > block_index {
+                    Some((i, info, block_index - i))
+                } else {
+                    None
+                }
+            });
+
+            match (search_left, search_right) {
+                (Some((i, info, _)), None) => {
+                    let start = info.end_version + 1;
+                    let range = (i + 1)..=block_index;
+                    (start, range, true)
+                }
+                (None, Some((i, info, _))) => {
+                    let start = info.start_version - 1;
+                    let range = (i - 1)..=block_index;
+                    (start, range, false)
+                }
+                (
+                    Some((left_index, left_info, left_distance)),
+                    Some((right_index, right_info, right_distance)),
+                ) => {
+                    if left_distance > right_distance {
+                        let start = left_info.start_version - 1;
+                        let range = (left_index - 1)..=block_index;
+                        (start, range, true)
+                    } else {
+                        let start = right_info.end_version + 1;
+                        let range = (right_index + 1)..=block_index;
+                        (start, range, false)
+                    }
+                }
+                _ => unreachable!("There should always be a block in the cache!"),
+            }
         };
 
         // Go through the blocks, and add them into the cache
-        let mut running_version = closest_block_info.end_version + 1;
-        for i in (closest_known_block + 1)..=block_index {
+        let mut running_version = start_version;
+        for i in range {
             let info = self.add_block(running_version).await?;
 
             // Increment to the next block
-            running_version = info.end_version + 1;
+            if traverse_right {
+                running_version = info.end_version.saturating_add(1);
+            } else {
+                running_version = info.start_version.saturating_sub(1);
+            }
 
-            // If it's the end condition, let's return the info
+            // If we found the block let's return the info
             if i == block_index {
                 return Ok(info);
             }
@@ -226,8 +269,6 @@ impl BlockCache {
     }
 
     /// Retrieve the block index for the version
-    ///
-    /// TODO: Improve parallelism and performance
     pub async fn get_block_index_by_version(&self, version: u64) -> ApiResult<u64> {
         // If we already have the version, let's roll with it
         if let Some(index) = self.versions.read().unwrap().get(&version) {

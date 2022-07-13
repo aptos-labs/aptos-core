@@ -246,7 +246,6 @@ async fn construction_metadata(
         return Err(ApiError::ChainIdMismatch);
     }
 
-    // TODO: Suggest fees?
     Ok(ConstructionMetadataResponse {
         metadata: ConstructionMetadata {
             sequence_number: response.inner().sequence_number,
@@ -288,7 +287,6 @@ async fn construction_parse(
     let sender = unsigned_txn.sender();
 
     // This is messy, but all we can do
-    // TODO: Support write set for genesis?
     let operations = match unsigned_txn.into_payload() {
         TransactionPayload::ScriptFunction(inner) => {
             let (module, script_name, type_args, args) = inner.into_inner();
