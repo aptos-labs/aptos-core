@@ -3,6 +3,7 @@
 
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
+use crate::quorum_store::quorum_store_db::QuorumStoreDB;
 use crate::quorum_store::{
     counters,
     quorum_store::{QuorumStoreCommand, QuorumStoreError},
@@ -31,6 +32,7 @@ use futures::{
     StreamExt,
 };
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::{
     collections::HashSet,
     time::{Duration, Instant},
@@ -53,28 +55,42 @@ pub struct QuorumStoreWrapper {
     // For ensuring that batch size does not exceed QuorumStore limit.
     quorum_store_max_batch_bytes: u64,
     last_end_batch_time: Instant,
+    db: Arc<QuorumStoreDB>,
 }
 
 impl QuorumStoreWrapper {
     pub fn new(
         epoch: u64,
+        db: Arc<QuorumStoreDB>,
         mempool_tx: Sender<QuorumStoreRequest>,
         quorum_store_sender: TokioSender<QuorumStoreCommand>,
         mempool_txn_pull_timeout_ms: u64,
         mempool_txn_pull_max_count: u64,
         quorum_store_max_batch_bytes: u64,
     ) -> Self {
+        let batch_id = if let Some(id) = db
+            .clean_and_get_batch_id(epoch)
+            .expect("Could not read from db")
+        {
+            id + 1
+        } else {
+            0
+        };
+        db.save_batch_id(epoch, batch_id + 1)
+            .expect("Could not save to db");
+
         Self {
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
             quorum_store_sender,
             batches_in_progress: HashMap::new(),
             batch_expirations: RoundExpirations::new(),
-            batch_builder: BatchBuilder::new(0, quorum_store_max_batch_bytes as usize),
+            batch_builder: BatchBuilder::new(batch_id, quorum_store_max_batch_bytes as usize),
             latest_logical_time: LogicalTime::new(epoch, 0),
             proofs_for_consensus: HashMap::new(),
             mempool_txn_pull_max_count,
             quorum_store_max_batch_bytes,
             last_end_batch_time: Instant::now(),
+            db,
         }
     }
 
@@ -129,6 +145,13 @@ impl QuorumStoreWrapper {
             if self.batch_builder.is_empty() {
                 return None;
             }
+
+            self.db
+                .save_batch_id(
+                    self.latest_logical_time.epoch(),
+                    self.batch_builder.batch_id() + 1,
+                )
+                .expect("Could not save to db");
 
             let (proof_tx, proof_rx) = oneshot::channel();
             let expiry_round = self.latest_logical_time.round() + 20; // TODO: take from quorum store config

@@ -17,5 +17,6 @@ pub(crate) mod types;
 pub(crate) mod utils;
 
 mod counters;
+mod schema;
 #[cfg(test)]
 mod tests;

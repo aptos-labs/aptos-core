@@ -5,6 +5,7 @@ use crate::{error::QuorumStoreError, state_replication::PayloadManager};
 use anyhow::Result;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::monitor;
+use aptos_types::block_info::Round;
 use consensus_types::{
     common::{Payload, PayloadFilter},
     request_response::{ConsensusResponse, WrapperCommand},
@@ -16,7 +17,6 @@ use futures::{
 };
 use std::time::Duration;
 use tokio::time::{sleep, timeout};
-use aptos_types::block_info::Round;
 
 const NO_TXN_DELAY: u64 = 30;
 
@@ -53,7 +53,8 @@ impl QuorumStoreClient {
         exclude_payloads: PayloadFilter,
     ) -> Result<Payload, QuorumStoreError> {
         let (callback, callback_rcv) = oneshot::channel();
-        let req = WrapperCommand::GetBlockRequest(round,max_size, exclude_payloads.clone(), callback);
+        let req =
+            WrapperCommand::GetBlockRequest(round, max_size, exclude_payloads.clone(), callback);
         // send to shared mempool
         self.consensus_to_quorum_store_sender
             .clone()

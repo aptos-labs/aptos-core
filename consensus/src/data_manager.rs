@@ -25,7 +25,11 @@ pub trait DataManager: Send + Sync {
         quorum_store_wrapper_tx: Sender<WrapperCommand>,
     );
 
-    async fn get_data(&self, payload: Payload, logical_time: LogicalTime) -> Result<Vec<SignedTransaction>, Error>;
+    async fn get_data(
+        &self,
+        payload: Payload,
+        logical_time: LogicalTime,
+    ) -> Result<Vec<SignedTransaction>, Error>;
 }
 
 /// Execution -> QuorumStore notification of commits.
@@ -78,7 +82,11 @@ impl DataManager for QuorumStoreDataManager {
     }
 
     // TODO: handle the case that the data was garbage collected and return error
-    async fn get_data(&self, payload: Payload, logical_time: LogicalTime) -> Result<Vec<SignedTransaction>, Error> {
+    async fn get_data(
+        &self,
+        payload: Payload,
+        logical_time: LogicalTime,
+    ) -> Result<Vec<SignedTransaction>, Error> {
         match payload {
             Payload::Empty => {
                 debug!("QSE: empty Payload");
@@ -91,7 +99,7 @@ impl DataManager for QuorumStoreDataManager {
                 let mut receivers = Vec::new();
                 for pos in poss {
                     debug!("QSE: requesting pos {:?}, digest {}", pos, pos.digest());
-                    if logical_time < pos.expiration(){
+                    if logical_time < pos.expiration() {
                         receivers.push(
                             self.data_reader
                                 .load()
@@ -141,7 +149,11 @@ impl DataManager for DummyDataManager {
 
     fn new_epoch(&self, _: Arc<BatchReader>, _: Sender<WrapperCommand>) {}
 
-    async fn get_data(&self, payload: Payload, _logical_time: LogicalTime) -> Result<Vec<SignedTransaction>, Error> {
+    async fn get_data(
+        &self,
+        payload: Payload,
+        _logical_time: LogicalTime,
+    ) -> Result<Vec<SignedTransaction>, Error> {
         match payload {
             Payload::Empty => Ok(Vec::new()),
             Payload::DirectMempool(txns) => Ok(txns),
