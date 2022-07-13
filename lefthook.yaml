@@ -1,0 +1,25 @@
+pre-commit:
+  # parallel: true
+  commands:
+    rust-fmt:
+      glob: "*.rs"
+      run: rustfmt {staged_files}
+    rust-cargo-sort:
+      glob: "Cargo.toml"
+      run: cargo sort --grouped {staged_files}
+    prettier-fmt:
+      glob: "*.{ts,js,tsx,jsx,yaml,yml}"
+      run: prettier --ignore-path .gitignore --write {staged_files}
+pre-push:
+  rust-fix:
+    files: git diff --name-only main
+    glob: "*.rs"
+    run: cargo xfix -- --allow-staged
+  rust-lint:
+    files: git diff --name-only main
+    glob: "*.rs"
+    run: cargo xlint
+  rust-clippy:
+    files: git diff --name-only main
+    glob: "*.rs"
+    run: cargo xclippy

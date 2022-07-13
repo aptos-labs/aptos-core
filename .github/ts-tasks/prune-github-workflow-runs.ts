@@ -7,6 +7,9 @@ import * as path from "path";
 const owner = "aptos-labs";
 const repo = "aptos-core";
 
+
+
+
 export async function pruneGithubWorkflowRuns() {
   const githubToken = process.env.GITHUB_TOKEN;
 
