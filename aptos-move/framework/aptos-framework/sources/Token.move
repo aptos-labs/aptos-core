@@ -24,6 +24,8 @@ module AptosFramework::Token {
     const ETOKEN_ALREADY_EXISTS: u64 = 12;
     const ETOKEN_NOT_PUBLISHED: u64 = 13;
     const ETOKEN_STORE_NOT_PUBLISHED: u64 = 14;
+    const ETOKEN_IS_NOT_MUTABLE: u64 = 15;
+    const ETOKEN_SIGNER_NOT_AUTHORIZED: u64 = 16;
     const ETOKEN_SPLIT_AMOUNT_LARGER_THEN_TOKEN_AMOUNT: u64 = 15;
 
     //
@@ -139,6 +141,8 @@ module AptosFramework::Token {
         maximum: Option<u64>,
         // Total number of this type of Token
         supply: Option<u64>,
+        // Flag to indicate if uri is mutable
+        mutable: bool,
         // URL for additional information / media
         uri: ASCII::String,
         // the royalty of the token
@@ -198,6 +202,7 @@ module AptosFramework::Token {
         monitor_supply: bool,
         initial_balance: u64,
         maximum: u64,
+        mutable: bool,
         uri: vector<u8>,
         royalty_points_per_million: u64,
         royalty_recipient: Option<address>
@@ -210,6 +215,7 @@ module AptosFramework::Token {
             monitor_supply,
             initial_balance,
             Option::some(maximum),
+            mutable,
             ASCII::string(uri),
             royalty_points_per_million,
             royalty_recipient
@@ -223,6 +229,7 @@ module AptosFramework::Token {
         description: vector<u8>,
         monitor_supply: bool,
         initial_balance: u64,
+        mutable: bool,
         uri: vector<u8>,
         royalty_points_per_million: u64,
         royalty_recipient: Option<address>
@@ -235,6 +242,7 @@ module AptosFramework::Token {
             monitor_supply,
             initial_balance,
             Option::none(),
+            mutable,
             ASCII::string(uri),
             royalty_points_per_million,
             royalty_recipient
@@ -391,6 +399,65 @@ module AptosFramework::Token {
         direct_deposit(to, token);
     }
 
+    public fun change_token_uri(
+        account: &signer,
+        creator: address,
+        id: TokenId,
+        new_uri: ASCII::String,
+    ) acquires Collections {
+        let account_addr = Signer::address_of(account);
+
+        assert!(
+            exists<TokenStore>(creator),
+            Errors::not_published(ETOKEN_STORE_NOT_PUBLISHED),
+        );
+
+        let collections = borrow_global_mut<Collections>(creator);
+        let token_data = Table::borrow_mut(&mut collections.token_data, id);
+
+        assert!(
+            token_data.mutable == true,
+            Errors::custom(ETOKEN_IS_NOT_MUTABLE),
+        );
+        // Only royalty can change the uri.
+        assert!(
+            token_data.royalty.creator_account == account_addr,
+            Errors::custom(ETOKEN_SIGNER_NOT_AUTHORIZED),
+        );
+
+        let uri = &mut token_data.uri;
+        *uri = new_uri;
+    }
+
+    public fun drop_token_mutability(
+        account: &signer,
+        creator: address,
+        id: TokenId,
+    ) acquires Collections {
+        let account_addr = Signer::address_of(account);
+
+        assert!(
+            exists<TokenStore>(creator),
+            Errors::not_published(ETOKEN_STORE_NOT_PUBLISHED),
+        );
+
+        let collections = borrow_global_mut<Collections>(creator);
+        let token_data = Table::borrow_mut(&mut collections.token_data, id);
+
+        assert!(
+            token_data.mutable == true,
+            Errors::custom(ETOKEN_IS_NOT_MUTABLE),
+        );
+        // Only royalty can drop mutability.
+        assert!(
+            token_data.royalty.creator_account == account_addr,
+            Errors::custom(ETOKEN_SIGNER_NOT_AUTHORIZED),
+        );
+
+        let mutable = &mut token_data.mutable;
+        *mutable = false;
+    }
+
     public fun withdraw_token(
         account: &signer,
         id: TokenId,
@@ -524,6 +591,7 @@ module AptosFramework::Token {
         monitor_supply: bool,
         initial_balance: u64,
         maximum: Option<u64>,
+        mutable: bool,
         uri: ASCII::String,
         royalty_points_per_million: u64,
         royalty_recipient: Option<address>,
@@ -565,6 +633,7 @@ module AptosFramework::Token {
             name: *&token_id.name,
             maximum,
             supply,
+            mutable,
             uri,
             royalty: Royalty {
                 royalty_points_per_million,
@@ -726,6 +795,79 @@ module AptosFramework::Token {
     }
 
     #[test(creator = @0x1)]
+    public fun create_collection_with_mutable_uri(
+        creator: signer,
+    ) acquires Collections, TokenStore {
+        let token_id = create_collection_and_token_with_mutable_uri(&creator, 1, 1, 1, Option::none());
+        let collections = borrow_global<Collections>(Signer::address_of(&creator));
+        let token_data = Table::borrow(&collections.token_data, token_id);
+        assert!(token_data.mutable == true, 1);
+    }
+
+    #[test(creator = @0x1, royalty_recipient = @0x2)]
+    public fun create_mutable_collection_with_custom_royalty_recipient(
+        creator: signer,
+        royalty_recipient: signer,
+    ) acquires Collections, TokenStore {
+        let new_uri = ASCII::string(b"https://nightly.app");
+        let royalty_recipient_address = Signer::address_of(&royalty_recipient);
+        let token_id = create_collection_and_token_with_mutable_uri(&creator, 1, 1, 1, Option::some(royalty_recipient_address));
+        let collections = borrow_global<Collections>(Signer::address_of(&creator));
+        let token_data = Table::borrow(&collections.token_data, token_id);
+        // assert old uri != new one
+        assert!(&token_data.uri != &new_uri, 1);
+        assert!(token_data.mutable == true, 1);
+
+        change_token_uri(&royalty_recipient, Signer::address_of(&creator), token_id, new_uri);
+        let collections = borrow_global<Collections>(Signer::address_of(&creator));
+        let token_data = Table::borrow(&collections.token_data, token_id);
+        // assert uri have been changed
+        assert!(&token_data.uri == &new_uri, 1);
+
+        // drop mutability
+        drop_token_mutability(&royalty_recipient, Signer::address_of(&creator), token_id);
+        let collections = borrow_global<Collections>(Signer::address_of(&creator));
+        let token_data = Table::borrow(&collections.token_data, token_id);
+        // assert uri have been changed
+        assert!(token_data.mutable == false, 1);
+    }
+
+    #[test(creator = @0x1, alice = @0x2)]
+    #[expected_failure] // (abort_code = 16)]
+    public fun test_drop_token_mutability(
+        creator: signer,
+        alice: signer,
+    ) acquires Collections, TokenStore {
+        let creator_address = Signer::address_of(&creator);
+        let token_id = create_collection_and_token_with_mutable_uri(&creator, 1, 1, 1, Option::some(creator_address));
+        drop_token_mutability(&alice, creator_address, token_id);
+    }
+
+    #[test(creator = @0x1, alice = @0x2)]
+    #[expected_failure] // (abort_code = 16)]
+    public fun test_mutate_token_with_not_authorized_signer(
+        creator: signer,
+        alice: signer,
+    ) acquires Collections, TokenStore {
+        let new_uri = ASCII::string(b"https://nightly.app");
+        let creator_address = Signer::address_of(&creator);
+        let token_id = create_collection_and_token_with_mutable_uri(&creator, 1, 1, 1, Option::some(creator_address));
+        change_token_uri(&alice, creator_address, token_id, new_uri);
+    }
+
+    #[test(creator = @0x1, royalty_recipient = @0x2)]
+    #[expected_failure] // (abort_code = 15)]
+    public fun test_immutable_token(
+        creator: signer,
+        royalty_recipient: signer,
+    ) acquires Collections, TokenStore {
+        let new_uri = ASCII::string(b"https://nightly.app");
+        let royalty_recipient_address = Signer::address_of(&royalty_recipient);
+        let token_id = create_collection_and_token(&creator, 1, 1, 1, Option::some(royalty_recipient_address));
+        change_token_uri(&royalty_recipient, Signer::address_of(&creator), token_id, new_uri);
+    }
+
+    #[test(creator = @0x1)]
     #[expected_failure] // (abort_code = 9)]
     public fun test_token_maximum(creator: signer) acquires Collections, TokenStore {
         let token_id = create_collection_and_token(&creator, 2, 2, 1, Option::none());
@@ -744,6 +886,7 @@ module AptosFramework::Token {
             true,
             2,
             Option::some(100),
+            false,
             ASCII::string(b"https://aptos.dev"),
             0,
             Option::some(royalty_recipient),
@@ -788,6 +931,40 @@ module AptosFramework::Token {
             true,
             amount,
             Option::some(token_max),
+            false,
+            ASCII::string(b"https://aptos.dev"),
+            0,
+            royalty_recipient,
+        )
+    }
+
+    #[test_only]
+    public fun create_collection_and_token_with_mutable_uri(
+        creator: &signer,
+        amount: u64,
+        collection_max: u64,
+        token_max: u64,
+        royalty_recipient: Option<address>,
+    ): TokenId acquires Collections, TokenStore {
+        let collection_name = ASCII::string(b"Hello, World");
+
+        create_collection(
+            creator,
+            *&collection_name,
+            ASCII::string(b"Collection: Hello, World"),
+            ASCII::string(b"https://aptos.dev"),
+            Option::some(collection_max),
+        );
+
+        create_token(
+            creator,
+            *&collection_name,
+            ASCII::string(b"Token: Hello, Token"),
+            ASCII::string(b"Hello, Token"),
+            true,
+            amount,
+            Option::some(token_max),
+            true,
             ASCII::string(b"https://aptos.dev"),
             0,
             royalty_recipient,
