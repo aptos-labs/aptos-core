@@ -119,29 +119,43 @@ impl TransactionStore {
         let address = txn.get_sender();
         let sequence_number = txn.sequence_info;
 
-        // check if transaction is already present in Mempool
-        // e.g. given request is update
-        // we allow increase in gas price to speed up process.
-        // ignores the case transaction hash is same for retrying submit transaction.
+        // If the transaction is already in Mempool, we only allow the user to
+        // increase the gas unit price to speed up a transaction, but not the max gas.
+        //
+        // Transactions with all the same inputs (but possibly signed differently) are idempotent
+        // since the raw transaction is the same
         if let Some(txns) = self.transactions.get_mut(&address) {
             if let Some(current_version) =
                 txns.get_mut(&sequence_number.transaction_sequence_number)
             {
-                if current_version.txn == txn.txn {
-                    return MempoolStatus::new(MempoolStatusCode::Accepted);
-                }
-                if current_version.txn.max_gas_amount() == txn.txn.max_gas_amount()
-                    && current_version.txn.payload() == txn.txn.payload()
-                    && current_version.txn.expiration_timestamp_secs()
-                        == txn.txn.expiration_timestamp_secs()
-                    && current_version.get_gas_price() < txn.get_gas_price()
+                if current_version.txn.payload() != txn.txn.payload() {
+                    return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
+                        "Transaction already in mempool with different payload".to_string(),
+                    );
+                } else if current_version.txn.expiration_timestamp_secs()
+                    != txn.txn.expiration_timestamp_secs()
                 {
-                    if let Some(txn) = txns.remove(&txn.sequence_info.transaction_sequence_number) {
+                    return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
+                        "Transaction already in mempool with different expiration timestamp"
+                            .to_string(),
+                    );
+                } else if current_version.txn.max_gas_amount() != txn.txn.max_gas_amount() {
+                    return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
+                        "Transaction already in mempool with different max gas amount".to_string(),
+                    );
+                } else if current_version.txn.gas_unit_price() < txn.get_gas_price() {
+                    // Update txn if gas unit price is a larger value than before
+                    if let Some(txn) = txns.remove(&sequence_number.transaction_sequence_number) {
                         self.index_remove(&txn);
-                    }
+                    };
+                } else if current_version.get_gas_price() > txn.get_gas_price() {
+                    return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
+                        "Transaction already in mempool with higher gas price".to_string(),
+                    );
                 } else {
-                    return MempoolStatus::new(MempoolStatusCode::InvalidUpdate)
-                        .with_message("Transaction already in mempool".to_string());
+                    // If the transaction is the same, it's an idempotent call
+                    // Updating signers is not supported, the previous submission must fail
+                    return MempoolStatus::new(MempoolStatusCode::Accepted);
                 }
             }
         }
