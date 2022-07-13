@@ -20,7 +20,6 @@
 //! ```
 
 use anyhow::Result;
-use aptos::common::types::EncodingType;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
@@ -32,55 +31,57 @@ use aptos_sdk::{
         LocalAccount,
     },
 };
+use clap::Parser;
 use futures::lock::Mutex;
 use reqwest::StatusCode;
-use std::{convert::Infallible, fmt, path::Path, sync::Arc};
-use structopt::StructOpt;
+use std::{convert::Infallible, fmt, path::PathBuf, sync::Arc};
 use url::Url;
 use warp::{http, Filter, Rejection, Reply};
 
 pub mod mint;
 
-#[derive(Debug, StructOpt)]
-#[structopt(
-    name = "Aptos Faucet",
-    author = "Aptos",
-    about = "Aptos Testnet utility service for creating test accounts and minting test coins"
-)]
+/// Aptos Testnet utility service for creating test accounts and minting test coins
+#[derive(Clone, Debug, Parser)]
+#[clap(name = "Aptos Node", author, version)]
 pub struct FaucetArgs {
     /// Faucet service listen address
-    #[structopt(short = "a", long, default_value = "127.0.0.1")]
+    #[clap(short = 'a', long, default_value = "127.0.0.1")]
     pub address: String,
     /// Faucet service listen port
-    #[structopt(short = "p", long, default_value = "80")]
+    #[clap(short = 'p', long, default_value = "80")]
     pub port: u16,
     /// Aptos fullnode/validator server URL
-    #[structopt(short = "s", long, default_value = "https://testnet.aptoslabs.com/")]
-    pub server_url: String,
+    #[clap(short = 's', long, default_value = "https://testnet.aptoslabs.com/")]
+    pub server_url: Url,
     /// Path to the private key for creating test account and minting coins.
     /// To keep Testnet simple, we used one private key for aptos root account
     /// To manually generate a keypair, use generate-key:
     /// `cargo run -p generate-keypair -- -o <output_file_path>`
-    #[structopt(short = "m", long, default_value = "/opt/aptos/etc/mint.key")]
-    pub mint_key_file_path: String,
+    #[clap(
+        short = 'm',
+        long,
+        default_value = "/opt/aptos/etc/mint.key",
+        parse(from_os_str)
+    )]
+    pub mint_key_file_path: PathBuf,
     /// Ed25519PrivateKey for minting coins
-    #[structopt(long, parse(try_from_str = ConfigKey::from_encoded_string))]
+    #[clap(long, parse(try_from_str = ConfigKey::from_encoded_string))]
     pub mint_key: Option<ConfigKey<Ed25519PrivateKey>>,
     /// Address of the account to send transactions from.
     /// On Testnet, for example, this is a550c18.
     /// If not present, the mint key's address is used
-    #[structopt(short = "t", long, parse(try_from_str = AccountAddress::from_hex_literal))]
+    #[clap(short = 't', long, parse(try_from_str = AccountAddress::from_hex_literal))]
     pub mint_account_address: Option<AccountAddress>,
     /// Chain ID of the network this client is connecting to.
     /// For mainnet: "MAINNET" or 1, testnet: "TESTNET" or 2, devnet: "DEVNET" or 3,
     /// local swarm: "TESTING" or 4
     /// Note: Chain ID of 0 is not allowed; Use number if chain id is not predefined.
-    #[structopt(short = "c", long, default_value = "2")]
+    #[clap(short = 'c', long, default_value = "2")]
     pub chain_id: ChainId,
     /// Maximum amount of coins to mint.
-    #[structopt(long)]
+    #[clap(long)]
     pub maximum_amount: Option<u64>,
-    #[structopt(long)]
+    #[clap(long)]
     pub do_not_delegate: bool,
 }
 
@@ -100,9 +101,11 @@ impl FaucetArgs {
         let key = if let Some(ref key) = self.mint_key {
             key.private_key()
         } else {
-            EncodingType::BCS
-                .load_key::<Ed25519PrivateKey>("mint key", Path::new(&self.mint_key_file_path))
-                .unwrap()
+            bcs::from_bytes(
+                &std::fs::read(self.mint_key_file_path.as_path())
+                    .expect("Failed to read mint key file"),
+            )
+            .expect("Failed to deserialize mint key file")
         };
 
         let faucet_address: AccountAddress =
@@ -127,13 +130,8 @@ impl FaucetArgs {
         let actual_service = if self.do_not_delegate {
             service
         } else {
-            delegate_mint_account(
-                service,
-                self.server_url.clone(),
-                self.chain_id,
-                self.maximum_amount,
-            )
-            .await
+            delegate_mint_account(service, self.server_url, self.chain_id, self.maximum_amount)
+                .await
         };
 
         info!(
@@ -149,18 +147,18 @@ pub struct Service {
     pub faucet_account: Mutex<LocalAccount>,
     pub transaction_factory: TransactionFactory,
     client: Client,
-    endpoint: String,
+    endpoint: Url,
     maximum_amount: Option<u64>,
 }
 
 impl Service {
     pub fn new(
-        endpoint: String,
+        endpoint: Url,
         chain_id: ChainId,
         faucet_account: LocalAccount,
         maximum_amount: Option<u64>,
     ) -> Self {
-        let client = Client::new(Url::parse(&endpoint).expect("Invalid rest endpoint"));
+        let client = Client::new(endpoint.clone());
         Service {
             faucet_account: Mutex::new(faucet_account),
             transaction_factory: TransactionFactory::new(chain_id)
@@ -172,7 +170,7 @@ impl Service {
         }
     }
 
-    pub fn endpoint(&self) -> &String {
+    pub fn endpoint(&self) -> &Url {
         &self.endpoint
     }
 }
@@ -249,7 +247,7 @@ impl<T: fmt::Display> fmt::Display for OptFmt<T> {
 /// succeed and the other will hit an unwrap. Eventually all faucets should get online.
 pub async fn delegate_mint_account(
     service: Arc<Service>,
-    server_url: String,
+    server_url: Url,
     chain_id: ChainId,
     maximum_amount: Option<u64>,
 ) -> Arc<Service> {
