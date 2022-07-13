@@ -374,7 +374,6 @@ impl Node {
             let transaction = txn.make_signed_transaction_with_max_gas_amount(5);
             mempool.add_txn(
                 transaction.clone(),
-                0,
                 transaction.gas_unit_price(),
                 AccountSequenceInfo::Sequential(0),
                 TimelineState::NotReady,

@@ -147,7 +147,6 @@ impl MockSharedMempool {
                 if pool
                     .add_txn(
                         txn.clone(),
-                        0,
                         txn.gas_unit_price(),
                         AccountSequenceInfo::Sequential(0),
                         TimelineState::NotReady,

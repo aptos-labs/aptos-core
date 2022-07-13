@@ -115,7 +115,6 @@ pub(crate) fn add_txns_to_mempool(
         let txn = transaction.make_signed_transaction();
         pool.add_txn(
             txn.clone(),
-            0,
             txn.gas_unit_price(),
             transaction.account_seqno_type,
             TimelineState::NotReady,
@@ -133,7 +132,6 @@ pub(crate) fn add_signed_txn(pool: &mut CoreMempool, transaction: SignedTransact
     match pool
         .add_txn(
             transaction.clone(),
-            0,
             transaction.gas_unit_price(),
             AccountSequenceInfo::Sequential(0),
             TimelineState::NotReady,
