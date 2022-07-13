@@ -34,11 +34,7 @@ impl XContext {
         let XConfig { core, config } = x_config;
         Ok(Self {
             core: XCoreContext::new(project_root(), current_dir, core)?,
-            installer: Installer::new(
-                config.cargo_config().clone(),
-                config.tools(),
-                vec!["llvm-tools-preview".to_string()],
-            ),
+            installer: Installer::new(config.tools(), vec!["llvm-tools-preview".to_string()]),
             config,
         })
     }

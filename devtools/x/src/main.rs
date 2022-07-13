@@ -19,7 +19,6 @@ mod config;
 mod context;
 mod diff_summary;
 mod fix;
-mod fmt;
 mod generate_summaries;
 mod installer;
 mod lint;
@@ -62,9 +61,6 @@ enum Command {
     #[structopt(name = "fix")]
     /// Run `cargo fix`
     Fix(fix::Args),
-    #[structopt(name = "fmt")]
-    /// Run `cargo fmt`
-    Fmt(fmt::Args),
     #[structopt(name = "test")]
     /// Run tests
     Test(test::Args),
@@ -121,7 +117,6 @@ fn main() -> Result<()> {
         Command::Check(args) => check::run(args, xctx),
         Command::Clippy(args) => clippy::run(args, xctx),
         Command::Fix(args) => fix::run(args, xctx),
-        Command::Fmt(args) => fmt::run(args, xctx),
         Command::Bench(args) => bench::run(args, xctx),
         Command::Lint(args) => lint::run(args, xctx),
         Command::Playground(args) => playground::run(args, xctx),

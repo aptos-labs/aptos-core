@@ -121,7 +121,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
       - run: cargo x lint
       - run: cargo xclippy --workspace --all-targets
-      - run: cargo xfmt --check
+      - run: cargo fmt --check
       - run: cargo install cargo-sort
       - run: cargo sort --grouped --check --workspace
 

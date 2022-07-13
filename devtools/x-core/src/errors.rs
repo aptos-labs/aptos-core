@@ -30,14 +30,6 @@ pub enum SystemError {
         context: Cow<'static, str>,
         err: guppy::Error,
     },
-    HakariCargoToml {
-        context: Cow<'static, str>,
-        err: hakari::CargoTomlError,
-    },
-    HakariTomlOut {
-        context: Cow<'static, str>,
-        err: hakari::TomlOutError,
-    },
     Io {
         context: Cow<'static, str>,
         err: io::Error,
@@ -73,26 +65,6 @@ impl SystemError {
 
     pub fn from_hex(context: impl Into<Cow<'static, str>>, err: FromHexError) -> Self {
         SystemError::FromHex {
-            context: context.into(),
-            err,
-        }
-    }
-
-    pub fn hakari_cargo_toml(
-        context: impl Into<Cow<'static, str>>,
-        err: hakari::CargoTomlError,
-    ) -> Self {
-        SystemError::HakariCargoToml {
-            context: context.into(),
-            err,
-        }
-    }
-
-    pub fn hakari_toml_out(
-        context: impl Into<Cow<'static, str>>,
-        err: hakari::TomlOutError,
-    ) -> Self {
-        SystemError::HakariTomlOut {
             context: context.into(),
             err,
         }
@@ -141,9 +113,7 @@ impl fmt::Display for SystemError {
             SystemError::FromHex { context, .. }
             | SystemError::Io { context, .. }
             | SystemError::Serde { context, .. }
-            | SystemError::Guppy { context, .. }
-            | SystemError::HakariCargoToml { context, .. }
-            | SystemError::HakariTomlOut { context, .. } => write!(f, "while {}", context),
+            | SystemError::Guppy { context, .. } => write!(f, "while {}", context),
         }
     }
 }
@@ -157,8 +127,6 @@ impl error::Error for SystemError {
             SystemError::FromHex { err, .. } => Some(err),
             SystemError::Io { err, .. } => Some(err),
             SystemError::Guppy { err, .. } => Some(err),
-            SystemError::HakariCargoToml { err, .. } => Some(err),
-            SystemError::HakariTomlOut { err, .. } => Some(err),
             SystemError::NonUtf8Path { err, .. } => Some(err),
             SystemError::Serde { err, .. } => Some(err.as_ref()),
         }

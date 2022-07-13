@@ -3,11 +3,7 @@
 
 use crate::{
     cargo::selected_package::{SelectedInclude, SelectedPackages},
-    config::CargoConfig,
-    utils::{
-        apply_sccache_if_possible, log_sccache_stats, project_root, sccache_should_run,
-        stop_sccache_server,
-    },
+    utils::project_root,
     Result,
 };
 use anyhow::anyhow;
@@ -38,46 +34,11 @@ impl Drop for Cargo {
 }
 
 impl Cargo {
-    pub fn new<S: AsRef<OsStr>>(
-        cargo_config: &CargoConfig,
-        command: S,
-        skip_sccache: bool,
-    ) -> Self {
+    pub fn new<S: AsRef<OsStr>>(command: S) -> Self {
         let mut inner = Command::new("cargo");
-        //sccache apply
-        let envs: IndexMap<OsString, Option<OsString>> = if !skip_sccache {
-            let result = apply_sccache_if_possible(cargo_config);
-            match result {
-                Ok(env) => env
-                    .iter()
-                    .map(|(key, option)| {
-                        if let Some(val) = option {
-                            (
-                                OsString::from(key.to_owned()),
-                                Some(OsString::from(val.to_owned())),
-                            )
-                        } else {
-                            (OsString::from(key.to_owned()), None)
-                        }
-                    })
-                    .collect(),
-                Err(hmm) => {
-                    warn!("Could not install sccache: {}", hmm);
-                    IndexMap::new()
-                }
-            }
-        } else {
-            IndexMap::new()
-        };
+        let envs = IndexMap::new();
 
-        let on_drop = if !skip_sccache && sccache_should_run(cargo_config, false) {
-            || {
-                log_sccache_stats();
-                stop_sccache_server();
-            }
-        } else {
-            || ()
-        };
+        let on_drop = || ();
 
         inner.arg(command);
         Self {
@@ -86,11 +47,6 @@ impl Cargo {
             env_additions: envs,
             on_close: on_drop,
         }
-    }
-
-    pub fn all(&mut self) -> &mut Self {
-        self.inner.arg("--all");
-        self
     }
 
     pub fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut Self {
@@ -251,61 +207,34 @@ impl Cargo {
 /// cargo based on groupings implied by the contents of <workspace-root>/x.toml.
 pub enum CargoCommand<'a> {
     Bench {
-        cargo_config: &'a CargoConfig,
         direct_args: &'a [OsString],
         args: &'a [OsString],
         env: &'a [(&'a str, Option<&'a str>)],
     },
     Check {
-        cargo_config: &'a CargoConfig,
         direct_args: &'a [OsString],
     },
     Clippy {
-        cargo_config: &'a CargoConfig,
         direct_args: &'a [OsString],
         args: &'a [OsString],
     },
     Fix {
-        cargo_config: &'a CargoConfig,
         direct_args: &'a [OsString],
         args: &'a [OsString],
     },
     Test {
-        cargo_config: &'a CargoConfig,
         direct_args: &'a [OsString],
         args: &'a [OsString],
         env: &'a [(&'a str, Option<&'a str>)],
-        skip_sccache: bool,
     },
     Build {
-        cargo_config: &'a CargoConfig,
         direct_args: &'a [OsString],
         args: &'a [OsString],
         env: &'a [(&'a str, Option<&'a str>)],
-        skip_sccache: bool,
     },
 }
 
 impl<'a> CargoCommand<'a> {
-    pub fn cargo_config(&self) -> &CargoConfig {
-        match self {
-            CargoCommand::Bench { cargo_config, .. } => cargo_config,
-            CargoCommand::Check { cargo_config, .. } => cargo_config,
-            CargoCommand::Clippy { cargo_config, .. } => cargo_config,
-            CargoCommand::Fix { cargo_config, .. } => cargo_config,
-            CargoCommand::Test { cargo_config, .. } => cargo_config,
-            CargoCommand::Build { cargo_config, .. } => cargo_config,
-        }
-    }
-
-    pub fn skip_sccache(&self) -> bool {
-        match self {
-            CargoCommand::Build { skip_sccache, .. } => *skip_sccache,
-            CargoCommand::Test { skip_sccache, .. } => *skip_sccache,
-            _ => false,
-        }
-    }
-
     pub fn run_on_packages(&self, packages: &SelectedPackages<'_>) -> Result<()> {
         // Early return if we have no packages to run.
         if !packages.should_invoke() {
@@ -331,7 +260,7 @@ impl<'a> CargoCommand<'a> {
     }
 
     fn prepare_cargo(&self, packages: &SelectedPackages<'_>) -> Cargo {
-        let mut cargo = Cargo::new(self.cargo_config(), self.as_str(), self.skip_sccache());
+        let mut cargo = Cargo::new(self.as_str());
         cargo
             .current_dir(project_root())
             .args(self.direct_args())
