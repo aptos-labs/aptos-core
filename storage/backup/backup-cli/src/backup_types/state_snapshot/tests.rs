@@ -78,7 +78,7 @@ fn end_to_end() {
     let tgt_db = AptosDB::new_readonly_for_test(&tgt_db_dir);
     assert_eq!(
         tgt_db
-            .get_latest_state_snapshot()
+            .get_state_snapshot_before(version + 1) // We cannot use get_latest_snapshot() because it searches backward from the latest txn_info version
             .unwrap()
             .map(|(_, hash)| hash)
             .unwrap(),

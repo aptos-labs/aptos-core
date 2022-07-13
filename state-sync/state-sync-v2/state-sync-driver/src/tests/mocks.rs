@@ -35,10 +35,10 @@ use data_streaming_service::{
 };
 use executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use mockall::mock;
-use scratchpad::SparseMerkleTree;
 use std::sync::Arc;
 use storage_interface::{
-    DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order, StartupInfo, StateSnapshotReceiver,
+    in_memory_state::InMemoryState, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order,
+    StartupInfo, StateSnapshotReceiver,
 };
 use tokio::task::JoinHandle;
 
@@ -305,7 +305,7 @@ mock! {
             first_version: Version,
             base_state_version: Option<Version>,
             ledger_info_with_sigs: Option<&'a LedgerInfoWithSignatures>,
-            state_tree: SparseMerkleTree<StateValue>,
+            in_memory_state: InMemoryState,
         ) -> Result<()>;
 
         fn delete_genesis(&self) -> Result<()>;

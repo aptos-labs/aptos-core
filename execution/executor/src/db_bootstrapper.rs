@@ -102,7 +102,7 @@ impl GenesisCommitter {
             self.output.result_view.txn_accumulator().version(),
             self.base_state_version,
             self.output.ledger_info.as_ref(),
-            self.output.result_view.state_tree(),
+            self.output.result_view.state().clone(),
         )?;
         info!("Genesis commited.");
         // DB bootstrapped, avoid anything that could fail after this.

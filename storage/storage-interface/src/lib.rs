@@ -45,6 +45,7 @@ pub mod proof_fetcher;
 pub mod state_view;
 pub mod sync_proof_fetcher;
 
+use crate::in_memory_state::InMemoryState;
 pub use executed_trees::ExecutedTrees;
 use scratchpad::SparseMerkleTree;
 
@@ -622,7 +623,7 @@ pub trait DbWriter: Send + Sync {
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         save_state_snapshots: bool,
-        state_tree: SparseMerkleTree<StateValue>,
+        latest_in_memory_state: InMemoryState,
     ) -> Result<()> {
         unimplemented!()
     }
@@ -633,7 +634,7 @@ pub trait DbWriter: Send + Sync {
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        state_tree: SparseMerkleTree<StateValue>,
+        latest_in_memory_state: InMemoryState,
     ) -> Result<()> {
         self.save_transactions_ext(
             txns_to_commit,
@@ -641,7 +642,7 @@ pub trait DbWriter: Send + Sync {
             base_state_version,
             ledger_info_with_sigs,
             true, /* save_state_snapshots */
-            state_tree,
+            latest_in_memory_state,
         )
     }
 
@@ -660,12 +661,7 @@ pub trait DbWriter: Send + Sync {
     /// See [`AptosDB::save_state_snapshot`].
     ///
     /// [`AptosDB::save_state_snapshot`]: ../aptosdb/struct.AptosDB.html#method.save_state_snapshot
-    fn save_state_snapshot(
-        &self,
-        version: Version,
-        base_version: Option<Version>,
-        state_tree_at_snapshot: SparseMerkleTree<StateValue>,
-    ) -> Result<()> {
+    fn save_state_snapshot(&self) -> Result<()> {
         unimplemented!()
     }
 

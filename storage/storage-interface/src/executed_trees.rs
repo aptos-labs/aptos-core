@@ -8,11 +8,7 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::{hash::TransactionAccumulatorHasher, HashValue};
 use aptos_state_view::StateViewId;
-use aptos_types::{
-    proof::accumulator::InMemoryAccumulator, state_store::state_value::StateValue,
-    transaction::Version,
-};
-use scratchpad::SparseMerkleTree;
+use aptos_types::{proof::accumulator::InMemoryAccumulator, transaction::Version};
 use std::sync::Arc;
 
 /// A wrapper of the in-memory state sparse merkle tree and the transaction accumulator that
@@ -30,10 +26,6 @@ pub struct ExecutedTrees {
 impl ExecutedTrees {
     pub fn state(&self) -> &InMemoryState {
         &self.state
-    }
-
-    pub fn state_tree(&self) -> SparseMerkleTree<StateValue> {
-        self.state().current.clone()
     }
 
     pub fn txn_accumulator(&self) -> &Arc<InMemoryAccumulator<TransactionAccumulatorHasher>> {

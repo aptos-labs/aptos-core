@@ -787,8 +787,6 @@ pub struct TransactionToCommitGen {
     /// N.B. the transaction sender and event owners must be updated to reflect information such as
     /// sequence numbers so that test data generated through this is more realistic and logical.
     account_state_gens: Vec<(Index, AccountStateGen)>,
-    /// Write set
-    write_set: WriteSet,
     /// Gas used.
     gas_used: u64,
     /// Transaction status
@@ -807,12 +805,28 @@ impl TransactionToCommitGen {
             .map(|(index, event_gen)| event_gen.materialize(index, universe))
             .collect();
 
+        let (state_updates, write_set): (HashMap<_, _>, Vec<_>) = self
+            .account_state_gens
+            .into_iter()
+            .flat_map(|(index, account_gen)| {
+                let address = universe.get_account_info(index).address;
+                account_gen
+                    .materialize(index, universe)
+                    .into_resource_iter()
+                    .map(move |(key, value)| {
+                        let state_key = StateKey::AccessPath(AccessPath::new(address, key));
+                        (
+                            (state_key.clone(), StateValue::from(value.clone())),
+                            (state_key, WriteOp::Value(value)),
+                        )
+                    })
+            })
+            .unzip();
         TransactionToCommit::new(
             Transaction::UserTransaction(transaction),
-            TransactionInfo::new_placeholder(self.gas_used, self.status),
-            // state updates will be dealt with in BlockGen at a state checkpoint
-            HashMap::new(), /* state updates */
-            self.write_set,
+            TransactionInfo::new_placeholder(self.gas_used, None, self.status),
+            state_updates,
+            WriteSetMut::new(write_set).freeze().expect("Cannot fail"),
             events,
         )
     }
@@ -843,12 +857,11 @@ impl Arbitrary for TransactionToCommitGen {
                 0..=2,
             ),
             vec((any::<Index>(), any::<AccountStateGen>()), 0..=1),
-            any::<WriteSet>(),
             any::<u64>(),
             any::<ExecutionStatus>(),
         )
             .prop_map(
-                |(sender, event_emitters, mut touched_accounts, write_set, gas_used, status)| {
+                |(sender, event_emitters, mut touched_accounts, gas_used, status)| {
                     // To reflect change of account/event sequence numbers, txn sender account and
                     // event emitter accounts must be updated.
                     let (sender_index, sender_blob_gen, txn_gen) = sender;
@@ -864,7 +877,6 @@ impl Arbitrary for TransactionToCommitGen {
                         transaction_gen: (sender_index, txn_gen),
                         event_gens,
                         account_state_gens: touched_accounts,
-                        write_set,
                         gas_used,
                         status,
                     }
@@ -1114,32 +1126,18 @@ impl BlockGen {
         let mut txns_to_commit = Vec::new();
 
         // materialize user transactions
-        let mut account_gens = Vec::new();
-        for mut txn_gen in self.txn_gens {
-            account_gens.extend(txn_gen.take_account_gens().into_iter());
+        for txn_gen in self.txn_gens {
             txns_to_commit.push(txn_gen.materialize(universe));
         }
 
-        // add state checkpoint transaction
-        let state_updates = account_gens
-            .into_iter()
-            .flat_map(|(index, account_gen)| {
-                let address = universe.get_account_info(index).address;
-                account_gen
-                    .materialize(index, universe)
-                    .into_resource_iter()
-                    .map(move |(key, value)| {
-                        (
-                            StateKey::AccessPath(AccessPath::new(address, key)),
-                            StateValue::from(value),
-                        )
-                    })
-            })
-            .collect();
         txns_to_commit.push(TransactionToCommit::new(
             Transaction::StateCheckpoint(HashValue::random()),
-            TransactionInfo::new_placeholder(0, ExecutionStatus::Success),
-            state_updates,
+            TransactionInfo::new_placeholder(
+                0,
+                Some(HashValue::random()),
+                ExecutionStatus::Success,
+            ),
+            HashMap::new(),
             WriteSet::default(),
             Vec::new(),
         ));

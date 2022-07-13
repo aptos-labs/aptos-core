@@ -165,7 +165,7 @@ impl RestoreRunMode {
     pub fn finish(&self, version: Version) {
         match self {
             Self::Restore { restore_handler } => {
-                restore_handler.maybe_reset_state_store(version);
+                restore_handler.maybe_reset_state_store(Some(version));
             }
             Self::Verify => (),
         }
