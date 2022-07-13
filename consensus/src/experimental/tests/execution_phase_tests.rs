@@ -1,8 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::{atomic::AtomicU64, Arc};
-
+use crate::{
+    experimental::{
+        buffer_manager::create_channel,
+        execution_phase::{ExecutionPhase, ExecutionRequest, ExecutionResponse},
+        pipeline_phase::{CountedRequest, PipelinePhase},
+        tests::phase_tester::PhaseTester,
+    },
+    test_utils::{consensus_runtime, RandomComputeResultStateComputer},
+};
 use aptos_crypto::HashValue;
 use aptos_types::{ledger_info::LedgerInfo, validator_verifier::random_validator_verifier};
 use consensus_types::{
@@ -12,16 +19,7 @@ use consensus_types::{
     quorum_cert::QuorumCert,
 };
 use executor_types::{Error, StateComputeResult};
-
-use crate::{
-    experimental::{
-        buffer_manager::create_channel,
-        execution_phase::{ExecutionPhase, ExecutionRequest, ExecutionResponse},
-        pipeline_phase::PipelinePhase,
-        tests::phase_tester::PhaseTester,
-    },
-    test_utils::{consensus_runtime, RandomComputeResultStateComputer},
-};
+use std::sync::Arc;
 
 pub fn prepare_execution_phase() -> (HashValue, ExecutionPhase) {
     let execution_proxy = Arc::new(RandomComputeResultStateComputer::new());
@@ -95,14 +93,13 @@ fn execution_phase_tests() {
     unit_phase_tester.unit_test(&execution_phase);
 
     // e2e tests
-    let (in_channel_tx, in_channel_rx) = create_channel::<ExecutionRequest>();
+    let (in_channel_tx, in_channel_rx) = create_channel::<CountedRequest<ExecutionRequest>>();
     let (out_channel_tx, out_channel_rx) = create_channel::<ExecutionResponse>();
 
     let execution_phase_pipeline = PipelinePhase::new(
         in_channel_rx,
         Some(out_channel_tx),
         Box::new(execution_phase),
-        Arc::new(AtomicU64::new(0)),
     );
 
     runtime.spawn(execution_phase_pipeline.start());
