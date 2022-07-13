@@ -531,7 +531,6 @@ impl Transaction {
         };
 
         for change in &txn_info.changes {
-            // TODO: Handle delete resource ?
             if let WriteSetChange::WriteResource { address, data, .. } = change {
                 // Determine operation
                 let address = *address.inner();
@@ -614,7 +613,6 @@ impl Transaction {
                     None
                 };
 
-                // TODO: support coin creation?
                 match op_details {
                     Some(OperationDetails::CreateAccount) => {
                         operations.push(Operation::create_account(
