@@ -213,15 +213,20 @@ pub fn load_test_environment<R>(
         .create(&node_dir)
         .unwrap();
 
+    // The directory that will hold all the data about the network
     let node_dir = node_dir.canonicalize().unwrap();
 
     let validator_config_path = node_dir.join("0").join("node.yaml");
     let aptos_root_key_path = node_dir.join("mint.key");
 
     let config = if let Some(config_path) = config_path {
+        // Copy the config into the node directory
         let config = NodeConfig::load(&config_path).expect("Unable to load config:");
         std::fs::copy(config_path, validator_config_path.as_path())
             .expect("Should be able to copy config");
+        config
+    } else if let Ok(config) = NodeConfig::load(&validator_config_path) {
+        // If there's an existing config, use that
         config
     } else {
         // Build a single validator network
