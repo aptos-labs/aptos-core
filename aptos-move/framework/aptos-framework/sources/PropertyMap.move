@@ -13,7 +13,7 @@ module AptosFramework::PropertyMap {
     const EKEY_COUNT_NOT_MATCH_TYPE_COUNT: u64 = 5;
 
     struct PropertyMap has store {
-        map: SimpleMap<String, PropertyValue>
+        map: SimpleMap<String, PropertyValue>,
     }
 
     struct PropertyValue has store, copy, drop {
@@ -29,7 +29,7 @@ module AptosFramework::PropertyMap {
         assert!(Vector::length(&keys) == Vector::length(&values), EKEY_COUNT_NOT_MATCH_VALUE_COUNT);
         assert!(Vector::length(&keys) == Vector::length(&types), EKEY_COUNT_NOT_MATCH_TYPE_COUNT);
         let properties = PropertyMap{
-            map: SimpleMap::create<String, PropertyValue>()
+            map: SimpleMap::create<String, PropertyValue>(),
         };
         let i = 0;
         while (i < Vector::length(&keys)) {
@@ -71,17 +71,6 @@ module AptosFramework::PropertyMap {
         *&property.type
     }
 
-    public fun update_property_value(
-        list: &mut PropertyMap,
-        key: &String,
-        value: PropertyValue
-    ) {
-        let found = contains_key(list, key);
-        assert!(found, EPROPERTY_NOT_EXIST);
-        let property_val = SimpleMap::borrow_mut(&mut list.map, key);
-        *property_val = value;
-    }
-
     public fun remove(
         list: &mut PropertyMap,
         key: &String
@@ -92,18 +81,40 @@ module AptosFramework::PropertyMap {
         SimpleMap::remove(&mut list.map, key)
     }
 
-    public fun update_property_values(
-        list: &mut PropertyMap,
-        keys: &vector<String>,
-        values: vector<PropertyValue>
+    /// update a property map with new values
+    /// assume not deleting old keys, only add or update key values
+    public fun update_property_map(
+        map: &mut PropertyMap,
+        property_keys: vector<String>,
+        property_values: vector<vector<u8>>,
+        property_types: vector<String>
     ) {
         let i = 0;
-        while (i < Vector::length(keys)) {
-            let key = Vector::borrow(keys, i);
-            let value = Vector::borrow(&values, i);
-            update_property_value(list, key, *value);
+        while (i < Vector::length(&property_keys)) {
+            let key = Vector::borrow(&property_keys, i);
+            let value = *Vector::borrow(&property_values, i);
+            let type = *Vector::borrow(&property_types, i);
+            if (contains_key(map, key)) {
+                let pv = PropertyValue {
+                    value,
+                    type,
+                };
+
+                update_property_value(map, key, pv);
+            };
             i = i + 1;
         };
+    }
+
+    public fun update_property_value(
+        list: &mut PropertyMap,
+        key: &String,
+        value: PropertyValue
+    ) {
+        let found = contains_key(list, key);
+        assert!(found, EPROPERTY_NOT_EXIST);
+        let property_val = SimpleMap::borrow_mut(&mut list.map, key);
+        *property_val = value;
     }
 
     public fun generate_string_vector(values: vector<vector<u8>>): vector<String> {
