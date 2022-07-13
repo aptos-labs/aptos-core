@@ -12,6 +12,7 @@ use crate::{
 use aptos_logger::{debug, trace};
 use aptos_rest_client::aptos_api_types::{BlockInfo, HashValue};
 use std::{
+    cmp::Ordering,
     collections::BTreeMap,
     sync::{Arc, RwLock},
 };
@@ -145,7 +146,7 @@ pub struct BlockCache {
 }
 
 impl BlockCache {
-    pub fn new(rest_client: Arc<aptos_rest_client::Client>) -> ApiResult<Self> {
+    pub async fn new(rest_client: Arc<aptos_rest_client::Client>) -> ApiResult<Self> {
         let mut blocks = BTreeMap::new();
         let mut hashes = BTreeMap::new();
         let mut versions = BTreeMap::new();
@@ -163,12 +164,22 @@ impl BlockCache {
         hashes.insert(hash, 0);
         versions.insert(0, 0);
 
-        Ok(BlockCache {
+        // Now insert the first and last blocks
+        let state = rest_client.get_ledger_information().await?.into_inner();
+        let block_cache = BlockCache {
             blocks: RwLock::new(blocks),
             hashes: RwLock::new(hashes),
             versions: RwLock::new(versions),
             rest_client,
-        })
+        };
+        if let Some(oldest_ledger_version) = state.oldest_ledger_version {
+            block_cache
+                .get_block_info_by_version(oldest_ledger_version)
+                .await?;
+        }
+        block_cache.get_block_info_by_version(state.version).await?;
+
+        Ok(block_cache)
     }
 
     /// Retrieve the block info for the index
@@ -181,54 +192,55 @@ impl BlockCache {
             }
 
             // Find the closest, left or right, and build up blocks from there
-            let search_left = map.iter().rev().find_map(|(i, info)| {
-                if *i < block_index {
-                    Some((i, info, block_index - i))
-                } else {
-                    None
+            // Search from right to left because we're less likely to search far into the past
+            let mut search_left = None;
+            let mut search_right = None;
+            for (i, info) in map.iter().rev() {
+                let i = *i;
+                match i.cmp(&block_index) {
+                    Ordering::Less => {
+                        let start_version = info.end_version.saturating_add(1);
+                        let block_range = i.saturating_add(1)..=block_index;
+                        let distance = block_index.saturating_sub(i);
+                        search_left = Some((start_version, block_range, distance));
+                        // We've passed our block_index so we can stop now
+                        break;
+                    }
+                    Ordering::Greater => {
+                        let start_version = info.start_version.saturating_sub(1);
+                        let block_range = block_index..=(i.saturating_sub(1));
+                        let distance = i.saturating_sub(block_index);
+                        search_right = Some((start_version, block_range, distance));
+                    }
+                    Ordering::Equal => {}
                 }
-            });
+            }
 
-            let search_right = map.iter().find_map(|(i, info)| {
-                if *i > block_index {
-                    Some((i, info, block_index - i))
-                } else {
-                    None
-                }
-            });
-
+            // Choose the shortest distance and search in that direction
             match (search_left, search_right) {
-                (Some((i, info, _)), None) => {
-                    let start = info.end_version + 1;
-                    let range = (i + 1)..=block_index;
-                    (start, range, true)
-                }
-                (None, Some((i, info, _))) => {
-                    let start = info.start_version - 1;
-                    let range = (i - 1)..=block_index;
-                    (start, range, false)
+                (Some((left_version, left_range, _)), None) => (left_version, left_range, true),
+                (None, Some((right_version, right_range, _))) => {
+                    (right_version, right_range, false)
                 }
                 (
-                    Some((left_index, left_info, left_distance)),
-                    Some((right_index, right_info, right_distance)),
+                    Some((left_version, left_range, left_distance)),
+                    Some((right_version, right_range, right_distance)),
                 ) => {
-                    if left_distance > right_distance {
-                        let start = left_info.start_version - 1;
-                        let range = (left_index - 1)..=block_index;
-                        (start, range, true)
+                    if left_distance < right_distance {
+                        (left_version, left_range, true)
                     } else {
-                        let start = right_info.end_version + 1;
-                        let range = (right_index + 1)..=block_index;
-                        (start, range, false)
+                        (right_version, right_range, false)
                     }
                 }
+                // This shouldn't happen as the first thing we do when we initialize the cache
+                // is put the first and last blocks into it
                 _ => unreachable!("There should always be a block in the cache!"),
             }
         };
 
         // Go through the blocks, and add them into the cache
         let mut running_version = start_version;
-        for i in range {
+        for _ in range {
             let info = self.add_block(running_version).await?;
 
             // Increment to the next block
@@ -237,15 +249,14 @@ impl BlockCache {
             } else {
                 running_version = info.start_version.saturating_sub(1);
             }
-
-            // If we found the block let's return the info
-            if i == block_index {
-                return Ok(info);
-            }
         }
 
-        // If for some reason the block doesn't get found, retry with block incomplete
-        Err(ApiError::BlockIncomplete)
+        if let Some(info) = self.blocks.read().unwrap().get(&block_index) {
+            Ok(*info)
+        } else {
+            // If for some reason the block doesn't get found, retry with block incomplete
+            Err(ApiError::BlockIncomplete)
+        }
     }
 
     /// Retrieve block info, and add it to the index

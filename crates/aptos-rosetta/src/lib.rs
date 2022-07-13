@@ -97,9 +97,13 @@ pub async fn bootstrap_async(
     let handle = tokio::spawn(async move {
         // If it's Online mode, add the block cache
         let rest_client = rest_client.map(Arc::new);
-        let block_cache = rest_client
-            .as_ref()
-            .map(|rest_client| Arc::new(BlockCache::new(rest_client.clone()).unwrap()));
+        let block_cache = if let Some(ref rest_client) = rest_client {
+            Some(Arc::new(
+                BlockCache::new(rest_client.clone()).await.unwrap(),
+            ))
+        } else {
+            None
+        };
 
         let context = RosettaContext {
             rest_client: rest_client.clone(),
