@@ -52,6 +52,10 @@ impl Error {
         Self::bad_request(format!("invalid request body: {}", msg))
     }
 
+    pub fn insufficient_storage<S: Display>(msg: S) -> Self {
+        Self::new(StatusCode::INSUFFICIENT_STORAGE, msg.to_string())
+    }
+
     pub fn internal(err: anyhow::Error) -> Self {
         Self::from_anyhow_error(StatusCode::INTERNAL_SERVER_ERROR, err)
     }

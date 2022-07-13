@@ -318,6 +318,9 @@ impl Transactions {
                 let resp = Response::new(self.ledger_info, &pending_txn)?;
                 Ok(reply::with_status(resp, StatusCode::ACCEPTED))
             }
+            MempoolStatusCode::MempoolIsFull => {
+                Err(Error::insufficient_storage(mempool_status.message))
+            }
             MempoolStatusCode::VmError => Err(Error::bad_request(format!(
                 "invalid transaction: {}",
                 vm_status_opt
