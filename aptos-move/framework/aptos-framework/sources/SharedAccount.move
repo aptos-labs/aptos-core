@@ -84,7 +84,7 @@ module AptosFramework::SharedAccount {
     }
 
     // Disperse all available balance to addresses in the shared account
-    public fun disperse<CoinType>(resource_addr: address) acquires SharedAccount {
+    public(script) fun disperse<CoinType>(resource_addr: address) acquires SharedAccount {
         assert!(exists<SharedAccount>(resource_addr), Errors::invalid_argument(EINVALID_SIGNER));
 
         let total_balance = Coin::balance<CoinType>(resource_addr);
@@ -108,7 +108,7 @@ module AptosFramework::SharedAccount {
     }
 
     #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113)]
-    public(script) fun test_initialize(user: signer, test_user1: signer, test_user2: signer) : (address) acquires SharedAccount {
+    public fun test_initialize(user: signer, test_user1: signer, test_user2: signer) : (address) acquires SharedAccount {
         let addresses = Vector::empty<address>();
         let numerators = Vector::empty<u64>();
         let denominators = Vector::empty<u64>();
@@ -135,7 +135,7 @@ module AptosFramework::SharedAccount {
 
     #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113)]
     #[expected_failure]
-    public(script) fun test_initialize_with_incorrect_numerator_denominator_combo(user: signer, test_user1: signer, test_user2: signer) : (address) acquires SharedAccount {
+    public fun test_initialize_with_incorrect_numerator_denominator_combo(user: signer, test_user1: signer, test_user2: signer) : (address) acquires SharedAccount {
         let addresses = Vector::empty<address>();
         let numerators = Vector::empty<u64>();
         let denominators = Vector::empty<u64>();
