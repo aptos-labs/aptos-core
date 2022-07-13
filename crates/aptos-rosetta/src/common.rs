@@ -205,8 +205,9 @@ pub async fn get_block_index_from_request(
 
             server_context
                 .block_cache()?
-                .get_block_index_by_version(state.version)
+                .get_block_info_by_version(state.version)
                 .await?
+                .block_height
         }
     })
 }

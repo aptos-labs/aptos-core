@@ -137,6 +137,7 @@ async fn get_block_by_index(
     }
 }
 
+/// A cache of [`BlockInfo`] to allow us to keep track of the block boundaries
 #[derive(Debug)]
 pub struct BlockCache {
     blocks: RwLock<BTreeMap<u64, BlockInfo>>,
@@ -173,11 +174,9 @@ impl BlockCache {
             rest_client,
         };
         if let Some(oldest_ledger_version) = state.oldest_ledger_version {
-            block_cache
-                .get_block_info_by_version(oldest_ledger_version)
-                .await?;
+            block_cache.add_block(oldest_ledger_version).await?;
         }
-        block_cache.get_block_info_by_version(state.version).await?;
+        block_cache.add_block(state.version).await?;
 
         Ok(block_cache)
     }
@@ -286,16 +285,6 @@ impl BlockCache {
     }
 
     /// Retrieve the block index for the version
-    pub async fn get_block_index_by_version(&self, version: u64) -> ApiResult<u64> {
-        // If we already have the version, let's roll with it
-        if let Some(index) = self.versions.read().unwrap().get(&version) {
-            return Ok(*index);
-        }
-
-        // Lookup block info by version
-        Ok(self.add_block(version).await?.block_height)
-    }
-
     pub async fn get_block_info_by_version(&self, version: u64) -> ApiResult<BlockInfo> {
         // If we already have the version, let's roll with it
         let maybe_index = { self.versions.read().unwrap().get(&version).copied() };
