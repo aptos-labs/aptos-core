@@ -26,6 +26,7 @@ use std::{
     convert::TryFrom,
     fs::File,
     io::Write,
+    path::Path,
     process::{Command, Stdio},
     str,
     time::{SystemTime, UNIX_EPOCH},
@@ -246,6 +247,15 @@ fn upgrade_helm_release(
     options: &[String],
     kube_namespace: String,
 ) -> Result<()> {
+    // Check to make sure helm_chart exists
+    let helm_chart_path = Path::new(&helm_chart);
+    if !helm_chart_path.exists() {
+        bail!(
+            "Helm chart {} does not exist, try running from the repo root",
+            helm_chart
+        );
+    }
+
     // only create cluster-level resources once
     let psp_values = match kube_namespace.as_str() {
         "default" => "podSecurityPolicy=true",
