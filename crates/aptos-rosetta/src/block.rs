@@ -160,9 +160,8 @@ impl BlockCache {
             end_version: 0,
             num_transactions: 1,
         };
-        let hash = genesis_block_info.block_hash;
         blocks.insert(0, genesis_block_info);
-        hashes.insert(hash, 0);
+        hashes.insert(genesis_block_info.block_hash, 0);
         versions.insert(0, 0);
 
         // Now insert the first and last blocks
@@ -279,12 +278,16 @@ impl BlockCache {
         // Write version to index mapping
         {
             let mut map = self.versions.write().unwrap();
-            map.insert(block_version, info.block_height);
+            // The only versions that will be used are the start and end versions of a block
+            // As those are the only versions that will be returned by ledger info
+            map.insert(info.start_version, info.block_height);
+            map.insert(info.end_version, info.block_height);
         }
         Ok(info)
     }
 
     /// Retrieve the block index for the version
+    /// TODO: We can search through the versions to find the closest version
     pub async fn get_block_info_by_version(&self, version: u64) -> ApiResult<BlockInfo> {
         // If we already have the version, let's roll with it
         let maybe_index = { self.versions.read().unwrap().get(&version).copied() };
