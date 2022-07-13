@@ -55,7 +55,7 @@ module AptosFramework::ResourceAccount {
         origin: &signer,
         seed: vector<u8>,
         optional_auth_key: vector<u8>,
-    ):  (signer) acquires Container {
+    ) acquires Container {
         let (resource, resource_signer_cap) = Account::create_resource_account(origin, seed);
 
         let origin_addr = Signer::address_of(origin);
@@ -73,7 +73,6 @@ module AptosFramework::ResourceAccount {
             optional_auth_key
         };
         Account::rotate_authentication_key_internal(&resource, auth_key);
-        resource
     }
 
     /// When called by the resource account, it will retrieve the capability associated with that
