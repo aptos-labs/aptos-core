@@ -19,7 +19,7 @@ module AptosFramework::SharedAccount {
     }
 
     const EINVALID_INPUT: u64 = 0;
-    const EACCOUNT_DNE: u64 = 1;
+    const EACCOUNT_NOT_FOUND: u64 = 1;
     const EADDRESS_ALREADY_EXISTS: u64 = 2;
     const EINVALID_NUMERATOR_DENOMINATOR_COMBINATIONS: u64 = 3;
     const EINVALID_SIGNER: u64 = 4;
@@ -46,7 +46,7 @@ module AptosFramework::SharedAccount {
         assert!(Vector::length(&addresses) == Vector::length(&numerators), Errors::invalid_argument(EINVALID_INPUT));
         assert!(Vector::length(&addresses) == Vector::length(&denominators), Errors::invalid_argument(EINVALID_INPUT));
 
-        assert!(Account::exists_at(Signer::address_of(source)), Errors::invalid_argument(EACCOUNT_DNE));
+        assert!(Account::exists_at(Signer::address_of(source)), Errors::invalid_argument(EACCOUNT_NOT_FOUND));
         let (resource_signer, resource_signer_cap) = Account::create_resource_account(source, seed);
         if (!exists<SharedAccount>(Signer::address_of(&resource_signer))) {
             move_to(
@@ -68,7 +68,7 @@ module AptosFramework::SharedAccount {
             let num = *Vector::borrow(&numerators, i);
             let denom = *Vector::borrow(&denominators, i); 
             let addr = *Vector::borrow(&addresses, i);
-            assert!(Account::exists_at(addr), Errors::invalid_argument(EACCOUNT_DNE));
+            assert!(Account::exists_at(addr), Errors::invalid_argument(EACCOUNT_NOT_FOUND));
             assert!(num >= 0 && denom > 0, Errors::invalid_argument(EINVALID_INPUT));
 
             let common_denom = find_least_common_denominator(cumulative_denominator, denom);
