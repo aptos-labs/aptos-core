@@ -7,21 +7,21 @@ use move_deps::move_core_types::account_address::AccountAddress;
 use reqwest::Url;
 
 pub struct FaucetClient {
-    faucet_url: String,
+    faucet_url: Url,
     rest_client: Client,
 }
 
 impl FaucetClient {
-    pub fn new(faucet_url: String, rest_url: String) -> Self {
+    pub fn new(faucet_url: Url, rest_url: Url) -> Self {
         Self {
             faucet_url,
-            rest_client: Client::new(Url::parse(&rest_url).expect("Unable to parse rest url")),
+            rest_client: Client::new(rest_url),
         }
     }
 
     pub fn create_account(&self, address: AccountAddress) -> Result<()> {
         let client = reqwest::blocking::Client::new();
-        let mut url = Url::parse(&self.faucet_url).map_err(Error::request)?;
+        let mut url = self.faucet_url.clone();
         url.set_path("mint");
         let query = format!("auth_key={}&amount=0&return_txns=true", address);
         url.set_query(Some(&query));
@@ -46,7 +46,7 @@ impl FaucetClient {
 
     pub fn fund(&self, address: AccountAddress, amount: u64) -> Result<()> {
         let client = reqwest::blocking::Client::new();
-        let mut url = Url::parse(&self.faucet_url).map_err(Error::request)?;
+        let mut url = self.faucet_url.clone();
         url.set_path("mint");
         let query = format!("auth_key={}&amount={}&return_txns=true", address, amount);
         url.set_query(Some(&query));

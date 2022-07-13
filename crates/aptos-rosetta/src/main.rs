@@ -26,7 +26,7 @@ const TOTAL_REST_API_WAIT_DURATION_S: u64 = 300;
 async fn main() {
     let args: CommandArgs = CommandArgs::parse();
 
-    // If we're in online mode, we run a full node side by side
+    // If we're in online mode, we run a full node side by side, the fullnode sets up the logger
     let _maybe_node = if let CommandArgs::Online(OnlineLocalArgs {
         ref node_args,
         ref online_args,
@@ -59,7 +59,7 @@ async fn main() {
 
         Some(runtime)
     } else {
-        // Offline mode we just need to start up the logger
+        // If we aren't running a full node, set up the logger now
         aptos_logger::Logger::new().init();
         None
     };
@@ -95,7 +95,7 @@ trait ServerArgs {
 pub enum CommandArgs {
     /// Run a local online server that connects to a fullnode endpoint
     OnlineRemote(OnlineRemoteArgs),
-    /// Run a local online server and a node that connects
+    /// Run a local full node in tandem with Rosetta
     Online(OnlineLocalArgs),
     /// Run a local online server that doesn't connect to a fullnode endpoint
     Offline(OfflineArgs),

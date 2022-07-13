@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_faucet::FaucetArgs;
-use structopt::StructOpt;
+use clap::Parser;
 
 #[tokio::main]
 async fn main() {
@@ -42,7 +42,8 @@ mod tests {
         convert::{Infallible, TryFrom, TryInto},
         sync::{Arc, Mutex},
     };
-    use tokio::task::yield_now;
+    use tokio::task::{yield_now, JoinHandle};
+    use url::Url;
     use warp::{
         body::BodyDeserializeError,
         cors::CorsForbidden,
@@ -111,7 +112,7 @@ mod tests {
         tokio::task::spawn(async move { future.await });
 
         let service = Service::new(
-            format!("http://localhost:{}/", address.port()),
+            Url::parse(&format!("http://localhost:{}/", address.port())).unwrap(),
             chain_id,
             faucet_account,
             maximum_amount,
@@ -475,24 +476,8 @@ mod tests {
 
     #[tokio::test]
     async fn create_account_with_client() {
-        let (_accounts, service) = setup(None);
-        let endpoint = service.endpoint().to_owned();
-        let (address, future) = warp::serve(routes(service)).bind_ephemeral(([127, 0, 0, 1], 0));
-        tokio::task::spawn(async move { future.await });
-
-        let faucet_client = FaucetClient::new(format!("http://{}", address), endpoint);
-
-        let pub_key: Ed25519PublicKey =
-            hex::decode(&"459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d")
-                .unwrap()
-                .as_slice()
-                .try_into()
-                .unwrap();
-        let address = AuthenticationKey::ed25519(&pub_key).derived_address();
-        assert_eq!(
-            address.to_string(),
-            "9FF98E82355EB13098F3B1157AC018A725C62C0E0820F422000814CDBA407835"
-        );
+        let (faucet_client, _service) = get_client().await;
+        let address = get_address();
 
         let res = tokio::task::spawn_blocking(move || faucet_client.create_account(address))
             .await
@@ -502,20 +487,9 @@ mod tests {
 
     #[tokio::test]
     async fn fund_account_with_client() {
-        let (_accounts, service) = setup(None);
-        let endpoint = service.endpoint().to_owned();
-        let (address, future) = warp::serve(routes(service)).bind_ephemeral(([127, 0, 0, 1], 0));
-        tokio::task::spawn(async move { future.await });
+        let (faucet_client, _service) = get_client().await;
+        let address = get_address();
 
-        let faucet_client = FaucetClient::new(format!("http://{}", address), endpoint);
-
-        let pub_key: Ed25519PublicKey =
-            hex::decode(&"459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d")
-                .unwrap()
-                .as_slice()
-                .try_into()
-                .unwrap();
-        let address = AuthenticationKey::ed25519(&pub_key).derived_address();
         let (res1, res2) = tokio::task::spawn_blocking(move || {
             (
                 faucet_client.create_account(address),
@@ -527,5 +501,34 @@ mod tests {
 
         res1.unwrap();
         res2.unwrap();
+    }
+
+    async fn get_client() -> (FaucetClient, JoinHandle<()>) {
+        let (_accounts, service) = setup(None);
+        let endpoint = service.endpoint().clone();
+        let (address, future) = warp::serve(routes(service)).bind_ephemeral(([127, 0, 0, 1], 0));
+        let service = tokio::task::spawn(async move { future.await });
+
+        let faucet_client = FaucetClient::new(
+            Url::parse(&format!("http://{}", address)).unwrap(),
+            endpoint,
+        );
+
+        (faucet_client, service)
+    }
+
+    fn get_address() -> AccountAddress {
+        let pub_key: Ed25519PublicKey =
+            hex::decode(&"459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d")
+                .unwrap()
+                .as_slice()
+                .try_into()
+                .unwrap();
+        let address = AuthenticationKey::ed25519(&pub_key).derived_address();
+        assert_eq!(
+            address.to_string(),
+            "9FF98E82355EB13098F3B1157AC018A725C62C0E0820F422000814CDBA407835"
+        );
+        address
     }
 }
