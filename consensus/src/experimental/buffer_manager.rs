@@ -28,6 +28,7 @@ use crate::{
         buffer_item::BufferItem,
         execution_phase::{ExecutionRequest, ExecutionResponse},
         persisting_phase::PersistingRequest,
+        pipeline_phase::CountedRequest,
         signing_phase::{SigningRequest, SigningResponse},
     },
     network::NetworkSender,
@@ -75,18 +76,18 @@ pub struct BufferManager {
     // the roots point to the first *unprocessed* item.
     // None means no items ready to be processed (either all processed or no item finishes previous stage)
     execution_root: BufferItemRootType,
-    execution_phase_tx: Sender<ExecutionRequest>,
+    execution_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
     execution_phase_rx: Receiver<ExecutionResponse>,
 
     signing_root: BufferItemRootType,
-    signing_phase_tx: Sender<SigningRequest>,
+    signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
     signing_phase_rx: Receiver<SigningResponse>,
 
     commit_msg_tx: NetworkSender,
     commit_msg_rx: channel::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
 
     // we don't hear back from the persisting phase
-    persisting_phase_tx: Sender<PersistingRequest>,
+    persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
 
     block_rx: UnboundedReceiver<OrderedBlocks>,
     reset_rx: UnboundedReceiver<ResetRequest>,
@@ -100,13 +101,13 @@ pub struct BufferManager {
 impl BufferManager {
     pub fn new(
         author: Author,
-        execution_phase_tx: Sender<ExecutionRequest>,
+        execution_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
         execution_phase_rx: Receiver<ExecutionResponse>,
-        signing_phase_tx: Sender<SigningRequest>,
+        signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
         signing_phase_rx: Receiver<SigningResponse>,
         commit_msg_tx: NetworkSender,
         commit_msg_rx: channel::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
-        persisting_phase_tx: Sender<PersistingRequest>,
+        persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
         verifier: ValidatorVerifier,
@@ -141,6 +142,10 @@ impl BufferManager {
         }
     }
 
+    fn create_new_request<Request>(&self, req: Request) -> CountedRequest<Request> {
+        CountedRequest::new(req, self.ongoing_tasks.clone())
+    }
+
     /// process incoming ordered blocks
     /// push them into the buffer and update the roots if they are none.
     fn process_ordered_blocks(&mut self, ordered_blocks: OrderedBlocks) {
@@ -167,7 +172,7 @@ impl BufferManager {
         if self.execution_root.is_some() {
             let ordered_blocks = self.buffer.get(&self.execution_root).get_blocks().clone();
             self.execution_phase_tx
-                .send(ExecutionRequest { ordered_blocks })
+                .send(self.create_new_request(ExecutionRequest { ordered_blocks }))
                 .await
                 .expect("Failed to send execution request")
         }
@@ -188,10 +193,10 @@ impl BufferManager {
             let item = self.buffer.get(&self.signing_root);
             let executed_item = item.unwrap_executed_ref();
             self.signing_phase_tx
-                .send(SigningRequest {
+                .send(self.create_new_request(SigningRequest {
                     ordered_ledger_info: executed_item.ordered_proof.clone(),
                     commit_ledger_info: executed_item.commit_proof.ledger_info().clone(),
-                })
+                }))
                 .await
                 .expect("Failed to send signing request");
         }
@@ -226,7 +231,7 @@ impl BufferManager {
                         .await;
                 }
                 self.persisting_phase_tx
-                    .send(PersistingRequest {
+                    .send(self.create_new_request(PersistingRequest {
                         blocks: blocks_to_persist,
                         commit_ledger_info: aggregated_item.commit_proof,
                         // we use the last callback
@@ -236,7 +241,7 @@ impl BufferManager {
                         // the block_tree and storage are the same for all the callbacks in the current epoch
                         // the commit root is used in logging only.
                         callback: aggregated_item.callback,
-                    })
+                    }))
                     .await
                     .expect("Failed to send persist request");
                 debug!("Advance head to {:?}", self.buffer.head_cursor());

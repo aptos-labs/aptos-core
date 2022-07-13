@@ -4,7 +4,7 @@
 use crate::{
     experimental::{
         buffer_manager::{create_channel, Receiver, Sender},
-        pipeline_phase::PipelinePhase,
+        pipeline_phase::{CountedRequest, PipelinePhase},
         signing_phase::{SigningPhase, SigningRequest, SigningResponse},
         tests::{
             phase_tester::PhaseTester,
@@ -23,28 +23,21 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
 };
 use safety_rules::Error;
-use std::{
-    collections::BTreeMap,
-    sync::{atomic::AtomicU64, Arc},
-};
+use std::collections::BTreeMap;
 
 pub fn prepare_signing_pipeline(
     signing_phase: SigningPhase,
 ) -> (
-    Sender<SigningRequest>,
+    Sender<CountedRequest<SigningRequest>>,
     Receiver<SigningResponse>,
     PipelinePhase<SigningPhase>,
 ) {
     // e2e tests
-    let (in_channel_tx, in_channel_rx) = create_channel::<SigningRequest>();
+    let (in_channel_tx, in_channel_rx) = create_channel::<CountedRequest<SigningRequest>>();
     let (out_channel_tx, out_channel_rx) = create_channel::<SigningResponse>();
 
-    let signing_phase_pipeline = PipelinePhase::new(
-        in_channel_rx,
-        Some(out_channel_tx),
-        Box::new(signing_phase),
-        Arc::new(AtomicU64::new(0)),
-    );
+    let signing_phase_pipeline =
+        PipelinePhase::new(in_channel_rx, Some(out_channel_tx), Box::new(signing_phase));
 
     (in_channel_tx, out_channel_rx, signing_phase_pipeline)
 }
