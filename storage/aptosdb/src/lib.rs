@@ -1090,6 +1090,7 @@ impl DbReader for AptosDB {
 
     fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
         gauged_api("get_startup_info", || {
+            let _lock = self.ledger_commit_lock.lock();
             self.ledger_store
                 .get_startup_info()?
                 .map(
@@ -1380,10 +1381,7 @@ impl DbWriter for AptosDB {
             // Executing and committing from more than one threads not allowed -- consensus and
             // state sync must hand over to each other after all pending execution and committing
             // complete.
-            let _lock = self
-                .ledger_commit_lock
-                .try_lock()
-                .expect("Concurrent committing detected.");
+            let _lock = self.ledger_commit_lock.lock();
 
             let num_txns = txns_to_commit.len() as u64;
             // ledger_info_with_sigs could be None if we are doing state synchronization. In this case
