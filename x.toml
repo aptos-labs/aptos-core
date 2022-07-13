@@ -5,27 +5,6 @@ version = "0.8.2"
 smoke-test = { path = "smoke-test" }
 testcases = { path = "testsuite/testcases" }
 
-[cargo.sccache]
-bucket = "ci-artifacts.aptoslabs.com"
-prefix = "sccache/aptos/"
-public = true
-region = "us-west-2"
-endpoint = "https://s3-us-west-2.amazonaws.com"
-required-cargo-home = "/opt/cargo"
-required-git-home = "/opt/git/aptos-core"
-envs = [
-   #To debug sccache uncomment the two lines below.
-   #["SCCACHE_ERROR_LOG","/tmp/sccache_log"],
-   #["SCCACHE_LOG", "sccache::compiler::compiler=trace,rusoto_core::request=trace"],
-]
-
-[cargo.sccache.installer]
-version = "0.2.16-alpha.0"
-git = "https://github.com/mozilla/sccache.git"
-git-rev = "ef50d87a58260c30767520045e242ccdbdb965af"
-features = [ "s3" ]
-
-
 [fix]
 
 [clippy]
@@ -48,47 +27,10 @@ warn = [
     "clippy::wildcard_dependencies",
 ]
 
-[hakari]
-resolver = "2"
-
 exact-versions = true
 platforms = [
     "x86_64-unknown-linux-gnu",
     "x86_64-apple-darwin",
-]
-
-# Ideally we'd have powerpc-unknown-linux-gnu here as well, but unification causes openssl-sys to be included,
-# and openssl can't be cross-compiled without extra work. This may need to be fixed in hakari through being able
-# to say "consider only these packages for these target platforms".
-
-[hakari.traversal-excludes]
-workspace-members = [
-    # Don't consider the crypto packages as they do weird things with mutually exclusive features.
-    "aptos-crypto",
-    "aptos-crypto-derive",
-
-    # Also exclude the devtools packages since they get compiled with a different set of options.
-    "x",
-    "x-core",
-    "x-lint",
-
-    # Don't consider since it includes excluded move crates
-    "move-deps",
-
-    # Don't include these since they contain test features that we don't want in production.
-    "forge",
-]
-
-[hakari.final-excludes]
-third-party = [
-    # Exclude the fail crate because the failpoints feature should only be enabled
-    # for certain builds.
-    { name = "fail" },
-    { name = "move-binary-format", git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" },
-    { name = "move-core-types", git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7", features=["address32"] },
-    { name = "move-stdlib", git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" },
-    { name = "move-vm-runtime", git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" },
-    { name = "move-vm-types", git = "https://github.com/move-language/move", rev = "ece13ae276e3925111bf48cd85b73af4287210e7" },
 ]
 
 # This follows the same syntax as CargoOptionsSummary in guppy.

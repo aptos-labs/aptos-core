@@ -3566,16 +3566,11 @@ dependencies = [
  "diffy",
  "guppy",
  "guppy-workspace-hack",
- "include_dir 0.6.2",
  "indenter",
  "itertools",
- "owo-colors",
  "pathdiff",
  "rayon",
- "serde 1.0.137",
- "tabular",
  "target-spec",
- "toml",
  "toml_edit",
  "twox-hash",
 ]
@@ -7985,16 +7980,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tabular"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9a2882c514780a1973df90de9d68adcd8871bacc9a6331c3f28e6d2ff91a3d1"
-dependencies = [
- "strip-ansi-escapes",
- "unicode-width",
-]
-
-[[package]]
 name = "tap"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9286,7 +9271,6 @@ dependencies = [
  "env_logger 0.8.4",
  "globset",
  "guppy",
- "hakari",
  "indexmap",
  "indoc",
  "log",
@@ -9310,7 +9294,6 @@ dependencies = [
  "debug-ignore",
  "determinator",
  "guppy",
- "hakari",
  "hex",
  "indoc",
  "log",

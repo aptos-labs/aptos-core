@@ -10,7 +10,7 @@ This document describes the coding guidelines for the Aptos Core Rust codebase.
 All code formatting is enforced with [rustfmt](https://github.com/rust-lang/rustfmt) with a project-specific configuration.  Below is an example command to adhere to the Aptos Core project conventions.
 
 ```
-aptos-core$ cargo xfmt
+cargo fmt
 ```
 
 ## Code analysis
@@ -18,7 +18,7 @@ aptos-core$ cargo xfmt
 [Clippy](https://github.com/rust-lang/rust-clippy) is used to catch common mistakes and is run as a part of continuous integration.  Before submitting your code for review, you can run clippy with our configuration:
 
 ```
-aptos-core$ cargo xclippy --all-targets
+cargo xclippy --all-targets
 ```
 
 In general, we follow the recommendations from [rust-lang-nursery](https://rust-lang-nursery.github.io/api-guidelines/about.html) and [The Rust Programming Language](https://doc.rust-lang.org/book/).  The remainder of this guide provides detailed guidelines on specific topics in order to achieve uniformity of the codebase.
