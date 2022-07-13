@@ -145,13 +145,19 @@ pub struct BlockCache {
 }
 
 impl BlockCache {
-    pub async fn new(rest_client: Arc<aptos_rest_client::Client>) -> ApiResult<Self> {
+    pub fn new(rest_client: Arc<aptos_rest_client::Client>) -> ApiResult<Self> {
         let mut blocks = BTreeMap::new();
         let mut hashes = BTreeMap::new();
         let mut versions = BTreeMap::new();
         // Genesis is always index 0
-        // TODO: Ensure that this won't fail if it's been pruned
-        let genesis_block_info = rest_client.get_block_info(0).await?.into_inner();
+        let genesis_block_info = BlockInfo {
+            block_height: 0,
+            block_hash: aptos_crypto::HashValue::zero().into(),
+            block_timestamp: 0,
+            start_version: 0,
+            end_version: 0,
+            num_transactions: 1,
+        };
         let hash = genesis_block_info.block_hash;
         blocks.insert(0, genesis_block_info);
         hashes.insert(hash, 0);

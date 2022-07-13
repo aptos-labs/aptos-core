@@ -151,7 +151,7 @@ impl Context {
         match &txn_with_proof.transaction {
             GenesisTransaction(_) => {
                 timestamp = 0;
-                block_hash = txn_with_proof.proof.transaction_info.transaction_hash();
+                block_hash = HashValue::zero();
             }
             BlockMetadata(inner) => {
                 timestamp = inner.timestamp_usecs();
