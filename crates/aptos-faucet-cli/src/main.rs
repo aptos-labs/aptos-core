@@ -10,11 +10,8 @@ use aptos_sdk::types::{
     LocalAccount,
 };
 use clap::Parser;
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::{collections::HashSet, path::PathBuf, str::FromStr};
+use url::Url;
 
 #[tokio::main]
 async fn main() {
@@ -24,17 +21,17 @@ async fn main() {
 }
 
 #[derive(Debug, Parser)]
-#[clap(name = "aptos-rosetta-cli", author, version, propagate_version = true)]
+#[clap(name = "aptos-faucet-cli", author, version)]
 pub struct FaucetCliArgs {
     /// Aptos fullnode/validator server URL
     #[clap(long, default_value = "https://fullnode.devnet.aptoslabs.com/")]
-    pub server_url: String,
+    pub server_url: Url,
     /// Path to the private key for creating test account and minting coins.
     /// To keep Testnet simple, we used one private key for aptos root account
     /// To manually generate a keypair, use generate-key:
     /// `cargo run -p generate-keypair -- -o <output_file_path>`
-    #[clap(long, default_value = "/opt/aptos/etc/mint.key")]
-    pub mint_key_file_path: String,
+    #[clap(long, default_value = "/opt/aptos/etc/mint.key", parse(from_os_str))]
+    pub mint_key_file_path: PathBuf,
     /// Ed25519PrivateKey for minting coins
     #[clap(long, parse(try_from_str = ConfigKey::from_encoded_string))]
     pub mint_key: Option<ConfigKey<Ed25519PrivateKey>>,
@@ -67,7 +64,7 @@ impl FaucetCliArgs {
             key.private_key()
         } else {
             EncodingType::BCS
-                .load_key::<Ed25519PrivateKey>("mint key", Path::new(&self.mint_key_file_path))
+                .load_key::<Ed25519PrivateKey>("mint key", self.mint_key_file_path.as_path())
                 .unwrap()
         };
         let faucet_account = LocalAccount::new(mint_account_address, mint_key, 0);

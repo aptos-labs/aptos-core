@@ -367,7 +367,6 @@ name = "aptos-faucet"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos",
  "aptos-config",
  "aptos-crypto",
  "aptos-infallible",
@@ -377,13 +376,13 @@ dependencies = [
  "aptos-sdk",
  "bcs",
  "bytes",
+ "clap 3.2.10",
  "futures",
  "hex",
  "rand 0.7.3",
  "reqwest",
  "serde 1.0.137",
  "serde_json",
- "structopt",
  "tempfile",
  "tokio",
  "url",

@@ -8,6 +8,7 @@ use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_faucet::FaucetArgs;
 use aptos_types::{account_config::aptos_root_address, chain_id::ChainId};
 use forge::{LocalSwarm, Node};
+use std::path::PathBuf;
 use tokio::task::JoinHandle;
 
 pub async fn setup_cli_test(num_nodes: usize) -> (LocalSwarm, CliTestFramework, JoinHandle<()>) {
@@ -39,8 +40,8 @@ pub fn launch_faucet(
     let faucet = FaucetArgs {
         address: "127.0.0.1".to_string(),
         port,
-        server_url: endpoint.to_string(),
-        mint_key_file_path: "".to_string(),
+        server_url: endpoint,
+        mint_key_file_path: PathBuf::new(),
         mint_key: Some(ConfigKey::new(mint_key)),
         mint_account_address: Some(aptos_root_address()),
         chain_id,
