@@ -199,7 +199,8 @@ module AptosFramework::Token {
         initial_balance: u64,
         maximum: u64,
         uri: vector<u8>,
-        royalty_points_per_million: u64
+        royalty_points_per_million: u64,
+        royalty_recipient: Option<address>
     ) acquires Collections, TokenStore {
         create_token(
             creator,
@@ -210,7 +211,8 @@ module AptosFramework::Token {
             initial_balance,
             Option::some(maximum),
             ASCII::string(uri),
-            royalty_points_per_million
+            royalty_points_per_million,
+            royalty_recipient
         );
     }
 
@@ -222,7 +224,8 @@ module AptosFramework::Token {
         monitor_supply: bool,
         initial_balance: u64,
         uri: vector<u8>,
-        royalty_points_per_million: u64
+        royalty_points_per_million: u64,
+        royalty_recipient: Option<address>
     ) acquires Collections, TokenStore {
         create_token(
             creator,
@@ -234,6 +237,7 @@ module AptosFramework::Token {
             Option::none(),
             ASCII::string(uri),
             royalty_points_per_million,
+            royalty_recipient
         );
     }
 
@@ -521,7 +525,8 @@ module AptosFramework::Token {
         initial_balance: u64,
         maximum: Option<u64>,
         uri: ASCII::String,
-        royalty_points_per_million: u64
+        royalty_points_per_million: u64,
+        royalty_recipient: Option<address>,
     ): TokenId acquires Collections, TokenStore {
         let account_addr = Signer::address_of(account);
         assert!(
@@ -552,6 +557,8 @@ module AptosFramework::Token {
 
         let supply = if (monitor_supply) { Option::some(0) } else { Option::none() };
 
+        let royalty_account:address = if (Option::is_some(&royalty_recipient)) { Option::extract(&mut royalty_recipient) } else { account_addr };
+
         let token_data = TokenData {
             collection: *&token_id.collection,
             description,
@@ -561,7 +568,7 @@ module AptosFramework::Token {
             uri,
             royalty: Royalty {
                 royalty_points_per_million,
-                creator_account: Signer::address_of(account)
+                creator_account: royalty_account
             }
         };
         Table::add(&mut collections.token_data, token_id, token_data);
@@ -674,7 +681,7 @@ module AptosFramework::Token {
         creator: signer,
         owner: signer,
     ) acquires Collections, TokenStore {
-        let token_id = create_collection_and_token(&creator, 1, 1, 1);
+        let token_id = create_collection_and_token(&creator, 1, 1, 1, Option::none());
 
         let token = withdraw_token(&creator, token_id, 1);
         deposit_token(&owner, token);
@@ -685,7 +692,7 @@ module AptosFramework::Token {
         creator: signer,
         owner: signer,
     ) acquires Collections, TokenStore {
-        let token_id = create_collection_and_token(&creator, 2, 5, 5);
+        let token_id = create_collection_and_token(&creator, 2, 5, 5, Option::none());
 
         let token_0 = withdraw_token(&creator, token_id, 1);
         let token_1 = withdraw_token(&creator, token_id, 1);
@@ -696,16 +703,39 @@ module AptosFramework::Token {
     }
 
     #[test(creator = @0x1)]
-    #[expected_failure] // (abort_code = 9)]
-    public fun test_token_maximum(creator: signer) acquires Collections, TokenStore {
-        let token_id = create_collection_and_token(&creator, 2, 2, 1);
-        mint(&creator, Signer::address_of(&creator), token_id, 1);
+    public fun create_collection_with_default_royalty_recipient(
+        creator: signer,
+    ) acquires Collections, TokenStore {
+        // Test default royalty recipient
+        let token_id = create_collection_and_token(&creator, 1, 1, 1, Option::none());
+        let collections = borrow_global<Collections>(Signer::address_of(&creator));
+        let token_data = Table::borrow(&collections.token_data, token_id);
+        assert!(&token_data.royalty.creator_account == &Signer::address_of(&creator), 1);
+    }
+
+    #[test(creator = @0x1, royalty_recipient = @0x2)]
+    public fun create_collection_with_custom_royalty_recipient(
+        creator: signer,
+        royalty_recipient: address,
+    ) acquires Collections, TokenStore {
+        // Test custom royalty recipient
+        let token_id = create_collection_and_token(&creator, 1, 1, 1, Option::some(royalty_recipient));
+        let collections = borrow_global<Collections>(Signer::address_of(&creator));
+        let token_data = Table::borrow(&collections.token_data, token_id);
+        assert!(&token_data.royalty.creator_account == &royalty_recipient, 1);
     }
 
     #[test(creator = @0x1)]
+    #[expected_failure] // (abort_code = 9)]
+    public fun test_token_maximum(creator: signer) acquires Collections, TokenStore {
+        let token_id = create_collection_and_token(&creator, 2, 2, 1, Option::none());
+        mint(&creator, Signer::address_of(&creator), token_id, 1);
+    }
+
+    #[test(creator = @0x1, royalty_recipient = @0x2)]
     #[expected_failure] // (abort_code = 5)]
-    public fun test_collection_maximum(creator: signer) acquires Collections, TokenStore {
-        let token_id = create_collection_and_token(&creator, 2, 2, 1);
+    public fun test_collection_maximum(creator: signer, royalty_recipient:address) acquires Collections, TokenStore {
+        let token_id = create_collection_and_token(&creator, 2, 2, 1, Option::none());
         create_token(
             &creator,
             token_id.collection,
@@ -716,6 +746,7 @@ module AptosFramework::Token {
             Option::some(100),
             ASCII::string(b"https://aptos.dev"),
             0,
+            Option::some(royalty_recipient),
         );
 
     }
@@ -725,7 +756,7 @@ module AptosFramework::Token {
         creator: signer,
         owner: signer,
     ) acquires Collections, TokenStore {
-        let token_id = create_collection_and_token(&creator, 2, 2, 2);
+        let token_id = create_collection_and_token(&creator, 2, 2, 2, Option::none());
         direct_transfer(&creator, &owner, token_id, 1);
         let token = withdraw_token(&owner, token_id, 1);
         deposit_token(&creator, token);
@@ -737,6 +768,7 @@ module AptosFramework::Token {
         amount: u64,
         collection_max: u64,
         token_max: u64,
+        royalty_recipient: Option<address>,
     ): TokenId acquires Collections, TokenStore {
         let collection_name = ASCII::string(b"Hello, World");
 
@@ -757,13 +789,14 @@ module AptosFramework::Token {
             amount,
             Option::some(token_max),
             ASCII::string(b"https://aptos.dev"),
-           0,
+            0,
+            royalty_recipient,
         )
     }
 
     #[test(creator = @0xFF)]
     fun test_create_events_generation(creator: signer) acquires Collections, TokenStore {
-        create_collection_and_token(&creator, 1, 2, 1);
+        create_collection_and_token(&creator, 1, 2, 1, Option::none());
         let collections = borrow_global<Collections>(Signer::address_of(&creator));
         assert!(Event::get_event_handle_counter(&collections.create_collection_events) == 1, 1);
         assert!(Event::get_event_handle_counter(&collections.create_token_events) == 1, 1);
