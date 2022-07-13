@@ -11,7 +11,7 @@ use aptos_types::{
 };
 use consensus_types::{
     block::block_test_utils::random_payload,
-    common::{Payload, PayloadFilter},
+    common::{Payload, PayloadFilter, Round},
     request_response::WrapperCommand,
 };
 use futures::{channel::mpsc, future::BoxFuture};
@@ -51,6 +51,7 @@ impl PayloadManager for MockPayloadManager {
     /// The returned future is fulfilled with the vector of SignedTransactions
     async fn pull_payload(
         &self,
+        _round: Round,
         _max_size: u64,
         _exclude: PayloadFilter,
         _wait_callback: BoxFuture<'static, ()>,
