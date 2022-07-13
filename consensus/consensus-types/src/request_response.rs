@@ -5,9 +5,9 @@ use crate::common::{Payload, PayloadFilter};
 use crate::proof_of_store::LogicalTime;
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_types::block_info::Round;
 use futures::channel::oneshot;
 use std::{fmt, fmt::Formatter};
-use aptos_types::block_info::Round;
 
 /// Message sent from Consensus to QuorumStore.
 pub enum WrapperCommand {

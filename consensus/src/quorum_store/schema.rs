@@ -1,17 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::quorum_store::types::{BatchId, PersistedValue};
+use anyhow::Result;
 use aptos_crypto::HashValue;
 use schemadb::{
     schema::{KeyCodec, Schema, ValueCodec},
-    ColumnFamilyName
+    ColumnFamilyName,
 };
-use crate::quorum_store::types::{BatchId, PersistedValue};
-use anyhow::{Result};
 
 pub(crate) const BATCH_CF_NAME: ColumnFamilyName = "batch";
 pub(crate) const BATCH_ID_CF_NAME: ColumnFamilyName = "batch_ID";
-
 
 pub(crate) struct BatchSchema;
 
@@ -40,7 +39,6 @@ impl ValueCodec<BatchSchema> for PersistedValue {
         Ok(bcs::from_bytes(data)?)
     }
 }
-
 
 pub(crate) struct BatchIdSchema;
 

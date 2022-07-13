@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::DbError;
+use crate::quorum_store::schema::{BatchIdSchema, BatchSchema, BATCH_CF_NAME, BATCH_ID_CF_NAME};
 use crate::quorum_store::types::{BatchId, PersistedValue};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_logger::info;
+use consensus_types::common::Round;
 use schemadb::{Options, ReadOptions, SchemaBatch, DB};
 use std::{collections::HashMap, path::Path, time::Instant};
-use crate::quorum_store::schema::{BatchSchema, BatchIdSchema, BATCH_CF_NAME, BATCH_ID_CF_NAME};
-
 
 pub struct QuorumStoreDB {
     db: DB,
@@ -36,11 +36,24 @@ impl QuorumStoreDB {
         Self { db }
     }
 
-    pub(crate) fn get_batch_id(&self, epoch: u64) -> Result<Option<BatchId>, DbError> {
-        Ok(self.db.get::<BatchIdSchema>(&epoch)?)
+    pub fn clean_and_get_batch_id(&self, current_epoch: u64) -> Result<Option<BatchId>, DbError> {
+        let mut iter = self.db.iter::<BatchIdSchema>(ReadOptions::default())?;
+        iter.seek_to_first();
+        let epoch_batch_id = iter.collect::<Result<HashMap<u64, Round>>>()?;
+        let mut ret = None;
+        for (epoch, batch_id) in epoch_batch_id {
+            assert!(current_epoch >= epoch);
+            if epoch < current_epoch {
+                self.delete_batch_id(epoch)
+                    .expect("Could not delete from db");
+            } else {
+                ret = Some(batch_id);
+            }
+        }
+        Ok(ret)
     }
 
-    pub(crate) fn delete_batch_id(&self, epoch: u64) -> Result<(), DbError> {
+    fn delete_batch_id(&self, epoch: u64) -> Result<(), DbError> {
         let mut batch = SchemaBatch::new();
         batch.delete::<BatchIdSchema>(&epoch)?;
         self.db.write_schemas(batch)?;

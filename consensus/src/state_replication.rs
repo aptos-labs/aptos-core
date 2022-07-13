@@ -4,6 +4,7 @@
 use crate::error::{QuorumStoreError, StateSyncError};
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_types::block_info::Round;
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
 use consensus_types::{
     block::Block,
@@ -13,7 +14,6 @@ use consensus_types::{
 use executor_types::{Error as ExecutionError, StateComputeResult};
 use futures::future::BoxFuture;
 use std::sync::Arc;
-use aptos_types::block_info::Round;
 
 pub type StateComputerCommitCallBackType =
     Box<dyn FnOnce(&[Arc<ExecutedBlock>], LedgerInfoWithSignatures) + Send + Sync>;

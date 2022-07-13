@@ -3,6 +3,7 @@
 
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
+use crate::quorum_store::quorum_store_db::QuorumStoreDB;
 use crate::quorum_store::{
     counters,
     quorum_store::{QuorumStoreCommand, QuorumStoreError},
@@ -30,14 +31,13 @@ use futures::{
     stream::FuturesUnordered,
     StreamExt,
 };
-use std::{
-    collections::{HashSet},
-    time::{Duration, Instant},
-};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::{
+    collections::HashSet,
+    time::{Duration, Instant},
+};
 use tokio::{sync::mpsc::Sender as TokioSender, time};
-use crate::quorum_store::quorum_store_db::QuorumStoreDB;
 
 type ProofReceiveChannel = oneshot::Receiver<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
 
@@ -68,14 +68,16 @@ impl QuorumStoreWrapper {
         mempool_txn_pull_max_count: u64,
         quorum_store_max_batch_bytes: u64,
     ) -> Self {
-        if epoch > 0 {
-            db.delete_batch_id(epoch - 1).expect("Could not delete from db");
-        }
-        let mut batch_id = 0;
-        if let Some(id) = db.get_batch_id(epoch).expect("Could not read from db"){
-           batch_id = id + 1;
-        }
-        db.save_batch_id(epoch, batch_id + 1).expect("Could not save to db");
+        let batch_id = if let Some(id) = db
+            .clean_and_get_batch_id(epoch)
+            .expect("Could not read from db")
+        {
+            id + 1
+        } else {
+            0
+        };
+        db.save_batch_id(epoch, batch_id + 1)
+            .expect("Could not save to db");
 
         Self {
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
@@ -144,7 +146,12 @@ impl QuorumStoreWrapper {
                 return None;
             }
 
-            self.db.save_batch_id(self.latest_logical_time.epoch(), self.batch_builder.batch_id() + 1).expect("Could not save to db");
+            self.db
+                .save_batch_id(
+                    self.latest_logical_time.epoch(),
+                    self.batch_builder.batch_id() + 1,
+                )
+                .expect("Could not save to db");
 
             let (proof_tx, proof_rx) = oneshot::channel();
             let expiry_round = self.latest_logical_time.round() + 20; // TODO: take from quorum store config
@@ -240,7 +247,9 @@ impl QuorumStoreWrapper {
                         break;
                     }
 
-                    if proof.expiration() < LogicalTime::new(self.latest_logical_time.epoch(), round) {
+                    if proof.expiration()
+                        < LogicalTime::new(self.latest_logical_time.epoch(), round)
+                    {
                         expired.push(proof.digest().clone());
                     } else if !excluded_proofs.contains(proof.digest()) {
                         proof_block.push(proof.clone());
@@ -265,9 +274,11 @@ impl QuorumStoreWrapper {
             }
             WrapperCommand::CleanRequest(logical_time, digests) => {
                 debug!("QS: got clean request from execution");
-                assert_eq!(self.latest_logical_time.epoch(),
-                           logical_time.epoch(),
-                           "Wrong epoch");
+                assert_eq!(
+                    self.latest_logical_time.epoch(),
+                    logical_time.epoch(),
+                    "Wrong epoch"
+                );
                 assert!(
                     self.latest_logical_time < logical_time,
                     "Non-increasing logical time"
