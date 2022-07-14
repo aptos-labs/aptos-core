@@ -1,8 +1,8 @@
-import { Deserializer, Serializer, Bytes, Seq, deserializeVector, serializeVector } from '../bcs';
+import { Deserializer, Serializer, Bytes, Seq, deserializeVector, serializeVector } from "../bcs";
 
-import { ModuleId } from './transaction';
+import { ModuleId } from "./transaction";
 
-import { TypeTag } from './type_tag';
+import { TypeTag } from "./type_tag";
 
 export class TypeArgumentABI {
   /**
