@@ -112,9 +112,9 @@ pub static COMMITTED_VOTES_IN_WINDOW: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 /// The number of block events the LeaderReputation uses
-pub static LEADER_REPUTATION_HISTORY_SIZE: Lazy<IntGauge> = Lazy::new(|| {
+pub static LEADER_REPUTATION_ROUND_HISTORY_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "aptos_leader_reputation_history_size",
+        "aptos_leader_reputation_round_history_size",
         "Total number of new block events in the current reputation window"
     )
     .unwrap()

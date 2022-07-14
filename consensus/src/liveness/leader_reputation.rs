@@ -4,7 +4,7 @@
 use crate::{
     counters::{
         COMMITTED_PROPOSALS_IN_WINDOW, COMMITTED_VOTES_IN_WINDOW, FAILED_PROPOSALS_IN_WINDOW,
-        LEADER_REPUTATION_HISTORY_SIZE,
+        LEADER_REPUTATION_ROUND_HISTORY_SIZE,
     },
     liveness::proposer_election::{next, ProposerElection},
 };
@@ -244,7 +244,7 @@ impl NewBlockEventAggregation {
                 .set(*votes.get(candidate).unwrap_or(&0) as i64);
         }
 
-        LEADER_REPUTATION_HISTORY_SIZE.set(
+        LEADER_REPUTATION_ROUND_HISTORY_SIZE.set(
             proposals.values().sum::<u32>() as i64 + failed_proposals.values().sum::<u32>() as i64,
         );
         (votes, proposals, failed_proposals)
