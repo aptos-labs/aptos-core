@@ -1,6 +1,6 @@
 /* eslint-disable no-bitwise */
-import { Bytes, Deserializer, Seq, Serializer, Uint8 } from '../bcs';
-import { Ed25519PublicKey, Ed25519Signature } from './ed25519';
+import { Bytes, Deserializer, Seq, Serializer, Uint8 } from "../bcs";
+import { Ed25519PublicKey, Ed25519Signature } from "./ed25519";
 
 /**
  * MultiEd25519 currently supports at most 32 signatures.
@@ -119,7 +119,7 @@ export class MultiEd25519Signature {
       }
 
       if (dupCheckSet.has(bit)) {
-        throw new Error('Duplicated bits detected.');
+        throw new Error("Duplicated bits detected.");
       }
 
       dupCheckSet.add(bit);
