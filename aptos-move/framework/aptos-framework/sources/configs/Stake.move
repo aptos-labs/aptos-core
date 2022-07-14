@@ -1016,6 +1016,12 @@ module AptosFramework::Stake {
     /// Validate that the lockup time is at least more than the minimum required.
     fun validate_lockup_time(locked_until_secs: u64, validator_set_config: &ValidatorSetConfiguration) {
         let current_time = Timestamp::now_seconds();
+        // Short-circuit early if current_time is 0. This only happens during Genesis before a first block
+        // is produced.
+        if (current_time == 0) {
+            return
+        };
+
         assert!(
             current_time + validator_set_config.min_lockup_duration_secs <= locked_until_secs,
             Errors::invalid_argument(ELOCK_TIME_TOO_SHORT),
