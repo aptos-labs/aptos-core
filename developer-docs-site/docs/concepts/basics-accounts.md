@@ -5,21 +5,23 @@ id: "basics-accounts"
 
 # Accounts
 
-An account on the Aptos Blockchain contains blockchain assets, which are, by nature, scarce and must be access-controlled. For example, coins and NFTs. Any such asset is represented in the blockchain account as a *resource*. A resource is a Move language primitive that emphasizes on access control and scarcity in its representation of an asset.  
+An account on the Aptos Blockchain contains blockchain assets. These assets, for example, coins and NFTs, are by nature scarce and must be access-controlled. Any such asset is represented in the blockchain account as a **resource**. A resource is a Move language primitive that emphasizes on access control and scarcity in its representation of an asset.  
 
-Each account on the Aptos Blockchain is identified by a 32-byte account address. Every account on Aptos Blockchain can store data, and it stores this data in resources. The initial resource is the account data itself (authentication key and sequence number). Additional resources like currency or NFTs are added after creating the account. An account can send transactions. 
+Each account on the Aptos Blockchain is identified by a 32-byte account address. An account can store data and it stores this data in resources. The initial resource is the account data itself (authentication key and sequence number). Additional resources like the currency or NFTs are added after creating the account. An account can send transactions. 
 
 ## Creating an account
 
 When a new account is requested by the user, the Aptos standard Move library, or the Aptos SDK, will perform a series of cryptographic steps to create the account. Below is a conceptual view of these steps:
 
 - Start by generating a new private key, public key pair.
-- From the user get the preferred signature scheme for the account: If the account should use a single signature or if it should require multiple signatures, for signing a transaction. 
+- From the user get the preferred signature scheme for the account: If the account should use a single signature or if it should require multiple signatures for signing a transaction. 
 - Combine the public key with the user's signature scheme to generate a 32-byte authentication key. 
 - Initialize the sequence number to 0. The sequence number represents the next transaction sequence number, to prevent replay attacks of transactions. Both the authentication key and the sequence number are stored in the account as an initial account resource. 
 - Create the 32-byte account address from the initial authentication key. 
 
 From now on, the user should use the private key for signing the transactions with this account. 
+
+## Signature schemes
 
 The Aptos Blockchain supports two signature schemes: 
 
@@ -27,7 +29,7 @@ The Aptos Blockchain supports two signature schemes:
 2. The MultiEd25519, for multi-signature transactions. 
 
 :::note
-Aptos Blockchain defaults to single signature transactions.
+The Aptos Blockchain defaults to single signature transactions.
 :::
 
   
@@ -37,7 +39,7 @@ For an existing account you can rotate the private key, public key pair, i.e., u
 
 ## Access control with signer
 
-When a `signer` is specified in a function in a transaction, then the `signer` is the only entity capable of adding or removing resources into an account. The sender of a transaction is represented by a signer. See a Move example code below with `&signer` in the `initialize` and `withdraw` functions:
+When a `signer` is specified in a function in a transaction, then the `signer` is the only entity capable of adding or removing resources into an account. The sender of a transaction is represented by a signer. See the below Move example code with `&signer` in the `initialize` and `withdraw` functions:
 
 ```rust
 module Test::Coin {
