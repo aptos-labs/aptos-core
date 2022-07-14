@@ -3,7 +3,8 @@
 
 use crate::{
     get_fullnodes, get_validators, k8s_wait_genesis_strategy, k8s_wait_nodes_strategy,
-    nodes_healthcheck, K8sNode, Result, DEFAULT_ROOT_KEY,
+    nodes_healthcheck, K8sNode, Result, DEFAULT_ROOT_KEY, FULLNODE_HAPROXY_SERVICE_SUFFIX,
+    FULLNODE_SERVICE_SUFFIX, VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
 };
 use anyhow::{bail, format_err};
 use aptos_logger::info;
@@ -103,6 +104,46 @@ async fn wait_genesis_job(kube_client: &K8sClient, era: &str, kube_namespace: &s
     .await
 }
 
+async fn wait_node_haproxy(
+    kube_client: &K8sClient,
+    kube_namespace: &str,
+    num_haproxy: usize,
+) -> Result<()> {
+    aptos_retrier::retry_async(k8s_wait_nodes_strategy(), || {
+        let deployments_api: Api<Deployment> = Api::namespaced(kube_client.clone(), kube_namespace);
+        Box::pin(async move {
+            for i in 0..num_haproxy {
+                let haproxy_deployment_name =
+                    format!("{}-{}-haproxy", APTOS_NODE_HELM_RELEASE_NAME, i);
+                match deployments_api.get_status(&haproxy_deployment_name).await {
+                    Ok(s) => {
+                        let deployment_name = s.name();
+                        if let Some(deployment_status) = s.status {
+                            let ready_replicas = deployment_status.ready_replicas.unwrap_or(0);
+                            info!(
+                                "Deployment {} has {} ready_replicas",
+                                deployment_name, ready_replicas
+                            );
+                            if ready_replicas > 0 {
+                                info!("Deployment {} ready", deployment_name);
+                                continue;
+                            }
+                        }
+                        info!("Deployment {} has no status", deployment_name);
+                        bail!("Deployment not ready");
+                    }
+                    Err(e) => {
+                        info!("Failed to get deployment: {}", e);
+                        bail!("Failed to get deployment: {}", e);
+                    }
+                }
+            }
+            Ok(())
+        })
+    })
+    .await
+}
+
 async fn wait_node_stateful_set(
     kube_client: &K8sClient,
     kube_namespace: &str,
@@ -128,9 +169,11 @@ async fn wait_node_stateful_set(
                                 continue;
                             }
                         }
+                        info!("StatefulSet {} has no status", sts_name);
                         bail!("STS not ready");
                     }
                     Err(e) => {
+                        info!("Failed to get sts: {}", e);
                         bail!("Failed to get sts: {}", e);
                     }
                 }
@@ -354,6 +397,7 @@ pub async fn install_testnet_resources(
     base_genesis_image_tag: String,
     genesis_modules_path: Option<String>,
     use_port_forward: bool,
+    enable_haproxy: bool,
 ) -> Result<(String, HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     assert!(base_num_validators <= MAX_NUM_VALIDATORS);
 
@@ -371,18 +415,32 @@ pub async fn install_testnet_resources(
         num_validators = base_num_validators,
         era = &new_era,
         image_tag = &base_genesis_image_tag,
+        enable_haproxy = enable_haproxy,
     );
     let aptos_node_forge_values_file = dump_string_to_file(
         "aptos-node-values.yaml".to_string(),
         aptos_node_forge_helm_values_yaml,
         &tmp_dir,
     )?;
+    let validator_internal_host_suffix = if enable_haproxy {
+        VALIDATOR_HAPROXY_SERVICE_SUFFIX
+    } else {
+        VALIDATOR_SERVICE_SUFFIX
+    };
+    let fullnode_internal_host_suffix = if enable_haproxy {
+        FULLNODE_HAPROXY_SERVICE_SUFFIX
+    } else {
+        FULLNODE_SERVICE_SUFFIX
+    };
+
     let genesis_forge_helm_values_yaml = format!(
         include_str!(GENESIS_FORGE_HELM_VALUES!()),
         num_validators = base_num_validators,
         image_tag = &base_genesis_image_tag,
         era = &new_era,
         root_key = DEFAULT_ROOT_KEY,
+        validator_internal_host_suffix = validator_internal_host_suffix,
+        fullnode_internal_host_suffix = fullnode_internal_host_suffix,
     );
     let genesis_forge_values_file = dump_string_to_file(
         "genesis-values.yaml".to_string(),
@@ -433,12 +491,17 @@ pub async fn install_testnet_resources(
         &base_validator_image_tag,
         &kube_namespace,
         use_port_forward,
+        enable_haproxy,
     )
     .await
     .unwrap();
 
     // wait for all validator STS to spin up
     wait_node_stateful_set(&kube_client, &kube_namespace, &validators).await?;
+
+    if enable_haproxy {
+        wait_node_haproxy(&kube_client, &kube_namespace, validators.len()).await?;
+    }
 
     // get all fullnodes
     let fullnodes = get_fullnodes(
@@ -447,6 +510,7 @@ pub async fn install_testnet_resources(
         &new_era,
         &kube_namespace,
         use_port_forward,
+        enable_haproxy,
     )
     .await
     .unwrap();

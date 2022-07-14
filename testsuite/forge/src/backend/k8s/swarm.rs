@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    backend::k8s::node::{K8sNode, REST_API_PORT},
+    backend::k8s::node::{K8sNode, REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT},
     create_k8s_client, query_sequence_numbers, set_validator_image_tag,
     uninstall_testnet_resources, ChainInfo, FullNode, Node, Result, Swarm, Validator, Version,
 };
@@ -23,8 +23,10 @@ use kube::{
 use std::{collections::HashMap, convert::TryFrom, env, net::TcpListener, str, sync::Arc};
 use tokio::{runtime::Runtime, time::Duration};
 
-const VALIDATOR_SERVICE_SUFFIX: &str = "validator";
-const FULLNODE_SERVICE_SUFFIX: &str = "fullnode";
+pub const VALIDATOR_SERVICE_SUFFIX: &str = "validator";
+pub const FULLNODE_SERVICE_SUFFIX: &str = "fullnode";
+pub const VALIDATOR_HAPROXY_SERVICE_SUFFIX: &str = "validator-lb";
+pub const FULLNODE_HAPROXY_SERVICE_SUFFIX: &str = "fullnode-lb";
 const LOCALHOST: &str = "127.0.0.1";
 
 pub struct K8sSwarm {
@@ -251,23 +253,34 @@ pub(crate) async fn get_validators(
     image_tag: &str,
     kube_namespace: &str,
     use_port_forward: bool,
+    enable_haproxy: bool,
 ) -> Result<HashMap<PeerId, K8sNode>> {
     let services = list_services(client, kube_namespace).await?;
+    let service_suffix = if enable_haproxy {
+        VALIDATOR_HAPROXY_SERVICE_SUFFIX
+    } else {
+        VALIDATOR_SERVICE_SUFFIX
+    };
     let validators = services
         .into_iter()
-        .filter(|s| s.name.contains(VALIDATOR_SERVICE_SUFFIX))
+        .filter(|s| s.name.contains(service_suffix))
         .map(|s| {
-            let mut port = REST_API_PORT;
+            let mut port = if enable_haproxy {
+                REST_API_HAPROXY_SERVICE_PORT
+            } else {
+                REST_API_SERVICE_PORT
+            };
             let mut ip = s.host_ip.clone();
             if use_port_forward {
                 port = get_free_port();
                 ip = LOCALHOST.to_string();
             }
             let node_id = parse_node_id(&s.name).expect("error to parse node id");
+            // the base validator name is the same as that of the StatefulSet, and does not have era
+            let validator_name = format!("aptos-node-{}-validator", node_id);
             let node = K8sNode {
-                name: format!("aptos-node-{}-validator", node_id),
-                // the base validator service name is the same as that of the StatefulSet
-                sts_name: s.name.clone(),
+                name: validator_name.clone(),
+                sts_name: validator_name,
                 // TODO: fetch this from running node
                 peer_id: PeerId::random(),
                 node_id,
@@ -277,6 +290,7 @@ pub(crate) async fn get_validators(
                 dns: s.name,
                 version: Version::new(0, image_tag.to_string()),
                 namespace: kube_namespace.to_string(),
+                enable_haproxy,
             };
             (node.peer_id(), node)
         })
@@ -291,23 +305,34 @@ pub(crate) async fn get_fullnodes(
     era: &str,
     kube_namespace: &str,
     use_port_forward: bool,
+    enable_haproxy: bool,
 ) -> Result<HashMap<PeerId, K8sNode>> {
     let services = list_services(client, kube_namespace).await?;
+    let service_suffix = if enable_haproxy {
+        FULLNODE_HAPROXY_SERVICE_SUFFIX
+    } else {
+        FULLNODE_SERVICE_SUFFIX
+    };
     let fullnodes = services
         .into_iter()
-        .filter(|s| s.name.contains(FULLNODE_SERVICE_SUFFIX))
+        .filter(|s| s.name.contains(service_suffix))
         .map(|s| {
-            let mut port = REST_API_PORT;
+            let mut port = if enable_haproxy {
+                REST_API_HAPROXY_SERVICE_PORT
+            } else {
+                REST_API_SERVICE_PORT
+            };
             let mut ip = s.host_ip.clone();
             if use_port_forward {
                 port = get_free_port();
                 ip = LOCALHOST.to_string();
             }
             let node_id = parse_node_id(&s.name).expect("error to parse node id");
+            // the base fullnode name is the same as that of the StatefulSet, and includes era
+            let fullnode_name = format!("{}-e{}", &s.name, era);
             let node = K8sNode {
-                name: format!("aptos-node-{}-fullnode", node_id),
-                // the base fullnode service name is the same as that of the StatefulSet plus the era
-                sts_name: format!("{}-e{}", &s.name, era),
+                name: fullnode_name.clone(),
+                sts_name: fullnode_name,
                 // TODO: fetch this from running node
                 peer_id: PeerId::random(),
                 node_id,
@@ -317,6 +342,7 @@ pub(crate) async fn get_fullnodes(
                 dns: s.name,
                 version: Version::new(0, image_tag.to_string()),
                 namespace: kube_namespace.to_string(),
+                enable_haproxy,
             };
             (node.peer_id(), node)
         })
@@ -326,7 +352,7 @@ pub(crate) async fn get_fullnodes(
 }
 
 // gets the node index based on its associated LB service name
-// assumes the input is named <RELEASE>-aptos-node-<INDEX>-<validator|fullnode>-lb
+// assumes the input is named <RELEASE>-aptos-node-<INDEX>-<validator|fullnode>[-lb]
 fn parse_node_id(s: &str) -> Result<usize> {
     // first get rid of the prefixes
     let v = s.split("aptos-node-").collect::<Vec<&str>>();
@@ -360,8 +386,11 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
                         if version > 100 {
                             info!("Node {} healthy @ version {} > 100", node.name(), version);
                             return Ok(());
-                        } 
-                        bail!("Node {} unhealthy: REST API returned version 0", node.name());
+                        }
+                        bail!(
+                            "Node {} unhealthy: REST API returned version 0",
+                            node.name()
+                        );
                     }
                     Err(x) => {
                         info!("Node {} unhealthy: {}", node.name(), &x);

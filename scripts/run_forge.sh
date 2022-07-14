@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Copyright (c) Aptos
+# SPDX-License-Identifier: Apache-2.0
+
 #
 # This script runs Forge using the current configured kubectl context
 # It is designed to be invoked within Github Actions, but can be run locally
@@ -18,10 +21,16 @@ AWS_REGION=${AWS_REGION:-us-west-2}
 
 FORGE_RUNNER_MODE=${FORGE_RUNNER_MODE:-k8s}
 FORGE_NAMESPACE_KEEP=${FORGE_NAMESPACE_KEEP:-false}
+FORGE_ENABLE_HAPROXY=${FORGE_ENABLE_HAPROXY:-false}
 
 if [ "$FORGE_NAMESPACE_KEEP" = "true" ]; then
     KEEP_ARGS="--keep"
 fi
+
+if [ "$FORGE_ENABLE_HAPROXY" = "true" ]; then
+    ENABLE_HAPROXY_ARGS="--enable-haproxy"
+fi
+
 
 if [ -z "$IMAGE_TAG" ]; then
     echo "IMAGE_TAG not set. Continuing with git HEAD"
@@ -53,19 +62,21 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     cargo run -p forge-cli -- test k8s-swarm \
         --image-tag $IMAGE_TAG \
         --namespace $FORGE_NAMESPACE \
-        --port-forward $KEEP_ARGS | tee $FORGE_OUTPUT
+        --port-forward $KEEP_ARGS $ENABLE_HAPROXY_ARGS | tee $FORGE_OUTPUT
 
     FORGE_EXIT_CODE=$?
 
     # try to kill orphaned port-forwards
-    ps -A | grep  "kubectl port-forward -n $FORGE_NAMESPACE" | awk '{ print $1 }' | xargs -I{} kill -9 {}
+    if [ -z "$KEEP_ARGS" ]; then
+        ps -A | grep  "kubectl port-forward -n $FORGE_NAMESPACE" | awk '{ print $1 }' | xargs -I{} kill -9 {}
+    fi
 
 else
     kubectl run $FORGE_POD_NAME \
         --overrides='{ "spec": { "serviceAccount": "forge" }  }' \
         --restart=Never \
         --image="${AWS_ACCOUNT_NUM}.dkr.ecr.${AWS_REGION}.amazonaws.com/aptos/forge:$IMAGE_TAG" \
-        --command -- bash -c "ulimit -n 1048576 && forge test k8s-swarm --image-tag $IMAGE_TAG --namespace $FORGE_NAMESPACE $KEEP_ARGS"
+        --command -- bash -c "ulimit -n 1048576 && forge test k8s-swarm --image-tag $IMAGE_TAG --namespace $FORGE_NAMESPACE $KEEP_ARGS $ENABLE_HAPROXY_ARGS"
 
     # wait for enough time for the pod to start and potentially new nodes to come online
     kubectl wait --timeout=5m --for=condition=Ready "pod/${FORGE_POD_NAME}"
@@ -95,12 +106,12 @@ fi
 # calculate regressions
 avg_tps=$(cat $FORGE_REPORT | grep -oE '\d+ TPS' | awk '{print $1}')
 p99_latency=$(cat $FORGE_REPORT | grep -oE '\d+ ms p99 latency' | awk '{print $1}')
-if [ "$avg_tps" -lt "$TPS_THRESHOLD" ]; then
-    echo "\(\!\) AVG_TPS: ${avg_tps} < ${TPS_THRESHOLD} tps"
+if [ -n "$avg_tps" ] && [ "$avg_tps" -lt "$TPS_THRESHOLD" ]; then
+    echo "(\!) AVG_TPS: ${avg_tps} < ${TPS_THRESHOLD} tps"
     FORGE_EXIT_CODE=1
 fi
-if [ "$p99_latency" -lt "$P99_LATENCY_MS_THRESHOLD" ]; then
-    echo "\(\!\) P99_LATENCY: ${p99_latency} > 5000 ms"
+if [ -n "$p99_latency" ] && [ "$p99_latency" -lt "$P99_LATENCY_MS_THRESHOLD" ]; then
+    echo "(\!) P99_LATENCY: ${p99_latency} > 5000 ms"
     FORGE_EXIT_CODE=1
 fi
 
@@ -108,6 +119,7 @@ fi
 FORGE_REPORT_TXT=$(cat $FORGE_REPORT | jq -r .text)
 if [ -z "$FORGE_REPORT_TXT" ]; then
     FORGE_REPORT_TXT="Forge report text empty. See test runner output."
+    FORGE_EXIT_CODE=1
 fi
 
 if [ "$FORGE_EXIT_CODE" == "0" ]; then

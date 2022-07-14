@@ -24,6 +24,7 @@ pub struct K8sFactory {
     kube_namespace: String,
     use_port_forward: bool,
     keep: bool,
+    enable_haproxy: bool,
 }
 
 // These are test keys for forge ephemeral networks. Do not use these elsewhere!
@@ -39,6 +40,7 @@ impl K8sFactory {
         base_image_tag: String,
         use_port_forward: bool,
         keep: bool,
+        enable_haproxy: bool,
     ) -> Result<K8sFactory> {
         let root_key: [u8; ED25519_PRIVATE_KEY_LENGTH] =
             hex::decode(DEFAULT_ROOT_PRIV_KEY)?.try_into().unwrap();
@@ -65,6 +67,7 @@ impl K8sFactory {
             kube_namespace,
             use_port_forward,
             keep,
+            enable_haproxy,
         })
     }
 }
@@ -108,6 +111,7 @@ impl Factory for K8sFactory {
             format!("{}", genesis_version),
             genesis_modules_path,
             self.use_port_forward,
+            self.enable_haproxy,
         )
         .await
         {

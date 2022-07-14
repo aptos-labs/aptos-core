@@ -23,7 +23,8 @@ use std::{
 const NODE_METRIC_PORT: u64 = 9101;
 
 // this is the port on the validator service itself, as opposed to 80 on the validator haproxy service
-pub const REST_API_PORT: u32 = 8080;
+pub const REST_API_SERVICE_PORT: u32 = 8080;
+pub const REST_API_HAPROXY_SERVICE_PORT: u32 = 80;
 
 pub struct K8sNode {
     pub(crate) name: String,
@@ -36,6 +37,8 @@ pub struct K8sNode {
     pub(crate) rest_api_port: u32,
     pub version: Version,
     pub namespace: String,
+    // this controls whether the connection routes to HAProxy first
+    pub enable_haproxy: bool,
 }
 
 impl K8sNode {
@@ -74,12 +77,17 @@ impl K8sNode {
     }
 
     pub fn spawn_port_forward(&self) -> Result<()> {
+        let remote_rest_api_port = if self.enable_haproxy {
+            REST_API_HAPROXY_SERVICE_PORT
+        } else {
+            REST_API_SERVICE_PORT
+        };
         let port_forward_args = [
             "port-forward",
             "-n",
             self.namespace(),
             &format!("svc/{}", self.dns()),
-            &format!("{}:{}", self.rest_api_port(), REST_API_PORT),
+            &format!("{}:{}", self.rest_api_port(), remote_rest_api_port),
         ];
         // spawn a port-forward child process
         let cmd = Command::new(KUBECTL_BIN)
