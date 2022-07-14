@@ -14,6 +14,7 @@ import Token from 'pages/Token';
 import Wallet from 'pages/Wallet';
 import React from 'react';
 import RecoveryPhrase from 'pages/RecoveryPhrase';
+import Transaction from 'pages/Transaction';
 
 export const Routes = Object.freeze({
   activity: {
@@ -59,6 +60,10 @@ export const Routes = Object.freeze({
   token: {
     element: <Token />,
     routePath: '/tokens/:id',
+  },
+  transaction: {
+    element: <Transaction />,
+    routePath: '/transactions/:version',
   },
   wallet: {
     element: <Wallet />,

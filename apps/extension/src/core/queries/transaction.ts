@@ -10,11 +10,12 @@ import { ScriptFunctionPayload, UserTransaction } from 'aptos/dist/api/data-cont
 export const transactionQueryKeys = Object.freeze({
   getAccountLatestTransactionTimestamp: 'getAccountLatestTransactionTimestamp',
   getCoinTransferTransactions: 'getCoinTransferTransactions',
+  getUserTransaction: 'getUserTransaction',
 } as const);
 
 export interface GetTransactionProps {
   nodeUrl: string,
-  txnHashOrVersion?: string;
+  txnHashOrVersion: string;
 }
 
 export const getTransaction = async ({
@@ -22,10 +23,7 @@ export const getTransaction = async ({
   txnHashOrVersion,
 }: GetTransactionProps) => {
   const aptosClient = new AptosClient(nodeUrl);
-  if (txnHashOrVersion) {
-    return aptosClient.getTransaction(txnHashOrVersion);
-  }
-  return undefined;
+  return aptosClient.getTransaction(txnHashOrVersion);
 };
 
 export const getUserTransaction = async ({
@@ -100,6 +98,27 @@ export function useCoinTransferTransactions() {
     getCoinTransferTransactionsQuery,
   );
 }
+
+type UseUserTransactionProps = Omit<GetTransactionProps, 'nodeUrl'>;
+
+export const useUserTransaction = ({ txnHashOrVersion }: UseUserTransactionProps) => {
+  const { aptosNetwork } = useWalletState();
+
+  const getTransactionQuery = useCallback(async () => {
+    const transaction = await getTransaction({
+      nodeUrl: aptosNetwork,
+      txnHashOrVersion,
+    });
+
+    if (transaction.type !== 'user_transaction') {
+      throw new Error('Requested transaction is not an user transaction');
+    }
+
+    return transaction as UserTransaction;
+  }, [aptosNetwork]);
+
+  return useQuery([transactionQueryKeys.getUserTransaction, txnHashOrVersion], getTransactionQuery);
+};
 
 export interface GetAccountLatestTransactionTimestamp {
   address: string;

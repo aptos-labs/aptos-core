@@ -9,6 +9,7 @@ import { HiDownload } from '@react-icons/all-files/hi/HiDownload';
 import { BsArrowUpRight } from '@react-icons/all-files/bs/BsArrowUpRight';
 import { UserTransaction } from 'aptos/src/api/data-contracts';
 import { ScriptFunctionPayload } from 'aptos/dist/api/data-contracts';
+import ChakraLink from 'core/components/ChakraLink';
 import Copyable from 'core/components/Copyable';
 import { collapseHexString } from 'core/utils/hex';
 
@@ -91,41 +92,43 @@ export function ActivityItem({ isSent, transaction }: ActivityItemProps) {
   });
 
   return (
-    <HStack
-      spacing={4}
-      padding={3}
-      paddingLeft={4}
-      paddingRight={4}
-      cursor="pointer"
-      color={secondaryTextColor[colorMode]}
-      bgColor={secondaryGridBgColor[colorMode]}
-      borderRadius=".5rem"
-      _hover={{
-        bgColor: secondaryGridHoverBgColor[colorMode],
-      }}
-    >
-      <Circle size={8} border="1px" borderColor="blue.400" color="blue.400">
-        { isSent ? <BsArrowUpRight /> : <HiDownload /> }
-      </Circle>
-      <VStack flexGrow={1} alignItems="start" spacing={0.5}>
-        <HStack w="100%" fontSize="sm">
-          <Text flexGrow={1}>
-            { `${isSent ? 'To' : 'From'} ` }
-            <Copyable prompt="Copy address" value={otherAddress}>
-              { collapseHexString(otherAddress, 8) }
-            </Copyable>
+    <ChakraLink to={`/transactions/${transaction.version}`} w="100%">
+      <HStack
+        spacing={4}
+        padding={3}
+        paddingLeft={4}
+        paddingRight={4}
+        cursor="pointer"
+        color={secondaryTextColor[colorMode]}
+        bgColor={secondaryGridBgColor[colorMode]}
+        borderRadius=".5rem"
+        _hover={{
+          bgColor: secondaryGridHoverBgColor[colorMode],
+        }}
+      >
+        <Circle size={8} border="1px" borderColor="blue.400" color="blue.400">
+          { isSent ? <BsArrowUpRight /> : <HiDownload /> }
+        </Circle>
+        <VStack flexGrow={1} alignItems="start" spacing={0.5}>
+          <HStack w="100%" fontSize="sm">
+            <Text flexGrow={1}>
+              { `${isSent ? 'To' : 'From'} ` }
+              <Copyable prompt="Copy address" value={otherAddress}>
+                { collapseHexString(otherAddress, 8) }
+              </Copyable>
+            </Text>
+            <Text color={isSent ? 'red.500' : 'green.500'} fontWeight={500}>
+              { `${isSent ? '-' : '+'}${amount} ${coinName}` }
+            </Text>
+          </HStack>
+          <Text color={timestampColor[colorMode]} fontSize="xs">
+            <Tooltip label={`${formattedDate} at ${formattedTime}`}>
+              { relativeTime(timestampMs) }
+            </Tooltip>
           </Text>
-          <Text color={isSent ? 'red.500' : 'green.500'} fontWeight={500}>
-            { `${isSent ? '-' : '+'}${amount} ${coinName}` }
-          </Text>
-        </HStack>
-        <Text color={timestampColor[colorMode]} fontSize="xs">
-          <Tooltip label={`${formattedDate} at ${formattedTime}`}>
-            { relativeTime(timestampMs) }
-          </Tooltip>
-        </Text>
-      </VStack>
-    </HStack>
+        </VStack>
+      </HStack>
+    </ChakraLink>
   );
 }
 
