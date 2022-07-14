@@ -9,7 +9,7 @@ chain:
 validator:
   enableNetworkPolicy: false
 haproxy:
-  enabled: false
+  enabled: {enable_haproxy}
 
 # no VFNs in forge for now
 fullnode:

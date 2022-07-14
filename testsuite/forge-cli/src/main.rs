@@ -96,6 +96,8 @@ struct K8sSwarm {
         help = "If set, keeps the forge testnet active in the specified namespace"
     )]
     keep: bool,
+    #[structopt(long, help = "If set, enables HAProxy for each of the validators")]
+    enable_haproxy: bool,
 }
 
 #[derive(StructOpt, Debug)]
@@ -144,6 +146,8 @@ struct Resize {
         help = "If set, uses kubectl port-forward instead of assuming k8s DNS access"
     )]
     port_forward: bool,
+    #[structopt(long, help = "If set, enables HAProxy for each of the validators")]
+    enable_haproxy: bool,
 }
 
 fn main() -> Result<()> {
@@ -193,6 +197,7 @@ fn main() -> Result<()> {
                         k8s.base_image_tag,
                         k8s.port_forward,
                         k8s.keep,
+                        k8s.enable_haproxy,
                     )
                     .unwrap(),
                     &args.options,
@@ -225,6 +230,7 @@ fn main() -> Result<()> {
                     resize.testnet_image_tag,
                     resize.move_modules_dir,
                     resize.port_forward,
+                    resize.enable_haproxy,
                 ))?;
                 Ok(())
             }
