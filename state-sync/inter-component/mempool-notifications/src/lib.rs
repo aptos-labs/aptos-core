@@ -263,19 +263,7 @@ mod tests {
     }
 
     #[test]
-    fn test_no_transactions() {
-        // Create runtime and mempool notifier
-        let runtime = create_runtime();
-        let _enter = runtime.enter();
-        let (mempool_notifier, _mempool_listener) = crate::new_mempool_notifier_listener_pair();
-
-        // Send a notification and verify no timeout because no notification was sent!
-        let notify_result = block_on(mempool_notifier.notify_new_commit(vec![], 0, 1000));
-        assert_ok!(notify_result);
-    }
-
-    #[test]
-    fn test_transaction_filtering() {
+    fn test_no_transaction_filtering() {
         // Create runtime and mempool notifier
         let runtime = create_runtime();
         let _enter = runtime.enter();
@@ -291,7 +279,7 @@ mod tests {
         // Send a notification and verify no timeout because no notification was sent!
         let notify_result =
             block_on(mempool_notifier.notify_new_commit(transactions.clone(), 0, 1000));
-        assert_ok!(notify_result);
+        assert_matches!(notify_result, Err(Error::TimeoutWaitingForMempool));
 
         // Send another notification with a single user transaction now included.
         transactions.push(create_user_transaction());
