@@ -19,6 +19,9 @@ Rails.application.routes.draw do
     root to: redirect('/it2') # creates user_root_path, where users go after confirming email
   end
 
+  # CMS
+  resources :articles, param: :slug, only: %i[index show]
+
   # Settings
   get 'settings', to: redirect('/settings/profile')
   get 'settings/profile'
