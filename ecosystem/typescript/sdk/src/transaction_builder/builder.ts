@@ -1,5 +1,5 @@
-import * as SHA3 from 'js-sha3';
-import { Buffer } from 'buffer/';
+import * as SHA3 from "js-sha3";
+import { Buffer } from "buffer/";
 import {
   Ed25519PublicKey,
   Ed25519Signature,
@@ -11,11 +11,11 @@ import {
   TransactionAuthenticatorMultiEd25519,
   SigningMessage,
   MultiAgentRawTransaction,
-} from './aptos_types';
-import { bcsToBytes, Bytes } from './bcs';
+} from "./aptos_types";
+import { bcsToBytes, Bytes } from "./bcs";
 
-const RAW_TRANSACTION_SALT = 'APTOS::RawTransaction';
-const RAW_TRANSACTION_WITH_DATA_SALT = 'APTOS::RawTransactionWithData';
+const RAW_TRANSACTION_SALT = "APTOS::RawTransaction";
+const RAW_TRANSACTION_WITH_DATA_SALT = "APTOS::RawTransactionWithData";
 
 type AnyRawTransaction = RawTransaction | MultiAgentRawTransaction;
 
@@ -40,7 +40,7 @@ export class TransactionBuilder<F extends SigningFn> {
     } else if (rawTxn instanceof MultiAgentRawTransaction) {
       hash.update(Buffer.from(RAW_TRANSACTION_WITH_DATA_SALT));
     } else {
-      throw new Error('Unknown transaction type.');
+      throw new Error("Unknown transaction type.");
     }
 
     const prefix = new Uint8Array(hash.arrayBuffer());

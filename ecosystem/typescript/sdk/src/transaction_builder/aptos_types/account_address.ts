@@ -1,5 +1,5 @@
-import { HexString, MaybeHexString } from '../../hex_string';
-import { Serializer, Deserializer, Bytes } from '../bcs';
+import { HexString, MaybeHexString } from "../../hex_string";
+import { Serializer, Deserializer, Bytes } from "../bcs";
 
 export class AccountAddress {
   static readonly LENGTH: number = 32;
@@ -8,7 +8,7 @@ export class AccountAddress {
 
   constructor(address: Bytes) {
     if (address.length !== AccountAddress.LENGTH) {
-      throw new Error('Expected address of length 32');
+      throw new Error("Expected address of length 32");
     }
     this.address = address;
   }
