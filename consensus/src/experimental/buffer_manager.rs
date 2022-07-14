@@ -229,6 +229,9 @@ impl BufferManager {
                             false,
                         ))
                         .await;
+                    // the epoch ends, reset to avoid executing more blocks, execute after
+                    // this persisting request will result in BlockNotFound
+                    self.reset().await;
                 }
                 self.persisting_phase_tx
                     .send(self.create_new_request(PersistingRequest {
@@ -251,20 +254,25 @@ impl BufferManager {
         unreachable!("Aggregated item not found in the list");
     }
 
+    async fn reset(&mut self) {
+        self.buffer = Buffer::new();
+        self.execution_root = None;
+        self.signing_root = None;
+        // purge the incoming blocks queue
+        while let Ok(Some(_)) = self.block_rx.try_next() {}
+        // Wait for ongoing tasks to finish before sending back ack.
+        while self.ongoing_tasks.load(Ordering::SeqCst) > 0 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }
+
     /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
     async fn process_reset_request(&mut self, request: ResetRequest) {
         let ResetRequest { tx, stop } = request;
         debug!("Receive reset");
 
         self.stop = stop;
-        self.buffer = Buffer::new();
-        self.execution_root = None;
-        self.signing_root = None;
-        // Wait for ongoing tasks to finish before sending back ack.
-        while self.ongoing_tasks.load(Ordering::SeqCst) > 0 {
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-
+        self.reset().await;
         tx.send(sync_ack_new()).unwrap();
     }
 
