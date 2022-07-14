@@ -1,6 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::error::DbError;
+use crate::quorum_store::quorum_store_db::BatchIdDB;
+use crate::quorum_store::types::BatchId;
 use crate::quorum_store::{
     quorum_store::QuorumStoreCommand,
     quorum_store_wrapper::QuorumStoreWrapper,
@@ -22,8 +25,31 @@ use futures::{
     },
     StreamExt,
 };
+use std::sync::Arc;
 use std::{collections::HashSet, time::Duration};
 use tokio::{sync::mpsc::channel as TokioChannel, time::timeout};
+
+pub struct MockBatchIdDB {}
+
+impl MockBatchIdDB {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl BatchIdDB for MockBatchIdDB {
+    // The first batch will be index 1
+    fn clean_and_get_batch_id(
+        &self,
+        _current_epoch: u64,
+    ) -> anyhow::Result<Option<BatchId>, DbError> {
+        Ok(Some(0))
+    }
+
+    fn save_batch_id(&self, _epoch: u64, _batch_id: BatchId) -> anyhow::Result<(), DbError> {
+        Ok(())
+    }
+}
 
 async fn queue_mempool_batch_response(
     txns: Vec<SignedTransaction>,
@@ -52,6 +78,7 @@ async fn test_batch_creation() {
 
     let mut wrapper = QuorumStoreWrapper::new(
         0,
+        Arc::new(MockBatchIdDB::new()),
         quorum_store_to_mempool_tx,
         wrapper_quorum_store_tx,
         10_000,
@@ -75,7 +102,8 @@ async fn test_batch_creation() {
         .await;
         // Expect AppendToBatch for 1 txn
         let quorum_store_command = wrapper_quorum_store_rx.recv().await.unwrap();
-        if let QuorumStoreCommand::AppendToBatch(data, 0) = quorum_store_command {
+        if let QuorumStoreCommand::AppendToBatch(data, batch_id) = quorum_store_command {
+            assert_eq!(batch_id, 1);
             assert_eq!(data.len(), signed_txns.len());
             assert_eq!(data, signed_txns);
         } else {
@@ -107,7 +135,8 @@ async fn test_batch_creation() {
         assert_eq!(exclude_txns.len(), num_txns);
         // Expect AppendBatch for 9 txns
         let quorum_store_command = wrapper_quorum_store_rx.recv().await.unwrap();
-        if let QuorumStoreCommand::AppendToBatch(data, 1) = quorum_store_command {
+        if let QuorumStoreCommand::AppendToBatch(data, batch_id) = quorum_store_command {
+            assert_eq!(batch_id, 2);
             assert_eq!(data.len(), signed_txns.len());
             assert_eq!(data, signed_txns);
         } else {
@@ -135,6 +164,7 @@ async fn test_block_request() {
 
     let mut wrapper = QuorumStoreWrapper::new(
         0,
+        Arc::new(MockBatchIdDB::new()),
         quorum_store_to_mempool_tx,
         wrapper_quorum_store_tx,
         10_000,
