@@ -12,6 +12,7 @@ use aptos_infallible::{Mutex, MutexGuard};
 use aptos_logger::prelude::*;
 use aptos_types::{account_config::NewBlockEvent, block_metadata::new_block_event_key};
 use consensus_types::common::{Author, Round};
+use short_hex_str::AsShortHexStr;
 use std::{cmp::Ordering, collections::HashMap, convert::TryFrom, sync::Arc};
 use storage_interface::{DbReader, Order};
 
@@ -217,6 +218,38 @@ impl NewBlockEventAggregation {
             .filter(move |&meta| meta.epoch() == epoch)
     }
 
+    pub fn get_aggregated_metrics(
+        &self,
+        epoch: u64,
+        candidates: &[Author],
+        history: &[NewBlockEvent],
+    ) -> (
+        HashMap<Author, u32>,
+        HashMap<Author, u32>,
+        HashMap<Author, u32>,
+    ) {
+        let votes = self.count_votes(epoch, candidates, history);
+        let proposals = self.count_proposals(epoch, history);
+        let failed_proposals = self.count_failed_proposals(epoch, candidates, history);
+
+        for candidate in candidates {
+            COMMITTED_PROPOSALS_IN_WINDOW
+                .with_label_values(&[candidate.short_str().as_str()])
+                .set(*proposals.get(candidate).unwrap_or(&0) as i64);
+            FAILED_PROPOSALS_IN_WINDOW
+                .with_label_values(&[candidate.short_str().as_str()])
+                .set(*failed_proposals.get(candidate).unwrap_or(&0) as i64);
+            COMMITTED_VOTES_IN_WINDOW
+                .with_label_values(&[candidate.short_str().as_str()])
+                .set(*votes.get(candidate).unwrap_or(&0) as i64);
+        }
+
+        LEADER_REPUTATION_HISTORY_SIZE.set(
+            proposals.values().sum::<u32>() as i64 + failed_proposals.values().sum::<u32>() as i64,
+        );
+        (votes, proposals, failed_proposals)
+    }
+
     pub fn count_votes(
         &self,
         epoch: u64,
@@ -320,12 +353,9 @@ impl ReputationHeuristic for ActiveInactiveHeuristic {
         candidates: &[Author],
         history: &[NewBlockEvent],
     ) -> Vec<u64> {
-        let votes = self.aggregation.count_votes(epoch, candidates, history);
-        let proposals = self.aggregation.count_proposals(epoch, history);
-
-        COMMITTED_PROPOSALS_IN_WINDOW.set(*proposals.get(&self.author).unwrap_or(&0) as i64);
-        COMMITTED_VOTES_IN_WINDOW.set(*votes.get(&self.author).unwrap_or(&0) as i64);
-        LEADER_REPUTATION_HISTORY_SIZE.set(proposals.values().sum::<u32>() as i64);
+        let (votes, proposals, _) = self
+            .aggregation
+            .get_aggregated_metrics(epoch, candidates, history);
 
         candidates
             .iter()
@@ -399,16 +429,9 @@ impl ReputationHeuristic for ProposerAndVoterHeuristic {
         candidates: &[Author],
         history: &[NewBlockEvent],
     ) -> Vec<u64> {
-        let votes = self.aggregation.count_votes(epoch, candidates, history);
-        let proposals = self.aggregation.count_proposals(epoch, history);
-        let failed_proposals = self
+        let (votes, proposals, failed_proposals) = self
             .aggregation
-            .count_failed_proposals(epoch, candidates, history);
-
-        COMMITTED_PROPOSALS_IN_WINDOW.set(*proposals.get(&self.author).unwrap_or(&0) as i64);
-        FAILED_PROPOSALS_IN_WINDOW.set(*failed_proposals.get(&self.author).unwrap_or(&0) as i64);
-        COMMITTED_VOTES_IN_WINDOW.set(*votes.get(&self.author).unwrap_or(&0) as i64);
-        LEADER_REPUTATION_HISTORY_SIZE.set(proposals.values().sum::<u32>() as i64);
+            .get_aggregated_metrics(epoch, candidates, history);
 
         candidates
             .iter()
