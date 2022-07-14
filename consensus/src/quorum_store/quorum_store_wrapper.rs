@@ -3,7 +3,7 @@
 
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::quorum_store_db::QuorumStoreDB;
+use crate::quorum_store::quorum_store_db::BatchIdDB;
 use crate::quorum_store::{
     counters,
     quorum_store::{QuorumStoreCommand, QuorumStoreError},
@@ -55,13 +55,13 @@ pub struct QuorumStoreWrapper {
     // For ensuring that batch size does not exceed QuorumStore limit.
     quorum_store_max_batch_bytes: u64,
     last_end_batch_time: Instant,
-    db: Arc<QuorumStoreDB>,
+    db: Arc<dyn BatchIdDB>,
 }
 
 impl QuorumStoreWrapper {
     pub fn new(
         epoch: u64,
-        db: Arc<QuorumStoreDB>,
+        db: Arc<dyn BatchIdDB>,
         mempool_tx: Sender<QuorumStoreRequest>,
         quorum_store_sender: TokioSender<QuorumStoreCommand>,
         mempool_txn_pull_timeout_ms: u64,
