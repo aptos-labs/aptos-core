@@ -18,7 +18,7 @@ interface UseSwitchNetworkMutationProps {
 export const useSwitchNetwork = () => {
   const queryClient = useQueryClient();
   const {
-    aptosAccount, aptosNetwork, updateNetworkState, updateWalletState,
+    aptosAccount, aptosNetwork, updateNetworkState,
   } = useWalletState();
   const toast = useToast();
 
@@ -40,7 +40,6 @@ export const useSwitchNetwork = () => {
       const faucetClient = new FaucetClient(newAptosNetwork, newFaucetNetwork);
       try {
         await faucetClient.fundAccount(aptosAccount.address(), 0);
-        updateWalletState({ aptosAccountState: aptosAccount });
         toast({
           description: `No account with your credentials existed on ${networkUriMap[newAptosNetwork]}, a new account was initialized`,
           duration: 5000,

@@ -54,7 +54,7 @@ export function CredentialHeaderAndBody({
 function NewAccountState() {
   const [isAccountBeingCreated, setIsAccountBeingCreated] = useState<boolean>(false);
   const {
-    aptosAccount, aptosNetwork, faucetNetwork, updateWalletState,
+    addAccount, aptosAccount, aptosNetwork, faucetNetwork,
   } = useWalletState();
   const privateKeyObject = aptosAccount?.toPrivateKeyObject();
   const privateKeyHex = privateKeyObject?.privateKeyHex;
@@ -67,7 +67,7 @@ function NewAccountState() {
     const account = createNewAccount();
     await faucetClient.fundAccount(account.address(), 0);
     Analytics.event({ eventType: createAccountEvents.CREATE_ACCOUNT });
-    updateWalletState({ aptosAccountState: account });
+    addAccount({ account });
     setIsAccountBeingCreated(false);
   };
 

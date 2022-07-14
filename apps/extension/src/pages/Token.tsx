@@ -15,7 +15,6 @@ function Token() {
         <TokenBody />
       </WalletLayout>
     </AuthLayout>
-
   );
 }
 

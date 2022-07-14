@@ -1,15 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-/* eslint-disable class-methods-use-this */
-/* eslint-disable max-classes-per-file */
-
 import { AptosAccount, AptosAccountObject } from 'aptos';
 
 export type AptosAccountState = AptosAccount | undefined;
 
 export interface LocalStorageState {
-  aptosAccountObject?: AptosAccountObject,
+  aptosAccounts?: {
+    [address: string]: AptosAccountObject
+  },
+  currAccountAddress?: string;
 }
 
 export const MessageMethod = Object.freeze({

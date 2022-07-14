@@ -43,7 +43,7 @@ interface FormValues {
 
 function Login() {
   const { colorMode } = useColorMode();
-  const { aptosNetwork, updateWalletState } = useWalletState();
+  const { addAccount, aptosNetwork } = useWalletState();
   const navigate = useNavigate();
   const {
     formState: { errors }, handleSubmit, register, setError, watch,
@@ -76,7 +76,7 @@ function Login() {
         eventType: loginEvents.LOGIN_WITH_PRIVATE_KEY,
         params: analyticsParams,
       });
-      updateWalletState({ aptosAccountState: account });
+      addAccount({ account });
       navigate('/wallet');
     } catch (err) {
       Analytics.event({

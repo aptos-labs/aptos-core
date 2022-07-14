@@ -48,11 +48,12 @@ export default function SettingsListItem({
 }: SettingsListItemProps) {
   const navigate = useNavigate();
   const { colorMode } = useColorMode();
-  const { signOut } = useWalletState();
+  const { aptosAccount, removeAccount } = useWalletState();
 
   const gridOnClick = () => {
     if (title === 'Sign out') {
-      signOut();
+      // Change to signOut once password is implemented
+      removeAccount({ accountAddress: aptosAccount?.address().hex() });
     }
     navigate(path);
   };

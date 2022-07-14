@@ -17,16 +17,30 @@ export function getLocalStorageState(): LocalStorageState | null {
   // Get from local storage by key
   const item = window.localStorage.getItem(WALLET_STATE_LOCAL_STORAGE_KEY);
   if (item) {
-    const accountObject: AptosAccountObject = JSON.parse(item);
-    return { aptosAccountObject: accountObject };
+    const localStorageState: LocalStorageState = JSON.parse(item);
+    return localStorageState;
   }
   return null;
+}
+
+export function getCurrentAptosAccountAddress() {
+  const localStorage = getLocalStorageState();
+  if (localStorage) {
+    const { currAccountAddress } = localStorage;
+    return currAccountAddress;
+  }
+  return undefined;
 }
 
 export function getAptosAccountState(): AptosAccountState {
   const localStorage = getLocalStorageState();
   if (localStorage) {
-    const { aptosAccountObject } = localStorage;
+    const { aptosAccounts, currAccountAddress } = localStorage;
+    const currAccountAddressString = currAccountAddress?.toString();
+    if (!currAccountAddressString || !aptosAccounts) {
+      return undefined;
+    }
+    const aptosAccountObject = aptosAccounts[currAccountAddressString];
     return aptosAccountObject ? AptosAccount.fromAptosAccountObject(aptosAccountObject) : undefined;
   }
   return undefined;
