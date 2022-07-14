@@ -38,8 +38,22 @@ export type SigningFn = (txn: SigningMessage) => Ed25519Signature | MultiEd25519
 export class TransactionBuilder<F extends SigningFn> {
   protected readonly signingFunction: F;
 
-  constructor(signingFunction: F) {
+  constructor(signingFunction: F, public readonly rawTxnBuilder?: TransactionBuilderABI) {
     this.signingFunction = signingFunction;
+  }
+
+  /**
+   * Builds a RawTransaction. Relays the call to TransactionBuilderABI.build
+   * @param func
+   * @param ty_tags
+   * @param args
+   */
+  build(func: string, ty_tags: string[], args: any[]): RawTransaction {
+    if (!this.rawTxnBuilder) {
+      throw new Error("this.rawTxnBuilder doesn't exist.");
+    }
+
+    return this.rawTxnBuilder.build(func, ty_tags, args);
   }
 
   /** Generates a Signing Message out of a raw transaction. */
