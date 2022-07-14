@@ -480,6 +480,9 @@ module AptosFramework::AuctionHouse {
         };
     }
 
+    #[test_only]
+    use AptosFramework::TestCoin;
+
     // Tests the end to end flow of an auction
     #[test(core_framework = @0x1, core_resources = @CoreResources, seller = @0x123, bidder = @0x234)]
     public(script) fun end_to_end_first_claim_coins(
