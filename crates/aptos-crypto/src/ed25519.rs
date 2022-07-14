@@ -209,7 +209,7 @@ impl Ed25519Signature {
     /// Note: It's true that malicious signers can already produce varying signatures by
     /// choosing a different nonce, so this method protects against malleability attacks performed
     /// by a non-signer.
-    pub fn check_malleability(bytes: &[u8]) -> std::result::Result<(), CryptoMaterialError> {
+    pub fn check_s_malleability(bytes: &[u8]) -> std::result::Result<(), CryptoMaterialError> {
         if bytes.len() != ED25519_SIGNATURE_LENGTH {
             return Err(CryptoMaterialError::WrongLengthError);
         }
@@ -400,7 +400,7 @@ impl Signature for Ed25519Signature {
     /// malleability and point malleability (see documentation [here](https://docs.rs/ed25519-dalek/latest/ed25519_dalek/struct.PublicKey.html#on-the-multiple-sources-of-malleability-in-ed25519-signatures)).
     ///
     /// This _strict_ verification performs steps 1,2 and 3 from Section 5.1.7 in RFC8032, and an
-    /// additional scalar malleability check (via [Ed25519Signature::check_malleability][Ed25519Signature::check_malleability]).
+    /// additional scalar malleability check (via [Ed25519Signature::check_s_malleability][Ed25519Signature::check_s_malleability]).
     ///
     /// This function will ensure both the signature and the `public_key` are not in a small subgroup.
     fn verify<T: CryptoHash + Serialize>(
@@ -420,7 +420,11 @@ impl Signature for Ed25519Signature {
     ///
     /// This function will check both the signature and `public_key` for small subgroup attacks.
     fn verify_arbitrary_msg(&self, message: &[u8], public_key: &Ed25519PublicKey) -> Result<()> {
-        Ed25519Signature::check_malleability(&self.to_bytes())?;
+        // NOTE: ed25519::PublicKey::verify_strict already checks that the s-component of the signature
+        // is not mauled, but does so via an optimistic path which fails into a slower path. By doing
+        // our own (much faster) checking here, we can ensure dalek's optimistic path always succeeds
+        // and the slow path is never triggered.
+        Ed25519Signature::check_s_malleability(&self.to_bytes())?;
 
         // NOTE: ed25519::PublicKey::verify_strict checks that the signature's R-component and
         // the public key are *not* in a small subgroup.
@@ -459,7 +463,10 @@ impl TryFrom<&[u8]> for Ed25519Signature {
     type Error = CryptoMaterialError;
 
     fn try_from(bytes: &[u8]) -> std::result::Result<Ed25519Signature, CryptoMaterialError> {
-        Ed25519Signature::check_malleability(bytes)?;
+        // We leave this check here to detect mauled signatures earlier, since it does not hurt
+        // performance much. (This check is performed again in Ed25519Signature::verify_arbitrary_msg
+        // and in ed25519-dalek's verify_strict API.)
+        Ed25519Signature::check_s_malleability(bytes)?;
         Ed25519Signature::from_bytes_unchecked(bytes)
     }
 }

@@ -386,6 +386,8 @@ proptest! {
     ) {
         let signature = keypair.private_key.sign(&message);
         let mut serialized = signature.to_bytes();
+        let serialized_old = serialized; // implements Copy trait
+        prop_assert_eq!(serialized_old, serialized);
 
         let mut r_bytes: [u8; 32] = [0u8; 32];
         r_bytes.copy_from_slice(&serialized[..32]);
@@ -402,6 +404,8 @@ proptest! {
         // Update the signature (the S part).
         serialized[32..].copy_from_slice(&malleable_s_bytes);
 
+        prop_assert_ne!(serialized_old, serialized);
+
         // Check that malleable signatures will pass verification and deserialization in dalek.
         // Construct the corresponding dalek public key.
         let _dalek_public_key = ed25519_dalek::PublicKey::from_bytes(
@@ -415,9 +419,20 @@ proptest! {
         // signature. It does not detect it.
         prop_assert!(dalek_sig.is_ok());
 
+        let msg_bytes = bcs::to_bytes(&message);
+        prop_assert!(msg_bytes.is_ok());
+
+        // ed25519_dalek verify will NOT accept the mauled signature
+        prop_assert!(_dalek_public_key.verify(msg_bytes.as_ref().unwrap(), dalek_sig.as_ref().unwrap()).is_err());
+        // ...and ed25519_dalek verify_strict will NOT accept it either
+        prop_assert!(_dalek_public_key.verify_strict(msg_bytes.as_ref().unwrap(), dalek_sig.as_ref().unwrap()).is_err());
+        // ...therefore, neither will our own Ed25519Signature::verify_arbitrary_msg
+        let sig = Ed25519Signature::from_bytes_unchecked(&serialized).unwrap();
+        prop_assert!(sig.verify(&message, &keypair.public_key).is_err());
+
         let serialized_malleable: &[u8] = &serialized;
         // try_from will fail on malleable signatures. We detect malleable signatures
-        // during deserialization.
+        // early during deserialization.
         prop_assert_eq!(
             Ed25519Signature::try_from(serialized_malleable),
             Err(CryptoMaterialError::CanonicalRepresentationError)
