@@ -5,6 +5,8 @@
 //!
 //! [Spec](https://www.rosetta-api.org/docs/api_objects.html)
 
+use crate::common::native_coin_tag;
+use crate::types::{create_account_identifier, test_coin_identifier, transfer_identifier};
 use crate::{
     common::{is_native_coin, native_coin},
     error::ApiResult,
@@ -14,16 +16,18 @@ use crate::{
         Error, NetworkIdentifier, OperationIdentifier, OperationStatus, OperationStatusType,
         OperationType, TransactionIdentifier,
     },
-    ApiError, CoinCache,
+    ApiError,
 };
 use anyhow::anyhow;
 use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
+use aptos_rest_client::aptos_api_types::{
+    Address, Event, MoveStructTag, MoveType, TransactionPayload,
+};
 use aptos_rest_client::{
     aptos::Balance,
     aptos_api_types::{WriteSetChange, U64},
 };
 use aptos_types::{account_address::AccountAddress, event::EventKey};
-use move_deps::move_core_types::language_storage::TypeTag;
 use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
 use std::{
     collections::HashMap,
@@ -31,7 +35,6 @@ use std::{
     fmt::{Display, Formatter},
     hash::Hash,
     str::FromStr,
-    sync::Arc,
 };
 
 /// A description of all types used by the Rosetta implementation.
@@ -497,13 +500,9 @@ impl Display for TransactionType {
 }
 
 impl Transaction {
-    pub async fn from_transaction(
-        coin_cache: Arc<CoinCache>,
-        rest_client: &aptos_rest_client::Client,
-        txn: aptos_rest_client::Transaction,
-    ) -> ApiResult<Transaction> {
+    pub async fn from_transaction(txn: aptos_rest_client::Transaction) -> ApiResult<Transaction> {
         use aptos_rest_client::Transaction::*;
-        let (txn_type, maybe_sender, txn_info, events) = match txn {
+        let (txn_type, maybe_sender, txn_info, events, maybe_payload) = match txn {
             // Pending transactions aren't supported by Rosetta (for now)
             PendingTransaction(_) => return Err(ApiError::TransactionIsPending),
             UserTransaction(txn) => (
@@ -511,173 +510,57 @@ impl Transaction {
                 Some(txn.request.sender),
                 txn.info,
                 txn.events,
+                Some(txn.request.payload),
             ),
-            GenesisTransaction(txn) => (TransactionType::Genesis, None, txn.info, txn.events),
-            BlockMetadataTransaction(txn) => {
-                (TransactionType::BlockMetadata, None, txn.info, txn.events)
-            }
-            StateCheckpointTransaction(txn) => {
-                (TransactionType::StateCheckpoint, None, txn.info, vec![])
-            }
+            GenesisTransaction(txn) => (TransactionType::Genesis, None, txn.info, txn.events, None),
+            BlockMetadataTransaction(txn) => (
+                TransactionType::BlockMetadata,
+                None,
+                txn.info,
+                txn.events,
+                None,
+            ),
+            StateCheckpointTransaction(txn) => (
+                TransactionType::StateCheckpoint,
+                None,
+                txn.info,
+                vec![],
+                None,
+            ),
         };
 
+        // Operations must be sequential and operation index must always be in the same order
+        // with no gaps
         let mut operations = vec![];
         let mut operation_index: u64 = 0;
-        let status = if txn_info.success {
-            OperationStatusType::Success
+        if txn_info.success {
+            // Parse all operations from the writeset changes in a success
+            for change in &txn_info.changes {
+                let mut ops = parse_operations_from_write_set(
+                    change,
+                    &events,
+                    &maybe_sender,
+                    operation_index,
+                );
+                operation_index += ops.len() as u64;
+                operations.append(&mut ops);
+            }
         } else {
-            // TODO: Pull failed operations from transaction payload
-            OperationStatusType::Failure
-        };
-
-        for change in &txn_info.changes {
-            if let WriteSetChange::WriteResource { address, data, .. } = change {
-                // Determine operation
-                let address = *address.inner();
-                let module = data.typ.module.clone();
-                let name = data.typ.name.clone();
-                let generic_type_params = &data.typ.generic_type_params;
-
-                // Only handle framework events for now
-                let op_details = if *data.typ.address.inner() == AccountAddress::ONE {
-                    let mut op_details = None;
-                    if module == account_identifier() && name == account_identifier() {
-                        // Account sequence number increase (possibly creation)
-                        // Find out if it's the 0th sequence number (creation)
-                        for (id, value) in data.data.0.iter() {
-                            if id == &sequence_number_identifier() {
-                                if let Ok(U64(0)) = serde_json::from_value::<U64>(value.clone()) {
-                                    op_details = Some(OperationDetails::CreateAccount);
-                                    break;
-                                }
-                            }
-                        }
-                    } else if module == coin_identifier() && name == coin_store_identifier() {
-                        if let Some(coin) = generic_type_params.first() {
-                            // Account balance change
-                            let mut withdraw_event = None;
-                            let mut deposit_event = None;
-
-                            // Find the coin details
-                            for (id, value) in data.data.0.iter() {
-                                if id == &withdraw_events_identifier() {
-                                    serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
-                                    if let Ok(event) =
-                                        serde_json::from_value::<CoinEventId>(value.clone())
-                                    {
-                                        withdraw_event = Some(EventKey::new_from_address(
-                                            &event.guid.guid.id.addr,
-                                            event.guid.guid.id.creation_num.0,
-                                        ));
-                                    }
-                                } else if id == &deposit_events_identifier() {
-                                    if let Ok(event) =
-                                        serde_json::from_value::<CoinEventId>(value.clone())
-                                    {
-                                        deposit_event = Some(EventKey::new_from_address(
-                                            &address,
-                                            event.guid.guid.id.creation_num.0,
-                                        ));
-                                    }
-                                }
-                            }
-
-                            // Some transfers are onesided (e.g. mints)
-                            if withdraw_event.is_some() || deposit_event.is_some() {
-                                if let Ok(coin_type) = TypeTag::try_from(coin.clone()) {
-                                    if let Some(currency) = coin_cache
-                                        .get_currency(
-                                            rest_client,
-                                            coin_type.clone(),
-                                            Some(txn_info.version.0),
-                                        )
-                                        .await?
-                                    {
-                                        op_details = Some(OperationDetails::TransferCoin {
-                                            currency,
-                                            withdraw_event_key: withdraw_event,
-                                            deposit_event_key: deposit_event,
-                                        });
-                                    } else {
-                                        return Err(ApiError::UnsupportedCurrency(Some(format!(
-                                            "Currency {} is not supported",
-                                            coin_type
-                                        ))));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    op_details
-                } else {
-                    None
-                };
-
-                match op_details {
-                    Some(OperationDetails::CreateAccount) => {
-                        operations.push(Operation::create_account(
-                            operation_index,
-                            Some(status),
-                            address,
-                            maybe_sender
-                                .map(|inner| *inner.inner())
-                                .unwrap_or(AccountAddress::ONE),
-                        ));
-                        operation_index += 1;
-                    }
-                    Some(OperationDetails::TransferCoin {
-                        currency,
-                        deposit_event_key,
-                        withdraw_event_key,
-                    }) => {
-                        // Determine amount change this is silly, cause you have to pull it from the events
-                        if let Some(event_key) = deposit_event_key {
-                            if let Some(event) = events
-                                .iter()
-                                .find(|event| EventKey::from(event.key) == event_key)
-                            {
-                                if let Ok(CoinEvent { amount }) =
-                                    serde_json::from_value::<CoinEvent>(event.data.clone())
-                                {
-                                    operations.push(Operation::deposit(
-                                        operation_index,
-                                        Some(status),
-                                        address,
-                                        currency.clone(),
-                                        amount.0,
-                                    ));
-                                    operation_index += 1;
-                                }
-                            }
-                        }
-
-                        if let Some(event_key) = withdraw_event_key {
-                            if let Some(event) = events
-                                .iter()
-                                .find(|event| EventKey::from(event.key) == event_key)
-                            {
-                                if let Ok(CoinEvent { amount }) =
-                                    serde_json::from_value::<CoinEvent>(event.data.clone())
-                                {
-                                    operations.push(Operation::withdraw(
-                                        operation_index,
-                                        Some(status),
-                                        address,
-                                        currency.clone(),
-                                        amount.0,
-                                    ));
-                                    operation_index += 1;
-                                }
-                            }
-                        }
-                    }
-                    // No operation was found
-                    _ => {}
+            // Parse all failed operations from the payload
+            if let Some(sender) = maybe_sender {
+                if let Some(payload) = maybe_payload {
+                    let mut ops = parse_operations_from_txn_payload(
+                        operation_index,
+                        *sender.inner(),
+                        payload,
+                    );
+                    operation_index += ops.len() as u64;
+                    operations.append(&mut ops);
                 }
             }
-        }
+        };
 
-        // Also add a gas removal
+        // Everything committed costs gas
         if let Some(sender) = maybe_sender {
             operations.push(Operation::withdraw(
                 operation_index,
@@ -699,6 +582,179 @@ impl Transaction {
             }),
         })
     }
+}
+
+/// Parses operations from the transaction payload
+///
+/// This case only occurs if the transaction failed, and that's because it's less accurate
+/// than just following the state changes
+fn parse_operations_from_txn_payload(
+    operation_index: u64,
+    sender: AccountAddress,
+    payload: TransactionPayload,
+) -> Vec<Operation> {
+    let mut operations = vec![];
+    if let TransactionPayload::ScriptFunctionPayload(inner) = payload {
+        if AccountAddress::ONE == *inner.function.module.address.inner()
+            && coin_identifier() == inner.function.module.name
+            && transfer_identifier() == inner.function.name
+        {
+            if let Some(MoveType::Struct(MoveStructTag {
+                address,
+                module,
+                name,
+                ..
+            })) = inner.type_arguments.first()
+            {
+                if *address.inner() == AccountAddress::ONE
+                    && *module == test_coin_identifier()
+                    && *name == test_coin_identifier()
+                {
+                    let receiver =
+                        serde_json::from_value::<Address>(inner.arguments.get(0).cloned().unwrap())
+                            .unwrap();
+                    let amount =
+                        serde_json::from_value::<U64>(inner.arguments.get(1).cloned().unwrap())
+                            .unwrap()
+                            .0;
+                    operations.push(Operation::withdraw(
+                        operation_index,
+                        Some(OperationStatusType::Failure),
+                        sender,
+                        native_coin(),
+                        amount,
+                    ));
+                    operations.push(Operation::deposit(
+                        operation_index + 1,
+                        Some(OperationStatusType::Failure),
+                        receiver.into(),
+                        native_coin(),
+                        amount,
+                    ));
+                }
+            }
+        } else if AccountAddress::ONE == *inner.function.module.address.inner()
+            && account_identifier() == inner.function.module.name
+            && create_account_identifier() == inner.function.name
+        {
+            let address =
+                serde_json::from_value::<Address>(inner.arguments.get(0).cloned().unwrap())
+                    .unwrap();
+            operations.push(Operation::create_account(
+                operation_index,
+                Some(OperationStatusType::Failure),
+                address.into(),
+                sender,
+            ));
+        }
+    }
+    operations
+}
+
+/// Parses operations from the write set
+///
+/// This can only be done during a successful transaction because there are actual state changes.
+/// It is more accurate because untracked scripts are included in balance operations
+fn parse_operations_from_write_set(
+    change: &WriteSetChange,
+    events: &[Event],
+    maybe_sender: &Option<Address>,
+    mut operation_index: u64,
+) -> Vec<Operation> {
+    let mut operations = vec![];
+    if let WriteSetChange::WriteResource { address, data, .. } = change {
+        // Determine operation
+        let address = *address.inner();
+        let account_tag = MoveStructTag::new(
+            AccountAddress::ONE.into(),
+            account_identifier(),
+            account_identifier(),
+            vec![],
+        );
+        let coin_store_tag = MoveStructTag::new(
+            AccountAddress::ONE.into(),
+            coin_identifier(),
+            coin_store_identifier(),
+            vec![native_coin_tag().into()],
+        );
+
+        if data.typ == account_tag {
+            // Account sequence number increase (possibly creation)
+            // Find out if it's the 0th sequence number (creation)
+            for (id, value) in data.data.0.iter() {
+                if id == &sequence_number_identifier() {
+                    if let Ok(U64(0)) = serde_json::from_value::<U64>(value.clone()) {
+                        operations.push(Operation::create_account(
+                            operation_index,
+                            Some(OperationStatusType::Success),
+                            address,
+                            maybe_sender
+                                .map(|inner| *inner.inner())
+                                .unwrap_or(AccountAddress::ONE),
+                        ));
+                        operation_index += 1;
+                    }
+                }
+            }
+        } else if data.typ == coin_store_tag {
+            // Account balance change
+            for (id, value) in data.data.0.iter() {
+                if id == &withdraw_events_identifier() {
+                    serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
+                    if let Ok(event) = serde_json::from_value::<CoinEventId>(value.clone()) {
+                        let withdraw_event = EventKey::new_from_address(
+                            &event.guid.guid.id.addr,
+                            event.guid.guid.id.creation_num.0,
+                        );
+                        if let Some(amount) = get_amount_from_event(events, withdraw_event) {
+                            operations.push(Operation::withdraw(
+                                operation_index,
+                                Some(OperationStatusType::Success),
+                                address,
+                                native_coin(),
+                                amount,
+                            ));
+                            operation_index += 1;
+                        }
+                    }
+                } else if id == &deposit_events_identifier() {
+                    serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
+                    if let Ok(event) = serde_json::from_value::<CoinEventId>(value.clone()) {
+                        let withdraw_event = EventKey::new_from_address(
+                            &event.guid.guid.id.addr,
+                            event.guid.guid.id.creation_num.0,
+                        );
+                        if let Some(amount) = get_amount_from_event(events, withdraw_event) {
+                            operations.push(Operation::deposit(
+                                operation_index,
+                                Some(OperationStatusType::Success),
+                                address,
+                                native_coin(),
+                                amount,
+                            ));
+                            operation_index += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    operations
+}
+
+/// Pulls the balance change from a withdraw or deposit event
+fn get_amount_from_event(events: &[Event], event_key: EventKey) -> Option<u64> {
+    if let Some(event) = events
+        .iter()
+        .find(|event| EventKey::from(event.key) == event_key)
+    {
+        if let Ok(CoinEvent { amount }) = serde_json::from_value::<CoinEvent>(event.data.clone()) {
+            return Some(amount.0);
+        }
+    }
+
+    None
 }
 
 /// An enum for processing which operation is in a transaction
