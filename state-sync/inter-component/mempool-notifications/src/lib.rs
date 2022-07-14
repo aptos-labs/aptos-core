@@ -93,11 +93,10 @@ impl MempoolNotificationSender for MempoolNotifier {
             })
             .collect();
 
-        // Only send a notification if user transactions have been committed
-        if user_transactions.is_empty() {
-            return Ok(());
-        }
-
+        // It is possible that there is no user transaction present in current block, even in that
+        // case, we notify the mempool, because otherwise, mempool might be stuck in an older version
+        // of state view, which can be pruned. See https://github.com/aptos-labs/aptos-core/issues/1882
+        // for more details.
         // Construct a oneshot channel to receive a mempool response
         let (callback, callback_receiver) = oneshot::channel();
         let commit_notification = MempoolCommitNotification {
