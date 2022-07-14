@@ -996,7 +996,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-types",
  "bcs",
- "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7)",
+ "move-core-types",
  "serde 1.0.137",
  "serde_bytes",
  "serde_json",
@@ -1187,6 +1187,7 @@ dependencies = [
  "serde 1.0.137",
  "serde_json",
  "smallvec",
+ "tiny-keccak",
  "tracing",
 ]
 
@@ -4818,21 +4819,6 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.8.5",
- "ref-cast",
- "serde 1.0.137",
- "serde_bytes",
-]
-
-[[package]]
-name = "move-core-types"
-version = "0.0.4"
-source = "git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7#ece13ae276e3925111bf48cd85b73af4287210e7"
-dependencies = [
- "anyhow",
- "bcs",
- "hex",
- "once_cell",
  "rand 0.8.5",
  "ref-cast",
  "serde 1.0.137",
