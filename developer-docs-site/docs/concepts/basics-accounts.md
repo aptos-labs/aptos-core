@@ -68,7 +68,7 @@ module Test::Coin {
 Generating the authentication key for an account requires that you provide one of the below 1-byte signature scheme identifiers for this account, i.e., whether the account is a single signature or a multisig account:
 
 - **1-byte single-signature scheme identifier**: `0x00`.
-- **1-byte multisign scheme identifier**: `0x01`.
+- **1-byte multisig scheme identifier**: `0x01`. Make sure to also provide the value of `K` to generate the K-of-N multisig authentication key.
 
 ## Single signer authentication
 
@@ -88,7 +88,8 @@ With K-of-N multisig authentication, there are a total of N signers for the acco
 To generate a K-of-N multisig account's authentication key and the account address:
 
 1. **Generate key-pairs**: Generate `N` ed25519 public keys `p_1`, ..., `p_n`.
-2. **Derive a 32-byte authentication key**: Compute:
+2. Decide on the value of `K`, the threshold number of signatures needed for authenticating the transaction.
+3. **Derive a 32-byte authentication key**: Compute:
     ```
     auth_key = sha3-256(p_1 | … | p_n | K | 0x01)
     ```
