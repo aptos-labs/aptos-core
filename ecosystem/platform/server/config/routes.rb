@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 Rails.application.routes.draw do
+  resources :proposals
   devise_for :users, {
     controllers: {
       omniauth_callbacks: 'users/omniauth_callbacks',
