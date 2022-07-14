@@ -1,10 +1,10 @@
 // This module provides a basic Auction house with first-price auction
 
-module Test::AuctionHouse {
+module AptosFramework::AuctionHouse {
     use AptosFramework::Coin::{Self, Coin};
     use AptosFramework::IterableTable::{Self, IterableTable};
     use AptosFramework::Table::{Self, Table};
-    use AptosFramework::TestCoin::{Self, TestCoin};
+    use AptosFramework::TestCoin::TestCoin;
     use AptosFramework::Timestamp;
     use AptosFramework::Token::{Self, Token, TokenId};
     use Std::Event::{Self, EventHandle};
