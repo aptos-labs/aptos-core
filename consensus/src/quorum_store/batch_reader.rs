@@ -172,11 +172,13 @@ impl BatchReader {
     // Return an error if storage quota is exceeded.
     fn update_cache(&self, digest: HashValue, mut value: PersistedValue) -> anyhow::Result<()> {
         let author = value.author;
-        let mut quota_manager = self
+        if self
             .peer_quota
             .entry(author)
-            .or_insert(QuotaManager::new(self.db_quota, self.memory_quota));
-        if quota_manager.update_quota(value.num_bytes)? == StorageMode::PersistedOnly {
+            .or_insert(QuotaManager::new(self.db_quota, self.memory_quota))
+            .update_quota(value.num_bytes)?
+            == StorageMode::PersistedOnly
+        {
             value.remove_payload();
         }
 
@@ -227,32 +229,28 @@ impl BatchReader {
         };
 
         let expired_digests = self.expirations.lock().unwrap().expire(expired_round);
-        expired_digests
-            .into_iter()
-            .filter_map(|h| {
-                let cache_expiration_round = self
-                    .db_cache
-                    .get(&h)
-                    .expect("Expired entry not in cache")
-                    .expiration
-                    .round();
+        let mut ret = Vec::new();
+        for h in expired_digests {
+            let cache_expiration_round = self
+                .db_cache
+                .get(&h)
+                .expect("Expired entry not in cache")
+                .expiration
+                .round();
 
-                // We need to check up-to-date expiration again because receiving the same
-                // digest with a higher expiration would update the persisted value and
-                // effectively extend the expiration.
-                if cache_expiration_round < expired_round {
-                    let (_, persisted_value) = self
-                        .db_cache
-                        .remove(&h)
-                        .expect("Expired entry not in cache");
-                    self.free_quota(persisted_value);
-                    Some(h)
-                } else {
-                    None
-                    // Otherwise, expiration got extended, ignore.
-                }
-            })
-            .collect()
+            // We need to check up-to-date expiration again because receiving the same
+            // digest with a higher expiration would update the persisted value and
+            // effectively extend the expiration.
+            if cache_expiration_round < expired_round {
+                let (_, persisted_value) = self
+                    .db_cache
+                    .remove(&h)
+                    .expect("Expired entry not in cache");
+                self.free_quota(persisted_value);
+                ret.push(h);
+            } // Otherwise, expiration got extended, ignore.
+        }
+        ret
     }
 
     fn free_quota(&self, persisted_value: PersistedValue) {
