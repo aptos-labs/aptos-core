@@ -1,6 +1,6 @@
 /* eslint-disable no-bitwise */
-import { MAX_U128_BIG_INT, MAX_U16_NUMBER, MAX_U32_NUMBER, MAX_U64_BIG_INT, MAX_U8_NUMBER } from './consts';
-import { AnyNumber, Bytes, Uint16, Uint32, Uint8 } from './types';
+import { MAX_U128_BIG_INT, MAX_U16_NUMBER, MAX_U32_NUMBER, MAX_U64_BIG_INT, MAX_U8_NUMBER } from "./consts";
+import { AnyNumber, Bytes, Uint16, Uint32, Uint8 } from "./types";
 
 export class Serializer {
   private buffer: ArrayBuffer;
@@ -83,8 +83,8 @@ export class Serializer {
    * BCS layout for "boolean": One byte. "0x01" for True and "0x00" for False.
    */
   serializeBool(value: boolean): void {
-    if (typeof value !== 'boolean') {
-      throw new Error('Value needs to be a boolean');
+    if (typeof value !== "boolean") {
+      throw new Error("Value needs to be a boolean");
     }
     const byteValue = value ? 1 : 0;
     this.serialize(new Uint8Array([byteValue]));
@@ -206,7 +206,7 @@ function checkNumberRange<T extends AnyNumber>(minValue: T, maxValue: T, message
     descriptor.value = function deco(value: AnyNumber) {
       const valueBigInt = BigInt(value.toString());
       if (valueBigInt > BigInt(maxValue.toString()) || valueBigInt < BigInt(minValue.toString())) {
-        throw new Error(message || 'Value is out of range');
+        throw new Error(message || "Value is out of range");
       }
       childFunction.apply(this, [value]);
     };

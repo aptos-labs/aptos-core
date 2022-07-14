@@ -1,6 +1,6 @@
 /* eslint-disable no-bitwise */
-import { MAX_U32_NUMBER } from './consts';
-import { Bytes, Uint128, Uint16, Uint32, Uint64, Uint8 } from './types';
+import { MAX_U32_NUMBER } from "./consts";
+import { Bytes, Uint128, Uint16, Uint32, Uint64, Uint8 } from "./types";
 
 export class Deserializer {
   private buffer: ArrayBuffer;
@@ -16,7 +16,7 @@ export class Deserializer {
 
   private read(length: number): ArrayBuffer {
     if (this.offset + length > this.buffer.byteLength) {
-      throw new Error('Reached to the end of buffer');
+      throw new Error("Reached to the end of buffer");
     }
 
     const bytes = this.buffer.slice(this.offset, this.offset + length);
@@ -71,7 +71,7 @@ export class Deserializer {
   deserializeBool(): boolean {
     const bool = new Uint8Array(this.read(1))[0];
     if (bool !== 1 && bool !== 0) {
-      throw new Error('Invalid boolean value');
+      throw new Error("Invalid boolean value");
     }
     return bool === 1;
   }
@@ -164,7 +164,7 @@ export class Deserializer {
     }
 
     if (value > MAX_U32_NUMBER) {
-      throw new Error('Overflow while parsing uleb128-encoded uint32 value');
+      throw new Error("Overflow while parsing uleb128-encoded uint32 value");
     }
 
     return Number(value);

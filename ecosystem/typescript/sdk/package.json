@@ -12,7 +12,7 @@
     "lint": "eslint \"**/*.ts\"",
     "push": "yarn publish --non-interactive --new-version",
     "test": "jest",
-    "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts'",
+    "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.js'",
     "fmt": "yarn _fmt --write",
     "fmt:check": "yarn _fmt --check",
     "cov:clean": "rm -rf coverage",
