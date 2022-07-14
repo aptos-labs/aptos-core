@@ -93,12 +93,10 @@ impl MempoolNotificationSender for MempoolNotifier {
             })
             .collect();
 
-        // It is possible that there is no user transaction present in current block, even in that
-        // case, we notify the mempool, because otherwise, mempool might be stuck in an older version
-        // of state view, which can be pruned. See https://github.com/aptos-labs/aptos-core/issues/1882
-        // for more details.
         // Construct a oneshot channel to receive a mempool response
         let (callback, callback_receiver) = oneshot::channel();
+        // Mempool needs to be notified about all transactions (user and non-user transactions).
+        // See https://github.com/aptos-labs/aptos-core/issues/1882 for more details.
         let commit_notification = MempoolCommitNotification {
             transactions: user_transactions,
             block_timestamp_usecs,
@@ -269,14 +267,14 @@ mod tests {
         let _enter = runtime.enter();
         let (mempool_notifier, _mempool_listener) = crate::new_mempool_notifier_listener_pair();
 
-        // Create several transactions that should be filtered out
+        // Create several non-user transactions
         let mut transactions = vec![];
         for _ in 0..5 {
             transactions.push(create_block_metadata_transaction());
             transactions.push(create_genesis_transaction());
         }
 
-        // Send a notification and verify no timeout because no notification was sent!
+        // Send a notification and verify we get a timeout because mempool didn't respond
         let notify_result =
             block_on(mempool_notifier.notify_new_commit(transactions.clone(), 0, 1000));
         assert_matches!(notify_result, Err(Error::TimeoutWaitingForMempool));
