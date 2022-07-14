@@ -12,7 +12,6 @@ class LeaderboardController < ApplicationController
   It2Metric = Struct.new(*IT2_METRIC_KEYS)
 
   def it1
-    expires_in 1.minute, public: true
     default_sort = [[:participation, -1], [:liveness, -1], [:latest_reported_timestamp, -1]]
     @metrics, @last_updated = Rails.cache.fetch(:it1_leaderboard, expires_in: 1.minute) do
       metrics = JSON.parse(IT1_RESULTS).map do |metric|
@@ -42,7 +41,6 @@ class LeaderboardController < ApplicationController
   end
 
   def it2
-    expires_in 1.minute, public: true
     default_sort = [[:num_votes, -1], [:participation, -1], [:liveness, -1], [:latest_reported_timestamp, -1]]
     @metrics, @last_updated = Rails.cache.fetch(:it2_leaderboard, expires_in: 1.minute) do
       response = HTTParty.get(ENV.fetch('LEADERBOARD_IT2_URL'))
