@@ -1090,6 +1090,7 @@ impl DbReader for AptosDB {
 
     fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
         gauged_api("get_startup_info", || {
+            let _lock = self.ledger_commit_lock.lock();
             self.ledger_store
                 .get_startup_info()?
                 .map(
@@ -1299,8 +1300,7 @@ impl DbWriter for AptosDB {
         })
     }
 
-    /// Snapshots are persisted checkpoints that merklize global state key-value pairs.
-    fn save_state_snapshot(
+    fn save_state_snapshot_for_bench(
         &self,
         jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
@@ -1333,6 +1333,36 @@ impl DbWriter for AptosDB {
         })
     }
 
+    /// Snapshots are persisted checkpoints that merklize global state key-value pairs.
+    fn save_state_snapshot(
+        &self,
+        version: Version,
+        base_version: Option<Version>,
+        state_tree_at_snapshot: SparseMerkleTree<StateValue>,
+    ) -> Result<()> {
+        gauged_api("save_state_snapshot", || {
+            let mut in_memory_state = self.state_store.in_memory_state().lock();
+            let root_hash = self.state_store.merklize_value_set(
+                jmt_update_refs(&jmt_updates(&in_memory_state.updated_since_checkpoint)),
+                None,
+                version,
+                base_version,
+            )?;
+            trace!(
+                version = version,
+                base_version = base_version,
+                root_hash = root_hash,
+                "State snapshot committed."
+            );
+            in_memory_state.checkpoint = state_tree_at_snapshot.clone();
+            in_memory_state.checkpoint_version = Some(version);
+            in_memory_state.current = state_tree_at_snapshot.clone();
+            in_memory_state.current_version = Some(version);
+            in_memory_state.updated_since_checkpoint.clear();
+            Ok(())
+        })
+    }
+
     /// `first_version` is the version of the first transaction in `txns_to_commit`.
     /// When `ledger_info_with_sigs` is provided, verify that the transaction accumulator root hash
     /// it carries is generated after the `txns_to_commit` are applied.
@@ -1351,10 +1381,7 @@ impl DbWriter for AptosDB {
             // Executing and committing from more than one threads not allowed -- consensus and
             // state sync must hand over to each other after all pending execution and committing
             // complete.
-            let _lock = self
-                .ledger_commit_lock
-                .try_lock()
-                .expect("Concurrent committing detected.");
+            let _lock = self.ledger_commit_lock.lock();
 
             let num_txns = txns_to_commit.len() as u64;
             // ledger_info_with_sigs could be None if we are doing state synchronization. In this case
@@ -1383,33 +1410,6 @@ impl DbWriter for AptosDB {
             let new_root_hash =
                 self.save_transactions_impl(txns_to_commit, first_version, &mut cs)?;
 
-            if save_state_snapshots {
-                let mut base_version = base_state_version;
-                // find all the checkpoint versions
-                for (idx, jmt_updates, jf_node_hashes) in txns_to_commit
-                    .iter()
-                    .enumerate()
-                    .filter(|(_idx, txn_to_commit)| !txn_to_commit.state_updates().is_empty())
-                    .map(|(idx, txn_to_commit)| {
-                        (
-                            idx,
-                            jmt_updates(txn_to_commit.state_updates()),
-                            txn_to_commit.jf_node_hashes(),
-                        )
-                    })
-                {
-                    let version = first_version + idx as LeafCount;
-                    self.save_state_snapshot(
-                        jmt_updates,
-                        jf_node_hashes,
-                        version,
-                        base_version,
-                        state_tree.clone(),
-                    )?;
-                    base_version = Some(version);
-                }
-            }
-
             // If expected ledger info is provided, verify result root hash and save the ledger info.
             if let Some(x) = ledger_info_with_sigs {
                 let expected_root_hash = x.ledger_info().transaction_accumulator_hash();
@@ -1431,12 +1431,36 @@ impl DbWriter for AptosDB {
                     .start_timer();
                 self.commit(sealed_cs)?;
             }
+            if save_state_snapshots {
+                let checkpoint_version =
+                    self.state_store.in_memory_state().lock().checkpoint_version;
+                let mut base_version = base_state_version;
+                ensure!(
+                    base_version == checkpoint_version,
+                    "base_version {:?} does not match checkpoint_version {:?} in state_store",
+                    base_version,
+                    checkpoint_version
+                );
+                // find all the checkpoint versions
+                for (idx, txn_to_commit) in txns_to_commit.iter().enumerate() {
+                    self.state_store
+                        .in_memory_state()
+                        .lock()
+                        .updated_since_checkpoint
+                        .extend(txn_to_commit.state_updates().clone());
+                    if txn_to_commit.is_state_checkpoint() {
+                        let version = first_version + idx as LeafCount;
+                        self.save_state_snapshot(version, base_version, state_tree.clone())?;
+                        base_version = Some(version);
+                    }
+                }
+            }
             // update the InMemoryState in StateStore.
             {
                 let mut in_memory_state = self.state_store.in_memory_state().lock();
-                in_memory_state.current = state_tree;
+                in_memory_state.current = state_tree.clone();
                 in_memory_state.current_version = Some(last_version);
-            }
+            };
 
             // Only increment counter if commit succeeds and there are at least one transaction written
             // to the storage. That's also when we'd inform the pruner thread to work.

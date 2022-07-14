@@ -140,12 +140,10 @@ pub fn run(args: Args, xctx: XContext) -> Result<()> {
 
     // Step 1: build all the test binaries with --no-run.
     let cmd = CargoCommand::Test {
-        cargo_config: xctx.config().cargo_config(),
         direct_args: direct_args.as_slice(),
         // Don't pass in the args (test name) -- they're for use by the test runner.
         args: &[],
         env: &[],
-        skip_sccache: false,
     };
 
     let stdout = cmd.run_capture_stdout(&packages)?;

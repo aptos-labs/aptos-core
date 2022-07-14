@@ -62,6 +62,10 @@ impl RestoreHandler {
         )
     }
 
+    pub fn maybe_reset_state_store(&self, version: Version) {
+        self.state_store.maybe_reset(version);
+    }
+
     pub fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {
         restore_utils::save_ledger_infos(
             self.ledger_db.clone(),

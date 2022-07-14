@@ -645,14 +645,23 @@ pub trait DbWriter: Send + Sync {
         )
     }
 
+    fn save_state_snapshot_for_bench(
+        &self,
+        jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
+        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
+        version: Version,
+        base_version: Option<Version>,
+        state_tree_at_snapshot: SparseMerkleTree<StateValue>,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
     /// Persists merklized states as authenticated state checkpoint.
     /// See [`AptosDB::save_state_snapshot`].
     ///
     /// [`AptosDB::save_state_snapshot`]: ../aptosdb/struct.AptosDB.html#method.save_state_snapshot
     fn save_state_snapshot(
         &self,
-        jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
-        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         version: Version,
         base_version: Option<Version>,
         state_tree_at_snapshot: SparseMerkleTree<StateValue>,
@@ -747,7 +756,7 @@ pub fn jmt_updates(
 ) -> Vec<(HashValue, (HashValue, StateKey))> {
     state_updates
         .iter()
-        .map(|(k, v)| (k.hash(), (v.hash(), k.clone())))
+        .map(|(k, v)| (k.hash(), (v.hash(), (*k).clone())))
         .collect()
 }
 

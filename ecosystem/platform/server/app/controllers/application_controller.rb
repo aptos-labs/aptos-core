@@ -23,10 +23,8 @@ class ApplicationController < ActionController::Base
 
     if user.email.nil? || user.username.nil?
       onboarding_email_path
-    elsif Flipper.enabled?(:it2_registration_open)
-      it2_path
     else
-      leaderboard_it2_path
+      it2_path
     end
   end
 

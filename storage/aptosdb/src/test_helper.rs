@@ -576,7 +576,7 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
     let mut in_memory_state = db.state_store.in_memory_state().lock();
     in_memory_state.current = smt;
     in_memory_state.current_version = Some(version);
-    in_memory_state.updated_since_checkpoint.insert(key);
+    in_memory_state.updated_since_checkpoint.insert(key, value);
 }
 
 pub fn test_sync_transactions_impl(

@@ -77,7 +77,7 @@ impl<V: TransactionValidation + 'static> SharedMempool<V> {
         }
     }
 
-    pub fn validator_broadcast(&self) -> bool {
+    pub fn broadcast_within_validator_network(&self) -> bool {
         self.config.shared_mempool_validator_broadcast
     }
 }

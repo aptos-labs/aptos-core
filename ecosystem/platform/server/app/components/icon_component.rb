@@ -1,6 +1,7 @@
+# frozen_string_literal: true
+
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
-# frozen_string_literal: true
 
 class IconComponent < ViewComponent::Base
   SIZE_CLASSES = {
@@ -11,7 +12,7 @@ class IconComponent < ViewComponent::Base
 
   ICONS = Dir[File.join(Rails.root, 'app/assets/images/icons/*.svg')].to_h do |icon_path|
     icon_name, _ext = File.basename(icon_path).split('.')
-    [icon_name.to_sym, icon_path]
+    [icon_name.to_sym, File.read(icon_path).html_safe]
   end
 
   def initialize(icon, size: :unspecified, **rest)
@@ -26,8 +27,7 @@ class IconComponent < ViewComponent::Base
   end
 
   def svg
-    path = ICONS[@icon]
-    Rails.cache.fetch(icon: @icon) { File.read(path).html_safe }
+    ICONS[@icon]
   end
 
   def call

@@ -35,7 +35,6 @@ pub fn run(args: Args, xctx: XContext) -> Result<()> {
     args.build_args.add_args(&mut direct_args);
 
     let cmd = CargoCommand::Clippy {
-        cargo_config: xctx.config().cargo_config(),
         direct_args: &direct_args,
         args: &pass_through_args,
     };

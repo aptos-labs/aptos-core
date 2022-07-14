@@ -24,6 +24,7 @@ use executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeRe
 use fail::fail_point;
 use futures::{SinkExt, StreamExt};
 use std::{boxed::Box, sync::Arc};
+use tokio::sync::Mutex as AsyncMutex;
 
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
@@ -42,6 +43,7 @@ pub struct ExecutionProxy {
     async_state_sync_notifier: channel::Sender<NotificationType>,
     async_commit_notifier: channel::Sender<CommitType>,
     validators: Mutex<Vec<AccountAddress>>,
+    write_mutex: AsyncMutex<()>,
 }
 
 impl ExecutionProxy {
@@ -86,6 +88,7 @@ impl ExecutionProxy {
             async_state_sync_notifier: tx,
             async_commit_notifier: commit_tx,
             validators: Mutex::new(vec![]),
+            write_mutex: AsyncMutex::new(()),
         }
     }
 }
@@ -143,6 +146,8 @@ impl StateComputer for ExecutionProxy {
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> Result<(), ExecutionError> {
+        let _guard = self.write_mutex.lock().await;
+
         let mut block_ids = Vec::new();
         let mut txns = Vec::new();
         let mut reconfig_events = Vec::new();
@@ -167,7 +172,8 @@ impl StateComputer for ExecutionProxy {
             "commit_block",
             self.executor
                 .commit_blocks(block_ids, finality_proof.clone())
-        )?;
+                .expect("Failed to commit blocks")
+        );
 
         let blocks = blocks.to_vec();
         let wrapped_callback = move || {
@@ -194,6 +200,7 @@ impl StateComputer for ExecutionProxy {
 
     /// Synchronize to a commit that not present locally.
     async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+        let _guard = self.write_mutex.lock().await;
         fail_point!("consensus::sync_to", |_| {
             Err(anyhow::anyhow!("Injected error in sync_to").into())
         });
@@ -206,7 +213,7 @@ impl StateComputer for ExecutionProxy {
             "sync_to",
             self.state_sync_notifier.sync_to_target(target).await
         );
-        // Similarily, after the state synchronization, we have to reset the cache
+        // Similarly, after the state synchronization, we have to reset the cache
         // of BlockExecutor to guarantee the latest committed state is up to date.
         self.executor.reset()?;
 

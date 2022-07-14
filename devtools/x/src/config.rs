@@ -38,8 +38,6 @@ pub struct Config {
     clippy: Clippy,
     /// Fix configureation
     fix: Fix,
-    /// Cargo configuration
-    cargo: CargoConfig,
     grcov: CargoTool,
     /// Determinator configuration
     determinator: DeterminatorRules,
@@ -51,30 +49,6 @@ pub struct CargoTool {
     pub installer: CargoInstallation,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub struct Sccache {
-    /// Sccache Url
-    pub installer: CargoInstallation,
-    /// Where cargo home must reside for sccache to function properly.  Paths are embedded in binaries by rustc.
-    pub required_cargo_home: String,
-    /// Where the git repo for this project must reside.  Paths are embedded in binaries by rustc.
-    pub required_git_home: String,
-    /// s3 bucket location
-    pub bucket: String,
-    /// prefix to files uploaded in to s3
-    pub prefix: Option<String>,
-    /// utility of this seems to change in stable/vs rusoto, left for completeness.
-    pub endpoint: Option<String>,
-    /// AWS region of the bucket if necessary.
-    pub region: Option<String>,
-    /// Only used in stable, sscache delete when rusoto is merged in
-    pub ssl: Option<bool>,
-    /// If the bucket is public
-    pub public: Option<bool>,
-    /// Extra environment variables to set for the sccache server.
-    pub envs: Option<Vec<(String, String)>>,
-}
 ///
 /// These can be passed to the installer.rs, which can check the installation against the version number supplied,
 /// or install the cargo tool via either githash/repo if provided or with simply the version if the artifact is released
@@ -188,12 +162,6 @@ pub struct Clippy {
 #[serde(rename_all = "kebab-case")]
 pub struct Fix {}
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub struct CargoConfig {
-    pub sccache: Option<Sccache>,
-}
-
 impl XConfig {
     pub fn from_file(f: impl AsRef<Path>) -> Result<Self> {
         let f = f.as_ref();
@@ -213,10 +181,6 @@ impl XConfig {
 }
 
 impl Config {
-    pub fn cargo_config(&self) -> &CargoConfig {
-        &self.cargo
-    }
-
     pub fn system_tests(&self) -> &HashMap<String, Package> {
         &self.system_tests
     }
@@ -238,10 +202,7 @@ impl Config {
     }
 
     pub fn tools(&self) -> Vec<(String, CargoInstallation)> {
-        let mut tools = vec![("grcov".to_owned(), self.grcov().installer.to_owned())];
-        if let Some(sccache) = &self.cargo_config().sccache {
-            tools.push(("sccache".to_owned(), sccache.installer.to_owned()));
-        }
+        let tools = vec![("grcov".to_owned(), self.grcov().installer.to_owned())];
         tools
     }
 
