@@ -383,6 +383,8 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
                     Ok(res) => {
                         let version = res.inner().version;
                         info!("Node {} @ version {}", node.name(), version);
+                        // ensure a threshold liveness for each node
+                        // we want to guarantee node is making progress without spinning too long
                         if version > 100 {
                             info!("Node {} healthy @ version {} > 100", node.name(), version);
                             return Ok(());
