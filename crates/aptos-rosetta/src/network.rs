@@ -8,10 +8,12 @@ use crate::{
         Allow, BlockIdentifier, MetadataRequest, NetworkListResponse, NetworkOptionsResponse,
         NetworkRequest, NetworkStatusResponse, OperationStatusType, OperationType, Peer, Version,
     },
-    RosettaContext, MIDDLEWARE_VERSION, NODE_VERSION, ROSETTA_VERSION,
+    RosettaContext, NODE_VERSION, ROSETTA_VERSION,
 };
 use aptos_logger::{debug, trace};
 use warp::Filter;
+
+shadow_rs::shadow!(build);
 
 pub fn list_route(
     server_context: RosettaContext,
@@ -88,8 +90,7 @@ async fn network_options(
         rosetta_version: ROSETTA_VERSION.to_string(),
         // TODO: Get from node via REST API
         node_version: NODE_VERSION.to_string(),
-        // TODO: Get from the binary directly
-        middleware_version: MIDDLEWARE_VERSION.to_string(),
+        middleware_version: build::PKG_VERSION.to_string(),
     };
 
     let operation_statuses = OperationStatusType::all()

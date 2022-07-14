@@ -12,6 +12,7 @@ use crate::{
 use aptos_logger::{debug, trace};
 use aptos_rest_client::aptos_api_types::{BlockInfo, HashValue};
 use std::{
+    cmp::Ordering,
     collections::BTreeMap,
     sync::{Arc, RwLock},
 };
@@ -47,7 +48,7 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
 
     // Retrieve by block or by hash, both or neither is not allowed
     let block_index =
-        get_block_index_from_request(&server_context, Some(request.block_identifier)).await?;
+        get_block_index_from_request(&server_context, request.block_identifier).await?;
 
     let (parent_transaction, block_info, transactions) = get_block_by_index(
         server_context.block_cache()?.as_ref(),
@@ -136,6 +137,7 @@ async fn get_block_by_index(
     }
 }
 
+/// A cache of [`BlockInfo`] to allow us to keep track of the block boundaries
 #[derive(Debug)]
 pub struct BlockCache {
     blocks: RwLock<BTreeMap<u64, BlockInfo>>,
@@ -150,53 +152,109 @@ impl BlockCache {
         let mut hashes = BTreeMap::new();
         let mut versions = BTreeMap::new();
         // Genesis is always index 0
-        // TODO: Ensure that this won't fail if it's been pruned
-        let genesis_block_info = rest_client.get_block_info(0).await?.into_inner();
-        let hash = genesis_block_info.block_hash;
+        let genesis_block_info = BlockInfo {
+            block_height: 0,
+            block_hash: aptos_crypto::HashValue::zero().into(),
+            block_timestamp: 0,
+            start_version: 0,
+            end_version: 0,
+            num_transactions: 1,
+        };
         blocks.insert(0, genesis_block_info);
-        hashes.insert(hash, 0);
+        hashes.insert(genesis_block_info.block_hash, 0);
         versions.insert(0, 0);
 
-        Ok(BlockCache {
+        // Now insert the first and last blocks
+        let state = rest_client.get_ledger_information().await?.into_inner();
+        let block_cache = BlockCache {
             blocks: RwLock::new(blocks),
             hashes: RwLock::new(hashes),
             versions: RwLock::new(versions),
             rest_client,
-        })
+        };
+        if let Some(oldest_ledger_version) = state.oldest_ledger_version {
+            block_cache.add_block(oldest_ledger_version).await?;
+        }
+        block_cache.add_block(state.version).await?;
+
+        Ok(block_cache)
     }
 
     /// Retrieve the block info for the index
-    ///
-    /// TODO: Improve parallelism and performance
     pub async fn get_block_info(&self, block_index: u64) -> ApiResult<BlockInfo> {
         // If we already have the block info, let's roll with it
-        let (closest_known_block, closest_block_info): (u64, BlockInfo) = {
+        let (start_version, range, traverse_right) = {
             let map = self.blocks.read().unwrap();
             if let Some(block_info) = map.get(&block_index) {
                 return Ok(*block_info);
             }
 
-            // There will always be an index less than the index, since it starts with 0 set
-            let (index, block_info) = map.iter().rev().find(|(i, _)| **i < block_index).unwrap();
-            (*index, *block_info)
+            // Find the closest, left or right, and build up blocks from there
+            // Search from right to left because we're less likely to search far into the past
+            let mut search_left = None;
+            let mut search_right = None;
+            for (i, info) in map.iter().rev() {
+                let i = *i;
+                match i.cmp(&block_index) {
+                    Ordering::Less => {
+                        let start_version = info.end_version.saturating_add(1);
+                        let block_range = i.saturating_add(1)..=block_index;
+                        let distance = block_index.saturating_sub(i);
+                        search_left = Some((start_version, block_range, distance));
+                        // We've passed our block_index so we can stop now
+                        break;
+                    }
+                    Ordering::Greater => {
+                        let start_version = info.start_version.saturating_sub(1);
+                        let block_range = block_index..=(i.saturating_sub(1));
+                        let distance = i.saturating_sub(block_index);
+                        search_right = Some((start_version, block_range, distance));
+                    }
+                    Ordering::Equal => {}
+                }
+            }
+
+            // Choose the shortest distance and search in that direction
+            match (search_left, search_right) {
+                (Some((left_version, left_range, _)), None) => (left_version, left_range, true),
+                (None, Some((right_version, right_range, _))) => {
+                    (right_version, right_range, false)
+                }
+                (
+                    Some((left_version, left_range, left_distance)),
+                    Some((right_version, right_range, right_distance)),
+                ) => {
+                    if left_distance < right_distance {
+                        (left_version, left_range, true)
+                    } else {
+                        (right_version, right_range, false)
+                    }
+                }
+                // This shouldn't happen as the first thing we do when we initialize the cache
+                // is put the first and last blocks into it
+                _ => unreachable!("There should always be a block in the cache!"),
+            }
         };
 
         // Go through the blocks, and add them into the cache
-        let mut running_version = closest_block_info.end_version + 1;
-        for i in (closest_known_block + 1)..=block_index {
+        let mut running_version = start_version;
+        for _ in range {
             let info = self.add_block(running_version).await?;
 
             // Increment to the next block
-            running_version = info.end_version + 1;
-
-            // If it's the end condition, let's return the info
-            if i == block_index {
-                return Ok(info);
+            if traverse_right {
+                running_version = info.end_version.saturating_add(1);
+            } else {
+                running_version = info.start_version.saturating_sub(1);
             }
         }
 
-        // If for some reason the block doesn't get found, retry with block incomplete
-        Err(ApiError::BlockIncomplete)
+        if let Some(info) = self.blocks.read().unwrap().get(&block_index) {
+            Ok(*info)
+        } else {
+            // If for some reason the block doesn't get found, retry with block incomplete
+            Err(ApiError::BlockIncomplete)
+        }
     }
 
     /// Retrieve block info, and add it to the index
@@ -220,24 +278,16 @@ impl BlockCache {
         // Write version to index mapping
         {
             let mut map = self.versions.write().unwrap();
-            map.insert(block_version, info.block_height);
+            // The only versions that will be used are the start and end versions of a block
+            // As those are the only versions that will be returned by ledger info
+            map.insert(info.start_version, info.block_height);
+            map.insert(info.end_version, info.block_height);
         }
         Ok(info)
     }
 
     /// Retrieve the block index for the version
-    ///
-    /// TODO: Improve parallelism and performance
-    pub async fn get_block_index_by_version(&self, version: u64) -> ApiResult<u64> {
-        // If we already have the version, let's roll with it
-        if let Some(index) = self.versions.read().unwrap().get(&version) {
-            return Ok(*index);
-        }
-
-        // Lookup block info by version
-        Ok(self.add_block(version).await?.block_height)
-    }
-
+    /// TODO: We can search through the versions to find the closest version
     pub async fn get_block_info_by_version(&self, version: u64) -> ApiResult<BlockInfo> {
         // If we already have the version, let's roll with it
         let maybe_index = { self.versions.read().unwrap().get(&version).copied() };

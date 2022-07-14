@@ -34,7 +34,6 @@ pub mod common;
 pub mod error;
 pub mod types;
 
-pub const MIDDLEWARE_VERSION: &str = "1.0.0";
 pub const NODE_VERSION: &str = "0.1";
 pub const ROSETTA_VERSION: &str = "1.4.12";
 
@@ -143,7 +142,6 @@ pub fn routes(
         )
         .with(aptos_api::log::logger())
         .recover(handle_rejection)
-    // TODO metrics?
 }
 
 /// Handle error codes from warp

@@ -1,5 +1,5 @@
-import { Buffer } from 'buffer/'; // the trailing slash is important!
-import { Types } from './types';
+import { Buffer } from "buffer/"; // the trailing slash is important!
+import { Types } from "./types";
 
 // eslint-disable-next-line no-use-before-define
 export type MaybeHexString = HexString | string | Types.HexEncodedBytes;
@@ -18,7 +18,7 @@ export class HexString {
    * @returns New HexString
    */
   static fromBuffer(buffer: Buffer): HexString {
-    return new HexString(buffer.toString('hex'));
+    return new HexString(buffer.toString("hex"));
   }
 
   /**
@@ -43,7 +43,7 @@ export class HexString {
    * ```
    */
   static ensure(hexString: MaybeHexString): HexString {
-    if (typeof hexString === 'string') {
+    if (typeof hexString === "string") {
       return new HexString(hexString);
     }
     return hexString;
@@ -60,7 +60,7 @@ export class HexString {
    * ```
    */
   constructor(hexString: string | Types.HexEncodedBytes) {
-    if (hexString.startsWith('0x')) {
+    if (hexString.startsWith("0x")) {
       this.hexString = hexString;
     } else {
       this.hexString = `0x${hexString}`;
@@ -105,7 +105,7 @@ export class HexString {
    * ```
    */
   toShortString(): string {
-    const trimmed = this.hexString.replace(/^0x0*/, '');
+    const trimmed = this.hexString.replace(/^0x0*/, "");
     return `0x${trimmed}`;
   }
 
@@ -114,7 +114,7 @@ export class HexString {
    * @returns Buffer from inner hexString without prefix
    */
   toBuffer(): Buffer {
-    return Buffer.from(this.noPrefix(), 'hex');
+    return Buffer.from(this.noPrefix(), "hex");
   }
 
   /**

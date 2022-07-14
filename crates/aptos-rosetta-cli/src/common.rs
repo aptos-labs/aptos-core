@@ -95,15 +95,13 @@ pub struct BlockArgs {
 
 impl From<BlockArgs> for Option<PartialBlockIdentifier> {
     fn from(args: BlockArgs) -> Self {
-        Some(args.into())
-    }
-}
-
-impl From<BlockArgs> for PartialBlockIdentifier {
-    fn from(args: BlockArgs) -> Self {
-        PartialBlockIdentifier {
-            index: args.block_index,
-            hash: args.block_hash,
+        if args.block_index.is_none() && args.block_hash.is_none() {
+            None
+        } else {
+            Some(PartialBlockIdentifier {
+                index: args.block_index,
+                hash: args.block_hash,
+            })
         }
     }
 }

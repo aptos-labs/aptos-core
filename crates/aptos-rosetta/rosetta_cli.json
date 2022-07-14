@@ -29,7 +29,7 @@
         "rebroadcast_all": false,
         "constructor_dsl_file": "aptos.ros",
         "status_port": 9090,
-        "force_retry": true,
+        "force_retry": false,
         "end_conditions": {
             "create_account": 10,
             "transfer": 20

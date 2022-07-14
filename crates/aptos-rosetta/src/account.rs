@@ -154,7 +154,6 @@ async fn get_balances(
     address: AccountAddress,
     version: u64,
 ) -> ApiResult<HashMap<TypeTag, Balance>> {
-    // TODO: Handle non not found errors
     if let Ok(response) = rest_client
         .get_account_resources_at_version(address, version)
         .await

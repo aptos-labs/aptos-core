@@ -47,11 +47,12 @@ pub struct BlockRequest {
     /// Network identifier describing the blockchain and the chain id
     pub network_identifier: NetworkIdentifier,
     /// A set of search parameters (latest, by hash, or by index)
-    pub block_identifier: PartialBlockIdentifier,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub block_identifier: Option<PartialBlockIdentifier>,
 }
 
 impl BlockRequest {
-    fn new(chain_id: ChainId, block_identifier: PartialBlockIdentifier) -> Self {
+    fn new(chain_id: ChainId, block_identifier: Option<PartialBlockIdentifier>) -> Self {
         Self {
             network_identifier: chain_id.into(),
             block_identifier,
@@ -59,15 +60,15 @@ impl BlockRequest {
     }
 
     pub fn latest(chain_id: ChainId) -> Self {
-        Self::new(chain_id, PartialBlockIdentifier::latest())
+        Self::new(chain_id, None)
     }
 
     pub fn by_hash(chain_id: ChainId, hash: String) -> Self {
-        Self::new(chain_id, PartialBlockIdentifier::by_hash(hash))
+        Self::new(chain_id, Some(PartialBlockIdentifier::by_hash(hash)))
     }
 
     pub fn by_version(chain_id: ChainId, version: u64) -> Self {
-        Self::new(chain_id, PartialBlockIdentifier::by_version(version))
+        Self::new(chain_id, Some(PartialBlockIdentifier::by_version(version)))
     }
 }
 
@@ -77,6 +78,7 @@ impl BlockRequest {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockResponse {
     /// The block requested.  This should always be populated for a given valid version
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub block: Option<Block>,
     /// Transactions that weren't included in the block
     #[serde(skip_serializing_if = "Option::is_none")]

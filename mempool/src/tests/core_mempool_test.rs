@@ -554,7 +554,6 @@ fn test_gc_ready_transaction() {
     let txn = TestTransaction::new(1, 1, 1).make_signed_transaction_with_expiration_time(0);
     pool.add_txn(
         txn,
-        0,
         1,
         AccountSequenceInfo::Sequential(0),
         TimelineState::NotReady,
@@ -592,7 +591,6 @@ fn test_clean_stuck_transactions() {
     let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
     pool.add_txn(
         txn,
-        0,
         1,
         AccountSequenceInfo::Sequential(db_sequence_number),
         TimelineState::NotReady,
@@ -633,7 +631,6 @@ fn test_get_transaction_by_hash() {
     let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
     pool.add_txn(
         txn.clone(),
-        0,
         1,
         AccountSequenceInfo::Sequential(db_sequence_number),
         TimelineState::NotReady,
@@ -653,7 +650,6 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
     let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
     pool.add_txn(
         txn.clone(),
-        0,
         1,
         AccountSequenceInfo::Sequential(db_sequence_number),
         TimelineState::NotReady,
@@ -664,7 +660,6 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
     let new_txn = TestTransaction::new(0, db_sequence_number, 100).make_signed_transaction();
     pool.add_txn(
         new_txn.clone(),
-        0,
         1,
         AccountSequenceInfo::Sequential(db_sequence_number),
         TimelineState::NotReady,

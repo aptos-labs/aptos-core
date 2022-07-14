@@ -3,8 +3,8 @@
 
 use aptos_metrics_core::{
     op_counters::DurationHistogram, register_histogram, register_histogram_vec,
-    register_int_counter, register_int_counter_vec, register_int_gauge, Histogram, HistogramVec,
-    IntCounter, IntCounterVec, IntGauge,
+    register_int_counter, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
+    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -81,37 +81,40 @@ pub static VOTE_NIL_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Committed proposals from this validator when using LeaderReputation as the ProposerElection
-pub static COMMITTED_PROPOSALS_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+/// Committed proposals map when using LeaderReputation as the ProposerElection
+pub static COMMITTED_PROPOSALS_IN_WINDOW: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
         "aptos_committed_proposals_in_window",
-        "Total number of this validator's committed proposals in the current reputation window"
+        "Total number committed proposals in the current reputation window",
+        &["address"]
     )
     .unwrap()
 });
 
-/// Failed proposals from this validator when using LeaderReputation as the ProposerElection
-pub static FAILED_PROPOSALS_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+/// Failed proposals map when using LeaderReputation as the ProposerElection
+pub static FAILED_PROPOSALS_IN_WINDOW: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
         "aptos_failed_proposals_in_window",
-        "Total number of this validator's failed proposals in the current reputation window"
+        "Total number of failed proposals in the current reputation window",
+        &["address"]
     )
     .unwrap()
 });
 
-/// Committed votes from this validator when using LeaderReputation as the ProposerElection
-pub static COMMITTED_VOTES_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+/// Committed votes map when using LeaderReputation as the ProposerElection
+pub static COMMITTED_VOTES_IN_WINDOW: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
         "aptos_committed_votes_in_window",
-        "Total number of this validator's committed votes in the current reputation window"
+        "Total number of committed votes in the current reputation window",
+        &["address"]
     )
     .unwrap()
 });
 
 /// The number of block events the LeaderReputation uses
-pub static LEADER_REPUTATION_HISTORY_SIZE: Lazy<IntGauge> = Lazy::new(|| {
+pub static LEADER_REPUTATION_ROUND_HISTORY_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "aptos_leader_reputation_history_size",
+        "aptos_leader_reputation_round_history_size",
         "Total number of new block events in the current reputation window"
     )
     .unwrap()

@@ -14,6 +14,8 @@ pub type ApiResult<T> = Result<T, ApiError>;
 pub enum ApiError {
     #[error("Aptos error")]
     AptosError(Option<String>),
+    #[error("Retriable aptos error")]
+    RetriableAptosError(Option<String>),
     #[error("Must provide either hash or index but not both")]
     BlockParameterConflict,
     #[error("Transaction is pending")]
@@ -55,6 +57,7 @@ impl ApiError {
         use ApiError::*;
         vec![
             AptosError(None),
+            RetriableAptosError(None),
             TransactionIsPending,
             DeserializationFailed(None),
             InvalidTransferOperations(None),
@@ -96,13 +99,16 @@ impl ApiError {
             UnsupportedCurrency(_) => 16,
             UnsupportedSignatureCount(_) => 17,
             TransactionParseError(_) => 18,
+            RetriableAptosError(_) => 19,
         }
     }
 
     pub fn retriable(&self) -> bool {
         matches!(
             self,
-            ApiError::AccountNotFound(_) | ApiError::BlockIncomplete
+            ApiError::AccountNotFound(_)
+                | ApiError::BlockIncomplete
+                | ApiError::RetriableAptosError(_)
         )
     }
 
@@ -112,6 +118,8 @@ impl ApiError {
             AccountNotFound(_) => StatusCode::NOT_FOUND,
             BlockIncomplete => StatusCode::PRECONDITION_FAILED,
             NodeIsOffline => StatusCode::METHOD_NOT_ALLOWED,
+            // TODO: Improve the error codes for these
+            RetriableAptosError(_) => StatusCode::SERVICE_UNAVAILABLE,
             _ => StatusCode::BAD_REQUEST,
         }
     }
@@ -135,6 +143,7 @@ impl From<&ApiError> for types::Error {
     fn from(error: &ApiError) -> Self {
         let details = match error {
             ApiError::AptosError(details) => details.clone(),
+            ApiError::RetriableAptosError(details) => details.clone(),
             ApiError::DeserializationFailed(details) => details.clone(),
             ApiError::InvalidTransferOperations(details) => details.map(|inner| inner.to_string()),
             ApiError::AccountNotFound(details) => details.clone(),
@@ -169,6 +178,16 @@ impl From<FromHexError> for ApiError {
 impl From<bcs::Error> for ApiError {
     fn from(err: bcs::Error) -> Self {
         ApiError::DeserializationFailed(Some(err.to_string()))
+    }
+}
+
+impl From<aptos_rest_client::error::Error> for ApiError {
+    fn from(err: aptos_rest_client::error::Error) -> Self {
+        if err.is_retriable() {
+            ApiError::RetriableAptosError(Some(err.to_string()))
+        } else {
+            ApiError::AptosError(Some(err.to_string()))
+        }
     }
 }
 

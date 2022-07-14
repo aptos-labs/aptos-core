@@ -1,9 +1,9 @@
 /* eslint-disable no-console */
-import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes, TransactionBuilderMultiEd25519 } from 'aptos';
-import assert from 'assert';
+import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes, TransactionBuilderMultiEd25519 } from "aptos";
+import assert from "assert";
 
-const NODE_URL = process.env.APTOS_NODE_URL || 'https://fullnode.devnet.aptoslabs.com';
-const FAUCET_URL = process.env.APTOS_FAUCET_URL || 'https://faucet.devnet.aptoslabs.com';
+const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
+const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
 
 type SigningMessage = TxnBuilderTypes.SigningMessage;
 
@@ -42,7 +42,7 @@ type SigningMessage = TxnBuilderTypes.SigningMessage;
   await faucetClient.fundAccount(mutisigAccountAddress, 5000);
 
   let resources = await client.getAccountResources(mutisigAccountAddress);
-  let accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
+  let accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
   let balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 5000);
   console.log(`multisig account coins: ${balance}. Should be 5000!`);
@@ -51,21 +51,21 @@ type SigningMessage = TxnBuilderTypes.SigningMessage;
   // Creates a receiver account and fund the account with 0 TestCoin
   await faucetClient.fundAccount(account4.address(), 0);
   resources = await client.getAccountResources(account4.address());
-  accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
+  accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 0);
   console.log(`multisig account coins: ${balance}. Should be 0!`);
 
-  const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString('0x1::TestCoin::TestCoin'));
+  const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::TestCoin::TestCoin"));
 
   // TS SDK support 3 types of transaction payloads: `ScriptFunction`, `Script` and `Module`.
   // See https://aptos-labs.github.io/ts-sdk-doc/ for the details.
   const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
     TxnBuilderTypes.ScriptFunction.natural(
       // Fully qualified module name, `AccountAddress::ModuleName`
-      '0x1::Coin',
+      "0x1::Coin",
       // Module function
-      'transfer',
+      "transfer",
       // The coin type to transfer
       [token],
       // Arguments for function `transfer`: receiver account address and amount to transfer
@@ -121,7 +121,7 @@ type SigningMessage = TxnBuilderTypes.SigningMessage;
   await client.waitForTransaction(transactionRes.hash);
 
   resources = await client.getAccountResources(account4.address());
-  accountResource = resources.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>');
+  accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 123);
   console.log(`multisig account coins: ${balance}. Should be 123!`);
