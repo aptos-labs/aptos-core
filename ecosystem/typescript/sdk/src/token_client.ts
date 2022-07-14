@@ -2,6 +2,7 @@ import { AptosAccount } from './aptos_account';
 import { AptosClient } from './aptos_client';
 import { Types } from './types';
 import { HexString, MaybeHexString } from './hex_string';
+import { TxnBuilderTypes, BCS } from './transaction_builder';
 
 /**
  * Class for creating, minting and managing minting NFT collections and tokens
@@ -17,20 +18,15 @@ export class TokenClient {
     this.aptosClient = aptosClient;
   }
 
-  /**
-   * Brings together methods for generating, signing and submitting transaction
-   * @param account AptosAccount which will sign a transaction
-   * @param payload Transaction payload. It depends on transaction type you want to send
-   * @returns Promise that resolves to transaction hash
-   */
-  async submitTransactionHelper(account: AptosAccount, payload: Types.TransactionPayload) {
-    const txnRequest = await this.aptosClient.generateTransaction(account.address(), payload, {
-      max_gas_amount: '4000',
-    });
-    const signedTxn = await this.aptosClient.signTransaction(account, txnRequest);
-    const res = await this.aptosClient.submitTransaction(signedTxn);
-    await this.aptosClient.waitForTransaction(res.hash);
-    return Promise.resolve(res.hash);
+  private async submitTransactionHelper(
+    account: AptosAccount,
+    rawTxn: TxnBuilderTypes.RawTransaction,
+  ): Promise<string> {
+    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
+    const transactionRes = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+
+    await this.aptosClient.waitForTransaction(transactionRes.hash);
+    return transactionRes.hash;
   }
 
   /**
@@ -47,18 +43,31 @@ export class TokenClient {
     description: string,
     uri: string,
   ): Promise<Types.HexEncodedBytes> {
-    const payload: Types.TransactionPayload = {
-      type: 'script_function_payload',
-      function: '0x1::Token::create_unlimited_collection_script',
-      type_arguments: [],
-      arguments: [
-        Buffer.from(name).toString('hex'),
-        Buffer.from(description).toString('hex'),
-        Buffer.from(uri).toString('hex'),
-      ],
-    };
-    const transactionHash = await this.submitTransactionHelper(account, payload);
-    return transactionHash;
+    const payload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+      TxnBuilderTypes.ScriptFunction.natural(
+        '0x1::Token',
+        'create_unlimited_collection_script',
+        [],
+        [BCS.bcsSerializeStr(name), BCS.bcsSerializeStr(description), BCS.bcsSerializeStr(uri)],
+      ),
+    );
+
+    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
+      this.aptosClient.getAccount(account.address()),
+      this.aptosClient.getChainId(),
+    ]);
+
+    const rawTxn = new TxnBuilderTypes.RawTransaction(
+      TxnBuilderTypes.AccountAddress.fromHex(account.address()),
+      BigInt(sequnceNumber),
+      payload,
+      1000n,
+      1n,
+      BigInt(Math.floor(Date.now() / 1000) + 10),
+      new TxnBuilderTypes.ChainId(chainId),
+    );
+
+    return this.submitTransactionHelper(account, rawTxn);
   }
 
   /**
@@ -81,22 +90,43 @@ export class TokenClient {
     uri: string,
     royalty_points_per_million: number,
   ): Promise<Types.HexEncodedBytes> {
-    const payload: Types.TransactionPayload = {
-      type: 'script_function_payload',
-      function: '0x1::Token::create_unlimited_token_script',
-      type_arguments: [],
-      arguments: [
-        Buffer.from(collectionName).toString('hex'),
-        Buffer.from(name).toString('hex'),
-        Buffer.from(description).toString('hex'),
-        true,
-        supply.toString(),
-        Buffer.from(uri).toString('hex'),
-        royalty_points_per_million.toString(),
-      ],
-    };
-    const transactionHash = await this.submitTransactionHelper(account, payload);
-    return transactionHash;
+    const payload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+      TxnBuilderTypes.ScriptFunction.natural(
+        '0x1::Token',
+        'create_unlimited_token_script',
+        [],
+        [
+          BCS.bcsSerializeStr(collectionName),
+          BCS.bcsSerializeStr(name),
+          BCS.bcsSerializeStr(description),
+          BCS.bcsSerializeBool(true),
+          BCS.bcsSerializeUint64(supply),
+          BCS.bcsSerializeStr(uri),
+          BCS.bcsSerializeUint64(royalty_points_per_million),
+        ],
+      ),
+    );
+
+    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
+      this.aptosClient.getAccount(account.address()),
+      this.aptosClient.getChainId(),
+    ]);
+
+    const rawTxn = new TxnBuilderTypes.RawTransaction(
+      TxnBuilderTypes.AccountAddress.fromHex(account.address()),
+      BigInt(sequnceNumber),
+      payload,
+      1000n,
+      1n,
+      BigInt(Math.floor(Date.now() / 1000) + 10),
+      new TxnBuilderTypes.ChainId(chainId),
+    );
+
+    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
+    const transactionRes = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+
+    await this.aptosClient.waitForTransaction(transactionRes.hash);
+    return transactionRes.hash;
   }
 
   /**
@@ -117,20 +147,37 @@ export class TokenClient {
     name: string,
     amount: number,
   ): Promise<Types.HexEncodedBytes> {
-    const payload: Types.TransactionPayload = {
-      type: 'script_function_payload',
-      function: '0x1::TokenTransfers::offer_script',
-      type_arguments: [],
-      arguments: [
-        receiver,
-        creator,
-        Buffer.from(collectionName).toString('hex'),
-        Buffer.from(name).toString('hex'),
-        amount.toString(),
-      ],
-    };
-    const transactionHash = await this.submitTransactionHelper(account, payload);
-    return transactionHash;
+    const payload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+      TxnBuilderTypes.ScriptFunction.natural(
+        '0x1::TokenTransfers',
+        'offer_script',
+        [],
+        [
+          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(receiver)),
+          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(creator)),
+          BCS.bcsSerializeStr(collectionName),
+          BCS.bcsSerializeStr(name),
+          BCS.bcsSerializeUint64(amount),
+        ],
+      ),
+    );
+
+    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
+      this.aptosClient.getAccount(account.address()),
+      this.aptosClient.getChainId(),
+    ]);
+
+    const rawTxn = new TxnBuilderTypes.RawTransaction(
+      TxnBuilderTypes.AccountAddress.fromHex(account.address()),
+      BigInt(sequnceNumber),
+      payload,
+      1000n,
+      1n,
+      BigInt(Math.floor(Date.now() / 1000) + 10),
+      new TxnBuilderTypes.ChainId(chainId),
+    );
+
+    return this.submitTransactionHelper(account, rawTxn);
   }
 
   /**
@@ -149,14 +196,36 @@ export class TokenClient {
     collectionName: string,
     name: string,
   ): Promise<Types.HexEncodedBytes> {
-    const payload: Types.TransactionPayload = {
-      type: 'script_function_payload',
-      function: '0x1::TokenTransfers::claim_script',
-      type_arguments: [],
-      arguments: [sender, creator, Buffer.from(collectionName).toString('hex'), Buffer.from(name).toString('hex')],
-    };
-    const transactionHash = await this.submitTransactionHelper(account, payload);
-    return transactionHash;
+    const payload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+      TxnBuilderTypes.ScriptFunction.natural(
+        '0x1::TokenTransfers',
+        'claim_script',
+        [],
+        [
+          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(sender)),
+          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(creator)),
+          BCS.bcsSerializeStr(collectionName),
+          BCS.bcsSerializeStr(name),
+        ],
+      ),
+    );
+
+    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
+      this.aptosClient.getAccount(account.address()),
+      this.aptosClient.getChainId(),
+    ]);
+
+    const rawTxn = new TxnBuilderTypes.RawTransaction(
+      TxnBuilderTypes.AccountAddress.fromHex(account.address()),
+      BigInt(sequnceNumber),
+      payload,
+      1000n,
+      1n,
+      BigInt(Math.floor(Date.now() / 1000) + 10),
+      new TxnBuilderTypes.ChainId(chainId),
+    );
+
+    return this.submitTransactionHelper(account, rawTxn);
   }
 
   /**
@@ -175,14 +244,36 @@ export class TokenClient {
     collectionName: string,
     name: string,
   ): Promise<Types.HexEncodedBytes> {
-    const payload: Types.TransactionPayload = {
-      type: 'script_function_payload',
-      function: '0x1::TokenTransfers::cancel_offer_script',
-      type_arguments: [],
-      arguments: [receiver, creator, Buffer.from(collectionName).toString('hex'), Buffer.from(name).toString('hex')],
-    };
-    const transactionHash = await this.submitTransactionHelper(account, payload);
-    return transactionHash;
+    const payload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+      TxnBuilderTypes.ScriptFunction.natural(
+        '0x1::TokenTransfers',
+        'cancel_offer_script',
+        [],
+        [
+          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(receiver)),
+          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(creator)),
+          BCS.bcsSerializeStr(collectionName),
+          BCS.bcsSerializeStr(name),
+        ],
+      ),
+    );
+
+    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
+      this.aptosClient.getAccount(account.address()),
+      this.aptosClient.getChainId(),
+    ]);
+
+    const rawTxn = new TxnBuilderTypes.RawTransaction(
+      TxnBuilderTypes.AccountAddress.fromHex(account.address()),
+      BigInt(sequnceNumber),
+      payload,
+      1000n,
+      1n,
+      BigInt(Math.floor(Date.now() / 1000) + 10),
+      new TxnBuilderTypes.ChainId(chainId),
+    );
+
+    return this.submitTransactionHelper(account, rawTxn);
   }
 
   /**
