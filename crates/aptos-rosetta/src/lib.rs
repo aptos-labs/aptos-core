@@ -15,7 +15,10 @@ use aptos_api::runtime::WebServer;
 use aptos_config::config::ApiConfig;
 use aptos_logger::debug;
 use aptos_rest_client::aptos_api_types::Error;
+use aptos_types::account_address::AccountAddress;
 use aptos_types::chain_id::ChainId;
+use futures::lock::Mutex;
+use std::collections::BTreeMap;
 use std::{convert::Infallible, sync::Arc};
 use tokio::task::JoinHandle;
 use warp::{
@@ -48,6 +51,7 @@ pub struct RosettaContext {
     pub coin_cache: Arc<CoinCache>,
     /// Block index cache
     pub block_cache: Option<Arc<BlockCache>>,
+    pub accounts: Arc<Mutex<BTreeMap<AccountAddress, u64>>>,
 }
 
 impl RosettaContext {
@@ -110,6 +114,7 @@ pub async fn bootstrap_async(
             chain_id,
             coin_cache: Arc::new(CoinCache::new()),
             block_cache,
+            accounts: Arc::new(Mutex::new(BTreeMap::new())),
         };
         api.serve(routes(context)).await;
     });

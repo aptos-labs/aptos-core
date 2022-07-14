@@ -246,9 +246,26 @@ async fn construction_metadata(
         return Err(ApiError::ChainIdMismatch);
     }
 
+    let sequence_number = {
+        let response_account = response.inner();
+        let mut accounts = server_context.accounts.lock().await;
+        if let Some(stored_sequence_number) = accounts.get_mut(&address) {
+            // If we missed a sequence number update, we should update
+            if response_account.sequence_number > *stored_sequence_number {
+                *stored_sequence_number = response_account.sequence_number;
+            }
+            let seq_num = *stored_sequence_number;
+            *stored_sequence_number += 1;
+            seq_num
+        } else {
+            accounts.insert(address, response_account.sequence_number + 1);
+            response_account.sequence_number
+        }
+    };
+
     Ok(ConstructionMetadataResponse {
         metadata: ConstructionMetadata {
-            sequence_number: response.inner().sequence_number,
+            sequence_number,
             max_gas: request.options.max_gas,
             gas_price_per_unit: request.options.gas_price_per_unit,
         },
