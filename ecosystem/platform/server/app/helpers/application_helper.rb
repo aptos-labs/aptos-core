@@ -12,8 +12,4 @@ module ApplicationHelper
       [attr, SORT_ORDER[sort_sign]]
     end
   end
-
-  def cached_page?
-    !!response.cache_control[:public]
-  end
 end
