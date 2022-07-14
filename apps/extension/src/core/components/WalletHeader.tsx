@@ -7,13 +7,13 @@ import {
   Grid,
   HStack,
   Text,
-  Tooltip,
-  useClipboard,
   useColorMode,
 } from '@chakra-ui/react';
 import React from 'react';
 import useWalletState from 'core/hooks/useWalletState';
 import { ChevronLeftIcon } from '@chakra-ui/icons';
+import Copyable from 'core/components/Copyable';
+import { collapseHexString } from 'core/utils/hex';
 import ChakraLink from './ChakraLink';
 
 const secondaryHeaderBgColor = {
@@ -21,7 +21,7 @@ const secondaryHeaderBgColor = {
   light: 'gray.200',
 };
 
-export const seconaryAddressFontColor = {
+export const secondaryAddressFontColor = {
   dark: 'gray.400',
   light: 'gray.500',
 };
@@ -35,9 +35,6 @@ export default function WalletHeader({
 }: WalletHeaderProps) {
   const { aptosAccount } = useWalletState();
   const { colorMode } = useColorMode();
-  const { hasCopied, onCopy } = useClipboard(
-    aptosAccount?.address().hex() || '',
-  );
 
   return (
     <Grid
@@ -59,11 +56,11 @@ export default function WalletHeader({
         <HStack px={2}>
           <Text
             fontSize="xs"
-            color={seconaryAddressFontColor[colorMode]}
+            color={secondaryAddressFontColor[colorMode]}
           >
             Address
           </Text>
-          <Tooltip label={hasCopied ? 'Copied!' : 'Copy address'} closeDelay={300}>
+          <Copyable value={aptosAccount!.address()}>
             <Text whiteSpace="nowrap" as="span">
               <Text
                 fontSize="xs"
@@ -73,13 +70,11 @@ export default function WalletHeader({
                 display="block"
                 noOfLines={1}
                 maxW={['100px', '120px']}
-                cursor="pointer"
-                onClick={onCopy}
               >
-                {aptosAccount?.address().hex()}
+                { collapseHexString(aptosAccount!.address(), 12) }
               </Text>
             </Text>
-          </Tooltip>
+          </Copyable>
         </HStack>
       </Center>
       <Box />

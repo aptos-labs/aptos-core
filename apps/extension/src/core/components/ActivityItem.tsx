@@ -3,12 +3,14 @@
 
 import React from 'react';
 import {
-  Circle, HStack, Text, Tooltip, useClipboard, useColorMode, VStack,
+  Circle, HStack, Text, Tooltip, useColorMode, VStack,
 } from '@chakra-ui/react';
 import { HiDownload } from '@react-icons/all-files/hi/HiDownload';
 import { BsArrowUpRight } from '@react-icons/all-files/bs/BsArrowUpRight';
 import { UserTransaction } from 'aptos/src/api/data-contracts';
 import { ScriptFunctionPayload } from 'aptos/dist/api/data-contracts';
+import Copyable from 'core/components/Copyable';
+import { collapseHexString } from 'core/utils/hex';
 
 /**
  * Convert a timestamp into a relative time short string. If the time difference
@@ -72,7 +74,6 @@ export function ActivityItem({ isSent, transaction }: ActivityItemProps) {
   const [recipient, amount]: string[] = typedPayload.arguments;
 
   const otherAddress = isSent ? recipient : transaction.sender;
-  const collapsedAddress = `${otherAddress.slice(0, 5)}..${otherAddress.slice(-4)}`;
 
   const coinName = typedPayload.type_arguments[0].split('::').pop();
 
@@ -89,18 +90,13 @@ export function ActivityItem({ isSent, transaction }: ActivityItemProps) {
     minute: 'numeric',
   });
 
-  const {
-    hasCopied: hasCopiedAddress,
-    onCopy: copyAddress,
-  } = useClipboard(otherAddress);
-
   return (
     <HStack
-      w="100%"
       spacing={4}
       padding={3}
       paddingLeft={4}
       paddingRight={4}
+      cursor="pointer"
       color={secondaryTextColor[colorMode]}
       bgColor={secondaryGridBgColor[colorMode]}
       borderRadius=".5rem"
@@ -115,11 +111,9 @@ export function ActivityItem({ isSent, transaction }: ActivityItemProps) {
         <HStack w="100%" fontSize="sm">
           <Text flexGrow={1}>
             { `${isSent ? 'To' : 'From'} ` }
-            <Tooltip label={hasCopiedAddress ? 'Copied!' : 'Copy address'} closeDelay={500}>
-              <Text cursor="pointer" as="span" onClick={copyAddress}>
-                { collapsedAddress }
-              </Text>
-            </Tooltip>
+            <Copyable prompt="Copy address" value={otherAddress}>
+              { collapseHexString(otherAddress, 8) }
+            </Copyable>
           </Text>
           <Text color={isSent ? 'red.500' : 'green.500'} fontWeight={500}>
             { `${isSent ? '-' : '+'}${amount} ${coinName}` }

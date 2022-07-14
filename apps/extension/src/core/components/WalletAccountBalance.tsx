@@ -5,7 +5,7 @@ import {
   Heading, Text, useColorMode, VStack,
 } from '@chakra-ui/react';
 import React from 'react';
-import { seconaryAddressFontColor } from 'core/components/WalletHeader';
+import { secondaryAddressFontColor } from 'core/components/WalletHeader';
 import { getTestCoinTokenBalanceFromAccountResources, useAccountResources } from 'core/queries/account';
 import numeral from 'numeral';
 
@@ -20,7 +20,7 @@ function WalletAccountBalance() {
 
   return (
     <VStack>
-      <Text fontSize="sm" color={seconaryAddressFontColor[colorMode]}>Account balance</Text>
+      <Text fontSize="sm" color={secondaryAddressFontColor[colorMode]}>Account balance</Text>
       <Heading>{tokenBalanceString}</Heading>
     </VStack>
   );
