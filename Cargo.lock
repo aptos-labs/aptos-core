@@ -82,7 +82,7 @@ dependencies = [
  "aptos-vm",
  "bcs",
  "cached-framework-packages",
- "clap 3.2.10",
+ "clap 3.2.11",
  "datatest-stable",
  "move-deps",
 ]
@@ -161,7 +161,8 @@ dependencies = [
  "base64",
  "bcs",
  "cached-framework-packages",
- "clap 3.2.10",
+ "clap 3.2.11",
+ "clap_complete",
  "executor",
  "framework",
  "hex",
@@ -376,7 +377,7 @@ dependencies = [
  "aptos-sdk",
  "bcs",
  "bytes",
- "clap 3.2.10",
+ "clap 3.2.11",
  "futures",
  "hex",
  "rand 0.7.3",
@@ -404,7 +405,7 @@ dependencies = [
  "aptos-sdk",
  "bcs",
  "bytes",
- "clap 3.2.10",
+ "clap 3.2.11",
  "futures",
  "hex",
  "rand 0.7.3",
@@ -524,7 +525,7 @@ dependencies = [
  "aptos-rest-client",
  "async-trait",
  "chrono",
- "clap 3.2.10",
+ "clap 3.2.11",
  "diesel",
  "diesel_migrations",
  "futures",
@@ -705,7 +706,7 @@ dependencies = [
  "backup-service",
  "bcs",
  "cached-framework-packages",
- "clap 3.2.10",
+ "clap 3.2.11",
  "consensus",
  "consensus-notifications",
  "crash-handler",
@@ -744,7 +745,7 @@ dependencies = [
  "aptos-rest-client",
  "aptos-sdk",
  "async-trait",
- "clap 3.2.10",
+ "clap 3.2.11",
  "const_format",
  "env_logger 0.8.4",
  "futures",
@@ -892,7 +893,7 @@ dependencies = [
  "aptos-types",
  "async-trait",
  "bcs",
- "clap 3.2.10",
+ "clap 3.2.11",
  "framework",
  "futures",
  "hex",
@@ -920,7 +921,7 @@ dependencies = [
  "aptos-logger",
  "aptos-rosetta",
  "aptos-types",
- "clap 3.2.10",
+ "clap 3.2.11",
  "hex",
  "serde 1.0.137",
  "serde_json",
@@ -1875,9 +1876,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.2.10"
+version = "3.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69c5a7f9997be616e47f0577ee38c91decb33392c5be4866494f34cdf329a9aa"
+checksum = "d646c7ade5eb07c4aa20e907a922750df0c448892513714fd3e4acbc7130829f"
 dependencies = [
  "atty",
  "bitflags",
@@ -1888,6 +1889,15 @@ dependencies = [
  "strsim 0.10.0",
  "termcolor",
  "textwrap 0.15.0",
+]
+
+[[package]]
+name = "clap_complete"
+version = "3.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ead064480dfc4880a10764488415a97fdd36a4cf1bb022d372f02e8faf8386e1"
+dependencies = [
+ "clap 3.2.11",
 ]
 
 [[package]]
@@ -3199,7 +3209,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs",
- "clap 3.2.10",
+ "clap 3.2.11",
  "include_dir 0.7.2",
  "log",
  "move-deps",
@@ -4612,7 +4622,7 @@ version = "0.1.0"
 source = "git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7#ece13ae276e3925111bf48cd85b73af4287210e7"
 dependencies = [
  "anyhow",
- "clap 3.2.10",
+ "clap 3.2.11",
  "crossterm 0.21.0",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -4630,7 +4640,7 @@ source = "git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd
 dependencies = [
  "anyhow",
  "bcs",
- "clap 3.2.10",
+ "clap 3.2.11",
  "codespan-reporting",
  "colored",
  "difference",
@@ -4686,7 +4696,7 @@ source = "git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd
 dependencies = [
  "anyhow",
  "bcs",
- "clap 3.2.10",
+ "clap 3.2.11",
  "codespan-reporting",
  "difference",
  "hex",
@@ -4732,7 +4742,7 @@ source = "git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd
 dependencies = [
  "anyhow",
  "bcs",
- "clap 3.2.10",
+ "clap 3.2.11",
  "codespan",
  "colored",
  "move-binary-format",
@@ -4782,7 +4792,7 @@ version = "0.1.0"
 source = "git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7#ece13ae276e3925111bf48cd85b73af4287210e7"
 dependencies = [
  "anyhow",
- "clap 3.2.10",
+ "clap 3.2.11",
  "colored",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -4832,7 +4842,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-types",
  "aptos-vm",
- "clap 3.2.10",
+ "clap 3.2.11",
  "move-deps",
  "tempfile",
 ]
@@ -4844,7 +4854,7 @@ source = "git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd
 dependencies = [
  "anyhow",
  "bcs",
- "clap 3.2.10",
+ "clap 3.2.11",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-bytecode-verifier",
@@ -4935,7 +4945,7 @@ source = "git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd
 dependencies = [
  "anyhow",
  "bcs",
- "clap 3.2.10",
+ "clap 3.2.11",
  "colored",
  "dirs-next",
  "move-abigen",
@@ -4969,7 +4979,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "atty",
- "clap 3.2.10",
+ "clap 3.2.11",
  "codespan",
  "codespan-reporting",
  "futures",
@@ -5086,7 +5096,7 @@ source = "git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd
 dependencies = [
  "anyhow",
  "bytecode-interpreter-crypto",
- "clap 3.2.10",
+ "clap 3.2.11",
  "codespan-reporting",
  "itertools",
  "move-binary-format",
@@ -5150,7 +5160,7 @@ version = "0.1.0"
 source = "git+https://github.com/move-language/move?rev=ece13ae276e3925111bf48cd85b73af4287210e7#ece13ae276e3925111bf48cd85b73af4287210e7"
 dependencies = [
  "anyhow",
- "clap 3.2.10",
+ "clap 3.2.11",
  "codespan-reporting",
  "colored",
  "itertools",
@@ -8555,7 +8565,7 @@ dependencies = [
  "anyhow",
  "aptos-logger",
  "aptos-sdk",
- "clap 3.2.10",
+ "clap 3.2.11",
  "futures",
  "itertools",
  "rand 0.7.3",
@@ -8578,7 +8588,7 @@ dependencies = [
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-transaction-builder",
- "clap 3.2.10",
+ "clap 3.2.11",
  "futures",
  "itertools",
  "once_cell",
