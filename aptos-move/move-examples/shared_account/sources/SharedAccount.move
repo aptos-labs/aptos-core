@@ -1,4 +1,4 @@
-module SharedAccount::Account {
+module SharedAccount::SharedAccount {
     use Std::Errors;
     use Std::Signer;
     use Std::Vector;
@@ -107,19 +107,9 @@ module SharedAccount::Account {
             i = i + 1;
         };
     }
-}
-
-#[test_only]
-module SharedAccount::SharedAccountTests{
-    use Std::Signer;
-    use Std::Vector;
-    use AptosFramework::Account;
-    use AptosFramework::Coin;
-    use AptosFramework::TestCoin::{Self, TestCoin};
-    use SharedAccount::Account::SharedAccount;
 
     #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113)]
-    public(script) fun set_up(user: signer, test_user1: signer, test_user2: signer) : address {
+    public(script) fun set_up(user: signer, test_user1: signer, test_user2: signer) : address acquires SharedAccount {
         let addresses = Vector::empty<address>();
         let numerators = Vector::empty<u64>();
         let denominators = Vector::empty<u64>();
@@ -141,12 +131,12 @@ module SharedAccount::SharedAccountTests{
         Vector::push_back(&mut denominators, 4);
         Vector::push_back(&mut denominators, 6);
 
-        SharedAccount::Account::initialize(&user, seed, addresses, numerators, denominators)
+        SharedAccount::SharedAccount::initialize(&user, seed, addresses, numerators, denominators)
     }
 
     #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113)]
     #[expected_failure]
-    public(script) fun test_initialize_with_incorrect_numerator_denominator_combo(user: signer, test_user1: signer, test_user2: signer) : address {
+    public(script) fun test_initialize_with_incorrect_numerator_denominator_combo(user: signer, test_user1: signer, test_user2: signer) : address acquires SharedAccount {
         let addresses = Vector::empty<address>();
         let numerators = Vector::empty<u64>();
         let denominators = Vector::empty<u64>();
@@ -168,21 +158,22 @@ module SharedAccount::SharedAccountTests{
         Vector::push_back(&mut denominators, 3);
         Vector::push_back(&mut denominators, 4);
 
-        SharedAccount::Account::initialize(&user, seed, addresses, numerators, denominators)
+        SharedAccount::SharedAccount::initialize(&user, seed, addresses, numerators, denominators)
     }
 
     #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113, core_resources = @CoreResources, core_framework = @AptosFramework)]
     public(script) fun test_disperse(user: signer, test_user1: signer, test_user2: signer, core_resources: signer, core_framework: signer) acquires SharedAccount {
+        use AptosFramework::TestCoin::{Self, TestCoin};
         let user_addr1 = Signer::address_of(&test_user1);
         let user_addr2 = Signer::address_of(&test_user2);
-        let resource_addr = SharedAccount::SharedAccountTests::set_up(user, test_user1, test_user2);
+        let resource_addr = SharedAccount::SharedAccount::set_up(user, test_user1, test_user2);
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
 
         let shared_account = borrow_global<SharedAccount>(resource_addr);
         let resource_signer = Account::create_signer_with_capability(&shared_account.signer_capability);
         Coin::register<TestCoin>(&resource_signer);
         TestCoin::mint(&core_framework, resource_addr, 1000);
-        SharedAccount::Account::disperse<TestCoin>(resource_addr);
+        SharedAccount::SharedAccount::disperse<TestCoin>(resource_addr);
         Coin::destroy_mint_cap<TestCoin>(mint_cap);
         Coin::destroy_burn_cap<TestCoin>(burn_cap);
 
@@ -195,10 +186,10 @@ module SharedAccount::SharedAccountTests{
     public(script) fun test_disperse_insufficient_balance(user: signer, test_user1: signer, test_user2: signer) acquires SharedAccount {
         use AptosFramework::TestCoin::TestCoin;
 
-        let resource_addr = SharedAccount::SharedAccountTests::set_up(user, test_user1, test_user2);
+        let resource_addr = SharedAccount::SharedAccount::set_up(user, test_user1, test_user2);
         let shared_account = borrow_global<SharedAccount>(resource_addr);
         let resource_signer = Account::create_signer_with_capability(&shared_account.signer_capability);
         Coin::register<TestCoin>(&resource_signer);
-        SharedAccount::Account::disperse<TestCoin>(resource_addr);
+        SharedAccount::SharedAccount::disperse<TestCoin>(resource_addr);
     }
 }
