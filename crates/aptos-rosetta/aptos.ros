@@ -57,10 +57,10 @@ request_funds(1){
         "move_type": "0x1::TestCoin::TestCoin"
       }
     };
-    print_message({"Find faucet with at least balance": "10000000"});
+    print_message({"Find faucet with at least balance": "0"});
     random_account = find_balance({
       "minimum_balance": {
-        "value": "10000000",
+        "value": "0",
         "currency": {{currency}}
       },
       "create_limit":1
@@ -79,7 +79,7 @@ request_funds(1){
 }
 
 // Transfer money between accounts
-transfer(20){
+transfer(50){
     transfer{
         transfer.network = {"network":"TESTING", "blockchain":"aptos"};
         currency = {
@@ -91,10 +91,10 @@ transfer(20){
         };
 
         // Find someone who can send money
-        print_message({"Find someone to send money with balance minimum": "20000"});
+        print_message({"Find someone to send money with balance minimum": "10000000"});
         sender = find_balance({
             "minimum_balance":{
-                "value": "20000",
+                "value": "10000000",
                 "currency": {{currency}}
             }
         });
