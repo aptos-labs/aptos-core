@@ -57,7 +57,7 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
     )
     .await?;
 
-    let block = build_block(server_context, parent_transaction, block_info, transactions).await?;
+    let block = build_block(parent_transaction, block_info, transactions).await?;
 
     Ok(BlockResponse {
         block: Some(block),
@@ -67,7 +67,6 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
 
 /// Build up the transaction, which should contain the `operations` as the change set
 async fn build_block(
-    server_context: RosettaContext,
     parent_block_identifier: BlockIdentifier,
     block_info: BlockInfo,
     transactions: Vec<aptos_rest_client::Transaction>,
@@ -79,14 +78,7 @@ async fn build_block(
     // Convert the transactions and build the block
     let mut txns: Vec<Transaction> = Vec::new();
     for txn in transactions {
-        txns.push(
-            Transaction::from_transaction(
-                server_context.coin_cache.clone(),
-                server_context.rest_client()?.as_ref(),
-                txn,
-            )
-            .await?,
-        )
+        txns.push(Transaction::from_transaction(txn).await?)
     }
 
     Ok(Block {
