@@ -4,7 +4,7 @@
 set -e
 
 # Build all the rust release binaries
-cargo build --release \
+cargo build --target aarch64-unknown-linux-musl --release \
         -p aptos \
         -p aptos-node \
         -p aptos-indexer \
@@ -39,4 +39,4 @@ do
 done
 
 # Build the Aptos Move framework
-cargo run --package framework -- --package aptos-framework --output current
+cargo run --target aarch64-unknown-linux-musl --package framework -- --package aptos-framework --output current
