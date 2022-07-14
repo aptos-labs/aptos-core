@@ -23,7 +23,6 @@ use move_deps::{
     move_cli::package::cli::UnitTestResult,
     move_command_line_common::env::get_bytecode_version_from_env,
     move_core_types::{
-        account_address::AccountAddress,
         identifier::Identifier,
         language_storage::{ModuleId, TypeTag},
     },
@@ -344,7 +343,7 @@ impl FunctionArgType {
     fn parse_arg(&self, arg: &str) -> CliTypedResult<Vec<u8>> {
         match self {
             FunctionArgType::Address => bcs::to_bytes(
-                &AccountAddress::from_str(arg)
+                &load_account_arg(arg)
                     .map_err(|err| CliError::UnableToParse("address", err.to_string()))?,
             ),
             FunctionArgType::Bool => bcs::to_bytes(
