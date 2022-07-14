@@ -42,6 +42,7 @@ target "builder" {
   cache-from = generate_cache_from("builder")
   cache-to   = generate_cache_to("builder")
   tags       = generate_tags("builder")
+  platforms  = ["linux/amd64", "linux/arm64"]
 }
 
 group "all" {
@@ -73,6 +74,7 @@ target "_common" {
     "org.label-schema.build-date"     = "${BUILD_DATE}"
     "org.label-schema.git-sha"        = "${GIT_SHA}"
   }
+  platforms = ["linux/amd64", "linux/arm64"]
 }
 
 target "validator" {
