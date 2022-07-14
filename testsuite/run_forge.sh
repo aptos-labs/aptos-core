@@ -3,11 +3,9 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
-#
 # This script runs Forge using the current configured kubectl context
 # It is designed to be invoked within Github Actions, but can be run locally
 # if the necessary environment variables are set.
-#
 
 # for calculating regression
 TPS_THRESHOLD=1500
