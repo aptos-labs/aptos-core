@@ -53,9 +53,9 @@ Aptos Labs’ own analytics system will aggregate all the off-chain telemetry da
 
 ### Troubleshooting
 
-If you validator node is facing persistent issues, e.g., it is unable to propose or fails to synchronize, please open a Github issue here ([https://github.com/aptos-labs/aptos-ait2/issues](https://github.com/aptos-labs/aptos-ait2/issues)) and provide the following:
-- Your node setup, e.g., if you're running it from source, Docker or Terraform
-- A description of the issues you're facing and how long they've been occuring
+If your validator node is facing persistent issues, e.g., it is unable to propose or fails to synchronize, please open a Github issue here ([https://github.com/aptos-labs/aptos-ait2/issues](https://github.com/aptos-labs/aptos-ait2/issues)) and provide the following:
+- Your node setup, e.g., if you're running it from source, Docker or Terraform (and the source code version, e.g., the image tag or branch).
+- A description of the issues you're facing and how long they've been occurring.
 - **Important**: The logs for your node (going as far back as possible). Without detailed logs we'll be unlikely to debug the issue.
 - We may also ask you to enable debug logs for the node. If this is the case, you can do this by updating your node configuration file (e.g., `validator.yaml`) by adding:
 ```
