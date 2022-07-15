@@ -66,7 +66,7 @@ FORGE_START_TIME_MS="$(date '+%s')000"
 if [ "$FORGE_RUNNER_MODE" = "local" ]; then
 
     # more file descriptors for heavy txn generation
-    ulimit -n unlimited
+    ulimit -n 1048576
 
     cargo run -p forge-cli -- test k8s-swarm \
         --image-tag $IMAGE_TAG \
@@ -95,7 +95,7 @@ else
         --overrides='{"spec": { "serviceAccount": "forge", "affinity": { "podAntiAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": [{ "labelSelector": { "matchExpressions": [{ "key": "run", "operator": "Exists" }]}, "topologyKey": "kubernetes.io/hostname" }] }}}}' \
         --restart=Never \
         --image="${AWS_ACCOUNT_NUM}.dkr.ecr.${AWS_REGION}.amazonaws.com/aptos/forge:$IMAGE_TAG" \
-        --command -- bash -c "forge test k8s-swarm --image-tag $IMAGE_TAG --namespace $FORGE_NAMESPACE $KEEP_ARGS $ENABLE_HAPROXY_ARGS"
+        --command -- bash -c "ulimit -n 1048576 && forge test k8s-swarm --image-tag $IMAGE_TAG --namespace $FORGE_NAMESPACE $KEEP_ARGS $ENABLE_HAPROXY_ARGS"
 
     # wait for enough time for the pod to start and potentially new nodes to come online
     kubectl wait --timeout=5m --for=condition=Ready "pod/${FORGE_POD_NAME}"
