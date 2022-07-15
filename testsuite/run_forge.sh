@@ -124,14 +124,14 @@ fi
 
 # detect regressions
 # TODO(rustielin): do not block on perf regressions for now until Forge network performance stabilizes
-avg_tps=$(cat $FORGE_REPORT | grep -oE '\d+ TPS' | awk '{print $1}')
-p99_latency=$(cat $FORGE_REPORT | grep -oE '\d+ ms p99 latency' | awk '{print $1}')
-if [ -n "$avg_tps" ] && [ "$avg_tps" -lt "$TPS_THRESHOLD" ]; then
-    echo "(\!) AVG_TPS: ${avg_tps} < ${TPS_THRESHOLD} tps"
+AVG_TPS=$(cat $FORGE_REPORT | grep -oE '\d+ TPS' | awk '{print $1}')
+P99_LATENCY=$(cat $FORGE_REPORT | grep -oE '\d+ ms p99 latency' | awk '{print $1}')
+if [ -n "$AVG_TPS" ] && [ "$AVG_TPS" -lt "$TPS_THRESHOLD" ]; then
+    echo "(\!) AVG_TPS: ${AVG_TPS} < ${TPS_THRESHOLD} tps"
     # FORGE_EXIT_CODE=1
 fi
-if [ -n "$p99_latency" ] && [ "$p99_latency" -gt "$P99_LATENCY_MS_THRESHOLD" ]; then
-    echo "(\!) P99_LATENCY: ${p99_latency} > 5000 ms"
+if [ -n "$P99_LATENCY" ] && [ "$P99_LATENCY" -gt "$P99_LATENCY_MS_THRESHOLD" ]; then
+    echo "(\!) P99_LATENCY: ${P99_LATENCY} > 5000 ms"
     # FORGE_EXIT_CODE=1
 fi
 
