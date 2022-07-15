@@ -16,7 +16,7 @@ import {
   Image,
 } from '@chakra-ui/react';
 import { InfoIcon } from '@chakra-ui/icons';
-import { PermissionType, PromptMessage } from 'core/types';
+import { PermissionType, PromptMessage } from 'core/types/dappTypes';
 
 const theme = extendTheme({
   initialColorMode: 'light',

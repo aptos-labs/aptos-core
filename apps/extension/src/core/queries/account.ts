@@ -5,7 +5,7 @@ import {
   AptosClient, MaybeHexString, Types,
 } from 'aptos';
 import useWalletState from 'core/hooks/useWalletState';
-import { AptosAccountState } from 'core/types';
+import { AptosAccountState } from 'core/types/stateTypes';
 import { AptosNetwork } from 'core/utils/network';
 import { useCallback } from 'react';
 import { useQuery } from 'react-query';

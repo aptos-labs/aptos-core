@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { MessageMethod } from '../core/types';
+import { MessageMethod } from '../core/types/dappTypes';
 
 class Web3 {
   requestId;

@@ -6,7 +6,7 @@ import { useState, useCallback, useMemo } from 'react';
 import constate from 'constate';
 import { getLocalStorageState } from 'core/utils/account';
 import { WALLET_STATE_LOCAL_STORAGE_KEY, WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY } from 'core/constants';
-import { AptosAccountState, LocalStorageState } from 'core/types';
+import { AptosAccountState, LocalStorageState } from 'core/types/stateTypes';
 import {
   AptosNetwork, getFaucetNetworkFromAptosNetwork, getLocalStorageNetworkState,
 } from 'core/utils/network';

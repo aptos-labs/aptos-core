@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Browser from 'core/utils/browser';
-import { PromptInfo, PermissionType, PromptMessage } from 'core/types';
+import { PromptInfo, PermissionType, PromptMessage } from 'core/types/dappTypes';
 
 const PERMISSIONS_STORAGE_KEY = 'aptosWalletPermissions';
 const PROMPT_HEIGHT = 600;

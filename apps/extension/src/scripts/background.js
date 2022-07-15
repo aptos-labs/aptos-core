@@ -5,10 +5,10 @@ import { AptosClient, BCS } from 'aptos';
 import fetchAdapter from '@vespaiach/axios-fetch-adapter';
 import { sign } from 'tweetnacl';
 import { DEVNET_NODE_URL } from '../core/constants';
-import { MessageMethod, PermissionType } from '../core/types';
+import { MessageMethod, PermissionType } from '../core/types/dappTypes';
 import { getBackgroundAptosAccountState } from '../core/utils/account';
 import Permissions from '../core/utils/permissions';
-import { DappErrorType } from '../core/types/Errors';
+import { DappErrorType } from '../core/types/errors';
 
 // Utils
 

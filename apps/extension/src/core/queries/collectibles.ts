@@ -9,7 +9,7 @@ import axios from 'axios';
 import { useQuery } from 'react-query';
 import { validStorageUris } from 'core/constants';
 import useWalletState from 'core/hooks/useWalletState';
-import { MetadataJson } from 'core/types/TokenMetadata';
+import { MetadataJson } from 'core/types/tokenMetadata';
 import { AptosNetwork } from 'core/utils/network';
 import { useCallback, useMemo } from 'react';
 import { getTokenIdDictFromString, TokenId } from 'core/utils/token';

@@ -3,7 +3,7 @@
 
 import { AptosAccount, AptosAccountObject } from 'aptos';
 import { WALLET_STATE_LOCAL_STORAGE_KEY } from 'core/constants';
-import { AptosAccountState, LocalStorageState } from 'core/types';
+import { AptosAccountState, LocalStorageState } from 'core/types/stateTypes';
 
 import Browser from 'core/utils/browser';
 

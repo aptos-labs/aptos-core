@@ -5,7 +5,7 @@ import { AptosClient, TokenClient, RequestError } from 'aptos';
 import useWalletState from 'core/hooks/useWalletState';
 import { getIsValidMetadataStructure } from 'core/queries/collectibles';
 import queryKeys from 'core/queries/queryKeys';
-import { AptosAccountState } from 'core/types';
+import { AptosAccountState } from 'core/types/stateTypes';
 import Analytics from 'core/utils/analytics/analytics';
 import { collectiblesEvents, CombinedEventParams } from 'core/utils/analytics/events';
 import { AptosNetwork } from 'core/utils/network';
