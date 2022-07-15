@@ -96,8 +96,8 @@ use std::{
     time::{Duration, Instant},
 };
 use storage_interface::{
-    in_memory_state::InMemoryState, jmt_update_refs, jmt_updates, DbReader, DbWriter,
-    ExecutedTrees, Order, StartupInfo, StateSnapshotReceiver,
+    jmt_update_refs, jmt_updates, state_delta::StateDelta, DbReader, DbWriter, ExecutedTrees,
+    Order, StartupInfo, StateSnapshotReceiver,
 };
 
 pub const LEDGER_DB_NAME: &str = "ledger_db";
@@ -420,7 +420,7 @@ impl AptosDB {
 
     /// This gets the current buffered_state in StateStore..
     #[cfg(any(test, feature = "fuzzing"))]
-    pub fn buffered_state(&self) -> InMemoryState {
+    pub fn buffered_state(&self) -> StateDelta {
         self.state_store.buffered_state().lock().clone()
     }
 
@@ -1135,7 +1135,7 @@ impl DbReader for AptosDB {
                                 (None, *SPARSE_MERKLE_PLACEHOLDER_HASH)
                             };
 
-                            let committed_trees = ExecutedTrees::new(InMemoryState::new_at_checkpoint(committed_root_hash, committed_version), transaction_accumulator);
+                            let committed_trees = ExecutedTrees::new(StateDelta::new_at_checkpoint(committed_root_hash, committed_version), transaction_accumulator);
                             StartupInfo::new(
                                 latest_ledger_info,
                                 latest_epoch_state_if_not_in_li,
@@ -1329,11 +1329,11 @@ impl DbWriter for AptosDB {
             );
             {
                 let mut in_memory_state = self.state_store.buffered_state().lock();
-                in_memory_state.checkpoint = state_tree_at_snapshot.clone();
-                in_memory_state.checkpoint_version = Some(version);
+                in_memory_state.base = state_tree_at_snapshot.clone();
+                in_memory_state.base_version = Some(version);
                 in_memory_state.current = state_tree_at_snapshot;
                 in_memory_state.current_version = Some(version);
-                in_memory_state.updated_since_checkpoint.clear();
+                in_memory_state.updates_since_base.clear();
             }
             Ok(())
         })
@@ -1347,11 +1347,11 @@ impl DbWriter for AptosDB {
                 .current
                 .clone()
                 .freeze()
-                .new_node_hashes_since(&buffered_state.checkpoint.clone().freeze());
+                .new_node_hashes_since(&buffered_state.base.clone().freeze());
             let version = buffered_state.current_version.expect("Cannot be empty");
-            let base_version = buffered_state.checkpoint_version;
+            let base_version = buffered_state.base_version;
             let root_hash = self.state_store.merklize_value_set(
-                jmt_update_refs(&jmt_updates(&buffered_state.updated_since_checkpoint)),
+                jmt_update_refs(&jmt_updates(&buffered_state.updates_since_base)),
                 Some(&node_hashes),
                 version,
                 base_version,
@@ -1362,9 +1362,9 @@ impl DbWriter for AptosDB {
                 root_hash = root_hash,
                 "State snapshot committed."
             );
-            buffered_state.checkpoint = buffered_state.current.clone();
-            buffered_state.checkpoint_version = buffered_state.current_version;
-            buffered_state.updated_since_checkpoint.clear();
+            buffered_state.base = buffered_state.current.clone();
+            buffered_state.base_version = buffered_state.current_version;
+            buffered_state.updates_since_base.clear();
             Ok(())
         })
     }
@@ -1381,7 +1381,7 @@ impl DbWriter for AptosDB {
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         save_state_snapshots: bool,
-        latest_in_memory_state: InMemoryState,
+        latest_in_memory_state: StateDelta,
     ) -> Result<()> {
         gauged_api("save_transactions", || {
             // Executing and committing from more than one threads not allowed -- consensus and
@@ -1443,8 +1443,7 @@ impl DbWriter for AptosDB {
                 self.commit(sealed_cs)?;
             }
             if save_state_snapshots {
-                let cached_snapshot_version =
-                    self.state_store.buffered_state().lock().checkpoint_version;
+                let cached_snapshot_version = self.state_store.buffered_state().lock().base_version;
                 ensure!(
                     base_state_version == cached_snapshot_version,
                     "base_state_version {:?} does not match cached_snapshot_version {:?} in state_store",
@@ -1453,7 +1452,7 @@ impl DbWriter for AptosDB {
                 );
 
                 let mut uncommitted_updates_start_idx = 0;
-                let new_snapshot_version = latest_in_memory_state.checkpoint_version;
+                let new_snapshot_version = latest_in_memory_state.base_version;
                 if new_snapshot_version >= Some(first_version) {
                     let new_snapshot_version = new_snapshot_version.expect("Must exist here");
                     ensure!(
@@ -1472,7 +1471,7 @@ impl DbWriter for AptosDB {
                     self.state_store
                         .buffered_state()
                         .lock()
-                        .updated_since_checkpoint
+                        .updates_since_base
                         .extend(
                             txns_to_commit[..=idx]
                                 .iter()
@@ -1480,7 +1479,7 @@ impl DbWriter for AptosDB {
                         );
                     {
                         let mut buffered_state = self.state_store.buffered_state().lock();
-                        buffered_state.current = latest_in_memory_state.checkpoint.clone();
+                        buffered_state.current = latest_in_memory_state.base.clone();
                         buffered_state.current_version = Some(new_snapshot_version);
                     }
                     self.save_state_snapshot()?;
@@ -1491,22 +1490,19 @@ impl DbWriter for AptosDB {
                     self.state_store
                         .buffered_state()
                         .lock()
-                        .updated_since_checkpoint
+                        .updates_since_base
                         .extend(
                             txns_to_commit[uncommitted_updates_start_idx..]
                                 .iter()
                                 .flat_map(|txn_to_commit| txn_to_commit.state_updates().clone()),
                         );
                     assert_eq!(
-                        latest_in_memory_state.updated_since_checkpoint,
-                        self.state_store
-                            .buffered_state()
-                            .lock()
-                            .updated_since_checkpoint
+                        latest_in_memory_state.updates_since_base,
+                        self.state_store.buffered_state().lock().updates_since_base
                     );
                 }
             }
-            // update the InMemoryState in StateStore.
+            // update the StateDelta in StateStore.
             *self.state_store.buffered_state().lock() = latest_in_memory_state;
 
             // Only increment counter if commit succeeds and there are at least one transaction written

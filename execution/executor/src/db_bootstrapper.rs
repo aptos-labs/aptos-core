@@ -178,7 +178,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     let committer = GenesisCommitter::new(
         db.writer.clone(),
         output,
-        executed_trees.state().checkpoint_version,
+        executed_trees.state().base_version,
     )?;
     info!(
         "Genesis calculated: ledger_info_with_sigs {:?}, waypoint {:?}",

@@ -37,8 +37,8 @@ use executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use mockall::mock;
 use std::sync::Arc;
 use storage_interface::{
-    in_memory_state::InMemoryState, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order,
-    StartupInfo, StateSnapshotReceiver,
+    state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order, StartupInfo,
+    StateSnapshotReceiver,
 };
 use tokio::task::JoinHandle;
 
@@ -305,7 +305,7 @@ mock! {
             first_version: Version,
             base_state_version: Option<Version>,
             ledger_info_with_sigs: Option<&'a LedgerInfoWithSignatures>,
-            in_memory_state: InMemoryState,
+            in_memory_state: StateDelta,
         ) -> Result<()>;
 
         fn delete_genesis(&self) -> Result<()>;

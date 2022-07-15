@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    cached_state_view::CachedStateView, in_memory_state::InMemoryState,
-    no_proof_fetcher::NoProofFetcher, sync_proof_fetcher::SyncProofFetcher, DbReader,
+    cached_state_view::CachedStateView, no_proof_fetcher::NoProofFetcher, state_delta::StateDelta,
+    sync_proof_fetcher::SyncProofFetcher, DbReader,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::TransactionAccumulatorHasher, HashValue};
@@ -16,7 +16,7 @@ use std::sync::Arc;
 #[derive(Clone, Debug)]
 pub struct ExecutedTrees {
     /// The in-memory representation of state after execution.
-    state: InMemoryState,
+    state: StateDelta,
 
     /// The in-memory Merkle Accumulator representing a blockchain state consistent with the
     /// `state_tree`.
@@ -24,7 +24,7 @@ pub struct ExecutedTrees {
 }
 
 impl ExecutedTrees {
-    pub fn state(&self) -> &InMemoryState {
+    pub fn state(&self) -> &StateDelta {
         &self.state
     }
 
@@ -45,7 +45,7 @@ impl ExecutedTrees {
     }
 
     pub fn new(
-        state: InMemoryState,
+        state: StateDelta,
         transaction_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
     ) -> Self {
         assert_eq!(
@@ -63,7 +63,7 @@ impl ExecutedTrees {
         frozen_subtrees_in_accumulator: Vec<HashValue>,
         num_leaves_in_accumulator: u64,
     ) -> Self {
-        let state = InMemoryState::new_at_checkpoint(
+        let state = StateDelta::new_at_checkpoint(
             state_root_hash,
             num_leaves_in_accumulator.checked_sub(1),
         );
@@ -77,7 +77,7 @@ impl ExecutedTrees {
 
     pub fn new_empty() -> Self {
         Self::new(
-            InMemoryState::new_empty(),
+            StateDelta::new_empty(),
             Arc::new(InMemoryAccumulator::new_empty()),
         )
     }

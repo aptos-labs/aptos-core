@@ -19,7 +19,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree};
-use storage_interface::{cached_state_view::StateCache, in_memory_state::InMemoryState};
+use storage_interface::{cached_state_view::StateCache, state_delta::StateDelta};
 
 pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);
 
@@ -56,29 +56,29 @@ pub struct InMemoryStateCalculator {
 }
 
 impl InMemoryStateCalculator {
-    pub fn new(base: &InMemoryState, state_cache: StateCache) -> Self {
+    pub fn new(base: &StateDelta, state_cache: StateCache) -> Self {
         let StateCache {
             frozen_base,
             state_cache,
             proofs,
         } = state_cache;
-        let InMemoryState {
-            checkpoint,
-            checkpoint_version,
+        let StateDelta {
+            base,
+            base_version,
             current,
             current_version,
-            updated_since_checkpoint,
+            updates_since_base,
         } = base.clone();
 
         Self {
             _frozen_base: frozen_base,
             state_cache,
             proof_reader: ProofReader::new(proofs),
-            checkpoint,
-            checkpoint_version,
+            checkpoint: base,
+            checkpoint_version: base_version,
             latest: current.freeze(),
             next_version: current_version.map_or(0, |v| v + 1),
-            updates_between_checkpoint_and_latest: updated_since_checkpoint,
+            updates_between_checkpoint_and_latest: updates_since_base,
             updates_after_latest: HashMap::new(),
         }
     }
@@ -90,7 +90,7 @@ impl InMemoryStateCalculator {
     ) -> Result<(
         Vec<HashMap<StateKey, StateValue>>,
         Vec<Option<HashValue>>,
-        InMemoryState,
+        StateDelta,
         Option<EpochState>,
     )> {
         let mut state_updates_vec = Vec::new();
@@ -181,7 +181,7 @@ impl InMemoryStateCalculator {
         })
     }
 
-    fn finish(mut self) -> Result<(InMemoryState, HashMap<StateKey, StateValue>)> {
+    fn finish(mut self) -> Result<(StateDelta, HashMap<StateKey, StateValue>)> {
         let smt_updates: Vec<_> = self
             .updates_after_latest
             .iter()
@@ -192,7 +192,7 @@ impl InMemoryStateCalculator {
         self.updates_between_checkpoint_and_latest
             .extend(self.updates_after_latest);
 
-        let result_state = InMemoryState::new(
+        let result_state = StateDelta::new(
             self.checkpoint,
             self.checkpoint_version,
             latest.unfreeze(),
@@ -206,7 +206,7 @@ impl InMemoryStateCalculator {
     pub fn calculate_for_write_sets_after_checkpoint(
         mut self,
         write_sets: &[WriteSet],
-    ) -> Result<InMemoryState> {
+    ) -> Result<StateDelta> {
         for write_set in write_sets {
             let state_updates =
                 process_write_set(None, &mut self.state_cache, (*write_set).clone())?;

@@ -14,9 +14,7 @@ use aptos_types::{
 };
 use aptos_vm::VMExecutor;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
-use storage_interface::{
-    in_memory_state::InMemoryState, DbReader, DbReaderWriter, DbWriter, StartupInfo,
-};
+use storage_interface::{state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, StartupInfo};
 
 fn create_test_executor() -> BlockExecutor<FakeVM> {
     // setup fake db
@@ -90,7 +88,7 @@ impl DbWriter for FakeDb {
         _first_version: Version,
         _base_state_version: Option<Version>,
         _ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        _in_memory_state: InMemoryState,
+        _in_memory_state: StateDelta,
     ) -> Result<()> {
         Ok(())
     }

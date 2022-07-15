@@ -30,7 +30,7 @@ fn end_to_end() {
 
     let latest_executed_trees = src_db.get_latest_executed_trees().unwrap();
     let version = latest_executed_trees.version().unwrap();
-    let state_root_hash = latest_executed_trees.state().checkpoint_root_hash();
+    let state_root_hash = latest_executed_trees.state().base_root_hash();
 
     let (rt, port) = start_local_backup_service(src_db);
     let client = Arc::new(BackupServiceClient::new(format!(
