@@ -78,7 +78,7 @@ fn end_to_end() {
     let tgt_db = AptosDB::new_readonly_for_test(&tgt_db_dir);
     assert_eq!(
         tgt_db
-            .get_latest_state_checkpoint()
+            .get_latest_state_snapshot()
             .unwrap()
             .map(|(_, hash)| hash)
             .unwrap(),
