@@ -18,7 +18,7 @@ proptest! {
     fn test_get_transaction_iter(input in arb_blocks_to_commit()) {
         let tmp_dir = TempPath::new();
         let db = AptosDB::new_for_test(&tmp_dir);
-        let mut in_memory_state = (*db.state_store.in_memory_state().lock()).clone();
+        let mut in_memory_state = (*db.state_store.buffered_state().lock()).clone();
         let _ancester = in_memory_state.current.clone().freeze();
         let mut cur_ver: Version = 0;
         for (txns_to_commit, ledger_info_with_sigs) in input.iter() {

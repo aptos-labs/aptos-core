@@ -53,7 +53,10 @@ const MAX_WRITE_SETS_AFTER_CHECKPOINT: LeafCount = 200_000;
 pub(crate) struct StateStore {
     ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
-    in_memory_state: Mutex<InMemoryState>,
+    // The `checkpoint` of buffered_state is the latest snapshot in state_merkle_db while `current`
+    // is the latest state sparse merkle tree that is replayed from that snapshot until the latest
+    // write set stored in ledger_db.
+    buffered_state: Mutex<InMemoryState>,
 }
 
 // "using an Arc<dyn DbReader> as an Arc<dyn StateReader>" is not allowed in stable Rust. Actually we
@@ -124,7 +127,7 @@ impl StateStore {
         let store = Arc::new(Self {
             ledger_db,
             state_merkle_db,
-            in_memory_state: Mutex::new(InMemoryState::new_empty()),
+            buffered_state: Mutex::new(InMemoryState::new_empty()),
         });
         store
             .initialize(hack_for_tests)
@@ -133,7 +136,7 @@ impl StateStore {
     }
 
     pub fn maybe_reset(self: &Arc<Self>, latest_snapshot_version: Option<Version>) {
-        if self.in_memory_state.lock().checkpoint_version < latest_snapshot_version {
+        if self.buffered_state.lock().checkpoint_version < latest_snapshot_version {
             self.initialize(false)
                 .expect("StateStore initialization failed.")
         }
@@ -160,7 +163,7 @@ impl StateStore {
         // Make sure the committed transactions is ahead of the latest snapshot.
         let snapshot_next_version = latest_snapshot_version.map_or(0, |v| v + 1);
         // Initialize the state store before replaying write sets.
-        *self.in_memory_state.lock() =
+        *self.buffered_state.lock() =
             InMemoryState::new_at_checkpoint(latest_snapshot_root_hash, latest_snapshot_version);
 
         // If we , we don't ensure the consistency.
@@ -185,29 +188,29 @@ impl StateStore {
                 snapshot_next_version,
                 num_transactions,
             );
-            let mut in_memory_state = self.in_memory_state.lock();
+            let mut buffered_state = self.buffered_state.lock();
             let latest_snapshot_state_view = CachedStateView::new(
                 StateViewId::Miscellaneous,
                 self.clone(),
                 num_transactions,
-                in_memory_state.current.clone(),
+                buffered_state.current.clone(),
                 Arc::new(SyncProofFetcher::new(self.clone())),
             )?;
             let write_sets = TransactionStore::new(Arc::clone(&self.ledger_db))
                 .get_write_sets(snapshot_next_version, num_transactions)?;
             latest_snapshot_state_view.prime_cache_by_write_set(&write_sets)?;
             let calculator = InMemoryStateCalculator::new(
-                &in_memory_state,
+                &buffered_state,
                 latest_snapshot_state_view.into_state_cache(),
             );
-            *in_memory_state = calculator.calculate_for_write_sets_after_checkpoint(&write_sets)?;
+            *buffered_state = calculator.calculate_for_write_sets_after_checkpoint(&write_sets)?;
         }
 
         let (latest_version, root_hash) = {
-            let in_memory_state = self.in_memory_state.lock();
+            let buffered_state = self.buffered_state.lock();
             (
-                in_memory_state.current_version,
-                in_memory_state.current.root_hash(),
+                buffered_state.current_version,
+                buffered_state.current.root_hash(),
             )
         };
         debug!(
@@ -219,8 +222,8 @@ impl StateStore {
         Ok(())
     }
 
-    pub fn in_memory_state(&self) -> &Mutex<InMemoryState> {
-        &self.in_memory_state
+    pub fn buffered_state(&self) -> &Mutex<InMemoryState> {
+        &self.buffered_state
     }
 
     /// Returns the key, value pairs for a particular state key prefix at at desired version. This
