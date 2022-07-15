@@ -129,8 +129,8 @@ impl ServerArgs for CommandArgs {
 
 #[derive(Debug, Parser)]
 pub struct OfflineArgs {
-    /// Listen address for the server. e.g. 127.0.0.1:8080
-    #[clap(long, default_value = "127.0.0.1:8082")]
+    /// Listen address for the server. e.g. 0.0.0.0:8082
+    #[clap(long, default_value = "0.0.0.0:8082")]
     listen_address: SocketAddr,
     /// Path to TLS cert for HTTPS support
     #[clap(long)]
