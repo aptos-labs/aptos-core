@@ -281,7 +281,7 @@ pub struct RunFunction {
     txn_options: TransactionOptions,
     /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
     ///
-    /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::Message::set_message`
+    /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
     #[clap(long, parse(try_from_str = parse_function_name))]
     function_id: FunctionId,
     /// Hex encoded arguments separated by spaces.
