@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::api::Api;
+use super::{api::Api, log::middleware_log};
 use crate::context::Context;
 use anyhow::Context as AnyhowContext;
 use aptos_config::config::NodeConfig;
@@ -60,7 +60,8 @@ pub fn attach_poem_to_runtime(
             // TODO: Consider making these part of the API itself.
             .at("/openapi.json", spec_json)
             .at("/openapi.yaml", spec_yaml)
-            .with(cors);
+            .with(cors)
+            .around(middleware_log);
         Server::new(listener)
             .run(route)
             .await
