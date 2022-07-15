@@ -14,17 +14,16 @@ use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{self, aptos_root_address, AccountResource, BalanceResource},
+    account_config::{aptos_root_address, AccountResource},
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
     transaction::{
-        Module as TransactionModule, RawTransaction, Script as TransactionScript,
+        ExecutionStatus, Module as TransactionModule, RawTransaction, Script as TransactionScript,
         ScriptFunction as TransactionScriptFunction, Transaction, TransactionOutput,
         TransactionStatus,
     },
-    vm_status::KeptVMStatus,
 };
 use aptos_vm::{
     data_cache::{IntoMoveResolver, RemoteStorageOwned},
@@ -32,35 +31,39 @@ use aptos_vm::{
 };
 use clap::StructOpt;
 use language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_FRESH};
-use move_command_line_common::files::verify_and_create_named_address_mapping;
-use move_compiler::{
-    shared::{NumberFormat, NumericalAddress},
-    FullyCompiledProgram,
-};
-use move_core_types::{
-    account_address::AccountAddress,
-    gas_schedule::{GasAlgebra, GasConstants},
-    identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, ResourceKey, TypeTag},
-    move_resource::MoveStructType,
-    transaction_argument::{convert_txn_args, TransactionArgument},
-    value::MoveTypeLayout,
-};
 use move_deps::{
-    move_binary_format::{CompiledModule, CompiledScript},
-    move_core_types::{ident_str, vm_status::StatusCode},
+    move_binary_format::file_format::{CompiledModule, CompiledScript},
+    move_command_line_common::{
+        address::ParsedAddress, files::verify_and_create_named_address_mapping,
+    },
+    move_compiler::{
+        self,
+        shared::{NumberFormat, NumericalAddress, PackagePaths},
+        FullyCompiledProgram,
+    },
+    move_core_types::{
+        account_address::AccountAddress,
+        gas_schedule::{GasAlgebra, GasConstants},
+        identifier::{IdentStr, Identifier},
+        language_storage::{ModuleId, ResourceKey, TypeTag},
+        move_resource::MoveStructType,
+        transaction_argument::{convert_txn_args, TransactionArgument},
+        value::{MoveTypeLayout, MoveValue},
+    },
+    move_transactional_test_runner::{
+        framework::{run_test_impl, CompiledState, MoveTestAdapter},
+        tasks::{InitCommand, SyntaxChoice, TaskInput},
+        vm_test_harness::view_resource_in_move_storage,
+    },
+    move_vm_runtime::session::SerializedReturnValues,
 };
-use move_transactional_test_runner::{
-    framework::{run_test_impl, CompiledState, MoveTestAdapter},
-    tasks::{InitCommand, RawAddress, SyntaxChoice, TaskInput},
-    vm_test_harness::view_resource_in_move_storage,
-};
-use move_vm_runtime::session::SerializedReturnValues;
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, HashMap},
+    convert::TryFrom,
     fmt,
     path::Path,
+    string::String,
 };
 use vm_genesis::GENESIS_KEYPAIR;
 
@@ -81,7 +84,7 @@ struct AptosTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
     storage: RemoteStorageOwned<FakeDataStore>,
     default_syntax: SyntaxChoice,
-    private_key_mapping: BTreeMap<Identifier, Ed25519PrivateKey>,
+    private_key_mapping: BTreeMap<String, Ed25519PrivateKey>,
 }
 
 /// Parameters *required* to create a transaction.
@@ -89,7 +92,6 @@ struct TransactionParameters {
     pub sequence_number: u64,
     pub max_gas_amount: u64,
     pub gas_unit_price: u64,
-    pub gas_currency_code: String,
     pub expiration_timestamp_secs: u64,
 }
 
@@ -111,13 +113,13 @@ struct AptosPublishArgs {
     #[structopt(long = "gas-currency")]
     gas_currency_code: Option<String>,
 
-    #[structopt(long = "override-signer", parse(try_from_str = RawAddress::parse))]
-    override_signer: Option<RawAddress>,
+    #[structopt(long = "override-signer", parse(try_from_str = ParsedAddress::parse))]
+    override_signer: Option<ParsedAddress>,
 }
 
 #[derive(Debug)]
 struct SignerAndKeyPair {
-    address: RawAddress,
+    address: ParsedAddress,
     private_key: Option<RawPrivateKey>,
 }
 
@@ -157,9 +159,6 @@ struct AptosInitArgs {
 
     #[structopt(long = "validators", parse(try_from_str = parse_identifier), multiple_values(true))]
     validators: Option<Vec<Identifier>>,
-
-    #[structopt(long = "parent-vasps", parse(try_from_str = ParentVaspInitArgs::parse), multiple_values(true))]
-    parent_vasps: Option<Vec<ParentVaspInitArgs>>,
 }
 
 /// A raw private key -- either a literal or an unresolved name.
@@ -172,23 +171,16 @@ enum RawPrivateKey {
 /// A fully qualified type name, where the address could be either a literal or an unresolved name.
 #[derive(Debug)]
 struct TypeName {
-    address: RawAddress,
+    address: ParsedAddress,
     module_name: Identifier,
     type_name: Identifier,
-}
-
-/// Arguments to initialize a parent vasp account.
-#[derive(Debug)]
-struct ParentVaspInitArgs {
-    name: Identifier,
-    currency_type: TypeName,
 }
 
 /// Command to initiate a block metadata transaction.
 #[derive(StructOpt, Debug)]
 struct BlockCommand {
-    #[structopt(long = "proposer", parse(try_from_str = RawAddress::parse))]
-    proposer: RawAddress,
+    #[structopt(long = "proposer", parse(try_from_str = ParsedAddress::parse))]
+    proposer: ParsedAddress,
 
     #[structopt(long = "time")]
     time: u64,
@@ -219,7 +211,7 @@ impl TypeName {
             )
         }
 
-        let address = RawAddress::parse(parts[0])?;
+        let address = ParsedAddress::parse(parts[0])?;
         let module_name = Identifier::new(parts[1])
             .map_err(|_| format_err!("Invalid module name {}. Expected identifier.", parts[1]))?;
         let type_name = Identifier::new(parts[1])
@@ -229,39 +221,6 @@ impl TypeName {
             address,
             module_name,
             type_name,
-        })
-    }
-}
-
-impl ParentVaspInitArgs {
-    fn parse(s: &str) -> Result<Self> {
-        if let Ok(name) = Identifier::new(s) {
-            return Ok(Self {
-                name,
-                currency_type: TypeName {
-                    address: RawAddress::Named(Identifier::new("AptosFramework").unwrap()),
-                    module_name: XUS_IDENTIFIER.to_owned(),
-                    type_name: XUS_IDENTIFIER.to_owned(),
-                },
-            });
-        }
-
-        let parts = s.split('=').collect::<Vec<_>>();
-        if parts.len() != 2 {
-            bail!("Invalid parent VSAP. Must be either <name> or <name>=<currency_type_tag>, but found {}.", s);
-        }
-
-        let name = Identifier::new(parts[0]).map_err(|_| {
-            format_err!(
-                "Invalid parent vasp name {}. Expected identifier.",
-                parts[0]
-            )
-        })?;
-        let currency_type = TypeName::parse(parts[1])?;
-
-        Ok(Self {
-            name,
-            currency_type,
         })
     }
 }
@@ -301,7 +260,7 @@ fn parse_named_private_key(s: &str) -> Result<(Identifier, Ed25519PrivateKey)> {
 
 impl SignerAndKeyPair {
     fn parse(s: &str) -> Result<Self> {
-        if let Ok(address) = RawAddress::parse(s) {
+        if let Ok(address) = ParsedAddress::parse(s) {
             return Ok(Self {
                 address,
                 private_key: None,
@@ -314,7 +273,7 @@ impl SignerAndKeyPair {
             bail!("Invalid signer and key pair. Must be of the form <signer addr>=<private_key> or <named signer addr>, but found '{}'", s);
         }
 
-        let address = RawAddress::parse(before_after[0])?;
+        let address = ParsedAddress::parse(before_after[0])?;
         let private_key = RawPrivateKey::parse(before_after[1])?;
 
         Ok(Self {
@@ -336,7 +295,7 @@ fn aptos_framework_private_key_mapping() -> Vec<(String, Ed25519PrivateKey)> {
     vec![("Root".to_string(), GENESIS_KEYPAIR.0.clone())]
 }
 
-fn panic_missing_private_key_named(cmd_name: &str, name: &IdentStr) -> ! {
+fn panic_missing_private_key_named(cmd_name: &str, name: &str) -> ! {
     panic!(
         "Missing private key. Either add a `--private-key <priv_key>` argument \
             to the {} command, or associate an address to the \
@@ -354,10 +313,11 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
 }
 
 static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
-    let deps = vec![(
-        framework::aptos::files(),
-        framework::aptos::named_addresses(),
-    )];
+    let deps = vec![PackagePaths {
+        name: None,
+        paths: framework::aptos::files(),
+        named_address_map: framework::aptos::named_addresses(),
+    }];
     let program_res = move_compiler::construct_pre_compiled_lib(
         deps,
         None,
@@ -383,7 +343,7 @@ static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
 impl<'a> AptosTestAdapter<'a> {
     /// Look up the named private key in the mapping.
     fn resolve_named_private_key(&self, s: &IdentStr) -> Ed25519PrivateKey {
-        if let Some(private_key) = self.private_key_mapping.get(s) {
+        if let Some(private_key) = self.private_key_mapping.get(s.as_str()) {
             return private_key.clone();
         }
         panic!("Failed to resolve private key '{}'", s)
@@ -414,7 +374,7 @@ impl<'a> AptosTestAdapter<'a> {
 
             let resolved_private_key = match (private_key, address) {
                 (Some(private_key), _) => self.resolve_private_key(private_key),
-                (None, RawAddress::Named(named_addr)) => {
+                (None, ParsedAddress::Named(named_addr)) => {
                     match self.private_key_mapping.get(named_addr) {
                         Some(private_key) => private_key.clone(),
                         None => panic!(
@@ -423,7 +383,7 @@ impl<'a> AptosTestAdapter<'a> {
                         ),
                     }
                 }
-                (None, RawAddress::Anonymous(addr)) => {
+                (None, ParsedAddress::Numerical(addr)) => {
                     panic!("No private key provided for secondary signer {}.", addr)
                 }
             };
@@ -454,31 +414,6 @@ impl<'a> AptosTestAdapter<'a> {
         Ok(bcs::from_bytes(&account_blob).unwrap())
     }
 
-    /// Obtain a Rust representation of the balance resource from storage, which is used to derive
-    /// a few default transaction parameters.
-    fn fetch_balance_resource(
-        &self,
-        signer_addr: &AccountAddress,
-        _balance_currency_code: Identifier,
-    ) -> Result<BalanceResource> {
-        let balance_resource_tag = BalanceResource::struct_tag();
-        let balance_access_path =
-            AccessPath::resource_access_path(ResourceKey::new(*signer_addr, balance_resource_tag));
-
-        let balance_blob = self
-            .storage
-            .get_state_value(&StateKey::AccessPath(balance_access_path))
-            .unwrap()
-            .ok_or_else(|| {
-                format_err!(
-                    "Failed to fetch balance resource under address {}.",
-                    signer_addr
-                )
-            })?;
-
-        Ok(bcs::from_bytes(&balance_blob).unwrap())
-    }
-
     /// Derive the default transaction parameters from the account and balance resources fetched
     /// from storage. In the future, we are planning to allow the user to override these using
     /// command arguments.
@@ -487,38 +422,22 @@ impl<'a> AptosTestAdapter<'a> {
         signer_addr: &AccountAddress,
         sequence_number: Option<u64>,
         expiration_time: Option<u64>,
-        gas_currency_code: Option<String>,
         gas_unit_price: Option<u64>,
         max_gas_amount: Option<u64>,
     ) -> Result<TransactionParameters> {
         let account_resource = self.fetch_account_resource(signer_addr)?;
 
         let sequence_number = sequence_number.unwrap_or_else(|| account_resource.sequence_number());
-        let gas_currency_code = gas_currency_code.unwrap_or_else(|| XUS_NAME.to_string());
         let max_number_of_gas_units = GasConstants::default().maximum_number_of_gas_units;
         let gas_unit_price = gas_unit_price.unwrap_or(0);
         let max_gas_amount = match max_gas_amount {
             Some(max_gas_amount) => max_gas_amount,
-            None => {
-                if gas_unit_price == 0 {
-                    max_number_of_gas_units.get()
-                } else {
-                    let account_balance = self.fetch_balance_resource(
-                        signer_addr,
-                        account_config::from_currency_code_string(&gas_currency_code).unwrap(),
-                    )?;
-                    std::cmp::min(
-                        max_number_of_gas_units.get(),
-                        account_balance.coin() / gas_unit_price,
-                    )
-                }
-            }
+            None => max_number_of_gas_units.get(),
         };
         let expiration_timestamp_secs = expiration_time.unwrap_or(40000);
 
         Ok(TransactionParameters {
             sequence_number,
-            gas_currency_code,
             gas_unit_price,
             max_gas_amount,
             expiration_timestamp_secs,
@@ -539,9 +458,9 @@ impl<'a> AptosTestAdapter<'a> {
             TransactionStatus::Keep(kept_vm_status) => {
                 self.storage.add_write_set(output.write_set());
                 match kept_vm_status {
-                    KeptVMStatus::Executed => Ok(output),
+                    ExecutionStatus::Success => Ok(output),
                     _ => {
-                        bail!("Failed to execute transaction. VMStatus: {}", status)
+                        bail!("Failed to execute transaction. ExecutionStatus: {}", status)
                     }
                 }
             }
@@ -572,12 +491,12 @@ impl<'a> AptosTestAdapter<'a> {
     ) {
         // Step 1. Create validator account.
         let parameters = self
-            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None, None)
+            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None)
             .unwrap();
         let txn = RawTransaction::new(
             aptos_root_address(),
             parameters.sequence_number,
-            aptos_transaction_builder::aptos_stdlib::encode_create_validator_account_script_function(
+            aptos_transaction_builder::aptos_stdlib::encode_validator_set_script_create_validator_account(
                 validator_account_addr,
                 validator_name.as_bytes().into(),
             ),
@@ -594,12 +513,12 @@ impl<'a> AptosTestAdapter<'a> {
 
         // Step 2. Create validator operator account.
         let parameters = self
-            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None, None)
+            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None)
             .unwrap();
         let txn = RawTransaction::new(
             aptos_root_address(),
             parameters.sequence_number,
-            aptos_transaction_builder::aptos_stdlib::encode_create_validator_operator_account_script_function(
+            aptos_transaction_builder::aptos_stdlib::encode_validator_set_script_create_validator_operator_account(
                 operator_account_addr,
                 validator_name.as_bytes().into(),
             ),
@@ -616,12 +535,12 @@ impl<'a> AptosTestAdapter<'a> {
 
         // Step 3. Set validator operator account.
         let parameters = self
-            .fetch_transaction_parameters(&validator_account_addr, None, None, None, None, None)
+            .fetch_transaction_parameters(&validator_account_addr, None, None, None, None)
             .unwrap();
         let txn = RawTransaction::new(
             validator_account_addr,
             parameters.sequence_number,
-            aptos_transaction_builder::aptos_stdlib::encode_set_validator_operator_script_function(
+            aptos_transaction_builder::aptos_stdlib::encode_validator_set_script_set_validator_operator(
                 validator_name.as_bytes().into(),
                 operator_account_addr,
             ),
@@ -638,12 +557,12 @@ impl<'a> AptosTestAdapter<'a> {
 
         // Step 4. Set validator config.
         let parameters = self
-            .fetch_transaction_parameters(&operator_account_addr, None, None, None, None, None)
+            .fetch_transaction_parameters(&operator_account_addr, None, None, None, None)
             .unwrap();
         let txn = RawTransaction::new(
             operator_account_addr,
             parameters.sequence_number,
-            aptos_transaction_builder::aptos_stdlib::encode_register_validator_config_script_function(
+            aptos_transaction_builder::aptos_stdlib::encode_validator_set_script_register_validator_config(
                 validator_account_addr,
                 validator_private_key.public_key().to_bytes().to_vec(),
                 vec![],
@@ -662,12 +581,12 @@ impl<'a> AptosTestAdapter<'a> {
 
         // Step 5. Add validator to validator set.
         let parameters = self
-            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None, None)
+            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None)
             .unwrap();
         let txn = RawTransaction::new(
             aptos_root_address(),
             parameters.sequence_number,
-            aptos_transaction_builder::aptos_stdlib::encode_add_validator_script_function(
+            aptos_transaction_builder::aptos_stdlib::encode_validator_set_script_add_validator(
                 validator_account_addr,
             ),
             parameters.max_gas_amount,
@@ -681,39 +600,6 @@ impl<'a> AptosTestAdapter<'a> {
         self.run_transaction(Transaction::UserTransaction(txn))
             .expect("Failed to add validator to validator set. This should not happen.");
     }
-
-    /// Create a parent vasp account with the given credentials.
-    ///
-    /// Note: this does not add it to the named address or private key mappings.
-    /// That needs to be done separately.
-    fn create_parent_vasp_account(
-        &mut self,
-        _validator_name: Identifier,
-        account_addr: AccountAddress,
-        _currency_type_name: TypeName,
-    ) {
-        let parameters = self
-            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None, None)
-            .unwrap();
-
-        let txn = RawTransaction::new(
-            aptos_root_address(),
-            parameters.sequence_number,
-            aptos_transaction_builder::aptos_stdlib::encode_create_account_script_function(
-                account_addr,
-            ),
-            parameters.max_gas_amount,
-            parameters.gas_unit_price,
-            parameters.expiration_timestamp_secs,
-            ChainId::test(),
-        )
-        .sign(&GENESIS_KEYPAIR.0, GENESIS_KEYPAIR.1.clone())
-        .unwrap()
-        .into_inner();
-
-        self.run_transaction(Transaction::UserTransaction(txn))
-            .expect("Failed to create parent vasp account. This should not happen.");
-    }
 }
 
 impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
@@ -721,6 +607,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
     type ExtraPublishArgs = AptosPublishArgs;
     type ExtraRunArgs = AptosRunArgs;
     type Subcommand = AptosSubCommand;
+    type ExtraValueArgs = ();
 
     fn compiled_state(&mut self) -> &mut CompiledState<'a> {
         &mut self.compiled_state
@@ -734,7 +621,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         default_syntax: SyntaxChoice,
         pre_compiled_deps: Option<&'a FullyCompiledProgram>,
         task_opt: Option<TaskInput<(InitCommand, Self::ExtraInitArgs)>>,
-    ) -> Self {
+    ) -> (Self, Option<String>) {
         // Named address mapping
         let additional_named_address_mapping = match task_opt.as_ref().map(|t| &t.command) {
             Some((InitCommand { named_addresses }, _)) => {
@@ -760,13 +647,12 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         // Builtin private key mapping
         let mut private_key_mapping = BTreeMap::new();
         for (name, private_key) in aptos_framework_private_key_mapping() {
-            private_key_mapping.insert(Identifier::new(name).unwrap(), private_key);
+            private_key_mapping.insert(name, private_key);
         }
 
         // Handle extra init args
         let mut keygen = KeyGen::from_seed([0; 32]);
         let mut validators_to_create = vec![];
-        let mut parent_vasps_to_create = vec![];
 
         if let Some(TaskInput {
             command: (_, init_args),
@@ -776,13 +662,13 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             // Private key mapping
             if let Some(additional_private_key_mapping) = init_args.private_keys {
                 for (name, private_key) in additional_private_key_mapping {
-                    if private_key_mapping.contains_key(&name) {
+                    if private_key_mapping.contains_key(name.as_str()) {
                         panic!(
                             "Invalid init. The named private key '{}' already exists.",
                             name
                         )
                     }
-                    private_key_mapping.insert(name, private_key);
+                    private_key_mapping.insert(name.as_str().to_string(), private_key);
                 }
             }
 
@@ -795,7 +681,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                             validator_name
                         )
                     }
-                    if private_key_mapping.contains_key(&validator_name) {
+                    if private_key_mapping.contains_key(validator_name.as_str()) {
                         panic!(
                             "Invalid validator name {} -- named private key already exists.",
                             validator_name
@@ -815,8 +701,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                             NumberFormat::Hex,
                         ),
                     );
-                    private_key_mapping
-                        .insert(validator_name.clone(), validator_private_key.clone());
+                    private_key_mapping.insert(
+                        validator_name.as_str().to_string(),
+                        validator_private_key.clone(),
+                    );
 
                     // Note: validator accounts are created at a later time.
                     // This is because we need to fetch the sequence number of Root, which is
@@ -830,46 +718,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     ));
                 }
             }
-
-            // Parent Vasps
-            if let Some(parent_vasps) = init_args.parent_vasps {
-                for parent_vasp_init_args in parent_vasps {
-                    let parent_vasp_name = parent_vasp_init_args.name;
-                    if named_address_mapping.contains_key(parent_vasp_name.as_str()) {
-                        panic!(
-                            "Invalid validator name {} -- named address already exists.",
-                            parent_vasp_name
-                        )
-                    }
-                    if private_key_mapping.contains_key(&parent_vasp_name) {
-                        panic!(
-                            "Invalid validator name {} -- named private key already exists.",
-                            parent_vasp_name
-                        )
-                    }
-
-                    let (private_key, _, account_addr) =
-                        keygen.generate_credentials_for_account_creation();
-                    named_address_mapping.insert(
-                        parent_vasp_name.to_string(),
-                        NumericalAddress::new(account_addr.into_bytes(), NumberFormat::Hex),
-                    );
-                    private_key_mapping.insert(parent_vasp_name.clone(), private_key);
-
-                    // Note: parent vasp accounts are created at a later time.
-                    // This is because we need to fetch the sequence number of Root, which is
-                    // only available after the AptosTestAdapter has been fully initialized.
-                    parent_vasps_to_create.push((
-                        parent_vasp_name,
-                        account_addr,
-                        parent_vasp_init_args.currency_type,
-                    ));
-                }
-            }
         }
 
         let mut adapter = Self {
-            compiled_state: CompiledState::new(named_address_mapping, pre_compiled_deps),
+            compiled_state: CompiledState::new(named_address_mapping, pre_compiled_deps, None),
             default_syntax,
             storage,
             private_key_mapping,
@@ -893,12 +745,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             );
         }
 
-        // Create parent vasp accounts
-        for (parent_vasp_name, account_addr, currency_type_name) in parent_vasps_to_create {
-            adapter.create_parent_vasp_account(parent_vasp_name, account_addr, currency_type_name);
-        }
-
-        adapter
+        (adapter, None)
     }
 
     fn publish_module(
@@ -907,15 +754,15 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         mut named_addr_opt: Option<Identifier>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraPublishArgs,
-    ) -> Result<()> {
+    ) -> Result<(Option<String>, CompiledModule)> {
         let module_id = module.self_id();
 
         // TODO: hack to allow the signer to be overridden.
         // See if we can implement it in a cleaner way.
         let signer = match extra_args.override_signer {
             Some(addr) => {
-                if let RawAddress::Named(named_addr) = &addr {
-                    named_addr_opt = Some(named_addr.clone())
+                if let ParsedAddress::Named(named_addr) = &addr {
+                    named_addr_opt = Some(Identifier::new(named_addr.clone()).unwrap())
                 }
                 self.compiled_state().resolve_address(&addr)
             }
@@ -926,7 +773,6 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             &signer,
             extra_args.sequence_number,
             extra_args.expiration_time,
-            extra_args.gas_currency_code,
             extra_args.gas_unit_price,
             gas_budget,
         )?;
@@ -936,9 +782,12 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
 
         let private_key = match (extra_args.private_key, named_addr_opt) {
             (Some(private_key), _) => self.resolve_private_key(&private_key),
-            (None, Some(named_addr)) => match self.private_key_mapping.get(&named_addr) {
+            (None, Some(named_addr)) => match self
+                .private_key_mapping
+                .get(&named_addr.as_str().to_string())
+            {
                 Some(private_key) => private_key.clone(),
-                None => panic_missing_private_key_named("publish", &named_addr),
+                None => panic_missing_private_key_named("publish", named_addr.as_str()),
             },
             (None, None) => panic_missing_private_key("publish"),
         };
@@ -957,25 +806,18 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
 
         self.run_transaction(Transaction::UserTransaction(txn))?;
 
-        Ok(())
+        Ok((None, module))
     }
 
     fn execute_script(
         &mut self,
         script: CompiledScript,
         type_args: Vec<TypeTag>,
-        signers: Vec<RawAddress>,
-        txn_args: Vec<TransactionArgument>,
+        signers: Vec<ParsedAddress>,
+        txn_args: Vec<MoveValue>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
     ) -> Result<(Option<String>, SerializedReturnValues)> {
-        if !extra_args.admin_script {
-            panic!(
-                "Transactions scripts are not currently allowed. \
-                If you intend to run an admin script, add the `--admin-script` option to the run command."
-            )
-        }
-
         if signers.len() != 2 {
             panic!("Expected 2 signer, got {}.", signers.len());
         }
@@ -1000,12 +842,13 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
 
         let private_key = match (extra_args.private_key, &signers[0]) {
             (Some(private_key), _) => self.resolve_private_key(&private_key),
-            (None, RawAddress::Named(named_addr)) => match self.private_key_mapping.get(named_addr)
-            {
-                Some(private_key) => private_key.clone(),
-                None => panic_missing_private_key_named("run", named_addr),
-            },
-            (None, RawAddress::Anonymous(_)) => panic_missing_private_key("run"),
+            (None, ParsedAddress::Named(named_addr)) => {
+                match self.private_key_mapping.get(named_addr) {
+                    Some(private_key) => private_key.clone(),
+                    None => panic_missing_private_key_named("run", named_addr.as_str()),
+                }
+            }
+            (None, ParsedAddress::Numerical(_)) => panic_missing_private_key("run"),
         };
 
         let mut script_blob = vec![];
@@ -1017,13 +860,19 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             None,
             None,
             None,
-            None,
         )?;
 
         let txn = RawTransaction::new_writeset_script(
             signer0,
             params.sequence_number,
-            TransactionScript::new(script_blob, type_args, txn_args),
+            TransactionScript::new(
+                script_blob,
+                type_args,
+                txn_args
+                    .into_iter()
+                    .map(|arg| TransactionArgument::try_from(arg).unwrap())
+                    .collect(),
+            ),
             signer1,
             ChainId::test(),
         )
@@ -1053,8 +902,8 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         module: &ModuleId,
         function: &IdentStr,
         type_args: Vec<TypeTag>,
-        signers: Vec<RawAddress>,
-        txn_args: Vec<TransactionArgument>,
+        signers: Vec<ParsedAddress>,
+        txn_args: Vec<MoveValue>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
     ) -> Result<(Option<String>, SerializedReturnValues)> {
@@ -1069,19 +918,19 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
 
         let private_key = match (extra_args.private_key, &signers[0]) {
             (Some(private_key), _) => self.resolve_private_key(&private_key),
-            (None, RawAddress::Named(named_addr)) => match self.private_key_mapping.get(named_addr)
-            {
-                Some(private_key) => private_key.clone(),
-                None => panic_missing_private_key_named("run", named_addr),
-            },
-            (None, RawAddress::Anonymous(_)) => panic_missing_private_key("run"),
+            (None, ParsedAddress::Named(named_addr)) => {
+                match self.private_key_mapping.get(named_addr) {
+                    Some(private_key) => private_key.clone(),
+                    None => panic_missing_private_key_named("run", named_addr.as_str()),
+                }
+            }
+            (None, ParsedAddress::Numerical(_)) => panic_missing_private_key("run"),
         };
 
         let params = self.fetch_transaction_parameters(
             &signer,
             extra_args.sequence_number,
             extra_args.expiration_time,
-            extra_args.gas_currency_code,
             extra_args.gas_unit_price,
             gas_budget,
         )?;
@@ -1092,7 +941,12 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                 module.clone(),
                 function.to_owned(),
                 type_args,
-                convert_txn_args(&txn_args),
+                convert_txn_args(
+                    &txn_args
+                        .into_iter()
+                        .map(|arg| TransactionArgument::try_from(arg).unwrap())
+                        .collect::<Vec<_>>(),
+                ),
             ),
             params.max_gas_amount,
             params.gas_unit_price,
@@ -1147,8 +1001,15 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         match input.command {
             AptosSubCommand::BlockCommand(block_cmd) => {
                 let proposer = self.compiled_state().resolve_address(&block_cmd.proposer);
-                let metadata =
-                    BlockMetadata::new(HashValue::zero(), 0, block_cmd.time, vec![], proposer);
+                let metadata = BlockMetadata::new(
+                    HashValue::zero(),
+                    0,
+                    block_cmd.time,
+                    vec![],
+                    proposer,
+                    vec![],
+                    block_cmd.time,
+                );
 
                 let output = self.run_transaction(Transaction::BlockMetadata(metadata))?;
 
