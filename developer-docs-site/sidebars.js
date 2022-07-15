@@ -58,6 +58,7 @@ const sidebars = {
       items: [
         "guides/basics-life-of-txn",
         "guides/sign-a-transaction",
+        "guides/multisig-multiagent-transaction",
         "guides/move-guides/move-on-aptos",
         "guides/interacting-with-the-blockchain",
         "guides/building-wallet-extension",
