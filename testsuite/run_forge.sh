@@ -23,6 +23,11 @@ FORGE_RUNNER_MODE=${FORGE_RUNNER_MODE:-k8s}
 FORGE_NAMESPACE_KEEP=${FORGE_NAMESPACE_KEEP:-false}
 FORGE_ENABLE_HAPROXY=${FORGE_ENABLE_HAPROXY:-true}
 
+# if this script is not triggered in GHA, use a default value
+if [ -z "$GITHUB_RUN_ID" ]; then
+    GITHUB_RUN_ID=0
+fi
+
 if [ -z "$FORGE_NAMESPACE" ]; then
     namespace="forge-${USER}-$(date '+%s')"
     echo "FORGE_NAMESPACE not set, using auto-generated namespace: ${namespace}"
@@ -80,7 +85,7 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
         ps -A | grep  "kubectl port-forward -n $FORGE_NAMESPACE" | awk '{ print $1 }' | xargs -I{} kill -9 {}
     fi
 
-else
+elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
     # try deleting existing forge pod of same name
     # since forge test runner will run in a pod that matches the namespace
     # this will pre-empt the existing forge test in the same namespace and ensures
@@ -111,6 +116,12 @@ else
     else
         FORGE_EXIT_CODE=1
     fi
+elif [ "$FORGE_RUNNER_MODE" = "dry-run" ]; then
+    # assume you already have the local report and output files
+    FORGE_EXIT_CODE=0
+else
+    echo "Invalid FORGE_RUNNER_MODE: ${FORGE_RUNNER_MODE}"
+    exit 1
 fi
 
 FORGE_END_TIME_MS="$(date '+%s')000"
@@ -126,13 +137,19 @@ fi
 # TODO(rustielin): do not block on perf regressions for now until Forge network performance stabilizes
 AVG_TPS=$(cat $FORGE_REPORT | grep -oE '\d+ TPS' | awk '{print $1}')
 P99_LATENCY=$(cat $FORGE_REPORT | grep -oE '\d+ ms p99 latency' | awk '{print $1}')
-if [ -n "$AVG_TPS" ] && [ "$AVG_TPS" -lt "$TPS_THRESHOLD" ]; then
-    echo "(\!) AVG_TPS: ${AVG_TPS} < ${TPS_THRESHOLD} tps"
-    # FORGE_EXIT_CODE=1
+if [ -n "$AVG_TPS" ]; then
+    echo "AVG_TPS: ${AVG_TPS}"
+    echo "forge_job_avg_tps {FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\",GITHUB_RUN_ID=\"$GITHUB_RUN_ID\"} $AVG_TPS" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
+    if [[ "$AVG_TPS" -lt "$AVG_TPS_MS_THRESHOLD" ]]; then
+        echo "(\!) AVG_TPS: ${avg_tps} < ${TPS_THRESHOLD} tps"
+    fi
 fi
-if [ -n "$P99_LATENCY" ] && [ "$P99_LATENCY" -gt "$P99_LATENCY_MS_THRESHOLD" ]; then
-    echo "(\!) P99_LATENCY: ${P99_LATENCY} > 5000 ms"
-    # FORGE_EXIT_CODE=1
+if [ -n "$P99_LATENCY" ]; then
+    echo "P99_LATENCY: ${P99_LATENCY}"
+    echo "forge_job_p99_latency {FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\",GITHUB_RUN_ID=\"$GITHUB_RUN_ID\"} $P99_LATENCY" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
+    if [[ "$P99_LATENCY" -gt "$P99_LATENCY_MS_THRESHOLD" ]]; then
+        echo "(\!) P99_LATENCY: ${P99_LATENCY} > ${P99_LATENCY_MS_THRESHOLD} ms"
+    fi
 fi
 
 # If no report text was generated, fill with default text
@@ -164,3 +181,6 @@ echo '```'
 echo "=====END FORGE COMMENT====="
 
 echo "Forge exit with: $FORGE_EXIT_CODE"
+
+# report metrics to pushgateway
+echo "forge_job_status {FORGE_EXIT_CODE=\"$FORGE_EXIT_CODE\",FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\"} $GITHUB_RUN_ID" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge

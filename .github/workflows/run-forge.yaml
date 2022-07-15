@@ -31,6 +31,7 @@ env:
   FORGE_CLUSTER_NAME: ${{ secrets.FORGE_CLUSTER_NAME }}
   FORGE_OUTPUT: forge_output.txt
   FORGE_REPORT: forge_report.json
+  FORGE_RUNNER_MODE: k8s
   FORGE_NAMESPACE: ${{ inputs.FORGE_NAMESPACE }}
   GRAFANA_BASE_URL: ${{ secrets.GRAFANA_BASE_URL }}
 
@@ -74,11 +75,6 @@ jobs:
           echo "FORGE_COMMENT_HEADER=$FORGE_COMMENT_HEADER" >> $GITHUB_ENV
           echo "FORGE_DASHBOARD_LINK=$FORGE_DASHBOARD_LINK" >> $GITHUB_ENV
           echo "FORGE_REPORT_TXT=$FORGE_REPORT_TXT" >> $GITHUB_ENV
-
-          # report metrics to pushgateway
-          echo "forge_job_status {FORGE_EXIT_CODE=\"$FORGE_EXIT_CODE\",FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\"} $GITHUB_RUN_ID" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
-          echo "forge_job_avg_tps {FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\",GITHUB_RUN_ID=\"$GITHUB_RUN_ID\"} $AVG_TPS" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
-          echo "forge_job_p99_latency {FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\",GITHUB_RUN_ID=\"$GITHUB_RUN_ID\"} $P99_LATENCY" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
 
       - name: Post result as PR comment
         if: env.FORGE_ENABLED == 'true' && env.PR_NUMBER != null
