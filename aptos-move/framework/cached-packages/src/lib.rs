@@ -9,8 +9,9 @@ use move_deps::{
 use once_cell::sync::Lazy;
 
 pub mod aptos_stdlib;
+pub mod aptos_token_stdlib;
 
-static PACKAGE: Dir<'static> = include_dir!("$OUT_DIR");
+static PACKAGE: Dir<'static> = include_dir!("$OUT_DIR/framework");
 
 static MODULE_BLOBS: Lazy<Vec<Vec<u8>>> = Lazy::new(|| load_modules("build"));
 
@@ -87,8 +88,23 @@ pub fn module_blobs() -> &'static [Vec<u8>] {
 }
 
 #[test]
-fn verify_load() {
+fn verify_load_framework() {
     module_blobs();
     error_map();
-    std::fs::read(concat!(env!("OUT_DIR"), "/transaction_script_builder.rs")).unwrap();
+    std::fs::read(concat!(
+        env!("OUT_DIR"),
+        "/framework/transaction_script_builder.rs"
+    ))
+    .unwrap();
+}
+
+#[test]
+fn verify_load_token() {
+    module_blobs();
+    error_map();
+    std::fs::read(concat!(
+        env!("OUT_DIR"),
+        "/token/transaction_script_builder.rs"
+    ))
+    .unwrap();
 }

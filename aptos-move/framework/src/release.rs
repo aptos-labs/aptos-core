@@ -18,6 +18,9 @@ use std::{
 };
 use structopt::*;
 
+pub const CORE_FRAMEWORK_RELEASE_SUFFIX: &str = "framework";
+pub const TOKEN_RELEASE_SUFFIX: &str = "token";
+
 /// Options to configure the generation of a release.
 #[derive(Debug, StructOpt, Clone)]
 #[structopt(
