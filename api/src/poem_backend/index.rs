@@ -33,8 +33,9 @@ impl IndexApi {
         let node_role = self.context.node_role();
         let index_response = IndexResponse::new(ledger_info.clone(), node_role);
         Ok(AptosResponse::try_from_rust_value(
-            &accept_type,
             index_response,
+            &ledger_info,
+            &accept_type,
         )?)
     }
 }
