@@ -324,7 +324,7 @@ pub trait DbReader: Send + Sync {
     }
 
     /// Returns the latest state checkpoint version if any.
-    fn get_latest_state_checkpoint(&self) -> Result<Option<(Version, HashValue)>> {
+    fn get_latest_state_snapshot(&self) -> Result<Option<(Version, HashValue)>> {
         unimplemented!()
     }
 
@@ -568,7 +568,7 @@ impl MoveStorage for &dyn DbReader {
     }
 
     fn fetch_latest_state_checkpoint_version(&self) -> Result<Version> {
-        self.get_latest_state_checkpoint()?
+        self.get_latest_state_snapshot()?
             .ok_or_else(|| format_err!("[MoveStorage] Latest state checkpoint not found."))
             .map(|(v, _)| v)
     }

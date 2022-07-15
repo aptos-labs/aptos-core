@@ -37,7 +37,7 @@ impl DbReader for MockDbReaderWriter {
         Ok(Some(1))
     }
 
-    fn get_latest_state_checkpoint(&self) -> Result<Option<(Version, HashValue)>> {
+    fn get_latest_state_snapshot(&self) -> Result<Option<(Version, HashValue)>> {
         // return a dummy version for tests
         Ok(Some((1, HashValue::zero())))
     }
