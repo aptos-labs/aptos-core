@@ -370,9 +370,11 @@ module AptosFramework::Account {
     }
 
     /// Create the account for @AptosFramework to help module upgrades on testnet.
-    public(friend) fun create_core_framework_account(): signer {
+    public(friend) fun create_core_framework_account(): (signer, SignerCapability) {
         Timestamp::assert_genesis();
-        create_account_unchecked(@AptosFramework)
+        let signer = create_account_unchecked(@AptosFramework);
+        let signer_cap = SignerCapability { account: @AptosFramework };
+        (signer, signer_cap)
     }
 
     ///////////////////////////////////////////////////////////////////////////
