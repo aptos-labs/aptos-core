@@ -13,7 +13,7 @@ use crate::{
 };
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_genesis::config::{HostAndPort, ValidatorConfiguration};
-use aptos_rest_client::Transaction;
+use aptos_rest_client::{Response, Transaction};
 use aptos_types::{account_address::AccountAddress, account_config::aptos_root_address};
 use async_trait::async_trait;
 use clap::Parser;
@@ -429,9 +429,13 @@ impl CliCommand<serde_json::Value> for ShowValidatorStake {
     async fn execute(mut self) -> CliTypedResult<serde_json::Value> {
         let client = self.rest_options.client(&self.profile_options.profile)?;
         let address = self.operator_args.address(&self.profile_options)?;
-        let response = client
-            .get_resource(address, "0x1::Stake::StakePool")
-            .await?;
+        let response = get_resource_migration(
+            &client,
+            address,
+            "0x1::Stake::StakePool",
+            "0x1::stake::StakePool",
+        )
+        .await?;
         Ok(response.into_inner())
     }
 }
@@ -456,9 +460,13 @@ impl CliCommand<serde_json::Value> for ShowValidatorConfig {
     async fn execute(mut self) -> CliTypedResult<serde_json::Value> {
         let client = self.rest_options.client(&self.profile_options.profile)?;
         let address = self.operator_args.address(&self.profile_options)?;
-        let response = client
-            .get_resource(address, "0x1::Stake::ValidatorConfig")
-            .await?;
+        let response = get_resource_migration(
+            &client,
+            address,
+            "0x1::Stake::ValidatorConfig",
+            "0x1::stake::ValidatorConfig",
+        )
+        .await?;
         Ok(response.into_inner())
     }
 }
@@ -480,9 +488,26 @@ impl CliCommand<serde_json::Value> for ShowValidatorSet {
 
     async fn execute(mut self) -> CliTypedResult<serde_json::Value> {
         let client = self.rest_options.client(&self.profile_options.profile)?;
-        let response = client
-            .get_resource(aptos_root_address(), "0x1::Stake::ValidatorSet")
-            .await?;
+        let response = get_resource_migration(
+            &client,
+            aptos_root_address(),
+            "0x1::Stake::ValidatorSet",
+            "0x1::stake::ValidatorSet",
+        )
+        .await?;
         Ok(response.into_inner())
+    }
+}
+
+async fn get_resource_migration(
+    client: &aptos_rest_client::Client,
+    address: AccountAddress,
+    original_resource: &'static str,
+    new_resource: &'static str,
+) -> CliTypedResult<Response<serde_json::Value>> {
+    if let Ok(response) = client.get_resource(address, original_resource).await {
+        Ok(response)
+    } else {
+        Ok(client.get_resource(address, new_resource).await?)
     }
 }
