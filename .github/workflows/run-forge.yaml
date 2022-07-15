@@ -28,6 +28,7 @@ env:
   AWS_REGION: us-west-2
   IMAGE_TAG: ${{ inputs.GIT_SHA }}
   FORGE_ENABLED: ${{ secrets.FORGE_ENABLED }}
+  FORGE_BLOCKING: ${{ secrets.FORGE_BLOCKING }}
   FORGE_CLUSTER_NAME: ${{ secrets.FORGE_CLUSTER_NAME }}
   FORGE_OUTPUT: forge_output.txt
   FORGE_REPORT: forge_report.json
