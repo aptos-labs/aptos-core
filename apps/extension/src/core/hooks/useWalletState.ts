@@ -11,7 +11,8 @@ import {
   AptosNetwork, getFaucetNetworkFromAptosNetwork, getLocalStorageNetworkState,
 } from 'core/utils/network';
 import Browser from 'core/utils/browser';
-import { AptosAccount } from 'aptos';
+import { AptosAccount, FaucetClient } from 'aptos';
+import { toast } from 'core/components/Toast';
 
 const defaultValue: LocalStorageState = {
   aptosAccounts: undefined,
@@ -51,9 +52,10 @@ export default function useWalletState() {
     [aptosNetwork],
   );
 
-  const addAccount = useCallback(({
+  const addAccount = useCallback(async ({
     account,
   }: AddAccountProps) => {
+    const faucetClient = new FaucetClient(aptosNetwork, faucetNetwork);
     let localStorageStateCopy = { ...localStorageState };
     localStorageStateCopy = {
       aptosAccounts: {
@@ -63,25 +65,45 @@ export default function useWalletState() {
       currAccountAddress: account.address().hex(),
     };
     try {
+      await faucetClient.fundAccount(account.address(), 0);
       setLocalStorageState(localStorageStateCopy);
       window.localStorage.setItem(
         WALLET_STATE_LOCAL_STORAGE_KEY,
         JSON.stringify(localStorageStateCopy),
       );
       Browser.storage()?.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: localStorageStateCopy });
+      toast({
+        description: 'Successfully created new account',
+        duration: 5000,
+        isClosable: true,
+        status: 'success',
+        title: 'Created account',
+        variant: 'solid',
+      });
     } catch (err) {
+      toast({
+        description: 'Error creating new account',
+        duration: 5000,
+        isClosable: true,
+        status: 'error',
+        title: 'Error creating account',
+        variant: 'solid',
+      });
       console.error(err);
     }
   }, []);
 
-  const switchAccount = useCallback(({ account }: UpdateWalletStateProps) => {
-    if (!account) {
+  const switchAccount = useCallback(({ accountAddress }: RemoveAccountProps) => {
+    if (!accountAddress
+      || (localStorageState.aptosAccounts
+         && localStorageState.aptosAccounts[accountAddress] === undefined)
+    ) {
       console.error('No account found');
       return;
     }
     const localStorageStateCopy = {
       ...localStorageState,
-      currAccountAddress: account.address().hex(),
+      currAccountAddress: accountAddress,
     };
     try {
       setLocalStorageState(localStorageStateCopy);
@@ -90,7 +112,23 @@ export default function useWalletState() {
         JSON.stringify(localStorageStateCopy),
       );
       Browser.storage()?.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: localStorageStateCopy });
+      toast({
+        description: `Successfully switched account to ${accountAddress.substring(0, 6)}...`,
+        duration: 5000,
+        isClosable: true,
+        status: 'success',
+        title: 'Switched account',
+        variant: 'solid',
+      });
     } catch (error) {
+      toast({
+        description: 'Error during account switch',
+        duration: 5000,
+        isClosable: true,
+        status: 'error',
+        title: 'Error switch account',
+        variant: 'solid',
+      });
       console.error(error);
     }
   }, []);
@@ -107,15 +145,38 @@ export default function useWalletState() {
   const removeAccount = useCallback(({
     accountAddress,
   }: RemoveAccountProps) => {
+    let newAccountAddress: string | undefined;
+    let toastMessage = `Still using account with address: ${accountAddress?.substring(0, 6)}...`;
     let localStorageStateCopy = { ...localStorageState };
-    if (!accountAddress || !localStorageStateCopy.aptosAccounts) {
+    if (
+      !accountAddress
+      || !localStorageStateCopy.aptosAccounts
+      || localStorageStateCopy.aptosAccounts[accountAddress] === undefined
+    ) {
       console.error('No account found');
       return;
     }
     delete localStorageStateCopy.aptosAccounts[accountAddress];
+
+    if (Object.keys(localStorageStateCopy.aptosAccounts).length === 0) {
+      newAccountAddress = undefined;
+      toastMessage = 'No other accounts in wallet, signing out';
+    } else if (accountAddress === currAccountAddress) {
+      // switch to another account in wallet
+      if (Object.keys(localStorageStateCopy.aptosAccounts).length >= 1) {
+        newAccountAddress = localStorageStateCopy.aptosAccounts[
+          Object.keys(localStorageStateCopy.aptosAccounts)[0]
+        ].address;
+      }
+      toastMessage = `Switching to account with address: ${newAccountAddress?.substring(0, 6)}...`;
+    } else {
+      newAccountAddress = currAccountAddress;
+      toastMessage = `Using the same account with address: ${newAccountAddress?.substring(0, 6)}...`;
+    }
+
     localStorageStateCopy = {
       ...localStorageStateCopy,
-      currAccountAddress: undefined,
+      currAccountAddress: newAccountAddress,
     };
     try {
       setLocalStorageState(localStorageStateCopy);
@@ -124,7 +185,23 @@ export default function useWalletState() {
         JSON.stringify(localStorageStateCopy),
       );
       Browser.storage()?.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: localStorageStateCopy });
+      toast({
+        description: toastMessage,
+        duration: 5000,
+        isClosable: true,
+        status: 'success',
+        title: 'Deleted account',
+        variant: 'solid',
+      });
     } catch (err) {
+      toast({
+        description: 'Account deletion process incurred an error',
+        duration: 5000,
+        isClosable: true,
+        status: 'error',
+        title: 'Error deleting account',
+        variant: 'solid',
+      });
       console.error(err);
     }
   }, []);

@@ -28,7 +28,7 @@ import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtens
 import { secondaryBgColor, secondaryErrorMessageColor } from 'core/constants';
 import { getAccountResources } from 'core/queries/account';
 import AuthLayout from 'core/layouts/AuthLayout';
-import { Routes as PageRoutes } from 'core/routes';
+import Routes, { Routes as PageRoutes } from 'core/routes';
 import Analytics from 'core/utils/analytics/analytics';
 import { loginEvents } from 'core/utils/analytics/events';
 
@@ -77,7 +77,7 @@ function Login() {
         params: analyticsParams,
       });
       addAccount({ account });
-      navigate('/wallet');
+      navigate(Routes.login.routePath);
     } catch (err) {
       Analytics.event({
         eventType: loginEvents.ERROR_LOGIN_WITH_PRIVATE_KEY,

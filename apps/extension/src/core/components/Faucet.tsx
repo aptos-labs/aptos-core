@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  Button, useToast,
+  Button,
 } from '@chakra-ui/react';
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -13,10 +13,10 @@ import { useMutation, useQueryClient } from 'react-query';
 import { LOCAL_FAUCET_URL } from 'core/constants';
 import Analytics from 'core/utils/analytics/analytics';
 import { faucetEvents } from 'core/utils/analytics/events';
+import { toast } from './Toast';
 
 export default function Faucet() {
   const { aptosAccount, aptosNetwork, faucetNetwork } = useWalletState();
-  const toast = useToast();
   const queryClient = useQueryClient();
   const {
     isLoading: isFaucetLoading,

@@ -10,6 +10,7 @@ import {
   useRadio,
   UseRadioProps,
 } from '@chakra-ui/react';
+import { secondaryBgColor, secondaryHoverBgColor } from 'core/colors';
 import { LOCAL_NODE_URL } from 'core/constants';
 import {
   AptosNetwork,
@@ -21,16 +22,6 @@ export interface SettingsListItemProps {
   title?: 'Mainnet' | 'Testnet' | 'Devnet' | 'Localhost';
   value: AptosNetwork;
 }
-
-const secondaryBgColor = {
-  dark: 'gray.600',
-  light: 'gray.100',
-};
-
-const secondaryHoverBgColor = {
-  dark: 'gray.700',
-  light: 'gray.200',
-};
 
 export default function NetworkListItem(props: UseRadioProps & { isLoading: boolean }) {
   const { getCheckboxProps, getInputProps } = useRadio(props);

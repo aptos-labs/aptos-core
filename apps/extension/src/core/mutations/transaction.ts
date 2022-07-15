@@ -1,13 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { useToast } from '@chakra-ui/react';
 import {
   AptosAccount, AptosClient, MaybeHexString, Types, TxnBuilderTypes, BCS,
 } from 'aptos';
 import {
   AccountAddress, Identifier, StructTag, TypeTagStruct,
 } from 'aptos/dist/transaction_builder/aptos_types';
+import { toast } from 'core/components/Toast';
 import useWalletState from 'core/hooks/useWalletState';
 import {
   type GetTestCoinTokenBalanceFromAccountResourcesProps,
@@ -191,7 +191,6 @@ export const submitTestCoinTransferTransaction = async ({
 export const useSubmitTestCoinTransfer = () => {
   const { aptosNetwork } = useWalletState();
   const queryClient = useQueryClient();
-  const toast = useToast();
 
   return useMutation(submitTestCoinTransferTransaction, {
     onSettled: async (data) => {

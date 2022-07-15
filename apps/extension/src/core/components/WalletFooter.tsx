@@ -12,9 +12,9 @@ import { useLocation } from 'react-router-dom';
 import { SettingsIcon } from '@chakra-ui/icons';
 import ChakraLink from './ChakraLink';
 
-const secondaryHeaderBgColor = {
+const secondaryFooterBgColor = {
   dark: 'gray.700',
-  light: 'gray.200',
+  light: 'gray.100',
 };
 
 const secondaryIconColor = {
@@ -35,8 +35,7 @@ export default function WalletFooter() {
     <Center
       maxW="100%"
       width="100%"
-      py={2}
-      bgColor={secondaryHeaderBgColor[colorMode]}
+      bgColor={secondaryFooterBgColor[colorMode]}
     >
       <SimpleGrid width="100%" gap={4} columns={4}>
         <Center width="100%">

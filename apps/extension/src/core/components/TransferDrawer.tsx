@@ -177,6 +177,7 @@ function TransferDrawer() {
                         toAddressRef(e);
                         addressInputRef.current = e || undefined;
                       }}
+                      textOverflow="ellipsis"
                       {...toAddressRest}
                     />
                   </InputGroup>

@@ -13,6 +13,9 @@ import { Routes as PageRoutes } from 'core/routes';
 import { WalletStateProvider } from 'core/hooks/useWalletState';
 import ReactGA from 'react-ga4';
 import { getLocalStorageNetworkState } from 'core/utils/network';
+import { createStandaloneToast } from '@chakra-ui/toast';
+
+const { ToastContainer } = createStandaloneToast();
 
 ReactGA.initialize('G-VFLV1PF59M');
 ReactGA.send({
@@ -56,5 +59,6 @@ root.render(
         </WalletStateProvider>
       </ChakraProvider>
     </QueryClientProvider>
+    <ToastContainer />
   </StrictMode>,
 );

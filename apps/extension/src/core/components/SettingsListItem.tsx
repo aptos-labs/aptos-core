@@ -23,17 +23,17 @@ export interface SettingsListItemProps {
   title: string;
 }
 
-const secondaryGridHoverBgColor = {
+export const secondaryGridHoverBgColor = {
   dark: 'gray.600',
   light: 'gray.200',
 };
 
-const secondaryGridBgColor = {
+export const secondaryGridBgColor = {
   dark: 'gray.700',
   light: 'gray.100',
 };
 
-const secondaryTextColor = {
+export const secondaryTextColor = {
   dark: 'white',
   light: 'black',
 };

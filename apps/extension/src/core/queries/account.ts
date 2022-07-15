@@ -125,15 +125,23 @@ export const useAccountExists = ({
   return useQuery([accountQueryKeys.getAccountExists, address], getAccountExistsQuery);
 };
 
-export const useAccountResources = () => {
+interface UseAccountResourcesProps {
+  address?: string;
+  refetchInterval?: number | false
+}
+
+export const useAccountResources = (props?: UseAccountResourcesProps) => {
   const { aptosAccount, aptosNetwork } = useWalletState();
 
   return useQuery(
-    accountQueryKeys.getAccountResources,
+    [
+      accountQueryKeys.getAccountResources,
+      props?.address,
+    ],
     () => getAccountResources({
-      address: aptosAccount?.address(),
+      address: props?.address || aptosAccount?.address(),
       nodeUrl: aptosNetwork,
     }),
-    { refetchInterval: 2000 },
+    { refetchInterval: props?.refetchInterval || 2000 },
   );
 };

@@ -13,7 +13,6 @@ import {
   useColorMode,
   VStack,
 } from '@chakra-ui/react';
-import { FaucetClient } from 'aptos';
 import React, { useState } from 'react';
 import useWalletState from 'core/hooks/useWalletState';
 import ChakraLink from 'core/components/ChakraLink';
@@ -54,7 +53,7 @@ export function CredentialHeaderAndBody({
 function NewAccountState() {
   const [isAccountBeingCreated, setIsAccountBeingCreated] = useState<boolean>(false);
   const {
-    addAccount, aptosAccount, aptosNetwork, faucetNetwork,
+    addAccount, aptosAccount,
   } = useWalletState();
   const privateKeyObject = aptosAccount?.toPrivateKeyObject();
   const privateKeyHex = privateKeyObject?.privateKeyHex;
@@ -63,11 +62,9 @@ function NewAccountState() {
 
   const createAccountOnClick = async () => {
     setIsAccountBeingCreated(true);
-    const faucetClient = new FaucetClient(aptosNetwork, faucetNetwork);
     const account = createNewAccount();
-    await faucetClient.fundAccount(account.address(), 0);
     Analytics.event({ eventType: createAccountEvents.CREATE_ACCOUNT });
-    addAccount({ account });
+    await addAccount({ account });
     setIsAccountBeingCreated(false);
   };
 

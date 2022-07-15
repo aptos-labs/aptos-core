@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { useToast } from '@chakra-ui/react';
 import { FaucetClient } from 'aptos';
+import toast from 'core/components/Toast';
 import { LOCAL_NODE_URL } from 'core/constants';
 import useWalletState from 'core/hooks/useWalletState';
 import { getAccountExists } from 'core/queries/account';
@@ -20,7 +20,6 @@ export const useSwitchNetwork = () => {
   const {
     aptosAccount, aptosNetwork, updateNetworkState,
   } = useWalletState();
-  const toast = useToast();
 
   const mutation = async ({
     event,

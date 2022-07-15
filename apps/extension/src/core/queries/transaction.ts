@@ -8,6 +8,7 @@ import { useQuery } from 'react-query';
 import { ScriptFunctionPayload, UserTransaction } from 'aptos/dist/api/data-contracts';
 
 export const transactionQueryKeys = Object.freeze({
+  getAccountLatestTransactionTimestamp: 'getAccountLatestTransactionTimestamp',
   getCoinTransferTransactions: 'getCoinTransferTransactions',
 } as const);
 
@@ -97,5 +98,53 @@ export function useCoinTransferTransactions() {
   return useQuery(
     transactionQueryKeys.getCoinTransferTransactions,
     getCoinTransferTransactionsQuery,
+  );
+}
+
+export interface GetAccountLatestTransactionTimestamp {
+  address: string;
+  nodeUrl: string;
+}
+
+export async function getAccountLatestTransactionTimestamp({
+  address,
+  nodeUrl,
+}:GetAccountLatestTransactionTimestamp) {
+  const txns = await getAccountUserTransactions({ address, nodeUrl });
+
+  // milliseconds
+  const latestTxnTimestamp = Number(txns.pop()?.timestamp.substring(0, 13));
+  const date = (latestTxnTimestamp) ? new Date(latestTxnTimestamp) : undefined;
+  return date;
+}
+
+export interface UseAccountLatestTransactionTimestampProps {
+  address: string;
+  refetchInterval?: number | false;
+}
+
+export function useAccountLatestTransactionTimestamp({
+  address,
+  refetchInterval,
+}: UseAccountLatestTransactionTimestampProps) {
+  const { aptosNetwork } = useWalletState();
+
+  const getCoinTransferTransactionsQuery = useCallback(
+    async () => getAccountLatestTransactionTimestamp({
+      address,
+      nodeUrl: aptosNetwork,
+    }),
+    [address, aptosNetwork],
+  );
+
+  return useQuery(
+    [
+      transactionQueryKeys.getAccountLatestTransactionTimestamp,
+      address,
+    ],
+    getCoinTransferTransactionsQuery,
+    {
+      refetchInterval,
+    },
   );
 }

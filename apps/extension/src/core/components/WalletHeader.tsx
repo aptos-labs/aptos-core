@@ -3,23 +3,39 @@
 
 import {
   Box,
+  Button,
+  ButtonGroup,
   Center,
+  Drawer,
+  DrawerBody,
+  DrawerContent,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerOverlay,
   Grid,
   HStack,
+  Input,
+  InputGroup,
+  InputLeftAddon,
+  InputRightAddon,
   Text,
+  Tooltip,
+  useClipboard,
   useColorMode,
+  useDisclosure,
 } from '@chakra-ui/react';
-import React from 'react';
+import React, { useState } from 'react';
 import useWalletState from 'core/hooks/useWalletState';
-import { ChevronLeftIcon } from '@chakra-ui/icons';
-import Copyable from 'core/components/Copyable';
-import { collapseHexString } from 'core/utils/hex';
+import {
+  AddIcon, ChevronLeftIcon, DragHandleIcon,
+} from '@chakra-ui/icons';
+import { secondaryBorderColor, secondaryHeaderInputBgColor, secondaryHeaderInputHoverBgColor } from 'core/colors';
+import { IoIosWallet } from '@react-icons/all-files/io/IoIosWallet';
+import { AptosAccount } from 'aptos';
+import { useNavigate } from 'react-router-dom';
+import Routes from 'core/routes';
 import ChakraLink from './ChakraLink';
-
-const secondaryHeaderBgColor = {
-  dark: 'gray.700',
-  light: 'gray.200',
-};
+import WalletDrawerBody from './WalletDrawerBody';
 
 export const secondaryAddressFontColor = {
   dark: 'gray.400',
@@ -33,17 +49,32 @@ interface WalletHeaderProps {
 export default function WalletHeader({
   backPage,
 }: WalletHeaderProps) {
-  const { aptosAccount } = useWalletState();
+  const { addAccount, aptosAccount } = useWalletState();
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const navigate = useNavigate();
+  const { isOpen, onClose, onOpen } = useDisclosure();
   const { colorMode } = useColorMode();
+  const { hasCopied, onCopy } = useClipboard(
+    aptosAccount?.address().hex() || '',
+  );
+
+  const newWalletOnClick = async () => {
+    const blankAptosAccount = new AptosAccount();
+    setIsLoading(true);
+    await addAccount({ account: blankAptosAccount });
+    setIsLoading(false);
+    navigate(Routes.login.routePath);
+  };
 
   return (
     <Grid
       maxW="100%"
       width="100%"
-      py={2}
-      height="40px"
-      templateColumns="40px 1fr 40px"
-      bgColor={secondaryHeaderBgColor[colorMode]}
+      py={4}
+      height="64px"
+      templateColumns={backPage ? '40px 1fr' : '1fr'}
+      borderBottomColor={secondaryBorderColor[colorMode]}
+      borderBottomWidth="1px"
     >
       {(backPage) ? (
         <Center>
@@ -52,29 +83,93 @@ export default function WalletHeader({
           </ChakraLink>
         </Center>
       ) : <Box />}
-      <Center>
-        <HStack px={2}>
-          <Text
-            fontSize="xs"
-            color={secondaryAddressFontColor[colorMode]}
-          >
-            Address
-          </Text>
-          <Copyable value={aptosAccount!.address()}>
-            <Text whiteSpace="nowrap" as="span">
-              <Text
-                fontSize="xs"
-                as="span"
-                whiteSpace="nowrap"
-                overflow="hidden"
-                display="block"
-                noOfLines={1}
-                maxW={['100px', '120px']}
+      <Center width="100%">
+        <HStack
+          px={4}
+          pl={(backPage) ? 0 : 4}
+          width="100%"
+        >
+          <InputGroup size="sm">
+            <InputLeftAddon
+              borderLeftRadius=".5rem"
+              bgColor={secondaryHeaderInputBgColor[colorMode]}
+              borderColor={secondaryBorderColor[colorMode]}
+              borderWidth="0px"
+            >
+              <IoIosWallet />
+            </InputLeftAddon>
+            <Tooltip
+              label={hasCopied ? 'Copied!' : 'Copy address'}
+              closeDelay={300}
+            >
+              <Input
+                size="sm"
+                readOnly
+                value={aptosAccount?.address().hex()}
+                onClick={onCopy}
+                borderColor={secondaryBorderColor[colorMode]}
+                bgColor={secondaryHeaderInputBgColor[colorMode]}
+                borderWidth="0px"
+                borderRadius={0}
+                cursor="pointer"
+                textOverflow="ellipsis"
+                _hover={{
+                  backgroundColor: secondaryHeaderInputHoverBgColor[colorMode],
+                }}
+              />
+            </Tooltip>
+            <Tooltip label="Switch wallet" closeDelay={300}>
+              <InputRightAddon
+                onClick={onOpen}
+                borderRightRadius=".5rem"
+                borderColor={secondaryBorderColor[colorMode]}
+                bgColor={secondaryHeaderInputBgColor[colorMode]}
+                borderWidth="0px"
+                cursor="pointer"
+                _hover={{
+                  backgroundColor: secondaryHeaderInputHoverBgColor[colorMode],
+                }}
               >
-                { collapseHexString(aptosAccount!.address(), 12) }
-              </Text>
-            </Text>
-          </Copyable>
+                <DragHandleIcon />
+              </InputRightAddon>
+            </Tooltip>
+          </InputGroup>
+          <Drawer placement="bottom" onClose={onClose} isOpen={isOpen}>
+            <DrawerOverlay />
+            <DrawerContent>
+              <DrawerHeader
+                px={4}
+                borderBottomWidth="1px"
+              >
+                <Grid templateColumns="1fr 150px">
+                  <Text>Wallets</Text>
+                  <ButtonGroup justifyContent="flex-end">
+                    <Button
+                      colorScheme="teal"
+                      size="sm"
+                      leftIcon={<AddIcon />}
+                      onClick={newWalletOnClick}
+                      isLoading={isLoading}
+                    >
+                      New Wallet
+                    </Button>
+                  </ButtonGroup>
+                </Grid>
+              </DrawerHeader>
+              <DrawerBody px={4} maxH="400px">
+                <WalletDrawerBody />
+              </DrawerBody>
+              <DrawerFooter
+                px={4}
+                borderTopWidth="1px"
+                borderTopColor={secondaryBorderColor[colorMode]}
+              >
+                <Button onClick={onClose}>
+                  Close
+                </Button>
+              </DrawerFooter>
+            </DrawerContent>
+          </Drawer>
         </HStack>
       </Center>
       <Box />
