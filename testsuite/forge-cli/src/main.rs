@@ -141,9 +141,9 @@ struct Resize {
     move_modules_dir: Option<String>,
     #[structopt(
         long,
-        help = "If set, uses kubectl port-forward instead of assuming k8s DNS access"
+        help = "If set, dont use kubectl port forward to access the cluster"
     )]
-    port_forward: bool,
+    connect_directly: bool,
 }
 
 fn main() -> Result<()> {
@@ -224,7 +224,7 @@ fn main() -> Result<()> {
                     resize.validator_image_tag,
                     resize.testnet_image_tag,
                     resize.move_modules_dir,
-                    resize.port_forward,
+                    !resize.connect_directly,
                 ))?;
                 Ok(())
             }
