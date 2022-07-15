@@ -1,0 +1,55 @@
+---
+title: "Sending a Transaction"
+slug: "transaction"
+---
+# Sending a Transaction
+
+Once a web app is connected to <CompanyName />, it can prompt the user to sign and send transactions.
+
+There a couple different ways the wallet api handles transactions:
+1. Sign a transaction, and then submit it to chain. Returing a pending transaction.
+2. Sign a transaction. Returning the signed transaction to be submitted by the web app.
+
+<Info>For more information about Aptos' transactions, please review the [sdk](https://aptos-labs.github.io/ts-sdk-doc/).</Info>
+
+
+## Sign and Submit
+
+```typescript
+const wallet = getAptosWallet(); // see "Connecting"
+
+// Example transaction
+const transaction = {
+    type: 'script_function_payload',
+    function: '0x1::Coin::transfer',
+    type_arguments: ['0x1::TestCoin::TestCoin'],
+    arguments: ['<receiverAddress>', amount]
+}
+
+try {
+    const pendingTransaction = await (window as any).aptos.signAndSubmitTransaction(transaction)
+} catch (error)
+    // see "Errors"
+}
+```
+
+
+## Sign Transaction
+
+```typescript
+const wallet = getAptosWallet(); // see "Connecting"
+
+// Example transaction
+const transaction = {
+    type: 'script_function_payload',
+    function: '0x1::Coin::transfer',
+    type_arguments: ['0x1::TestCoin::TestCoin'],
+    arguments: ['<receiverAddress>', amount]
+}
+
+try {
+    const signTransaction = await (window as any).aptos.signTransaction(transaction)
+} catch (error)
+    // see "Errors"
+}
+```

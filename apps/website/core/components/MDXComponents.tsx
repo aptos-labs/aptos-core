@@ -7,6 +7,7 @@ import { secondaryLinkColor } from 'core/colors';
 import { COMPANY_NAME } from 'core/constants';
 import dynamic from 'next/dynamic';
 import ChakraLink from './ChakraLink';
+import Info from './Info';
 
 const ifmH2VerticalRhythmTop = 2;
 const ifmH3VerticalRhythmTop = 1.5;
@@ -134,8 +135,14 @@ const ListItem = (props: any) => (
   />
 );
 
+const Table = (props: any) => (
+  <table style={{ border: '1px solid black' }} {...props} />
+);
+
 export const components = {
   CompanyName,
+  Info,
+  Table,
   a: Link,
   code: DynamicCodeBlock,
   h1: Heading1,

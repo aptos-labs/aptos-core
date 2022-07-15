@@ -1,0 +1,48 @@
+---
+title: "Connecting"
+slug: "connect"
+---
+
+# Detecting the Wallet
+
+First we need to make sure that the user has the wallet installed. The wallet injects an `aptos` object into the [window](https://developer.mozilla.org/en-US/docs/Web/API/Window) of any web app the user visits. So to check if the user has the wallet installed we can simply check:
+
+```typescript
+const isAptosInstalled = window.aptos
+```
+
+If the wallet is not installed you can redirect the user to our download page. This could look like:
+```typescript
+const getAptosWallet = () => {
+    if ('aptos' in window) {
+        return window.aptos;
+    } else {
+        window.open('https://aptos.app/', `_blank`);
+    }
+}
+```
+
+# Connecting
+Now that we have the `aptos` object, we can connect to it. Calling `connect` prompts the user to allow your web app to make additional calls to the wallet, and get basic information like the `address` and `public key`.
+
+Once a user has approved the connnection for the first time, the web app's domain will be remembered for future sessions. Though a user or web app can `disconnect` if they decide to.
+
+```typescript
+const wallet = getAptosWallet();
+try {
+    const response = await wallet.connect();
+    console.log(response); // { address: string, address: string }
+
+    const account = await wallet.account();
+    console.log(account); // { address: string, address: string }
+} catch (error) {
+    // { code: 4001, message: "User rejected the request."}
+}
+```
+
+# Disconnecting
+There may come a time where you want the wallet to forget about the connection status. To do this simply call `disconnect`. The web app will need to reconnect to the wallet the next time it wants to make requests.
+
+```typescript
+await wallet.disconnect();
+```

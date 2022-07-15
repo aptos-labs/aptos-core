@@ -12,5 +12,8 @@ export const docsFilePaths = fs
 
 export const docsSlugOrdering = Object.freeze([
   'getting-started',
-  'building-wallet-extension',
+  'connect',
+  'transaction',
+  'message',
+  'errors',
 ]);

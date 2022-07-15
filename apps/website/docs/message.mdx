@@ -1,0 +1,20 @@
+---
+title: "Signing Messages"
+slug: "message"
+---
+
+# Signing Messages
+A web app can also request to sign a message. Web apps can write their own message, then send it to the wallet (`wallet.signMessage()`). The user will be prompted to sign that message, and then signed message will be returned to the web application. The most common usecase for this is verifying ownership of an address or public key.
+
+```typescript
+const wallet = getAptosWallet(); // see "Connecting"
+
+const message = "hello";
+
+try {
+    const signedMessage = await wallet.signMessage(message);
+    // verify message
+} catch (error)
+    // see "Errors"
+}
+```
