@@ -8,6 +8,7 @@ use aptos_crypto::{
     HashValue, PrivateKey, Uniform,
 };
 use aptos_data_client::GlobalDataSummary;
+use aptos_types::on_chain_config::ValidatorSet;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -37,7 +38,6 @@ use futures::StreamExt;
 use mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
 use move_deps::move_core_types::language_storage::TypeTag;
 use std::collections::BTreeMap;
-use storage_interface::{ExecutedTrees, StartupInfo};
 use storage_service_types::CompleteDataRange;
 
 /// Creates a new data stream listener and notification sender pair
@@ -51,7 +51,7 @@ pub fn create_data_stream_listener() -> (Sender<(), DataNotification>, DataStrea
 
 /// Creates a test epoch ending ledger info
 pub fn create_epoch_ending_ledger_info() -> LedgerInfoWithSignatures {
-    let ledger_info = LedgerInfo::new(BlockInfo::random(0), HashValue::zero());
+    let ledger_info = LedgerInfo::genesis(HashValue::zero(), ValidatorSet::empty());
     LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
 }
 
@@ -119,39 +119,16 @@ pub fn create_random_epoch_ending_ledger_info(
     LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
 }
 
-/// Creates a test startup info
-pub fn create_startup_info() -> StartupInfo {
-    StartupInfo::new(
-        create_epoch_ending_ledger_info(),
-        Some(EpochState::empty()),
-        ExecutedTrees::new_empty(),
-        None,
-    )
+/// Returns an empty epoch state
+pub fn create_empty_epoch_state() -> EpochState {
+    EpochState::empty()
 }
 
-/// Creates a test startup info at the given version and epoch
-pub fn create_startup_info_at_version_epoch(version: Version, epoch: Epoch) -> StartupInfo {
-    let mut startup_info = create_startup_info();
-
-    // Set the latest ledger info
-    let block_info = BlockInfo::new(
-        epoch,
-        0,
-        HashValue::zero(),
-        HashValue::random(),
-        version,
-        0,
-        None,
-    );
-    let ledger_info = LedgerInfo::new(block_info, HashValue::random());
-    startup_info.latest_ledger_info = LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new());
-
-    // Set the latest epoch state
-    let mut latest_epoch_state = EpochState::empty();
-    latest_epoch_state.epoch = epoch;
-    startup_info.latest_epoch_state = Some(latest_epoch_state);
-
-    startup_info
+/// Returns an epoch state at the specified epoch
+pub fn create_epoch_state(epoch: u64) -> EpochState {
+    let mut epoch_state = create_empty_epoch_state();
+    epoch_state.epoch = epoch;
+    epoch_state
 }
 
 /// Creates a test state value chunk with proof

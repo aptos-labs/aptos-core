@@ -24,7 +24,7 @@ use event_notifications::EventSubscriptionService;
 use futures::StreamExt;
 use mempool_notifications::MempoolNotificationSender;
 use std::{sync::Arc, time::Duration};
-use storage_interface::{DbReader, StartupInfo};
+use storage_interface::DbReader;
 use tokio::time::timeout;
 
 // TODO(joshlind): make these configurable!
@@ -176,16 +176,24 @@ pub async fn handle_end_of_stream_or_invalid_payload<
 
 /// Fetches the latest epoch state from the specified storage
 pub fn fetch_latest_epoch_state(storage: Arc<dyn DbReader>) -> Result<EpochState, Error> {
-    let startup_info = fetch_startup_info(storage)?;
-    Ok(startup_info.get_epoch_state().clone())
+    storage.get_latest_epoch_state().map_err(|error| {
+        Error::StorageError(format!(
+            "Failed to get the latest epoch state from storage: {:?}",
+            error
+        ))
+    })
 }
 
 /// Fetches the latest synced ledger info from the specified storage
 pub fn fetch_latest_synced_ledger_info(
     storage: Arc<dyn DbReader>,
 ) -> Result<LedgerInfoWithSignatures, Error> {
-    let startup_info = fetch_startup_info(storage)?;
-    Ok(startup_info.latest_ledger_info)
+    storage.get_latest_ledger_info().map_err(|error| {
+        Error::StorageError(format!(
+            "Failed to get the latest ledger info from storage: {:?}",
+            error
+        ))
+    })
 }
 
 /// Fetches the latest synced version from the specified storage
@@ -202,17 +210,6 @@ pub fn fetch_latest_synced_version(storage: Arc<dyn DbReader>) -> Result<Version
     latest_transaction_info
         .ok_or_else(|| Error::StorageError("Latest transaction info is missing!".into()))
         .map(|(latest_synced_version, _)| latest_synced_version)
-}
-
-/// Fetches the startup info from the specified storage
-fn fetch_startup_info(storage: Arc<dyn DbReader>) -> Result<StartupInfo, Error> {
-    let startup_info = storage.get_startup_info().map_err(|error| {
-        Error::StorageError(format!(
-            "Failed to get startup info from storage: {:?}",
-            error
-        ))
-    })?;
-    startup_info.ok_or_else(|| Error::StorageError("Missing startup info from storage".into()))
 }
 
 /// Initializes all relevant metric gauges (e.g., after a reboot
