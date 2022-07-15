@@ -10,6 +10,7 @@ members = [
     "aptos-move/aptos-sdk-builder",
     "aptos-move/aptos-transaction-benchmarks",
     "aptos-move/aptos-validator-interface",
+    "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-vm",
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",

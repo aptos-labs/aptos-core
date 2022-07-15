@@ -1165,6 +1165,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-transactional-test-harness"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-keygen",
+ "aptos-state-view",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-vm",
+ "bcs",
+ "cached-framework-packages",
+ "clap 3.2.10",
+ "datatest-stable",
+ "framework",
+ "hex",
+ "language-e2e-tests",
+ "move-deps",
+ "once_cell",
+ "vm-genesis",
+]
+
+[[package]]
 name = "aptos-types"
 version = "0.0.3"
 dependencies = [
