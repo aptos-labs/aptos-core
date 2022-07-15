@@ -24,10 +24,8 @@ RUN git clone $GIT_REPO ./ && git reset origin/$GIT_REF --hard
 >>>>>>> 5b549bf57f (rosetta: add rosetta compliant dockerfile and docs how to build+run it)
 RUN --mount=type=cache,target=/aptos/target --mount=type=cache,target=$CARGO_HOME/registry \
   cargo build --release \
-  -p aptos-node \
   -p aptos-rosetta \
   && mkdir dist \
-  && cp target/release/aptos-node dist/aptos-node \
   && cp target/release/aptos-rosetta dist/aptos-rosetta
 
 ### Create image with aptos-node and aptos-rosetta ###
@@ -43,10 +41,8 @@ RUN apt-get update && apt-get install -y libssl-dev ca-certificates && apt-get c
 
 COPY --from=builder /aptos/dist/aptos-rosetta /usr/local/bin/aptos-rosetta
 
-# Rosetta online API
+# Rosetta API
 EXPOSE 8082
-# Rosetta offline API
-EXPOSE 8083
 
 # Capture backtrace on error
 ENV RUST_BACKTRACE 1
