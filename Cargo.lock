@@ -1177,7 +1177,7 @@ dependencies = [
  "aptos-vm",
  "bcs",
  "cached-framework-packages",
- "clap 3.2.10",
+ "clap 3.2.11",
  "datatest-stable",
  "framework",
  "hex",
