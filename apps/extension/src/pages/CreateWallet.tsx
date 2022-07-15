@@ -19,7 +19,7 @@ import ChakraLink from 'core/components/ChakraLink';
 import CreateWalletHeader from 'core/components/CreateWalletHeader';
 import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import { createNewAccount } from 'core/utils/account';
-import { secondaryBgColor } from 'core/constants';
+import { secondaryBgColor } from 'core/colors';
 import { ChevronRightIcon } from '@chakra-ui/icons';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';

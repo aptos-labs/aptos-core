@@ -25,17 +25,12 @@ import ChakraLink from 'core/components/ChakraLink';
 import useWalletState from 'core/hooks/useWalletState';
 import { AptosWhiteLogo, AptosBlackLogo } from 'core/components/AptosLogo';
 import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
-import { secondaryBgColor, secondaryErrorMessageColor } from 'core/constants';
+import { secondaryBgColor, secondaryErrorMessageColor, secondaryTextColor } from 'core/colors';
 import { getAccountResources } from 'core/queries/account';
 import AuthLayout from 'core/layouts/AuthLayout';
 import Routes, { Routes as PageRoutes } from 'core/routes';
 import Analytics from 'core/utils/analytics/analytics';
 import { loginEvents } from 'core/utils/analytics/events';
-
-export const secondaryTextColor = {
-  dark: 'gray.400',
-  light: 'gray.500',
-};
 
 interface FormValues {
   privateKey: string;

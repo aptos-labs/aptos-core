@@ -29,18 +29,17 @@ import useWalletState from 'core/hooks/useWalletState';
 import {
   AddIcon, ChevronLeftIcon, DragHandleIcon,
 } from '@chakra-ui/icons';
-import { secondaryBorderColor, secondaryHeaderInputBgColor, secondaryHeaderInputHoverBgColor } from 'core/colors';
+import {
+  secondaryBorderColor,
+  secondaryHeaderInputBgColor,
+  secondaryHeaderInputHoverBgColor,
+} from 'core/colors';
 import { IoIosWallet } from '@react-icons/all-files/io/IoIosWallet';
 import { AptosAccount } from 'aptos';
 import { useNavigate } from 'react-router-dom';
 import Routes from 'core/routes';
 import ChakraLink from './ChakraLink';
 import WalletDrawerBody from './WalletDrawerBody';
-
-export const secondaryAddressFontColor = {
-  dark: 'gray.400',
-  light: 'gray.500',
-};
 
 interface WalletHeaderProps {
   backPage?: string;

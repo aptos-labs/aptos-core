@@ -10,7 +10,7 @@ import {
   useRadio,
   UseRadioProps,
 } from '@chakra-ui/react';
-import { secondaryBgColor, secondaryHoverBgColor } from 'core/colors';
+import { secondaryHoverBgColor, secondaryButtonColor } from 'core/colors';
 import { LOCAL_NODE_URL } from 'core/constants';
 import {
   AptosNetwork,
@@ -38,7 +38,7 @@ export default function NetworkListItem(props: UseRadioProps & { isLoading: bool
         {...checkbox}
         cursor="pointer"
         borderRadius="md"
-        bgColor={secondaryBgColor[colorMode]}
+        bgColor={secondaryButtonColor[colorMode]}
         _checked={{
           bg: 'teal.600',
           color: 'white',

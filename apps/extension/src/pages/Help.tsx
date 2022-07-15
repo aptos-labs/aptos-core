@@ -7,7 +7,7 @@ import HelpHeader from 'core/components/HelpHeader';
 import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
-import { secondaryBgColor } from '../core/constants';
+import { secondaryBgColor } from '../core/colors';
 
 /**
  * TODO fill out Help page

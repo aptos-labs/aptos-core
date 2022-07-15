@@ -7,7 +7,7 @@ import {
 } from '@chakra-ui/react';
 import { AptosBlackLogo, AptosWhiteLogo } from 'core/components/AptosLogo';
 import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
-import { secondaryBgColor } from 'core/constants';
+import { secondaryBgColor } from 'core/colors';
 import React, { useCallback, useState } from 'react';
 
 function Password() {

@@ -21,9 +21,9 @@ import SettingsPaths from 'core/components/SettingsPaths';
 import SettingsListItem from 'core/components/SettingsListItem';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
+import { secondaryTextColor } from 'core/colors';
 import withSimulatedExtensionContainer from '../core/components/WithSimulatedExtensionContainer';
 import { CredentialHeaderAndBodyProps } from './CreateWallet';
-import { secondaryTextColor } from './Login';
 
 export function CredentialRow({
   body,

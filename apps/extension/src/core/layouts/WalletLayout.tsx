@@ -5,7 +5,7 @@ import React from 'react';
 import { Box, Grid, useColorMode } from '@chakra-ui/react';
 import WalletFooter from 'core/components/WalletFooter';
 import WalletHeader from 'core/components/WalletHeader';
-import { secondaryBgColor } from 'core/constants';
+import { secondaryBgColor } from 'core/colors';
 
 interface WalletLayoutProps {
   backPage?: string;

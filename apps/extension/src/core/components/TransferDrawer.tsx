@@ -33,12 +33,10 @@ import {
 } from 'core/queries/account';
 import { useSubmitTestCoinTransfer } from 'core/mutations/transaction';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
-import {
-  secondaryErrorMessageColor, STATIC_GAS_AMOUNT,
-} from 'core/constants';
+import { STATIC_GAS_AMOUNT } from 'core/constants';
+import { secondaryErrorMessageColor, secondaryTextColor } from 'core/colors';
 import { GraceHopperBoringAvatar } from 'core/components/BoringAvatar';
 import numeral from 'numeral';
-import { secondaryTextColor } from '../../pages/Login';
 
 export const secondaryDividerColor = {
   dark: 'whiteAlpha.300',

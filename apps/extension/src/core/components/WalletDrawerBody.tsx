@@ -23,13 +23,12 @@ import {
   UseRadioProps,
   VStack,
 } from '@chakra-ui/react';
-import { secondaryBgColor } from 'core/colors';
+import { secondaryTextColor, secondaryBgColor } from 'core/colors';
 import useWalletState from 'core/hooks/useWalletState';
 import { getTestCoinTokenBalanceFromAccountResources, useAccountResources } from 'core/queries/account';
 import { useAccountLatestTransactionTimestamp } from 'core/queries/transaction';
 import Routes from 'core/routes';
 import numeral from 'numeral';
-import { secondaryTextColor } from 'pages/Login';
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 

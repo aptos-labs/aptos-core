@@ -15,16 +15,6 @@ export const DEVNET_FAUCET_URL = 'https://faucet.devnet.aptoslabs.com';
 export const NODE_URL = DEVNET_NODE_URL;
 export const FAUCET_URL = DEVNET_FAUCET_URL;
 
-export const secondaryBgColor = {
-  dark: 'gray.900',
-  light: 'white',
-};
-
-export const secondaryErrorMessageColor = {
-  dark: 'red.200',
-  light: 'red.500',
-};
-
 export const validStorageUris = [
   'amazonaws.com',
   'ipfs.io',

@@ -5,7 +5,7 @@ import {
   Heading, Text, useColorMode, VStack,
 } from '@chakra-ui/react';
 import React from 'react';
-import { secondaryAddressFontColor } from 'core/components/WalletHeader';
+import { secondaryAddressFontColor } from 'core/colors';
 import { getTestCoinTokenBalanceFromAccountResources, useAccountResources } from 'core/queries/account';
 import numeral from 'numeral';
 

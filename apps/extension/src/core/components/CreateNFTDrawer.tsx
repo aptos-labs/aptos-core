@@ -23,7 +23,7 @@ import {
 import React from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import useWalletState from 'core/hooks/useWalletState';
-import { secondaryTextColor } from 'pages/Login';
+import { secondaryTextColor } from 'core/colors';
 import { useCreateTokenAndCollection } from 'core/mutations/collectibles';
 
 // eslint-disable-next-line global-require

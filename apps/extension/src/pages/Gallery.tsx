@@ -20,11 +20,7 @@ import WalletLayout from 'core/layouts/WalletLayout';
 import { useGalleryItems } from 'core/queries/collectibles';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
-
-const secondaryBorderColor = {
-  dark: 'gray.600',
-  light: 'gray.200',
-};
+import { secondaryBorderColor } from 'core/colors';
 
 function Gallery() {
   const { colorMode } = useColorMode();

@@ -6,17 +6,8 @@ import {
   Center, Grid, IconButton, Text, useColorMode,
 } from '@chakra-ui/react';
 import React from 'react';
+import { secondaryHeaderBgColor } from 'core/colors';
 import ChakraLink from './ChakraLink';
-
-const secondaryHeaderBgColor = {
-  dark: 'gray.700',
-  light: 'gray.200',
-};
-
-export const seconaryAddressFontColor = {
-  dark: 'gray.400',
-  light: 'gray.500',
-};
 
 export default function HelpHeader() {
   const { colorMode } = useColorMode();

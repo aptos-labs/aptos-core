@@ -8,6 +8,7 @@ import {
 import useWalletState from 'core/hooks/useWalletState';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { secondaryGridHoverBgColor, secondaryGridBgColor, textColor } from 'core/colors';
 
 interface BgColorDictType {
   dark: string;
@@ -23,25 +24,10 @@ export interface SettingsListItemProps {
   title: string;
 }
 
-export const secondaryGridHoverBgColor = {
-  dark: 'gray.600',
-  light: 'gray.200',
-};
-
-export const secondaryGridBgColor = {
-  dark: 'gray.700',
-  light: 'gray.100',
-};
-
-export const secondaryTextColor = {
-  dark: 'white',
-  light: 'black',
-};
-
 export default function SettingsListItem({
   bgColorDict = secondaryGridBgColor,
   hoverBgColorDict = secondaryGridHoverBgColor,
-  textColorDict = secondaryTextColor,
+  textColorDict = textColor,
   icon,
   path,
   title,
