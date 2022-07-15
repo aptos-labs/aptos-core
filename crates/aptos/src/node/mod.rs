@@ -36,6 +36,7 @@ pub enum NodeTool {
     ShowValidatorConfig(ShowValidatorConfig),
     ShowValidatorSet(ShowValidatorSet),
     ShowValidatorStake(ShowValidatorStake),
+    UpdateValidatorNetworkAddresses(UpdateValidatorNetworkAddresses),
 }
 
 impl NodeTool {
@@ -52,6 +53,7 @@ impl NodeTool {
             ShowValidatorSet(tool) => tool.execute_serialized().await,
             ShowValidatorStake(tool) => tool.execute_serialized().await,
             ShowValidatorConfig(tool) => tool.execute_serialized().await,
+            UpdateValidatorNetworkAddresses(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -181,11 +183,8 @@ impl CliCommand<Transaction> for IncreaseLockup {
     }
 }
 
-/// Register the current account as a Validator candidate
 #[derive(Parser)]
-pub struct RegisterValidatorCandidate {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
+pub struct ValidatorConfigArgs {
     /// Validator Configuration file, created from the `genesis set-validator-configuration` command
     #[clap(long)]
     pub(crate) validator_config_file: Option<PathBuf>,
@@ -206,7 +205,7 @@ pub struct RegisterValidatorCandidate {
     pub(crate) full_node_network_public_key: Option<x25519::PublicKey>,
 }
 
-impl RegisterValidatorCandidate {
+impl ValidatorConfigArgs {
     fn process_inputs(
         &self,
     ) -> CliTypedResult<(
@@ -288,6 +287,16 @@ impl RegisterValidatorCandidate {
     }
 }
 
+#[derive(Parser)]
+/// Register the current account as a Validator candidate
+pub struct RegisterValidatorCandidate {
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+
+    #[clap(flatten)]
+    pub(crate) validator_config_args: ValidatorConfigArgs,
+}
+
 #[async_trait]
 impl CliCommand<Transaction> for RegisterValidatorCandidate {
     fn command_name(&self) -> &'static str {
@@ -301,7 +310,7 @@ impl CliCommand<Transaction> for RegisterValidatorCandidate {
             full_node_network_public_key,
             validator_host,
             full_node_host,
-        ) = self.process_inputs()?;
+        ) = self.validator_config_args.process_inputs()?;
         let validator_network_addresses =
             vec![validator_host.as_network_address(validator_network_public_key)?];
         let full_node_network_addresses =
@@ -484,5 +493,54 @@ impl CliCommand<serde_json::Value> for ShowValidatorSet {
             .get_resource(aptos_root_address(), "0x1::Stake::ValidatorSet")
             .await?;
         Ok(response.into_inner())
+    }
+}
+
+#[derive(Parser)]
+/// Update the current validator's network and fullnode addresses
+pub struct UpdateValidatorNetworkAddresses {
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+
+    #[clap(flatten)]
+    pub(crate) validator_config_args: ValidatorConfigArgs,
+}
+
+#[async_trait]
+impl CliCommand<Transaction> for UpdateValidatorNetworkAddresses {
+    fn command_name(&self) -> &'static str {
+        "UpdateValidatorNetworkAddresses"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<Transaction> {
+        let (
+            consensus_public_key,
+            validator_network_public_key,
+            full_node_network_public_key,
+            validator_host,
+            full_node_host,
+        ) = self.validator_config_args.process_inputs()?;
+        let validator_network_addresses =
+            vec![validator_host.as_network_address(validator_network_public_key)?];
+        let full_node_network_addresses =
+            match (full_node_host.as_ref(), full_node_network_public_key) {
+                (Some(host), Some(public_key)) => vec![host.as_network_address(public_key)?],
+                _ => vec![],
+            };
+
+        self.txn_options
+            .submit_script_function(
+                AccountAddress::ONE,
+                "Stake",
+                "update_network_and_fullnode_addresses",
+                vec![],
+                vec![
+                    bcs::to_bytes(&consensus_public_key)?,
+                    // Double BCS encode, so that we can hide the original type
+                    bcs::to_bytes(&bcs::to_bytes(&validator_network_addresses)?)?,
+                    bcs::to_bytes(&bcs::to_bytes(&full_node_network_addresses)?)?,
+                ],
+            )
+            .await
     }
 }
