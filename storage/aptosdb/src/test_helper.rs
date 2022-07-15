@@ -207,7 +207,7 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
 
-    let mut in_memory_state = (*db.state_store.in_memory_state().lock()).clone();
+    let mut in_memory_state = (*db.state_store.buffered_state().lock()).clone();
     let _ancester = in_memory_state.current.clone();
     let num_batches = input.len();
     let mut cur_ver: Version = 0;
@@ -626,7 +626,7 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
     db.ledger_db
         .put::<StateValueSchema>(&(key.clone(), version), &value)
         .unwrap();
-    let mut in_memory_state = db.state_store.in_memory_state().lock();
+    let mut in_memory_state = db.state_store.buffered_state().lock();
     in_memory_state.current = smt;
     in_memory_state.current_version = Some(version);
     in_memory_state.updated_since_checkpoint.insert(key, value);
@@ -638,7 +638,7 @@ pub fn test_sync_transactions_impl(
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
 
-    let mut in_memory_state = (*db.state_store.in_memory_state().lock()).clone();
+    let mut in_memory_state = (*db.state_store.buffered_state().lock()).clone();
     let _ancester = in_memory_state.current.clone().freeze();
     let num_batches = input.len();
     let mut cur_ver: Version = 0;
