@@ -37,15 +37,15 @@ use thiserror::Error;
 
 pub mod cached_state_view;
 mod executed_trees;
-pub mod in_memory_state;
 #[cfg(any(feature = "testing", feature = "fuzzing"))]
 pub mod mock;
 pub mod no_proof_fetcher;
 pub mod proof_fetcher;
+pub mod state_delta;
 pub mod state_view;
 pub mod sync_proof_fetcher;
 
-use crate::in_memory_state::InMemoryState;
+use crate::state_delta::StateDelta;
 pub use executed_trees::ExecutedTrees;
 use scratchpad::SparseMerkleTree;
 
@@ -623,7 +623,7 @@ pub trait DbWriter: Send + Sync {
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         save_state_snapshots: bool,
-        latest_in_memory_state: InMemoryState,
+        latest_in_memory_state: StateDelta,
     ) -> Result<()> {
         unimplemented!()
     }
@@ -634,7 +634,7 @@ pub trait DbWriter: Send + Sync {
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        latest_in_memory_state: InMemoryState,
+        latest_in_memory_state: StateDelta,
     ) -> Result<()> {
         self.save_transactions_ext(
             txns_to_commit,

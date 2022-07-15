@@ -18,16 +18,14 @@ use aptos_types::{
 use executor_types::ProofReader;
 use proptest::{collection::vec, prelude::*};
 
-pub fn update_in_memory_state(state: &mut InMemoryState, txns_to_commit: &[TransactionToCommit]) {
+pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[TransactionToCommit]) {
     let mut next_version = state.current_version.map_or(0, |v| v + 1);
     for txn_to_commit in txns_to_commit {
         txn_to_commit
             .state_updates()
             .iter()
             .for_each(|(key, value)| {
-                state
-                    .updated_since_checkpoint
-                    .insert(key.clone(), value.clone());
+                state.updates_since_base.insert(key.clone(), value.clone());
             });
         next_version += 1;
         if txn_to_commit.is_state_checkpoint() {
@@ -37,7 +35,7 @@ pub fn update_in_memory_state(state: &mut InMemoryState, txns_to_commit: &[Trans
                 .freeze()
                 .batch_update(
                     state
-                        .updated_since_checkpoint
+                        .updates_since_base
                         .iter()
                         .map(|(k, v)| (k.hash(), v))
                         .collect(),
@@ -46,9 +44,9 @@ pub fn update_in_memory_state(state: &mut InMemoryState, txns_to_commit: &[Trans
                 .unwrap()
                 .unfreeze();
             state.current_version = next_version.checked_sub(1);
-            state.checkpoint = state.current.clone();
-            state.checkpoint_version = state.current_version;
-            state.updated_since_checkpoint.clear();
+            state.base = state.current.clone();
+            state.base_version = state.current_version;
+            state.updates_since_base.clear();
         }
     }
     if next_version.checked_sub(1) != state.current_version {
@@ -58,7 +56,7 @@ pub fn update_in_memory_state(state: &mut InMemoryState, txns_to_commit: &[Trans
             .freeze()
             .batch_update(
                 state
-                    .updated_since_checkpoint
+                    .updates_since_base
                     .iter()
                     .map(|(k, v)| (k.hash(), v))
                     .collect(),
@@ -91,7 +89,7 @@ prop_compose! {
         let mut txn_accumulator = TxnAccumulator::new_empty();
         let mut result = Vec::new();
 
-    let mut in_memory_state = InMemoryState::new_empty();
+    let mut in_memory_state = StateDelta::new_empty();
     let _ancester = in_memory_state.current.clone().freeze();
 
         for block_gen in block_gens {
@@ -629,7 +627,7 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
     let mut in_memory_state = db.state_store.buffered_state().lock();
     in_memory_state.current = smt;
     in_memory_state.current_version = Some(version);
-    in_memory_state.updated_since_checkpoint.insert(key, value);
+    in_memory_state.updates_since_base.insert(key, value);
 }
 
 pub fn test_sync_transactions_impl(

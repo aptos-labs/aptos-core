@@ -30,7 +30,7 @@ use aptos_types::{
 use executor_types::in_memory_state_calculator::InMemoryStateCalculator;
 use schemadb::{ReadOptions, SchemaBatch, DB};
 use storage_interface::{
-    cached_state_view::CachedStateView, in_memory_state::InMemoryState,
+    cached_state_view::CachedStateView, state_delta::StateDelta,
     sync_proof_fetcher::SyncProofFetcher, DbReader, StateSnapshotReceiver,
 };
 
@@ -56,7 +56,7 @@ pub(crate) struct StateStore {
     // The `checkpoint` of buffered_state is the latest snapshot in state_merkle_db while `current`
     // is the latest state sparse merkle tree that is replayed from that snapshot until the latest
     // write set stored in ledger_db.
-    buffered_state: Mutex<InMemoryState>,
+    buffered_state: Mutex<StateDelta>,
 }
 
 // "using an Arc<dyn DbReader> as an Arc<dyn StateReader>" is not allowed in stable Rust. Actually we
@@ -127,7 +127,7 @@ impl StateStore {
         let store = Arc::new(Self {
             ledger_db,
             state_merkle_db,
-            buffered_state: Mutex::new(InMemoryState::new_empty()),
+            buffered_state: Mutex::new(StateDelta::new_empty()),
         });
         store
             .initialize(hack_for_tests)
@@ -136,7 +136,7 @@ impl StateStore {
     }
 
     pub fn maybe_reset(self: &Arc<Self>, latest_snapshot_version: Option<Version>) {
-        if self.buffered_state.lock().checkpoint_version < latest_snapshot_version {
+        if self.buffered_state.lock().base_version < latest_snapshot_version {
             self.initialize(false)
                 .expect("StateStore initialization failed.")
         }
@@ -164,7 +164,7 @@ impl StateStore {
         let snapshot_next_version = latest_snapshot_version.map_or(0, |v| v + 1);
         // Initialize the state store before replaying write sets.
         *self.buffered_state.lock() =
-            InMemoryState::new_at_checkpoint(latest_snapshot_root_hash, latest_snapshot_version);
+            StateDelta::new_at_checkpoint(latest_snapshot_root_hash, latest_snapshot_version);
 
         // If we , we don't ensure the consistency.
         if hack_for_tests {
@@ -222,7 +222,7 @@ impl StateStore {
         Ok(())
     }
 
-    pub fn buffered_state(&self) -> &Mutex<InMemoryState> {
+    pub fn buffered_state(&self) -> &Mutex<StateDelta> {
         &self.buffered_state
     }
 
