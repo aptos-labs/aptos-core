@@ -28,12 +28,12 @@ async fn main() {
 
     match args {
         CommandArgs::OnlineRemote(_) => {
-            println!("Starting Rosetta in Online remote (no local full node) mode")
+            println!("aptos-rosetta: Starting Rosetta in Online remote (no local full node) mode")
         }
         CommandArgs::Online(_) => {
-            println!("Starting Rosetta in Online (with local full node) mode")
+            println!("aptos-rosetta: Starting Rosetta in Online (with local full node) mode")
         }
-        CommandArgs::Offline(_) => println!("Starting Rosetta in Offline mode"),
+        CommandArgs::Offline(_) => println!("aptos-rosetta: Starting Rosetta in Offline mode"),
     }
 
     // If we're in online mode, we run a full node side by side, the fullnode sets up the logger
@@ -42,7 +42,7 @@ async fn main() {
         ref online_args,
     }) = args
     {
-        println!("Starting local node");
+        println!("aptos-rosetta: Starting local full node");
         let node_args = node_args.clone();
         let runtime = thread::spawn(move || node_args.run());
 
@@ -63,12 +63,12 @@ async fn main() {
         // If it didn't start up, we need to crash
         if !successful {
             panic!(
-                "Node didn't start up on time after {} seconds at {}",
+                "aptos-rosetta: Local full node didn't start up on time after {} seconds at {}",
                 TOTAL_REST_API_WAIT_DURATION_S, online_args.rest_api_url
             )
         }
 
-        println!("Local node started successfully");
+        println!("aptos-rosetta: Local full node started successfully");
         Some(runtime)
     } else {
         // If we aren't running a full node, set up the logger now
@@ -76,11 +76,12 @@ async fn main() {
         None
     };
 
-    println!("Starting rosetta");
+    println!("aptos-rosetta: Starting rosetta");
     // Ensure runtime for Rosetta is up and running
     let _rosetta = bootstrap(args.chain_id(), args.api_config(), args.rest_client())
-        .expect("Should bootstrap");
+        .expect("aptos-rosetta: Should bootstrap rosetta server");
 
+    println!("aptos-rosetta: Rosetta started");
     // Run until there is an interrupt
     let term = Arc::new(AtomicBool::new(false));
     while !term.load(Ordering::Acquire) {
