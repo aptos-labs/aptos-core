@@ -5,8 +5,11 @@
 //!
 //! [Spec](https://www.rosetta-api.org/docs/api_objects.html)
 
-use crate::common::native_coin_tag;
-use crate::types::{create_account_identifier, test_coin_identifier, transfer_identifier};
+use crate::common::{native_coin_tag, native_coin_tag_lower};
+use crate::types::{
+    account_identifier_lower, coin_identifier_lower, create_account_identifier,
+    test_coin_identifier, test_coin_identifier_lower, transfer_identifier,
+};
 use crate::{
     common::{is_native_coin, native_coin},
     error::ApiResult,
@@ -596,7 +599,8 @@ fn parse_operations_from_txn_payload(
     let mut operations = vec![];
     if let TransactionPayload::ScriptFunctionPayload(inner) = payload {
         if AccountAddress::ONE == *inner.function.module.address.inner()
-            && coin_identifier() == inner.function.module.name
+            && (coin_identifier() == inner.function.module.name
+                || coin_identifier_lower() == inner.function.module.name)
             && transfer_identifier() == inner.function.name
         {
             if let Some(MoveType::Struct(MoveStructTag {
@@ -607,7 +611,8 @@ fn parse_operations_from_txn_payload(
             })) = inner.type_arguments.first()
             {
                 if *address.inner() == AccountAddress::ONE
-                    && *module == test_coin_identifier()
+                    && (*module == test_coin_identifier()
+                        || *module == test_coin_identifier_lower())
                     && *name == test_coin_identifier()
                 {
                     let receiver =
@@ -634,7 +639,8 @@ fn parse_operations_from_txn_payload(
                 }
             }
         } else if AccountAddress::ONE == *inner.function.module.address.inner()
-            && account_identifier() == inner.function.module.name
+            && (account_identifier() == inner.function.module.name
+                || account_identifier_lower() == inner.function.module.name)
             && create_account_identifier() == inner.function.name
         {
             let address =
@@ -671,14 +677,26 @@ fn parse_operations_from_write_set(
             account_identifier(),
             vec![],
         );
+        let account_tag_lower = MoveStructTag::new(
+            AccountAddress::ONE.into(),
+            account_identifier_lower(),
+            account_identifier(),
+            vec![],
+        );
         let coin_store_tag = MoveStructTag::new(
             AccountAddress::ONE.into(),
             coin_identifier(),
             coin_store_identifier(),
             vec![native_coin_tag().into()],
         );
+        let coin_store_tag_lower = MoveStructTag::new(
+            AccountAddress::ONE.into(),
+            coin_identifier_lower(),
+            coin_store_identifier(),
+            vec![native_coin_tag_lower().into()],
+        );
 
-        if data.typ == account_tag {
+        if data.typ == account_tag || data.typ == account_tag_lower {
             // Account sequence number increase (possibly creation)
             // Find out if it's the 0th sequence number (creation)
             for (id, value) in data.data.0.iter() {
@@ -696,7 +714,7 @@ fn parse_operations_from_write_set(
                     }
                 }
             }
-        } else if data.typ == coin_store_tag {
+        } else if data.typ == coin_store_tag || data.typ == coin_store_tag_lower {
             // Account balance change
             for (id, value) in data.data.0.iter() {
                 if id == &withdraw_events_identifier() {

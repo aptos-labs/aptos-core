@@ -9,10 +9,17 @@ pub fn account_identifier() -> Identifier {
     ident_str!("Account").into()
 }
 
+pub fn account_identifier_lower() -> Identifier {
+    ident_str!("account").into()
+}
+
 pub fn coin_identifier() -> Identifier {
     ident_str!("Coin").into()
 }
 
+pub fn coin_identifier_lower() -> Identifier {
+    ident_str!("coin").into()
+}
 pub fn coin_info_identifier() -> Identifier {
     ident_str!("CoinInfo").into()
 }
@@ -27,6 +34,10 @@ pub fn create_account_identifier() -> Identifier {
 
 pub fn test_coin_identifier() -> Identifier {
     ident_str!("TestCoin").into()
+}
+
+pub fn test_coin_identifier_lower() -> Identifier {
+    ident_str!("testcoin").into()
 }
 
 pub fn sequence_number_identifier() -> Identifier {

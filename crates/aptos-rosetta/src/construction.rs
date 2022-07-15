@@ -310,13 +310,15 @@ async fn construction_parse(
         TransactionPayload::ScriptFunction(inner) => {
             let (module, script_name, type_args, args) = inner.into_inner();
 
+            let module_name = Identifier::from(module.name());
             if AccountAddress::ONE == *module.address()
-                && coin_identifier() == Identifier::from(module.name())
+                && (coin_identifier() == module_name || coin_identifier_lower() == module_name)
                 && transfer_identifier() == script_name
             {
                 parse_transfer_operation(sender, &type_args, &args)?
             } else if AccountAddress::ONE == *module.address()
-                && account_identifier() == Identifier::from(module.name())
+                && (account_identifier() == module_name
+                    || account_identifier_lower() == module_name)
                 && create_account_identifier() == script_name
             {
                 parse_create_account_operation(sender, &type_args, &args)?
@@ -383,7 +385,7 @@ fn parse_transfer_operation(
     {
         // Currency must be the native coin for now
         if *address != AccountAddress::ONE
-            || *module != test_coin_identifier()
+            || (*module != test_coin_identifier() && *module != test_coin_identifier_lower())
             || *name != test_coin_identifier()
             || !type_params.is_empty()
         {
