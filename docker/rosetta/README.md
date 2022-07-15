@@ -44,13 +44,13 @@ Once you've built the image and put all the config data in the `data` directory 
 **online mode**
 
 ```
-docker run -p 8082:8082 --rm -v $(pwd)/data:/opt/aptos aptos-core:rosetta-latest aptos-rosetta online --config /opt/aptos/fullnode.yaml
+docker run -p 8082:8082 --rm -v $(pwd)/data:/opt/aptos aptos-core:rosetta-latest online --config /opt/aptos/fullnode.yaml
 ```
 
 **offline mode**
 
 ```
-docker run -p 8082:8082 --rm -v $(pwd)/data:/opt/aptos aptos-core:rosetta-latest aptos-rosetta offline --config /opt/aptos/fullnode.yaml
+docker run -p 8082:8082 --rm -v $(pwd)/data:/opt/aptos aptos-core:rosetta-latest offline
 ```
 
-The APIs are available under: `http://localhost:8082`
+The Rosetta API is available under: http://localhost:8082
