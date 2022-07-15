@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::types::test_coin_identifier_lower;
 use crate::{
     error::{ApiError, ApiResult},
     types::{
@@ -144,7 +145,7 @@ pub fn native_coin() -> Currency {
         symbol: DEFAULT_COIN.to_string(),
         decimals: DEFAULT_DECIMALS,
         metadata: Some(CurrencyMetadata {
-            move_type: native_coin_tag().to_string(),
+            move_type: native_coin_tag_lower().to_string(),
         }),
     }
 }
@@ -153,6 +154,15 @@ pub fn native_coin_tag() -> TypeTag {
     TypeTag::Struct(StructTag {
         address: AccountAddress::ONE,
         module: test_coin_identifier(),
+        name: test_coin_identifier(),
+        type_params: vec![],
+    })
+}
+
+pub fn native_coin_tag_lower() -> TypeTag {
+    TypeTag::Struct(StructTag {
+        address: AccountAddress::ONE,
+        module: test_coin_identifier_lower(),
         name: test_coin_identifier(),
         type_params: vec![],
     })
