@@ -6,86 +6,58 @@ module SharedAccount::SharedAccount {
     use AptosFramework::Coin;
 
     // struct State records the address of the share_holder and the numerator and the denominator of a fraction
-    struct State has store {
+    struct ShareRecord has store {
         share_holder: address,
         numerator: u64,
-        denominator: u64,
     }
 
     // Resource representing a shared account
     struct SharedAccount has key {
-        share_record: vector<State>,
+        share_record: vector<ShareRecord>,
+        total_shares: u64,
         signer_capability: Account::SignerCapability,
     }
 
-    const EINVALID_INPUT: u64 = 0;
-    const EACCOUNT_NOT_FOUND: u64 = 1;
-    const EADDRESS_ALREADY_EXISTS: u64 = 2;
-    const EINVALID_NUMERATOR_DENOMINATOR_COMBINATIONS: u64 = 3;
-    const EINVALID_SIGNER: u64 = 4;
-    const EINSUFFICIENT_BALANCE: u64 = 5;
+    const EACCOUNT_NOT_FOUND: u64 = 0;
+    const ERESOURCE_DNE: u64 = 1;
+    const EINSUFFICIENT_BALANCE: u64 = 2;
 
-    fun find_greatest_common_divisor(denominator1: u64, denominator2: u64) : u64 {
-        if (denominator1 == 0) {
-            denominator2
-        }
-        else {
-            find_greatest_common_divisor(denominator2 % denominator1, denominator1)
-        }
-    }
-
-    fun find_least_common_denominator(denominator1: u64, denominator2: u64) : u64 {
-        assert!(denominator1 * denominator2 > 0, Errors::invalid_argument(EINVALID_INPUT));
-        let gcd: u64 = find_greatest_common_divisor(denominator1, denominator2);
-        assert!(gcd > 0, Errors::invalid_argument(Errors::invalid_argument(EINVALID_INPUT)));
-        (denominator1 * denominator2) / gcd
+    public(script) fun initialize(source: &signer, seed: vector<u8>, addresses: vector<address>, numerators: vector<u64>) {
+        initialize_internal(source, seed, addresses, numerators);
     }
 
     // Create and initialize a shared account
-    public fun initialize(source: &signer, seed: vector<u8>, addresses: vector<address>, numerators: vector<u64>, denominators: vector<u64>): address acquires SharedAccount {
-        assert!(Vector::length(&addresses) == Vector::length(&numerators), Errors::invalid_argument(EINVALID_INPUT));
-        assert!(Vector::length(&addresses) == Vector::length(&denominators), Errors::invalid_argument(EINVALID_INPUT));
-
-        assert!(Account::exists_at(Signer::address_of(source)), Errors::invalid_argument(EACCOUNT_NOT_FOUND));
-        let (resource_signer, resource_signer_cap) = Account::create_resource_account(source, seed);
-        if (!exists<SharedAccount>(Signer::address_of(&resource_signer))) {
-            move_to(
-                &resource_signer,
-                SharedAccount {
-                    share_record: Vector::empty<State>(),
-                    signer_capability: resource_signer_cap,
-                }
-            )
-        };
-
-        let shared_account = borrow_global_mut<SharedAccount>(Signer::address_of(&resource_signer));
-
+    fun initialize_internal(source: &signer, seed: vector<u8>, addresses: vector<address>, numerators: vector<u64>): address {
         let i = 0;
-        let cumulative_numerator = 0;
-        let cumulative_denominator = 1;
+        let total = 0;
+        let share_record = Vector::empty<ShareRecord>();
 
         while (i < Vector::length(&addresses)) {
-            let num = *Vector::borrow(&numerators, i);
-            let denom = *Vector::borrow(&denominators, i);
+            let num_shares = *Vector::borrow(&numerators, i);
             let addr = *Vector::borrow(&addresses, i);
             assert!(Account::exists_at(addr), Errors::invalid_argument(EACCOUNT_NOT_FOUND));
-            assert!(num >= 0 && denom > 0, Errors::invalid_argument(EINVALID_INPUT));
 
-            let common_denom = find_least_common_denominator(cumulative_denominator, denom);
-            cumulative_numerator = cumulative_numerator * (common_denom / cumulative_denominator) + num * (common_denom / denom);
-            cumulative_denominator = common_denom;
-
-            Vector::push_back(&mut shared_account.share_record, State { share_holder: addr, numerator: num, denominator: denom });
+            Vector::push_back(&mut share_record, ShareRecord { share_holder: addr, numerator: num_shares });
+            total = total + num_shares;
             i = i + 1;
         };
 
-        assert!(cumulative_numerator == cumulative_denominator, Errors::invalid_argument(EINVALID_NUMERATOR_DENOMINATOR_COMBINATIONS));
+        let (resource_signer, resource_signer_cap) = Account::create_resource_account(source, seed);
+        move_to(
+            &resource_signer,
+            SharedAccount {
+                share_record,
+                total_shares: total,
+                signer_capability: resource_signer_cap,
+            }
+        );
+
         Signer::address_of(&resource_signer)
     }
 
     // Disperse all available balance to addresses in the shared account
     public(script) fun disperse<CoinType>(resource_addr: address) acquires SharedAccount {
-        assert!(exists<SharedAccount>(resource_addr), Errors::invalid_argument(EINVALID_SIGNER));
+        assert!(exists<SharedAccount>(resource_addr), Errors::invalid_argument(ERESOURCE_DNE));
 
         let total_balance = Coin::balance<CoinType>(resource_addr);
         assert!(total_balance > 0, Errors::limit_exceeded(EINSUFFICIENT_BALANCE));
@@ -94,25 +66,25 @@ module SharedAccount::SharedAccount {
         let resource_signer = Account::create_signer_with_capability(&shared_account.signer_capability);
 
         let i = 0;
-        while (i < Vector::length(&shared_account.share_record)) {
-            let state = Vector::borrow(&shared_account.share_record, i);
-            let current_amount = state.numerator * total_balance / state.denominator;
-            let current_balance = Coin::balance<CoinType>(resource_addr);
+        let current_balance = Coin::balance<CoinType>(resource_addr);
 
+        while (i < Vector::length(&shared_account.share_record)) {
+            let share_record = Vector::borrow(&shared_account.share_record, i);
+            let current_amount = share_record.numerator * total_balance / shared_account.total_shares;
             if (current_amount > current_balance) {
                 current_amount = current_balance;
             };
+            Coin::transfer<CoinType>(&resource_signer, share_record.share_holder, current_amount);
 
-            Coin::transfer<CoinType>(&resource_signer, state.share_holder, current_amount);
+            current_balance = current_balance - current_amount;
             i = i + 1;
         };
     }
 
-    #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113)]
-    public(script) fun set_up(user: signer, test_user1: signer, test_user2: signer) : address acquires SharedAccount {
+    #[test_only]
+    public(script) fun set_up(user: signer, test_user1: signer, test_user2: signer) : address {
         let addresses = Vector::empty<address>();
         let numerators = Vector::empty<u64>();
-        let denominators = Vector::empty<u64>();
         let seed = x"01";
         let user_addr = Signer::address_of(&user);
         let user_addr1 = Signer::address_of(&test_user1);
@@ -125,40 +97,10 @@ module SharedAccount::SharedAccount {
         Vector::push_back(&mut addresses, user_addr1);
         Vector::push_back(&mut addresses, user_addr2);
 
-        Vector::push_back(&mut numerators, 2);
-        Vector::push_back(&mut numerators, 3);
+        Vector::push_back(&mut numerators, 1);
+        Vector::push_back(&mut numerators, 4);
 
-        Vector::push_back(&mut denominators, 4);
-        Vector::push_back(&mut denominators, 6);
-
-        SharedAccount::SharedAccount::initialize(&user, seed, addresses, numerators, denominators)
-    }
-
-    #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113)]
-    #[expected_failure]
-    public(script) fun test_initialize_with_incorrect_numerator_denominator_combo(user: signer, test_user1: signer, test_user2: signer) : address acquires SharedAccount {
-        let addresses = Vector::empty<address>();
-        let numerators = Vector::empty<u64>();
-        let denominators = Vector::empty<u64>();
-        let seed = x"01";
-        let user_addr = Signer::address_of(&user);
-        let user_addr1 = Signer::address_of(&test_user1);
-        let user_addr2 = Signer::address_of(&test_user2);
-
-        Account::create_account(user_addr);
-        Account::create_account(user_addr1);
-        Account::create_account(user_addr2);
-
-        Vector::push_back(&mut addresses, user_addr1);
-        Vector::push_back(&mut addresses, user_addr2);
-
-        Vector::push_back(&mut numerators, 2);
-        Vector::push_back(&mut numerators, 3);
-
-        Vector::push_back(&mut denominators, 3);
-        Vector::push_back(&mut denominators, 4);
-
-        SharedAccount::SharedAccount::initialize(&user, seed, addresses, numerators, denominators)
+        initialize_internal(&user, seed, addresses, numerators)
     }
 
     #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113, core_resources = @CoreResources, core_framework = @AptosFramework)]
@@ -166,19 +108,19 @@ module SharedAccount::SharedAccount {
         use AptosFramework::TestCoin::{Self, TestCoin};
         let user_addr1 = Signer::address_of(&test_user1);
         let user_addr2 = Signer::address_of(&test_user2);
-        let resource_addr = SharedAccount::SharedAccount::set_up(user, test_user1, test_user2);
+        let resource_addr = set_up(user, test_user1, test_user2);
         let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
 
         let shared_account = borrow_global<SharedAccount>(resource_addr);
         let resource_signer = Account::create_signer_with_capability(&shared_account.signer_capability);
         Coin::register<TestCoin>(&resource_signer);
         TestCoin::mint(&core_framework, resource_addr, 1000);
-        SharedAccount::SharedAccount::disperse<TestCoin>(resource_addr);
+        disperse<TestCoin>(resource_addr);
         Coin::destroy_mint_cap<TestCoin>(mint_cap);
         Coin::destroy_burn_cap<TestCoin>(burn_cap);
 
-        assert!(Coin::balance<TestCoin>(user_addr1) == 500, 0);
-        assert!(Coin::balance<TestCoin>(user_addr2) == 500, 1);
+        assert!(Coin::balance<TestCoin>(user_addr1) == 200, 0);
+        assert!(Coin::balance<TestCoin>(user_addr2) == 800, 1);
     }
 
     #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113)]
@@ -186,10 +128,10 @@ module SharedAccount::SharedAccount {
     public(script) fun test_disperse_insufficient_balance(user: signer, test_user1: signer, test_user2: signer) acquires SharedAccount {
         use AptosFramework::TestCoin::TestCoin;
 
-        let resource_addr = SharedAccount::SharedAccount::set_up(user, test_user1, test_user2);
+        let resource_addr = set_up(user, test_user1, test_user2);
         let shared_account = borrow_global<SharedAccount>(resource_addr);
         let resource_signer = Account::create_signer_with_capability(&shared_account.signer_capability);
         Coin::register<TestCoin>(&resource_signer);
-        SharedAccount::SharedAccount::disperse<TestCoin>(resource_addr);
+        disperse<TestCoin>(resource_addr);
     }
 }
