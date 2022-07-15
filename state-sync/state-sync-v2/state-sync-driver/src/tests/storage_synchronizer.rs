@@ -10,12 +10,12 @@ use crate::{
     storage_synchronizer::{StorageSynchronizer, StorageSynchronizerInterface},
     tests::{
         mocks::{
-            create_mock_db_reader, create_mock_db_writer, create_mock_executor,
-            create_mock_reader_writer, create_mock_receiver, MockChunkExecutor,
+            create_mock_db_writer, create_mock_executor, create_mock_reader_writer,
+            create_mock_receiver, MockChunkExecutor,
         },
         utils::{
             create_epoch_ending_ledger_info, create_event, create_output_list_with_proof,
-            create_startup_info, create_state_value_chunk_with_proof, create_transaction,
+            create_state_value_chunk_with_proof, create_transaction,
             create_transaction_list_with_proof, verify_mempool_and_event_notification,
         },
     },
@@ -58,18 +58,9 @@ async fn test_apply_transaction_outputs() {
         .expect_commit_chunk()
         .return_once(move || expected_commit_return);
 
-    // Set up the mock db reader
-    let mut db_reader = create_mock_db_reader();
-    db_reader
-        .expect_get_startup_info()
-        .returning(|| Ok(Some(create_startup_info())));
-
     // Create the storage synchronizer
     let (_, _, event_subscription_service, mut mempool_listener, mut storage_synchronizer, _, _) =
-        create_storage_synchronizer(
-            chunk_executor,
-            create_mock_reader_writer(Some(db_reader), None),
-        );
+        create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
 
     // Subscribe to the expected event
     let mut event_listener = event_subscription_service
@@ -180,18 +171,9 @@ async fn test_execute_transactions() {
         .expect_commit_chunk()
         .return_once(move || expected_commit_return);
 
-    // Set up the mock db reader
-    let mut db_reader = create_mock_db_reader();
-    db_reader
-        .expect_get_startup_info()
-        .returning(|| Ok(Some(create_startup_info())));
-
     // Create the storage synchronizer
     let (_, _, event_subscription_service, mut mempool_listener, mut storage_synchronizer, _, _) =
-        create_storage_synchronizer(
-            chunk_executor,
-            create_mock_reader_writer(Some(db_reader), None),
-        );
+        create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
 
     // Subscribe to the expected event
     let mut event_listener = event_subscription_service
@@ -377,12 +359,6 @@ async fn test_save_states_completion() {
     let mut chunk_executor = create_mock_executor();
     chunk_executor.expect_reset().returning(|| Ok(()));
 
-    // Set up the mock db reader
-    let mut db_reader = create_mock_db_reader();
-    db_reader
-        .expect_get_startup_info()
-        .returning(|| Ok(Some(create_startup_info())));
-
     // Setup the mock db writer
     let mut db_writer = create_mock_db_writer();
     db_writer
@@ -409,7 +385,7 @@ async fn test_save_states_completion() {
     let (mut commit_listener, _, _, _, mut storage_synchronizer, _, _) =
         create_storage_synchronizer(
             chunk_executor,
-            create_mock_reader_writer(Some(db_reader), Some(db_writer)),
+            create_mock_reader_writer(None, Some(db_writer)),
         );
 
     // Subscribe to the expected event

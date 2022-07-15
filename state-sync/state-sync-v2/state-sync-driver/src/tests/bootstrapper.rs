@@ -11,10 +11,10 @@ use crate::{
             MockStorageSynchronizer, MockStreamingClient,
         },
         utils::{
-            create_data_stream_listener, create_full_node_driver_configuration,
-            create_global_summary, create_output_list_with_proof,
-            create_random_epoch_ending_ledger_info, create_startup_info, create_transaction_info,
-            create_transaction_list_with_proof,
+            create_data_stream_listener, create_empty_epoch_state, create_epoch_ending_ledger_info,
+            create_full_node_driver_configuration, create_global_summary,
+            create_output_list_with_proof, create_random_epoch_ending_ledger_info,
+            create_transaction_info, create_transaction_list_with_proof,
         },
     },
 };
@@ -570,8 +570,11 @@ fn create_bootstrapper(
     // Create the mock db reader with only genesis loaded
     let mut mock_database_reader = create_mock_db_reader();
     mock_database_reader
-        .expect_get_startup_info()
-        .returning(|| Ok(Some(create_startup_info())));
+        .expect_get_latest_epoch_state()
+        .returning(|| Ok(create_empty_epoch_state()));
+    mock_database_reader
+        .expect_get_latest_ledger_info()
+        .returning(|| Ok(create_epoch_ending_ledger_info()));
     mock_database_reader
         .expect_get_latest_transaction_info_option()
         .returning(|| Ok(Some((0, create_transaction_info()))));

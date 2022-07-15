@@ -12,9 +12,8 @@ use crate::{
             MockStorageSynchronizer, MockStreamingClient,
         },
         utils::{
-            create_data_stream_listener, create_epoch_ending_ledger_info,
-            create_full_node_driver_configuration, create_startup_info_at_version_epoch,
-            create_transaction_info,
+            create_data_stream_listener, create_epoch_ending_ledger_info, create_epoch_state,
+            create_full_node_driver_configuration, create_transaction_info,
         },
     },
 };
@@ -289,13 +288,8 @@ fn create_continuous_syncer(
         .expect_get_latest_transaction_info_option()
         .returning(move || Ok(Some((synced_version, create_transaction_info()))));
     mock_database_reader
-        .expect_get_startup_info()
-        .returning(move || {
-            Ok(Some(create_startup_info_at_version_epoch(
-                synced_version,
-                current_epoch,
-            )))
-        });
+        .expect_get_latest_epoch_state()
+        .returning(move || Ok(create_epoch_state(current_epoch)));
 
     ContinuousSyncer::new(
         driver_configuration,

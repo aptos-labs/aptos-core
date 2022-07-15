@@ -1,12 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::tests::utils::{create_empty_epoch_state, create_epoch_ending_ledger_info};
 use crate::{
-    storage_synchronizer::StorageSynchronizerInterface,
-    tests::utils::{create_startup_info, create_transaction_info},
+    storage_synchronizer::StorageSynchronizerInterface, tests::utils::create_transaction_info,
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_types::epoch_state::EpochState;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::EventWithVersion,
@@ -70,8 +71,11 @@ pub fn create_mock_reader_writer(
         .expect_get_latest_transaction_info_option()
         .returning(|| Ok(Some((0, create_transaction_info()))));
     reader
-        .expect_get_startup_info()
-        .returning(|| Ok(Some(create_startup_info())));
+        .expect_get_latest_epoch_state()
+        .returning(|| Ok(create_empty_epoch_state()));
+    reader
+        .expect_get_latest_ledger_info()
+        .returning(|| Ok(create_epoch_ending_ledger_info()));
 
     let writer = writer.unwrap_or_else(create_mock_db_writer);
     DbReaderWriter {
@@ -205,6 +209,8 @@ mock! {
         ) -> Result<Version>;
 
         fn get_latest_state_value(&self, state_key: StateKey) -> Result<Option<StateValue>>;
+
+        fn get_latest_epoch_state(&self) -> Result<EpochState>;
 
         fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>>;
 
