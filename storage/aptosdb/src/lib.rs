@@ -58,6 +58,7 @@ use aptos_config::config::{RocksdbConfigs, StoragePrunerConfig, NO_OP_STORAGE_PR
 use aptos_crypto::hash::{HashValue, SPARSE_MERKLE_PLACEHOLDER_HASH};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_types::epoch_state::EpochState;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::EventWithVersion,
@@ -1164,6 +1165,18 @@ impl DbReader for AptosDB {
 
             self.state_store
                 .get_state_value_with_proof_by_version(state_store_key, version)
+        })
+    }
+
+    fn get_latest_epoch_state(&self) -> Result<EpochState> {
+        gauged_api("get_latest_epoch_state", || {
+            let latest_ledger_info = self.ledger_store.get_latest_ledger_info()?;
+            match latest_ledger_info.ledger_info().next_epoch_state() {
+                Some(epoch_state) => Ok(epoch_state.clone()),
+                None => self
+                    .ledger_store
+                    .get_epoch_state(latest_ledger_info.ledger_info().epoch()),
+            }
         })
     }
 

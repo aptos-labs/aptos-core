@@ -290,6 +290,11 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
+    /// Gets the latest epoch state currently held in storage.
+    fn get_latest_epoch_state(&self) -> Result<EpochState> {
+        unimplemented!()
+    }
+
     /// Returns the key, value pairs for a particular state key prefix at at desired version. This
     /// API can be used to get all resources of an account by passing the account address as the
     /// key prefix.
