@@ -176,7 +176,7 @@ const config = {
               {
                 html: `
                   <a class="social-link" href="https://aptoslabs.com" target="_blank" rel="noopener noreferrer" title="Git">
-                     <img class="logo" src="/img/aptos_word.svg" alt="Git Icon" />
+                     <img class="logo" src="/img/aptos_word_dark.svg" alt="Aptos Logo" />
                   </a>
                 `,
               },
