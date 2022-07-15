@@ -1,5 +1,5 @@
 /// This module provides the foundation for Tokens.
-module AptosFramework::TokenV1 {
+module AptosToken::TokenV1 {
     use Std::ASCII::{String, Self};
     use Std::Errors;
     use Std::Event::{Self, EventHandle};
@@ -7,7 +7,7 @@ module AptosFramework::TokenV1 {
     use Std::Vector;
 
     use AptosFramework::Table::{Self, Table};
-    use AptosFramework::PropertyMap::{Self, PropertyMap};
+    use AptosToken::PropertyMap::{Self, PropertyMap};
 
     const TOKEN_MAX_MUTABLE_IND: u64 = 0;
     const TOKEN_URI_MUTABLE_IND: u64 = 1;

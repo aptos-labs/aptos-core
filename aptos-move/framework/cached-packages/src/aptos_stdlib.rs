@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(unused_imports)]
-include!(concat!(env!("OUT_DIR"), "/transaction_script_builder.rs"));
+
+include!(concat!(
+    concat!(env!("OUT_DIR"), "/framework"),
+    "/transaction_script_builder.rs"
+));
 
 use aptos_types::utility_coin::TEST_COIN_TYPE;
 use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
