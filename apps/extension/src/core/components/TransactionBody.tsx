@@ -4,7 +4,8 @@
 import React from 'react';
 import {
   Box,
-  Button, Heading,
+  Button,
+  Heading,
   HStack,
   Text,
   Tooltip,
