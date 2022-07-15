@@ -184,12 +184,13 @@ where
             fail_point!("executor::commit_blocks", |_| {
                 Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
             });
-            let checkpoint = self
+            let result_in_memory_state = self
                 .block_tree
                 .get_block(block_id_to_commit)?
                 .output
                 .result_view
-                .state_tree();
+                .state()
+                .clone();
             self.db.writer.save_transactions_ext(
                 &txns_to_commit,
                 first_version,
@@ -200,7 +201,7 @@ where
                     .checkpoint_version,
                 Some(&ledger_info_with_sigs),
                 save_state_snapshots,
-                checkpoint,
+                result_in_memory_state,
             )?;
             self.block_tree
                 .prune(ledger_info_with_sigs.ledger_info())

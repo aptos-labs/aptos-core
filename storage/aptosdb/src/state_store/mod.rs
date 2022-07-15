@@ -132,14 +132,8 @@ impl StateStore {
         store
     }
 
-    pub fn maybe_reset(self: &Arc<Self>, version: Version) {
-        if self
-            .in_memory_state
-            .lock()
-            .checkpoint_version
-            .map_or(0, |v| v + 1)
-            <= version
-        {
+    pub fn maybe_reset(self: &Arc<Self>, latest_snapshot_version: Option<Version>) {
+        if self.in_memory_state.lock().checkpoint_version < latest_snapshot_version {
             self.initialize(false)
                 .expect("StateStore initialization failed.")
         }

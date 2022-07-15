@@ -979,12 +979,16 @@ impl TransactionInfo {
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
-    pub fn new_placeholder(gas_used: u64, status: ExecutionStatus) -> Self {
+    pub fn new_placeholder(
+        gas_used: u64,
+        state_checkpoint_hash: Option<HashValue>,
+        status: ExecutionStatus,
+    ) -> Self {
         Self::new(
             HashValue::default(),
             HashValue::default(),
             HashValue::default(),
-            Some(HashValue::default()),
+            state_checkpoint_hash,
             gas_used,
             status,
         )

@@ -6,18 +6,18 @@ use crate::{
     state_store::StateStore, transaction_store::TransactionStore, AptosDB,
 };
 use anyhow::Result;
-use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_crypto::HashValue;
 use aptos_jellyfish_merkle::restore::StateSnapshotRestore;
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
-    proof::{accumulator::InMemoryAccumulator, definition::LeafCount},
+    proof::definition::LeafCount,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version},
 };
 use schemadb::DB;
 use std::sync::Arc;
-use storage_interface::{in_memory_state::InMemoryState, DbReader, ExecutedTrees};
+use storage_interface::DbReader;
 
 /// Provides functionalities for AptosDB data restore.
 #[derive(Clone)]
@@ -62,8 +62,8 @@ impl RestoreHandler {
         )
     }
 
-    pub fn maybe_reset_state_store(&self, version: Version) {
-        self.state_store.maybe_reset(version);
+    pub fn maybe_reset_state_store(&self, latest_snapshot_version: Option<Version>) {
+        self.state_store.maybe_reset(latest_snapshot_version);
     }
 
     pub fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {
@@ -103,29 +103,6 @@ impl RestoreHandler {
             txn_infos,
             events,
         )
-    }
-
-    pub fn get_executed_trees(&self, version: Option<Version>) -> Result<ExecutedTrees> {
-        let num_transactions: LeafCount = version.map_or(0, |v| v + 1);
-        let frozen_subtrees = self
-            .ledger_store
-            .get_frozen_subtree_hashes(num_transactions)?;
-        // For now, we know there must be a state snapshot at `committed_version`. We need to recover checkpoint after make commit async.
-        let (committed_version, committed_root_hash) = if let Some((version, hash)) = self
-            .state_store
-            .get_state_snapshot_before(num_transactions)?
-        {
-            (Some(version), hash)
-        } else {
-            (None, *SPARSE_MERKLE_PLACEHOLDER_HASH)
-        };
-
-        let transaction_accumulator =
-            Arc::new(InMemoryAccumulator::new(frozen_subtrees, num_transactions)?);
-        Ok(ExecutedTrees::new(
-            InMemoryState::new_at_checkpoint(committed_root_hash, committed_version),
-            transaction_accumulator,
-        ))
     }
 
     pub fn get_next_expected_transaction_version(&self) -> Result<Version> {

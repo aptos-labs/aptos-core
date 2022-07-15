@@ -66,8 +66,8 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     nibble::nibble_path::NibblePath,
     proof::{
-        accumulator::InMemoryAccumulator, definition::LeafCount, AccumulatorConsistencyProof,
-        SparseMerkleProof, TransactionInfoListWithProof,
+        accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProof,
+        TransactionInfoListWithProof,
     },
     state_proof::StateProof,
     state_store::{
@@ -416,6 +416,12 @@ impl AptosDB {
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_readonly_for_test<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
         Self::new_without_pruner(db_root_path, true)
+    }
+
+    /// This gets the current cached_state in StateStore..
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn cached_state(&self) -> InMemoryState {
+        self.state_store.in_memory_state().lock().clone()
     }
 
     /// This force the db to update rocksdb properties immediately.
@@ -1334,17 +1340,19 @@ impl DbWriter for AptosDB {
     }
 
     /// Snapshots are persisted checkpoints that merklize global state key-value pairs.
-    fn save_state_snapshot(
-        &self,
-        version: Version,
-        base_version: Option<Version>,
-        state_tree_at_snapshot: SparseMerkleTree<StateValue>,
-    ) -> Result<()> {
+    fn save_state_snapshot(&self) -> Result<()> {
         gauged_api("save_state_snapshot", || {
-            let mut in_memory_state = self.state_store.in_memory_state().lock();
+            let mut cached_state = self.state_store.in_memory_state().lock();
+            let node_hashes = cached_state
+                .current
+                .clone()
+                .freeze()
+                .new_node_hashes_since(&cached_state.checkpoint.clone().freeze());
+            let version = cached_state.current_version.expect("Cannot be empty");
+            let base_version = cached_state.checkpoint_version;
             let root_hash = self.state_store.merklize_value_set(
-                jmt_update_refs(&jmt_updates(&in_memory_state.updated_since_checkpoint)),
-                None,
+                jmt_update_refs(&jmt_updates(&cached_state.updated_since_checkpoint)),
+                Some(&node_hashes),
                 version,
                 base_version,
             )?;
@@ -1354,11 +1362,9 @@ impl DbWriter for AptosDB {
                 root_hash = root_hash,
                 "State snapshot committed."
             );
-            in_memory_state.checkpoint = state_tree_at_snapshot.clone();
-            in_memory_state.checkpoint_version = Some(version);
-            in_memory_state.current = state_tree_at_snapshot.clone();
-            in_memory_state.current_version = Some(version);
-            in_memory_state.updated_since_checkpoint.clear();
+            cached_state.checkpoint = cached_state.current.clone();
+            cached_state.checkpoint_version = cached_state.current_version;
+            cached_state.updated_since_checkpoint.clear();
             Ok(())
         })
     }
@@ -1375,7 +1381,7 @@ impl DbWriter for AptosDB {
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         save_state_snapshots: bool,
-        state_tree: SparseMerkleTree<StateValue>,
+        latest_in_memory_state: InMemoryState,
     ) -> Result<()> {
         gauged_api("save_transactions", || {
             // Executing and committing from more than one threads not allowed -- consensus and
@@ -1392,6 +1398,11 @@ impl DbWriter for AptosDB {
             );
 
             let last_version = first_version + num_txns - 1;
+            ensure!(Some(last_version) == latest_in_memory_state.current_version,
+                "the last_version {:?} to commit doesn't match the current_version {:?} in latest_in_memory_state",
+                last_version,
+               latest_in_memory_state.current_version.expect("Must exist")
+            );
 
             if let Some(x) = ledger_info_with_sigs {
                 let claimed_last_version = x.ledger_info().version();
@@ -1432,35 +1443,71 @@ impl DbWriter for AptosDB {
                 self.commit(sealed_cs)?;
             }
             if save_state_snapshots {
-                let checkpoint_version =
+                let cached_snapshot_version =
                     self.state_store.in_memory_state().lock().checkpoint_version;
-                let mut base_version = base_state_version;
                 ensure!(
-                    base_version == checkpoint_version,
-                    "base_version {:?} does not match checkpoint_version {:?} in state_store",
-                    base_version,
-                    checkpoint_version
+                    base_state_version == cached_snapshot_version,
+                    "base_state_version {:?} does not match cached_snapshot_version {:?} in state_store",
+                    base_state_version,
+                    cached_snapshot_version
                 );
-                // find all the checkpoint versions
-                for (idx, txn_to_commit) in txns_to_commit.iter().enumerate() {
+
+                let mut uncommitted_updates_start_idx = 0;
+                let new_snapshot_version = latest_in_memory_state.checkpoint_version;
+                if new_snapshot_version >= Some(first_version) {
+                    let new_snapshot_version = new_snapshot_version.expect("Must exist here");
+                    ensure!(
+                        last_version >= new_snapshot_version,
+                        "last_version is smaller than new_snapshot version {} {}",
+                        last_version,
+                        new_snapshot_version
+                    );
+                    let idx = (new_snapshot_version - first_version) as usize;
+                    ensure!(
+                            txns_to_commit[idx].is_state_checkpoint(),
+                            "The new snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
+                            new_snapshot_version,
+                            first_version + idx as u64
+                    );
                     self.state_store
                         .in_memory_state()
                         .lock()
                         .updated_since_checkpoint
-                        .extend(txn_to_commit.state_updates().clone());
-                    if txn_to_commit.is_state_checkpoint() {
-                        let version = first_version + idx as LeafCount;
-                        self.save_state_snapshot(version, base_version, state_tree.clone())?;
-                        base_version = Some(version);
+                        .extend(
+                            txns_to_commit[..=idx]
+                                .iter()
+                                .flat_map(|txn_to_commit| txn_to_commit.state_updates().clone()),
+                        );
+                    {
+                        let mut cached_state = self.state_store.in_memory_state().lock();
+                        cached_state.current = latest_in_memory_state.checkpoint.clone();
+                        cached_state.current_version = Some(new_snapshot_version);
                     }
+                    self.save_state_snapshot()?;
+                    uncommitted_updates_start_idx = idx + 1;
+                }
+
+                if cfg!(any(test, feature = "fuzzing")) {
+                    self.state_store
+                        .in_memory_state()
+                        .lock()
+                        .updated_since_checkpoint
+                        .extend(
+                            txns_to_commit[uncommitted_updates_start_idx..]
+                                .iter()
+                                .flat_map(|txn_to_commit| txn_to_commit.state_updates().clone()),
+                        );
+                    assert_eq!(
+                        latest_in_memory_state.updated_since_checkpoint,
+                        self.state_store
+                            .in_memory_state()
+                            .lock()
+                            .updated_since_checkpoint
+                    );
                 }
             }
             // update the InMemoryState in StateStore.
-            {
-                let mut in_memory_state = self.state_store.in_memory_state().lock();
-                in_memory_state.current = state_tree.clone();
-                in_memory_state.current_version = Some(last_version);
-            };
+            *self.state_store.in_memory_state().lock() = latest_in_memory_state;
 
             // Only increment counter if commit succeeds and there are at least one transaction written
             // to the storage. That's also when we'd inform the pruner thread to work.
@@ -1563,7 +1610,7 @@ impl DbWriter for AptosDB {
                 version,
                 outputs,
             )?;
-            self.state_store.maybe_reset(version);
+            self.state_store.maybe_reset(Some(version));
             Ok(())
         })
     }
