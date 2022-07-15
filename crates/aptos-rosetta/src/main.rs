@@ -19,15 +19,15 @@ use std::{
 };
 use tokio::time::Instant;
 
-const REST_API_WAIT_DURATION_MS: u64 = 60;
-const TOTAL_REST_API_WAIT_DURATION_S: u64 = 300;
+const REST_API_WAIT_DURATION_MS: u64 = 500;
+const TOTAL_REST_API_WAIT_DURATION_S: u64 = 60;
 
 #[tokio::main]
 async fn main() {
     let args: CommandArgs = CommandArgs::parse();
 
     // If we're in online mode, we run a full node side by side, the fullnode sets up the logger
-    let _maybe_node = if let CommandArgs::Online(OnlineLocalArgs {
+    let maybe_node = if let CommandArgs::Online(OnlineLocalArgs {
         ref node_args,
         ref online_args,
     }) = args
@@ -68,10 +68,14 @@ async fn main() {
     let _rosetta = bootstrap(args.chain_id(), args.api_config(), args.rest_client())
         .expect("Should bootstrap");
 
-    // Run until there is an interrupt
-    let term = Arc::new(AtomicBool::new(false));
-    while !term.load(Ordering::Acquire) {
-        std::thread::park();
+    if let Some(node) = maybe_node {
+        node.join().unwrap();
+    } else {
+        // Run until there is an interrupt
+        let term = Arc::new(AtomicBool::new(false));
+        while !term.load(Ordering::Acquire) {
+            std::thread::park();
+        }
     }
 }
 
