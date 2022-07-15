@@ -4,7 +4,7 @@
 use std::fmt::Display;
 
 use anyhow::format_err;
-use aptos_api_types::U64;
+use aptos_api_types::{LedgerInfo, U64};
 use poem::Result as PoemResult;
 use poem_openapi::{payload::Json, types::ToJSON, ApiResponse, Enum, Object, ResponseContent};
 use serde::{Deserialize, Serialize};
@@ -93,7 +93,14 @@ pub enum AptosResponseContent<T: ToJSON + Send + Sync> {
 #[derive(ApiResponse)]
 pub enum AptosResponse<T: ToJSON + Send + Sync> {
     #[oai(status = 200)]
-    Ok(AptosResponseContent<T>),
+    Ok(
+        AptosResponseContent<T>,
+        #[oai(header = "X-Aptos-Chain-Id")] u16,
+        #[oai(header = "X-Aptos-Ledger-Version")] u64,
+        #[oai(header = "X-Aptos-Ledger-Oldest-Version")] u64,
+        #[oai(header = "X-Aptos-Ledger-TimestampUsec")] u64,
+        #[oai(header = "X-Aptos-Epoch")] u64,
+    ),
 }
 
 // From impls
@@ -114,15 +121,26 @@ impl AptosErrorResponse {
 }
 
 impl<T: ToJSON + Send + Sync + Serialize> AptosResponse<T> {
+    fn from_ledger_info(content: AptosResponseContent<T>, ledger_info: &LedgerInfo) -> Self {
+        AptosResponse::Ok(
+            content,
+            ledger_info.chain_id as u16,
+            ledger_info.ledger_version.into(),
+            ledger_info.oldest_ledger_version.into(),
+            ledger_info.ledger_timestamp.into(),
+            ledger_info.epoch,
+        )
+    }
+
     /// Construct a response from bytes that you know ahead of time a BCS
     /// encoded value.
-    pub fn from_bcs(value: Vec<u8>) -> Self {
-        AptosResponse::Ok(AptosResponseContent::Bcs(Bcs(value)))
+    pub fn from_bcs(value: Vec<u8>, ledger_info: &LedgerInfo) -> Self {
+        Self::from_ledger_info(AptosResponseContent::Bcs(Bcs(value)), &ledger_info)
     }
 
     /// Construct an Aptos response from a Rust type, serializing it to JSON.
-    pub fn from_json(value: T) -> Self {
-        AptosResponse::Ok(AptosResponseContent::Json(Json(value)))
+    pub fn from_json(value: T, ledger_info: &LedgerInfo) -> Self {
+        Self::from_ledger_info(AptosResponseContent::Json(Json(value)), &ledger_info)
     }
 
     /// This is a convenience function for creating a response when you have
@@ -130,12 +148,16 @@ impl<T: ToJSON + Send + Sync + Serialize> AptosResponse<T> {
     /// you should instead check the accept type and use either `from_bcs`
     /// or `from_json`.
     pub fn try_from_rust_value(
-        accept_type: &AcceptType,
         value: T,
+        ledger_info: &LedgerInfo,
+        accept_type: &AcceptType,
     ) -> Result<Self, AptosErrorResponse> {
         match accept_type {
-            AcceptType::Bcs => Ok(AptosResponse::from_bcs(serialize_to_bcs(&value)?)),
-            AcceptType::Json => Ok(AptosResponse::from_json(value)),
+            AcceptType::Bcs => Ok(AptosResponse::from_bcs(
+                serialize_to_bcs(&value)?,
+                ledger_info,
+            )),
+            AcceptType::Json => Ok(AptosResponse::from_json(value, ledger_info)),
         }
     }
 }
