@@ -19,12 +19,22 @@ use std::{
 };
 use tokio::time::Instant;
 
-const REST_API_WAIT_DURATION_MS: u64 = 60;
-const TOTAL_REST_API_WAIT_DURATION_S: u64 = 300;
+const REST_API_WAIT_DURATION_MS: u64 = 100;
+const TOTAL_REST_API_WAIT_DURATION_S: u64 = 60;
 
 #[tokio::main]
 async fn main() {
     let args: CommandArgs = CommandArgs::parse();
+
+    match args {
+        CommandArgs::OnlineRemote(_) => {
+            println!("Starting Rosetta in Online remote (no local full node) mode")
+        }
+        CommandArgs::Online(_) => {
+            println!("Starting Rosetta in Online (with local full node) mode")
+        }
+        CommandArgs::Offline(_) => println!("Starting Rosetta in Offline mode"),
+    }
 
     // If we're in online mode, we run a full node side by side, the fullnode sets up the logger
     let _maybe_node = if let CommandArgs::Online(OnlineLocalArgs {
@@ -32,6 +42,7 @@ async fn main() {
         ref online_args,
     }) = args
     {
+        println!("Starting local node");
         let node_args = node_args.clone();
         let runtime = thread::spawn(move || node_args.run());
 
@@ -52,11 +63,12 @@ async fn main() {
         // If it didn't start up, we need to crash
         if !successful {
             panic!(
-                "Node didn't start up on time after {} seconds",
-                TOTAL_REST_API_WAIT_DURATION_S
+                "Node didn't start up on time after {} seconds at {}",
+                TOTAL_REST_API_WAIT_DURATION_S, online_args.rest_api_url
             )
         }
 
+        println!("Local node started successfully");
         Some(runtime)
     } else {
         // If we aren't running a full node, set up the logger now
@@ -64,6 +76,7 @@ async fn main() {
         None
     };
 
+    println!("Starting rosetta");
     // Ensure runtime for Rosetta is up and running
     let _rosetta = bootstrap(args.chain_id(), args.api_config(), args.rest_client())
         .expect("Should bootstrap");
@@ -171,7 +184,7 @@ pub struct OnlineRemoteArgs {
     #[clap(flatten)]
     offline_args: OfflineArgs,
     /// URL for the Aptos REST API. e.g. https://fullnode.devnet.aptoslabs.com
-    #[clap(long, default_value = "https://localhost:8080")]
+    #[clap(long, default_value = "http://localhost:8080")]
     rest_api_url: url::Url,
 }
 
