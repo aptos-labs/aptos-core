@@ -17,6 +17,7 @@ module AptosFramework::AptosGovernance {
     use Std::Option;
     use Std::Signer;
 
+    use AptosFramework::Account::{SignerCapability, create_signer_with_capability};
     use AptosFramework::Coin;
     use AptosFramework::GovernanceProposal::{Self, GovernanceProposal};
     use AptosFramework::Stake;
@@ -32,6 +33,11 @@ module AptosFramework::AptosGovernance {
     const EINSUFFICIENT_STAKE_LOCKUP: u64 = 3;
     const EALREADY_VOTED: u64 = 4;
     const ENO_VOTING_POWER: u64 = 5;
+
+    /// Store the SignerCapability of the framework account (0x1) so AptosGovernance can have control over it.
+    struct GovernanceResponsbility has key {
+        signer_cap: SignerCapability,
+    }
 
     /// Configurations of the AptosGovernance, set during Genesis and can be updated by the same process offered
     /// by this AptosGovernance module.
@@ -80,6 +86,15 @@ module AptosFramework::AptosGovernance {
         min_voting_threshold: u128,
         required_proposer_stake: u64,
         voting_period_secs: u64,
+    }
+
+    /// Stores the signer capability for 0x1.
+    public fun store_signer_cap(
+        core_framework: &signer,
+        signer_cap: SignerCapability,
+    ) {
+        SystemAddresses::assert_core_framework(core_framework);
+        move_to(core_framework, GovernanceResponsbility { signer_cap });
     }
 
     /// Initializes the state for Aptos Governance. Can only be called during Genesis with a signer
@@ -246,6 +261,13 @@ module AptosFramework::AptosGovernance {
                 should_pass,
             },
         );
+    }
+
+    /// Return a signer for making changes to 0x1 as part of on-chain governance proposal process.
+    /// Accept a GovernanceProposal object instead of a reference so it can't be used more than once.
+    public fun get_framework_signer(_proposal: GovernanceProposal): signer acquires GovernanceResponsbility {
+        let governance_responsibility = borrow_global<GovernanceResponsbility>(@AptosFramework);
+        create_signer_with_capability(&governance_responsibility.signer_cap)
     }
 
     #[test(core_resources = @CoreResources, core_framework = @AptosFramework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]

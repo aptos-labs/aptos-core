@@ -5,6 +5,7 @@ module AptosFramework::Genesis {
     use Std::Vector;
 
     use AptosFramework::Account;
+    use AptosFramework::AptosGovernance;
     use AptosFramework::Coin;
     use AptosFramework::ConsensusConfig;
     use AptosFramework::TransactionPublishingOption;
@@ -102,7 +103,10 @@ module AptosFramework::Genesis {
         Account::create_account_internal(Signer::address_of(core_resource_account));
         Account::rotate_authentication_key_internal(core_resource_account, copy core_resource_account_auth_key);
         // initialize the core framework account
-        let core_framework_account = Account::create_core_framework_account();
+        let (core_framework_account, framework_signer_cap) = Account::create_core_framework_account();
+
+        // Give the decentralized on-chain governance control over the core framework account.
+        AptosGovernance::store_signer_cap(&core_framework_account, framework_signer_cap);
 
         // Consensus config setup
         ConsensusConfig::initialize(core_resource_account);

@@ -33,5 +33,13 @@
         "dummy_field": false
       }
     }
+  },
+  {
+    "type": "0x1::AptosGovernance::GovernanceResponsbility",
+    "data": {
+      "signer_cap": {
+        "account": "0x1"
+      }
+    }
   }
 ]
