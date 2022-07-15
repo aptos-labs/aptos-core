@@ -11,6 +11,72 @@
     }
   },
   {
+    "type": "0x1::GUID::Generator",
+    "data": {
+      "counter": "7"
+    }
+  },
+  {
+    "type": "0x1::Voting::VotingForum<0x1::GovernanceProposal::GovernanceProposal>",
+    "data": {
+      "events": {
+        "create_proposal_events": {
+          "counter": "0",
+          "guid": {
+            "guid": {
+              "id": {
+                "addr": "0x1",
+                "creation_num": "0"
+              }
+            },
+            "len_bytes": 40
+          }
+        },
+        "register_forum_events": {
+          "counter": "1",
+          "guid": {
+            "guid": {
+              "id": {
+                "addr": "0x1",
+                "creation_num": "1"
+              }
+            },
+            "len_bytes": 40
+          }
+        },
+        "resolve_proposal_events": {
+          "counter": "0",
+          "guid": {
+            "guid": {
+              "id": {
+                "addr": "0x1",
+                "creation_num": "2"
+              }
+            },
+            "len_bytes": 40
+          }
+        },
+        "vote_events": {
+          "counter": "0",
+          "guid": {
+            "guid": {
+              "id": {
+                "addr": "0x1",
+                "creation_num": "3"
+              }
+            },
+            "len_bytes": 40
+          }
+        }
+      },
+      "next_proposal_id": "0",
+      "proposals": {
+        "handle": "66250964772389598023276627514581198483",
+        "length": "0"
+      }
+    }
+  },
+  {
     "type": "0x1::Account::Account",
     "data": {
       "authentication_key": "0x0000000000000000000000000000000000000000000000000000000000000001",
@@ -31,6 +97,64 @@
     "data": {
       "burn_cap": {
         "dummy_field": false
+      }
+    }
+  },
+  {
+    "type": "0x1::AptosGovernance::VotingRecords",
+    "data": {
+      "votes": {
+        "handle": "250572580766766989648150312918132283230",
+        "length": "0"
+      }
+    }
+  },
+  {
+    "type": "0x1::AptosGovernance::GovernanceConfig",
+    "data": {
+      "min_voting_threshold": "0",
+      "required_proposer_stake": "0",
+      "voting_period_secs": "604800"
+    }
+  },
+  {
+    "type": "0x1::AptosGovernance::GovernanceEvents",
+    "data": {
+      "create_proposal_events": {
+        "counter": "0",
+        "guid": {
+          "guid": {
+            "id": {
+              "addr": "0x1",
+              "creation_num": "4"
+            }
+          },
+          "len_bytes": 40
+        }
+      },
+      "update_config_events": {
+        "counter": "0",
+        "guid": {
+          "guid": {
+            "id": {
+              "addr": "0x1",
+              "creation_num": "5"
+            }
+          },
+          "len_bytes": 40
+        }
+      },
+      "vote_events": {
+        "counter": "0",
+        "guid": {
+          "guid": {
+            "id": {
+              "addr": "0x1",
+              "creation_num": "6"
+            }
+          },
+          "len_bytes": 40
+        }
       }
     }
   },

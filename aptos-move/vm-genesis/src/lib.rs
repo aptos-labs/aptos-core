@@ -124,13 +124,12 @@ pub fn encode_genesis_change_set(
         validators,
         genesis_configs.initial_lockup_timestamp,
     );
-    reconfigure(&mut session);
 
-    // TODO: Make on chain governance parameters configurable in the genesis blob.
-    let enable_on_chain_governance = false;
-    if enable_on_chain_governance {
-        initialize_on_chain_governance(&mut session);
-    }
+    // Initialize on-chain governance.
+    initialize_on_chain_governance(&mut session);
+
+    // Reconfiguration should happen after all on-chain invocations.
+    reconfigure(&mut session);
 
     let mut session1_out = session.finish().unwrap();
 
@@ -196,8 +195,6 @@ fn create_and_initialize_main_accounts(
 ) {
     let aptos_root_auth_key = AuthenticationKey::ed25519(aptos_root_key);
 
-    let root_aptos_root_address = account_config::aptos_root_address();
-
     let initial_allow_list = MoveValue::Vector(
         publishing_option
             .script_allow_list
@@ -235,7 +232,7 @@ fn create_and_initialize_main_accounts(
         "initialize",
         vec![],
         serialize_values(&vec![
-            MoveValue::Signer(root_aptos_root_address),
+            MoveValue::Signer(account_config::aptos_root_address()),
             MoveValue::vector_u8(aptos_root_auth_key.to_vec()),
             initial_allow_list,
             MoveValue::Bool(publishing_option.is_open_module),
@@ -270,6 +267,7 @@ fn initialize_on_chain_governance(session: &mut SessionExt<impl MoveResolver>) {
         "initialize",
         vec![],
         serialize_values(&vec![
+            MoveValue::Signer(account_config::aptos_framework_address()),
             MoveValue::U128(min_voting_threshold),
             MoveValue::U64(required_proposer_stake),
             MoveValue::U64(voting_period_secs),
@@ -285,7 +283,6 @@ fn create_and_initialize_validators(
     validators: &[Validator],
     initial_lockup_timestamp: u64,
 ) {
-    let aptos_root_address = account_config::aptos_root_address();
     let mut owners = vec![];
     let mut consensus_pubkeys = vec![];
     let mut proof_of_possession = vec![];
@@ -308,7 +305,7 @@ fn create_and_initialize_validators(
         "create_initialize_validators",
         vec![],
         serialize_values(&vec![
-            MoveValue::Signer(aptos_root_address),
+            MoveValue::Signer(account_config::aptos_root_address()),
             MoveValue::Vector(owners),
             MoveValue::Vector(consensus_pubkeys),
             MoveValue::Vector(proof_of_possession),
