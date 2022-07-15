@@ -1,7 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::vm_status::StatusCode;
+use aptos_types::{
+    state_store::state_key::StateKey,
+    vm_status::StatusCode,
+    write_set::{WriteOp, WriteSetMut, WriteSet},
+};
 use better_any::{Tid, TidAble};
 use move_deps::{
     move_binary_format::errors::{PartialVMResult, PartialVMError},
@@ -192,18 +196,51 @@ impl<'a> NativeAggregatorContext<'a> {
             registry_data: Default::default(),
         }
     }
+
+    /// Temporary into_change_set!
+    pub fn into_change_set(self) -> WriteSet {
+        let NativeAggregatorContext { registry_data, .. } = self;
+        let RegistryData {
+            registries,
+        } = registry_data.into_inner();
+
+        let mut write_set_mut = WriteSetMut::new(Vec::new());
+        for (table_handle, registry) in registries {
+            let Registry {
+                table,
+                ..
+            } = registry;
+            for (key, aggregator) in table {
+                let key_bytes = u128::to_be_bytes(key).to_vec();
+                let state_key = StateKey::table_item(table_handle.0, key_bytes);
+
+                let Aggregator {
+                    state,
+                    value,
+                    ..
+                } = aggregator;
+
+                // TODO: introduce deltas!
+                assert!(state == AggregatorState::Data);
+
+                let value_bytes = u128::to_be_bytes(value).to_vec();
+                write_set_mut.push((state_key, WriteOp::Value(value_bytes)));
+            }
+        }
+        write_set_mut.freeze().unwrap()
+    }
 }
 
 // ================================= Natives =================================
 
 /// All aggregator native functions. For more details, refer to cod in 
-/// AggregatorRegistry.move.
+/// AggregatorTable.move.
 pub fn aggregator_natives(aggregator_addr: AccountAddress) -> NativeFunctionTable {
     native_functions::make_table(
         aggregator_addr, 
         &[
+            ("AggregatorTable", "new_aggregator", native_new_aggregator),
             ("Aggregator", "add", native_add),
-            ("Aggregator", "new", native_new),
             ("Aggregator", "read", native_read),
         ],
     )
@@ -247,7 +284,7 @@ fn native_add(
     })
 }
 
-fn native_new(
+fn native_new_aggregator(
     context: &mut NativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -346,7 +383,7 @@ fn native_read(
 
 // ================================ Utilities ================================
 
-/// The field index of the `table` field in the `AggregatorRegistry` Move
+/// The field index of the `table` field in the `AggregatorTable` Move
 /// struct.
 const TABLE_FIELD_INDEX: usize = 0;
 
@@ -359,7 +396,7 @@ const REGISTRY_HANDLE_FIELD_INDEX: usize = 0;
 const KEY_FIELD_INDEX: usize = 1;
 const LIMIT_FIELD_INDEX: usize = 2;
 
-/// Given a reference to `AggregatorRegistry` Move struct, returns `TableHandle`
+/// Given a reference to `AggregatorTable` Move struct, returns `TableHandle`
 /// (`RegistryHandle`) field value.
 fn get_table_handle(aggregator_registry: &StructRef) -> PartialVMResult<TableHandle> {
     let table_ref =
