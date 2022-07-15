@@ -40,3 +40,8 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
 fn move_unit_tests() {
     run_tests_for_pkg("aptos-framework");
 }
+
+#[test]
+fn move_token_unit_tests() {
+    run_tests_for_pkg("aptos-token");
+}

@@ -1,6 +1,6 @@
 /// PropertyMap is a specialization of SimpleMap for Tokens.
-/// It maps a String key to a PropertyValue that consists of a String type and a vec value
-module AptosFramework::PropertyMap {
+/// It maps a String key to a PropertyValue that consists of type (string) and value (vecotr<u8>)
+module AptosToken::PropertyMap {
     use Std::Vector;
     use Std::ASCII::{Self, String};
     use AptosFramework::SimpleMap::{Self, SimpleMap};

@@ -1,15 +1,15 @@
 /// A module for
-/// 1. hold tokens escrow to prevent token been transferred
-/// 2. list token for swapping with a targeted CoinType.
-/// 3. execute the swapping
-module AptosFramework::TokenCoinSwap {
+/// 1. Hold tokens escrow to prevent token been transferred
+/// 2. List token for swapping with a targeted CoinType.
+/// 3. Execute the swapping
+module AptosToken::TokenCoinSwap {
     use Std::Event::{Self, EventHandle};
     use Std::Signer;
     use AptosFramework::Table::{Self, Table};
-    use AptosFramework::TokenV1::{Self, Token, TokenId, deposit_token, withdraw_token, merge, split};
     use AptosFramework::Coin;
     use AptosFramework::Timestamp;
     use AptosFramework::TypeInfo::{Self, TypeInfo};
+    use AptosToken::TokenV1::{Self, Token, TokenId, deposit_token, withdraw_token, merge, split};
 
     const ETOKEN_ALREADY_LISTED: u64 = 1;
     const ETOKEN_LISTING_NOT_EXIST: u64 = 2;

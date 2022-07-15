@@ -1,0 +1,14 @@
+[package]
+name = "AptosToken"
+version = "1.0.0"
+
+[addresses]
+Std = "0x1"
+AptosFramework = "0x1"
+CoreResources = "0xA550C18"
+VMReserved = "0x0"
+AptosToken = "0x2"
+
+[dependencies]
+MoveStdlib = { local = "../move-stdlib" }
+AptosFramework = { local = "../aptos-framework"}
