@@ -45,7 +45,7 @@ use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_metrics_core::monitor;
-use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
+use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::validator_signer::ValidatorSigner;
 use aptos_types::{
     account_address::AccountAddress,
