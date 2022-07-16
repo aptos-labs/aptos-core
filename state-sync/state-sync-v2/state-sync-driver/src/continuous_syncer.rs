@@ -253,7 +253,7 @@ impl<
                         self.storage_synchronizer.apply_transaction_outputs(
                             notification_id,
                             transaction_outputs_with_proof,
-                            ledger_info_with_signatures,
+                            ledger_info_with_signatures.clone(),
                             None,
                         )?;
                         num_transaction_outputs
@@ -274,7 +274,7 @@ impl<
                         self.storage_synchronizer.execute_transactions(
                             notification_id,
                             transaction_list_with_proof,
-                            ledger_info_with_signatures,
+                            ledger_info_with_signatures.clone(),
                             None,
                         )?;
                         num_transactions
@@ -294,8 +294,9 @@ impl<
             .checked_add(num_transactions_or_outputs as u64)
             .and_then(|version| version.checked_sub(1)) // synced_version = start + num txns/outputs - 1
             .ok_or_else(|| Error::IntegerOverflow("The synced version has overflown!".into()))?;
-        self.get_speculative_stream_state()
-            .update_synced_version(synced_version);
+        let speculative_stream_state = self.get_speculative_stream_state();
+        speculative_stream_state.update_synced_version(synced_version);
+        speculative_stream_state.maybe_update_epoch_state(ledger_info_with_signatures);
 
         Ok(())
     }
