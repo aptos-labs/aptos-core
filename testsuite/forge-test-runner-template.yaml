@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {FORGE_POD_NAME}
+  labels:
+    app.kubernetes.io/name: forge
+spec:
+  restartPolicy: Never
+  serviceAccountName: forge
+  containers:
+  - name: main
+    image: {AWS_ACCOUNT_NUM}.dkr.ecr.{AWS_REGION}.amazonaws.com/aptos/forge:{IMAGE_TAG}
+    imagePullPolicy: Always
+    command:
+    - /bin/bash
+    - -c
+    - |
+      ulimit -n 1048576
+      forge test k8s-swarm --image-tag {IMAGE_TAG} --namespace {FORGE_NAMESPACE} {KEEP_ARGS} {ENABLE_HAPROXY_ARGS}
+    resources:
+      requests:
+        cpu: 15.5
+  affinity:
+    # avoid scheduling with other forge or validator/fullnode pods
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values: ["validator", "fullnode", "forge"]
+          - key: run
+            operator: Exists
+        topologyKey: "kubernetes.io/hostname"
+  # schedule on a k8s worker node in the "validators" nodegroup
+  # to access more compute
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: validators
+  tolerations:
+  - effect: NoExecute
+    key: aptos.org/nodepool
+    value: validators
+  
