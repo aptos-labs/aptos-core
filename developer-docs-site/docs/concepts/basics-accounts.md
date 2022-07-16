@@ -60,7 +60,7 @@ To generate an authentication key and the account address for a single signature
      ```
      auth_key = sha3-256(pubkey_A | 0x00)
      ```
-     where `|` denotes concatenation. The `0x00` is the 1-byte single-signature scheme identifier. The first 16 bytes of `auth_key` is the "authentication key prefix".
+     where `|` denotes concatenation. The `0x00` is the 1-byte single-signature scheme identifier. 
 3. Use this initial authentication key as the permanent account address.
 
 ## Multisigner authentication
