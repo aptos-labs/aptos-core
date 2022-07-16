@@ -161,15 +161,16 @@ pub fn prune_state_store(
     target_version: Version,
     max_versions: usize,
 ) -> Result<Version> {
-    let indices = StaleNodeIndicesByVersionIterator::new(db, min_readable_version, target_version)?
-        .take(max_versions) // Iterator<Item = Result<Vec<StaleNodeIndex>>>
-        .collect::<Result<Vec<_>>>()? // now Vec<Vec<StaleNodeIndex>>
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>();
+    let indices =
+        StaleNodeIndicesByVersionIterator::new(db, min_readable_version + 1, target_version)?
+            .take(max_versions) // Iterator<Item = Result<Vec<StaleNodeIndex>>>
+            .collect::<Result<Vec<_>>>()? // now Vec<Vec<StaleNodeIndex>>
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
 
     if indices.is_empty() {
-        Ok(min_readable_version)
+        Ok(target_version)
     } else {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["pruner_commit"])
