@@ -8,9 +8,8 @@ use anyhow::{bail, format_err, Result};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     hash::HashValue,
-    PrivateKey, ValidCryptoMaterialStringExt,
+    ValidCryptoMaterialStringExt,
 };
-use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -36,11 +35,7 @@ use move_deps::{
     move_command_line_common::{
         address::ParsedAddress, files::verify_and_create_named_address_mapping,
     },
-    move_compiler::{
-        self,
-        shared::{NumberFormat, NumericalAddress, PackagePaths},
-        FullyCompiledProgram,
-    },
+    move_compiler::{self, shared::PackagePaths, FullyCompiledProgram},
     move_core_types::{
         account_address::AccountAddress,
         gas_schedule::{GasAlgebra, GasConstants},
@@ -150,9 +145,6 @@ struct AptosRunArgs {
 struct AptosInitArgs {
     #[structopt(long = "private-keys", parse(try_from_str = parse_named_private_key), multiple_values(true))]
     private_keys: Option<Vec<(Identifier, Ed25519PrivateKey)>>,
-
-    #[structopt(long = "validators", parse(try_from_str = parse_identifier), multiple_values(true))]
-    validators: Option<Vec<Identifier>>,
 }
 
 /// A raw private key -- either a literal or an unresolved name.
@@ -465,136 +457,6 @@ impl<'a> AptosTestAdapter<'a> {
         }
     }
 
-    /// Create a validator account with the given credentials.
-    ///
-    /// Note: this does not add it to the named address or private key mappings.
-    /// That needs to be done separately.
-    ///
-    /// TODO: the Genesis code seems to imply that one can use the same account as a validator owner and a
-    /// validator operator, but the `public(script) fun set_validator_operator` aborted when I tried to do
-    /// so. We should check if this is intended.
-    fn create_validator_account(
-        &mut self,
-        validator_name: Identifier,
-
-        validator_private_key: Ed25519PrivateKey,
-        validator_account_addr: AccountAddress,
-
-        operator_private_key: Ed25519PrivateKey,
-        operator_account_addr: AccountAddress,
-    ) {
-        // Step 1. Create validator account.
-        let parameters = self
-            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None)
-            .unwrap();
-        let txn = RawTransaction::new(
-            aptos_root_address(),
-            parameters.sequence_number,
-            aptos_transaction_builder::aptos_stdlib::encode_validator_set_script_create_validator_account(
-                validator_account_addr,
-                validator_name.as_bytes().into(),
-            ),
-            parameters.max_gas_amount,
-            parameters.gas_unit_price,
-            parameters.expiration_timestamp_secs,
-            ChainId::test(),
-        )
-        .sign(&GENESIS_KEYPAIR.0, GENESIS_KEYPAIR.1.clone())
-        .unwrap()
-        .into_inner();
-        self.run_transaction(Transaction::UserTransaction(txn))
-            .expect("Failed to create validator account. This should not happen.");
-
-        // Step 2. Create validator operator account.
-        let parameters = self
-            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None)
-            .unwrap();
-        let txn = RawTransaction::new(
-            aptos_root_address(),
-            parameters.sequence_number,
-            aptos_transaction_builder::aptos_stdlib::encode_validator_set_script_create_validator_operator_account(
-                operator_account_addr,
-                validator_name.as_bytes().into(),
-            ),
-            parameters.max_gas_amount,
-            parameters.gas_unit_price,
-            parameters.expiration_timestamp_secs,
-            ChainId::test(),
-        )
-        .sign(&GENESIS_KEYPAIR.0, GENESIS_KEYPAIR.1.clone())
-        .unwrap()
-        .into_inner();
-        self.run_transaction(Transaction::UserTransaction(txn))
-            .expect("Failed to create validator operator account. This should not happen.");
-
-        // Step 3. Set validator operator account.
-        let parameters = self
-            .fetch_transaction_parameters(&validator_account_addr, None, None, None, None)
-            .unwrap();
-        let txn = RawTransaction::new(
-            validator_account_addr,
-            parameters.sequence_number,
-            aptos_transaction_builder::aptos_stdlib::encode_validator_set_script_set_validator_operator(
-                validator_name.as_bytes().into(),
-                operator_account_addr,
-            ),
-            parameters.max_gas_amount,
-            parameters.gas_unit_price,
-            parameters.expiration_timestamp_secs,
-            ChainId::test(),
-        )
-        .sign(&validator_private_key, validator_private_key.public_key())
-        .unwrap()
-        .into_inner();
-        self.run_transaction(Transaction::UserTransaction(txn))
-            .expect("Failed to set validator operator. This should not happen.");
-
-        // Step 4. Set validator config.
-        let parameters = self
-            .fetch_transaction_parameters(&operator_account_addr, None, None, None, None)
-            .unwrap();
-        let txn = RawTransaction::new(
-            operator_account_addr,
-            parameters.sequence_number,
-            aptos_transaction_builder::aptos_stdlib::encode_validator_set_script_register_validator_config(
-                validator_account_addr,
-                validator_private_key.public_key().to_bytes().to_vec(),
-                vec![],
-                vec![],
-            ),
-            parameters.max_gas_amount,
-            parameters.gas_unit_price,
-            parameters.expiration_timestamp_secs,
-            ChainId::test(),
-        )
-        .sign(&operator_private_key, operator_private_key.public_key())
-        .unwrap()
-        .into_inner();
-        self.run_transaction(Transaction::UserTransaction(txn))
-            .expect("Failed to set validator config. This should not happen.");
-
-        // Step 5. Add validator to validator set.
-        let parameters = self
-            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None)
-            .unwrap();
-        let txn = RawTransaction::new(
-            aptos_root_address(),
-            parameters.sequence_number,
-            aptos_transaction_builder::aptos_stdlib::encode_validator_set_script_add_validator(
-                validator_account_addr,
-            ),
-            parameters.max_gas_amount,
-            parameters.gas_unit_price,
-            parameters.expiration_timestamp_secs,
-            ChainId::test(),
-        )
-        .sign(&GENESIS_KEYPAIR.0, GENESIS_KEYPAIR.1.clone())
-        .unwrap()
-        .into_inner();
-        self.run_transaction(Transaction::UserTransaction(txn))
-            .expect("Failed to add validator to validator set. This should not happen.");
-    }
-
     fn create_account(&mut self, account_addr: AccountAddress) {
         let parameters = self
             .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None)
@@ -688,10 +550,6 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             private_key_mapping.insert(name, private_key);
         }
 
-        // Handle extra init args
-        let mut keygen = KeyGen::from_seed([0; 32]);
-        let mut validators_to_create = vec![];
-
         if let Some(TaskInput {
             command: (_, init_args),
             ..
@@ -709,53 +567,6 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     private_key_mapping.insert(name.as_str().to_string(), private_key);
                 }
             }
-
-            // Validators
-            if let Some(validators) = init_args.validators {
-                for validator_name in validators {
-                    if named_address_mapping.contains_key(validator_name.as_str()) {
-                        panic!(
-                            "Invalid validator name {} -- named address already exists.",
-                            validator_name
-                        )
-                    }
-                    if private_key_mapping.contains_key(validator_name.as_str()) {
-                        panic!(
-                            "Invalid validator name {} -- named private key already exists.",
-                            validator_name
-                        )
-                    }
-
-                    let (validator_private_key, _, validator_account_addr) =
-                        keygen.generate_credentials_for_account_creation();
-
-                    let (operator_private_key, _, operator_account_addr) =
-                        keygen.generate_credentials_for_account_creation();
-
-                    named_address_mapping.insert(
-                        validator_name.to_string(),
-                        NumericalAddress::new(
-                            validator_account_addr.into_bytes(),
-                            NumberFormat::Hex,
-                        ),
-                    );
-                    private_key_mapping.insert(
-                        validator_name.as_str().to_string(),
-                        validator_private_key.clone(),
-                    );
-
-                    // Note: validator accounts are created at a later time.
-                    // This is because we need to fetch the sequence number of Root, which is
-                    // only available after the AptosTestAdapter has been fully initialized.
-                    validators_to_create.push((
-                        validator_name,
-                        validator_private_key,
-                        validator_account_addr,
-                        operator_private_key,
-                        operator_account_addr,
-                    ));
-                }
-            }
         }
 
         let mut adapter = Self {
@@ -764,24 +575,6 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             storage,
             private_key_mapping,
         };
-
-        // Create validator accounts
-        for (
-            validator_name,
-            validator_private_key,
-            validator_account_addr,
-            operator_private_key,
-            operator_account_addr,
-        ) in validators_to_create
-        {
-            adapter.create_validator_account(
-                validator_name,
-                validator_private_key,
-                validator_account_addr,
-                operator_private_key,
-                operator_account_addr,
-            );
-        }
 
         for (_, addr) in additional_named_address_mapping {
             adapter.create_account(addr.into_inner());
