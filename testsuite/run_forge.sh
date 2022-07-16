@@ -9,6 +9,9 @@
 # if the necessary environment variables are set.
 #
 
+# ensure the script is run from project root
+pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
+
 # for calculating regression
 TPS_THRESHOLD=1500
 P99_LATENCY_MS_THRESHOLD=5000
@@ -24,9 +27,7 @@ FORGE_NAMESPACE_KEEP=${FORGE_NAMESPACE_KEEP:-false}
 FORGE_ENABLE_HAPROXY=${FORGE_ENABLE_HAPROXY:-true}
 
 # if this script is not triggered in GHA, use a default value
-if [ -z "$GITHUB_RUN_ID" ]; then
-    GITHUB_RUN_ID=0
-fi
+[ -z "$GITHUB_RUN_ID" ] && GITHUB_RUN_ID=0
 
 if [ -z "$FORGE_NAMESPACE" ]; then
     namespace="forge-${USER}-$(date '+%s')"
@@ -40,14 +41,8 @@ FORGE_NAMESPACE="${FORGE_NAMESPACE//[^[:alnum:]]/-}"
 FORGE_NAMESPACE=${FORGE_NAMESPACE:0:64}
 
 
-if [ "$FORGE_NAMESPACE_KEEP" = "true" ]; then
-    KEEP_ARGS="--keep"
-fi
-
-if [ "$FORGE_ENABLE_HAPROXY" = "true" ]; then
-    ENABLE_HAPROXY_ARGS="--enable-haproxy"
-fi
-
+[ "$FORGE_NAMESPACE_KEEP" = "true" ] && KEEP_ARGS="--keep"
+[ "$FORGE_ENABLE_HAPROXY" = "true" ] && ENABLE_HAPROXY_ARGS="--enable-haproxy"
 
 if [ -z "$IMAGE_TAG" ]; then
     echo "IMAGE_TAG not set"
@@ -94,13 +89,19 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
     kubectl delete pod $FORGE_POD_NAME || true
     kubectl wait --for=delete "pod/${FORGE_POD_NAME}" || true
 
-    # run a pod that runs the forge test runner
-    # ensure that the pod uses for "forge" serviceAccount, and antiaffinity for other manually run forge pods
-    kubectl run $FORGE_POD_NAME \
-        --overrides='{"spec": { "serviceAccount": "forge", "affinity": { "podAntiAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": [{ "labelSelector": { "matchExpressions": [{ "key": "run", "operator": "Exists" }]}, "topologyKey": "kubernetes.io/hostname" }] }}}}' \
-        --restart=Never \
-        --image="${AWS_ACCOUNT_NUM}.dkr.ecr.${AWS_REGION}.amazonaws.com/aptos/forge:$IMAGE_TAG" \
-        --command -- bash -c "ulimit -n 1048576 && forge test k8s-swarm --image-tag $IMAGE_TAG --namespace $FORGE_NAMESPACE $KEEP_ARGS $ENABLE_HAPROXY_ARGS"
+    specfile=$(mktemp -t $FORGE_POD_NAME)
+    echo "Forge test-runner pod Spec : ${specfile}"
+
+    sed -e "s/{FORGE_POD_NAME}/${FORGE_POD_NAME}/g" \
+        -e "s/{IMAGE_TAG}/${IMAGE_TAG}/g" \
+        -e "s/{AWS_ACCOUNT_NUM}/${AWS_ACCOUNT_NUM}/g" \
+        -e "s/{AWS_REGION}/${AWS_REGION}/g" \
+        -e "s/{FORGE_NAMESPACE}/${FORGE_NAMESPACE}/g" \
+        -e "s/{KEEP_ARGS}/${KEEP_ARGS}/g" \
+        -e "s/{ENABLE_HAPROXY_ARGS}/${ENABLE_HAPROXY_ARGS}/g" \
+        testsuite/forge-test-runner-template.yaml > ${specfile}
+    
+    kubectl apply -f $specfile
 
     # wait for enough time for the pod to start and potentially new nodes to come online
     kubectl wait --timeout=5m --for=condition=Ready "pod/${FORGE_POD_NAME}"
@@ -132,6 +133,9 @@ cat $FORGE_OUTPUT | awk '/====json-report-begin===/{f=1;next} /====json-report-e
 if [ ! -s "${FORGE_REPORT}" ]; then
     echo '{"text": "Forge test runner terminated"}' >"${FORGE_REPORT}"
 fi
+
+# print the Forge report
+cat $FORGE_REPORT
 
 # detect regressions
 # TODO(rustielin): do not block on perf regressions for now until Forge network performance stabilizes
