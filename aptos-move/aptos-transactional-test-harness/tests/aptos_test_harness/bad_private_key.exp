@@ -1,4 +1,0 @@
-processed 4 tasks
-
-task 3 'run'. lines 20-23:
-Error: Transaction discarded. VMStatus: status INVALID_AUTH_KEY of type Validation
