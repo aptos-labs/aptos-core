@@ -24,7 +24,7 @@ AWS_REGION=${AWS_REGION:-us-west-2}
 # forge test runner customization
 FORGE_RUNNER_MODE=${FORGE_RUNNER_MODE:-k8s}
 FORGE_NAMESPACE_KEEP=${FORGE_NAMESPACE_KEEP:-false}
-FORGE_ENABLE_HAPROXY=${FORGE_ENABLE_HAPROXY:-true}
+FORGE_ENABLE_HAPROXY=${FORGE_ENABLE_HAPROXY:-false}
 
 # if this script is not triggered in GHA, use a default value
 [ -z "$GITHUB_RUN_ID" ] && GITHUB_RUN_ID=0
@@ -89,7 +89,7 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
     kubectl delete pod $FORGE_POD_NAME || true
     kubectl wait --for=delete "pod/${FORGE_POD_NAME}" || true
 
-    specfile=$(mktemp -t $FORGE_POD_NAME)
+    specfile=$(mktemp)
     echo "Forge test-runner pod Spec : ${specfile}"
 
     sed -e "s/{FORGE_POD_NAME}/${FORGE_POD_NAME}/g" \
