@@ -145,6 +145,8 @@ struct AptosRunArgs {
 struct AptosInitArgs {
     #[structopt(long = "private-keys", parse(try_from_str = parse_named_private_key), multiple_values(true))]
     private_keys: Option<Vec<(Identifier, Ed25519PrivateKey)>>,
+    #[structopt(long = "initial-coins")]
+    initial_coins: Option<u64>,
 }
 
 /// A raw private key -- either a literal or an unresolved name.
@@ -479,7 +481,7 @@ impl<'a> AptosTestAdapter<'a> {
             .expect("Failed to create an account. This should not happen.");
     }
 
-    fn mint_test_coin_for_account(&mut self, account_addr: AccountAddress, amount: u64) {
+    fn fund_account(&mut self, account_addr: AccountAddress, amount: u64) {
         let parameters = self
             .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None)
             .unwrap();
@@ -550,6 +552,9 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             private_key_mapping.insert(name, private_key);
         }
 
+        // Initial coins to mint, defaults to 5000
+        let mut coins_to_mint = 5000;
+
         if let Some(TaskInput {
             command: (_, init_args),
             ..
@@ -567,6 +572,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     private_key_mapping.insert(name.as_str().to_string(), private_key);
                 }
             }
+
+            if let Some(initial_coins) = init_args.initial_coins {
+                coins_to_mint = initial_coins;
+            }
         }
 
         let mut adapter = Self {
@@ -578,7 +587,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
 
         for (_, addr) in additional_named_address_mapping {
             adapter.create_account(addr.into_inner());
-            adapter.mint_test_coin_for_account(addr.into_inner(), 5000);
+            adapter.fund_account(addr.into_inner(), coins_to_mint);
         }
 
         (adapter, None)
