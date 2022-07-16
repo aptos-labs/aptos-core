@@ -7,7 +7,10 @@ use crate::{
         Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature, ED25519_PRIVATE_KEY_LENGTH,
         ED25519_PUBLIC_KEY_LENGTH, ED25519_SIGNATURE_LENGTH,
     },
-    test_utils::{random_serializable_struct, uniform_keypair_strategy},
+    test_utils::{
+        random_serializable_struct, small_order_pk_with_adversarial_message,
+        uniform_keypair_strategy,
+    },
     traits::*,
     x25519,
 };
@@ -16,9 +19,12 @@ use core::{
     convert::TryFrom,
     ops::{Add, Index, IndexMut, Mul, Neg},
 };
+use curve25519_dalek::{
+    constants::ED25519_BASEPOINT_POINT, edwards::CompressedEdwardsY, edwards::EdwardsPoint,
+    scalar::Scalar,
+};
 use ed25519_dalek::ed25519::signature::Verifier as _;
 
-use crate::validatable::{Validatable, Validate};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use digest::Digest;
 use proptest::{collection::vec, prelude::*};
@@ -29,11 +35,11 @@ use sha2::Sha512;
 struct CryptoHashable(pub usize);
 
 // Takes a point in eight_torsion and finds its order
-fn eight_torsion_order(ep: curve25519_dalek::edwards::EdwardsPoint) -> usize {
+fn eight_torsion_order(ep: EdwardsPoint) -> usize {
     let mut pt = ep;
     let mut ord = 1;
     for _i in 0..8 {
-        if pt == curve25519_dalek::edwards::EdwardsPoint::default() {
+        if pt == EdwardsPoint::default() {
             break;
         } else {
             pt = pt.add(ep);
@@ -46,24 +52,24 @@ fn eight_torsion_order(ep: curve25519_dalek::edwards::EdwardsPoint) -> usize {
 proptest! {
     #[test]
     fn verify_canonicity_torsion(scalar in any::<[u8;32]>(), idx in 0usize..8usize){
-        let s = curve25519_dalek::scalar::Scalar::from_bytes_mod_order(scalar);
-        let s_b = curve25519_dalek::constants::ED25519_BASEPOINT_POINT.mul(s);
-        let torsion_component = curve25519_dalek::edwards::CompressedEdwardsY(EIGHT_TORSION[idx]).decompress().unwrap();
+        let s = Scalar::from_bytes_mod_order(scalar);
+        let s_b = ED25519_BASEPOINT_POINT.mul(s);
+        let torsion_component = CompressedEdwardsY(EIGHT_TORSION[idx]).decompress().unwrap();
         let torsioned = s_b.add(torsion_component);
         let torsioned_bytes = torsioned.compress().to_bytes();
-        let deserialized = curve25519_dalek::edwards::CompressedEdwardsY(torsioned_bytes).decompress().unwrap();
+        let deserialized = CompressedEdwardsY(torsioned_bytes).decompress().unwrap();
         prop_assert_eq!(deserialized, torsioned);
     }
 
 
     #[test]
     fn verify_mul_torsion(idx in 0usize..8usize){
-        let torsion_component = curve25519_dalek::edwards::CompressedEdwardsY(EIGHT_TORSION[idx]).decompress().unwrap();
+        let torsion_component = CompressedEdwardsY(EIGHT_TORSION[idx]).decompress().unwrap();
         let mut order_bytes = [0u8;32];
         order_bytes[..8].copy_from_slice(&(eight_torsion_order(torsion_component)).to_le_bytes());
-        let torsion_order = curve25519_dalek::scalar::Scalar::from_bits(order_bytes);
+        let torsion_order = Scalar::from_bits(order_bytes);
 
-        prop_assert_eq!(torsion_component.mul(torsion_order), curve25519_dalek::edwards::EdwardsPoint::default());
+        prop_assert_eq!(torsion_component.mul(torsion_order), EdwardsPoint::default());
     }
 
     // In this test we demonstrate a signature that's not message-bound by only
@@ -83,16 +89,16 @@ proptest! {
         let signature = priv_key.sign(&message[..], &pub_key);
         prop_assert!(pub_key.verify(&message[..], &signature).is_ok());
 
-        let torsion_component = curve25519_dalek::edwards::CompressedEdwardsY(EIGHT_TORSION[idx]).decompress().unwrap();
+        let torsion_component = CompressedEdwardsY(EIGHT_TORSION[idx]).decompress().unwrap();
 
         let mut r_bits = [0u8; 32];
         r_bits.copy_from_slice(&signature.to_bytes()[..32]);
 
-        let r_point = curve25519_dalek::edwards::CompressedEdwardsY(r_bits).decompress().unwrap();
+        let r_point = CompressedEdwardsY(r_bits).decompress().unwrap();
         let mixed_r_point = r_point.add(torsion_component);
         prop_assert_eq!(r_point.mul_by_cofactor(), mixed_r_point.mul_by_cofactor());
 
-        let pub_point = curve25519_dalek::edwards::CompressedEdwardsY(pub_key_bytes).decompress().unwrap();
+        let pub_point = CompressedEdwardsY(pub_key_bytes).decompress().unwrap();
         let mixed_pub_point = pub_point.add(torsion_component);
         prop_assert_eq!(pub_point.mul_by_cofactor(), mixed_pub_point.mul_by_cofactor());
 
@@ -107,7 +113,7 @@ proptest! {
         // Scalar::from_hash
         let mut output = [0u8; 64];
         output.copy_from_slice(h.finalize().as_slice());
-        let k = curve25519_dalek::scalar::Scalar::from_bytes_mod_order_wide(&output);
+        let k = Scalar::from_bytes_mod_order_wide(&output);
 
         //////////////////////////////////////////////////////////////
         // obtain the original r s.t. R = r B, to solve for s later //
@@ -125,10 +131,10 @@ proptest! {
         // Scalar::from_hash
         let mut output = [0u8; 64];
         output.copy_from_slice(h.finalize().as_slice());
-        let original_r = curve25519_dalek::scalar::Scalar::from_bytes_mod_order_wide(&output);
+        let original_r = Scalar::from_bytes_mod_order_wide(&output);
 
         // check r_point = original_r * basepoint
-        prop_assert_eq!(curve25519_dalek::constants::ED25519_BASEPOINT_POINT.mul(original_r), r_point);
+        prop_assert_eq!(ED25519_BASEPOINT_POINT.mul(original_r), r_point);
 
         //////////////////////////////////////////
         // obtain the original a s.t. a * B = A //
@@ -138,9 +144,9 @@ proptest! {
         key_bytes[0] &= 248;
         key_bytes[31] &= 127;
         key_bytes[31] |= 64;
-        let priv_scalar = curve25519_dalek::scalar::Scalar::from_bits(key_bytes);
+        let priv_scalar = Scalar::from_bits(key_bytes);
         // check pub_point = priv_scalar * basepoint
-        prop_assert_eq!(curve25519_dalek::constants::ED25519_BASEPOINT_POINT.mul(priv_scalar), pub_point);
+        prop_assert_eq!(ED25519_BASEPOINT_POINT.mul(priv_scalar), pub_point);
 
         //////////////////////////
         // s = r + k a as usual //
@@ -153,9 +159,9 @@ proptest! {
         /////////////////////////////////////////////////////////////////////////////////
         let mut eight_scalar_bytes = [0u8;32];
         eight_scalar_bytes[..8].copy_from_slice(&(8_usize).to_le_bytes());
-        let eight_scalar = curve25519_dalek::scalar::Scalar::from_bits(eight_scalar_bytes);
+        let eight_scalar = Scalar::from_bits(eight_scalar_bytes);
 
-        let r_candidate_point = curve25519_dalek::edwards::EdwardsPoint::vartime_double_scalar_mul_basepoint(&k, &(mixed_pub_point.neg().mul_by_cofactor()), &(s * eight_scalar));
+        let r_candidate_point = EdwardsPoint::vartime_double_scalar_mul_basepoint(&k, &(mixed_pub_point.neg().mul_by_cofactor()), &(s * eight_scalar));
         prop_assert_eq!(mixed_r_point.mul_by_cofactor(), r_candidate_point);
 
         ///////////////////////////////////////////////////////////
@@ -174,7 +180,7 @@ proptest! {
         let strict_passes = mixed_pub_key.verify_strict(&message[..], &mixed_signature).is_ok();
 
         let torsion_order = eight_torsion_order(torsion_component);
-        let torsion_components_cancel = torsion_component + k * torsion_component == curve25519_dalek::edwards::EdwardsPoint::default();
+        let torsion_components_cancel = torsion_component + k * torsion_component == EdwardsPoint::default();
 
         prop_assert!(!permissive_passes || (torsion_order == 1) || torsion_components_cancel,
                      "bad verification_state permissive passes {} strict passes {} mixed_order {:?} torsion_components_cancel {:?}",
@@ -189,15 +195,14 @@ proptest! {
     // modifying the public key and the R component, under a pathological yet
     // admissible s < l value for the signature. It shows the difference
     // between `verify` and `verify_strict` in ed25519-dalek
-    #[ignore]
     #[test]
     fn verify_sig_strict_torsion(idx in 0usize..8usize){
         let message = b"hello_world";
 
         // Dalek only performs an order check, so this is allowed
-        let bad_scalar = curve25519_dalek::scalar::Scalar::zero();
+        let bad_scalar = Scalar::zero();
 
-        let bad_component_1 = curve25519_dalek::edwards::CompressedEdwardsY(EIGHT_TORSION[idx]).decompress().unwrap();
+        let bad_component_1 = curve25519_dalek::constants::EIGHT_TORSION[idx];
         let bad_component_2 = bad_component_1.neg();
 
         // compute bad_pub_key, bad_signature
@@ -207,19 +212,17 @@ proptest! {
         let bad_sig_point = bad_component_2;
 
         let bad_key = ed25519_dalek::PublicKey::from_bytes(&bad_pub_key_point.compress().to_bytes()).unwrap();
-        // We check that we would have caught this one on the public key
-        // NOTE: This will fail now, since Ed25519PublicKey::TryFrom<&[u8]> no longer checks for small subgroup membership
-        prop_assert!(Ed25519PublicKey::try_from(&bad_pub_key_point.compress().to_bytes()[..]).is_err());
+        // This assertion passes because Ed25519PublicKey::TryFrom<&[u8]> no longer checks for small subgroup membership
+        prop_assert!(Ed25519PublicKey::try_from(&bad_pub_key_point.compress().to_bytes()[..]).is_ok());
 
         let bad_signature = ed25519_dalek::Signature::from_bytes(&[
             &bad_sig_point.compress().to_bytes()[..],
             &bad_scalar.to_bytes()[..]
         ].concat()).unwrap();
 
-        // Seek k = H(R, A, M) ≡ 1 [8]
+        // Seek k = H(R, A, M) ≡ 1 [8] so that sB - kA = R <=> -kA = -A <=> k mod order(A) = 0
         prop_assume!(bad_key.verify(&message[..], &bad_signature).is_ok());
         prop_assert!(bad_key.verify_strict(&message[..], &bad_signature).is_err());
-
     }
 
 
@@ -276,7 +279,7 @@ proptest! {
 
     #[test]
     fn test_pub_key_deserialization(bits in any::<[u8; 32]>()){
-        let pt_deser = curve25519_dalek::edwards::CompressedEdwardsY(bits).decompress();
+        let pt_deser = CompressedEdwardsY(bits).decompress();
         let pub_key = Ed25519PublicKey::try_from(&bits[..]);
         let check = matches!((pt_deser, pub_key),
             (Some(_), Ok(_)) // we agree with Dalek,
@@ -453,26 +456,46 @@ proptest! {
             Err(CryptoMaterialError::CanonicalRepresentationError)
         );
     }
-}
 
-// Test against known small subgroup public keys.
-// NOTE: Ignored for now, because our signature verification code implicitly checks the PK for
-// small subgroup membership, so our Validate implementation is a dummy implementation.
-#[ignore]
-#[test]
-fn test_publickey_smallorder() {
-    for torsion_point in &EIGHT_TORSION {
-        let serialized: &[u8] = torsion_point;
+    // Test against known small subgroup public keys.
+    #[allow(non_snake_case)]
+    #[test]
+    fn test_publickey_smallorder((R, A, m) in small_order_pk_with_adversarial_message()) {
+        let pk_bytes = A.compress().to_bytes();
 
-        // We expect from_bytes_unchecked to pass, as it does not validate the key.
-        let result = Ed25519PublicKey::from_bytes_unchecked(serialized);
-        assert!(result.is_ok());
-        let pk = result.unwrap();
+        // We expect from_bytes to pass in ed25519_dalek, as it does not validate the PK.
+        let pk_dalek = ed25519_dalek::PublicKey::from_bytes(&pk_bytes);
+        prop_assert!(pk_dalek.is_ok());
+        let pk_dalek = pk_dalek.unwrap();
 
-        // ...but we expect validation to fail using the Validatable trait
-        let unvalidated = pk.to_unvalidated();
-        let pkv = Validatable::<Ed25519PublicKey>::new_unvalidated(unvalidated);
-        assert!(pkv.validate().is_err());
+        // We expect from_bytes_unchecked to pass, as it does not validate the PK.
+        let pk = Ed25519PublicKey::from_bytes_unchecked(&pk_bytes);
+        prop_assert!(pk.is_ok());
+        let pk = pk.unwrap();
+
+        // Ensure the order of the PK is small
+        prop_assert!(EIGHT_TORSION.len() <= 8);
+        prop_assert!(eight_torsion_order(A) <= EIGHT_TORSION.len());
+
+        // Verification checks sB - hA = R. We set s = 0, and we get R + hA = Identity. We set R to
+        // be a small order element, and all we have to do is find a message with any hash h such
+        // that R + hA = Identity.
+        let s = Scalar::zero();
+
+        let sig_bytes : Vec<u8> = [R.compress().to_bytes(), s.to_bytes()].concat();
+        let sig_dalek = ed25519_dalek::Signature::from_bytes(&sig_bytes).unwrap();
+
+        // We expect ed25519-dalek verify to succeed
+        prop_assert!(pk_dalek.verify(signing_message(&m).as_ref(), &sig_dalek).is_ok());
+
+        // We expect ed25519-dalek verify_strict to fail
+        prop_assert!(pk_dalek.verify_strict(signing_message(&m).as_ref(), &sig_dalek).is_err());
+
+        // We expect our own validation to fail in Ed25519Signature::verify_arbitrary_msg, since it
+        // calls ed25519-dalek's verify_strict
+        let sig = Ed25519Signature::from_bytes_unchecked(sig_bytes.as_ref()).unwrap();
+        prop_assert!(pk.verify_struct_signature(&m, &sig).is_err());
+
     }
 }
 
