@@ -102,6 +102,12 @@ variable "logger_helm_values" {
   default     = {}
 }
 
+variable "vector_daemonset_helm_values" {
+  description = "Map of helm values to pass to vector-daemonset chart"
+  type        = any
+  default     = {}
+}
+
 variable "monitoring_helm_values" {
   description = "Map of values to pass to monitoring helm chart"
   type        = any
