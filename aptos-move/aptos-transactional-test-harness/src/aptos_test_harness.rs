@@ -110,9 +110,6 @@ struct AptosPublishArgs {
     #[structopt(long = "gas-price")]
     gas_unit_price: Option<u64>,
 
-    #[structopt(long = "gas-currency")]
-    gas_currency_code: Option<String>,
-
     #[structopt(long = "override-signer", parse(try_from_str = ParsedAddress::parse))]
     override_signer: Option<ParsedAddress>,
 }
@@ -140,9 +137,6 @@ struct AptosRunArgs {
 
     #[structopt(long = "gas-price")]
     gas_unit_price: Option<u64>,
-
-    #[structopt(long = "gas-currency")]
-    gas_currency_code: Option<String>,
 
     #[structopt(long = "show-events")]
     show_events: bool,
@@ -429,7 +423,7 @@ impl<'a> AptosTestAdapter<'a> {
 
         let sequence_number = sequence_number.unwrap_or_else(|| account_resource.sequence_number());
         let max_number_of_gas_units = GasConstants::default().maximum_number_of_gas_units;
-        let gas_unit_price = gas_unit_price.unwrap_or(0);
+        let gas_unit_price = gas_unit_price.unwrap_or(1);
         let max_gas_amount = match max_gas_amount {
             Some(max_gas_amount) => max_gas_amount,
             None => max_number_of_gas_units.get(),
@@ -600,6 +594,50 @@ impl<'a> AptosTestAdapter<'a> {
         self.run_transaction(Transaction::UserTransaction(txn))
             .expect("Failed to add validator to validator set. This should not happen.");
     }
+
+    fn create_account(&mut self, account_addr: AccountAddress) {
+        let parameters = self
+            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None)
+            .unwrap();
+
+        let txn = RawTransaction::new(
+            aptos_root_address(),
+            parameters.sequence_number,
+            aptos_transaction_builder::aptos_stdlib::encode_account_create_account(account_addr),
+            parameters.max_gas_amount,
+            parameters.gas_unit_price,
+            parameters.expiration_timestamp_secs,
+            ChainId::test(),
+        )
+        .sign(&GENESIS_KEYPAIR.0, GENESIS_KEYPAIR.1.clone())
+        .unwrap()
+        .into_inner();
+
+        self.run_transaction(Transaction::UserTransaction(txn))
+            .expect("Failed to create an account. This should not happen.");
+    }
+
+    fn mint_test_coin_for_account(&mut self, account_addr: AccountAddress, amount: u64) {
+        let parameters = self
+            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None)
+            .unwrap();
+
+        let txn = RawTransaction::new(
+            aptos_root_address(),
+            parameters.sequence_number,
+            aptos_transaction_builder::aptos_stdlib::encode_test_coin_mint(account_addr, amount),
+            parameters.max_gas_amount,
+            parameters.gas_unit_price,
+            parameters.expiration_timestamp_secs,
+            ChainId::test(),
+        )
+        .sign(&GENESIS_KEYPAIR.0, GENESIS_KEYPAIR.1.clone())
+        .unwrap()
+        .into_inner();
+
+        self.run_transaction(Transaction::UserTransaction(txn))
+            .expect("Failed to mint test coin. This should not happen.");
+    }
 }
 
 impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
@@ -632,7 +670,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
 
         let mut named_address_mapping = framework::aptos::named_addresses();
 
-        for (name, addr) in additional_named_address_mapping {
+        for (name, addr) in additional_named_address_mapping.clone() {
             if named_address_mapping.contains_key(&name) {
                 panic!("Invalid init. The named address '{}' already exists.", name)
             }
@@ -745,6 +783,11 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             );
         }
 
+        for (_, addr) in additional_named_address_mapping {
+            adapter.create_account(addr.into_inner());
+            adapter.mint_test_coin_for_account(addr.into_inner(), 5000);
+        }
+
         (adapter, None)
     }
 
@@ -829,9 +872,6 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         }
         if extra_args.gas_unit_price.is_some() {
             panic!("Cannot set gas price for admin script.")
-        }
-        if extra_args.gas_currency_code.is_some() {
-            panic!("Cannot set gas currency for admin script.")
         }
         if extra_args.expiration_time.is_some() {
             panic!("Cannot set expiration time for admin script.")
