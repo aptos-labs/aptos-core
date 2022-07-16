@@ -21,6 +21,14 @@ FORGE_REPORT=${FORGE_REPORT:-forge_report.json}
 AWS_ACCOUNT_NUM=${AWS_ACCOUNT_NUM:-$(aws sts get-caller-identity | jq -r .Account)}
 AWS_REGION=${AWS_REGION:-us-west-2}
 
+# o11y resources
+INTERN_ES_DEFAULT_INDEX="90037930-aafc-11ec-acce-2d961187411f"
+INTERN_ES_BASE_URL="https://es.intern.aptosdev.com"
+INTERN_GRAFANA_BASE_URL="https://o11y.aptosdev.com/grafana/d/overview/overview?orgId=1&refresh=10s&var-Datasource=Remote%20Prometheus%20Intern"
+DEVINFRA_ES_DEFAULT_INDEX="d0bc5e20-badc-11ec-9a50-89b84ac337af"
+DEVINFRA_ES_BASE_URL="https://es.devinfra.aptosdev.com"
+DEVINFRA_GRAFANA_BASE_URL="https://o11y.aptosdev.com/grafana/d/overview/overview?orgId=1&refresh=10s&var-Datasource=Remote%20Prometheus%20Devinfra"
+
 # forge test runner customization
 FORGE_RUNNER_MODE=${FORGE_RUNNER_MODE:-k8s}
 FORGE_NAMESPACE_KEEP=${FORGE_NAMESPACE_KEEP:-false}
@@ -56,11 +64,22 @@ if [ $? != 0 ]; then
     exit 1
 fi
 
+# determine cluster name from kubectl context and set o11y resources
 FORGE_CLUSTER_NAME=$(kubectl config current-context | grep -oE 'aptos.*')
+if echo $FORGE_CLUSTER_NAME | grep "forge"; then
+    ES_DEFAULT_INDEX=$DEVINFRA_ES_DEFAULT_INDEX
+    ES_BASE_URL=$DEVINFRA_ES_BASE_URL
+    GRAFANA_BASE_URL=$DEVINFRA_GRAFANA_BASE_URL
+else
+    ES_DEFAULT_INDEX=$INTERN_ES_DEFAULT_INDEX
+    ES_BASE_URL=$INTERN_ES_BASE_URL
+    GRAFANA_BASE_URL=$INTERN_GRAFANA_BASE_URL
+fi
 
 echo "Using cluster ${FORGE_CLUSTER_NAME} from current kubectl context"
 
 FORGE_START_TIME_MS="$(date '+%s')000"
+ES_START_TIME=$(TZ=UTC date +"%Y-%m-%dT%H:%M:%S.000Z")
 
 # # Run forge with test runner in k8s
 if [ "$FORGE_RUNNER_MODE" = "local" ]; then
@@ -126,6 +145,7 @@ else
 fi
 
 FORGE_END_TIME_MS="$(date '+%s')000"
+ES_END_TIME=$(TZ=UTC date +"%Y-%m-%dT%H:%M:%S.000Z")
 
 # parse the JSON report
 cat $FORGE_OUTPUT | awk '/====json-report-begin===/{f=1;next} /====json-report-end===/{f=0} f' >"${FORGE_REPORT}"
@@ -139,8 +159,8 @@ cat $FORGE_REPORT
 
 # detect regressions
 # TODO(rustielin): do not block on perf regressions for now until Forge network performance stabilizes
-AVG_TPS=$(cat $FORGE_REPORT | grep -oE '\d+ TPS' | awk '{print $1}')
-P99_LATENCY=$(cat $FORGE_REPORT | grep -oE '\d+ ms p99 latency' | awk '{print $1}')
+AVG_TPS=$(cat $FORGE_REPORT | grep -oE '[0-9]+ TPS' | awk '{print $1}')
+P99_LATENCY=$(cat $FORGE_REPORT | grep -oE '[0-9]+ ms p99 latency' | awk '{print $1}')
 if [ -n "$AVG_TPS" ]; then
     echo "AVG_TPS: ${AVG_TPS}"
     echo "forge_job_avg_tps {FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\",GITHUB_RUN_ID=\"$GITHUB_RUN_ID\"} $AVG_TPS" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
@@ -169,16 +189,32 @@ else
     FORGE_COMMENT_HEADER='### :x: Forge test failure'
 fi
 
-# remove the "aptos-" prefix to get the chain name as reported to Prometheus
-FORGE_CHAIN_NAME=${FORGE_CLUSTER_NAME#"aptos-"}
+# remove the "aptos-" prefix and add "net" suffix to get the chain name
+# as used by the deployment setup and as reported to o11y systems
+FORGE_CHAIN_NAME=${FORGE_CLUSTER_NAME#"aptos-"}net
 FORGE_DASHBOARD_LINK="${GRAFANA_BASE_URL}&var-namespace=${FORGE_NAMESPACE}&var-chain_name=${FORGE_CHAIN_NAME}&from=${FORGE_START_TIME_MS}&to=${FORGE_END_TIME_MS}"
-if [ -z "$GRAFANA_BASE_URL" ]; then
-    echo "GRAFANA_BASE_URL not set. Use above query on supported Grafana dashboards"
-fi
+
+# build the logs link in a readable way...
+# filter by:
+#   * chain_name: name of the Forge cluster "chain"
+#   * namespace: kubernetes namespace the Forge test was executed in
+#   * hostname: name of a kubernetes pod e.g. validator name
+VAL0_HOSTNAME="aptos-node-0-validator-0"
+VALIDATOR_LOGS_LINK="${ES_BASE_URL}/_dashboards/app/discover#/?
+    _g=(filters:!(),refreshInterval:(pause:!t,value:0),time:(from:'${ES_START_TIME}',to:'${ES_END_TIME}'))
+    &_a=(columns:!(_source),filters:!(
+        ('\$state':(store:appState),meta:(alias:!n,disabled:!f,index:'${ES_DEFAULT_INDEX}',key:chain_name,negate:!f,params:(query:${FORGE_CHAIN_NAME}),type:phrase),query:(match_phrase:(chain_name:${FORGE_CHAIN_NAME}))),
+        ('\$state':(store:appState),meta:(alias:!n,disabled:!f,index:'${ES_DEFAULT_INDEX}',key:namespace,negate:!f,params:(query:${FORGE_NAMESPACE}),type:phrase),query:(match_phrase:(namespace:${FORGE_NAMESPACE}))),
+        ('\$state':(store:appState),meta:(alias:!n,disabled:!f,index:'${ES_DEFAULT_INDEX}',key:hostname,negate:!f,params:(query:${VAL0_HOSTNAME}),type:phrase),query:(match_phrase:(hostname:${VAL0_HOSTNAME})))
+    ),index:'${ES_DEFAULT_INDEX}',interval:auto,query:(language:kuery,query:''),sort:!())"
+
+# trim all the whitespace in logs link
+VALIDATOR_LOGS_LINK=$(echo $VALIDATOR_LOGS_LINK | tr -d '[:space:]')
 
 echo "=====START FORGE COMMENT====="
 echo "$FORGE_COMMENT_HEADER"
-echo "$FORGE_DASHBOARD_LINK"
+echo "Dashboard: ${FORGE_DASHBOARD_LINK}"
+echo "Logs: ${VALIDATOR_LOGS_LINK}"
 echo '```'
 echo "$FORGE_REPORT_TXT"
 echo '```'
