@@ -168,6 +168,7 @@ impl ServerArgs for OfflineArgs {
             tls_cert_path: self.tls_cert_path.clone(),
             tls_key_path: self.tls_key_path.clone(),
             content_length_limit: self.content_length_limit,
+            failpoints_enabled: false,
         }
     }
 

@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "failpoints")]
+use crate::set_failpoints;
 use crate::{
     accounts, blocks,
     context::Context,
@@ -25,7 +27,7 @@ const OPEN_API_HTML: &str = include_str!("../doc/spec.html");
 const OPEN_API_SPEC: &str = include_str!("../doc/openapi.yaml");
 
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
-    index(context.clone())
+    let paths = index(context.clone())
         .or(openapi_spec())
         .or(accounts::get_account(context.clone()))
         .or(accounts::get_account_resources(context.clone()))
@@ -48,7 +50,16 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .or(state::get_account_resource(context.clone()))
         .or(state::get_account_module(context.clone()))
         .or(state::get_table_item(context.clone()))
-        .or(context.health_check_route().with(metrics("health_check")))
+        .or(context.health_check_route());
+
+    #[cfg(feature = "failpoints")]
+    let paths_with_optional = paths.or(set_failpoints::set_failpoint(context.clone()));
+
+    #[cfg(not(feature = "failpoints"))]
+    let paths_with_optional = paths;
+
+    paths_with_optional
+        .with(metrics("health_check"))
         .with(
             warp::cors()
                 .allow_any_origin()

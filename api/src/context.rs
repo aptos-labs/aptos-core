@@ -87,6 +87,10 @@ impl Context {
         self.node_config.api.content_length_limit()
     }
 
+    pub fn failpoints_enabled(&self) -> bool {
+        self.node_config.api.failpoints_enabled
+    }
+
     pub fn filter(self) -> impl Filter<Extract = (Context,), Error = Infallible> + Clone {
         warp::any().map(move || self.clone())
     }
