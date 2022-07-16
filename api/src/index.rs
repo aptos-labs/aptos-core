@@ -8,7 +8,7 @@ use crate::{
     failpoint::fail_point,
     log,
     metrics::{metrics, status_metrics},
-    state, transactions,
+    set_failpoints, state, transactions,
 };
 use aptos_api_types::{Error, IndexResponse, Response};
 use std::convert::Infallible;
@@ -48,6 +48,7 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .or(state::get_account_resource(context.clone()))
         .or(state::get_account_module(context.clone()))
         .or(state::get_table_item(context.clone()))
+        .or(set_failpoints::get_update_failpoint())
         .or(context.health_check_route().with(metrics("health_check")))
         .with(
             warp::cors()
