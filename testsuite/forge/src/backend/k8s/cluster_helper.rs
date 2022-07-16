@@ -615,32 +615,47 @@ fn dump_helm_values_to_file(helm_release_name: &str, tmp_dir: &TempDir) -> Resul
 
 pub async fn create_management_configmap(kube_namespace: String, keep: bool) -> Result<()> {
     let kube_client = create_k8s_client().await;
-    let pp = PostParams::default();
 
-    let namespaces_api: Api<Namespace> = Api::all(kube_client.clone());
-    let namespace = Namespace {
-        metadata: ObjectMeta {
-            name: Some(kube_namespace.clone()),
-            ..ObjectMeta::default()
-        },
-        spec: None,
-        status: None,
-    };
-
-    if let Err(KubeError::Api(api_err)) = namespaces_api.create(&pp, &namespace).await {
-        if api_err.code == 409 {
-            info!(
-                "Namespace {} already exists, continuing with it",
-                &kube_namespace
-            );
-        } else {
-            bail!(
-                "Failed to use existing namespace {}: {:?}",
-                &kube_namespace,
-                api_err
-            );
-        }
-    };
+    // try to create a new namespace
+    // * if it errors with 409, the namespace exists already and we should use it
+    // * if it errors with 403, the namespace is likely in the process of being terminated, so try again
+    aptos_retrier::retry_async(k8s_wait_genesis_strategy(), || {
+        let namespaces_api: Api<Namespace> = Api::all(kube_client.clone());
+        let kube_namespace_name = kube_namespace.clone();
+        let namespace = Namespace {
+            metadata: ObjectMeta {
+                name: Some(kube_namespace_name.clone()),
+                ..ObjectMeta::default()
+            },
+            spec: None,
+            status: None,
+        };
+        Box::pin(async move {
+            if let Err(KubeError::Api(api_err)) = namespaces_api
+                .create(&PostParams::default(), &namespace)
+                .await
+            {
+                if api_err.code == 409 {
+                    info!(
+                        "Namespace {} already exists, continuing with it",
+                        &kube_namespace_name
+                    );
+                } else {
+                    info!(
+                        "Failed to use existing namespace {}: {:?}",
+                        &kube_namespace_name, api_err
+                    );
+                    bail!(
+                        "Failed to use existing namespace {}: {:?}",
+                        &kube_namespace_name,
+                        api_err
+                    );
+                }
+            };
+            Ok(())
+        })
+    })
+    .await?;
 
     let configmap: Api<ConfigMap> = Api::namespaced(kube_client.clone(), &kube_namespace);
 
@@ -662,7 +677,7 @@ pub async fn create_management_configmap(kube_namespace: String, keep: bool) -> 
             ..ObjectMeta::default()
         },
     };
-    configmap.create(&pp, &config).await?;
+    configmap.create(&PostParams::default(), &config).await?;
 
     info!(
         "Created configmap {} with data {:?}",
