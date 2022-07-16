@@ -38,7 +38,6 @@ use crate::{
 use anyhow::{anyhow, Result};
 use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use core::convert::TryFrom;
-pub use ed25519_dalek;
 use serde::Serialize;
 use std::{cmp::Ordering, fmt};
 
