@@ -1,7 +1,0 @@
-processed 5 tasks
-
-task 3 'run'. lines 21-23:
-Error: Failed to execute transaction. VMStatus: status FUNCTION_RESOLUTION_FAILURE of type Verification
-
-task 4 'run'. lines 26-28:
-Error: Failed to execute transaction. VMStatus: status LINKER_ERROR of type Verification
