@@ -161,13 +161,14 @@ impl VerifiedEpochStates {
         &mut self,
         epoch_ending_ledger_info: LedgerInfoWithSignatures,
     ) {
+        let ledger_info = epoch_ending_ledger_info.ledger_info();
         info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
-            "Adding a new epoch to the epoch ending ledger infos: {}",
-            &epoch_ending_ledger_info
+            "Adding a new epoch to the epoch ending ledger infos. Epoch: {:?}, Version: {:?}, Ends epoch: {:?}",
+            ledger_info.epoch(), ledger_info.version(), ledger_info.ends_epoch(),
         )));
 
         // Insert the version to ledger info mapping
-        let version = epoch_ending_ledger_info.ledger_info().version();
+        let version = ledger_info.version();
         if let Some(epoch_ending_ledger_info) = self
             .new_epoch_ending_ledger_infos
             .insert(version, epoch_ending_ledger_info)
