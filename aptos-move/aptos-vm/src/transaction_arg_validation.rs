@@ -19,7 +19,7 @@ use once_cell::sync::Lazy;
 use std::collections::BTreeSet;
 
 static ALLOWED_STRUCTS: Lazy<BTreeSet<String>> = Lazy::new(|| {
-    ["0x1::ASCII::String"]
+    ["0x1::ascii::String"]
         .iter()
         .map(|s| s.to_string())
         .collect()

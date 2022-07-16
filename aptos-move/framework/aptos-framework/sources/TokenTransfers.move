@@ -1,6 +1,6 @@
 /// This module provides the foundation for transferring of Tokens
 module AptosFramework::TokenTransfers {
-    use Std::Signer;
+    use std::signer;
     use AptosFramework::Table::{Self, Table};
     use AptosFramework::Token::{Self, Token, TokenId};
 
@@ -17,7 +17,7 @@ module AptosFramework::TokenTransfers {
         )
     }
 
-    public(script) fun offer_script(
+    public entry fun offer_script(
         sender: signer,
         receiver: address,
         creator: address,
@@ -36,7 +36,7 @@ module AptosFramework::TokenTransfers {
         token_id: TokenId,
         amount: u64,
     ) acquires TokenTransfers {
-        let sender_addr = Signer::address_of(sender);
+        let sender_addr = signer::address_of(sender);
         if (!exists<TokenTransfers>(sender_addr)) {
             initialize_token_transfers(sender)
         };
@@ -58,7 +58,7 @@ module AptosFramework::TokenTransfers {
         }
     }
 
-    public(script) fun claim_script(
+    public entry fun claim_script(
         receiver: signer,
         sender: address,
         creator: address,
@@ -75,7 +75,7 @@ module AptosFramework::TokenTransfers {
         sender: address,
         token_id: TokenId,
     ) acquires TokenTransfers {
-        let receiver_addr = Signer::address_of(receiver);
+        let receiver_addr = signer::address_of(receiver);
         let pending_claims =
             &mut borrow_global_mut<TokenTransfers>(sender).pending_claims;
         let pending_tokens = Table::borrow_mut(pending_claims, receiver_addr);
@@ -89,7 +89,7 @@ module AptosFramework::TokenTransfers {
         Token::deposit_token(receiver, token)
     }
 
-    public(script) fun cancel_offer_script(
+    public entry fun cancel_offer_script(
         sender: signer,
         receiver: address,
         creator: address,
@@ -106,7 +106,7 @@ module AptosFramework::TokenTransfers {
         receiver: address,
         token_id: TokenId,
     ) acquires TokenTransfers {
-        let sender_addr = Signer::address_of(sender);
+        let sender_addr = signer::address_of(sender);
         let pending_claims =
             &mut borrow_global_mut<TokenTransfers>(sender_addr).pending_claims;
         let pending_tokens = Table::borrow_mut(pending_claims, receiver);
@@ -124,8 +124,8 @@ module AptosFramework::TokenTransfers {
     public fun test_nft(creator: signer, owner: signer) acquires TokenTransfers {
         let token_id = create_token(&creator, 1);
 
-        let creator_addr = Signer::address_of(&creator);
-        let owner_addr = Signer::address_of(&owner);
+        let creator_addr = signer::address_of(&creator);
+        let owner_addr = signer::address_of(&owner);
         offer(&creator, owner_addr, token_id, 1);
         claim(&owner, creator_addr, token_id);
 
@@ -141,9 +141,9 @@ module AptosFramework::TokenTransfers {
     ) acquires TokenTransfers {
         let token_id = create_token(&creator, 2);
 
-        let creator_addr = Signer::address_of(&creator);
-        let owner0_addr = Signer::address_of(&owner0);
-        let owner1_addr = Signer::address_of(&owner1);
+        let creator_addr = signer::address_of(&creator);
+        let owner0_addr = signer::address_of(&owner0);
+        let owner1_addr = signer::address_of(&owner1);
 
         offer(&creator, owner0_addr, token_id, 1);
         assert!(Table::length(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 1, 1);
@@ -163,28 +163,28 @@ module AptosFramework::TokenTransfers {
     }
 
     fun create_token(creator: &signer, amount: u64): TokenId {
-        use Std::ASCII;
-        use Std::Option;
+        use std::ascii;
+        use std::option;
 
-        let collection_name = ASCII::string(b"Hello, World");
+        let collection_name = ascii::string(b"Hello, World");
 
         Token::create_collection(
             creator,
             *&collection_name,
-            ASCII::string(b"Collection: Hello, World"),
-            ASCII::string(b"https://aptos.dev"),
-            Option::some(1),
+            ascii::string(b"Collection: Hello, World"),
+            ascii::string(b"https://aptos.dev"),
+            option::some(1),
         );
 
         Token::create_token(
             creator,
             *&collection_name,
-            ASCII::string(b"Token: Hello, Token"),
-            ASCII::string(b"Hello, Token"),
+            ascii::string(b"Token: Hello, Token"),
+            ascii::string(b"Hello, Token"),
             false,
             amount,
-            Option::none(),
-            ASCII::string(b"https://aptos.dev"),
+            option::none(),
+            ascii::string(b"https://aptos.dev"),
             0,
         )
     }

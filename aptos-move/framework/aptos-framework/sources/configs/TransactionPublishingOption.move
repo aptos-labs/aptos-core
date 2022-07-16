@@ -1,7 +1,7 @@
 /// This module defines a struct storing the publishing policies for the VM.
 module AptosFramework::TransactionPublishingOption {
-    use Std::Errors;
-    use Std::Vector;
+    use std::errors;
+    use std::vector;
     use AptosFramework::Timestamp;
     use AptosFramework::SystemAddresses;
     use AptosFramework::Reconfiguration;
@@ -28,7 +28,7 @@ module AptosFramework::TransactionPublishingOption {
     ) {
         Timestamp::assert_genesis();
         SystemAddresses::assert_core_resource(core_resource_account);
-        assert!(!exists<TransactionPublishingOption>(@CoreResources), Errors::already_published(ECONFIG));
+        assert!(!exists<TransactionPublishingOption>(@CoreResources), errors::already_published(ECONFIG));
 
         move_to(
             core_resource_account,
@@ -40,11 +40,11 @@ module AptosFramework::TransactionPublishingOption {
     }
 
     public fun is_script_allowed(script_hash: &vector<u8>): bool acquires TransactionPublishingOption {
-        if (Vector::is_empty(script_hash)) return true;
+        if (vector::is_empty(script_hash)) return true;
         let publish_option = borrow_global<TransactionPublishingOption>(@CoreResources);
         // allowlist empty = open publishing, anyone can send txes
-        Vector::is_empty(&publish_option.script_allow_list)
-        || Vector::contains(&publish_option.script_allow_list, script_hash)
+        vector::is_empty(&publish_option.script_allow_list)
+        || vector::contains(&publish_option.script_allow_list, script_hash)
     }
 
     public fun is_module_allowed(): bool acquires TransactionPublishingOption {
@@ -53,7 +53,7 @@ module AptosFramework::TransactionPublishingOption {
         publish_option.module_publishing_allowed
     }
 
-    public(script) fun set_module_publishing_allowed(account:signer, is_allowed: bool) acquires TransactionPublishingOption {
+    public entry fun set_module_publishing_allowed(account:signer, is_allowed: bool) acquires TransactionPublishingOption {
         SystemAddresses::assert_core_resource(&account);
         let publish_option = borrow_global_mut<TransactionPublishingOption>(@CoreResources);
         publish_option.module_publishing_allowed = is_allowed;

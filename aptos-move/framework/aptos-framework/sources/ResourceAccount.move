@@ -36,9 +36,9 @@
 /// }
 /// ```
 module AptosFramework::ResourceAccount {
-    use Std::Errors;
-    use Std::Signer;
-    use Std::Vector;
+    use std::errors;
+    use std::signer;
+    use std::vector;
     use AptosFramework::Account;
     use AptosFramework::SimpleMap::{Self, SimpleMap};
 
@@ -51,23 +51,23 @@ module AptosFramework::ResourceAccount {
     /// Creates a new resource account and rotates the authentication key to either
     /// the optional auth key if it is non-empty (though auth keys are 32-bytes)
     /// or the source accounts current auth key.
-    public(script) fun create_resource_account(
+    public entry fun create_resource_account(
         origin: &signer,
         seed: vector<u8>,
         optional_auth_key: vector<u8>,
     ) acquires Container {
         let (resource, resource_signer_cap) = Account::create_resource_account(origin, seed);
 
-        let origin_addr = Signer::address_of(origin);
+        let origin_addr = signer::address_of(origin);
         if (!exists<Container>(origin_addr)) {
             move_to(origin, Container { store: SimpleMap::create() })
         };
 
         let container = borrow_global_mut<Container>(origin_addr);
-        let resource_addr = Signer::address_of(&resource);
+        let resource_addr = signer::address_of(&resource);
         SimpleMap::add(&mut container.store, resource_addr, resource_signer_cap);
 
-        let auth_key = if (Vector::is_empty(&optional_auth_key)) {
+        let auth_key = if (vector::is_empty(&optional_auth_key)) {
             Account::get_authentication_key(origin_addr)
         } else {
             optional_auth_key
@@ -82,9 +82,9 @@ module AptosFramework::ResourceAccount {
         resource: &signer,
         source_addr: address,
     ): Account::SignerCapability acquires Container {
-        assert!(exists<Container>(source_addr), Errors::not_published(ECONTAINER_NOT_PUBLISHED));
+        assert!(exists<Container>(source_addr), errors::not_published(ECONTAINER_NOT_PUBLISHED));
 
-        let resource_addr = Signer::address_of(resource);
+        let resource_addr = signer::address_of(resource);
         let (resource_signer_cap, empty_container) = {
             let container = borrow_global_mut<Container>(source_addr);
             let (_resource_addr, signer_cap) = SimpleMap::remove(&mut container.store, &resource_addr);
@@ -104,19 +104,19 @@ module AptosFramework::ResourceAccount {
     }
 
     #[test(user = @0x1111)]
-    public(script) fun end_to_end(user: signer) acquires Container {
-        use Std::BCS;
-        use Std::Hash;
+    public entry fun end_to_end(user: signer) acquires Container {
+        use std::bcs;
+        use std::hash;
 
-        let user_addr = Signer::address_of(&user);
+        let user_addr = signer::address_of(&user);
         Account::create_account(user_addr);
 
         let seed = x"01";
-        let bytes = BCS::to_bytes(&user_addr);
-        Vector::append(&mut bytes, copy seed);
-        let resource_addr = Account::create_address_for_test(Hash::sha3_256(bytes));
+        let bytes = bcs::to_bytes(&user_addr);
+        vector::append(&mut bytes, copy seed);
+        let resource_addr = Account::create_address_for_test(hash::sha3_256(bytes));
 
-        create_resource_account(&user, seed, Vector::empty());
+        create_resource_account(&user, seed, vector::empty());
         let container = borrow_global<Container>(user_addr);
         let resource_cap = SimpleMap::borrow(&container.store, &resource_addr);
 

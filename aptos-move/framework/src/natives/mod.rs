@@ -44,7 +44,7 @@ pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
             signature::native_ed25519_signature_verification,
         ),
         ("TypeInfo", "type_of", type_info::type_of),
-        ("Hash", "sip_hash", hash::native_sip_hash),
+        ("hash", "sip_hash", hash::native_sip_hash),
     ];
     NATIVES
         .iter()

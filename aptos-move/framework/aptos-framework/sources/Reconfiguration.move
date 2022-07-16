@@ -1,10 +1,10 @@
 /// Publishes configuration information for validators, and issues reconfiguration events
 /// to synchronize configuration changes for the validators.
 module AptosFramework::Reconfiguration {
-    use Std::Errors;
-    use Std::Event;
-    use Std::Signer;
-    use Std::GUID;
+    use std::errors;
+    use std::event;
+    use std::signer;
+    use std::guid;
     use AptosFramework::SystemAddresses;
     use AptosFramework::Timestamp;
     use AptosFramework::Stake;
@@ -30,7 +30,7 @@ module AptosFramework::Reconfiguration {
         /// Time of last reconfiguration. Only changes on reconfiguration events.
         last_reconfiguration_time: u64,
         /// Event handle for reconfiguration events
-        events: Event::EventHandle<NewEpochEvent>,
+        events: event::EventHandle<NewEpochEvent>,
     }
 
     /// Reconfiguration disabled if this resource occurs under LibraRoot.
@@ -55,15 +55,15 @@ module AptosFramework::Reconfiguration {
     ) {
         Timestamp::assert_genesis();
         SystemAddresses::assert_core_resource(account);
-        assert!(!exists<Configuration>(@CoreResources), Errors::already_published(ECONFIGURATION));
+        assert!(!exists<Configuration>(@CoreResources), errors::already_published(ECONFIGURATION));
         // assert it matches `new_epoch_event_key()`, otherwise the event can't be recognized
-        assert!(GUID::get_next_creation_num(Signer::address_of(account)) == 5, Errors::invalid_state(EINVALID_GUID_FOR_EVENT));
+        assert!(guid::get_next_creation_num(signer::address_of(account)) == 5, errors::invalid_state(EINVALID_GUID_FOR_EVENT));
         move_to<Configuration>(
             account,
             Configuration {
                 epoch: 0,
                 last_reconfiguration_time: 0,
-                events: Event::new_event_handle<NewEpochEvent>(account),
+                events: event::new_event_handle<NewEpochEvent>(account),
             }
         );
     }
@@ -72,7 +72,7 @@ module AptosFramework::Reconfiguration {
     /// This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
     fun disable_reconfiguration(account: &signer) {
         SystemAddresses::assert_core_resource(account);
-        assert!(reconfiguration_enabled(), Errors::invalid_state(ECONFIGURATION));
+        assert!(reconfiguration_enabled(), errors::invalid_state(ECONFIGURATION));
         move_to(account, DisableReconfiguration {} )
     }
 
@@ -81,8 +81,8 @@ module AptosFramework::Reconfiguration {
     fun enable_reconfiguration(account: &signer) acquires DisableReconfiguration {
         SystemAddresses::assert_core_resource(account);
 
-        assert!(!reconfiguration_enabled(), Errors::invalid_state(ECONFIGURATION));
-        DisableReconfiguration {} = move_from<DisableReconfiguration>(Signer::address_of(account));
+        assert!(!reconfiguration_enabled(), errors::invalid_state(ECONFIGURATION));
+        DisableReconfiguration {} = move_from<DisableReconfiguration>(signer::address_of(account));
     }
 
     fun reconfiguration_enabled(): bool {
@@ -90,7 +90,7 @@ module AptosFramework::Reconfiguration {
     }
 
     /// Force an epoch change.
-    public(script) fun force_reconfigure(account: &signer) acquires Configuration {
+    public entry fun force_reconfigure(account: &signer) acquires Configuration {
         SystemAddresses::assert_core_resource(account);
         reconfigure();
     }
@@ -132,11 +132,11 @@ module AptosFramework::Reconfiguration {
             return
         };
 
-        assert!(current_time > config_ref.last_reconfiguration_time, Errors::invalid_state(EINVALID_BLOCK_TIME));
+        assert!(current_time > config_ref.last_reconfiguration_time, errors::invalid_state(EINVALID_BLOCK_TIME));
         config_ref.last_reconfiguration_time = current_time;
         config_ref.epoch = config_ref.epoch + 1;
 
-        Event::emit_event<NewEpochEvent>(
+        event::emit_event<NewEpochEvent>(
             &mut config_ref.events,
             NewEpochEvent {
                 epoch: config_ref.epoch,
@@ -147,12 +147,12 @@ module AptosFramework::Reconfiguration {
     /// Emit a `NewEpochEvent` event. This function will be invoked by genesis directly to generate the very first
     /// reconfiguration event.
     fun emit_genesis_reconfiguration_event() acquires Configuration {
-        assert!(exists<Configuration>(@CoreResources), Errors::not_published(ECONFIGURATION));
+        assert!(exists<Configuration>(@CoreResources), errors::not_published(ECONFIGURATION));
         let config_ref = borrow_global_mut<Configuration>(@CoreResources);
-        assert!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, Errors::invalid_state(ECONFIGURATION));
+        assert!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, errors::invalid_state(ECONFIGURATION));
         config_ref.epoch = 1;
 
-        Event::emit_event<NewEpochEvent>(
+        event::emit_event<NewEpochEvent>(
             &mut config_ref.events,
             NewEpochEvent {
                 epoch: config_ref.epoch,

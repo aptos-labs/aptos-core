@@ -3,8 +3,8 @@
 /// 2. List token for swapping with a targeted CoinType.
 /// 3. Execute the swapping
 module AptosToken::TokenCoinSwap {
-    use Std::Event::{Self, EventHandle};
-    use Std::Signer;
+    use std::event::{Self, EventHandle};
+    use std::signer;
     use AptosFramework::Table::{Self, Table};
     use AptosFramework::Coin;
     use AptosFramework::Timestamp;
@@ -63,7 +63,7 @@ module AptosToken::TokenCoinSwap {
     }
 
     /// Coin owner withdraw coin to swap with tokens listed for swapping at the token owner's address.
-    public(script) fun exchange_coin_for_token<CoinType>(
+    public entry fun exchange_coin_for_token<CoinType>(
         coin_owner: &signer,
         coin_amount: u64,
         token_owner: address,
@@ -71,7 +71,7 @@ module AptosToken::TokenCoinSwap {
         token_amount: u64,
     ) acquires TokenListings, TokenStoreEscrow {
         // valide listing existing and coin owner has sufficient balance
-        let coin_address = Signer::address_of(coin_owner);
+        let coin_address = signer::address_of(coin_owner);
         let token_listing = borrow_global_mut<TokenListings<CoinType>>(token_owner);
         assert!(Table::contains(&token_listing.listings, token_id), ETOKEN_LISTING_NOT_EXIST);
         assert!(Coin::balance<CoinType>(coin_address) >= coin_amount, ENOT_ENOUGH_COIN);
@@ -110,7 +110,7 @@ module AptosToken::TokenCoinSwap {
             token_swap.token_amount = token_swap.token_amount - token_amount;
         };
 
-        Event::emit_event<TokenSwapEvent>(
+        event::emit_event<TokenSwapEvent>(
             &mut token_listing.swap_events,
             TokenSwapEvent {
                 token_id,
@@ -123,7 +123,7 @@ module AptosToken::TokenCoinSwap {
     }
 
     /// Token owner lists their token for swapping
-    public(script) fun list_token_for_swap<CoinType>(
+    public entry fun list_token_for_swap<CoinType>(
         token_owner: &signer,
         token_id: TokenId,
         token_amount: u64,
@@ -140,12 +140,12 @@ module AptosToken::TokenCoinSwap {
             token_amount,
             min_price_per_token: min_coin_per_token
         };
-        let listing = &mut borrow_global_mut<TokenListings<CoinType>>(Signer::address_of(token_owner)).listings;
+        let listing = &mut borrow_global_mut<TokenListings<CoinType>>(signer::address_of(token_owner)).listings;
         assert!(!Table::contains(listing, token_id), ETOKEN_ALREADY_LISTED);
         Table::add(listing, token_id, swap);
 
-        let event_handle = &mut borrow_global_mut<TokenListings<CoinType>>(Signer::address_of(token_owner)).listing_events;
-        Event::emit_event<TokenListingEvent>(
+        let event_handle = &mut borrow_global_mut<TokenListings<CoinType>>(signer::address_of(token_owner)).listing_events;
+        event::emit_event<TokenListingEvent>(
             event_handle,
             TokenListingEvent {
                 token_id,
@@ -159,12 +159,12 @@ module AptosToken::TokenCoinSwap {
 
     /// Initalize the token listing for a token owner
     fun initialize_token_listing<CoinType>(token_owner: &signer) {
-        let addr = Signer::address_of(token_owner);
+        let addr = signer::address_of(token_owner);
         if ( !exists<TokenListings<CoinType>>(addr) ) {
             let token_listing = TokenListings<CoinType>{
                 listings: Table::new<TokenId, TokenCoinSwap<CoinType>>(),
-                listing_events: Event::new_event_handle<TokenListingEvent>(token_owner),
-                swap_events: Event::new_event_handle<TokenSwapEvent>(token_owner),
+                listing_events: event::new_event_handle<TokenListingEvent>(token_owner),
+                swap_events: event::new_event_handle<TokenSwapEvent>(token_owner),
 
             };
             move_to(token_owner, token_listing);
@@ -173,7 +173,7 @@ module AptosToken::TokenCoinSwap {
 
     /// Intialize the token escrow
     fun initialize_token_store_escrow(token_owner: &signer) {
-        let addr = Signer::address_of(token_owner);
+        let addr = signer::address_of(token_owner);
         if ( !exists<TokenStoreEscrow>(addr) ) {
             let token_store_escrow = TokenStoreEscrow{
                 token_escrows: Table::new<TokenId, TokenEscrow>()
@@ -190,7 +190,7 @@ module AptosToken::TokenCoinSwap {
         locked_until_secs: u64
     ) acquires TokenStoreEscrow {
         let tokens_in_escrow = &mut borrow_global_mut<TokenStoreEscrow>(
-            Signer::address_of(token_owner)).token_escrows;
+            signer::address_of(token_owner)).token_escrows;
         if (Table::contains(tokens_in_escrow, token_id)) {
             let dst = &mut Table::borrow_mut(tokens_in_escrow, token_id).token;
             merge(dst, tokens);
@@ -222,7 +222,7 @@ module AptosToken::TokenCoinSwap {
         token_id: TokenId,
         amount: u64
     ): Token acquires TokenStoreEscrow {
-        withdraw_token_from_escrow_internal(Signer::address_of(token_owner), token_id, amount)
+        withdraw_token_from_escrow_internal(signer::address_of(token_owner), token_id, amount)
     }
 
     /// Cancel token listing for a fixed amount
@@ -231,7 +231,7 @@ module AptosToken::TokenCoinSwap {
         token_id: TokenId,
         token_amount: u64
     ) acquires TokenListings, TokenStoreEscrow {
-        let listing = &mut borrow_global_mut<TokenListings<CoinType>>(Signer::address_of(token_owner)).listings;
+        let listing = &mut borrow_global_mut<TokenListings<CoinType>>(signer::address_of(token_owner)).listings;
         // remove the listing entry
         assert!(Table::contains(listing, token_id), ETOKEN_LISTING_NOT_EXIST);
         Table::remove(listing, token_id);
@@ -241,7 +241,7 @@ module AptosToken::TokenCoinSwap {
     }
 
     #[test(token_owner = @0xAB, coin_owner = @0x1, core_resources = @CoreResources)]
-    public(script) fun test_exchange_coin_for_token(token_owner: signer, coin_owner: signer, core_resources: signer) acquires TokenStoreEscrow, TokenListings {
+    public entry fun test_exchange_coin_for_token(token_owner: signer, coin_owner: signer, core_resources: signer) acquires TokenStoreEscrow, TokenListings {
         Timestamp::set_time_has_started_for_testing(&core_resources);
         Timestamp::update_global_time_for_test(10000000);
         let token_id = TokenV1::create_collection_and_token(&token_owner, 100, 100, 100);
@@ -249,13 +249,13 @@ module AptosToken::TokenCoinSwap {
         Coin::create_fake_money(&coin_owner, &token_owner, 100);
 
         list_token_for_swap<Coin::FakeMoney>(&token_owner, token_id, 100, 1, 0);
-        exchange_coin_for_token<Coin::FakeMoney>(&coin_owner, 51, Signer::address_of(&token_owner), token_id, 50);
+        exchange_coin_for_token<Coin::FakeMoney>(&coin_owner, 51, signer::address_of(&token_owner), token_id, 50);
         // coin owner only has 50 coins left
-        assert!(Coin::balance<Coin::FakeMoney>(Signer::address_of(&coin_owner)) == 50, 1);
+        assert!(Coin::balance<Coin::FakeMoney>(signer::address_of(&coin_owner)) == 50, 1);
         // all tokens in token escrow or transferred. Token owner has 0 token in token_store
-        assert!(TokenV1::balance_of(Signer::address_of(&token_owner), token_id) == 0, 1);
+        assert!(TokenV1::balance_of(signer::address_of(&token_owner), token_id) == 0, 1);
 
-        let token_listing = &borrow_global<TokenListings<Coin::FakeMoney>>(Signer::address_of(&token_owner)).listings;
+        let token_listing = &borrow_global<TokenListings<Coin::FakeMoney>>(signer::address_of(&token_owner)).listings;
 
         // completely sold, no listing left
         assert!(Table::length(token_listing) == 1, 1);

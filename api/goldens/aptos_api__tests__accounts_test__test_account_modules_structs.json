@@ -251,7 +251,7 @@
           ],
           "params": [],
           "return": [
-            "0x1::ASCII::String"
+            "0x1::ascii::String"
           ]
         },
         {
@@ -409,7 +409,7 @@
           "fields": [
             {
               "name": "name",
-              "type": "0x1::ASCII::String"
+              "type": "0x1::ascii::String"
             },
             {
               "name": "scaling_factor",
@@ -517,7 +517,7 @@
             "&signer"
           ],
           "return": [
-            "0x1::GUID::GUID"
+            "0x1::guid::GUID"
           ]
         },
         {
@@ -529,7 +529,7 @@
             "u64"
           ],
           "return": [
-            "0x1::GUID::ID"
+            "0x1::guid::ID"
           ]
         },
         {
@@ -538,10 +538,10 @@
           "generic_type_params": [],
           "params": [
             "address",
-            "&0x1::GUID::CreateCapability"
+            "&0x1::guid::CreateCapability"
           ],
           "return": [
-            "0x1::GUID::GUID"
+            "0x1::guid::GUID"
           ]
         },
         {
@@ -549,7 +549,7 @@
           "visibility": "public",
           "generic_type_params": [],
           "params": [
-            "&0x1::GUID::GUID"
+            "&0x1::guid::GUID"
           ],
           "return": [
             "u64"
@@ -560,7 +560,7 @@
           "visibility": "public",
           "generic_type_params": [],
           "params": [
-            "&0x1::GUID::GUID"
+            "&0x1::guid::GUID"
           ],
           "return": [
             "address"
@@ -571,8 +571,8 @@
           "visibility": "public",
           "generic_type_params": [],
           "params": [
-            "&0x1::GUID::GUID",
-            "&0x1::GUID::ID"
+            "&0x1::guid::GUID",
+            "&0x1::guid::ID"
           ],
           "return": [
             "bool"
@@ -586,7 +586,7 @@
             "&signer"
           ],
           "return": [
-            "0x1::GUID::CreateCapability"
+            "0x1::guid::CreateCapability"
           ]
         },
         {
@@ -605,10 +605,10 @@
           "visibility": "public",
           "generic_type_params": [],
           "params": [
-            "&0x1::GUID::GUID"
+            "&0x1::guid::GUID"
           ],
           "return": [
-            "0x1::GUID::ID"
+            "0x1::guid::ID"
           ]
         },
         {
@@ -616,7 +616,7 @@
           "visibility": "public",
           "generic_type_params": [],
           "params": [
-            "&0x1::GUID::ID"
+            "&0x1::guid::ID"
           ],
           "return": [
             "u64"
@@ -627,7 +627,7 @@
           "visibility": "public",
           "generic_type_params": [],
           "params": [
-            "&0x1::GUID::ID"
+            "&0x1::guid::ID"
           ],
           "return": [
             "address"
@@ -671,7 +671,7 @@
           "fields": [
             {
               "name": "id",
-              "type": "0x1::GUID::ID"
+              "type": "0x1::guid::ID"
             }
           ]
         },
@@ -814,7 +814,7 @@
           "visibility": "public",
           "generic_type_params": [],
           "params": [
-            "&0x1::ASCII::String"
+            "&0x1::ascii::String"
           ],
           "return": [
             "bool"
@@ -825,7 +825,7 @@
           "visibility": "public",
           "generic_type_params": [],
           "params": [
-            "&0x1::ASCII::String"
+            "&0x1::ascii::String"
           ],
           "return": [
             "&vector<u8>"
@@ -836,7 +836,7 @@
           "visibility": "public",
           "generic_type_params": [],
           "params": [
-            "0x1::ASCII::Char"
+            "0x1::ascii::Char"
           ],
           "return": [
             "u8"
@@ -850,7 +850,7 @@
             "u8"
           ],
           "return": [
-            "0x1::ASCII::Char"
+            "0x1::ascii::Char"
           ]
         },
         {
@@ -858,7 +858,7 @@
           "visibility": "public",
           "generic_type_params": [],
           "params": [
-            "0x1::ASCII::String"
+            "0x1::ascii::String"
           ],
           "return": [
             "vector<u8>"
@@ -891,7 +891,7 @@
           "visibility": "public",
           "generic_type_params": [],
           "params": [
-            "&0x1::ASCII::String"
+            "&0x1::ascii::String"
           ],
           "return": [
             "u64"
@@ -902,10 +902,10 @@
           "visibility": "public",
           "generic_type_params": [],
           "params": [
-            "&mut 0x1::ASCII::String"
+            "&mut 0x1::ascii::String"
           ],
           "return": [
-            "0x1::ASCII::Char"
+            "0x1::ascii::Char"
           ]
         },
         {
@@ -913,8 +913,8 @@
           "visibility": "public",
           "generic_type_params": [],
           "params": [
-            "&mut 0x1::ASCII::String",
-            "0x1::ASCII::Char"
+            "&mut 0x1::ascii::String",
+            "0x1::ascii::Char"
           ],
           "return": []
         },
@@ -926,7 +926,7 @@
             "vector<u8>"
           ],
           "return": [
-            "0x1::ASCII::String"
+            "0x1::ascii::String"
           ]
         },
         {
@@ -937,7 +937,7 @@
             "vector<u8>"
           ],
           "return": [
-            "0x1::Option::Option<0x1::ASCII::String>"
+            "0x1::Option::Option<0x1::ascii::String>"
           ]
         }
       ],
@@ -1116,7 +1116,7 @@
             "&0x1::Event::EventHandle<T0>"
           ],
           "return": [
-            "&0x1::GUID::GUID"
+            "&0x1::guid::GUID"
           ]
         },
         {
@@ -1198,7 +1198,7 @@
             },
             {
               "name": "guid",
-              "type": "0x1::GUID::GUID"
+              "type": "0x1::guid::GUID"
             }
           ]
         }
@@ -1836,9 +1836,9 @@
           "generic_type_params": [],
           "params": [
             "&signer",
-            "0x1::ASCII::String",
-            "0x1::ASCII::String",
-            "0x1::ASCII::String",
+            "0x1::ascii::String",
+            "0x1::ascii::String",
+            "0x1::ascii::String",
             "0x1::Option::Option<u64>"
           ],
           "return": []
@@ -1878,13 +1878,13 @@
           "generic_type_params": [],
           "params": [
             "&signer",
-            "0x1::ASCII::String",
-            "0x1::ASCII::String",
-            "0x1::ASCII::String",
+            "0x1::ascii::String",
+            "0x1::ascii::String",
+            "0x1::ascii::String",
             "bool",
             "u64",
             "0x1::Option::Option<u64>",
-            "0x1::ASCII::String"
+            "0x1::ascii::String"
           ],
           "return": [
             "0x1::Token::TokenId"
@@ -1896,8 +1896,8 @@
           "generic_type_params": [],
           "params": [
             "address",
-            "0x1::ASCII::String",
-            "0x1::ASCII::String"
+            "0x1::ascii::String",
+            "0x1::ascii::String"
           ],
           "return": [
             "0x1::Token::TokenId"
@@ -2136,15 +2136,15 @@
           "fields": [
             {
               "name": "description",
-              "type": "0x1::ASCII::String"
+              "type": "0x1::ascii::String"
             },
             {
               "name": "name",
-              "type": "0x1::ASCII::String"
+              "type": "0x1::ascii::String"
             },
             {
               "name": "uri",
-              "type": "0x1::ASCII::String"
+              "type": "0x1::ascii::String"
             },
             {
               "name": "count",
@@ -2166,7 +2166,7 @@
           "fields": [
             {
               "name": "collections",
-              "type": "0x1::Table::Table<0x1::ASCII::String, 0x1::Token::Collection>"
+              "type": "0x1::Table::Table<0x1::ascii::String, 0x1::Token::Collection>"
             },
             {
               "name": "token_data",
@@ -2245,15 +2245,15 @@
           "fields": [
             {
               "name": "collection",
-              "type": "0x1::ASCII::String"
+              "type": "0x1::ascii::String"
             },
             {
               "name": "description",
-              "type": "0x1::ASCII::String"
+              "type": "0x1::ascii::String"
             },
             {
               "name": "name",
-              "type": "0x1::ASCII::String"
+              "type": "0x1::ascii::String"
             },
             {
               "name": "maximum",
@@ -2265,7 +2265,7 @@
             },
             {
               "name": "uri",
-              "type": "0x1::ASCII::String"
+              "type": "0x1::ascii::String"
             }
           ]
         },
@@ -2285,11 +2285,11 @@
             },
             {
               "name": "collection",
-              "type": "0x1::ASCII::String"
+              "type": "0x1::ascii::String"
             },
             {
               "name": "name",
-              "type": "0x1::ASCII::String"
+              "type": "0x1::ascii::String"
             }
           ]
         },

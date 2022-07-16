@@ -12,7 +12,7 @@ exceptions in Genesis and AptosAccount where there can temporarily be multiple s
 
 Offer solves this problem by providing an <code><a href="Offer.md#0x1_Offer">Offer</a></code> resource.  To move a struct <code>T</code> from
 account A to B, account A first publishes an <code><a href="Offer.md#0x1_Offer">Offer</a>&lt;T&gt;</code> resource at <code><a href="Offer.md#0x1_Offer_address_of">address_of</a>(A)</code>,
-using the <code><a href="Offer.md#0x1_Offer_create">Offer::create</a></code> function.
+using the <code><a href="Offer.md#0x1_Offer_create">offer::create</a></code> function.
 Then account B, in a separate transaction, can move the struct <code>T</code> from the <code><a href="Offer.md#0x1_Offer">Offer</a></code> at
 A's address to the desired destination. B accesses the resource using the <code>redeem</code> function,
 which aborts unless the <code>for</code> field is B's address (preventing other addresses from

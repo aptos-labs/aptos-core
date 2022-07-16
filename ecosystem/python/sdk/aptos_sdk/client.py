@@ -454,7 +454,7 @@ class RestClient:
 
         return self.get_table_item(
             token_data,
-            "0x1::ASCII::String",
+            "0x1::ascii::String",
             "0x1::Token::Collection",
             collection_name,
         )

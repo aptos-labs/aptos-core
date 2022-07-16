@@ -6,11 +6,11 @@
 /// struct itself, while the operations are implemented as native functions. No traversal is provided.
 
 module AptosFramework::Table {
-    use Std::Errors;
+    use std::errors;
 
-    // native code raises this with Errors::invalid_arguments()
+    // native code raises this with errors::invalid_arguments()
     const EALREADY_EXISTS: u64 = 100;
-    // native code raises this with Errors::invalid_arguments()
+    // native code raises this with errors::invalid_arguments()
     const ENOT_FOUND: u64 = 101;
     const ENOT_EMPTY: u64 = 102;
 
@@ -30,7 +30,7 @@ module AptosFramework::Table {
 
     /// Destroy a table. The table must be empty to succeed.
     public fun destroy_empty<K: copy + drop, V>(table: Table<K, V>) {
-        assert!(table.length == 0, Errors::invalid_state(ENOT_EMPTY));
+        assert!(table.length == 0, errors::invalid_state(ENOT_EMPTY));
         destroy_empty_box<K, V, Box<V>>(&table);
         drop_unchecked_box<K, V, Box<V>>(table)
     }

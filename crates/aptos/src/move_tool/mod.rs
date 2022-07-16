@@ -18,9 +18,9 @@ use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
+use move_deps::move_cli::base::test::UnitTestResult;
 use move_deps::{
     move_cli,
-    move_cli::package::cli::UnitTestResult,
     move_command_line_common::env::get_bytecode_version_from_env,
     move_core_types::{
         identifier::Identifier,
@@ -201,7 +201,7 @@ impl CliCommand<&'static str> for TestPackage {
             install_dir: self.move_options.output_dir.clone(),
             ..Default::default()
         };
-        let result = move_cli::package::cli::run_move_unit_tests(
+        let result = move_cli::base::test::run_move_unit_tests(
             self.move_options.package_dir.as_path(),
             config,
             UnitTestingConfig {
@@ -210,6 +210,7 @@ impl CliCommand<&'static str> for TestPackage {
             },
             aptos_debug_natives::aptos_debug_natives(),
             false,
+            &mut std::io::stdout(),
         )
         .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
 

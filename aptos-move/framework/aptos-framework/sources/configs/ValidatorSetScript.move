@@ -1,7 +1,7 @@
 // placeholder to maintain compatibility
 module AptosFramework::ValidatorSetScript {
 
-    public(script) fun register_validator_config(
+    public entry fun register_validator_config(
        _validator_operator_account: signer,
        _validator_address: address,
        _consensus_pubkey: vector<u8>,
@@ -10,14 +10,14 @@ module AptosFramework::ValidatorSetScript {
     ) {
     }
 
-    public(script) fun set_validator_operator(
+    public entry fun set_validator_operator(
         _account: signer,
         _operator_name: vector<u8>,
         _operator_account: address
     ) {
     }
 
-    public(script) fun set_validator_config_and_reconfigure(
+    public entry fun set_validator_config_and_reconfigure(
         _validator_operator_account: signer,
         _validator_account: address,
         _consensus_pubkey: vector<u8>,
@@ -26,27 +26,27 @@ module AptosFramework::ValidatorSetScript {
     ) {
     }
 
-    public(script) fun create_validator_account(
+    public entry fun create_validator_account(
         _core_resource: signer,
         _new_account_address: address,
         _human_name: vector<u8>,
     ) {
     }
 
-    public(script) fun create_validator_operator_account(
+    public entry fun create_validator_operator_account(
         _core_resource: signer,
         _new_account_address: address,
         _human_name: vector<u8>,
     ) {
     }
 
-    public(script) fun add_validator(
+    public entry fun add_validator(
         _account: signer,
         _validator_addr: address
     ) {
     }
 
-    public(script) fun remove_validator(
+    public entry fun remove_validator(
         _account: signer,
         _validator_addr: address
     ) {

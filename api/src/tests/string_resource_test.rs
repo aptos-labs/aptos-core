@@ -19,12 +19,12 @@ async fn test_renders_move_acsii_string_into_utf8_string() {
     context.commit_block(&vec![txn]).await;
 
     // module 0x87342d91af60c3a883a2812c9294c2f8::Message {
-    //     use Std::ASCII;
+    //     use Std::ascii;
     //     struct MessageHolder has key {
-    //         message: ASCII::String,
+    //         message: ascii::String,
     //     }
     //     public(script) fun set_message(account: signer, msg: vector<u8>) {
-    //         let message = ASCII::string(msg);
+    //         let message = ascii::string(msg);
     //         move_to(&account, MessageHolder {
     //             message,
     //         });

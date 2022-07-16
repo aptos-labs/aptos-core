@@ -536,7 +536,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         if MoveValue::is_ascii_string(struct_tag) {
             let string = val
                 .as_str()
-                .ok_or_else(|| format_err!("failed to parse ASCII::String."))?;
+                .ok_or_else(|| format_err!("failed to parse ascii::String."))?;
             return Ok(new_vm_ascii_string(string));
         }
 
@@ -570,12 +570,13 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     let explanation = error_explain::get_explanation(module_id, *code);
                     explanation
                         .map(|ec| {
+                            // TODO(wrwg): category and reason where removed from Move apis,
+                            //   instead we have only single code_name/description. Need to
+                            //   verify whether error reporting in the api is still reasonable.
                             format!(
-                                "Move abort by {} - {}\n{}\n{}",
-                                ec.category.code_name,
-                                ec.reason.code_name,
-                                ec.category.code_description,
-                                ec.reason.code_description
+                                "Move abort by {}\n{}",
+                                ec.code_name,
+                                ec.code_description,
                             )
                         })
                         .unwrap_or_else(|| {

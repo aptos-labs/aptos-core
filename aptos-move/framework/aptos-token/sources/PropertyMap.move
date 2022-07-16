@@ -1,8 +1,8 @@
 /// PropertyMap is a specialization of SimpleMap for Tokens.
 /// It maps a String key to a PropertyValue that consists of type (string) and value (vecotr<u8>)
 module AptosToken::PropertyMap {
-    use Std::Vector;
-    use Std::ASCII::{Self, String};
+    use std::vector;
+    use std::ascii::{Self, String};
     use AptosFramework::SimpleMap::{Self, SimpleMap};
 
     const MAX_PROPERTY_MAP_SIZE: u64 = 1000;
@@ -26,17 +26,17 @@ module AptosToken::PropertyMap {
         values: vector<vector<u8>>,
         types: vector<String>
     ): PropertyMap {
-        assert!(Vector::length(&keys) == Vector::length(&values), EKEY_COUNT_NOT_MATCH_VALUE_COUNT);
-        assert!(Vector::length(&keys) == Vector::length(&types), EKEY_COUNT_NOT_MATCH_TYPE_COUNT);
+        assert!(vector::length(&keys) == vector::length(&values), EKEY_COUNT_NOT_MATCH_VALUE_COUNT);
+        assert!(vector::length(&keys) == vector::length(&types), EKEY_COUNT_NOT_MATCH_TYPE_COUNT);
         let properties = PropertyMap{
             map: SimpleMap::create<String, PropertyValue>(),
         };
         let i = 0;
-        while (i < Vector::length(&keys)) {
+        while (i < vector::length(&keys)) {
             SimpleMap::add(
                 &mut properties.map,
-                *Vector::borrow(&keys, i),
-                PropertyValue{ value: *Vector::borrow(&values, i), type: *Vector::borrow(&types, i) }
+                *vector::borrow(&keys, i),
+                PropertyValue{ value: *vector::borrow(&values, i), type: *vector::borrow(&types, i) }
             );
             i = i + 1;
         };
@@ -90,10 +90,10 @@ module AptosToken::PropertyMap {
         property_types: vector<String>
     ) {
         let i = 0;
-        while (i < Vector::length(&property_keys)) {
-            let key = Vector::borrow(&property_keys, i);
-            let value = *Vector::borrow(&property_values, i);
-            let type = *Vector::borrow(&property_types, i);
+        while (i < vector::length(&property_keys)) {
+            let key = vector::borrow(&property_keys, i);
+            let value = *vector::borrow(&property_values, i);
+            let type = *vector::borrow(&property_types, i);
             if (contains_key(map, key)) {
                 let pv = PropertyValue {
                     value,
@@ -118,10 +118,10 @@ module AptosToken::PropertyMap {
     }
 
     public fun generate_string_vector(values: vector<vector<u8>>): vector<String> {
-        let vals: vector<String> = Vector::empty<String>();
+        let vals: vector<String> = vector::empty<String>();
         let i = 0;
-        while (i < Vector::length(&values)) {
-            Vector::push_back(&mut vals, ASCII::string(*Vector::borrow(&mut values, i )));
+        while (i < vector::length(&values)) {
+            vector::push_back(&mut vals, ascii::string(*vector::borrow(&mut values, i )));
             i = i + 1;
         };
         vals
@@ -129,7 +129,7 @@ module AptosToken::PropertyMap {
 
     #[test_only]
     fun create_property_list(): PropertyMap {
-        use Std::ASCII::string;
+        use std::ascii::string;
         let keys = vector<String>[ string(b"attack"), string(b"durability"), string(b"type")];
         let values = vector<vector<u8>>[ b"10", b"5", b"weapon" ];
         let types = vector<String>[ string(b"integer"), string(b"integer"), string(b"String") ];
@@ -138,7 +138,7 @@ module AptosToken::PropertyMap {
 
     #[test]
     fun test_add_property(): PropertyMap {
-        use Std::ASCII::string;
+        use std::ascii::string;
         let properties = create_property_list();
         add(
             &mut properties, string(b"level"),
@@ -154,7 +154,7 @@ module AptosToken::PropertyMap {
 
     #[test]
     fun test_update_property(): PropertyMap {
-        use Std::ASCII::string;
+        use std::ascii::string;
         let properties = create_property_list();
         update_property_value(&mut properties, &string(b"attack"), PropertyValue{ value: b"7", type: string(b"integer") });
         assert!(
@@ -166,7 +166,7 @@ module AptosToken::PropertyMap {
 
     #[test]
     fun test_remove_property(): PropertyMap {
-        use Std::ASCII::string;
+        use std::ascii::string;
         let properties = create_property_list();
         assert!(length(&mut properties) == 3, 1);
         let (_, _) = remove(&mut properties, &string(b"attack"));

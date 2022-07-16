@@ -1,7 +1,7 @@
 /// Provides a framework for comparing two elements
 module AptosFramework::Comparator {
-    use Std::BCS;
-    use Std::Vector;
+    use std::bcs;
+    use std::vector;
 
     const EQUAL: u8 = 0;
     const SMALLER: u8 = 1;
@@ -25,22 +25,22 @@ module AptosFramework::Comparator {
 
     // Performs a comparison of two types after BCS serialization.
     public fun compare<T>(left: &T, right: &T): Result {
-        let left_bytes = BCS::to_bytes(left);
-        let right_bytes = BCS::to_bytes(right);
+        let left_bytes = bcs::to_bytes(left);
+        let right_bytes = bcs::to_bytes(right);
 
         compare_u8_vector(left_bytes, right_bytes)
     }
 
     // Performs a comparison of two vector<u8>s or byte vectors
     public fun compare_u8_vector(left: vector<u8>, right: vector<u8>): Result {
-        let left_length = Vector::length(&left);
-        let right_length = Vector::length(&right);
+        let left_length = vector::length(&left);
+        let right_length = vector::length(&right);
 
         let idx = 0;
 
         while (idx < left_length && idx < right_length) {
-            let left_byte = *Vector::borrow(&left, idx);
-            let right_byte = *Vector::borrow(&right, idx);
+            let left_byte = *vector::borrow(&left, idx);
+            let right_byte = *vector::borrow(&right, idx);
 
             if (left_byte < right_byte) {
                 return Result { inner: SMALLER }
@@ -61,11 +61,11 @@ module AptosFramework::Comparator {
 
     #[test]
     public fun test_strings() {
-        use Std::ASCII;
+        use std::ascii;
 
-        let value0 = ASCII::string(b"alpha");
-        let value1 = ASCII::string(b"beta");
-        let value2 = ASCII::string(b"betaa");
+        let value0 = ascii::string(b"alpha");
+        let value1 = ascii::string(b"beta");
+        let value2 = ascii::string(b"betaa");
 
         assert!(is_equal(&compare(&value0, &value0)), 0);
         assert!(is_equal(&compare(&value1, &value1)), 1);
@@ -110,16 +110,16 @@ module AptosFramework::Comparator {
 
     #[test]
     public fun test_complex() {
-        let value0_0 = Vector::empty();
-        Vector::push_back(&mut value0_0, 10);
-        Vector::push_back(&mut value0_0, 9);
-        Vector::push_back(&mut value0_0, 5);
+        let value0_0 = vector::empty();
+        vector::push_back(&mut value0_0, 10);
+        vector::push_back(&mut value0_0, 9);
+        vector::push_back(&mut value0_0, 5);
 
-        let value0_1 = Vector::empty();
-        Vector::push_back(&mut value0_1, 10);
-        Vector::push_back(&mut value0_1, 9);
-        Vector::push_back(&mut value0_1, 5);
-        Vector::push_back(&mut value0_1, 1);
+        let value0_1 = vector::empty();
+        vector::push_back(&mut value0_1, 10);
+        vector::push_back(&mut value0_1, 9);
+        vector::push_back(&mut value0_1, 5);
+        vector::push_back(&mut value0_1, 1);
 
         let base = Complex {
             value0: value0_0,

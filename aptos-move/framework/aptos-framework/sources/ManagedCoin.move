@@ -2,9 +2,9 @@
 /// It contains scripts you will need to initialize, mint, burn, transfer coins.
 /// By utilizing this current module, a developer can create his own coin and care less about mint and burn capabilities,
 module AptosFramework::ManagedCoin {
-    use Std::ASCII;
-    use Std::Errors;
-    use Std::Signer;
+    use std::ascii;
+    use std::errors;
+    use std::signer;
 
     use AptosFramework::Coin::{Self, BurnCapability, MintCapability};
 
@@ -31,15 +31,15 @@ module AptosFramework::ManagedCoin {
     //
 
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
-    public(script) fun burn<CoinType>(
+    public entry fun burn<CoinType>(
         account: &signer,
         amount: u64,
     ) acquires Capabilities {
-        let account_addr = Signer::address_of(account);
+        let account_addr = signer::address_of(account);
 
         assert!(
             exists<Capabilities<CoinType>>(account_addr),
-            Errors::not_published(ENO_CAPABILITIES),
+            errors::not_published(ENO_CAPABILITIES),
         );
 
         let capabilities = borrow_global<Capabilities<CoinType>>(account_addr);
@@ -50,7 +50,7 @@ module AptosFramework::ManagedCoin {
 
     /// Initialize new coin `CoinType` in Aptos Blockchain.
     /// Mint and Burn Capabilities will be stored under `account` in `Capabilities` resource.
-    public(script) fun initialize<CoinType>(
+    public entry fun initialize<CoinType>(
         account: &signer,
         name: vector<u8>,
         symbol: vector<u8>,
@@ -59,8 +59,8 @@ module AptosFramework::ManagedCoin {
     ) {
         let (mint_cap, burn_cap) = Coin::initialize<CoinType>(
             account,
-            ASCII::string(name),
-            ASCII::string(symbol),
+            ascii::string(name),
+            ascii::string(symbol),
             decimals,
             monitor_supply,
         );
@@ -72,16 +72,16 @@ module AptosFramework::ManagedCoin {
     }
 
     /// Create new coins `CoinType` and deposit them into dst_addr's account.
-    public(script) fun mint<CoinType>(
+    public entry fun mint<CoinType>(
         account: &signer,
         dst_addr: address,
         amount: u64,
     ) acquires Capabilities {
-        let account_addr = Signer::address_of(account);
+        let account_addr = signer::address_of(account);
 
         assert!(
             exists<Capabilities<CoinType>>(account_addr),
-            Errors::not_published(ENO_CAPABILITIES),
+            errors::not_published(ENO_CAPABILITIES),
         );
 
         let capabilities = borrow_global<Capabilities<CoinType>>(account_addr);
@@ -91,7 +91,7 @@ module AptosFramework::ManagedCoin {
 
     /// Creating a resource that stores balance of `CoinType` on user's account, withdraw and deposit event handlers.
     /// Required if user wants to start accepting deposits of `CoinType` in his account.
-    public(script) fun register<CoinType>(account: &signer) {
+    public entry fun register<CoinType>(account: &signer) {
         Coin::register<CoinType>(account);
     }
 
@@ -100,18 +100,18 @@ module AptosFramework::ManagedCoin {
     //
 
     #[test_only]
-    use Std::Option;
+    use std::option;
 
     #[test_only]
     struct FakeMoney { }
 
     #[test(source = @0x1, destination = @0x2)]
-    public(script) fun test_end_to_end(
+    public entry fun test_end_to_end(
         source: signer,
         destination: signer,
     ) acquires Capabilities {
-        let source_addr = Signer::address_of(&source);
-        let destination_addr = Signer::address_of(&destination);
+        let source_addr = signer::address_of(&source);
+        let destination_addr = signer::address_of(&destination);
 
         initialize<FakeMoney>(
             &source,
@@ -131,8 +131,8 @@ module AptosFramework::ManagedCoin {
         assert!(Coin::balance<FakeMoney>(destination_addr) == 10, 2);
 
         let supply = Coin::supply<FakeMoney>();
-        assert!(Option::is_some(&supply), 1);
-        assert!(Option::extract(&mut supply) == 60, 2);
+        assert!(option::is_some(&supply), 1);
+        assert!(option::extract(&mut supply) == 60, 2);
 
         Coin::transfer<FakeMoney>(&source, destination_addr, 10);
         assert!(Coin::balance<FakeMoney>(source_addr) == 40, 3);
@@ -143,16 +143,16 @@ module AptosFramework::ManagedCoin {
         assert!(Coin::balance<FakeMoney>(source_addr) == 0, 1);
 
         let new_supply = Coin::supply<FakeMoney>();
-        assert!(Option::extract(&mut new_supply) == 20, 2);
+        assert!(option::extract(&mut new_supply) == 20, 2);
     }
 
     #[test(source = @0x1, destination = @0x2)]
     #[expected_failure(abort_code = 5)]
-    public(script) fun fail_mint(
+    public entry fun fail_mint(
         source: signer,
         destination: signer,
     ) acquires Capabilities {
-        let source_addr = Signer::address_of(&source);
+        let source_addr = signer::address_of(&source);
 
         initialize<FakeMoney>(&source, b"Fake money", b"FMD", 1, true);
         register<FakeMoney>(&source);
@@ -163,11 +163,11 @@ module AptosFramework::ManagedCoin {
 
     #[test(source = @0x1, destination = @0x2)]
     #[expected_failure(abort_code = 5)]
-    public(script) fun fail_burn(
+    public entry fun fail_burn(
         source: signer,
         destination: signer,
     ) acquires Capabilities {
-        let source_addr = Signer::address_of(&source);
+        let source_addr = signer::address_of(&source);
 
         initialize<FakeMoney>(&source, b"Fake money", b"FMD", 1, true);
         register<FakeMoney>(&source);

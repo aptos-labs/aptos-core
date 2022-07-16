@@ -1,18 +1,18 @@
 module DebugDemo::Message {
-    use Std::ASCII;
-    use Std::Signer;
-    use Std::Debug;
+    use std::ascii;
+    use std::signer;
+    use std::Debug;
 
     struct MessageHolder has key {
-        message: ASCII::String,
+        message: ascii::String,
     }
 
 
-    public(script) fun set_message(account: signer, message_bytes: vector<u8>)
+    public entry fun set_message(account: signer, message_bytes: vector<u8>)
     acquires MessageHolder {
         Debug::print_stack_trace();
-        let message = ASCII::string(message_bytes);
-        let account_addr = Signer::address_of(&account);
+        let message = ascii::string(message_bytes);
+        let account_addr = signer::address_of(&account);
         if (!exists<MessageHolder>(account_addr)) {
             move_to(&account, MessageHolder {
                 message,
@@ -24,8 +24,8 @@ module DebugDemo::Message {
     }
 
     #[test(account = @0x1)]
-    public(script) fun sender_can_set_message(account: signer) acquires MessageHolder {
-        let addr = Signer::address_of(&account);
+    public entry fun sender_can_set_message(account: signer) acquires MessageHolder {
+        let addr = signer::address_of(&account);
         Debug::print<address>(&addr);
         set_message(account,  b"Hello, Blockchain");
     }

@@ -28,7 +28,7 @@ async fn test_value_conversion() {
     assert_value_conversion(&converter, "address", "0x1", VmMoveValue::Address(address));
     assert_value_conversion(
         &converter,
-        "0x1::ASCII::String",
+        "0x1::ascii::String",
         "hello",
         new_vm_ascii_string("hello"),
     );
@@ -46,7 +46,7 @@ async fn test_value_conversion() {
     );
     assert_value_conversion(
         &converter,
-        "0x1::GUID::ID",
+        "0x1::guid::ID",
         json!({"addr": "0x1", "creation_num": "1"}),
         VmMoveValue::Struct(MoveStruct::Runtime(vec![
             VmMoveValue::U64(1),

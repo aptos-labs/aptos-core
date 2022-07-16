@@ -6,4 +6,4 @@ version = "1.5.0"
 MoveStdlib = { local = ".." }
 
 [dev-addresses]
-Std = "0x1"
+std = "0x1"

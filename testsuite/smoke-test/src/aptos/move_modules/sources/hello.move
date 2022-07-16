@@ -1,8 +1,8 @@
 module 0xA550C18::HelloWorld {
-    use AptosFramework::Signer;
+    use AptosFramework::signer;
     use AptosFramework::Coin;
     use AptosFramework::TestCoin::TestCoin;
-    use AptosFramework::ASCII::{Self, String};
+    use AptosFramework::ascii::{Self, String};
 
     struct ModuleData has key, store {
         global_counter: u64,
@@ -12,7 +12,7 @@ module 0xA550C18::HelloWorld {
     fun init_module(sender: &signer) {
         move_to(
             sender,
-            ModuleData { global_counter: 0, state: ASCII::string(b"init") }
+            ModuleData { global_counter: 0, state: ascii::string(b"init") }
         );
     }
 
@@ -20,7 +20,7 @@ module 0xA550C18::HelloWorld {
         Coin::balance<TestCoin>(addr)
     }
 
-    public(script) fun hi(sender: &signer, msg: String) acquires ModuleData {
-        borrow_global_mut<ModuleData>(Signer::address_of(sender)).state = msg;
+    public entry fun hi(sender: &signer, msg: String) acquires ModuleData {
+        borrow_global_mut<ModuleData>(signer::address_of(sender)).state = msg;
     }
 }

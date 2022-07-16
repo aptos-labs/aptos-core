@@ -21,10 +21,10 @@
  * the resolution process.
  */
 module AptosFramework::Voting {
-    use Std::Errors;
-    use Std::Event::{Self, EventHandle};
-    use Std::Option::{Self, Option};
-    use Std::Signer;
+    use std::errors;
+    use std::event::{Self, EventHandle};
+    use std::option::{Self, Option};
+    use std::signer;
 
     use AptosFramework::Table::{Self, Table};
     use AptosFramework::Timestamp;
@@ -116,17 +116,17 @@ module AptosFramework::Voting {
             next_proposal_id: 0,
             proposals: Table::new<u64, Proposal<ProposalType>>(),
             events: VotingEvents {
-                create_proposal_events: Event::new_event_handle<CreateProposalEvent>(account),
-                register_forum_events: Event::new_event_handle<RegisterForumEvent>(account),
-                resolve_proposal_events: Event::new_event_handle<ResolveProposal>(account),
-                vote_events: Event::new_event_handle<VoteEvent>(account),
+                create_proposal_events: event::new_event_handle<CreateProposalEvent>(account),
+                register_forum_events: event::new_event_handle<RegisterForumEvent>(account),
+                resolve_proposal_events: event::new_event_handle<ResolveProposal>(account),
+                vote_events: event::new_event_handle<VoteEvent>(account),
             }
         };
 
-        Event::emit_event<RegisterForumEvent>(
+        event::emit_event<RegisterForumEvent>(
             &mut voting_forum.events.register_forum_events,
             RegisterForumEvent {
-                hosting_account: Signer::address_of(account),
+                hosting_account: signer::address_of(account),
                 proposal_type_info: TypeInfo::type_of<ProposalType>(),
             },
         );
@@ -157,7 +157,7 @@ module AptosFramework::Voting {
         voting_forum.next_proposal_id = voting_forum.next_proposal_id + 1;
 
         Table::add(&mut voting_forum.proposals, proposal_id, Proposal {
-            execution_content: Option::some<ProposalType>(execution_content),
+            execution_content: option::some<ProposalType>(execution_content),
             execution_hash,
             min_vote_threshold,
             expiration_secs,
@@ -167,7 +167,7 @@ module AptosFramework::Voting {
             is_resolved: false,
         });
 
-        Event::emit_event<CreateProposalEvent>(
+        event::emit_event<CreateProposalEvent>(
             &mut voting_forum.events.create_proposal_events,
             CreateProposalEvent {
                 proposal_id,
@@ -204,7 +204,7 @@ module AptosFramework::Voting {
             proposal.no_votes = proposal.no_votes + (num_votes as u128);
         };
 
-        Event::emit_event<VoteEvent>(
+        event::emit_event<VoteEvent>(
             &mut voting_forum.events.vote_events,
             VoteEvent { proposal_id, num_votes },
         );
@@ -220,21 +220,21 @@ module AptosFramework::Voting {
         proposal_id: u64,
     ): ProposalType acquires VotingForum {
         let proposal_state = get_proposal_state<ProposalType>(voting_forum_address, proposal_id);
-        assert!(proposal_state == PROPOSAL_STATE_SUCCEEDED, Errors::invalid_argument(EPROPOSAL_CANNOT_BE_RESOLVED));
+        assert!(proposal_state == PROPOSAL_STATE_SUCCEEDED, errors::invalid_argument(EPROPOSAL_CANNOT_BE_RESOLVED));
 
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = Table::borrow_mut(&mut voting_forum.proposals, proposal_id);
-        assert!(!proposal.is_resolved, Errors::invalid_argument(EPROPOSAL_ALREADY_RESOLVED));
+        assert!(!proposal.is_resolved, errors::invalid_argument(EPROPOSAL_ALREADY_RESOLVED));
 
         let resolved_early = can_be_resolved_early(proposal);
         proposal.is_resolved = true;
 
         assert!(
             TransactionContext::get_script_hash() == proposal.execution_hash,
-            Errors::invalid_argument(EPROPOSAL_EXECUTION_HASH_NOT_MATCHING),
+            errors::invalid_argument(EPROPOSAL_EXECUTION_HASH_NOT_MATCHING),
         );
 
-        Event::emit_event<ResolveProposal>(
+        event::emit_event<ResolveProposal>(
             &mut voting_forum.events.resolve_proposal_events,
             ResolveProposal {
                 proposal_id,
@@ -244,7 +244,7 @@ module AptosFramework::Voting {
             },
         );
 
-        Option::extract(&mut proposal.execution_content)
+        option::extract(&mut proposal.execution_content)
     }
 
     /// Return true if the voting on the given proposal has already concluded.
@@ -261,8 +261,8 @@ module AptosFramework::Voting {
 
     /// Return true if the proposal has reached early resolution threshold (if specified).
     public fun can_be_resolved_early<ProposalType: store>(proposal: &Proposal<ProposalType>): bool {
-        if (Option::is_some(&proposal.early_resolution_vote_threshold)) {
-            let early_resolution_threshold = *Option::borrow(&proposal.early_resolution_vote_threshold);
+        if (option::is_some(&proposal.early_resolution_vote_threshold)) {
+            let early_resolution_threshold = *option::borrow(&proposal.early_resolution_vote_threshold);
             if (proposal.yes_votes >= early_resolution_threshold || proposal.no_votes >= early_resolution_threshold) {
                 return true
             };
@@ -312,7 +312,7 @@ module AptosFramework::Voting {
     public fun create_test_proposal(governance: &signer, early_resolution_threshold: Option<u128>): u64 acquires VotingForum {
         // Register voting forum and create a proposal.
         register<TestProposal>(governance);
-        let governance_address = Signer::address_of(governance);
+        let governance_address = signer::address_of(governance);
         let proposal = TestProposal {};
         let proposal_id = create_proposal<TestProposal>(
             governance_address,
@@ -327,12 +327,12 @@ module AptosFramework::Voting {
     }
 
     #[test(core_resources = @CoreResources, governance = @0x123)]
-    public(script) fun test_voting_passed(core_resources: signer, governance: signer) acquires VotingForum {
+    public entry fun test_voting_passed(core_resources: signer, governance: signer) acquires VotingForum {
         Timestamp::set_time_has_started_for_testing(&core_resources);
 
         // Register voting forum and create a proposal.
-        let governance_address = Signer::address_of(&governance);
-        let proposal_id = create_test_proposal(&governance, Option::none<u128>());
+        let governance_address = signer::address_of(&governance);
+        let proposal_id = create_test_proposal(&governance, option::none<u128>());
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_PENDING, 0);
 
         // Vote.
@@ -352,12 +352,12 @@ module AptosFramework::Voting {
 
     #[test(core_resources = @CoreResources, governance = @0x123)]
     #[expected_failure(abort_code = 775)]
-    public(script) fun test_cannot_resolve_twice(core_resources: signer, governance: signer) acquires VotingForum {
+    public entry fun test_cannot_resolve_twice(core_resources: signer, governance: signer) acquires VotingForum {
         Timestamp::set_time_has_started_for_testing(&core_resources);
 
         // Register voting forum and create a proposal.
-        let governance_address = Signer::address_of(&governance);
-        let proposal_id = create_test_proposal(&governance, Option::none<u128>());
+        let governance_address = signer::address_of(&governance);
+        let proposal_id = create_test_proposal(&governance, option::none<u128>());
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_PENDING, 0);
 
         // Vote.
@@ -375,12 +375,12 @@ module AptosFramework::Voting {
     }
 
     #[test(core_resources = @CoreResources, governance = @0x123)]
-    public(script) fun test_voting_passed_early(core_resources: signer, governance: signer) acquires VotingForum {
+    public entry fun test_voting_passed_early(core_resources: signer, governance: signer) acquires VotingForum {
         Timestamp::set_time_has_started_for_testing(&core_resources);
 
         // Register voting forum and create a proposal.
-        let governance_address = Signer::address_of(&governance);
-        let proposal_id = create_test_proposal(&governance, Option::some(100));
+        let governance_address = signer::address_of(&governance);
+        let proposal_id = create_test_proposal(&governance, option::some(100));
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_PENDING, 0);
 
         // Vote.
@@ -400,12 +400,12 @@ module AptosFramework::Voting {
 
     #[test(core_resources = @CoreResources, governance = @0x123)]
     #[expected_failure(abort_code = 519)]
-    public(script) fun test_voting_failed(core_resources: signer, governance: signer) acquires VotingForum {
+    public entry fun test_voting_failed(core_resources: signer, governance: signer) acquires VotingForum {
         Timestamp::set_time_has_started_for_testing(&core_resources);
 
         // Register voting forum and create a proposal.
-        let governance_address = Signer::address_of(&governance);
-        let proposal_id = create_test_proposal(&governance, Option::none<u128>());
+        let governance_address = signer::address_of(&governance);
+        let proposal_id = create_test_proposal(&governance, option::none<u128>());
 
         // Vote.
         let proof = TestProposal { };
@@ -422,12 +422,12 @@ module AptosFramework::Voting {
 
     #[test(core_resources = @CoreResources, governance = @0x123)]
     #[expected_failure(abort_code = 519)]
-    public(script) fun test_voting_failed_early(core_resources: signer, governance: signer) acquires VotingForum {
+    public entry fun test_voting_failed_early(core_resources: signer, governance: signer) acquires VotingForum {
         Timestamp::set_time_has_started_for_testing(&core_resources);
 
         // Register voting forum and create a proposal.
-        let governance_address = Signer::address_of(&governance);
-        let proposal_id = create_test_proposal(&governance, Option::some(100));
+        let governance_address = signer::address_of(&governance);
+        let proposal_id = create_test_proposal(&governance, option::some(100));
 
         // Vote.
         let proof = TestProposal { };

@@ -11,8 +11,8 @@
 /// which reflect that the system has been successfully initialized.
 module AptosFramework::Timestamp {
     use AptosFramework::SystemAddresses;
-    use Std::Signer;
-    use Std::Errors;
+    use std::signer;
+    use std::errors;
 
     friend AptosFramework::Genesis;
 
@@ -46,7 +46,7 @@ module AptosFramework::Timestamp {
         /// and need to hold.
         pragma delegate_invariants_to_caller;
         include AbortsIfNotGenesis;
-        include SystemAddresses::AbortsIfNotCoreResource{addr: Signer::address_of(root_account)};
+        include SystemAddresses::AbortsIfNotCoreResource{addr: signer::address_of(root_account)};
         ensures is_operating();
     }
 
@@ -72,10 +72,10 @@ module AptosFramework::Timestamp {
         let now = global_timer.microseconds;
         if (proposer == @VMReserved) {
             // NIL block with null address as proposer. Timestamp must be equal.
-            assert!(now == timestamp, Errors::invalid_argument(ETIMESTAMP));
+            assert!(now == timestamp, errors::invalid_argument(ETIMESTAMP));
         } else {
             // Normal block. Time must advance
-            assert!(now < timestamp, Errors::invalid_argument(ETIMESTAMP));
+            assert!(now < timestamp, errors::invalid_argument(ETIMESTAMP));
         };
         global_timer.microseconds = timestamp;
     }
@@ -99,7 +99,7 @@ module AptosFramework::Timestamp {
                 now >= timestamp
              }
             )
-            with Errors::INVALID_ARGUMENT;
+            with errors::INVALID_ARGUMENT;
     }
 
     /// Gets the current time in microseconds.
@@ -136,7 +136,7 @@ module AptosFramework::Timestamp {
 
     /// Helper function to assert genesis state.
     public fun assert_genesis() {
-        assert!(is_genesis(), Errors::invalid_state(ENOT_GENESIS));
+        assert!(is_genesis(), errors::invalid_state(ENOT_GENESIS));
     }
     spec assert_genesis {
         pragma opaque = true;
@@ -150,12 +150,12 @@ module AptosFramework::Timestamp {
     }
     /// Helper schema to specify that a function aborts if not in genesis.
     spec schema AbortsIfNotGenesis {
-        aborts_if !is_genesis() with Errors::INVALID_STATE;
+        aborts_if !is_genesis() with errors::INVALID_STATE;
     }
 
     /// Helper function to assert operating (!genesis) state.
     public fun assert_operating() {
-        assert!(is_operating(), Errors::invalid_state(ENOT_OPERATING));
+        assert!(is_operating(), errors::invalid_state(ENOT_OPERATING));
     }
     spec assert_operating {
         pragma opaque = true;
@@ -164,14 +164,14 @@ module AptosFramework::Timestamp {
 
     /// Helper schema to specify that a function aborts if not operating.
     spec schema AbortsIfNotOperating {
-        aborts_if !is_operating() with Errors::INVALID_STATE;
+        aborts_if !is_operating() with errors::INVALID_STATE;
     }
 
     #[test_only]
     public fun update_global_time_for_test(timestamp: u64) acquires CurrentTimeMicroseconds {
         let global_timer = borrow_global_mut<CurrentTimeMicroseconds>(@CoreResources);
         let now = global_timer.microseconds;
-        assert!(now < timestamp, Errors::invalid_argument(ETIMESTAMP));
+        assert!(now < timestamp, errors::invalid_argument(ETIMESTAMP));
         global_timer.microseconds = timestamp;
     }
 
