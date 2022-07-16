@@ -34,7 +34,6 @@ env:
   FORGE_REPORT: forge_report.json
   FORGE_RUNNER_MODE: k8s
   FORGE_NAMESPACE: ${{ inputs.FORGE_NAMESPACE }}
-  GRAFANA_BASE_URL: ${{ secrets.GRAFANA_BASE_URL }}
 
 jobs:
   forge:
@@ -76,6 +75,8 @@ jobs:
           echo "FORGE_COMMENT_HEADER=$FORGE_COMMENT_HEADER" >> $GITHUB_ENV
           echo "FORGE_DASHBOARD_LINK=$FORGE_DASHBOARD_LINK" >> $GITHUB_ENV
           echo "FORGE_REPORT_TXT=$FORGE_REPORT_TXT" >> $GITHUB_ENV
+          echo "FORGE_DASHBOARD_LINK=$FORGE_DASHBOARD_LINK" >> $GITHUB_ENV
+          echo "VALIDATOR_LOGS_LINK=$VALIDATOR_LOGS_LINK" >> $GITHUB_ENV
 
       - name: Post result as PR comment
         if: env.FORGE_ENABLED == 'true' && env.PR_NUMBER != null
@@ -86,6 +87,7 @@ jobs:
             ${{ env.FORGE_BLOCKING == 'true' && 'Forge is land-blocking' || 'Forge is not land-blocking' }}
             * [Test runner output](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
             * [Grafana dashboard](${{ env.FORGE_DASHBOARD_LINK }})
+            * [Validator 0 logs](${{ env.VALIDATOR_LOGS_LINK }})
             ```
             ${{ env.FORGE_REPORT_TXT }}
             ```
