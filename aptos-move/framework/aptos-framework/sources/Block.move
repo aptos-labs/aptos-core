@@ -1,7 +1,7 @@
 /// This module defines a struct storing the metadata of the block and new block events.
 module AptosFramework::Block {
-    use Std::Errors;
-    use Std::Event;
+    use std::errors;
+    use std::event;
 
     use AptosFramework::GovernanceProposal::GovernanceProposal;
     use AptosFramework::Timestamp;
@@ -15,7 +15,7 @@ module AptosFramework::Block {
         /// Time period between epochs.
         epoch_internal: u64,
         /// Handle where events with the time of new blocks are emitted
-        new_block_events: Event::EventHandle<Self::NewBlockEvent>,
+        new_block_events: event::EventHandle<Self::NewBlockEvent>,
     }
 
     struct NewBlockEvent has drop, store {
@@ -38,13 +38,13 @@ module AptosFramework::Block {
         Timestamp::assert_genesis();
         SystemAddresses::assert_core_resource(account);
 
-        assert!(!is_initialized(), Errors::already_published(EBLOCK_METADATA));
+        assert!(!is_initialized(), errors::already_published(EBLOCK_METADATA));
         move_to<BlockMetadata>(
             account,
             BlockMetadata {
                 height: 0,
                 epoch_internal,
-                new_block_events: Event::new_event_handle<Self::NewBlockEvent>(account),
+                new_block_events: event::new_event_handle<Self::NewBlockEvent>(account),
             }
         );
     }
@@ -83,13 +83,13 @@ module AptosFramework::Block {
         // Authorization
         assert!(
             proposer == @VMReserved || Stake::is_current_validator(proposer),
-            Errors::requires_address(EVM_OR_VALIDATOR)
+            errors::requires_address(EVM_OR_VALIDATOR)
         );
 
         let block_metadata_ref = borrow_global_mut<BlockMetadata>(@CoreResources);
         Timestamp::update_global_time(&vm, proposer, timestamp);
         block_metadata_ref.height = block_metadata_ref.height + 1;
-        Event::emit_event<NewBlockEvent>(
+        event::emit_event<NewBlockEvent>(
             &mut block_metadata_ref.new_block_events,
             NewBlockEvent {
                 epoch,
@@ -112,7 +112,7 @@ module AptosFramework::Block {
 
     /// Get the current block height
     public fun get_current_block_height(): u64 acquires BlockMetadata {
-        assert!(is_initialized(), Errors::not_published(EBLOCK_METADATA));
+        assert!(is_initialized(), errors::not_published(EBLOCK_METADATA));
         borrow_global<BlockMetadata>(@CoreResources).height
     }
 }

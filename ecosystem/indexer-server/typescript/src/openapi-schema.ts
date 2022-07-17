@@ -722,7 +722,7 @@ export interface components {
      *
      * **Special serialization for Move stdlib types:**
      *
-     * * [0x1::ASCII::String](https://github.com/aptos-labs/aptos-core/blob/main/language/move-stdlib/docs/ASCII.md) is serialized into `string`. For example, struct value `0x1::ASCII::String{bytes: b"hello world"}` is serialized as `"hello world"` in JSON.
+     * * [0x1::ascii::String](https://github.com/aptos-labs/aptos-core/blob/main/language/move-stdlib/docs/ascii.md) is serialized into `string`. For example, struct value `0x1::ascii::String{bytes: b"hello world"}` is serialized as `"hello world"` in JSON.
      *
      * @example 3344000000
      */

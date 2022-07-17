@@ -3,9 +3,9 @@
 /// Compare to other implementation, linear hashing splits one bucket a time instead of doubling buckets when expanding to avoid unexpected gas cost.
 /// BucketTable uses faster hash function SipHash instead of cryptographically secure hash functions like sha3-256 since it tolerates collisions.
 module AptosFramework::BucketTable {
-    use Std::Errors;
-    use Std::Vector;
-    use Std::Hash::sip_hash;
+    use std::errors;
+    use std::vector;
+    use std::hash::sip_hash;
     use AptosFramework::Table::{Self, Table};
 
     const TARGET_LOAD_PER_BUCKET: u64 = 10;
@@ -38,9 +38,9 @@ module AptosFramework::BucketTable {
 
     /// Create an empty BucketTable with `initial_buckets` buckets.
     public fun new<K: drop + store, V: store>(initial_buckets: u64): BucketTable<K, V> {
-        assert!(initial_buckets > 0, Errors::invalid_argument(EZERO_CAPACITY));
+        assert!(initial_buckets > 0, errors::invalid_argument(EZERO_CAPACITY));
         let buckets = Table::new();
-        Table::add(&mut buckets, 0, Vector::empty());
+        Table::add(&mut buckets, 0, vector::empty());
         let map = BucketTable {
             buckets,
             num_buckets: 1,
@@ -54,10 +54,10 @@ module AptosFramework::BucketTable {
     /// Destroy empty map.
     /// Aborts if it's not empty.
     public fun destroy_empty<K, V>(map: BucketTable<K, V>) {
-        assert!(map.len == 0, Errors::invalid_argument(ENOT_EMPTY));
+        assert!(map.len == 0, errors::invalid_argument(ENOT_EMPTY));
         let i = 0;
         while (i < map.num_buckets) {
-            Vector::destroy_empty(Table::remove(&mut map.buckets, i));
+            vector::destroy_empty(Table::remove(&mut map.buckets, i));
             i = i + 1;
         };
         let BucketTable {buckets, num_buckets: _, level: _, len: _} = map;
@@ -72,13 +72,13 @@ module AptosFramework::BucketTable {
         let index = bucket_index(map.level, map.num_buckets, hash);
         let bucket = Table::borrow_mut(&mut map.buckets, index);
         let i = 0;
-        let len = Vector::length(bucket);
+        let len = vector::length(bucket);
         while (i < len) {
-            let entry = Vector::borrow(bucket, i);
-            assert!(&entry.key != &key, Errors::invalid_argument(EALREADY_EXIST));
+            let entry = vector::borrow(bucket, i);
+            assert!(&entry.key != &key, errors::invalid_argument(EALREADY_EXIST));
             i = i + 1;
         };
-        Vector::push_back(bucket, Entry {hash, key, value});
+        vector::push_back(bucket, Entry {hash, key, value});
         map.len = map.len + 1;
 
         if (load_factor(map) > SPLIT_THRESHOLD) {
@@ -91,7 +91,7 @@ module AptosFramework::BucketTable {
         let new_bucket_index = map.num_buckets;
         // the next bucket to split is num_bucket without the most significant bit.
         let to_split = new_bucket_index ^ (1 << map.level);
-        let new_bucket = Vector::empty();
+        let new_bucket = vector::empty();
         map.num_buckets = new_bucket_index + 1;
         // if the whole level is splitted once, bump the level.
         if (to_split + 1 == 1 << map.level) {
@@ -100,21 +100,21 @@ module AptosFramework::BucketTable {
         let old_bucket = Table::borrow_mut(&mut map.buckets, to_split);
         // partition the bucket. after the loop, i == j and [0..i) stays in old bucket, [j..len) goes to new bucket
         let i = 0;
-        let j = Vector::length(old_bucket);
+        let j = vector::length(old_bucket);
         let len = j;
         while (i < j) {
-            let entry = Vector::borrow(old_bucket, i);
+            let entry = vector::borrow(old_bucket, i);
             let index = bucket_index(map.level, map.num_buckets, entry.hash);
             if (index == new_bucket_index) {
                 j = j - 1;
-                Vector::swap(old_bucket, i, j);
+                vector::swap(old_bucket, i, j);
             } else {
                 i = i + 1;
             };
         };
         while (j < len) {
-            let entry = Vector::pop_back(old_bucket);
-            Vector::push_back(&mut new_bucket, entry);
+            let entry = vector::pop_back(old_bucket);
+            vector::push_back(&mut new_bucket, entry);
             len = len - 1;
         };
         Table::add(&mut map.buckets, new_bucket_index, new_bucket);
@@ -140,15 +140,15 @@ module AptosFramework::BucketTable {
         let index = bucket_index(map.level, map.num_buckets, sip_hash(&key));
         let bucket = Table::borrow_mut(&mut map.buckets, index);
         let i = 0;
-        let len = Vector::length(bucket);
+        let len = vector::length(bucket);
         while (i < len) {
-            let entry = Vector::borrow(bucket, i);
+            let entry = vector::borrow(bucket, i);
             if (&entry.key == &key) {
                 return &entry.value
             };
             i = i + 1;
         };
-        abort Errors::invalid_argument(ENOT_FOUND)
+        abort errors::invalid_argument(ENOT_FOUND)
     }
 
     /// Acquire a mutable reference to the value which `key` maps to.
@@ -157,15 +157,15 @@ module AptosFramework::BucketTable {
         let index = bucket_index(map.level, map.num_buckets, sip_hash(&key));
         let bucket = Table::borrow_mut(&mut map.buckets, index);
         let i = 0;
-        let len = Vector::length(bucket);
+        let len = vector::length(bucket);
         while (i < len) {
-            let entry = Vector::borrow_mut(bucket, i);
+            let entry = vector::borrow_mut(bucket, i);
             if (&entry.key == &key) {
                 return &mut entry.value
             };
             i = i + 1;
         };
-        abort Errors::invalid_argument(ENOT_FOUND)
+        abort errors::invalid_argument(ENOT_FOUND)
     }
 
     /// Returns true iff `table` contains an entry for `key`.
@@ -173,9 +173,9 @@ module AptosFramework::BucketTable {
         let index = bucket_index(map.level, map.num_buckets, sip_hash(key));
         let bucket = Table::borrow(&map.buckets, index);
         let i = 0;
-        let len = Vector::length(bucket);
+        let len = vector::length(bucket);
         while (i < len) {
-            let entry = Vector::borrow(bucket, i);
+            let entry = vector::borrow(bucket, i);
             if (&entry.key == key) {
                 return true
             };
@@ -190,17 +190,17 @@ module AptosFramework::BucketTable {
         let index = bucket_index(map.level, map.num_buckets, sip_hash(key));
         let bucket = Table::borrow_mut(&mut map.buckets, index);
         let i = 0;
-        let len = Vector::length(bucket);
+        let len = vector::length(bucket);
         while (i < len) {
-            let entry = Vector::borrow(bucket, i);
+            let entry = vector::borrow(bucket, i);
             if (&entry.key == key) {
-                let Entry {hash:_, key:_, value} = Vector::swap_remove(bucket, i);
+                let Entry {hash:_, key:_, value} = vector::swap_remove(bucket, i);
                 map.len = map.len - 1;
                 return value
             };
             i = i + 1;
         };
-        abort Errors::invalid_argument(ENOT_FOUND)
+        abort errors::invalid_argument(ENOT_FOUND)
     }
 
     /// Returns the length of the table, i.e. the number of entries.

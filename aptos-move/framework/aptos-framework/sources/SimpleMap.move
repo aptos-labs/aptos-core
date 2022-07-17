@@ -5,9 +5,9 @@
 /// 4) The data is stored as a sorted by Key
 /// 5) Adds and removals take O(N) time
 module AptosFramework::SimpleMap {
-    use Std::Errors;
-    use Std::Option;
-    use Std::Vector;
+    use std::errors;
+    use std::option;
+    use std::vector;
     use AptosFramework::Comparator;
 
     const EKEY_ALREADY_EXISTS: u64 = 0;
@@ -23,12 +23,12 @@ module AptosFramework::SimpleMap {
     }
 
     public fun length<Key: store, Value: store>(map: &SimpleMap<Key, Value>): u64 {
-        Vector::length(&map.data)
+        vector::length(&map.data)
     }
 
     public fun create<Key: store, Value: store>(): SimpleMap<Key, Value> {
         SimpleMap {
-            data: Vector::empty(),
+            data: vector::empty(),
         }
     }
 
@@ -37,9 +37,9 @@ module AptosFramework::SimpleMap {
         key: &Key,
     ): &Value {
         let (maybe_idx, _) = find(map, key);
-        assert!(Option::is_some(&maybe_idx), Errors::invalid_argument(EKEY_NOT_FOUND));
-        let idx = Option::extract(&mut maybe_idx);
-        &Vector::borrow(&map.data, idx).value
+        assert!(option::is_some(&maybe_idx), errors::invalid_argument(EKEY_NOT_FOUND));
+        let idx = option::extract(&mut maybe_idx);
+        &vector::borrow(&map.data, idx).value
     }
 
     public fun borrow_mut<Key: store, Value: store>(
@@ -47,9 +47,9 @@ module AptosFramework::SimpleMap {
         key: &Key,
     ): &mut Value {
         let (maybe_idx, _) = find(map, key);
-        assert!(Option::is_some(&maybe_idx), Errors::invalid_argument(EKEY_NOT_FOUND));
-        let idx = Option::extract(&mut maybe_idx);
-        &mut Vector::borrow_mut(&mut map.data, idx).value
+        assert!(option::is_some(&maybe_idx), errors::invalid_argument(EKEY_NOT_FOUND));
+        let idx = option::extract(&mut maybe_idx);
+        &mut vector::borrow_mut(&mut map.data, idx).value
     }
 
     public fun contains_key<Key: store, Value: store>(
@@ -57,12 +57,12 @@ module AptosFramework::SimpleMap {
         key: &Key,
     ): bool {
         let (maybe_idx, _) = find(map, key);
-        Option::is_some(&maybe_idx)
+        option::is_some(&maybe_idx)
     }
 
     public fun destroy_empty<Key: store, Value: store>(map: SimpleMap<Key, Value>) {
         let SimpleMap { data } = map;
-        Vector::destroy_empty(data);
+        vector::destroy_empty(data);
     }
 
     public fun add<Key: store, Value: store>(
@@ -71,15 +71,15 @@ module AptosFramework::SimpleMap {
         value: Value,
     ) {
         let (maybe_idx, maybe_placement) = find(map, &key);
-        assert!(Option::is_none(&maybe_idx), Errors::invalid_argument(EKEY_ALREADY_EXISTS));
+        assert!(option::is_none(&maybe_idx), errors::invalid_argument(EKEY_ALREADY_EXISTS));
 
         // Append to the end and then swap elements until the list is ordered again
-        Vector::push_back(&mut map.data, Element { key, value });
+        vector::push_back(&mut map.data, Element { key, value });
 
-        let placement = Option::extract(&mut maybe_placement);
-        let end = Vector::length(&map.data) - 1;
+        let placement = option::extract(&mut maybe_placement);
+        let end = vector::length(&map.data) - 1;
         while (placement < end) {
-          Vector::swap(&mut map.data, placement, end);
+          vector::swap(&mut map.data, placement, end);
           placement = placement + 1;
         };
     }
@@ -89,28 +89,28 @@ module AptosFramework::SimpleMap {
         key: &Key,
     ): (Key, Value) {
         let (maybe_idx, _) = find(map, key);
-        assert!(Option::is_some(&maybe_idx), Errors::invalid_argument(EKEY_NOT_FOUND));
+        assert!(option::is_some(&maybe_idx), errors::invalid_argument(EKEY_NOT_FOUND));
 
-        let placement = Option::extract(&mut maybe_idx);
-        let end = Vector::length(&map.data) - 1;
+        let placement = option::extract(&mut maybe_idx);
+        let end = vector::length(&map.data) - 1;
 
         while (placement < end) {
-            Vector::swap(&mut map.data, placement, placement + 1);
+            vector::swap(&mut map.data, placement, placement + 1);
             placement = placement + 1;
         };
 
-        let Element { key, value } = Vector::pop_back(&mut map.data);
+        let Element { key, value } = vector::pop_back(&mut map.data);
         (key, value)
     }
 
     fun find<Key: store, Value: store>(
         map: &SimpleMap<Key, Value>,
         key: &Key,
-    ): (Option::Option<u64>, Option::Option<u64>) {
-        let length = Vector::length(&map.data);
+    ): (option::Option<u64>, option::Option<u64>) {
+        let length = vector::length(&map.data);
 
         if (length == 0) {
-            return (Option::none(), Option::some(0))
+            return (option::none(), option::some(0))
         };
 
         let left = 0;
@@ -118,7 +118,7 @@ module AptosFramework::SimpleMap {
 
         while (left != right) {
             let mid = (left + right) / 2;
-            let potential_key = &Vector::borrow(&map.data, mid).key;
+            let potential_key = &vector::borrow(&map.data, mid).key;
             if (Comparator::is_smaller_than(&Comparator::compare(potential_key, key))) {
                 left = mid + 1;
             } else {
@@ -126,10 +126,10 @@ module AptosFramework::SimpleMap {
             };
         };
 
-        if (left != length && key == &Vector::borrow(&map.data, left).key) {
-            (Option::some(left), Option::none())
+        if (left != length && key == &vector::borrow(&map.data, left).key) {
+            (option::some(left), option::none())
         } else {
-            (Option::none(), Option::some(left))
+            (option::none(), option::some(left))
         }
     }
 
@@ -179,8 +179,8 @@ module AptosFramework::SimpleMap {
         add(&mut map, 4, 4);
 
         let idx = 0;
-        while (idx < Vector::length(&map.data)) {
-            assert!(idx == Vector::borrow(&map.data, idx).key, idx);
+        while (idx < vector::length(&map.data)) {
+            assert!(idx == vector::borrow(&map.data, idx).key, idx);
             idx = idx + 1;
         };
 

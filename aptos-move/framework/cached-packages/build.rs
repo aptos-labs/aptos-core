@@ -9,6 +9,7 @@ use framework::release::TOKEN_RELEASE_SUFFIX;
 fn main() {
     println!("cargo:rerun-if-changed=../aptos-framework/sources");
     println!("cargo:rerun-if-changed=../move-stdlib/sources");
+    println!("cargo:rerun-if-changed=../move-stdlib/nursery/sources");
     let release = framework::release::ReleaseOptions {
         check_layout_compatibility: false,
         build_docs: false,

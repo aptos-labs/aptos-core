@@ -1,39 +1,39 @@
-// Generic set that leverages Compare::cmp.
+// Generic set that leverages compare::cmp.
 // This is a reasonable smoke test for the Compare module, but don't actually use this without
 // singificantly more testing/thought about the API!
 address 0x2 {
 module Set {
-    use Std::Compare;
-    use Std::BCS;
-    use Std::Vector;
+    use std::compare;
+    use std::bcs;
+    use std::vector;
 
     struct T<Elem> has copy, drop, store { v: vector<Elem> }
 
     public fun empty<Elem>(): T<Elem> {
-        T { v: Vector::empty() }
+        T { v: vector::empty() }
     }
 
     public fun size<Elem>(t: &T<Elem>): u64 {
-       Vector::length(&t.v)
+       vector::length(&t.v)
     }
 
     public fun borrow<Elem>(t: &T<Elem>, index: u64): &Elem {
-        Vector::borrow(&t.v, index)
+        vector::borrow(&t.v, index)
     }
 
     fun find<Elem>(t: &T<Elem>, e: &Elem): (u64, bool) {
-        let e_bcs = BCS::to_bytes(e);
+        let e_bcs = bcs::to_bytes(e);
         let v = &t.v;
         // use binary search to locate `e` (if it exists)
         let left = 0;
-        let len =  Vector::length(v);
+        let len =  vector::length(v);
         if (len == 0) {
             return (0, false)
         };
         let right = len - 1;
         while (left <= right) {
             let mid = (left + right) / 2;
-            let cmp = Compare::cmp_bcs_bytes(&BCS::to_bytes(Vector::borrow(v, mid)), &e_bcs);
+            let cmp = compare::cmp_bcs_bytes(&bcs::to_bytes(vector::borrow(v, mid)), &e_bcs);
             if (cmp == 0u8) {
                 return (mid, true)
             } else if (cmp == 1u8) {
@@ -57,12 +57,12 @@ module Set {
             abort(999)
         };
         let v = &mut t.v;
-        // TODO: Vector::insert(index, e) would be useful here.
-        let i = Vector::length(v);
+        // TODO: vector::insert(index, e) would be useful here.
+        let i = vector::length(v);
         // add e to the end and then move it  to the left until we hit `insert_at`
-        Vector::push_back(v, e);
+        vector::push_back(v, e);
         while (i > insert_at) {
-            Vector::swap(v, i, i - 1);
+            vector::swap(v, i, i - 1);
             i = i - 1;
         }
     }

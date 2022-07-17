@@ -15,7 +15,7 @@ use std::{convert::TryInto, path::PathBuf};
 async fn test_get_account_resource() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
-        .get(&get_account_resource("0xA550C18", "0x1::GUID::Generator"))
+        .get(&get_account_resource("0xA550C18", "0x1::guid::Generator"))
         .await;
     context.check_golden_output(resp);
 }
@@ -29,7 +29,7 @@ async fn test_get_account_resource_by_invalid_address() {
             .expect_status_code(400)
             .get(&get_account_resource(
                 invalid_address,
-                "0x1::GUID::Generator",
+                "0x1::guid::Generator",
             ))
             .await;
         context.check_golden_output(resp);
@@ -51,7 +51,7 @@ async fn test_get_account_resource_address_not_found() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
         .expect_status_code(404)
-        .get(&get_account_resource("0xA550C19", "0x1::GUID::Generator"))
+        .get(&get_account_resource("0xA550C19", "0x1::guid::Generator"))
         .await;
     context.check_golden_output(resp);
 }
@@ -61,7 +61,7 @@ async fn test_get_account_resource_struct_tag_not_found() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
         .expect_status_code(404)
-        .get(&get_account_resource("0xA550C19", "0x1::GUID::GeneratorX"))
+        .get(&get_account_resource("0xA550C19", "0x1::guid::GeneratorX"))
         .await;
     context.check_golden_output(resp);
 }
@@ -69,7 +69,7 @@ async fn test_get_account_resource_struct_tag_not_found() {
 #[tokio::test]
 async fn test_get_account_module() {
     let mut context = new_test_context(current_function_name!());
-    let resp = context.get(&get_account_module("0x1", "GUID")).await;
+    let resp = context.get(&get_account_module("0x1", "guid")).await;
     context.check_golden_output(resp);
 }
 
@@ -78,7 +78,7 @@ async fn test_get_account_module_by_invalid_address() {
     let mut context = new_test_context(current_function_name!());
     let resp = context
         .expect_status_code(400)
-        .get(&get_account_module("1", "GUID"))
+        .get(&get_account_module("1", "guid"))
         .await;
     context.check_golden_output(resp);
 }
@@ -131,8 +131,8 @@ async fn test_get_table_item() {
     assert_table_item(
         ctx,
         &tt["string_table"],
-        "0x1::ASCII::String",
-        "0x1::ASCII::String",
+        "0x1::ascii::String",
+        "0x1::ascii::String",
         "abc",
         "abc",
     )
@@ -149,8 +149,8 @@ async fn test_get_table_item() {
     assert_table_item(
         ctx,
         &tt["vector_string_table"],
-        "vector<0x1::ASCII::String>",
-        "vector<0x1::ASCII::String>",
+        "vector<0x1::ascii::String>",
+        "vector<0x1::ascii::String>",
         ["abc", "abc"],
         ["abc", "abc"],
     )
@@ -159,8 +159,8 @@ async fn test_get_table_item() {
     assert_table_item(
         ctx,
         &tt["id_table"],
-        "0x1::GUID::ID",
-        "0x1::GUID::ID",
+        "0x1::guid::ID",
+        "0x1::guid::ID",
         id,
         id,
     )

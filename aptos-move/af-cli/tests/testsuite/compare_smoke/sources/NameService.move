@@ -6,8 +6,8 @@ address 0x2 {
 module NameService {
     use 0x2::SortedLinkedList::{Self, EntryHandle};
     use AptosFramework::Block;
-    use Std::Signer;
-    use Std::Vector;
+    use std::signer;
+    use std::vector;
 
     //TODO use constants when Move support constants, '5' is used for example
     public fun EXPIRE_AFTER() : u64{5}
@@ -22,21 +22,21 @@ module NameService {
     }
 
     public fun initialize(account: &signer) {
-        let sender = Signer::address_of(account);
+        let sender = signer::address_of(account);
         assert!(sender == NAMESERVICE_ADDR, 8000);
 
-        SortedLinkedList::create_new_list<vector<u8>>(account, Vector::empty());
-        move_to<Expiration>(account, Expiration { expire_on_block_height: Vector::singleton(0u64)});
+        SortedLinkedList::create_new_list<vector<u8>>(account, vector::empty());
+        move_to<Expiration>(account, Expiration { expire_on_block_height: vector::singleton(0u64)});
     }
 
     fun add_expirtation(account: &signer) acquires Expiration {
-        let sender = Signer::address_of(account);
+        let sender = signer::address_of(account);
         let current_block = Block::get_current_block_height();
         if (!exists<Expiration>(sender)) {
-            move_to<Expiration>(account, Expiration {expire_on_block_height: Vector::singleton(current_block + EXPIRE_AFTER())});
+            move_to<Expiration>(account, Expiration {expire_on_block_height: vector::singleton(current_block + EXPIRE_AFTER())});
         } else {
             let expire_vector_mut = &mut borrow_global_mut<Expiration>(sender).expire_on_block_height;
-            Vector::push_back<u64>(expire_vector_mut, current_block + EXPIRE_AFTER());
+            vector::push_back<u64>(expire_vector_mut, current_block + EXPIRE_AFTER());
         };
     }
 
@@ -53,10 +53,10 @@ module NameService {
         let account_address = SortedLinkedList::get_addr(copy entry);
         let index = SortedLinkedList::get_index(entry);
         let expire_vector_mut = &mut borrow_global_mut<Expiration>(account_address).expire_on_block_height;
-        Vector::remove<u64>(expire_vector_mut, index);
-        if (Vector::is_empty<u64>(expire_vector_mut)) {
+        vector::remove<u64>(expire_vector_mut, index);
+        if (vector::is_empty<u64>(expire_vector_mut)) {
             let Expiration { expire_on_block_height } = move_from<Expiration>(account_address);
-            Vector::destroy_empty(expire_on_block_height);
+            vector::destroy_empty(expire_on_block_height);
         }
     }
     public fun remove_entry_by_entry_owner(account: &signer, entry: EntryHandle) acquires Expiration {
@@ -86,7 +86,7 @@ module NameService {
         let addr = SortedLinkedList::get_addr(copy entry);
         let index = SortedLinkedList::get_index(entry);
         let expire_vector = *&borrow_global<Expiration>(addr).expire_on_block_height;
-        *Vector::borrow<u64>(&expire_vector, index)
+        *vector::borrow<u64>(&expire_vector, index)
     }
 
     public fun is_expired(entry: EntryHandle): bool acquires Expiration {

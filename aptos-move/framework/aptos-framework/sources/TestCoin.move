@@ -1,11 +1,11 @@
 /// This module defines a minimal and generic Coin and Balance.
 /// modified from https://github.com/move-language/move/tree/main/language/documentation/tutorial
 module AptosFramework::TestCoin {
-    use Std::ASCII;
-    use Std::Errors;
-    use Std::Signer;
-    use Std::Vector;
-    use Std::Option::{Self, Option};
+    use std::ascii;
+    use std::errors;
+    use std::signer;
+    use std::vector;
+    use std::option::{Self, Option};
 
     use AptosFramework::Coin::{Self, BurnCapability, MintCapability};
     use AptosFramework::SystemAddresses;
@@ -39,8 +39,8 @@ module AptosFramework::TestCoin {
 
         let (mint_cap, burn_cap) = Coin::initialize<TestCoin>(
             core_framework,
-            ASCII::string(b"Test Coin"),
-            ASCII::string(b"TC"),
+            ascii::string(b"Test Coin"),
+            ascii::string(b"TC"),
             6, /* decimals */
             false, /* monitor_supply */
         );
@@ -51,7 +51,7 @@ module AptosFramework::TestCoin {
             18446744073709551615,
             &mint_cap,
         );
-        Coin::deposit<TestCoin>(Signer::address_of(core_resource), coins);
+        Coin::deposit<TestCoin>(signer::address_of(core_resource), coins);
 
         // Save MintCapability so we can give Faucet mint capability when one claims.
         move_to(core_framework, Capabilities { mint_cap: copy mint_cap });
@@ -61,22 +61,22 @@ module AptosFramework::TestCoin {
 
         // Give Core Resources ability to delegate/create mint capability so it can grant the
         // faucet account mint cap.
-        move_to(core_resource, Delegations { inner: Vector::empty() });
+        move_to(core_resource, Delegations { inner: vector::empty() });
 
         (mint_cap, burn_cap)
     }
 
     /// Create new test coins and deposit them into dst_addr's account.
-    public(script) fun mint(
+    public entry fun mint(
         account: &signer,
         dst_addr: address,
         amount: u64,
     ) acquires Capabilities {
-        let account_addr = Signer::address_of(account);
+        let account_addr = signer::address_of(account);
 
         assert!(
             exists<Capabilities>(account_addr),
-            Errors::not_published(ENO_CAPABILITIES),
+            errors::not_published(ENO_CAPABILITIES),
         );
 
         let capabilities = borrow_global<Capabilities>(account_addr);
@@ -85,25 +85,25 @@ module AptosFramework::TestCoin {
     }
 
     /// Create delegated token for the address so the account could claim MintCapability later.
-    public(script) fun delegate_mint_capability(account: signer, to: address) acquires Delegations {
+    public entry fun delegate_mint_capability(account: signer, to: address) acquires Delegations {
         SystemAddresses::assert_core_resource(&account);
         let delegations = &mut borrow_global_mut<Delegations>(@CoreResources).inner;
         let i = 0;
-        while (i < Vector::length(delegations)) {
-            let element = Vector::borrow(delegations, i);
-            assert!(element.to != to, Errors::invalid_argument(EALREADY_DELEGATED));
+        while (i < vector::length(delegations)) {
+            let element = vector::borrow(delegations, i);
+            assert!(element.to != to, errors::invalid_argument(EALREADY_DELEGATED));
             i = i + 1;
         };
-        Vector::push_back(delegations, DelegatedMintCapability { to });
+        vector::push_back(delegations, DelegatedMintCapability { to });
     }
 
     /// Claim the delegated mint capability and destroy the delegated token.
-    public(script) fun claim_mint_capability(account: &signer) acquires Delegations, Capabilities {
-        let maybe_index = find_delegation(Signer::address_of(account));
-        assert!(Option::is_some(&maybe_index), EDELEGATION_NOT_FOUND);
-        let idx = *Option::borrow(&maybe_index);
+    public entry fun claim_mint_capability(account: &signer) acquires Delegations, Capabilities {
+        let maybe_index = find_delegation(signer::address_of(account));
+        assert!(option::is_some(&maybe_index), EDELEGATION_NOT_FOUND);
+        let idx = *option::borrow(&maybe_index);
         let delegations = &mut borrow_global_mut<Delegations>(@CoreResources).inner;
-        let DelegatedMintCapability { to: _} = Vector::swap_remove(delegations, idx);
+        let DelegatedMintCapability { to: _} = vector::swap_remove(delegations, idx);
 
         // Make a copy of mint cap and give it to the specified account.
         let mint_cap = borrow_global<Capabilities>(@AptosFramework).mint_cap;
@@ -113,12 +113,12 @@ module AptosFramework::TestCoin {
     fun find_delegation(addr: address): Option<u64> acquires Delegations {
         let delegations = &borrow_global<Delegations>(@CoreResources).inner;
         let i = 0;
-        let len = Vector::length(delegations);
-        let index = Option::none();
+        let len = vector::length(delegations);
+        let index = option::none();
         while (i < len) {
-            let element = Vector::borrow(delegations, i);
+            let element = vector::borrow(delegations, i);
             if (element.to == addr) {
-                index = Option::some(i);
+                index = option::some(i);
                 break
             };
             i = i + 1;

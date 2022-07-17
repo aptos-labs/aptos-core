@@ -283,14 +283,14 @@ impl MoveValue {
     pub fn is_ascii_string(st: &StructTag) -> bool {
         st.address == CORE_CODE_ADDRESS
             && st.name.to_string() == "String"
-            && st.module.to_string() == "ASCII"
+            && st.module.to_string() == "ascii"
     }
 
     pub fn convert_ascii_string(v: AnnotatedMoveStruct) -> anyhow::Result<MoveValue> {
         if let Some((_, AnnotatedMoveValue::Bytes(bytes))) = v.value.into_iter().next() {
             Ok(MoveValue::String(String::from_utf8(bytes)?))
         } else {
-            bail!("expect ASCII::String, but failed to decode struct value");
+            bail!("expect ascii::String, but failed to decode struct value");
         }
     }
 }
@@ -607,7 +607,7 @@ impl From<CompiledModule> for MoveModule {
                 .function_defs
                 .iter()
                 .filter(|def| match def.visibility {
-                    Visibility::Public | Visibility::Friend | Visibility::Script => true,
+                    Visibility::Public | Visibility::Friend => true,
                     Visibility::Private => false,
                 })
                 .map(|def| m.new_move_function(def))
@@ -780,6 +780,7 @@ pub struct MoveStructField {
 pub struct MoveFunction {
     pub name: Identifier,
     pub visibility: MoveFunctionVisibility,
+    pub is_entry: bool,
     pub generic_type_params: Vec<MoveFunctionGenericTypeParam>,
     pub params: Vec<MoveType>,
     #[serde(rename = "return")]
@@ -790,7 +791,8 @@ impl From<&CompiledScript> for MoveFunction {
     fn from(script: &CompiledScript) -> Self {
         Self {
             name: Identifier::new("main").unwrap(),
-            visibility: MoveFunctionVisibility::Script,
+            visibility: MoveFunctionVisibility::Public,
+            is_entry: true,
             generic_type_params: script
                 .type_parameters
                 .iter()
@@ -812,7 +814,6 @@ impl From<&CompiledScript> for MoveFunction {
 pub enum MoveFunctionVisibility {
     Private,
     Public,
-    Script,
     Friend,
 }
 
@@ -821,7 +822,6 @@ impl From<Visibility> for MoveFunctionVisibility {
         match &v {
             Visibility::Private => Self::Private,
             Visibility::Public => Self::Public,
-            Visibility::Script => Self::Script,
             Visibility::Friend => Self::Friend,
         }
     }
@@ -832,7 +832,6 @@ impl From<MoveFunctionVisibility> for Visibility {
         match &v {
             MoveFunctionVisibility::Private => Self::Private,
             MoveFunctionVisibility::Public => Self::Public,
-            MoveFunctionVisibility::Script => Self::Script,
             MoveFunctionVisibility::Friend => Self::Friend,
         }
     }

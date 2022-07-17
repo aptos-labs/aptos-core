@@ -1,7 +1,7 @@
 /// This module defines structs and methods to initialize VM configurations,
 /// including different costs of running the VM.
 module AptosFramework::VMConfig {
-    use Std::Errors;
+    use std::errors;
     use AptosFramework::Reconfiguration;
     use AptosFramework::SystemAddresses;
     use AptosFramework::Timestamp;
@@ -84,7 +84,7 @@ module AptosFramework::VMConfig {
 
         assert!(
             !exists<VMConfig>(@CoreResources),
-            Errors::already_published(ECONFIG)
+            errors::already_published(ECONFIG)
         );
 
         let gas_constants = GasConstants {
@@ -113,7 +113,7 @@ module AptosFramework::VMConfig {
         );
     }
 
-    public(script) fun set_gas_constants(
+    public entry fun set_gas_constants(
         account: signer,
         global_memory_per_byte_cost: u64,
         global_memory_per_byte_write_cost: u64,
@@ -132,14 +132,14 @@ module AptosFramework::VMConfig {
 
         assert!(
             min_price_per_gas_unit <= max_price_per_gas_unit,
-            Errors::invalid_argument(EGAS_CONSTANT_INCONSISTENCY)
+            errors::invalid_argument(EGAS_CONSTANT_INCONSISTENCY)
         );
         assert!(
             min_transaction_gas_units <= maximum_number_of_gas_units,
-            Errors::invalid_argument(EGAS_CONSTANT_INCONSISTENCY)
+            errors::invalid_argument(EGAS_CONSTANT_INCONSISTENCY)
         );
 
-        assert!(exists<VMConfig>(@CoreResources), Errors::not_published(ECONFIG));
+        assert!(exists<VMConfig>(@CoreResources), errors::not_published(ECONFIG));
 
         let gas_constants = &mut borrow_global_mut<VMConfig>(@CoreResources).gas_schedule.gas_constants;
 

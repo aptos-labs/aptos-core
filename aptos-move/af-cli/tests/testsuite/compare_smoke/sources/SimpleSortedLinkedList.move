@@ -1,8 +1,8 @@
 address 0x2 {
 module SimpleSortedLinkedList {
-    use Std::Compare;
-    use Std::BCS;
-    use Std::Signer;
+    use std::compare;
+    use std::bcs;
+    use std::signer;
 
     struct Node<T> has key {
         prev: address, //account address where the previous node is stored (head if no previous node exists)
@@ -37,7 +37,7 @@ module SimpleSortedLinkedList {
 
     //creates a new list whose head is at txn_sender (is owned by the caller)
     public fun create_new_list<T: copy + drop + store>(account: &signer, key: T) {
-        let sender = Signer::address_of(account);
+        let sender = signer::address_of(account);
 
         //make sure no node/list is already stored in this account
         assert!(!exists<Node<T>>(sender), 3);
@@ -53,7 +53,7 @@ module SimpleSortedLinkedList {
 
     //adds a node that is stored in txn_sender's account and whose location in the list is right after prev_node_address
     public fun add_node<T: copy + drop + store>(account: &signer, key: T, prev_node_address: address) acquires Node {
-        let sender_address = Signer::address_of(account);
+        let sender_address = signer::address_of(account);
 
         //make sure no node is already stored in this account
         assert!(!exists<Node<T>>(sender_address), 4);
@@ -70,9 +70,9 @@ module SimpleSortedLinkedList {
         //see if either prev or next are the head and get their keys
         let prev_key = *&prev_node.key;
         let next_key = *&next_node.key;
-        let key_bcs_bytes = BCS::to_bytes(&key);
-        let cmp_with_prev = Compare::cmp_bcs_bytes(&key_bcs_bytes, &BCS::to_bytes(&prev_key));
-        let cmp_with_next = Compare::cmp_bcs_bytes(&key_bcs_bytes, &BCS::to_bytes(&next_key));
+        let key_bcs_bytes = bcs::to_bytes(&key);
+        let cmp_with_prev = compare::cmp_bcs_bytes(&key_bcs_bytes, &bcs::to_bytes(&prev_key));
+        let cmp_with_next = compare::cmp_bcs_bytes(&key_bcs_bytes, &bcs::to_bytes(&next_key));
 
         let prev_is_head = Self::is_head_node<T>(prev_node_address);
         let next_is_head = Self::is_head_node<T>(next_node_address);
@@ -131,7 +131,7 @@ module SimpleSortedLinkedList {
         //make sure the caller owns the list
         let node = borrow_global<Node<T>>(node_address);
         let list_owner = node.head;
-        assert!(list_owner == Signer::address_of(account), 11);
+        assert!(list_owner == signer::address_of(account), 11);
 
         //remove it
         Self::remove_node<T>(node_address);
@@ -139,7 +139,7 @@ module SimpleSortedLinkedList {
 
     //removes the current non-head node -- fails if the passed node is the head of a list
     public fun remove_node_by_node_owner<T: copy + drop + store>(account: &signer) acquires Node {
-        let sender_address = Signer::address_of(account);
+        let sender_address = signer::address_of(account);
 
         //make sure a node exists
         assert!(exists<Node<T>>(sender_address), 12);
@@ -154,7 +154,7 @@ module SimpleSortedLinkedList {
     //can only called by the list owner (head) -- removes the list if it is empty
     //fails if it is non-empty or if no list is owned by the caller
     public fun remove_list<T: copy + drop + store>(account: &signer) acquires Node {
-        let sender_address = Signer::address_of(account);
+        let sender_address = signer::address_of(account);
 
         //fail if the caller does not own a list
         assert!(Self::is_head_node<T>(sender_address), 14);
@@ -175,14 +175,14 @@ module SimpleSortedLinkedList {
     public fun find<T: copy + drop + store>(key: T, head_address: address): (bool, address) acquires Node {
         assert!(Self::is_head_node<T>(head_address), 18);
 
-        let key_bcs_bytes = BCS::to_bytes(&key);
+        let key_bcs_bytes = bcs::to_bytes(&key);
         let head_node = borrow_global<Node<T>>(head_address);
         let next_node_address = head_node.next;
         while (next_node_address != head_address) {
             let next_node = borrow_global<Node<T>>(next_node_address);
             let next_node_key = *&next_node.key;
-            let next_key_bcs_bytes = BCS::to_bytes(&next_node_key);
-            let cmp = Compare::cmp_bcs_bytes(&next_key_bcs_bytes, &key_bcs_bytes);
+            let next_key_bcs_bytes = bcs::to_bytes(&next_node_key);
+            let cmp = compare::cmp_bcs_bytes(&next_key_bcs_bytes, &key_bcs_bytes);
 
             if (cmp == 0u8) { // next_key == key
                 return (true, next_node_address)
@@ -197,7 +197,7 @@ module SimpleSortedLinkedList {
     }
 
     public fun empty_node<T: copy + drop + store>(account: &signer, key: T) {
-        let sender = Signer::address_of(account);
+        let sender = signer::address_of(account);
 
         //make sure no node/list is already stored in this account
         assert!(!exists<Node<T>>(sender), 19);
@@ -212,7 +212,7 @@ module SimpleSortedLinkedList {
     }
 
     public fun move_node_to<T: copy + drop + store>(account: &signer, receiver: address) acquires Node {
-        let sender_address = Signer::address_of(account);
+        let sender_address = signer::address_of(account);
         //make sure the node exists
         assert!(exists<Node<T>>(sender_address), 20);
         assert!(exists<Node<T>>(receiver), 21);  //empty node

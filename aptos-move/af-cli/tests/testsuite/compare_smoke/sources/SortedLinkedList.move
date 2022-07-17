@@ -1,9 +1,9 @@
 address 0x2 {
 module SortedLinkedList {
-    use Std::Compare;
-    use Std::BCS;
-    use Std::Signer;
-    use Std::Vector;
+    use std::compare;
+    use std::bcs;
+    use std::signer;
+    use std::vector;
 
     struct EntryHandle has copy, drop, store {
         //address where the Node is stored
@@ -40,7 +40,7 @@ module SortedLinkedList {
     public fun node_exists<T: copy + drop + store>(entry: EntryHandle): bool acquires NodeVector {
         if (!exists<NodeVector<T>>(entry.addr)) return false;
         let node_vector = &borrow_global<NodeVector<T>>(entry.addr).nodes;
-        if (entry.index >= Vector::length<Node<T>>(node_vector)) return false;
+        if (entry.index >= vector::length<Node<T>>(node_vector)) return false;
         true
     }
 
@@ -48,7 +48,7 @@ module SortedLinkedList {
         //make sure a node exists in entry
         assert!(node_exists<T>(copy entry), 1);
         let nodes = &borrow_global<NodeVector<T>>(entry.addr).nodes;
-        let node = Vector::borrow<Node<T>>(nodes, entry.index);
+        let node = vector::borrow<Node<T>>(nodes, entry.index);
         *&node.data
     }
 
@@ -56,7 +56,7 @@ module SortedLinkedList {
         //make sure a node exists in entry
         assert!(node_exists<T>(copy entry), 2);
         let nodes = &borrow_global<NodeVector<T>>(entry.addr).nodes;
-        let node = Vector::borrow<Node<T>>(nodes, entry.index);
+        let node = vector::borrow<Node<T>>(nodes, entry.index);
         *&node.prev.addr
     }
 
@@ -66,7 +66,7 @@ module SortedLinkedList {
         assert!(node_exists<T>(*entry), 3);
         let nodes = &borrow_global<NodeVector<T>>(entry.addr).nodes;
         //find the head node
-        let node = Vector::borrow<Node<T>>(nodes, entry.index);
+        let node = vector::borrow<Node<T>>(nodes, entry.index);
 
         //check if this is the head node
         node.head.addr == entry.addr && node.head.index == entry.index
@@ -74,7 +74,7 @@ module SortedLinkedList {
 
     //creates a new list whose head is at txn_sender (is owned by the caller)
     public fun create_new_list<T: copy + drop + store>(account: &signer, data: T) {
-        let sender = Signer::address_of(account);
+        let sender = signer::address_of(account);
 
         //make sure no node/list is already stored in this account
         assert!(!exists<NodeVector<T>>(sender), 3);
@@ -86,31 +86,31 @@ module SortedLinkedList {
             data: data
         };
 
-        let node_vector = Vector::singleton(head);
+        let node_vector = vector::singleton(head);
         move_to<NodeVector<T>>(account, NodeVector<T> { nodes: node_vector });
     }
 
     //adds a node that is stored in txn_sender's account and whose location in the list is right after prev_node_address
     public fun insert_node<T: copy + drop + store>(account: &signer, data: T, prev_entry: EntryHandle) acquires NodeVector {
-        let sender_address = Signer::address_of(account);
+        let sender_address = signer::address_of(account);
 
         //make sure a node exists in prev_entry
         assert!(node_exists<T>(copy prev_entry), 1);
         let prev_nodes = &borrow_global<NodeVector<T>>(prev_entry.addr).nodes;
 
         //get a reference to prev_node and find the address and reference to next_node, head
-        let prev_node = Vector::borrow(prev_nodes, prev_entry.index);
+        let prev_node = vector::borrow(prev_nodes, prev_entry.index);
         let next_entry = *&prev_node.next;
         let next_node_vector = &borrow_global<NodeVector<T>>(next_entry.addr).nodes;
-        let next_node = Vector::borrow(next_node_vector, next_entry.index);
+        let next_node = vector::borrow(next_node_vector, next_entry.index);
         let head_entry = *&next_node.head;
 
         //see if either prev or next are the head and get their datas
         let prev_data = *&prev_node.data;
         let next_data = *&next_node.data;
-        let data_bcs_bytes = BCS::to_bytes(&data);
-        let cmp_with_prev = Compare::cmp_bcs_bytes(&data_bcs_bytes, &BCS::to_bytes(&prev_data));
-        let cmp_with_next = Compare::cmp_bcs_bytes(&data_bcs_bytes, &BCS::to_bytes(&next_data));
+        let data_bcs_bytes = bcs::to_bytes(&data);
+        let cmp_with_prev = compare::cmp_bcs_bytes(&data_bcs_bytes, &bcs::to_bytes(&prev_data));
+        let cmp_with_next = compare::cmp_bcs_bytes(&data_bcs_bytes, &bcs::to_bytes(&next_data));
 
         let prev_is_head = Self::is_head_node<T>(&prev_entry);
         let next_is_head = Self::is_head_node<T>(&next_entry);
@@ -129,21 +129,21 @@ module SortedLinkedList {
 
         let index = 0u64;
         if (!exists<NodeVector<T>>(sender_address)) {
-            move_to<NodeVector<T>>(account, NodeVector<T> { nodes: Vector::singleton(node) });
+            move_to<NodeVector<T>>(account, NodeVector<T> { nodes: vector::singleton(node) });
         } else {
             let node_vector_mut = &mut borrow_global_mut<NodeVector<T>>(sender_address).nodes;
-            Vector::push_back<Node<T>>(node_vector_mut, node);
-            index = Vector::length<Node<T>>(node_vector_mut) - 1;
+            vector::push_back<Node<T>>(node_vector_mut, node);
+            index = vector::length<Node<T>>(node_vector_mut) - 1;
         };
 
         let prev_node_vector_mut = &mut borrow_global_mut<NodeVector<T>>(prev_entry.addr).nodes;
-        let prev_node_mut = Vector::borrow_mut(prev_node_vector_mut, prev_entry.index);
+        let prev_node_mut = vector::borrow_mut(prev_node_vector_mut, prev_entry.index);
         //fix the pointers at prev
         prev_node_mut.next.addr = sender_address;
         prev_node_mut.next.index = index;
 
         let next_node_vector_mut = &mut borrow_global_mut<NodeVector<T>>(next_entry.addr).nodes;
-        let next_node_mut = Vector::borrow_mut(next_node_vector_mut, next_entry.index);
+        let next_node_mut = vector::borrow_mut(next_node_vector_mut, next_entry.index);
         //fix the pointers at next
         next_node_mut.prev.addr = sender_address;
         next_node_mut.prev.index = index;
@@ -156,25 +156,25 @@ module SortedLinkedList {
         let nodes = &borrow_global<NodeVector<T>>(entry.addr).nodes;
 
         //find prev and next
-        let current_node = Vector::borrow(nodes, entry.index);
+        let current_node = vector::borrow(nodes, entry.index);
         let prev_entry = *&current_node.prev;
         let next_entry = *&current_node.next;
 
         let prev_node_vector_mut = &mut borrow_global_mut<NodeVector<T>>(prev_entry.addr).nodes;
-        let prev_node_mut = Vector::borrow_mut(prev_node_vector_mut, prev_entry.index);
+        let prev_node_mut = vector::borrow_mut(prev_node_vector_mut, prev_entry.index);
         //fix the pointers at prev
         prev_node_mut.next.addr = next_entry.addr;
         prev_node_mut.next.index = next_entry.index;
 
         let next_node_vector_mut = &mut borrow_global_mut<NodeVector<T>>(next_entry.addr).nodes;
-        let next_node_mut = Vector::borrow_mut(next_node_vector_mut, next_entry.index);
+        let next_node_mut = vector::borrow_mut(next_node_vector_mut, next_entry.index);
         //fix the pointers at next
         next_node_mut.prev.addr = prev_entry.addr;
         next_node_mut.prev.index = prev_entry.index;
 
         let node_vector_mut = &mut borrow_global_mut<NodeVector<T>>(entry.addr).nodes;
         //destroy the current node
-        let Node<T> { prev: _, next: _, head: _, data: _ } = Vector::remove<Node<T>>(node_vector_mut, entry.index);
+        let Node<T> { prev: _, next: _, head: _, data: _ } = vector::remove<Node<T>>(node_vector_mut, entry.index);
     }
 
     public fun remove_node_by_list_owner<T: copy + drop + store>(account: &signer, entry: EntryHandle) acquires NodeVector {
@@ -185,9 +185,9 @@ module SortedLinkedList {
         //make sure the caller owns the list
 
         let nodes = &borrow_global<NodeVector<T>>(entry.addr).nodes;
-        let current_node = Vector::borrow(nodes, entry.index);
+        let current_node = vector::borrow(nodes, entry.index);
         let list_owner = current_node.head.addr;
-        assert!(list_owner == Signer::address_of(account), 11);
+        assert!(list_owner == signer::address_of(account), 11);
 
         //remove it
         Self::remove_node<T>(entry);
@@ -200,7 +200,7 @@ module SortedLinkedList {
         //make sure it is not a head node
         assert!(!Self::is_head_node<T>(&copy entry), 10);
         //make sure the caller owns the node
-        assert!(entry.addr == Signer::address_of(account), 11);
+        assert!(entry.addr == signer::address_of(account), 11);
 
         //remove it
         Self::remove_node<T>(entry);
@@ -209,13 +209,13 @@ module SortedLinkedList {
     //can only called by the list owner (head) -- removes the list if it is empty
     //fails if it is non-empty or if no list is owned by the caller
     public fun remove_list<T: copy + drop + store>(account: &signer) acquires NodeVector {
-        let sender_address = Signer::address_of(account);
+        let sender_address = signer::address_of(account);
 
         //fail if the caller does not own a list
         assert!(Self::is_head_node<T>(&Self::entry_handle(sender_address, 0)), 14);
 
         let node_vector = &borrow_global<NodeVector<T>>(sender_address).nodes;
-        let current_node = Vector::borrow(node_vector, 0);
+        let current_node = vector::borrow(node_vector, 0);
 
         //check that the list is empty
         assert!(current_node.next.addr == sender_address, 15);
@@ -225,26 +225,26 @@ module SortedLinkedList {
 
         //destroy the Node
         let NodeVector { nodes: nodes } = move_from<NodeVector<T>>(sender_address);
-        let Node<T> { prev: _, next: _, head: _, data: _ } = Vector::remove<Node<T>>(&mut nodes, 0);
-        Vector::destroy_empty(nodes);
+        let Node<T> { prev: _, next: _, head: _, data: _ } = vector::remove<Node<T>>(&mut nodes, 0);
+        vector::destroy_empty(nodes);
     }
 
     public fun find_position_and_insert<T: copy + drop + store>(account: &signer, data: T, head: EntryHandle): bool acquires NodeVector {
         assert!(Self::is_head_node<T>(&copy head), 18);
 
-        let data_bcs_bytes = BCS::to_bytes(&data);
+        let data_bcs_bytes = bcs::to_bytes(&data);
         let nodes = &borrow_global<NodeVector<T>>(head.addr).nodes;
-        let head_node = Vector::borrow<Node<T>>(nodes, head.index);
+        let head_node = vector::borrow<Node<T>>(nodes, head.index);
         let next_entry = *&head_node.next;
         let last_entry = *&head_node.prev;
 
         while (!Self::is_head_node<T>(&next_entry)) {
             let next_nodes = &borrow_global<NodeVector<T>>(next_entry.addr).nodes;
-            let next_node = Vector::borrow<Node<T>>(next_nodes, next_entry.index);
+            let next_node = vector::borrow<Node<T>>(next_nodes, next_entry.index);
 
             let next_node_data = *&next_node.data;
-            let next_data_bcs_bytes = BCS::to_bytes(&next_node_data);
-            let cmp = Compare::cmp_bcs_bytes(&next_data_bcs_bytes, &data_bcs_bytes);
+            let next_data_bcs_bytes = bcs::to_bytes(&next_node_data);
+            let cmp = compare::cmp_bcs_bytes(&next_data_bcs_bytes, &data_bcs_bytes);
 
             if (cmp == 0u8) { // next_data == data
                 return false  // data already exist

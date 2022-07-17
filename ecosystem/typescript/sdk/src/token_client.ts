@@ -210,7 +210,7 @@ export class TokenClient {
     const accountResource: { type: string; data: any } = resources.find((r) => r.type === "0x1::Token::Collections");
     const { handle }: { handle: string } = accountResource.data.collections;
     const getCollectionTableItemRequest: Types.TableItemRequest = {
-      key_type: "0x1::ASCII::String",
+      key_type: "0x1::ascii::String",
       value_type: "0x1::Token::Collection",
       key: collectionName,
     };

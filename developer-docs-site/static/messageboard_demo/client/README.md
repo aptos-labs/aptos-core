@@ -70,14 +70,14 @@ To provide participant the capability resource, the board creator creates the `M
 ```tsx
 public(script) fun add_participant(account: &signer, participant: address) acquires MessageCapEventHandle {
     let board_addr = Signer::address_of(account);
-    Offer::create(account, MessageChangeCapability{ board: board_addr }, participant);
+    offer::create(account, MessageChangeCapability{ board: board_addr }, participant);
 ...
 }
 ```
 
 The participant can then claim this capability and move it to their own account. Later on, the participant can use this resource stored in their account to modify the `pinned_post`.
 ```tsx
-let notice_cap = Offer::redeem<MessageChangeCapability>(
+let notice_cap = offer::redeem<MessageChangeCapability>(
             account, board);
 move_to(account, notice_cap);
 ```

@@ -1,6 +1,6 @@
 module AptosFramework::BigVector {
-    use Std::Errors;
-    use Std::Vector;
+    use std::errors;
+    use std::vector;
     use AptosFramework::Table::{Self, Table};
 
     /// The index into the vector is out of bounds
@@ -50,7 +50,7 @@ module AptosFramework::BigVector {
     /// Destroy the vector `v`.
     /// Aborts if `v` is not empty.
     public fun destroy_empty<T>(v: BigVector<T>) {
-        assert!(is_empty(&v), Errors::invalid_argument(ENOT_EMPTY));
+        assert!(is_empty(&v), errors::invalid_argument(ENOT_EMPTY));
         shrink_to_fit(&mut v);
         let BigVector { buckets, end_index: _, num_buckets: _, bucket_size: _ } = v;
         Table::destroy_empty(buckets);
@@ -60,10 +60,10 @@ module AptosFramework::BigVector {
     /// This operation will cost more gas when it adds new bucket.
     public fun push_back<T>(v: &mut BigVector<T>, val: T) {
         if (v.end_index.bucket_index == v.num_buckets) {
-            Table::add(&mut v.buckets, v.num_buckets, Vector::empty());
+            Table::add(&mut v.buckets, v.num_buckets, vector::empty());
             v.num_buckets = v.num_buckets + 1;
         };
-        Vector::push_back(Table::borrow_mut(&mut v.buckets, v.end_index.bucket_index), val);
+        vector::push_back(Table::borrow_mut(&mut v.buckets, v.end_index.bucket_index), val);
         increment_index(&mut v.end_index, v.bucket_size);
     }
 
@@ -72,8 +72,8 @@ module AptosFramework::BigVector {
     /// It can split the gas responsibility between user of the vector and owner of the vector.
     /// Call `reserve` to explicit add more buckets.
     public fun push_back_no_grow<T>(v: &mut BigVector<T>, val: T) {
-        assert!(v.end_index.bucket_index < v.num_buckets, Errors::invalid_argument(EOUT_OF_CAPACITY));
-        Vector::push_back(Table::borrow_mut(&mut v.buckets, v.end_index.bucket_index), val);
+        assert!(v.end_index.bucket_index < v.num_buckets, errors::invalid_argument(EOUT_OF_CAPACITY));
+        vector::push_back(Table::borrow_mut(&mut v.buckets, v.end_index.bucket_index), val);
         increment_index(&mut v.end_index, v.bucket_size);
     }
 
@@ -81,22 +81,22 @@ module AptosFramework::BigVector {
     /// Call `shrink_to_fit` explicity to deallocate empty buckets.
     /// Aborts if `v` is empty.
     public fun pop_back<T>(v: &mut BigVector<T>): T {
-        assert!(!is_empty(v), Errors::invalid_argument(EINDEX_OUT_OF_BOUNDS));
+        assert!(!is_empty(v), errors::invalid_argument(EINDEX_OUT_OF_BOUNDS));
         decrement_index(&mut v.end_index, v.bucket_size);
-        let val = Vector::pop_back(Table::borrow_mut(&mut v.buckets, v.end_index.bucket_index));
+        let val = vector::pop_back(Table::borrow_mut(&mut v.buckets, v.end_index.bucket_index));
         val
     }
 
     /// Acquire an immutable reference to the `i`th element of the vector `v`.
     /// Aborts if `i` is out of bounds.
     public fun borrow<T>(v: &BigVector<T>, index: &BigVectorIndex): &T {
-        Vector::borrow(Table::borrow(&v.buckets, index.bucket_index), index.vec_index)
+        vector::borrow(Table::borrow(&v.buckets, index.bucket_index), index.vec_index)
     }
 
     /// Return a mutable reference to the `i`th element in the vector `v`.
     /// Aborts if `i` is out of bounds.
     public fun borrow_mut<T>(v: &mut BigVector<T>, index: &BigVectorIndex): &mut T {
-        Vector::borrow_mut(Table::borrow_mut(&mut v.buckets, index.bucket_index), index.vec_index)
+        vector::borrow_mut(Table::borrow_mut(&mut v.buckets, index.bucket_index), index.vec_index)
     }
 
     /// Return the length of the vector.
@@ -121,10 +121,10 @@ module AptosFramework::BigVector {
         // because the lack of mem::swap, here we swap remove the requested value from the bucket
         // and append the last_val to the bucket then swap the last bucket val back
         let bucket = Table::borrow_mut(&mut v.buckets, index.bucket_index);
-        let bucket_len = Vector::length(bucket);
-        let val = Vector::swap_remove(bucket, index.vec_index);
-        Vector::push_back(bucket, last_val);
-        Vector::swap(bucket, index.vec_index, bucket_len - 1);
+        let bucket_len = vector::length(bucket);
+        let val = vector::swap_remove(bucket, index.vec_index);
+        vector::push_back(bucket, last_val);
+        vector::swap(bucket, index.vec_index, bucket_len - 1);
         val
     }
 
@@ -192,7 +192,7 @@ module AptosFramework::BigVector {
     /// Reserver `additional_buckets` more buckets.
     public fun reserve<T>(v: &mut BigVector<T>, additional_buckets: u64) {
         while (additional_buckets > 0) {
-            Table::add(&mut v.buckets, v.num_buckets, Vector::empty());
+            Table::add(&mut v.buckets, v.num_buckets, vector::empty());
             v.num_buckets = v.num_buckets + 1;
             additional_buckets = additional_buckets - 1;
         }
@@ -203,7 +203,7 @@ module AptosFramework::BigVector {
         while (v.num_buckets > buckets_required(&v.end_index)) {
             v.num_buckets = v.num_buckets - 1;
             let v = Table::remove(&mut v.buckets, v.num_buckets);
-            Vector::destroy_empty(v);
+            vector::destroy_empty(v);
         }
     }
 

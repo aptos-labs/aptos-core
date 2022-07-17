@@ -12,18 +12,16 @@ This is the root document for the Move stdlib module documentation. The Move std
 ## Index
 
 
--  [`0x1::ASCII`](ASCII.md#0x1_ASCII)
--  [`0x1::BCS`](BCS.md#0x1_BCS)
--  [`0x1::BitVector`](BitVector.md#0x1_BitVector)
--  [`0x1::Capability`](Capability.md#0x1_Capability)
--  [`0x1::Errors`](Errors.md#0x1_Errors)
--  [`0x1::Event`](Event.md#0x1_Event)
--  [`0x1::FixedPoint32`](FixedPoint32.md#0x1_FixedPoint32)
--  [`0x1::GUID`](GUID.md#0x1_GUID)
--  [`0x1::Hash`](Hash.md#0x1_Hash)
--  [`0x1::Option`](Option.md#0x1_Option)
--  [`0x1::Signer`](Signer.md#0x1_Signer)
--  [`0x1::Vector`](Vector.md#0x1_Vector)
+-  [`0x1::ascii`](ascii.md#0x1_ascii)
+-  [`0x1::bcs`](bcs.md#0x1_bcs)
+-  [`0x1::bit_vector`](bit_vector.md#0x1_bit_vector)
+-  [`0x1::error`](error.md#0x1_error)
+-  [`0x1::fixed_point32`](fixed_point32.md#0x1_fixed_point32)
+-  [`0x1::hash`](hash.md#0x1_hash)
+-  [`0x1::option`](option.md#0x1_option)
+-  [`0x1::signer`](signer.md#0x1_signer)
+-  [`0x1::string`](string.md#0x1_string)
+-  [`0x1::vector`](vector.md#0x1_vector)
 
 
 [//]: # ("File containing references which can be used from documentation")

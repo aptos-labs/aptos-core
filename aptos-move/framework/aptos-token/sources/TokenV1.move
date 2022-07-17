@@ -1,10 +1,10 @@
 /// This module provides the foundation for Tokens.
 module AptosToken::TokenV1 {
-    use Std::ASCII::{String, Self};
-    use Std::Errors;
-    use Std::Event::{Self, EventHandle};
-    use Std::Signer;
-    use Std::Vector;
+    use std::ascii::{String, Self};
+    use std::errors;
+    use std::event::{Self, EventHandle};
+    use std::signer;
+    use std::vector;
 
     use AptosFramework::Table::{Self, Table};
     use AptosToken::PropertyMap::{Self, PropertyMap};
@@ -212,7 +212,7 @@ module AptosToken::TokenV1 {
     //
 
     /// create a empty token collection with parameters
-    public(script) fun create_collection_script(
+    public entry fun create_collection_script(
         creator: &signer,
         name: vector<u8>,
         description: vector<u8>,
@@ -222,16 +222,16 @@ module AptosToken::TokenV1 {
     ) acquires Collections {
         create_collection(
             creator,
-            ASCII::string(name),
-            ASCII::string(description),
-            ASCII::string(uri),
+            ascii::string(name),
+            ascii::string(description),
+            ascii::string(uri),
             maximum,
             mutate_setting
         );
     }
 
     /// create token with raw inputs
-    public(script) fun create_token_script(
+    public entry fun create_token_script(
         creator: &signer,
         collection: vector<u8>,
         name: vector<u8>,
@@ -249,12 +249,12 @@ module AptosToken::TokenV1 {
     ) acquires Collections, TokenStore, TokenAuthorityStore {
         create_token(
             creator,
-            ASCII::string(collection),
-            ASCII::string(name),
-            ASCII::string(description),
+            ascii::string(collection),
+            ascii::string(name),
+            ascii::string(description),
             balance,
             maximum,
-            ASCII::string(uri),
+            ascii::string(uri),
             royalty_payee_address,
             royalty_points_denominator,
             royalty_points_nominator,
@@ -266,7 +266,7 @@ module AptosToken::TokenV1 {
     }
 
     /// Mint more token from an existing token_data. Mint only adds more token to serial_number 0
-    public(script) fun mint(
+    public entry fun mint(
         account: &signer,
         token_data_address: address,
         collection: vector<u8>,
@@ -275,11 +275,11 @@ module AptosToken::TokenV1 {
     ) acquires Collections, TokenStore {
         let token_data_id = create_token_data_id(
             token_data_address,
-            ASCII::string(collection),
-            ASCII::string(name),
+            ascii::string(collection),
+            ascii::string(name),
         );
         // TODO: check based on mint_capability
-        assert!(token_data_id.creator == Signer::address_of(account), ENO_MINT_CAPABILITY);
+        assert!(token_data_id.creator == signer::address_of(account), ENO_MINT_CAPABILITY);
         mint_token(
             account,
             token_data_id,
@@ -291,7 +291,7 @@ module AptosToken::TokenV1 {
     // Transaction Script functions
     //
 
-    public(script) fun direct_transfer_script(
+    public entry fun direct_transfer_script(
         sender: &signer,
         receiver: &signer,
         creators_address: address,
@@ -304,7 +304,7 @@ module AptosToken::TokenV1 {
         direct_transfer(sender, receiver, token_id, amount);
     }
 
-    public(script) fun initialize_token_script(account: &signer) {
+    public entry fun initialize_token_script(account: &signer) {
         initialize_token_store(account);
     }
 
@@ -321,7 +321,7 @@ module AptosToken::TokenV1 {
         types: vector<String>,
     ) acquires Collections, TokenStore {
         // TODO: mutate based on capability
-        assert!(Signer::address_of(account) == token_owner, ENO_MUTATE_CAPABILITY);
+        assert!(signer::address_of(account) == token_owner, ENO_MUTATE_CAPABILITY);
         // validate if the properties is mutable
         assert!(exists<Collections>(token_id.token_data_id.creator), ECOLLECTIONS_NOT_PUBLISHED);
         let all_token_data = &mut borrow_global_mut<Collections>(
@@ -330,7 +330,7 @@ module AptosToken::TokenV1 {
         let token_data = Table::borrow_mut(all_token_data, token_id.token_data_id);
 
         assert!(token_data.mutability_config.properties, EFIELD_NOT_MUTABLE);
-        let addr = Signer::address_of(account);
+        let addr = signer::address_of(account);
         // check if the serial_number is 0 to determine if we need to update the serial_number
         if (token_id.serial_number == 0) {
             let token = withdraw_with_event_internal(addr, token_id, amount);
@@ -378,7 +378,7 @@ module AptosToken::TokenV1 {
 
     /// Deposit the token balance into the owner's account and emit an event.
     public fun deposit_token(account: &signer, token: Token) acquires TokenStore {
-        let account_addr = Signer::address_of(account);
+        let account_addr = signer::address_of(account);
         initialize_token_store(account);
         let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
         if (!Table::contains(tokens, token.id)) {
@@ -392,7 +392,7 @@ module AptosToken::TokenV1 {
     public fun direct_deposit(account_addr: address, token: Token) acquires TokenStore {
         let token_store = borrow_global_mut<TokenStore>(account_addr);
 
-        Event::emit_event<DepositEvent>(
+        event::emit_event<DepositEvent>(
             &mut token_store.deposit_events,
             DepositEvent { id: token.id, amount: token.value },
         );
@@ -404,7 +404,7 @@ module AptosToken::TokenV1 {
     public fun direct_deposit_without_event(account_addr: address, token: Token) acquires TokenStore {
         assert!(
             exists<TokenStore>(account_addr),
-            Errors::not_published(ETOKEN_STORE_NOT_PUBLISHED),
+            errors::not_published(ETOKEN_STORE_NOT_PUBLISHED),
         );
         let token_store = borrow_global_mut<TokenStore>(account_addr);
 
@@ -425,7 +425,7 @@ module AptosToken::TokenV1 {
     ) acquires TokenStore {
         let token = withdraw_token(sender, token_id, amount);
         deposit_token(receiver, token);
-        transfer_token_property(Signer::address_of(sender), Signer::address_of(receiver), token_id);
+        transfer_token_property(signer::address_of(sender), signer::address_of(receiver), token_id);
     }
 
     fun transfer_token_property(from: address, to: address, token_id: TokenId) acquires TokenStore {
@@ -443,36 +443,36 @@ module AptosToken::TokenV1 {
     }
 
     public fun initialize_token(account: &signer, token_id: TokenId) acquires TokenStore {
-        let account_addr = Signer::address_of(account);
+        let account_addr = signer::address_of(account);
         assert!(
             exists<TokenStore>(account_addr),
-            Errors::not_published(ETOKEN_STORE_NOT_PUBLISHED),
+            errors::not_published(ETOKEN_STORE_NOT_PUBLISHED),
         );
         let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
 
         assert!(
             !Table::contains(tokens, token_id),
-            Errors::already_published(EALREADY_HAS_BALANCE),
+            errors::already_published(EALREADY_HAS_BALANCE),
         );
         Table::add(tokens, token_id, Token { value: 0, id: token_id });
     }
 
     public fun initialize_token_store(account: &signer) {
-        if (!exists<TokenStore>(Signer::address_of(account))) {
+        if (!exists<TokenStore>(signer::address_of(account))) {
             move_to(
                 account,
                 TokenStore {
                     tokens: Table::new(),
                     token_properties: Table::new(),
-                    deposit_events: Event::new_event_handle<DepositEvent>(account),
-                    withdraw_events: Event::new_event_handle<WithdrawEvent>(account),
+                    deposit_events: event::new_event_handle<DepositEvent>(account),
+                    withdraw_events: event::new_event_handle<WithdrawEvent>(account),
                 },
             );
         }
     }
 
     public fun merge(dst_token: &mut Token, source_token: Token) {
-        assert!(&dst_token.id == &source_token.id, Errors::invalid_argument(EINVALID_TOKEN_MERGE));
+        assert!(&dst_token.id == &source_token.id, errors::invalid_argument(EINVALID_TOKEN_MERGE));
         dst_token.value = dst_token.value + source_token.value;
         let Token { id: _, value: _ } = source_token;
     }
@@ -499,7 +499,7 @@ module AptosToken::TokenV1 {
     ) acquires TokenStore {
         let token = withdraw_token(from, id, amount);
         direct_deposit(to, token);
-        transfer_token_property(Signer::address_of(from), to, id);
+        transfer_token_property(signer::address_of(from), to, id);
     }
 
     public fun withdraw_token(
@@ -507,7 +507,7 @@ module AptosToken::TokenV1 {
         id: TokenId,
         amount: u64,
     ): Token acquires TokenStore {
-        let account_addr = Signer::address_of(account);
+        let account_addr = signer::address_of(account);
         withdraw_with_event_internal(account_addr, id, amount)
     }
 
@@ -517,18 +517,18 @@ module AptosToken::TokenV1 {
         amount: u64,
     ): Token acquires TokenStore {
         let token_store = borrow_global_mut<TokenStore>(account_addr);
-        Event::emit_event<WithdrawEvent>(
+        event::emit_event<WithdrawEvent>(
             &mut token_store.withdraw_events,
             WithdrawEvent{ id, amount },
         );
         assert!(
             exists<TokenStore>(account_addr),
-            Errors::not_published(ETOKEN_STORE_NOT_PUBLISHED),
+            errors::not_published(ETOKEN_STORE_NOT_PUBLISHED),
         );
         let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
         assert!(
             Table::contains(tokens, id),
-            Errors::not_published(EBALANCE_NOT_PUBLISHED),
+            errors::not_published(EBALANCE_NOT_PUBLISHED),
         );
         let balance = &mut Table::borrow_mut(tokens, id).value;
 
@@ -549,7 +549,7 @@ module AptosToken::TokenV1 {
         maximum: u64,
         mutate_setting: vector<bool>
     ) acquires Collections {
-        let account_addr = Signer::address_of(creator);
+        let account_addr = signer::address_of(creator);
         if (!exists<Collections>(account_addr)) {
             move_to(
                 creator,
@@ -557,9 +557,9 @@ module AptosToken::TokenV1 {
                     collections: Table::new(),
                     token_data: Table::new(),
                     mint_capabilities: Table::new(),
-                    create_collection_events: Event::new_event_handle<CreateCollectionEvent>(creator),
-                    create_token_events: Event::new_event_handle<CreateTokenEvent>(creator),
-                    mint_token_events: Event::new_event_handle<MintTokenEvent>(creator),
+                    create_collection_events: event::new_event_handle<CreateCollectionEvent>(creator),
+                    create_token_events: event::new_event_handle<CreateTokenEvent>(creator),
+                    mint_token_events: event::new_event_handle<MintTokenEvent>(creator),
                 },
             )
         };
@@ -568,7 +568,7 @@ module AptosToken::TokenV1 {
 
         assert!(
             !Table::contains(collections, name),
-            Errors::already_published(ECOLLECTION_ALREADY_EXISTS),
+            errors::already_published(ECOLLECTION_ALREADY_EXISTS),
         );
 
         let mutability_config = create_collection_mutability_config(&mutate_setting);
@@ -583,7 +583,7 @@ module AptosToken::TokenV1 {
 
         Table::add(collections, name, collection);
         let collection_handle = borrow_global_mut<Collections>(account_addr);
-        Event::emit_event<CreateCollectionEvent>(
+        event::emit_event<CreateCollectionEvent>(
             &mut collection_handle.create_collection_events,
             CreateCollectionEvent {
                 creator: account_addr,
@@ -611,10 +611,10 @@ module AptosToken::TokenV1 {
         property_values: vector<vector<u8>>,
         property_types: vector<String>
     ): TokenDataId acquires Collections {
-        let account_addr = Signer::address_of(account);
+        let account_addr = signer::address_of(account);
         assert!(
             exists<Collections>(account_addr),
-            Errors::not_published(ECOLLECTIONS_NOT_PUBLISHED),
+            errors::not_published(ECOLLECTIONS_NOT_PUBLISHED),
         );
         let collections = borrow_global_mut<Collections>(account_addr);
 
@@ -622,11 +622,11 @@ module AptosToken::TokenV1 {
 
         assert!(
             Table::contains(&collections.collections, token_data_id.collection),
-            Errors::already_published(ECOLLECTION_NOT_PUBLISHED),
+            errors::already_published(ECOLLECTION_NOT_PUBLISHED),
         );
         assert!(
             !Table::contains(&collections.token_data, token_data_id),
-            Errors::already_published(ETOKEN_ALREADY_EXISTS),
+            errors::already_published(ETOKEN_ALREADY_EXISTS),
         );
 
         let collection = Table::borrow_mut(&mut collections.collections, token_data_id.collection);
@@ -665,19 +665,19 @@ module AptosToken::TokenV1 {
 
     public fun create_token_mutability_config(mutate_setting: &vector<bool>): TokenMutabilityConfig {
         TokenMutabilityConfig{
-            maximum: *Vector::borrow(mutate_setting, TOKEN_MAX_MUTABLE_IND),
-            uri: *Vector::borrow(mutate_setting, TOKEN_URI_MUTABLE_IND),
-            royalty: *Vector::borrow(mutate_setting, TOKEN_ROYALTY_MUTABLE_IND),
-            description: *Vector::borrow(mutate_setting, TOKEN_DESCRIPTION_MUTABLE_IND),
-            properties: *Vector::borrow(mutate_setting, TOKEN_PROPERTY_MUTABLE_IND),
+            maximum: *vector::borrow(mutate_setting, TOKEN_MAX_MUTABLE_IND),
+            uri: *vector::borrow(mutate_setting, TOKEN_URI_MUTABLE_IND),
+            royalty: *vector::borrow(mutate_setting, TOKEN_ROYALTY_MUTABLE_IND),
+            description: *vector::borrow(mutate_setting, TOKEN_DESCRIPTION_MUTABLE_IND),
+            properties: *vector::borrow(mutate_setting, TOKEN_PROPERTY_MUTABLE_IND),
         }
     }
 
     public fun create_collection_mutability_config(mutate_setting: &vector<bool>): CollectionMutabilityConfig {
         CollectionMutabilityConfig{
-            description: *Vector::borrow(mutate_setting, COLLECTION_DESCRIPTION_MUTABLE_IND),
-            uri: *Vector::borrow(mutate_setting, COLLECTION_URI_MUTABLE_IND),
-            maximum: *Vector::borrow(mutate_setting, COLLECTION_MAX_MUTABLE_IND),
+            description: *vector::borrow(mutate_setting, COLLECTION_DESCRIPTION_MUTABLE_IND),
+            uri: *vector::borrow(mutate_setting, COLLECTION_URI_MUTABLE_IND),
+            maximum: *vector::borrow(mutate_setting, COLLECTION_MAX_MUTABLE_IND),
         }
     }
 
@@ -735,21 +735,21 @@ module AptosToken::TokenV1 {
         values: &vector<vector<u8>>,
         types: &vector<String>
     ): PropertyMap {
-        let res_keys = Vector::empty<String>();
-        let res_vals = Vector::empty<vector<u8>>();
-        let res_types = Vector::empty<String>();
+        let res_keys = vector::empty<String>();
+        let res_vals = vector::empty<vector<u8>>();
+        let res_types = vector::empty<String>();
         let default_properties = &token_data.properties;
         let i = 0;
-        while (i < Vector::length(keys)) {
-            let k = Vector::borrow(keys, i);
-            let v = Vector::borrow(values, i);
-            let t = Vector::borrow(types, i);
+        while (i < vector::length(keys)) {
+            let k = vector::borrow(keys, i);
+            let v = vector::borrow(values, i);
+            let t = vector::borrow(types, i);
             if (PropertyMap::contains_key(default_properties, k) ) {
                 if ( PropertyMap::borrow_type(PropertyMap::borrow(default_properties, k)) == *t &&
                      PropertyMap::borrow_value(PropertyMap::borrow(default_properties, k)) != *v ) {
-                    Vector::push_back(&mut res_keys, *k);
-                    Vector::push_back(&mut res_vals, *v);
-                    Vector::push_back(&mut res_types, *t);
+                    vector::push_back(&mut res_keys, *k);
+                    vector::push_back(&mut res_vals, *v);
+                    vector::push_back(&mut res_types, *t);
                 };
             };
             i = i + 1;
@@ -762,7 +762,7 @@ module AptosToken::TokenV1 {
         token_data_id: TokenDataId,
         amount: u64,
     ): TokenId acquires Collections, TokenStore {
-        assert!(token_data_id.creator == Signer::address_of(account), ENO_MINT_CAPABILITY);
+        assert!(token_data_id.creator == signer::address_of(account), ENO_MINT_CAPABILITY);
         let creator_addr = token_data_id.creator;
         let all_token_data = &mut borrow_global_mut<Collections>(creator_addr).token_data;
         let token_data = Table::borrow_mut(all_token_data, token_data_id);
@@ -804,17 +804,17 @@ module AptosToken::TokenV1 {
         serial_number: u64,
     ): TokenId {
         TokenId{
-            token_data_id: create_token_data_id(creator, ASCII::string(collection), ASCII::string(name)),
+            token_data_id: create_token_data_id(creator, ascii::string(collection), ascii::string(name)),
             serial_number,
         }
     }
 
-    public(script) fun burn_script(
+    public entry fun burn_script(
         account: &signer,
         token_id: TokenId,
         amount: u64,
     ) acquires TokenStore, Collections, TokenAuthorityStore {
-        let addr = Signer::address_of(account);
+        let addr = signer::address_of(account);
         assert!(balance_of(addr, token_id) >= amount, EINSUFFICIENT_BALANCE);
         let token = withdraw_token(account, token_id, amount);
         let burn_cap = acquire_burn_capability(account, token_id);
@@ -826,13 +826,13 @@ module AptosToken::TokenV1 {
         let creator_addr = token.id.token_data_id.creator;
         assert!(
             exists<Collections>(creator_addr),
-            Errors::not_published(ECOLLECTIONS_NOT_PUBLISHED),
+            errors::not_published(ECOLLECTIONS_NOT_PUBLISHED),
         );
 
         let collections = borrow_global_mut<Collections>(creator_addr);
         assert!(
             Table::contains(&collections.token_data, token.id.token_data_id),
-            Errors::not_published(ETOKEN_NOT_PUBLISHED),
+            errors::not_published(ETOKEN_NOT_PUBLISHED),
         );
 
         let token_data = Table::borrow_mut(
@@ -890,7 +890,7 @@ module AptosToken::TokenV1 {
 
     /// initialize capability store for storing all token capabilities
     /// this function should be called by any account that plan to own tokens
-    public(script) fun initialize_token_authority_store_script(creator: &signer) {
+    public entry fun initialize_token_authority_store_script(creator: &signer) {
         initialize_token_authority_store(creator);
     }
 
@@ -898,7 +898,7 @@ module AptosToken::TokenV1 {
         account: &signer,
         token_id: TokenId
     ): BurnCapability acquires TokenAuthorityStore {
-        assert!(exist_burn_authority(Signer::address_of(account), token_id), ENO_BURN_CAPABILITY);
+        assert!(exist_burn_authority(signer::address_of(account), token_id), ENO_BURN_CAPABILITY);
         BurnCapability {
             token_id
         }
@@ -915,7 +915,7 @@ module AptosToken::TokenV1 {
     /// 1. only token creator can create this authority,
     /// 2. token creator can create only 1 burn authority per token
     public fun create_burn_authority(creator: &signer, token_id: TokenId) acquires TokenAuthorityStore{
-        let addr = Signer::address_of(creator);
+        let addr = signer::address_of(creator);
         assert!(token_id.token_data_id.creator == addr, EONLY_CREATOR_CAN_CREATE_BURN_CAP);
         if (!exists<TokenAuthorityStore>(addr)) {
             initialize_token_authority_store(creator);
@@ -933,7 +933,7 @@ module AptosToken::TokenV1 {
         to: address,
         token_id: TokenId,
     ) acquires TokenAuthorityStore, TokenStore {
-        let addr = Signer::address_of(cap_owner);
+        let addr = signer::address_of(cap_owner);
         assert!(exist_burn_authority(addr, token_id), ENOT_OWN_THE_CAPABILITY);
         let token_auths = &mut borrow_global_mut<TokenAuthorityStore>(addr).token_auths;
         let token_cap = Table::borrow_mut(token_auths, token_id);
@@ -995,20 +995,20 @@ module AptosToken::TokenV1 {
     #[expected_failure] // (abort_code = 5)]
     public fun test_collection_maximum(creator: signer) acquires Collections, TokenStore, TokenAuthorityStore {
         let token_id = create_collection_and_token(&creator, 2, 2, 1);
-        let default_keys = vector<String>[ ASCII::string(b"attack"), ASCII::string(b"num_of_use") ];
+        let default_keys = vector<String>[ ascii::string(b"attack"), ascii::string(b"num_of_use") ];
         let default_vals = vector<vector<u8>>[ b"10", b"5" ];
-        let default_types = vector<String>[ ASCII::string(b"integer"), ASCII::string(b"integer") ];
+        let default_types = vector<String>[ ascii::string(b"integer"), ascii::string(b"integer") ];
         let mutate_setting = vector<bool>[ false, false, false, false, false, false ];
 
         create_token(
             &creator,
             token_id.token_data_id.collection,
-            ASCII::string(b"Token"),
-            ASCII::string(b"Hello, Token"),
+            ascii::string(b"Token"),
+            ascii::string(b"Hello, Token"),
             100,
             2,
-            ASCII::string(b"https://aptos.dev"),
-            Signer::address_of(&creator),
+            ascii::string(b"https://aptos.dev"),
+            signer::address_of(&creator),
             100,
             0,
             mutate_setting,
@@ -1019,7 +1019,7 @@ module AptosToken::TokenV1 {
     }
 
     #[test(creator = @0x1, owner = @0x2)]
-    public(script) fun direct_transfer_test(
+    public entry fun direct_transfer_test(
         creator: signer,
         owner: signer,
     ) acquires Collections, TokenStore, TokenAuthorityStore {
@@ -1031,12 +1031,12 @@ module AptosToken::TokenV1 {
 
     #[test_only]
     public fun get_collection_name(): String {
-        ASCII::string(b"Hello, World")
+        ascii::string(b"Hello, World")
     }
 
     #[test_only]
     public fun get_token_name(): String {
-        ASCII::string(b"Token")
+        ascii::string(b"Token")
     }
 
     #[test_only]
@@ -1051,25 +1051,25 @@ module AptosToken::TokenV1 {
         create_collection(
             creator,
             get_collection_name(),
-            ASCII::string(b"Collection: Hello, World"),
-            ASCII::string(b"https://aptos.dev"),
+            ascii::string(b"Collection: Hello, World"),
+            ascii::string(b"https://aptos.dev"),
             collection_max,
             mutate_setting
         );
 
-        let default_keys = vector<String>[ASCII::string(b"attack"), ASCII::string(b"num_of_use")];
+        let default_keys = vector<String>[ascii::string(b"attack"), ascii::string(b"num_of_use")];
         let default_vals = vector<vector<u8>>[b"10", b"5"];
-        let default_types = vector<String>[ASCII::string(b"integer"), ASCII::string(b"integer")];
+        let default_types = vector<String>[ascii::string(b"integer"), ascii::string(b"integer")];
         let mutate_setting = vector<bool>[false, false, false, false, true];
         create_token(
             creator,
             get_collection_name(),
             get_token_name(),
-            ASCII::string(b"Hello, Token"),
+            ascii::string(b"Hello, Token"),
             amount,
             token_max,
-            ASCII::string(b"https://aptos.dev"),
-            Signer::address_of(creator),
+            ascii::string(b"https://aptos.dev"),
+            signer::address_of(creator),
             100,
             0,
             mutate_setting,
@@ -1082,16 +1082,16 @@ module AptosToken::TokenV1 {
     #[test(creator = @0xFF)]
     fun test_create_events_generation(creator: signer) acquires Collections, TokenStore, TokenAuthorityStore {
         create_collection_and_token(&creator, 1, 2, 1);
-        let collections = borrow_global<Collections>(Signer::address_of(&creator));
-        assert!(Event::get_event_handle_counter(&collections.create_collection_events) == 1, 1);
-        // TODO assert!(Event::get_event_handle_counter(&collections.create_token_events) == 1, 1);
+        let collections = borrow_global<Collections>(signer::address_of(&creator));
+        assert!(event::get_event_handle_counter(&collections.create_collection_events) == 1, 1);
+        // TODO assert!(event::get_event_handle_counter(&collections.create_token_events) == 1, 1);
     }
 
     #[test(creator = @0xAF)]
     fun test_create_token_from_tokendata(creator: &signer) acquires Collections, TokenStore, TokenAuthorityStore {
         create_collection_and_token(creator, 2, 4, 4);
         let token_data_id = create_token_data_id(
-            Signer::address_of(creator),
+            signer::address_of(creator),
             get_collection_name(),
             get_token_name());
 
@@ -1101,7 +1101,7 @@ module AptosToken::TokenV1 {
             1,
         );
 
-        assert!(balance_of(Signer::address_of(creator), token_id) == 3, 1);
+        assert!(balance_of(signer::address_of(creator), token_id) == 3, 1);
     }
     #[test(creator = @0xAF, owner = @0xBB)]
     fun test_mutate_token_property(creator: &signer, owner: &signer) acquires Collections, TokenStore, TokenAuthorityStore {
@@ -1109,18 +1109,18 @@ module AptosToken::TokenV1 {
         let token_id = create_collection_and_token(creator, 2, 4, 4);
         assert!(token_id.serial_number == 0, 1);
         let new_keys = vector<String>[
-            ASCII::string(b"attack"), ASCII::string(b"num_of_use")
+            ascii::string(b"attack"), ascii::string(b"num_of_use")
         ];
         let new_vals = vector<vector<u8>>[
             b"1", b"1"
         ];
         let new_types = vector<String>[
-            ASCII::string(b"integer"), ASCII::string(b"integer")
+            ascii::string(b"integer"), ascii::string(b"integer")
         ];
 
         mutate_token_properties(
             creator,
-            Signer::address_of(creator),
+            signer::address_of(creator),
             token_id,
             2,
             new_keys,
@@ -1132,31 +1132,31 @@ module AptosToken::TokenV1 {
         let new_id_2 = create_token_id(token_id.token_data_id, 2);
         let new_id_3 = create_token_id(token_id.token_data_id, 3);
 
-        assert!(balance_of(Signer::address_of(creator), new_id_1) == 1, 1);
-        assert!(balance_of(Signer::address_of(creator), new_id_2) == 1, 1);
-        assert!(balance_of(Signer::address_of(creator), token_id) == 0, 1);
+        assert!(balance_of(signer::address_of(creator), new_id_1) == 1, 1);
+        assert!(balance_of(signer::address_of(creator), new_id_2) == 1, 1);
+        assert!(balance_of(signer::address_of(creator), token_id) == 0, 1);
 
         // mutate token with serial_number > 0 should not generate new serial number
         mutate_token_properties(
             creator,
-            Signer::address_of(creator),
+            signer::address_of(creator),
             new_id_1,
             1,
             new_keys,
             new_vals,
             new_types
         );
-        assert!(balance_of(Signer::address_of(creator), new_id_3) == 0, 1);
+        assert!(balance_of(signer::address_of(creator), new_id_3) == 0, 1);
         // transfer token with serial_numer > 0 also transfer the token properties
         initialize_token_store(owner);
-        transfer(creator, new_id_1, Signer::address_of(owner), 1);
+        transfer(creator, new_id_1, signer::address_of(owner), 1);
 
-        let props = &borrow_global<TokenStore>(Signer::address_of(owner)).token_properties;
+        let props = &borrow_global<TokenStore>(signer::address_of(owner)).token_properties;
         assert!(Table::contains(props, new_id_1), 1);
     }
 
     #[test(creator = @0x1, owner = @0x2)]
-    public(script) fun test_burn_token(
+    public entry fun test_burn_token(
         creator: signer,
         owner: signer
     ) acquires Collections, TokenStore, TokenAuthorityStore {
@@ -1166,7 +1166,7 @@ module AptosToken::TokenV1 {
         burn_script(&creator, token_id, 1);
 
         // creator transfer the remaining 1 token. owner canot burn the token
-        let owner_addr =  Signer::address_of(&owner);
+        let owner_addr =  signer::address_of(&owner);
 
         // init owner to receive token
         initialize_token_store(&owner);

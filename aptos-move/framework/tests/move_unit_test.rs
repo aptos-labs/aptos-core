@@ -4,15 +4,16 @@
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use aptos_vm::move_vm_ext::test_transaction_context_natives;
 use framework::path_in_crate;
+use move_deps::move_cli::base::test::run_move_unit_tests;
 use move_deps::{
-    move_cli::package::cli, move_stdlib, move_table_extension, move_unit_test::UnitTestingConfig,
+    move_stdlib, move_table_extension, move_unit_test::UnitTestingConfig,
     move_vm_runtime::native_functions::NativeFunctionTable,
 };
 use tempfile::tempdir;
 
 fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
-    cli::run_move_unit_tests(
+    run_move_unit_tests(
         &pkg_path,
         move_deps::move_package::BuildConfig {
             test_mode: true,
@@ -22,6 +23,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         UnitTestingConfig::default_with_bound(Some(100_000)),
         aptos_test_natives(),
         /* compute_coverage */ false,
+        &mut std::io::stdout(),
     )
     .unwrap();
 }

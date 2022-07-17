@@ -1,6 +1,6 @@
 /// Maintains the version number for the blockchain.
 module AptosFramework::Version {
-    use Std::Errors;
+    use std::errors;
     use AptosFramework::Reconfiguration;
     use AptosFramework::Timestamp;
     use AptosFramework::SystemAddresses;
@@ -22,7 +22,7 @@ module AptosFramework::Version {
 
         assert!(
             !exists<Version>(@CoreResources),
-            Errors::already_published(ECONFIG)
+            errors::already_published(ECONFIG)
         );
 
         move_to(
@@ -32,14 +32,14 @@ module AptosFramework::Version {
     }
 
     /// Updates the major version to a larger version.
-    public(script) fun set_version(account: signer, major: u64) acquires Version {
+    public entry fun set_version(account: signer, major: u64) acquires Version {
         SystemAddresses::assert_core_resource(&account);
-        assert!(exists<Version>(@CoreResources), Errors::not_published(ECONFIG));
+        assert!(exists<Version>(@CoreResources), errors::not_published(ECONFIG));
         let old_major = *&borrow_global<Version>(@CoreResources).major;
 
         assert!(
             old_major < major,
-            Errors::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER)
+            errors::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER)
         );
 
         let config = borrow_global_mut<Version>(@CoreResources);
