@@ -137,7 +137,6 @@ subsequent incarnation to finish.
 **/
 pub mod errors;
 pub mod executor;
-mod outcome_array;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;
 mod scheduler;
