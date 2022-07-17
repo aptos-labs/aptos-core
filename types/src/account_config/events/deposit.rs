@@ -23,6 +23,6 @@ impl DepositEvent {
 }
 
 impl MoveStructType for DepositEvent {
-    const MODULE_NAME: &'static IdentStr = ident_str!("Coin");
+    const MODULE_NAME: &'static IdentStr = ident_str!("coin");
     const STRUCT_NAME: &'static IdentStr = ident_str!("DepositEvent");
 }

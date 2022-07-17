@@ -14,7 +14,7 @@
       "address": "0xa550c18",
       "state_key_hash": "",
       "data": {
-        "type": "0x1::Account::Account",
+        "type": "0x1::account::Account",
         "data": {
           "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
           "self_address": "0xa550c18",

@@ -42,8 +42,8 @@ use rand::prelude::*;
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
 
-const GENESIS_MODULE_NAME: &str = "Genesis";
-const GOVERNANCE_MODULE_NAME: &str = "AptosGovernance";
+const GENESIS_MODULE_NAME: &str = "genesis";
+const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
@@ -353,7 +353,7 @@ fn publish_stdlib(session: &mut SessionExt<impl MoveResolver>, stdlib: Modules) 
 fn reconfigure(session: &mut SessionExt<impl MoveResolver>) {
     exec_function(
         session,
-        "Reconfiguration",
+        "reconfiguration",
         "emit_genesis_reconfiguration_event",
         vec![],
         vec![],

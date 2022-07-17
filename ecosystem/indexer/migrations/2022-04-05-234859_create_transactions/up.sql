@@ -22,7 +22,7 @@
           {
              "key":"0x0400000000000000000000000000000000000000000000000000000000000000000000000a550c18",
              "sequence_number":"0",
-             "type":"0x1::Reconfiguration::NewEpochEvent",
+             "type":"0x1::reconfiguration::NewEpochEvent",
              "data":{
                 "epoch":"1"
              }
@@ -69,7 +69,7 @@ CREATE TABLE transactions
        "expiration_timestamp_secs":"1649713172",
        "payload":{
           "type":"script_function_payload",
-          "function":"0x1::TestCoin::mint",
+          "function":"0x1::test_coin::mint",
           "type_arguments":[
 
           ],

@@ -148,7 +148,7 @@ language to have 'phantom type parameters' or similar features added, which will
 
 
 <pre><code><b>use</b> <a href="">0x1::Errors</a>;
-<b>use</b> <a href="">0x1::Event</a>;
+<b>use</b> <a href="">0x1::event</a>;
 <b>use</b> <a href="">0x1::Option</a>;
 <b>use</b> <a href="">0x1::Signer</a>;
 <b>use</b> <a href="">0x1::Vector</a>;

@@ -3,17 +3,27 @@
 
 #![allow(unused_imports)]
 
+use aptos_types::utility_coin::TEST_COIN_TYPE;
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{Script, ScriptFunction, TransactionArgument, TransactionPayload, VecBytes},
+};
+use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
+use move_deps::move_core_types::{ident_str, language_storage::ModuleId};
+
+pub use crate::generated_aptos_txn_builder::*;
+
+/* Currently the generated builders are checked in as source.
+
 include!(concat!(
     concat!(env!("OUT_DIR"), "/framework"),
     "/transaction_script_builder.rs"
 ));
-
-use aptos_types::utility_coin::TEST_COIN_TYPE;
-use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
+ */
 
 pub fn encode_test_coin_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(AccountAddress::ONE, ident_str!("Coin").to_owned()),
+        ModuleId::new(AccountAddress::ONE, ident_str!("coin").to_owned()),
         ident_str!("transfer").to_owned(),
         vec![TEST_COIN_TYPE.clone()],
         vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],

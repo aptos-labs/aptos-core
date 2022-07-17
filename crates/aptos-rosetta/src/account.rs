@@ -13,8 +13,8 @@ use crate::{
     },
     error::{ApiError, ApiResult},
     types::{
-        coin_identifier, coin_store_identifier, AccountBalanceRequest, AccountBalanceResponse,
-        Amount, BlockIdentifier, Currency, CurrencyMetadata,
+        coin_identifier_lower, coin_store_identifier, AccountBalanceRequest,
+        AccountBalanceResponse, Amount, BlockIdentifier, Currency, CurrencyMetadata,
     },
     RosettaContext,
 };
@@ -164,7 +164,7 @@ async fn get_balances(
             .iter()
             .filter(|resource| {
                 resource.resource_type.address == AccountAddress::ONE
-                    && resource.resource_type.module == coin_identifier()
+                    && resource.resource_type.module == coin_identifier_lower()
                     && resource.resource_type.name == coin_store_identifier()
             })
             .filter_map(|resource| {
@@ -263,7 +263,7 @@ impl CoinCache {
         // Retrieve the coin type
         const ENCODE_CHARS: &AsciiSet = &CONTROLS.add(b'<').add(b'>');
         let address = struct_tag.address;
-        let resource_tag = format!("0x1::Coin::CoinInfo<{}>", struct_tag);
+        let resource_tag = format!("0x1::coin::CoinInfo<{}>", struct_tag);
         let encoded_resource_tag = utf8_percent_encode(&resource_tag, ENCODE_CHARS).to_string();
 
         let response = if let Some(version) = version {

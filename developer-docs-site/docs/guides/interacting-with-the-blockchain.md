@@ -30,8 +30,8 @@ The payload for instructing the blockchain to perform a transfer is:
 ```
 {
   "type": "script_function_payload",
-  "function": "0x1::Coin::transfer",
-  "type_arguments": ["0x1::TestCoin::TestCoin"],
+  "function": "0x1::coin::transfer",
+  "type_arguments": ["0x1::test_coin::TestCoin"],
   "arguments": [
     "0x737b36c96926043794ed3a0b3eaaceaf",
     "1000",
@@ -39,7 +39,7 @@ The payload for instructing the blockchain to perform a transfer is:
 }
 ```
 
-This instructs the VM to execute the `script` `0x1::Coin::transfer` with a type argument of 0x1::TestCoin::TestCoin. Type is required here as Coin is our standard module that can be used to create many types of Coins. See the [Your first coin tutorial][your-first-coin] for an example of creating a custom Coin. The first argument is the recipient address, `0x737b36c96926043794ed3a0b3eaaceaf`, and the second is the amount to transfer, `1000`. The sender address is the account
+This instructs the VM to execute the `script` `0x1::coin::transfer` with a type argument of 0x1::test_coin::TestCoin. Type is required here as Coin is our standard module that can be used to create many types of Coins. See the [Your first coin tutorial][your-first-coin] for an example of creating a custom Coin. The first argument is the recipient address, `0x737b36c96926043794ed3a0b3eaaceaf`, and the second is the amount to transfer, `1000`. The sender address is the account
 address that sent the transaction querying this `script`.
 
 ## Creating a new account

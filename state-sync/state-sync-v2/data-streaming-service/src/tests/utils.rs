@@ -55,7 +55,7 @@ pub const MAX_REAL_TRANSACTION_OUTPUT: u64 = MAX_REAL_TRANSACTION;
 pub const MAX_RESPONSE_ID: u64 = 100000;
 
 /// Test timeout constant
-pub const MAX_NOTIFICATION_TIMEOUT_SECS: u64 = 10;
+pub const MAX_NOTIFICATION_TIMEOUT_SECS: u64 = 20;
 
 /// A simple mock of the Aptos Data Client
 #[derive(Clone, Debug)]

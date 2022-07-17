@@ -118,7 +118,7 @@ async fn test_get_account_resources_by_ledger_version() {
         ))
         .await;
     let root_account = find_value(&ledger_version_1_resources, |f| {
-        f["type"] == "0x1::Account::Account"
+        f["type"] == "0x1::account::Account"
     });
     assert_eq!(root_account["data"]["sequence_number"], "1");
 
@@ -129,7 +129,7 @@ async fn test_get_account_resources_by_ledger_version() {
         ))
         .await;
     let root_account = find_value(&ledger_version_0_resources, |f| {
-        f["type"] == "0x1::Account::Account"
+        f["type"] == "0x1::account::Account"
     });
     assert_eq!(root_account["data"]["sequence_number"], "0");
 }
