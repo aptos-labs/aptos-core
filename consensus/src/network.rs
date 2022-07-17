@@ -18,10 +18,12 @@ use channel::{self, aptos_channel, message_queues::QueueStyle};
 use consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
     common::Author,
-    experimental::commit_decision::CommitDecision,
+    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
 };
+use fail::fail_point;
 use futures::{channel::oneshot, stream::select, SinkExt, Stream, StreamExt};
 use network::{
     protocols::{
@@ -90,6 +92,10 @@ impl NetworkSender {
         from: Author,
         timeout: Duration,
     ) -> anyhow::Result<BlockRetrievalResponse> {
+        fail_point!("consensus::send_block_retrieval", |_| {
+            Err(anyhow::anyhow!("Injected error in request_block"))
+        });
+
         ensure!(from != self.author, "Retrieve block from self");
         let msg = ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
         let response_msg = monitor!(
@@ -120,7 +126,7 @@ impl NetworkSender {
     /// internal(to provide back pressure), it does not indicate the message is delivered or sent
     /// out. It does not give indication about when the message is delivered to the recipients,
     /// as well as there is no indication about the network failures.
-    pub async fn broadcast(&mut self, msg: ConsensusMsg) {
+    async fn broadcast(&mut self, msg: ConsensusMsg) {
         // Directly send the message to ourself without going through network.
         let self_msg = Event::Message(self.author, msg.clone());
         if let Err(err) = self.self_sender.send(self_msg).await {
@@ -142,7 +148,7 @@ impl NetworkSender {
     }
 
     /// Tries to send msg to given recipients.
-    pub async fn send(&self, msg: ConsensusMsg, recipients: Vec<Author>) {
+    async fn send(&self, msg: ConsensusMsg, recipients: Vec<Author>) {
         let network_sender = self.network_sender.clone();
         let mut self_sender = self.self_sender.clone();
         for peer in recipients {
@@ -162,6 +168,36 @@ impl NetworkSender {
         }
     }
 
+    pub async fn broadcast_proposal(&mut self, proposal_msg: ProposalMsg) {
+        fail_point!("consensus::send_proposal", |_| ());
+        let msg = ConsensusMsg::ProposalMsg(Box::new(proposal_msg));
+        self.broadcast(msg).await
+    }
+
+    pub async fn broadcast_sync_info(&mut self, sync_info_msg: SyncInfo) {
+        fail_point!("consensus::send_sync_info", |_| ());
+        let msg = ConsensusMsg::SyncInfo(Box::new(sync_info_msg));
+        self.broadcast(msg).await
+    }
+
+    pub async fn broadcast_timeout_vote(&mut self, timeout_vote_msg: VoteMsg) {
+        fail_point!("consensus::send_vote", |_| ());
+        let msg = ConsensusMsg::VoteMsg(Box::new(timeout_vote_msg));
+        self.broadcast(msg).await
+    }
+
+    pub async fn broadcast_epoch_change(&mut self, epoch_chnage_proof: EpochChangeProof) {
+        fail_point!("consensus::send_epoch_change", |_| ());
+        let msg = ConsensusMsg::EpochChangeProof(Box::new(epoch_chnage_proof));
+        self.broadcast(msg).await
+    }
+
+    pub async fn broadcast_commit_vote(&mut self, commit_vote: CommitVote) {
+        fail_point!("consensus::send_commit_vote", |_| ());
+        let msg = ConsensusMsg::CommitVoteMsg(Box::new(commit_vote));
+        self.broadcast(msg).await
+    }
+
     /// Sends the vote to the chosen recipients (typically that would be the recipients that
     /// we believe could serve as proposers in the next round). The recipients on the receiving
     /// end are going to be notified about a new vote in the vote queue.
@@ -171,6 +207,7 @@ impl NetworkSender {
     /// out. It does not give indication about when the message is delivered to the recipients,
     /// as well as there is no indication about the network failures.
     pub async fn send_vote(&self, vote_msg: VoteMsg, recipients: Vec<Author>) {
+        fail_point!("consensus::send_vote", |_| ());
         let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
         self.send(msg, recipients).await
     }
@@ -179,17 +216,27 @@ impl NetworkSender {
     /// The future is fulfilled as soon as the message is added to the internal network channel
     /// (does not indicate whether the message is delivered or sent out).
     pub async fn send_sync_info(&self, sync_info: SyncInfo, recipient: Author) {
+        fail_point!("consensus::send_sync_info", |_| ());
         let msg = ConsensusMsg::SyncInfo(Box::new(sync_info));
         self.send(msg, vec![recipient]).await
     }
 
+    pub async fn send_proposal(&self, proposal_msg: ProposalMsg, recipients: Vec<Author>) {
+        fail_point!("consensus::send_proposal", |_| ());
+        let msg = ConsensusMsg::ProposalMsg(Box::new(proposal_msg));
+        self.send(msg, recipients).await
+    }
+
     pub async fn notify_epoch_change(&mut self, proof: EpochChangeProof) {
+        fail_point!("consensus::send_epoch_change", |_| ());
         let msg = ConsensusMsg::EpochChangeProof(Box::new(proof));
         self.send(msg, vec![self.author]).await
     }
 
     /// Sends the ledger info to self buffer manager
     pub async fn notify_commit_proof(&self, ledger_info: LedgerInfoWithSignatures) {
+        fail_point!("consensus::send_commit_proof", |_| ());
+
         // this requires re-verification of the ledger info we can probably optimize it later
         let msg = ConsensusMsg::CommitDecisionMsg(Box::new(CommitDecision::new(ledger_info)));
         self.send(msg, vec![self.author]).await
