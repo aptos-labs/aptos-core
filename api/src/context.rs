@@ -180,7 +180,7 @@ impl Context {
         let height_id = ident_str!("height");
         let block_metadata_type = move_deps::move_core_types::language_storage::StructTag {
             address: CORE_CODE_ADDRESS,
-            module: ident_str!("Block").into(),
+            module: ident_str!("block").into(),
             name: ident_str!("BlockMetadata").into(),
             type_params: vec![],
         };

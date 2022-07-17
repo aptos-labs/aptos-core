@@ -13,7 +13,7 @@ use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 
 impl MoveStructType for ValidatorConfig {
-    const MODULE_NAME: &'static IdentStr = ident_str!("Stake");
+    const MODULE_NAME: &'static IdentStr = ident_str!("stake");
     const STRUCT_NAME: &'static IdentStr = ident_str!("ValidatorConfig");
 }
 
@@ -25,7 +25,7 @@ pub struct ValidatorOperatorConfigResource {
 }
 
 impl MoveStructType for ValidatorOperatorConfigResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("ValidatorOperatorConfig");
+    const MODULE_NAME: &'static IdentStr = ident_str!("validator_operator_config");
     const STRUCT_NAME: &'static IdentStr = ident_str!("ValidatorOperatorConfig");
 }
 

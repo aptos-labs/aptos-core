@@ -50,7 +50,7 @@ impl Client {
     }
 
     pub async fn get_aptos_version(&self) -> Result<Response<AptosVersion>> {
-        self.get_resource::<AptosVersion>(CORE_CODE_ADDRESS, "0x1::Version::Version")
+        self.get_resource::<AptosVersion>(CORE_CODE_ADDRESS, "0x1::version::Version")
             .await
     }
 
@@ -61,7 +61,7 @@ impl Client {
 
     pub async fn get_account_balance(&self, address: AccountAddress) -> Result<Response<Balance>> {
         let resp = self
-            .get_account_resource(address, "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>")
+            .get_account_resource(address, "0x1::coin::CoinStore<0x1::test_coin::TestCoin>")
             .await?;
         resp.and_then(|resource| {
             if let Some(res) = resource {

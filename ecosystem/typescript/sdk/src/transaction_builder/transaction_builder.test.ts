@@ -86,7 +86,7 @@ test("serialize script function payload with no type args", () => {
 });
 
 test("serialize script function payload with type args", () => {
-  const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::TestCoin::TestCoin`));
+  const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::test_coin::TestCoin`));
 
   const scriptFunctionPayload = new TransactionPayloadScriptFunction(
     ScriptFunction.natural(
@@ -115,7 +115,7 @@ test("serialize script function payload with type args", () => {
 });
 
 test("serialize script function payload with type args but no function args", () => {
-  const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::TestCoin::TestCoin`));
+  const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::test_coin::TestCoin`));
 
   const scriptFunctionPayload = new TransactionPayloadScriptFunction(
     ScriptFunction.natural(`${ADDRESS_1}::Coin`, "fake_func", [token], []),
@@ -161,7 +161,7 @@ test("serialize script payload with no type args and no function args", () => {
 });
 
 test("serialize script payload with type args but no function args", () => {
-  const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::TestCoin::TestCoin`));
+  const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::test_coin::TestCoin`));
 
   const script = hexToBytes("a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102");
 
@@ -185,7 +185,7 @@ test("serialize script payload with type args but no function args", () => {
 });
 
 test("serialize script payload with type arg and function arg", () => {
-  const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::TestCoin::TestCoin`));
+  const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::test_coin::TestCoin`));
 
   const argU8 = new TransactionArgumentU8(2);
 
@@ -210,7 +210,7 @@ test("serialize script payload with type arg and function arg", () => {
 });
 
 test("serialize script payload with one type arg and two function args", () => {
-  const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::TestCoin::TestCoin`));
+  const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::test_coin::TestCoin`));
 
   const argU8Vec = new TransactionArgumentU8Vector(bcsSerializeUint64(1));
   const argAddress = new TransactionArgumentAddress(AccountAddress.fromHex("0x01"));

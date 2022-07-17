@@ -1,8 +1,8 @@
 module 0xA550C18::HelloWorld {
     use std::ascii::{Self, String};
     use std::signer;
-    use AptosFramework::Coin;
-    use AptosFramework::TestCoin::TestCoin;
+    use aptos_framework::coin;
+    use aptos_framework::test_coin::TestCoin;
 
     struct ModuleData has key, store {
         global_counter: u64,
@@ -17,7 +17,7 @@ module 0xA550C18::HelloWorld {
     }
 
     public fun foo(addr: address): u64 {
-        Coin::balance<TestCoin>(addr)
+        coin::balance<TestCoin>(addr)
     }
 
     public entry fun hi(sender: &signer, msg: String) acquires ModuleData {

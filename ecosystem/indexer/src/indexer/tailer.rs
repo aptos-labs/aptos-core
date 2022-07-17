@@ -301,7 +301,7 @@ mod test {
                      "address":"0x1",
                      "state_key_hash":"3502b05382fba777545b45a0a9d40e86cdde7c3afbde19c748ce8b5f142c2b46",
                      "data":{
-                        "type":"0x1::Account::Account",
+                        "type":"0x1::account::Account",
                         "data":{
                            "authentication_key":"0x1e4dcad3d5d94307f30d51ff66d2ce784e0c2822d3138766907179bcb61f9edc",
                            "self_address":"0x1",
@@ -382,7 +382,7 @@ mod test {
                            "address":"0x1",
                            "state_key_hash":"3502b05382fba777545b45a0a9d40e86cdde7c3afbde19c748ce8b5f142c2b46",
                            "data":{
-                              "type":"0x1::Account::Account",
+                              "type":"0x1::account::Account",
                               "data":{
                                  "authentication_key":"0x1e4dcad3d5d94307f30d51ff66d2ce784e0c2822d3138766907179bcb61f9edc",
                                  "self_address":"0x1",
@@ -457,7 +457,7 @@ mod test {
                         {
                            "key":"0x0400000000000000000000000000000000000000000000000000000000000000000000000a550c18",
                            "sequence_number":"0",
-                           "type":"0x1::Reconfiguration::NewEpochEvent",
+                           "type":"0x1::reconfiguration::NewEpochEvent",
                            "data":{
                               "epoch":"1"
                            }
@@ -469,7 +469,7 @@ mod test {
                   {
                      "key":"0x0400000000000000000000000000000000000000000000000000000000000000000000000a550c18",
                      "sequence_number":"0",
-                     "type":"0x1::Reconfiguration::NewEpochEvent",
+                     "type":"0x1::reconfiguration::NewEpochEvent",
                      "data":{
                         "epoch":"1"
                      }
@@ -512,7 +512,7 @@ mod test {
                  {
                     "key": "0x0600000000000000000000000000000000000000000000000000000000000000000000000a550c18",
                     "sequence_number": "0",
-                    "type": "0x1::Block::NewBlockEvent",
+                    "type": "0x1::block::NewBlockEvent",
                     "data": {
                       "epoch": "1",
                       "failed_proposer_indices": [],
@@ -529,7 +529,7 @@ mod test {
                   "address": "0xa550c18",
                   "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
                   "data": {
-                    "type": "0x1::Block::BlockMetadata",
+                    "type": "0x1::block::BlockMetadata",
                     "data": {
                       "height": "1",
                       "new_block_events": {
@@ -604,7 +604,7 @@ mod test {
               "expiration_timestamp_secs": "1649713172",
               "payload": {
                 "type": "script_function_payload",
-                "function": "0x1::TestCoin::mint",
+                "function": "0x1::test_coin::mint",
                 "type_arguments": [],
                 "arguments": [
                   "0x45b44793724a5ecc6ad85fa60949d0824cfc7f61d6bd74490b13598379313142",
@@ -641,7 +641,7 @@ mod test {
                   "address": "0xa550c18",
                   "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
                   "data": {
-                    "type": "0x1::Block::BlockMetadata",
+                    "type": "0x1::block::BlockMetadata",
                     "data": {
                       "height": "1",
                       "new_block_events": {

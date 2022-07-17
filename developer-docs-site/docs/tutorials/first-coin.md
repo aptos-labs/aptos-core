@@ -66,7 +66,7 @@ cargo install --git https://github.com/aptos-labs/aptos-core.git aptos
 
 In this terminal, change directories to `aptos-move/move-examples/moon_coin`. Keep this terminal window for the rest of this tutorial- we will refer to it later as the "Move Window". The rest of this section will review the file `sources/MoonCoinType.move`.
 
-This module enables users to create a new MoonCoinType::MoonCoin::MoonCoin that can be used to register with the framework Coin module (0x1::Coin) to create a standard Coin. Developers can write their own functionalities in the MoonCoin module if they want to do more than what's provided by the standard 0x1::Coin or 0x1::ManagedCoin (adds mint/burn functionalities).  
+This module enables users to create a new MoonCoinType::MoonCoin::MoonCoin that can be used to register with the framework Coin module (0x1::coin) to create a standard Coin. Developers can write their own functionalities in the MoonCoin module if they want to do more than what's provided by the standard 0x1::coin or 0x1::ManagedCoin (adds mint/burn functionalities).  
 
 ```rust
 module MoonCoinType::MoonCoin {
@@ -74,7 +74,7 @@ module MoonCoinType::MoonCoin {
 }
 ```
 
-The code is very simple as we are not adding more functionalities to MoonCoin beyond the standard ones provided by the framework Coin (transfer, deposit, withdraw, mint, burn). The most important part is struct MoonCoin, which defines a new type of coin that can be registered with 0x1::Coin.
+The code is very simple as we are not adding more functionalities to MoonCoin beyond the standard ones provided by the framework Coin (transfer, deposit, withdraw, mint, burn). The most important part is struct MoonCoin, which defines a new type of coin that can be registered with 0x1::coin.
 
 ### Step 1.3) Deploying the Move module containing MoonCoin type
 
@@ -160,7 +160,7 @@ The MoonCoin module has alreayd been deployed. The next step is to initialize Mo
 
 In other networks, since tokens/coins are just balance numbers in a contract, anyone can "send" anyone else a random coin, even if the recipient doesn't want it. In Aptos, a user needs to explicitly register to receive a ```Coin<RandomCoin>``` before it can be sent to them.
 
-To register, the recipient just needs to call ```0x1::Coin::register<CoinType>```:
+To register, the recipient just needs to call ```0x1::coin::register<CoinType>```:
 
 <Tabs>
   <TabItem value="python" label="Python" default>

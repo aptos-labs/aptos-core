@@ -36,7 +36,7 @@ class FirstCoinClient extends RestClient {
     let payload: { function: string; arguments: string[]; type: string; type_arguments: any[] };
     payload = {
       type: "script_function_payload",
-      function: `0x1::Coin::register`,
+      function: `0x1::coin::register`,
       type_arguments: [`0x${coinTypeAddress}::MoonCoin::MoonCoin`],
       arguments: [],
     };
@@ -68,7 +68,7 @@ class FirstCoinClient extends RestClient {
   async getBalance(accountAddress: string, coinTypeAddress: string): Promise<string> {
     const resource = await this.accountResource(
       accountAddress,
-      `0x1::Coin::CoinStore<0x${coinTypeAddress}::MoonCoin::MoonCoin>`,
+      `0x1::coin::CoinStore<0x${coinTypeAddress}::MoonCoin::MoonCoin>`,
     );
     if (resource == null) {
       return null;

@@ -20,7 +20,7 @@ create_account(1){
           "symbol": "TC",
           "decimals": 6,
           "metadata": {
-            "move_type": "0x1::TestCoin::TestCoin"
+            "move_type": "0x1::test_coin::TestCoin"
           }
         };
         print_message({"Find faucet with at least balance to create accounts": "10000000"});
@@ -54,7 +54,7 @@ request_funds(1){
       "symbol": "TC",
       "decimals": 6,
       "metadata": {
-        "move_type": "0x1::TestCoin::TestCoin"
+        "move_type": "0x1::test_coin::TestCoin"
       }
     };
     print_message({"Find faucet with at least balance": "0"});
@@ -86,7 +86,7 @@ transfer(50){
           "symbol": "TC",
           "decimals": 6,
           "metadata": {
-            "move_type": "0x1::TestCoin::TestCoin"
+            "move_type": "0x1::test_coin::TestCoin"
           }
         };
 

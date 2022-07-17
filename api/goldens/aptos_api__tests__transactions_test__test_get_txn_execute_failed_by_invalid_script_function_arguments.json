@@ -6,7 +6,7 @@
   "event_root_hash": "",
   "gas_used": "1",
   "success": false,
-  "vm_status": "Transaction Executed and Committed with Error FAILED_TO_DESERIALIZE_ARGUMENT",
+  "vm_status": "Transaction Executed and Committed with Error LINKER_ERROR",
   "accumulator_root_hash": "",
   "changes": [
     {
@@ -14,7 +14,7 @@
       "address": "0xa550c18",
       "state_key_hash": "",
       "data": {
-        "type": "0x1::Account::Account",
+        "type": "0x1::account::Account",
         "data": {
           "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
           "self_address": "0xa550c18",
@@ -32,7 +32,7 @@
     "type": "script_function_payload",
     "function": "0x1::Coin::transfer",
     "type_arguments": [
-      "0x1::TestCoin::TestCoin"
+      "0x1::test_coin::TestCoin"
     ],
     "arguments": [
       "0x00000000000000000000000000000000000000000000000000000000000000dd",
@@ -42,7 +42,7 @@
   "signature": {
     "type": "ed25519_signature",
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0xc092753608ea42033b0dd1338a92190d1bb515e018c047434de6485644e96515ece0ab071859561dfb6d2293ade5861f04ab4f27ecd3df568074663d49f91603"
+    "signature": "0x985e045588c3f18946f9128a7ba61e86299162d12cd1502a770ce4bf050dcefdebd63495400b1b740f0c16b03fb4e8a3b3d790d5f1c2c6b2db5370be336e8202"
   },
   "events": [],
   "timestamp": "1"
