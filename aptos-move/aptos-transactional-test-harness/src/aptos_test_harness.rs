@@ -1,9 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-// We're currently evaluating the future of this crate
-#![allow(dead_code)]
-
 use anyhow::{bail, format_err, Result};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -158,14 +155,6 @@ enum RawPrivateKey {
     Anonymous(Ed25519PrivateKey),
 }
 
-/// A fully qualified type name, where the address could be either a literal or an unresolved name.
-#[derive(Debug)]
-struct TypeName {
-    address: ParsedAddress,
-    module_name: Identifier,
-    type_name: Identifier,
-}
-
 /// Command to initiate a block metadata transaction.
 #[derive(StructOpt, Debug)]
 struct BlockCommand {
@@ -189,35 +178,6 @@ enum AptosSubCommand {
  *
  *
  ************************************************************************************************/
-
-impl TypeName {
-    fn parse(s: &str) -> Result<Self> {
-        let parts = s.split("::").collect::<Vec<_>>();
-
-        if parts.len() != 3 {
-            bail!(
-                "Invalid type name {}. Must be of form <addr>::<module_name>::<type_name>",
-                s
-            )
-        }
-
-        let address = ParsedAddress::parse(parts[0])?;
-        let module_name = Identifier::new(parts[1])
-            .map_err(|_| format_err!("Invalid module name {}. Expected identifier.", parts[1]))?;
-        let type_name = Identifier::new(parts[1])
-            .map_err(|_| format_err!("Invalid type name {}. Expected identifier.", parts[2]))?;
-
-        Ok(Self {
-            address,
-            module_name,
-            type_name,
-        })
-    }
-}
-
-fn parse_identifier(s: &str) -> Result<Identifier> {
-    Identifier::new(s).map_err(|_| format_err!("Failed to parse identifier"))
-}
 
 fn parse_ed25519_private_key(s: &str) -> Result<Ed25519PrivateKey> {
     Ok(Ed25519PrivateKey::from_encoded_string(s)?)
