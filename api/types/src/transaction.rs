@@ -10,7 +10,6 @@ use anyhow::bail;
 use aptos_crypto::{
     ed25519::{self, Ed25519PublicKey},
     multi_ed25519::{self, MultiEd25519PublicKey},
-    validatable::Validatable,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -673,15 +672,6 @@ impl TryFrom<MultiAgentSignature> for TransactionAuthenticator {
                 .map(|s| s.try_into())
                 .collect::<anyhow::Result<_>>()?,
         ))
-    }
-}
-
-impl From<(&Validatable<Ed25519PublicKey>, &ed25519::Ed25519Signature)> for Ed25519Signature {
-    fn from((pk, sig): (&Validatable<Ed25519PublicKey>, &ed25519::Ed25519Signature)) -> Self {
-        Self {
-            public_key: pk.unvalidated().to_bytes().to_vec().into(),
-            signature: sig.to_bytes().to_vec().into(),
-        }
     }
 }
 
