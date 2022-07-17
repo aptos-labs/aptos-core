@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::account::{Account, AccountData, AccountRoleSpecifier};
+use crate::account::{Account, AccountData};
 use proptest::prelude::*;
 
 impl Arbitrary for Account {
@@ -39,7 +39,6 @@ impl AccountData {
                         sequence_number,
                         sent_events_count,
                         received_events_count,
-                        AccountRoleSpecifier::default(), // TODO: Vary account type?
                     )
                 },
             )

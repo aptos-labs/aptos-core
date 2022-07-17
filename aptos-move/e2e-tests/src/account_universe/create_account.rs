@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account::{Account, AccountData, AccountRoleSpecifier},
+    account::{Account, AccountData},
     account_universe::{
         txn_one_account_result, AUTransactionGen, AccountPair, AccountPairGen, AccountUniverse,
     },
@@ -56,7 +56,6 @@ impl AUTransactionGen for CreateAccountGen {
                 self.new_account.clone(),
                 self.amount,
                 0,
-                AccountRoleSpecifier::default(),
             ));
         } else {
             gas_used = 0;
