@@ -23,6 +23,7 @@ use aptos_types::{
         ScriptFunction as TransactionScriptFunction, Transaction, TransactionOutput,
         TransactionStatus,
     },
+    utility_coin::TEST_COIN_TYPE,
 };
 use aptos_vm::{
     data_cache::{IntoMoveResolver, RemoteStorageOwned},
@@ -40,11 +41,12 @@ use move_deps::{
         account_address::AccountAddress,
         gas_schedule::{GasAlgebra, GasConstants},
         identifier::{IdentStr, Identifier},
-        language_storage::{ModuleId, ResourceKey, TypeTag},
+        language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
         move_resource::MoveStructType,
         transaction_argument::{convert_txn_args, TransactionArgument},
         value::{MoveTypeLayout, MoveValue},
     },
+    move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator},
     move_transactional_test_runner::{
         framework::{run_test_impl, CompiledState, MoveTestAdapter},
         tasks::{InitCommand, SyntaxChoice, TaskInput},
@@ -402,6 +404,53 @@ impl<'a> AptosTestAdapter<'a> {
         Ok(bcs::from_bytes(&account_blob).unwrap())
     }
 
+    /// Obtain the TestCoin amount under address `signer_addr`
+    fn fetch_account_balance(&self, signer_addr: &AccountAddress) -> Result<u64> {
+        let test_coin_tag = StructTag {
+            address: AccountAddress::ONE,
+            module: Identifier::new("Coin").unwrap(),
+            name: Identifier::new("CoinStore").unwrap(),
+            type_params: vec![TEST_COIN_TYPE.clone()],
+        };
+
+        let coin_access_path =
+            AccessPath::resource_access_path(ResourceKey::new(*signer_addr, test_coin_tag.clone()));
+
+        let balance_blob = self
+            .storage
+            .get_state_value(&StateKey::AccessPath(coin_access_path))
+            .unwrap()
+            .ok_or_else(|| {
+                format_err!(
+                    "Failed to fetch balance resource under address {}.",
+                    signer_addr
+                )
+            })?;
+
+        let annotated =
+            MoveValueAnnotator::new(&self.storage).view_resource(&test_coin_tag, &balance_blob)?;
+
+        // Filter the Coin resource and return the resouce value
+        for (_, val) in annotated.value {
+            if let AnnotatedMoveValue::Struct(s) = val {
+                if s.type_.name.as_str() != "Coin" {
+                    continue;
+                }
+
+                for (_, val) in s.value {
+                    if let AnnotatedMoveValue::U64(v) = val {
+                        return Ok(v);
+                    }
+                }
+            }
+        }
+
+        bail!(
+            "Failed to fetch balance resource under address {}.",
+            signer_addr
+        )
+    }
+
     /// Derive the default transaction parameters from the account and balance resources fetched
     /// from storage. In the future, we are planning to allow the user to override these using
     /// command arguments.
@@ -420,7 +469,17 @@ impl<'a> AptosTestAdapter<'a> {
         let gas_unit_price = gas_unit_price.unwrap_or(1);
         let max_gas_amount = match max_gas_amount {
             Some(max_gas_amount) => max_gas_amount,
-            None => max_number_of_gas_units.get(),
+            None => {
+                if gas_unit_price == 0 {
+                    max_number_of_gas_units.get()
+                } else {
+                    let account_balance = self.fetch_account_balance(signer_addr).unwrap();
+                    std::cmp::min(
+                        max_number_of_gas_units.get(),
+                        account_balance / gas_unit_price,
+                    )
+                }
+            }
         };
         let expiration_timestamp_secs = expiration_time.unwrap_or(40000);
 
