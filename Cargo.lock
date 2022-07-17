@@ -1170,7 +1170,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
- "aptos-keygen",
  "aptos-state-view",
  "aptos-transaction-builder",
  "aptos-types",
