@@ -1,0 +1,36 @@
+processed 3 tasks
+
+task 1 'run'. lines 5-13:
+mutable inputs after call: local#0: 0
+return values: 0
+
+task 2 'view'. lines 15-15:
+key 0x1::Coin::CoinStore<0x1::TestCoin::TestCoin> {
+    coin: store 0x1::Coin::Coin<0x1::TestCoin::TestCoin> {
+        value: 10100
+    }
+    deposit_events: store 0x1::Event::EventHandle<0x1::Coin::DepositEvent> {
+        counter: 2
+        guid: drop store 0x1::Event::GUIDWrapper {
+            len_bytes: 40u8
+            guid: drop store 0x1::GUID::GUID {
+                id: copy drop store 0x1::GUID::ID {
+                    creation_num: 1
+                    addr: 9c3b634ac05d0af393e0f93b9b19b61e7cac1c519f566276aa0c6fd15dac12aa
+                }
+            }
+        }
+    }
+    withdraw_events: store 0x1::Event::EventHandle<0x1::Coin::WithdrawEvent> {
+        counter: 0
+        guid: drop store 0x1::Event::GUIDWrapper {
+            len_bytes: 40u8
+            guid: drop store 0x1::GUID::GUID {
+                id: copy drop store 0x1::GUID::ID {
+                    creation_num: 2
+                    addr: 9c3b634ac05d0af393e0f93b9b19b61e7cac1c519f566276aa0c6fd15dac12aa
+                }
+            }
+        }
+    }
+}
