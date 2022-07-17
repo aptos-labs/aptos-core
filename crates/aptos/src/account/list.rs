@@ -89,7 +89,7 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
         let response = match self.query {
             ListQuery::Balance => vec![
                 client
-                    .get_account_resource(account, "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>")
+                    .get_account_resource(account, "0x1::coin::CoinStore<0x1::test_coin::TestCoin>")
                     .await
                     .map_err(map_err_func)?
                     .into_inner()

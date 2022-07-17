@@ -1,6 +1,6 @@
 /// This module provides test tables of various key / value types, for use in API tests
 module TestAccount::TableTestData {
-    use 0x1::Table::{Self, Table};
+    use 0x1::table::{Self, Table};
     use 0x1::ascii;
     use 0x1::guid::{Self, ID};
     use 0x1::vector;
@@ -28,35 +28,35 @@ module TestAccount::TableTestData {
         let vec_str = vector::empty<ascii::String>();
         vector::push_back(&mut vec_str, str);
         vector::push_back(&mut vec_str, str);
-        let table_u8 = Table::new();
-        Table::add(&mut table_u8, 2, 3);
+        let table_u8 = table::new();
+        table::add(&mut table_u8, 2, 3);
 
         let test_tables = TestTables {
-            u8_table: Table::new(),
-            u64_table: Table::new(),
-            u128_table: Table::new(),
-            bool_table: Table::new(),
-            string_table: Table::new(),
-            address_table: Table::new(),
-            vector_u8_table: Table::new(),
-            vector_string_table: Table::new(),
-            id_table: Table::new(),
+            u8_table: table::new(),
+            u64_table: table::new(),
+            u128_table: table::new(),
+            bool_table: table::new(),
+            string_table: table::new(),
+            address_table: table::new(),
+            vector_u8_table: table::new(),
+            vector_string_table: table::new(),
+            id_table: table::new(),
             id_table_id: copy id,
-            table_table: Table::new(),
+            table_table: table::new(),
         };
 
         let t = &mut test_tables;
 
-        Table::add(&mut t.u8_table, 1, 1);
-        Table::add(&mut t.u64_table, 1, 1);
-        Table::add(&mut t.u128_table, 1, 1);
-        Table::add(&mut t.bool_table, true, true);
-        Table::add(&mut t.string_table, str, copy str);
-        Table::add(&mut t.address_table, @0x1, @0x1);
-        Table::add(&mut t.vector_u8_table, vec_u8, copy vec_u8);
-        Table::add(&mut t.vector_string_table, vec_str, copy vec_str);
-        Table::add(&mut t.id_table, id, copy id);
-        Table::add(&mut t.table_table, 1, table_u8);
+        table::add(&mut t.u8_table, 1, 1);
+        table::add(&mut t.u64_table, 1, 1);
+        table::add(&mut t.u128_table, 1, 1);
+        table::add(&mut t.bool_table, true, true);
+        table::add(&mut t.string_table, str, copy str);
+        table::add(&mut t.address_table, @0x1, @0x1);
+        table::add(&mut t.vector_u8_table, vec_u8, copy vec_u8);
+        table::add(&mut t.vector_string_table, vec_str, copy vec_str);
+        table::add(&mut t.id_table, id, copy id);
+        table::add(&mut t.table_table, 1, table_u8);
 
         move_to(&account, test_tables);
     }

@@ -44,7 +44,7 @@ impl CliCommand<TransferSummary> for TransferCoins {
 }
 
 const SUPPORTED_COINS: [&str; 2] = [
-    "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>",
+    "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
     "0x1::coin::CoinStore<0x1::testcoin::TestCoin>",
 ];
 

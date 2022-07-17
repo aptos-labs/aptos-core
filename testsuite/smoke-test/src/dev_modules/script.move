@@ -7,15 +7,15 @@
 // the compiled stdlib.
 
 script {
-use AptosFramework::Aptos;
-use AptosFramework::AptosAccount;
-use AptosFramework::XUS::XUS;
+use aptos_framework::Aptos;
+use aptos_framework::AptosAccount;
+use aptos_framework::XUS::XUS;
 use {{sender}}::MyModule;
 
 fun main(account: signer, recipient: address, amount: u64) {
-    let with_cap = AptosAccount::extract_withdraw_capability(&account);
-    AptosAccount::pay_from<XUS>(&with_cap, recipient, amount, x"", x"");
-    AptosAccount::restore_withdraw_capability(with_cap);
+    let with_cap = Aptosaccount::extract_withdraw_capability(&account);
+    Aptosaccount::pay_from<XUS>(&with_cap, recipient, amount, x"", x"");
+    Aptosaccount::restore_withdraw_capability(with_cap);
     let coin = MyModule::id<XUS>(Aptos::zero<XUS>());
     Aptos::destroy_zero(coin)
 }

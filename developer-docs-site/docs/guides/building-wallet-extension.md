@@ -58,8 +58,8 @@ const accountAddress = await (window as any).aptos.account()
 // Create a transaction
 const transaction = {
     type: 'script_function_payload',
-    function: '0x1::Coin::transfer',
-    type_arguments: ['0x1::TestCoin::TestCoin'],
+    function: '0x1::coin::transfer',
+    type_arguments: ['0x1::test_coin::TestCoin'],
     arguments: [receiverAddress, amount]
 }
 

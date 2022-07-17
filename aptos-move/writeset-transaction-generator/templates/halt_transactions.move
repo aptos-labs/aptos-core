@@ -1,6 +1,6 @@
 script {
-    use AptosFramework::TransactionPublishingOption;
+    use aptos_framework::transaction_publishing_option;
     fun main(aptos_root: signer) {
-        TransactionPublishingOption::halt_all_transactions(&aptos_root);
+        transaction_publishing_option::halt_all_transactions(&aptos_root);
     }
 }

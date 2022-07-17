@@ -199,7 +199,7 @@ async fn test_get_transactions_output_user_transaction_with_write_set_payload() 
                         context.root_account().address(),
                         bcs::to_bytes(&Path::Resource(StructTag {
                             address: code_address,
-                            module: Identifier::new("Coin").unwrap(),
+                            module: Identifier::new("coin").unwrap(),
                             name: Identifier::new("CoinStore").unwrap(),
                             type_params: vec![TEST_COIN_TYPE.clone()],
                         }))
@@ -507,7 +507,7 @@ async fn test_signing_message_with_script_function_payload() {
 
     let payload = json!({
         "type": "script_function_payload",
-        "function": "0x1::Account::create_account",
+        "function": "0x1::account::create_account",
         "type_arguments": [
         ],
         "arguments": [
@@ -567,7 +567,7 @@ async fn test_signing_message_with_write_set_payload() {
                             context.root_account().address(),
                             bcs::to_bytes(&Path::Resource(StructTag {
                                 address: code_address,
-                                module: Identifier::new("Coin").unwrap(),
+                                module: Identifier::new("coin").unwrap(),
                                 name: Identifier::new("CoinStore").unwrap(),
                                 type_params: vec![TEST_COIN_TYPE.clone()],
                             }))
@@ -590,12 +590,12 @@ async fn test_signing_message_with_write_set_payload() {
                 {
                     "type": "delete_module",
                     "address": "0x1",
-                    "module": "0x1::Account"
+                    "module": "0x1::account"
                 },
                 {
                     "type": "delete_resource",
                     "address": "0xb1e55ed",
-                    "resource": "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>"
+                    "resource": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>"
                 }
             ],
             "events": []

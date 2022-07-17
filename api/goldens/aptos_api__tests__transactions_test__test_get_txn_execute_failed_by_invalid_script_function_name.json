@@ -6,7 +6,7 @@
   "event_root_hash": "",
   "gas_used": "1",
   "success": false,
-  "vm_status": "Transaction Executed and Committed with Error FUNCTION_RESOLUTION_FAILURE",
+  "vm_status": "Transaction Executed and Committed with Error LINKER_ERROR",
   "accumulator_root_hash": "",
   "changes": [
     {
@@ -14,7 +14,7 @@
       "address": "0xa550c18",
       "state_key_hash": "",
       "data": {
-        "type": "0x1::Account::Account",
+        "type": "0x1::account::Account",
         "data": {
           "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
           "self_address": "0xa550c18",
@@ -32,7 +32,7 @@
     "type": "script_function_payload",
     "function": "0x1::Coin::transfer_invalid",
     "type_arguments": [
-      "0x1::TestCoin::TestCoin"
+      "0x1::test_coin::TestCoin"
     ],
     "arguments": [
       "0x00000000000000000000000000000000000000000000000000000000000000dd",
@@ -42,7 +42,7 @@
   "signature": {
     "type": "ed25519_signature",
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0x0157c813a8fa4d5c1d2979e5a65963102d05ba2fd4d0c469646dbf3cf156e2386e0d40b74663a71fa5b94e52c9af76386203a5811e3881e7619458a383e95908"
+    "signature": "0x71341f63b6d8e5de757c15584dfc45d26d7520c611f9112f1bc2a5271ccde00dfb913a0e0fcf8c428d6fae07abcb74c302d6a4310a529b78f8a49452406e8500"
   },
   "events": [],
   "timestamp": "1"

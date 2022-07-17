@@ -6,7 +6,7 @@
     }
   },
   {
-    "type": "0x1::Block::BlockMetadata",
+    "type": "0x1::block::BlockMetadata",
     "data": {
       "epoch_internal": "86400000000",
       "height": "0",
@@ -46,7 +46,7 @@
     }
   },
   {
-    "type": "0x1::Account::Account",
+    "type": "0x1::account::Account",
     "data": {
       "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
       "self_address": "0xa550c18",
@@ -54,7 +54,7 @@
     }
   },
   {
-    "type": "0x1::Account::ChainSpecificAccountInfo",
+    "type": "0x1::account::ChainSpecificAccountInfo",
     "data": {
       "currency_code_required": false,
       "module_addr": "0x1",
@@ -68,19 +68,19 @@
     }
   },
   {
-    "type": "0x1::ChainId::ChainId",
+    "type": "0x1::chain_id::ChainId",
     "data": {
       "id": 4
     }
   },
   {
-    "type": "0x1::Version::Version",
+    "type": "0x1::version::Version",
     "data": {
       "major": "4"
     }
   },
   {
-    "type": "0x1::TestCoin::Balance",
+    "type": "0x1::test_coin::Balance",
     "data": {
       "coin": {
         "value": "18446744073709551614"
@@ -88,31 +88,31 @@
     }
   },
   {
-    "type": "0x1::TestCoin::CoinInfo",
+    "type": "0x1::test_coin::CoinInfo",
     "data": {
       "scaling_factor": "1000000"
     }
   },
   {
-    "type": "0x1::TestCoin::Delegations",
+    "type": "0x1::test_coin::Delegations",
     "data": {
       "inner": []
     }
   },
   {
-    "type": "0x1::TestCoin::BurnCapability",
+    "type": "0x1::test_coin::BurnCapability",
     "data": {
       "dummy_field": false
     }
   },
   {
-    "type": "0x1::TestCoin::MintCapability",
+    "type": "0x1::test_coin::MintCapability",
     "data": {
       "dummy_field": false
     }
   },
   {
-    "type": "0x1::TestCoin::TransferEvents",
+    "type": "0x1::test_coin::TransferEvents",
     "data": {
       "received_events": {
         "counter": "0",
@@ -175,7 +175,7 @@
     }
   },
   {
-    "type": "0x1::Reconfiguration::Configuration",
+    "type": "0x1::reconfiguration::Configuration",
     "data": {
       "epoch": "1",
       "events": {
