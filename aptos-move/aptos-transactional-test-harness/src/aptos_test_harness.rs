@@ -518,7 +518,7 @@ impl<'a> AptosTestAdapter<'a> {
         }
     }
 
-    fn create_account(&mut self, account_addr: AccountAddress) {
+    fn create_and_fund_account(&mut self, account_addr: AccountAddress, amount: u64) {
         let parameters = self
             .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None)
             .unwrap();
@@ -538,16 +538,10 @@ impl<'a> AptosTestAdapter<'a> {
 
         self.run_transaction(Transaction::UserTransaction(txn))
             .expect("Failed to create an account. This should not happen.");
-    }
-
-    fn fund_account(&mut self, account_addr: AccountAddress, amount: u64) {
-        let parameters = self
-            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None)
-            .unwrap();
 
         let txn = RawTransaction::new(
             aptos_root_address(),
-            parameters.sequence_number,
+            parameters.sequence_number + 1,
             aptos_transaction_builder::aptos_stdlib::encode_test_coin_mint(account_addr, amount),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
@@ -645,8 +639,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         };
 
         for (_, addr) in additional_named_address_mapping {
-            adapter.create_account(addr.into_inner());
-            adapter.fund_account(addr.into_inner(), coins_to_mint);
+            adapter.create_and_fund_account(addr.into_inner(), coins_to_mint);
         }
 
         (adapter, None)
