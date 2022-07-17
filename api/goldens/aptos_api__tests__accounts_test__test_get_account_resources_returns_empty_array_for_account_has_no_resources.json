@@ -24,13 +24,10 @@
       "new_block_events": {
         "counter": "0",
         "guid": {
-          "guid": {
-            "id": {
-              "addr": "0x1",
-              "creation_num": "3"
-            }
-          },
-          "len_bytes": 40
+          "id": {
+            "addr": "0x1",
+            "creation_num": "3"
+          }
         }
       }
     }
@@ -91,49 +88,37 @@
         "create_proposal_events": {
           "counter": "0",
           "guid": {
-            "guid": {
-              "id": {
-                "addr": "0x1",
-                "creation_num": "4"
-              }
-            },
-            "len_bytes": 40
+            "id": {
+              "addr": "0x1",
+              "creation_num": "4"
+            }
           }
         },
         "register_forum_events": {
           "counter": "1",
           "guid": {
-            "guid": {
-              "id": {
-                "addr": "0x1",
-                "creation_num": "5"
-              }
-            },
-            "len_bytes": 40
+            "id": {
+              "addr": "0x1",
+              "creation_num": "5"
+            }
           }
         },
         "resolve_proposal_events": {
           "counter": "0",
           "guid": {
-            "guid": {
-              "id": {
-                "addr": "0x1",
-                "creation_num": "6"
-              }
-            },
-            "len_bytes": 40
+            "id": {
+              "addr": "0x1",
+              "creation_num": "6"
+            }
           }
         },
         "vote_events": {
           "counter": "0",
           "guid": {
-            "guid": {
-              "id": {
-                "addr": "0x1",
-                "creation_num": "7"
-              }
-            },
-            "len_bytes": 40
+            "id": {
+              "addr": "0x1",
+              "creation_num": "7"
+            }
           }
         }
       },
@@ -245,37 +230,28 @@
       "create_proposal_events": {
         "counter": "0",
         "guid": {
-          "guid": {
-            "id": {
-              "addr": "0x1",
-              "creation_num": "8"
-            }
-          },
-          "len_bytes": 40
+          "id": {
+            "addr": "0x1",
+            "creation_num": "8"
+          }
         }
       },
       "update_config_events": {
         "counter": "0",
         "guid": {
-          "guid": {
-            "id": {
-              "addr": "0x1",
-              "creation_num": "9"
-            }
-          },
-          "len_bytes": 40
+          "id": {
+            "addr": "0x1",
+            "creation_num": "9"
+          }
         }
       },
       "vote_events": {
         "counter": "0",
         "guid": {
-          "guid": {
-            "id": {
-              "addr": "0x1",
-              "creation_num": "10"
-            }
-          },
-          "len_bytes": 40
+          "id": {
+            "addr": "0x1",
+            "creation_num": "10"
+          }
         }
       }
     }
@@ -301,13 +277,10 @@
       "events": {
         "counter": "1",
         "guid": {
-          "guid": {
-            "id": {
-              "addr": "0x1",
-              "creation_num": "2"
-            }
-          },
-          "len_bytes": 40
+          "id": {
+            "addr": "0x1",
+            "creation_num": "2"
+          }
         }
       },
       "last_reconfiguration_time": "0"

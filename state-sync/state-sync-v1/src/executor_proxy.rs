@@ -781,7 +781,7 @@ mod tests {
     }
 
     fn create_random_event_key() -> EventKey {
-        EventKey::new_from_address(&AccountAddress::random(), 0)
+        EventKey::new(0, AccountAddress::random())
     }
 
     /// Defines a new on-chain config for test purposes.

@@ -12,7 +12,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, AccountResource, CoinStoreResource},
     chain_id::ChainId,
-    event::EventHandle,
+    event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
     transaction::{
         authenticator::AuthenticationKey, Module, ModuleBundle, RawTransaction, Script,
@@ -338,11 +338,17 @@ impl CoinStore {
             Value::u64(self.coin),
             Value::struct_(Struct::pack(vec![
                 Value::u64(self.withdraw_events.count()),
-                Value::vector_u8(self.withdraw_events.key().to_vec()),
+                Value::struct_(Struct::pack(vec![
+                    Value::u64(self.withdraw_events.key().get_creation_number()),
+                    Value::address(self.withdraw_events.key().get_creator_address()),
+                ])),
             ])),
             Value::struct_(Struct::pack(vec![
                 Value::u64(self.deposit_events.count()),
-                Value::vector_u8(self.deposit_events.key().to_vec()),
+                Value::struct_(Struct::pack(vec![
+                    Value::u64(self.deposit_events.key().get_creation_number()),
+                    Value::address(self.deposit_events.key().get_creator_address()),
+                ])),
             ])),
         ]))
     }
@@ -353,11 +359,17 @@ impl CoinStore {
             MoveTypeLayout::U64,
             MoveTypeLayout::Struct(MoveStructLayout::new(vec![
                 MoveTypeLayout::U64,
-                MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
+                MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+                    MoveTypeLayout::U64,
+                    MoveTypeLayout::Address,
+                ])),
             ])),
             MoveTypeLayout::Struct(MoveStructLayout::new(vec![
                 MoveTypeLayout::U64,
-                MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
+                MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+                    MoveTypeLayout::U64,
+                    MoveTypeLayout::Address,
+                ])),
             ])),
         ])
     }
@@ -462,7 +474,7 @@ pub struct AccountData {
 }
 
 fn new_event_handle(count: u64, address: AccountAddress) -> EventHandle {
-    EventHandle::new_from_address(&address, count)
+    EventHandle::new(EventKey::new(count, address), 0)
 }
 
 impl AccountData {
@@ -652,8 +664,8 @@ impl AccountData {
     }
 
     /// Returns the unique key for this sent events stream.
-    pub fn sent_events_key(&self) -> &[u8] {
-        self.coin_store.withdraw_events.key().as_bytes()
+    pub fn sent_events_key(&self) -> Vec<u8> {
+        self.coin_store.withdraw_events.key().to_bytes()
     }
 
     /// Returns the initial sent events count.
@@ -662,8 +674,8 @@ impl AccountData {
     }
 
     /// Returns the unique key for this received events stream.
-    pub fn received_events_key(&self) -> &[u8] {
-        self.coin_store.deposit_events.key().as_bytes()
+    pub fn received_events_key(&self) -> Vec<u8> {
+        self.coin_store.deposit_events.key().to_bytes()
     }
 
     /// Returns the initial received events count.

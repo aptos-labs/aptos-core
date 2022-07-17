@@ -186,7 +186,7 @@ impl AptosDebugger {
         }
         for event in o.events() {
             state_view.save_event(
-                event.key().as_bytes(),
+                &event.key().to_bytes(),
                 event.sequence_number(),
                 event.type_tag().clone(),
                 event.event_data().to_vec(),

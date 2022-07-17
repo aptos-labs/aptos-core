@@ -534,7 +534,7 @@ fn create_test_event(event_key: EventKey) -> ContractEvent {
 }
 
 fn create_random_event_key() -> EventKey {
-    EventKey::new_from_address(&AccountAddress::random(), 0)
+    EventKey::new(0, AccountAddress::random())
 }
 
 fn create_event_subscription_service() -> EventSubscriptionService {

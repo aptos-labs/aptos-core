@@ -10,7 +10,6 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
-    event::EventKey,
     state_store::state_key::StateKey,
     transaction::{ChangeSet, SignatureCheckedTransaction},
     write_set::{WriteOp, WriteSetMut},
@@ -28,7 +27,7 @@ use move_deps::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    convert::{TryFrom, TryInto},
+    convert::TryInto,
     ops::{Deref, DerefMut},
 };
 
@@ -186,7 +185,7 @@ impl SessionOutput {
         let events = events
             .into_iter()
             .map(|(guid, seq_num, ty_tag, blob)| {
-                let key = EventKey::try_from(guid.as_slice())
+                let key = bcs::from_bytes(guid.as_slice())
                     .map_err(|_| VMStatus::Error(StatusCode::EVENT_KEY_MISMATCH))?;
                 Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
             })
