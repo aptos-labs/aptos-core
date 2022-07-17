@@ -42,9 +42,9 @@ export const sendTestCoinTransaction = async ({
 }: SendTestCoinTransactionProps) => {
   const payload: Types.TransactionPayload = {
     arguments: [toAddress, `${amount}`],
-    function: '0x1::Coin::transfer',
+    function: '0x1::coin::transfer',
     type: 'script_function_payload',
-    type_arguments: ['0x1::TestCoin::TestCoin'],
+    type_arguments: ['0x1::test_coin::TestCoin'],
   };
   const txnHash = await submitTransaction({
     fromAccount,

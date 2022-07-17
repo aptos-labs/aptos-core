@@ -217,6 +217,9 @@ impl ScriptFunctionCall {
             .with_comments(comments)
             .with_external_definitions(external_definitions)
             .with_serialization(!self.local_types);
+        for (k, v) in script_registry.iter() {
+            eprintln!("reg {}: {:?}", k, v);
+        }
         rust::CodeGenerator::new(&config)
             .with_derive_macros(vec![
                 "Clone".to_string(),

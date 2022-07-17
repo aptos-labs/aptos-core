@@ -24,7 +24,7 @@ export const getAccountBalanceFromAccountResources = (
   accountResources: Types.AccountResource[] | undefined,
 ): Number => {
   if (accountResources) {
-    const accountResource = (accountResources) ? accountResources?.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>') : undefined;
+    const accountResource = (accountResources) ? accountResources?.find((r) => r.type === '0x1::coin::CoinStore<0x1::test_coin::TestCoin>') : undefined;
     const tokenBalance = (accountResource)
       ? (accountResource.data as { coin: { value: string } }).coin.value
       : undefined;
@@ -52,7 +52,7 @@ export const getTestCoinTokenBalanceFromAccountResources = ({
 }: GetTestCoinTokenBalanceFromAccountResourcesProps) => {
   const testCoinResource = getResourceFromAccountResources({
     accountResources,
-    resource: '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>',
+    resource: '0x1::coin::CoinStore<0x1::test_coin::TestCoin>',
   });
   const tokenBalance = (testCoinResource)
     ? (testCoinResource.data as { coin: { value: string } }).coin.value

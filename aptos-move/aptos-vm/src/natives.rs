@@ -11,7 +11,9 @@ pub fn aptos_natives() -> NativeFunctionTable {
     move_stdlib::natives::all_natives(CORE_CODE_ADDRESS)
         .into_iter()
         .chain(framework::natives::all_natives(CORE_CODE_ADDRESS))
-        .chain(move_table_extension::table_natives(CORE_CODE_ADDRESS))
+        .chain(framework::natives::patch_table_module(
+            move_table_extension::table_natives(CORE_CODE_ADDRESS),
+        ))
         .chain(transaction_context_natives(CORE_CODE_ADDRESS))
         .collect()
 }

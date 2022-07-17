@@ -2,7 +2,7 @@
   {
     "key": "0x02000000000000000000000000000000000000000000000000000000000000000000000000000001",
     "sequence_number": "0",
-    "type": "0x1::Reconfiguration::NewEpochEvent",
+    "type": "0x1::reconfiguration::NewEpochEvent",
     "data": {
       "epoch": "1"
     }

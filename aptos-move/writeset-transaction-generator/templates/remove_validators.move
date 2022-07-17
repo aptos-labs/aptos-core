@@ -1,8 +1,8 @@
 script {
-    use AptosFramework::ValidatorSet;
+    use aptos_framework::validator_set;
     fun main(aptos_root: signer) {
         {{#each addresses}}
-        ValidatorSet::remove_validator(&aptos_root, @0x{{this}});
+        validator_set::remove_validator(&aptos_root, @0x{{this}});
         {{/each}}
     }
 }

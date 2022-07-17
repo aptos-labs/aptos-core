@@ -31,17 +31,17 @@ pub const TOKEN_RELEASE_SUFFIX: &str = "token";
 )]
 pub struct ReleaseOptions {
     #[structopt(long = "no-check-linking-layout-compatibility")]
-    pub check_layout_compatibility: bool,
+    pub no_check_layout_compatibility: bool,
     #[structopt(long = "no-build-docs")]
-    pub build_docs: bool,
+    pub no_build_docs: bool,
     #[structopt(long = "with-diagram")]
     pub with_diagram: bool,
     #[structopt(long = "no-script-builder")]
-    pub script_builder: bool,
+    pub no_script_builder: bool,
     #[structopt(long = "no-script-abi")]
-    pub script_abis: bool,
+    pub no_script_abis: bool,
     #[structopt(long = "no-errmap")]
-    pub errmap: bool,
+    pub no_errmap: bool,
     #[structopt(
         long = "package",
         default_value = "aptos-framework",
@@ -55,13 +55,13 @@ pub struct ReleaseOptions {
 impl Default for ReleaseOptions {
     fn default() -> Self {
         Self {
-            build_docs: true,
+            no_build_docs: true,
             package: PathBuf::from("aptos-framework"),
-            check_layout_compatibility: false,
+            no_check_layout_compatibility: false,
             with_diagram: false,
-            script_abis: true,
-            script_builder: true,
-            errmap: true,
+            no_script_abis: true,
+            no_script_builder: true,
+            no_errmap: true,
             output: PathBuf::from("current"),
         }
     }
@@ -76,7 +76,7 @@ impl ReleaseOptions {
             .join(&self.output);
 
         let mut old_module_apis = None;
-        if !self.check_layout_compatibility {
+        if !self.no_check_layout_compatibility {
             old_module_apis = extract_old_apis(&output_path);
         }
 
@@ -86,8 +86,8 @@ impl ReleaseOptions {
         std::fs::create_dir_all(output_path.parent().unwrap()).unwrap();
 
         let build_config = move_deps::move_package::BuildConfig {
-            generate_docs: !self.build_docs,
-            generate_abis: !self.script_abis,
+            generate_docs: !self.no_build_docs,
+            generate_abis: !self.no_script_abis,
             install_dir: Some(output_path.clone()),
             ..Default::default()
         };
@@ -99,7 +99,7 @@ impl ReleaseOptions {
             .compile_package(&package_path, &mut std::io::stdout())
             .unwrap();
 
-        if !self.check_layout_compatibility {
+        if !self.no_check_layout_compatibility {
             println!("Checking layout compatibility");
             if let Some(old_module_apis) = old_module_apis {
                 let new_modules =
@@ -115,12 +115,12 @@ impl ReleaseOptions {
             }
         }
 
-        if !self.errmap {
+        if !self.no_errmap {
             println!("Generating error map");
             generate_error_map(&package_path, &output_path, build_config)
         }
 
-        if !self.script_builder {
+        if !self.no_script_builder {
             println!("Generating script builders");
             let abi_paths: Vec<&Path> = vec![&output_path];
             generate_script_builder(

@@ -14,7 +14,7 @@
       "address": "0xa550c18",
       "state_key_hash": "",
       "data": {
-        "type": "0x1::Account::Account",
+        "type": "0x1::account::Account",
         "data": {
           "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
           "self_address": "0xa550c18",
@@ -32,7 +32,7 @@
     "type": "script_function_payload",
     "function": "0x1222::Coin::transfer",
     "type_arguments": [
-      "0x1::TestCoin::TestCoin"
+      "0x1::test_coin::TestCoin"
     ],
     "arguments": [
       "0x00000000000000000000000000000000000000000000000000000000000000dd",
@@ -42,7 +42,7 @@
   "signature": {
     "type": "ed25519_signature",
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0x617deed882af2f20f9ff92b580d0a5e83762d8ce49117525007a5df109d234e25965fc63c5e3eb2eb1de3e1145aaf0e656a690cd7c74af5a1a46a2cf2b979f07"
+    "signature": "0x1bffa6e9fc8da2580b4d622b38bee6a5b3225e99ebd6c25949dfe57d0032a4de0e6bb4cf07f890e8965625106ea1242e532d04ed034b96989da724aa619ebb0c"
   },
   "events": [],
   "timestamp": "1"

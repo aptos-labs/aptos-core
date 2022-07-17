@@ -18,19 +18,19 @@ test(
     const tx1 = await client.getTransaction(txns[1]);
     expect(tx1.type).toBe("user_transaction");
     let resources = await client.getAccountResources(account1.address());
-    let accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
+    let accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::test_coin::TestCoin>");
     expect((accountResource.data as { coin: { value: string } }).coin.value).toBe("5000");
 
     const account2 = new AptosAccount();
     await faucetClient.fundAccount(account2.address(), 0);
     resources = await client.getAccountResources(account2.address());
-    accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
+    accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::test_coin::TestCoin>");
     expect((accountResource.data as { coin: { value: string } }).coin.value).toBe("0");
 
     const payload: Types.TransactionPayload = {
       type: "script_function_payload",
-      function: "0x1::Coin::transfer",
-      type_arguments: ["0x1::TestCoin::TestCoin"],
+      function: "0x1::coin::transfer",
+      type_arguments: ["0x1::test_coin::TestCoin"],
       arguments: [account2.address().hex(), "717"],
     };
     const txnRequest = await client.generateTransaction(account1.address(), payload);
@@ -39,7 +39,7 @@ test(
     await client.waitForTransaction(transactionRes.hash);
 
     resources = await client.getAccountResources(account2.address());
-    accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
+    accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::test_coin::TestCoin>");
     expect((accountResource.data as { coin: { value: string } }).coin.value).toBe("717");
 
     const res = await client.getAccountTransactions(account1.address(), { start: 0 });
@@ -48,21 +48,21 @@ test(
 
     const events = await client.getEventsByEventHandle(
       tx.sender,
-      "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>",
+      "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
       "withdraw_events",
     );
-    expect(events[0].type).toBe("0x1::Coin::WithdrawEvent");
+    expect(events[0].type).toBe("0x1::coin::WithdrawEvent");
 
     const eventSubset = await client.getEventsByEventHandle(
       tx.sender,
-      "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>",
+      "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
       "withdraw_events",
       { start: 0, limit: 1 },
     );
-    expect(eventSubset[0].type).toBe("0x1::Coin::WithdrawEvent");
+    expect(eventSubset[0].type).toBe("0x1::coin::WithdrawEvent");
 
     const events2 = await client.getEventsByEventKey(events[0].key);
-    expect(events2[0].type).toBe("0x1::Coin::WithdrawEvent");
+    expect(events2[0].type).toBe("0x1::coin::WithdrawEvent");
   },
   30 * 1000,
 );

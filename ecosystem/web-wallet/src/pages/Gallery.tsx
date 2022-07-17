@@ -67,7 +67,7 @@ const getGalleryItems = async ({
     ));
     accountTransactions.forEach((transaction) => {
       if ('payload' in transaction && 'function' in transaction.payload) {
-        if (transaction?.payload?.function === '0x1::Token::create_unlimited_collection_script') {
+        if (transaction?.payload?.function === '0x1::token::create_unlimited_collection_script') {
           const collectionName = new HexString(
             transaction.payload.arguments[0],
           ).toBuffer().toString();
@@ -80,7 +80,7 @@ const getGalleryItems = async ({
       if (
         'payload' in accountTransaction
         && 'function' in accountTransaction.payload
-        && accountTransaction.payload.function === '0x1::Token::create_unlimited_token_script'
+        && accountTransaction.payload.function === '0x1::token::create_unlimited_token_script'
       ) {
         const uri = new HexString(accountTransaction.payload.arguments[5]).toBuffer().toString();
         // check if uri is hosted on ipfs, arweave, or s3
@@ -103,7 +103,7 @@ const getGalleryItems = async ({
       if (
         'payload' in accountTransaction
         && 'function' in accountTransaction.payload
-        && accountTransaction.payload.function === '0x1::Token::create_unlimited_token_script'
+        && accountTransaction.payload.function === '0x1::token::create_unlimited_token_script'
       ) {
         const collectionName = new HexString(
           accountTransaction.payload.arguments[0],

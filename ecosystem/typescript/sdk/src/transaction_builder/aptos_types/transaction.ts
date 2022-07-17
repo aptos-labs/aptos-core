@@ -143,7 +143,7 @@ export class ScriptFunction {
 
   /**
    *
-   * @param module Fully qualified module name in format "AccountAddress::ModuleName" e.g. "0x1::Coin"
+   * @param module Fully qualified module name in format "AccountAddress::ModuleName" e.g. "0x1::coin"
    * @param func Function name
    * @param ty_args Type arguments that move function requires.
    *
