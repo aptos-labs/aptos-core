@@ -4,7 +4,6 @@
 //! Test infrastructure for modeling Aptos accounts.
 
 use crate::gas_costs;
-use anyhow::{Error, Result};
 use aptos_crypto::ed25519::*;
 use aptos_keygen::KeyGen;
 use aptos_types::{
@@ -28,7 +27,6 @@ use move_deps::{
     },
     move_vm_types::values::{Struct, Value},
 };
-use std::str::FromStr;
 use vm_genesis::GENESIS_KEYPAIR;
 
 // TTL is 86400s. Initial time was set to 0.
@@ -376,88 +374,8 @@ impl CoinStore {
 }
 
 //---------------------------------------------------------------------------
-// Account type represenation
+// Account resource represenation
 //---------------------------------------------------------------------------
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum AccountRoleSpecifier {
-    AptosRoot,
-    TreasuryCompliance,
-    DesignatedDealer,
-    Validator,
-    ValidatorOperator,
-    ParentVASP,
-    ChildVASP,
-}
-
-impl AccountRoleSpecifier {
-    pub fn id(&self) -> u64 {
-        match self {
-            Self::AptosRoot => 0,
-            Self::TreasuryCompliance => 1,
-            Self::DesignatedDealer => 2,
-            Self::Validator => 3,
-            Self::ValidatorOperator => 4,
-            Self::ParentVASP => 5,
-            Self::ChildVASP => 6,
-        }
-    }
-
-    pub fn layout() -> MoveStructLayout {
-        MoveStructLayout::new(vec![MoveTypeLayout::U64])
-    }
-
-    pub fn to_value(&self) -> Value {
-        Value::struct_(Struct::pack(vec![Value::u64(self.id())]))
-    }
-}
-
-impl FromStr for AccountRoleSpecifier {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "vasp" => Ok(AccountRoleSpecifier::ParentVASP), // TODO: rename from vasp
-            "validator" => Ok(AccountRoleSpecifier::Validator),
-            "validator_operator" => Ok(AccountRoleSpecifier::ValidatorOperator),
-            other => Err(Error::msg(format!(
-                "Unrecognized account type specifier {} found.",
-                other
-            ))),
-        }
-    }
-}
-
-impl Default for AccountRoleSpecifier {
-    fn default() -> Self {
-        AccountRoleSpecifier::ParentVASP
-    }
-}
-
-//---------------------------------------------------------------------------
-// Account type resource represenation
-//---------------------------------------------------------------------------
-
-/// Struct that represents an account type for testing.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AccountRole {
-    self_address: AccountAddress,
-    account_specifier: AccountRoleSpecifier,
-}
-
-impl AccountRole {
-    /// Create a new AccountRole testing account.
-    pub fn new(self_address: AccountAddress, account_specifier: AccountRoleSpecifier) -> Self {
-        Self {
-            self_address,
-            account_specifier,
-        }
-    }
-
-    pub fn account_specifier(&self) -> AccountRoleSpecifier {
-        self.account_specifier
-    }
-}
 
 /// Represents an account along with initial state about it.
 ///
@@ -470,7 +388,6 @@ pub struct AccountData {
     sequence_number: u64,
 
     coin_store: CoinStore,
-    account_role: AccountRole,
 }
 
 fn new_event_handle(count: u64, address: AccountAddress) -> EventHandle {
@@ -482,41 +399,19 @@ impl AccountData {
     ///
     /// This constructor is non-deterministic and should not be used against golden file.
     pub fn new(balance: u64, sequence_number: u64) -> Self {
-        Self::with_account(
-            Account::new(),
-            balance,
-            sequence_number,
-            AccountRoleSpecifier::ParentVASP,
-        )
+        Self::with_account(Account::new(), balance, sequence_number)
     }
 
     /// Creates a new `AccountData` with a new account.
     ///
     /// Most tests will want to use this constructor.
     pub fn new_from_seed(seed: &mut KeyGen, balance: u64, sequence_number: u64) -> Self {
-        Self::with_account(
-            Account::new_from_seed(seed),
-            balance,
-            sequence_number,
-            AccountRoleSpecifier::ParentVASP,
-        )
+        Self::with_account(Account::new_from_seed(seed), balance, sequence_number)
     }
 
     /// Creates a new `AccountData` with the provided account.
-    pub fn with_account(
-        account: Account,
-        balance: u64,
-        sequence_number: u64,
-        account_specifier: AccountRoleSpecifier,
-    ) -> Self {
-        Self::with_account_and_event_counts(
-            account,
-            balance,
-            sequence_number,
-            0,
-            0,
-            account_specifier,
-        )
+    pub fn with_account(account: Account, balance: u64, sequence_number: u64) -> Self {
+        Self::with_account_and_event_counts(account, balance, sequence_number, 0, 0)
     }
 
     /// Creates a new `AccountData` with the provided account.
@@ -525,10 +420,9 @@ impl AccountData {
         pubkey: Ed25519PublicKey,
         balance: u64,
         sequence_number: u64,
-        account_specifier: AccountRoleSpecifier,
     ) -> Self {
         let account = Account::with_keypair(privkey, pubkey);
-        Self::with_account(account, balance, sequence_number, account_specifier)
+        Self::with_account(account, balance, sequence_number)
     }
 
     /// Creates a new `AccountData` with custom parameters.
@@ -538,11 +432,9 @@ impl AccountData {
         sequence_number: u64,
         sent_events_count: u64,
         received_events_count: u64,
-        account_specifier: AccountRoleSpecifier,
     ) -> Self {
         let addr = *account.address();
         Self {
-            account_role: AccountRole::new(*account.address(), account_specifier),
             withdrawal_capability: Some(WithdrawCapability::new(addr)),
             key_rotation_capability: Some(KeyRotationCapability::new(addr)),
             account,
@@ -566,11 +458,6 @@ impl AccountData {
         use MoveTypeLayout as T;
 
         S::new(vec![T::Vector(Box::new(T::U8)), T::U64, T::Address])
-    }
-
-    /// Returns the account role specifier
-    pub fn account_role(&self) -> AccountRoleSpecifier {
-        self.account_role.account_specifier()
     }
 
     /// Creates and returns the top-level resources to be published under the account
@@ -664,8 +551,8 @@ impl AccountData {
     }
 
     /// Returns the unique key for this sent events stream.
-    pub fn sent_events_key(&self) -> Vec<u8> {
-        self.coin_store.withdraw_events.key().to_bytes()
+    pub fn sent_events_key(&self) -> &EventKey {
+        self.coin_store.withdraw_events.key()
     }
 
     /// Returns the initial sent events count.
@@ -674,8 +561,8 @@ impl AccountData {
     }
 
     /// Returns the unique key for this received events stream.
-    pub fn received_events_key(&self) -> Vec<u8> {
-        self.coin_store.deposit_events.key().to_bytes()
+    pub fn received_events_key(&self) -> &EventKey {
+        self.coin_store.deposit_events.key()
     }
 
     /// Returns the initial received events count.
@@ -721,20 +608,5 @@ impl KeyRotationCapability {
         Value::vector_for_testing_only(vec![Value::struct_(Struct::pack(vec![Value::address(
             self.account_address,
         )]))])
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FreezingBit {
-    is_frozen: bool,
-}
-
-impl FreezingBit {
-    pub fn layout() -> MoveStructLayout {
-        MoveStructLayout::new(vec![MoveTypeLayout::Bool])
-    }
-
-    pub fn value() -> Value {
-        Value::struct_(Struct::pack(vec![Value::bool(false)]))
     }
 }

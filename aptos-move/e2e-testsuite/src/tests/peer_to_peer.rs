@@ -52,13 +52,10 @@ fn single_peer_to_peer_with_event() {
         assert_eq!(0, updated_sender_balance.deposit_events().count(),);
         assert_eq!(1, updated_receiver_balance.deposit_events().count());
 
-        let rec_ev_path = receiver.received_events_key().to_vec();
-        let sent_ev_path = sender.sent_events_key().to_vec();
+        let rec_ev_path = receiver.received_events_key();
+        let sent_ev_path = sender.sent_events_key();
         for event in output.events() {
-            assert!(
-                rec_ev_path.as_slice() == event.key().to_bytes()
-                    || sent_ev_path.as_slice() == event.key().to_bytes()
-            );
+            assert!(rec_ev_path == event.key() || sent_ev_path == event.key());
         }
     }
     }
