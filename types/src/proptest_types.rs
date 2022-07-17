@@ -45,7 +45,7 @@ use proptest_derive::Arbitrary;
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
-    convert::{TryFrom, TryInto},
+    convert::TryFrom,
     iter::Iterator,
 };
 
@@ -131,15 +131,23 @@ impl Arbitrary for ChangeSet {
     type Strategy = BoxedStrategy<Self>;
 }
 
+impl EventKey {
+    pub fn strategy_impl(
+        account_address_strategy: impl Strategy<Value = AccountAddress>,
+    ) -> impl Strategy<Value = Self> {
+        // We only generate small counters so that it won't overflow.
+        (account_address_strategy, 0..std::u64::MAX / 2)
+            .prop_map(|(account_address, counter)| EventKey::new(counter, account_address))
+    }
+}
+
 impl Arbitrary for EventKey {
     type Parameters = ();
-    fn arbitrary_with(_args: ()) -> Self::Strategy {
-        vec(any::<u8>(), EventKey::LENGTH)
-            .prop_map(|e| EventKey::new(e.try_into().unwrap()))
-            .boxed()
-    }
-
     type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        EventKey::strategy_impl(any::<AccountAddress>()).boxed()
+    }
 }
 
 #[derive(Debug)]
@@ -166,8 +174,8 @@ impl AccountInfo {
             public_key,
             consensus_private_key,
             sequence_number: 0,
-            sent_event_handle: EventHandle::new_from_address(&address, 0),
-            received_event_handle: EventHandle::new_from_address(&address, 1),
+            sent_event_handle: EventHandle::new(EventKey::new(0, address), 0),
+            received_event_handle: EventHandle::new(EventKey::new(1, address), 0),
         }
     }
 }
@@ -689,11 +697,7 @@ pub struct CoinStoreResourceGen {
 
 impl CoinStoreResourceGen {
     pub fn materialize(self) -> CoinStoreResource {
-        CoinStoreResource::new(
-            self.coin,
-            EventHandle::random_handle(0),
-            EventHandle::random_handle(0),
-        )
+        CoinStoreResource::new(self.coin, EventHandle::random(0), EventHandle::random(0))
     }
 }
 

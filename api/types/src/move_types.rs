@@ -238,7 +238,7 @@ impl From<HexEncodedBytes> for move_core_types::value::MoveValue {
 impl TryFrom<HexEncodedBytes> for EventKey {
     type Error = anyhow::Error;
     fn try_from(bytes: HexEncodedBytes) -> anyhow::Result<Self> {
-        Ok(EventKey::from_bytes(bytes.0)?)
+        Ok(bcs::from_bytes(&bytes.0)?)
     }
 }
 

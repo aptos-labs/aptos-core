@@ -56,8 +56,8 @@ fn single_peer_to_peer_with_event() {
         let sent_ev_path = sender.sent_events_key().to_vec();
         for event in output.events() {
             assert!(
-                rec_ev_path.as_slice() == event.key().as_bytes()
-                    || sent_ev_path.as_slice() == event.key().as_bytes()
+                rec_ev_path.as_slice() == event.key().to_bytes()
+                    || sent_ev_path.as_slice() == event.key().to_bytes()
             );
         }
     }

@@ -23,11 +23,9 @@ impl FromStr for EventKey {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self, anyhow::Error> {
-        if let Some(hex) = s.strip_prefix("0x") {
-            Ok(hex.parse::<aptos_types::event::EventKey>()?.into())
-        } else {
-            Ok(s.parse::<aptos_types::event::EventKey>()?.into())
-        }
+        let value = s.strip_prefix("0x").unwrap_or(s);
+        let inner_event: aptos_types::event::EventKey = bcs::from_bytes(&hex::decode(value)?)?;
+        Ok(inner_event.into())
     }
 }
 

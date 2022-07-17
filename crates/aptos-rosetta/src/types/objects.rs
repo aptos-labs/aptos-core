@@ -720,9 +720,9 @@ fn parse_operations_from_write_set(
                 if id == &withdraw_events_identifier() {
                     serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
                     if let Ok(event) = serde_json::from_value::<CoinEventId>(value.clone()) {
-                        let withdraw_event = EventKey::new_from_address(
-                            &event.guid.guid.id.addr,
+                        let withdraw_event = EventKey::new(
                             event.guid.guid.id.creation_num.0,
+                            event.guid.guid.id.addr,
                         );
                         if let Some(amount) = get_amount_from_event(events, withdraw_event) {
                             operations.push(Operation::withdraw(
@@ -738,9 +738,9 @@ fn parse_operations_from_write_set(
                 } else if id == &deposit_events_identifier() {
                     serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
                     if let Ok(event) = serde_json::from_value::<CoinEventId>(value.clone()) {
-                        let withdraw_event = EventKey::new_from_address(
-                            &event.guid.guid.id.addr,
+                        let withdraw_event = EventKey::new(
                             event.guid.guid.id.creation_num.0,
+                            event.guid.guid.id.addr,
                         );
                         if let Some(amount) = get_amount_from_event(events, withdraw_event) {
                             operations.push(Operation::deposit(

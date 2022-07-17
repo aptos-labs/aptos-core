@@ -6,7 +6,7 @@ use crate::{
     error::ApiError,
     types::{
         Allow, BlockIdentifier, MetadataRequest, NetworkListResponse, NetworkOptionsResponse,
-        NetworkRequest, NetworkStatusResponse, OperationStatusType, OperationType, Peer, Version,
+        NetworkRequest, NetworkStatusResponse, OperationStatusType, OperationType, Version,
     },
     RosettaContext, NODE_VERSION, ROSETTA_VERSION,
 };
@@ -165,16 +165,13 @@ async fn network_status(
     let current_block_identifier = BlockIdentifier::from_block_info(block_info);
     let current_block_timestamp = get_timestamp(block_info);
 
-    // TODO: add peers
-    let peers: Vec<Peer> = vec![];
-
     let response = NetworkStatusResponse {
         current_block_identifier,
         current_block_timestamp,
         genesis_block_identifier,
         oldest_block_identifier,
         sync_status: None,
-        peers,
+        peers: vec![],
     };
 
     Ok(response)

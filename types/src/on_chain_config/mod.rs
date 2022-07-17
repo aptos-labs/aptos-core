@@ -155,7 +155,7 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
 }
 
 pub fn new_epoch_event_key() -> EventKey {
-    EventKey::new_from_address(&CORE_CODE_ADDRESS, 2)
+    EventKey::new(2, CORE_CODE_ADDRESS)
 }
 
 pub fn struct_tag_for_config(config_name: Identifier) -> StructTag {
@@ -226,7 +226,7 @@ impl Default for ConfigurationResource {
         Self {
             epoch: 0,
             last_reconfiguration_time: 0,
-            events: EventHandle::new_from_address(&CORE_CODE_ADDRESS, 16),
+            events: EventHandle::new(EventKey::new(16, CORE_CODE_ADDRESS), 0),
         }
     }
 }

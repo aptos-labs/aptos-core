@@ -209,7 +209,10 @@ EpochState:
     - verifier:
         TYPENAME: ValidatorVerifier
 EventKey:
-  NEWTYPESTRUCT: BYTES
+  STRUCT:
+    - creation_number: U64
+    - account_address:
+        TYPENAME: AccountAddress
 HashValue:
   NEWTYPESTRUCT: BYTES
 Identifier:
