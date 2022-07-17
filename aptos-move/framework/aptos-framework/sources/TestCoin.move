@@ -32,35 +32,31 @@ module AptosFramework::TestCoin {
     }
 
     public fun initialize(
-        core_framework: &signer,
+        aptos_framework: &signer,
         core_resource: &signer,
     ): (MintCapability<TestCoin>, BurnCapability<TestCoin>) {
-        SystemAddresses::assert_core_resource(core_resource);
+        SystemAddresses::assert_aptos_framework(aptos_framework);
 
         let (mint_cap, burn_cap) = Coin::initialize<TestCoin>(
-            core_framework,
+            aptos_framework,
             ascii::string(b"Test Coin"),
             ascii::string(b"TC"),
             6, /* decimals */
             false, /* monitor_supply */
         );
 
+        // Aptos framework needs mint cap to mint coins to initial validators.
+        move_to(aptos_framework, Capabilities { mint_cap: copy mint_cap });
+
         // Mint the core resource account TestCoin for gas so it can execute system transactions.
+        // TODO: Only do this for testnets.
         Coin::register_internal<TestCoin>(core_resource);
         let coins = Coin::mint<TestCoin>(
             18446744073709551615,
             &mint_cap,
         );
         Coin::deposit<TestCoin>(signer::address_of(core_resource), coins);
-
-        // Save MintCapability so we can give Faucet mint capability when one claims.
-        move_to(core_framework, Capabilities { mint_cap: copy mint_cap });
-
-        // Also give Core resources account mint capability so it can mint test coins if needed.
         move_to(core_resource, Capabilities { mint_cap: copy mint_cap });
-
-        // Give Core Resources ability to delegate/create mint capability so it can grant the
-        // faucet account mint cap.
         move_to(core_resource, Delegations { inner: vector::empty() });
 
         (mint_cap, burn_cap)
@@ -106,7 +102,7 @@ module AptosFramework::TestCoin {
         let DelegatedMintCapability { to: _} = vector::swap_remove(delegations, idx);
 
         // Make a copy of mint cap and give it to the specified account.
-        let mint_cap = borrow_global<Capabilities>(@AptosFramework).mint_cap;
+        let mint_cap = borrow_global<Capabilities>(@CoreResources).mint_cap;
         move_to(account, Capabilities { mint_cap });
     }
 

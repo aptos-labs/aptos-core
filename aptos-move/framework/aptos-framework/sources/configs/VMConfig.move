@@ -79,11 +79,10 @@ module AptosFramework::VMConfig {
         min_price_per_gas_unit: u64,
     ) {
         Timestamp::assert_genesis();
-
-        SystemAddresses::assert_core_resource(account);
+        SystemAddresses::assert_aptos_framework(account);
 
         assert!(
-            !exists<VMConfig>(@CoreResources),
+            !exists<VMConfig>(@AptosFramework),
             errors::already_published(ECONFIG)
         );
 
@@ -139,9 +138,9 @@ module AptosFramework::VMConfig {
             errors::invalid_argument(EGAS_CONSTANT_INCONSISTENCY)
         );
 
-        assert!(exists<VMConfig>(@CoreResources), errors::not_published(ECONFIG));
+        assert!(exists<VMConfig>(@AptosFramework), errors::not_published(ECONFIG));
 
-        let gas_constants = &mut borrow_global_mut<VMConfig>(@CoreResources).gas_schedule.gas_constants;
+        let gas_constants = &mut borrow_global_mut<VMConfig>(@AptosFramework).gas_schedule.gas_constants;
 
         gas_constants.global_memory_per_byte_cost       = global_memory_per_byte_cost;
         gas_constants.global_memory_per_byte_write_cost = global_memory_per_byte_write_cost;

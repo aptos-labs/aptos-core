@@ -6,8 +6,7 @@ use aptos_management::error::Error;
 use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config,
-    account_config::AccountResource,
+    account_config::{AccountResource, CORE_CODE_ADDRESS},
     on_chain_config::{access_path_for_config, OnChainConfig},
     transaction::SignedTransaction,
     validator_config::ValidatorConfig,
@@ -72,15 +71,13 @@ impl RestClient {
         &self,
         account: Option<AccountAddress>,
     ) -> Result<Vec<ValidatorInfo>, Error> {
-        let validator_set_account = account_config::validator_set_address();
         let access_path =
             access_path_for_config(aptos_types::on_chain_config::ValidatorSet::CONFIG_ID).path;
         let resource_type = std::str::from_utf8(&access_path)
             .map_err(|e| Error::RestReadError("Unable to form resource type", e.to_string()))?;
 
-        let validator_set: aptos_types::on_chain_config::ValidatorSet = self
-            .get_resource(validator_set_account, resource_type)
-            .await?;
+        let validator_set: aptos_types::on_chain_config::ValidatorSet =
+            self.get_resource(CORE_CODE_ADDRESS, resource_type).await?;
 
         let mut validator_infos = vec![];
         for validator_info in validator_set.payload() {

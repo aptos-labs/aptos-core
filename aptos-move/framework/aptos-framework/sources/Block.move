@@ -36,7 +36,7 @@ module AptosFramework::Block {
     /// This can only be called during Genesis.
     public fun initialize_block_metadata(account: &signer, epoch_internal: u64) {
         Timestamp::assert_genesis();
-        SystemAddresses::assert_core_resource(account);
+        SystemAddresses::assert_aptos_framework(account);
 
         assert!(!is_initialized(), errors::already_published(EBLOCK_METADATA));
         move_to<BlockMetadata>(
@@ -55,13 +55,13 @@ module AptosFramework::Block {
         _gov_proposal: GovernanceProposal,
         new_epoch_interval: u64,
     ) acquires BlockMetadata {
-        let block_metadata = borrow_global_mut<BlockMetadata>(@CoreResources);
+        let block_metadata = borrow_global_mut<BlockMetadata>(@AptosFramework);
         block_metadata.epoch_internal = new_epoch_interval;
     }
 
     /// Helper function to determine whether this module has been initialized.
     fun is_initialized(): bool {
-        exists<BlockMetadata>(@CoreResources)
+        exists<BlockMetadata>(@AptosFramework)
     }
 
     /// Set the metadata for the current block.
@@ -86,7 +86,7 @@ module AptosFramework::Block {
             errors::requires_address(EVM_OR_VALIDATOR)
         );
 
-        let block_metadata_ref = borrow_global_mut<BlockMetadata>(@CoreResources);
+        let block_metadata_ref = borrow_global_mut<BlockMetadata>(@AptosFramework);
         Timestamp::update_global_time(&vm, proposer, timestamp);
         block_metadata_ref.height = block_metadata_ref.height + 1;
         event::emit_event<NewBlockEvent>(
@@ -113,6 +113,6 @@ module AptosFramework::Block {
     /// Get the current block height
     public fun get_current_block_height(): u64 acquires BlockMetadata {
         assert!(is_initialized(), errors::not_published(EBLOCK_METADATA));
-        borrow_global<BlockMetadata>(@CoreResources).height
+        borrow_global<BlockMetadata>(@AptosFramework).height
     }
 }

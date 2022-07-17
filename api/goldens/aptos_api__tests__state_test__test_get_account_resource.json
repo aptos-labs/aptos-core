@@ -1,6 +1,6 @@
 {
   "type": "0x1::guid::Generator",
   "data": {
-    "counter": "7"
+    "counter": "3"
   }
 }

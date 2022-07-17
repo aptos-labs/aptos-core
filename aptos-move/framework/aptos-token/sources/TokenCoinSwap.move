@@ -240,9 +240,9 @@ module AptosToken::TokenCoinSwap {
         deposit_token(token_owner, tokens);
     }
 
-    #[test(token_owner = @0xAB, coin_owner = @0x1, core_resources = @CoreResources)]
-    public entry fun test_exchange_coin_for_token(token_owner: signer, coin_owner: signer, core_resources: signer) acquires TokenStoreEscrow, TokenListings {
-        Timestamp::set_time_has_started_for_testing(&core_resources);
+    #[test(token_owner = @0xAB, coin_owner = @0x1, aptos_framework = @AptosFramework)]
+    public entry fun test_exchange_coin_for_token(token_owner: signer, coin_owner: signer, aptos_framework: signer) acquires TokenStoreEscrow, TokenListings {
+        Timestamp::set_time_has_started_for_testing(&aptos_framework);
         Timestamp::update_global_time_for_test(10000000);
         let token_id = TokenV1::create_collection_and_token(&token_owner, 100, 100, 100);
         TokenV1::initialize_token_store(&coin_owner);

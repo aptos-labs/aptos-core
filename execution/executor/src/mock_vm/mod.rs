@@ -9,12 +9,13 @@ use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
+    account_config::CORE_CODE_ADDRESS,
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::EventKey,
     on_chain_config::{
-        access_path_for_config, config_address, new_epoch_event_key, ConfigurationResource,
-        OnChainConfig, ValidatorSet,
+        access_path_for_config, new_epoch_event_key, ConfigurationResource, OnChainConfig,
+        ValidatorSet,
     },
     state_store::state_key::StateKey,
     transaction::{
@@ -160,7 +161,7 @@ impl VMExecutor for MockVM {
                     );
                     read_state_value_from_storage(
                         state_view,
-                        &AccessPath::new(config_address(), ConfigurationResource::resource_path()),
+                        &AccessPath::new(CORE_CODE_ADDRESS, ConfigurationResource::resource_path()),
                     );
                     outputs.push(TransactionOutput::new(
                         // WriteSet cannot be empty so use genesis writeset only for testing.
@@ -254,7 +255,7 @@ fn gen_genesis_writeset() -> WriteSet {
     ));
     write_set.push((
         StateKey::AccessPath(AccessPath::new(
-            config_address(),
+            CORE_CODE_ADDRESS,
             ConfigurationResource::resource_path(),
         )),
         WriteOp::Value(bcs::to_bytes(&ConfigurationResource::default()).unwrap()),

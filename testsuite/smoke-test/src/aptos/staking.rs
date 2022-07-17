@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_transaction_builder::aptos_stdlib;
-use aptos_types::{account_address::AccountAddress, account_config::aptos_root_address};
+use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use forge::{AptosContext, AptosTest, Result, Test};
 
 pub struct Staking;
@@ -88,7 +88,7 @@ async fn stake_pool_from_addr(ctx: &AptosContext<'_>, addr: AccountAddress) -> s
 
 async fn validator_set(ctx: &AptosContext<'_>) -> serde_json::Value {
     ctx.client()
-        .get_account_resource(aptos_root_address(), "0x1::Stake::ValidatorSet")
+        .get_account_resource(CORE_CODE_ADDRESS, "0x1::Stake::ValidatorSet")
         .await
         .unwrap()
         .into_inner()

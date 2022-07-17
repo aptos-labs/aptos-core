@@ -3,7 +3,6 @@
 
 use crate::{
     access_path::AccessPath,
-    account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,
     event::{EventHandle, EventKey},
 };
@@ -43,12 +42,6 @@ pub use self::{
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ConfigID(&'static str, &'static str, &'static str);
-
-pub const CONFIG_ADDRESS_STR: &str = "0xA550C18";
-
-pub fn config_address() -> AccountAddress {
-    AccountAddress::from_hex_literal(CONFIG_ADDRESS_STR).expect("failed to get address")
-}
 
 impl ConfigID {
     pub fn name(&self) -> String {
@@ -125,8 +118,7 @@ pub trait ConfigStorage {
 /// Trait to be implemented by a Rust struct representation of an on-chain config
 /// that is stored in storage as a serialized byte array
 pub trait OnChainConfig: Send + Sync + DeserializeOwned {
-    // aptos_root_address
-    const ADDRESS: &'static str = CONFIG_ADDRESS_STR;
+    const ADDRESS: &'static str = "0x1";
     const IDENTIFIER: &'static str;
     const CONFIG_ID: ConfigID = ConfigID(Self::ADDRESS, Self::IDENTIFIER, Self::IDENTIFIER);
 
@@ -163,7 +155,7 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
 }
 
 pub fn new_epoch_event_key() -> EventKey {
-    EventKey::new_from_address(&config_address(), 5)
+    EventKey::new_from_address(&CORE_CODE_ADDRESS, 2)
 }
 
 pub fn struct_tag_for_config(config_name: Identifier) -> StructTag {
@@ -188,7 +180,7 @@ pub fn access_path_for_config(config_id: ConfigID) -> AccessPath {
         type_params: vec![],
     };
     AccessPath::new(
-        config_address(),
+        CORE_CODE_ADDRESS,
         AccessPath::resource_access_vec(struct_tag),
     )
 }
@@ -234,7 +226,7 @@ impl Default for ConfigurationResource {
         Self {
             epoch: 0,
             last_reconfiguration_time: 0,
-            events: EventHandle::new_from_address(&crate::account_config::aptos_root_address(), 16),
+            events: EventHandle::new_from_address(&CORE_CODE_ADDRESS, 16),
         }
     }
 }
