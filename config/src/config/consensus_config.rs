@@ -32,7 +32,7 @@ pub struct ConsensusConfig {
 impl Default for ConsensusConfig {
     fn default() -> ConsensusConfig {
         ConsensusConfig {
-            max_block_size: 3000,
+            max_block_size: 6000,
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
