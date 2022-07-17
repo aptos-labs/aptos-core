@@ -123,8 +123,8 @@ struct AptosRunArgs {
     #[structopt(long = "private-key", parse(try_from_str = RawPrivateKey::parse))]
     private_key: Option<RawPrivateKey>,
 
-    #[structopt(long = "admin-script")]
-    admin_script: bool,
+    #[structopt(long = "script")]
+    script: bool,
 
     #[structopt(long = "expiration")]
     expiration_time: Option<u64>,
@@ -715,23 +715,19 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
     ) -> Result<(Option<String>, SerializedReturnValues)> {
-        if signers.len() != 2 {
-            panic!("Expected 2 signer, got {}.", signers.len());
-        }
         let signer0 = self.compiled_state().resolve_address(&signers[0]);
-        let signer1 = self.compiled_state().resolve_address(&signers[1]);
 
         if gas_budget.is_some() {
-            panic!("Cannot set gas budget for admin script.")
+            panic!("Cannot set gas budget for script.")
         }
         if extra_args.gas_unit_price.is_some() {
-            panic!("Cannot set gas price for admin script.")
+            panic!("Cannot set gas price for script.")
         }
         if extra_args.expiration_time.is_some() {
-            panic!("Cannot set expiration time for admin script.")
+            panic!("Cannot set expiration time for script.")
         }
         if extra_args.secondary_signers.is_some() {
-            panic!("Cannot set secondary signers for admin script.")
+            panic!("Cannot set secondary signers for script.")
         }
 
         let private_key = match (extra_args.private_key, &signers[0]) {
@@ -756,7 +752,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             None,
         )?;
 
-        let txn = RawTransaction::new_writeset_script(
+        let txn = RawTransaction::new_script(
             signer0,
             params.sequence_number,
             TransactionScript::new(
@@ -767,7 +763,9 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     .map(|arg| TransactionArgument::try_from(arg).unwrap())
                     .collect(),
             ),
-            signer1,
+            params.max_gas_amount,
+            params.gas_unit_price,
+            params.expiration_timestamp_secs,
             ChainId::test(),
         )
         .sign(&private_key, Ed25519PublicKey::from(&private_key))
@@ -801,8 +799,8 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
     ) -> Result<(Option<String>, SerializedReturnValues)> {
-        if extra_args.admin_script {
-            panic!("Admin script functions are not supported.")
+        if extra_args.script {
+            panic!("Script functions are not supported.")
         }
 
         if signers.len() != 1 {
