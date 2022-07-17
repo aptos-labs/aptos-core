@@ -95,7 +95,7 @@ impl Default for EmitJobRequest {
     fn default() -> Self {
         Self {
             rest_clients: Vec::new(),
-            accounts_per_client: 20,
+            accounts_per_client: 15,
             workers_per_endpoint: None,
             thread_params: EmitThreadParams::default(),
             gas_price: 0,
@@ -240,7 +240,7 @@ impl<'t> TxnEmitter<'t> {
         let workers_per_endpoint = match req.workers_per_endpoint {
             Some(x) => x,
             None => {
-                let target_threads = 500;
+                let target_threads = 600;
                 // Trying to create somewhere between target_threads/2..target_threads threads
                 // We want to have equal numbers of threads for each endpoint, so that they are equally loaded
                 // Otherwise things like flamegrap/perf going to show different numbers depending on which endpoint is chosen
