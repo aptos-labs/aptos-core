@@ -7,10 +7,10 @@ module shared_account::SharedAccount {
     use AptosFramework::Account;
     use AptosFramework::Coin;
 
-    // struct Share records the address of the share_holder and the numerator and the denominator of a fraction
+    // struct Share records the address of the share_holder and their corresponding number of shares
     struct Share has store {
         share_holder: address,
-        numerator: u64,
+        num_shares: u64,
     }
 
     // Resource representing a shared account
@@ -37,9 +37,12 @@ module shared_account::SharedAccount {
         while (i < vector::length(&addresses)) {
             let num_shares = *vector::borrow(&numerators, i);
             let addr = *vector::borrow(&addresses, i);
+
+            // make sure that the account exists, so when we call disperse() it wouldn't fail
+            // because one of the accounts does not exist
             assert!(Account::exists_at(addr), errors::invalid_argument(EACCOUNT_NOT_FOUND));
 
-            vector::push_back(&mut share_record, Share { share_holder: addr, numerator: num_shares });
+            vector::push_back(&mut share_record, Share { share_holder: addr, num_shares: num_shares });
             total = total + num_shares;
             i = i + 1;
         };
@@ -72,7 +75,7 @@ module shared_account::SharedAccount {
         let i = 0;
         while (i < vector::length(&shared_account.share_record)) {
             let share_record = vector::borrow(&shared_account.share_record, i);
-            let current_amount = share_record.numerator * total_balance / shared_account.total_shares;
+            let current_amount = share_record.num_shares * total_balance / shared_account.total_shares;
             Coin::transfer<CoinType>(&resource_signer, share_record.share_holder, current_amount);
             i = i + 1;
         };
