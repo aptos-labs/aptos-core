@@ -20,6 +20,7 @@ module AptosFramework::AptosGovernance {
     use AptosFramework::Account::{SignerCapability, create_signer_with_capability};
     use AptosFramework::Coin;
     use AptosFramework::GovernanceProposal::{Self, GovernanceProposal};
+    use AptosFramework::Reconfiguration;
     use AptosFramework::Stake;
     use AptosFramework::SystemAddresses;
     use AptosFramework::Table::{Self, Table};
@@ -265,10 +266,14 @@ module AptosFramework::AptosGovernance {
     }
 
     /// Return a signer for making changes to 0x1 as part of on-chain governance proposal process.
-    /// Accept a GovernanceProposal object instead of a reference so it can't be used more than once.
-    public fun get_framework_signer(_proposal: GovernanceProposal): signer acquires GovernanceResponsbility {
+    public fun get_framework_signer(_proposal: &GovernanceProposal): signer acquires GovernanceResponsbility {
         let governance_responsibility = borrow_global<GovernanceResponsbility>(@AptosFramework);
         create_signer_with_capability(&governance_responsibility.signer_cap)
+    }
+
+    /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
+    public fun reconfigure(_proposal: &GovernanceProposal) {
+        Reconfiguration::reconfigure();
     }
 
     #[test(core_resources = @CoreResources, aptos_framework = @AptosFramework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
