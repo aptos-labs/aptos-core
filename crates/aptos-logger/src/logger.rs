@@ -56,7 +56,7 @@ pub fn set_global_logger(logger: Arc<dyn Logger>) {
     //tracing_subscriber::registry().with(crate::tracing_adapter::TracingToAptosDataLayer::layer()).init();
      */
     let console_layer = console_subscriber::ConsoleLayer::builder()
-        .with_default_env()
+        .server_addr(([0, 0, 0, 0], 6669))
         .spawn();
 
     tracing_subscriber::registry()
