@@ -219,6 +219,7 @@ impl RoundManager {
                 counters::TIMEOUT_ROUNDS_COUNT.inc();
             }
         };
+        info!("Just a random spam");
         info!(
             self.new_log(LogEvent::NewRound),
             reason = new_round_event.reason
