@@ -67,8 +67,8 @@ impl BlockRequest {
         Self::new(chain_id, Some(PartialBlockIdentifier::by_hash(hash)))
     }
 
-    pub fn by_version(chain_id: ChainId, version: u64) -> Self {
-        Self::new(chain_id, Some(PartialBlockIdentifier::by_version(version)))
+    pub fn by_index(chain_id: ChainId, index: u64) -> Self {
+        Self::new(chain_id, Some(PartialBlockIdentifier::block_index(index)))
     }
 }
 
