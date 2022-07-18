@@ -167,60 +167,27 @@ async fn test_block() {
     let (swarm, _cli, _faucet, rosetta_client) = setup_test(1, 0).await;
     let chain_id = swarm.chain_id();
 
+    // Genesis by version
     let request_genesis = BlockRequest::by_index(chain_id, 0);
-    let by_version_response = try_until_ok(|| rosetta_client.block(&request_genesis))
+    let genesis_block = try_until_ok(|| rosetta_client.block(&request_genesis))
         .await
-        .unwrap();
-    let genesis_block = by_version_response.block.unwrap();
-
-    // Genesis txn should always have parent be same as block
-    assert_eq!(
-        genesis_block.block_identifier,
-        genesis_block.parent_block_identifier
-    );
-    assert_eq!(
-        HashValue::zero().to_hex(),
-        genesis_block.block_identifier.hash,
-    );
-    assert_eq!(0, genesis_block.block_identifier.index);
-
-    // Genesis timestamp is always Y2K
-    assert_eq!(Y2K_SECS, genesis_block.timestamp);
-
-    // There should only be the genesis transaction
-    assert_eq!(1, genesis_block.transactions.len());
-    let genesis_txn = genesis_block.transactions.first().unwrap();
-
-    // Version should match as 0
-    assert_eq!(
-        0,
-        genesis_txn.metadata.unwrap().version.0,
-        "Genesis version"
-    );
-
-    // There should be at least one transfer in genesis
-    assert!(!genesis_txn.operations.is_empty());
+        .unwrap().block.unwrap();
+    assert_genesis_block(&genesis_block);
 
     // Get genesis txn by hash
     let request_genesis_by_hash =
         BlockRequest::by_hash(chain_id, genesis_block.block_identifier.hash.clone());
-    let by_hash_response = rosetta_client
+    let genesis_block_by_hash = rosetta_client
         .block(&request_genesis_by_hash)
         .await
-        .unwrap();
-    let genesis_block_by_hash = by_hash_response.block.unwrap();
+        .unwrap().block.unwrap();
 
     // Both blocks should be the same
-    assert_eq!(genesis_block, genesis_block_by_hash);
+    assert_eq!(genesis_block, genesis_block_by_hash, "Genesis by hash or by index should be the same");
 
     // Responses should be idempotent
-    let response = rosetta_client.block(&request_genesis).await.unwrap();
-    assert_eq!(response.block.unwrap(), genesis_block_by_hash);
-    let response = rosetta_client
-        .block(&request_genesis_by_hash)
-        .await
-        .unwrap();
-    assert_eq!(response.block.unwrap(), genesis_block_by_hash);
+    let idempotent_block = rosetta_client.block(&request_genesis).await.unwrap().block.unwrap();
+    assert_eq!(idempotent_block, genesis_block_by_hash, "Blocks should be idempotent");
 
     // Block 1 is always a reconfig with exactly 1 txn
     let block_1 = get_block(&rosetta_client, chain_id, 1).await;
@@ -301,6 +268,49 @@ async fn test_block() {
         .unwrap();
     assert!(newer_block.block_identifier.index >= latest_block.block_identifier.index);
     assert!(newer_block.timestamp >= latest_block.timestamp);
+}
+
+fn assert_genesis_block(block: &Block) {
+    assert_eq!(
+        genesis_block.block_identifier, genesis_block.parent_block_identifier,
+        "The genesis block is also it's own parent"
+    );
+    assert_eq!(
+        HashValue::zero().to_hex(),
+        block.block_identifier.hash,
+        "The genesis block hash is always 0s"
+    );
+    assert_eq!(
+        0, block.block_identifier.index,
+        "The genesis block index is always 0"
+    );
+
+    assert_eq!(
+        Y2K_SECS, block.timestamp,
+        "The genesis timestamp should be Y2K seconds"
+    );
+    assert_eq!(
+        1,
+        block.transactions.len(),
+        "The genesis block should be exactly 1 transaction"
+    );
+
+    let genesis_txn = block.transactions.first().unwrap();
+    assert_eq!(
+        0,
+        genesis_txn.metadata.unwrap().version.0,
+        "Genesis version should be 0"
+    );
+    assert_ne!(
+        HashValue::zero().to_hex(),
+        genesis_txn.transaction_identifier.hash,
+        "Genesis should have a txn hash"
+    );
+
+    assert!(
+        !genesis_txn.operations.is_empty(),
+        "There should be at least one operation in genesis"
+    );
 }
 
 async fn get_block(rosetta_client: &RosettaClient, chain_id: ChainId, index: u64) -> Block {
