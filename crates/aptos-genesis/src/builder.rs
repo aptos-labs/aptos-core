@@ -39,7 +39,6 @@ const VFN_IDENTITY: &str = "vfn-identity.yaml";
 const PRIVATE_IDENTITY: &str = "private-identity.yaml";
 const CONFIG_FILE: &str = "node.yaml";
 const GENESIS_BLOB: &str = "genesis.blob";
-const SECURE_DATA: &str = "secure-data.json";
 
 /// Configuration to run a local validator node
 #[derive(Debug, Clone)]
@@ -546,7 +545,8 @@ impl Builder {
         // Ensure safety rules runs in a thread
         config.consensus.safety_rules.service = SafetyRulesService::Thread;
         let mut storage = OnDiskStorageConfig::default();
-        storage.set_data_dir(validator.dir.join(SECURE_DATA));
+        storage.set_data_dir(validator.dir.clone());
+
         config.consensus.safety_rules.backend = SecureBackend::OnDiskStorage(storage);
 
         if index > 0 || self.randomize_first_validator_ports {
