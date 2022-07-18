@@ -93,7 +93,7 @@ To transfer coins from Alice’s account to Bob’s account, we need to prepare 
 const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::TestCoin::TestCoin"));
 
 const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-  TxnBuilderTypes.ScriptFunction.natual(
+  TxnBuilderTypes.ScriptFunction.natural(
     // Fully qualified module name, `AccountAddress::ModuleName`
     "0x1::Coin",
     // Module function
@@ -144,7 +144,7 @@ const rawTxn = new TxnBuilderTypes.RawTransaction(
   new TxnBuilderTypes.ChainId(chainId),
 );
 
-// Sign the raw transaction with account1's private key
+// Sign the raw transaction with Alice's private key
 const bcsTxn = AptosClient.generateBCSTransaction(alice, rawTxn);
 // Submit the transaction
 const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);

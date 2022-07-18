@@ -58,7 +58,7 @@ The core SDK layer exposes the functionalities needed by most applications, incl
 
 The optional application layer provides built-in support for **NFT token** API. 
 
-:::note
+:::tip
 You can also use this NFT token API as an example before you start developing your own application APIs using the SDK.
 :::
 
