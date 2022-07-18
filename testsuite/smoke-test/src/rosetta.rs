@@ -33,6 +33,7 @@ pub async fn setup_test(
         tls_cert_path: None,
         tls_key_path: None,
         content_length_limit: None,
+        use_poem_backend: false,
     };
 
     // Start the server
