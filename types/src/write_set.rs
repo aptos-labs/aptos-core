@@ -2,16 +2,47 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! For each transaction the VM executes, the VM will output a `WriteSet` that contains each access
-//! path it updates. For each access path, the VM can either give its new value or delete it.
+//! path it updates. For each access path, the VM can either give its new value or delete it. If
+//! aggregator is used, a delta update is used.
 
 use crate::state_store::state_key::StateKey;
 use anyhow::Result;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use serde::{Deserialize, Serialize};
 
+/// Specifies operation such as +, - to use with `WriteOp::Delta`.
+#[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DeltaOperation {
+    Addition,
+    Subtraction,
+}
+
+impl std::fmt::Debug for DeltaOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeltaOperation::Addition => write!(f, "+"),
+            DeltaOperation::Subtraction => write!(f, "-"),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeltaLimit(pub u128);
+
+impl std::fmt::Debug for DeltaLimit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "result <= {}", self.0)
+    }
+}
+
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {
     Deletion,
+    Delta(
+        DeltaOperation,
+        DeltaLimit,
+        #[serde(with = "serde_bytes")] Vec<u8>,
+    ),
     Value(#[serde(with = "serde_bytes")] Vec<u8>),
 }
 
@@ -20,6 +51,7 @@ impl WriteOp {
     pub fn is_deletion(&self) -> bool {
         match self {
             WriteOp::Deletion => true,
+            WriteOp::Delta(..) => false,
             WriteOp::Value(_) => false,
         }
     }
@@ -35,6 +67,16 @@ impl std::fmt::Debug for WriteOp {
                     .iter()
                     .map(|byte| format!("{:02x}", byte))
                     .collect::<String>()
+            ),
+            WriteOp::Delta(op, limit, value) => write!(
+                f,
+                "Delta({:?}{} ensures {:?})",
+                op,
+                value
+                    .iter()
+                    .map(|byte| format!("{:02x}", byte))
+                    .collect::<String>(),
+                limit
             ),
             WriteOp::Deletion => write!(f, "Deletion"),
         }

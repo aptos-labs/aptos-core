@@ -50,6 +50,7 @@ impl FakeDataStore {
                 WriteOp::Deletion => {
                     self.remove(state_key);
                 }
+                WriteOp::Delta(..) => unreachable!("deltas are only used in executor"),
             }
         }
     }
