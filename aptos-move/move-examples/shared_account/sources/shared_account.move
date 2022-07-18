@@ -1,0 +1,136 @@
+// This module demonstrates a basic shared account that could be used for NFT royalties
+// Users can (1) create a shared account (2) disperse the coins to multiple creators
+module shared_account::SharedAccount {
+    use std::errors;
+    use std::signer;
+    use std::vector;
+    use AptosFramework::Account;
+    use AptosFramework::Coin;
+
+    // struct Share records the address of the share_holder and the numerator and the denominator of a fraction
+    struct Share has store {
+        share_holder: address,
+        numerator: u64,
+    }
+
+    // Resource representing a shared account
+    struct SharedAccount has key {
+        share_record: vector<Share>,
+        total_shares: u64,
+        signer_capability: Account::SignerCapability,
+    }
+
+    struct SharedAccountEvent has key {
+        resource_addr: address,
+    }
+
+    const EACCOUNT_NOT_FOUND: u64 = 0;
+    const ERESOURCE_DNE: u64 = 1;
+    const EINSUFFICIENT_BALANCE: u64 = 2;
+
+    // Create and initialize a shared account
+    public entry fun initialize(source: &signer, seed: vector<u8>, addresses: vector<address>, numerators: vector<u64>) {
+        let i = 0;
+        let total = 0;
+        let share_record = vector::empty<Share>();
+
+        while (i < vector::length(&addresses)) {
+            let num_shares = *vector::borrow(&numerators, i);
+            let addr = *vector::borrow(&addresses, i);
+            assert!(Account::exists_at(addr), errors::invalid_argument(EACCOUNT_NOT_FOUND));
+
+            vector::push_back(&mut share_record, Share { share_holder: addr, numerator: num_shares });
+            total = total + num_shares;
+            i = i + 1;
+        };
+
+        let (resource_signer, resource_signer_cap) = Account::create_resource_account(source, seed);
+        move_to(
+            &resource_signer,
+            SharedAccount {
+                share_record,
+                total_shares: total,
+                signer_capability: resource_signer_cap,
+            }
+        );
+
+        move_to(source, SharedAccountEvent {
+            resource_addr: signer::address_of(&resource_signer)
+        });
+    }
+
+    // Disperse all available balance to addresses in the shared account
+    public entry fun disperse<CoinType>(resource_addr: address) acquires SharedAccount {
+        assert!(exists<SharedAccount>(resource_addr), errors::invalid_argument(ERESOURCE_DNE));
+
+        let total_balance = Coin::balance<CoinType>(resource_addr);
+        assert!(total_balance > 0, errors::limit_exceeded(EINSUFFICIENT_BALANCE));
+
+        let shared_account = borrow_global<SharedAccount>(resource_addr);
+        let resource_signer = Account::create_signer_with_capability(&shared_account.signer_capability);
+
+        let i = 0;
+        while (i < vector::length(&shared_account.share_record)) {
+            let share_record = vector::borrow(&shared_account.share_record, i);
+            let current_amount = share_record.numerator * total_balance / shared_account.total_shares;
+            Coin::transfer<CoinType>(&resource_signer, share_record.share_holder, current_amount);
+            i = i + 1;
+        };
+    }
+
+    #[test_only]
+    public entry fun set_up(user: signer, test_user1: signer, test_user2: signer) : address acquires SharedAccountEvent {
+        let addresses = vector::empty<address>();
+        let numerators = vector::empty<u64>();
+        let seed = x"01";
+        let user_addr = signer::address_of(&user);
+        let user_addr1 = signer::address_of(&test_user1);
+        let user_addr2 = signer::address_of(&test_user2);
+
+        Account::create_account(user_addr);
+        Account::create_account(user_addr1);
+        Account::create_account(user_addr2);
+
+        vector::push_back(&mut addresses, user_addr1);
+        vector::push_back(&mut addresses, user_addr2);
+
+        vector::push_back(&mut numerators, 1);
+        vector::push_back(&mut numerators, 4);
+
+        initialize(&user, seed, addresses, numerators);
+
+        assert!(exists<SharedAccountEvent>(user_addr), errors::not_published(EACCOUNT_NOT_FOUND));
+        *&borrow_global<SharedAccountEvent>(user_addr).resource_addr
+    }
+
+    #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113, core_resources = @CoreResources, core_framework = @AptosFramework)]
+    public entry fun test_disperse(user: signer, test_user1: signer, test_user2: signer, core_resources: signer, core_framework: signer) acquires SharedAccount, SharedAccountEvent {
+        use AptosFramework::TestCoin::{Self, TestCoin};
+        let user_addr1 = signer::address_of(&test_user1);
+        let user_addr2 = signer::address_of(&test_user2);
+        let resource_addr = set_up(user, test_user1, test_user2);
+        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework, &core_resources);
+
+        let shared_account = borrow_global<SharedAccount>(resource_addr);
+        let resource_signer = Account::create_signer_with_capability(&shared_account.signer_capability);
+        Coin::register<TestCoin>(&resource_signer);
+        TestCoin::mint(&core_framework, resource_addr, 1000);
+        disperse<TestCoin>(resource_addr);
+        Coin::destroy_mint_cap<TestCoin>(mint_cap);
+        Coin::destroy_burn_cap<TestCoin>(burn_cap);
+
+        assert!(Coin::balance<TestCoin>(user_addr1) == 200, 0);
+        assert!(Coin::balance<TestCoin>(user_addr2) == 800, 1);
+    }
+
+    #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113)]
+    #[expected_failure]
+    public entry fun test_disperse_insufficient_balance(user: signer, test_user1: signer, test_user2: signer) acquires SharedAccount, SharedAccountEvent {
+        use AptosFramework::TestCoin::TestCoin;
+        let resource_addr = set_up(user, test_user1, test_user2);
+        let shared_account = borrow_global<SharedAccount>(resource_addr);
+        let resource_signer = Account::create_signer_with_capability(&shared_account.signer_capability);
+        Coin::register<TestCoin>(&resource_signer);
+        disperse<TestCoin>(resource_addr);
+    }
+}
