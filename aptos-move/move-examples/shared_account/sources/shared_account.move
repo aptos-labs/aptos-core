@@ -37,6 +37,9 @@ module shared_account::SharedAccount {
         while (i < vector::length(&addresses)) {
             let num_shares = *vector::borrow(&numerators, i);
             let addr = *vector::borrow(&addresses, i);
+
+            // make sure that the account exists, so when we call disperse() it wouldn't fail
+            // because one of the accounts does not exist
             assert!(Account::exists_at(addr), errors::invalid_argument(EACCOUNT_NOT_FOUND));
 
             vector::push_back(&mut share_record, Share { share_holder: addr, numerator: num_shares });
