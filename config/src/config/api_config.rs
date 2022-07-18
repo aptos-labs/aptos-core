@@ -18,6 +18,9 @@ pub struct ApiConfig {
     // optional for compatible with old configuration
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_length_limit: Option<u64>,
+    /// If set, use the server and API built using Poem, which enables
+    /// generation of an OpenAPI spec.
+    pub use_poem_backend: bool,
 }
 
 pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
@@ -38,6 +41,7 @@ impl Default for ApiConfig {
             tls_cert_path: None,
             tls_key_path: None,
             content_length_limit: None,
+            use_poem_backend: false,
         }
     }
 }

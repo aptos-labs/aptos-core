@@ -1,16 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{context::Context, index};
-
+use crate::{context::Context, index, poem_backend::runtime::attach_poem_to_runtime};
+use anyhow::Context as AnyhowContext;
 use aptos_config::config::{ApiConfig, NodeConfig};
 use aptos_mempool::MempoolClientSender;
 use aptos_types::chain_id::ChainId;
-use storage_interface::DbReader;
-use warp::{Filter, Reply};
-
 use std::{convert::Infallible, net::SocketAddr, sync::Arc};
+use storage_interface::DbReader;
 use tokio::runtime::{Builder, Runtime};
+use warp::{Filter, Reply};
 
 /// Creates HTTP server (warp-based) serves for both REST and JSON-RPC API.
 /// When api and json-rpc are configured with same port, both API will be served for the port.
@@ -27,16 +26,20 @@ pub fn bootstrap(
         .thread_name("api")
         .enable_all()
         .build()
-        .expect("[api] failed to create runtime");
+        .context("[api] failed to create runtime")?;
 
-    let api = WebServer::from(config.api.clone());
-    let node_config = config.clone();
+    if config.api.use_poem_backend {
+        attach_poem_to_runtime(&runtime, config).context("Failed to attach poem to runtime")?;
+    } else {
+        let api = WebServer::from(config.api.clone());
+        let node_config = config.clone();
+        runtime.spawn(async move {
+            let context = Context::new(chain_id, db, mp_sender, node_config);
+            let routes = index::routes(context);
+            api.serve(routes).await;
+        });
+    }
 
-    runtime.spawn(async move {
-        let context = Context::new(chain_id, db, mp_sender, node_config);
-        let routes = index::routes(context);
-        api.serve(routes).await;
-    });
     Ok(runtime)
 }
 
