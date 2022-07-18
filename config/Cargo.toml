@@ -14,7 +14,11 @@ anyhow = "1.0.57"
 bcs = "0.1.3"
 get_if_addrs = { version = "0.5.3", default-features = false }
 mirai-annotations = "1.12.0"
+<<<<<<< HEAD
 poem-openapi = { version = "2.0.5", features = ["swagger-ui", "url"] }
+=======
+poem-openapi = { git = "https://github.com/poem-web/poem", rev = "cd27094b82bc07dfaf2cc87690b59a5cb4c7058d", features = ["swagger-ui", "url"] }
+>>>>>>> d65f95bcd5 ([API] Add request and response types for the JSON / BCS enum)
 rand = "0.7.3"
 serde = { version = "1.0.137", features = ["rc"], default-features = false }
 serde_yaml = "0.8.24"

@@ -18,7 +18,7 @@ pub struct BasicApi {
 
 #[OpenApi]
 impl BasicApi {
-    /// openapi
+    /// Show OpenAPI explorer
     ///
     /// Provides a UI that you can use to explore the API. You can also retrieve the API directly at `/openapi.yaml` and `/openapi.json`.
     #[oai(

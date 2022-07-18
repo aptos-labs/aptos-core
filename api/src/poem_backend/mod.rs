@@ -3,10 +3,13 @@
 
 use poem_openapi::Tags;
 
+mod accept_type;
 mod basic;
 mod bcs_payload;
 mod index;
 mod log;
+mod post;
+mod response;
 mod runtime;
 
 #[derive(Tags)]
@@ -18,6 +21,10 @@ pub enum ApiTags {
 pub use basic::BasicApi;
 pub use index::IndexApi;
 pub use log::middleware_log;
+pub use post::AptosPost;
+pub use response::{
+    AptosError, AptosErrorCode, AptosErrorResponse, AptosResponse, AptosResponseContent,
+};
 pub use runtime::attach_poem_to_runtime;
 
 // TODO: Move these impls throughout each of the files in the parent directory.
