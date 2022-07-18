@@ -21,7 +21,7 @@ use std::{convert::Infallible, fmt::LowerHex, future::Future, str::FromStr};
 use warp::Filter;
 
 /// The year 2000 in seconds, as this is the lower limit for Rosetta API implementations
-const Y2K_SECS: u64 = 946713600000;
+pub const Y2K_SECS: u64 = 946713600000;
 pub const BLOCKCHAIN: &str = "aptos";
 
 /// Checks the request network matches the server network
