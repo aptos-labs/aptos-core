@@ -135,9 +135,7 @@ impl Account {
         self.make_access_path(CoinStoreResource::struct_tag())
     }
 
-    // TODO: plug in the account type
     pub fn make_access_path(&self, tag: StructTag) -> AccessPath {
-        // TODO: we need a way to get the type (FatStructType) of the Account in place
         let resource_tag = ResourceKey::new(self.addr, tag);
         AccessPath::resource_access_path(resource_tag)
     }
@@ -383,10 +381,7 @@ impl CoinStore {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AccountData {
     account: Account,
-    withdrawal_capability: Option<WithdrawCapability>,
-    key_rotation_capability: Option<KeyRotationCapability>,
     sequence_number: u64,
-
     coin_store: CoinStore,
 }
 
@@ -435,8 +430,6 @@ impl AccountData {
     ) -> Self {
         let addr = *account.address();
         Self {
-            withdrawal_capability: Some(WithdrawCapability::new(addr)),
-            key_rotation_capability: Some(KeyRotationCapability::new(addr)),
             account,
             coin_store: CoinStore::new(
                 balance,
@@ -462,9 +455,7 @@ impl AccountData {
 
     /// Creates and returns the top-level resources to be published under the account
     pub fn to_value(&self) -> (Value, Value) {
-        // TODO: publish some concept of Account
         let account = Value::struct_(Struct::pack(vec![
-            // TODO: this needs to compute the auth key instead
             Value::vector_u8(AuthenticationKey::ed25519(&self.account.pubkey).to_vec()),
             Value::u64(self.sequence_number),
             Value::address(*self.address()),
@@ -568,45 +559,5 @@ impl AccountData {
     /// Returns the initial received events count.
     pub fn received_events_count(&self) -> u64 {
         self.coin_store.deposit_events.count()
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct WithdrawCapability {
-    account_address: AccountAddress,
-}
-impl WithdrawCapability {
-    pub fn new(account_address: AccountAddress) -> Self {
-        Self { account_address }
-    }
-
-    pub fn layout() -> MoveStructLayout {
-        MoveStructLayout::new(vec![MoveTypeLayout::Address])
-    }
-
-    pub fn value(&self) -> Value {
-        Value::vector_for_testing_only(vec![Value::struct_(Struct::pack(vec![Value::address(
-            self.account_address,
-        )]))])
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct KeyRotationCapability {
-    account_address: AccountAddress,
-}
-impl KeyRotationCapability {
-    pub fn new(account_address: AccountAddress) -> Self {
-        Self { account_address }
-    }
-
-    pub fn layout() -> MoveStructLayout {
-        MoveStructLayout::new(vec![MoveTypeLayout::Address])
-    }
-
-    pub fn value(&self) -> Value {
-        Value::vector_for_testing_only(vec![Value::struct_(Struct::pack(vec![Value::address(
-            self.account_address,
-        )]))])
     }
 }
