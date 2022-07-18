@@ -11,8 +11,6 @@ from typing import Any, Dict, Optional
 
 TESTNET_URL = "https://fullnode.devnet.aptoslabs.com"
 FAUCET_URL = "https://faucet.devnet.aptoslabs.com"
-TESTNET_URL = "http://127.0.0.1:8080"
-FAUCET_URL = "http://127.0.0.1:8081"
 
 #:!:>section_1
 class Account:
