@@ -191,7 +191,10 @@ fi
 
 # remove the "aptos-" prefix and add "net" suffix to get the chain name
 # as used by the deployment setup and as reported to o11y systems
-FORGE_CHAIN_NAME=${FORGE_CLUSTER_NAME#"aptos-"}net
+FORGE_CHAIN_NAME=${FORGE_CLUSTER_NAME#"aptos-"}
+if echo $FORGE_CLUSTER_NAME | grep -qv "forge"; then
+    FORGE_CHAIN_NAME="${FORGE_CHAIN_NAME}net"
+fi
 FORGE_DASHBOARD_LINK="${GRAFANA_BASE_URL}&var-namespace=${FORGE_NAMESPACE}&var-chain_name=${FORGE_CHAIN_NAME}&from=${FORGE_START_TIME_MS}&to=${FORGE_END_TIME_MS}"
 
 # build the logs link in a readable way...
