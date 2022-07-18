@@ -5,6 +5,7 @@ module aptos_token::token_v1 {
     use aptos_std::event::{Self, EventHandle};
     use std::signer;
     use std::vector;
+    use std::acl::{Self, ACL};
 
     use aptos_std::table::{Self, Table};
     use aptos_token::property_map::{Self, PropertyMap};
@@ -129,8 +130,11 @@ module aptos_token::token_v1 {
         tokens: Table<TokenId, Token>,
         // used for storing token PropertyMap that has a serial number bigger than 0
         token_properties: Table<TokenId, PropertyMap>,
+        // store the authority. stored at owner's account for easy quering who owns the authority over my token
+        token_auths: Table<TokenId, TokenAuthority>,
         deposit_events: EventHandle<DepositEvent>,
         withdraw_events: EventHandle<WithdrawEvent>,
+        burn_events: EventHandle<BurnTokenEvent>,
     }
 
     /// This config specifies which fields in the Collection are mutable
@@ -193,6 +197,12 @@ module aptos_token::token_v1 {
         amount: u64,
     }
 
+    ///
+    struct BurnTokenEvent has drop, store {
+        id: TokenId,
+        amount: u64,
+    }
+
     /// create collection event with creator address and collection name
     struct CreateCollectionEvent has drop, store {
         creator: address,
@@ -246,7 +256,7 @@ module aptos_token::token_v1 {
         property_keys: vector<vector<u8>>,
         property_values: vector<vector<u8>>,
         property_types: vector<vector<u8>>,
-    ) acquires Collections, TokenStore, TokenAuthorityStore {
+    ) acquires Collections, TokenStore {
         create_token(
             creator,
             string::utf8(collection),
@@ -464,8 +474,10 @@ module aptos_token::token_v1 {
                 TokenStore {
                     tokens: table::new(),
                     token_properties: table::new(),
+                    token_auths: table::new(),
                     deposit_events: event::new_event_handle<DepositEvent>(account),
                     withdraw_events: event::new_event_handle<WithdrawEvent>(account),
+                    burn_events: event::new_event_handle<BurnTokenEvent>(account),
                 },
             );
         }
@@ -696,7 +708,7 @@ module aptos_token::token_v1 {
         property_keys: vector<String>,
         property_values: vector<vector<u8>>,
         property_types: vector<String>
-    ): TokenId acquires Collections, TokenStore, TokenAuthorityStore {
+    ): TokenId acquires Collections, TokenStore {
         let token_mut_config = create_token_mutability_config(&mutate_setting);
 
         let tokendata_id = create_tokendata(
@@ -722,9 +734,7 @@ module aptos_token::token_v1 {
             balance,
         );
 
-        // initialize capability associated with token
-        initialize_token_authority_store(account);
-        create_burn_authority(account, token_id);
+        initialize_token_authority(account, token_id);
 
         token_id
     }
@@ -811,19 +821,19 @@ module aptos_token::token_v1 {
 
     public entry fun burn_script(
         account: &signer,
+        owner: address,
         token_id: TokenId,
         amount: u64,
-    ) acquires TokenStore, Collections, TokenAuthorityStore {
-        let addr = signer::address_of(account);
-        assert!(balance_of(addr, token_id) >= amount, EINSUFFICIENT_BALANCE);
-        let token = withdraw_token(account, token_id, amount);
-        let burn_cap = acquire_burn_capability(account, token_id);
-        burn(burn_cap, token)
+    ) acquires TokenStore, Collections {
+        assert!(balance_of(owner, token_id) >= amount, EINSUFFICIENT_BALANCE);
+        let burn_cap = acquire_burn_capability(account, owner, token_id);
+        burn(burn_cap, owner, token_id, amount);
     }
 
-    public fun burn(burn_cap: BurnCapability, token: Token) acquires Collections {
-        assert!(burn_cap.token_id == token.id, ENO_BURN_CAPABILITY);
-        let creator_addr = token.id.token_data_id.creator;
+    public fun burn(burn_cap: BurnCapability, owner: address, token_id: TokenId, amount: u64) acquires Collections, TokenStore {
+        assert!(burn_cap.token_id == token_id, ENO_BURN_CAPABILITY);
+        assert!(burn_cap.owner == owner, ENO_BURN_CAPABILITY);
+        let creator_addr = token_id.token_data_id.creator;
         assert!(
             exists<Collections>(creator_addr),
             error::not_found(ECOLLECTIONS_NOT_PUBLISHED),
@@ -831,16 +841,25 @@ module aptos_token::token_v1 {
 
         let collections = borrow_global_mut<Collections>(creator_addr);
         assert!(
-            table::contains(&collections.token_data, token.id.token_data_id),
+            table::contains(&collections.token_data, token_id.token_data_id),
             error::not_found(ETOKEN_NOT_PUBLISHED),
         );
 
         let token_data = table::borrow_mut(
             &mut collections.token_data,
-            token.id.token_data_id,
+            token_id.token_data_id,
         );
+
+        let token = withdraw_with_event_internal(owner, token_id, amount);
         token_data.supply = token_data.supply - token.value;
-        let Token { id: _, value: _ } = token;
+        let Token { id: _, value: burned_amount } = token;
+
+        let token_store = borrow_global_mut<TokenStore>(owner);
+
+        event::emit_event<BurnTokenEvent>(
+            &mut token_store.burn_events,
+            BurnTokenEvent { id: token_id, amount: burned_amount},
+        );
     }
 
     public fun balance_of(owner: address, id: TokenId): u64 acquires TokenStore {
@@ -877,89 +896,104 @@ module aptos_token::token_v1 {
 
     /********************Token Capability*****************************/
     struct TokenAuthority has store {
-        burn: bool
+        burn: ACL,
+        transfer: ACL,
+        mutate_properties: ACL,
     }
 
     struct BurnCapability has drop {
         token_id: TokenId,
+        owner: address,
     }
 
-    struct TokenAuthorityStore has key {
-        token_auths: Table<TokenId, TokenAuthority>,
-    }
-
-    /// initialize capability store for storing all token capabilities
-    /// this function should be called by any account that plan to own tokens
-    public entry fun initialize_token_authority_store_script(creator: &signer) {
-        initialize_token_authority_store(creator);
-    }
-
+    /// acquire burn capability from the owner of token id
     public fun acquire_burn_capability(
         account: &signer,
+        owner: address,
         token_id: TokenId
-    ): BurnCapability acquires TokenAuthorityStore {
-        assert!(exist_burn_authority(signer::address_of(account), token_id), ENO_BURN_CAPABILITY);
+    ): BurnCapability acquires TokenStore {
+        assert!(exist_burn_authority(signer::address_of(account), owner, token_id), ENO_BURN_CAPABILITY);
         BurnCapability {
-            token_id
+            token_id,
+            owner,
         }
     }
 
-    public fun initialize_token_authority_store(creator: &signer) {
-        let token_auths = table::new<TokenId, TokenAuthority>();
-        move_to(creator, TokenAuthorityStore {
-            token_auths
-        })
+    /// create authority for a token id.
+    /// 1. only token owner can create this authority, creator is also the intial owner
+    /// 2. token creator can create only 1 burn authority per token
+    public fun initialize_token_authority(owner: &signer, token_id: TokenId) acquires TokenStore{
+        let addr = signer::address_of(owner);
+        // validate the owner has this token_id
+        assert!(balance_of(addr, token_id) > 0, EINSUFFICIENT_BALANCE);
+        let token_auths = &mut borrow_global_mut<TokenStore>(addr).token_auths;
+        if(!table::contains(token_auths, token_id)) {
+            let brun_acl_list = acl::empty();
+            acl::add(&mut brun_acl_list, addr);
+            let transfer_acl_list = acl::empty();
+            acl::add(&mut transfer_acl_list, addr);
+            let mutate_prop_acl_list = acl::empty();
+            acl::add(&mut mutate_prop_acl_list, addr);
+
+            table::add(
+                token_auths,
+                token_id,
+                TokenAuthority{
+                    burn: brun_acl_list,
+                    transfer: transfer_acl_list,
+                    mutate_properties: mutate_prop_acl_list
+                },
+            );
+        } else {
+            let auth = table::borrow_mut(token_auths, token_id);
+            if (! acl::contains(&mut auth.burn, addr)) {
+                acl::add(&mut auth.burn, addr);
+            };
+            if (! acl::contains(&mut auth.transfer, addr)) {
+                acl::add(&mut auth.transfer, addr);
+            };
+            if (! acl::contains(&mut auth.mutate_properties, addr)) {
+                acl::add(&mut auth.mutate_properties, addr);
+            };
+        }
     }
 
-    /// create burn authority for a token id.
-    /// 1. only token creator can create this authority,
-    /// 2. token creator can create only 1 burn authority per token
-    public fun create_burn_authority(creator: &signer, token_id: TokenId) acquires TokenAuthorityStore{
-        let addr = signer::address_of(creator);
-        assert!(token_id.token_data_id.creator == addr, EONLY_CREATOR_CAN_CREATE_BURN_CAP);
-        if (!exists<TokenAuthorityStore>(addr)) {
-            initialize_token_authority_store(creator);
-        };
-        let token_auths = &mut borrow_global_mut<TokenAuthorityStore>(addr).token_auths;
-        assert!(!table::contains(token_auths, token_id), EBURNCAP_EXISTS_OR_CREATED_FOR_TOKEN);
-
-        table::add(token_auths, token_id, TokenAuthority {burn: true});
+    /// token owner revokes an authority delegated to an address for a token_id
+    public fun revoke_burn_authority(owner: &signer, from: address, token_id: TokenId) acquires TokenStore {
+        let addr = signer::address_of(owner);
+        assert!(exist_burn_authority(from, addr, token_id), ENO_BURN_CAPABILITY);
+        let token_auths = &mut borrow_global_mut<TokenStore>(addr).token_auths;
+        let token_auth = table::borrow_mut(token_auths, token_id);
+        acl::remove(&mut token_auth.burn, from);
     }
 
     /// delegate burn capability
     /// only existing capability holder is allowed to delegate to the owner of the token
     public fun delegate_burn_authority(
-        cap_owner: &signer,
+        owner: &signer,
         to: address,
         token_id: TokenId,
-    ) acquires TokenAuthorityStore, TokenStore {
-        let addr = signer::address_of(cap_owner);
-        assert!(exist_burn_authority(addr, token_id), ENOT_OWN_THE_CAPABILITY);
-        let token_auths = &mut borrow_global_mut<TokenAuthorityStore>(addr).token_auths;
-        let token_cap = table::borrow_mut(token_auths, token_id);
-        token_cap.burn = false; // capability is disable
+    ) acquires TokenStore {
+        let addr = signer::address_of(owner);
+        // validate the owner processes this token
+        assert!(balance_of(addr, token_id) > 0, EINSUFFICIENT_BALANCE);
+        initialize_token_authority(owner, token_id);
 
-        assert!(exists<TokenAuthorityStore>(to), ETOKEN_CAPABILITY_STORE_NOT_EXISTS);
-        assert!(balance_of(to, token_id)>0, EONLY_TOKEN_OWNER_CAN_HAVE_BURN_CAP);
-
-        let owner_auth_store = &mut borrow_global_mut<TokenAuthorityStore>(to).token_auths;
-        if (table::contains(owner_auth_store, token_id)) {
-            let cap = table::borrow_mut(owner_auth_store, token_id);
-            cap.burn = true;
-        } else {
-            table::add(owner_auth_store, token_id, TokenAuthority {burn: true});
-        };
+        let token_auths = &mut borrow_global_mut<TokenStore>(addr).token_auths;
+        let burn_acl = &mut table::borrow_mut(token_auths, token_id).burn;
+        assert!(!acl::contains(burn_acl, to), EBURNCAP_EXISTS_OR_CREATED_FOR_TOKEN);
+        acl::add(burn_acl, to);
     }
 
-    /// validate if an account has the burn capability for a token_id
-    public fun exist_burn_authority(account: address, token_id: TokenId): bool acquires TokenAuthorityStore{
-        assert!(exists<TokenAuthorityStore>(account), ETOKEN_CAPABILITY_STORE_NOT_EXISTS);
-        let auth_store = &borrow_global<TokenAuthorityStore>(account).token_auths;
+    /// validate if an account has the burn capability for a token_id belong to owner
+    public fun exist_burn_authority(account: address, owner: address, token_id: TokenId): bool acquires TokenStore{
+        assert!(exists<TokenStore>(owner), ETOKEN_CAPABILITY_STORE_NOT_EXISTS);
+        let auth_store = &borrow_global<TokenStore>(owner).token_auths;
         if (!table::contains(auth_store, token_id)) {
             false
         } else {
-            let token_cap = table::borrow(auth_store, token_id);
-            token_cap.burn
+            let token_auth = table::borrow(auth_store, token_id);
+            acl::contains(&token_auth.burn, account)
         }
     }
 
@@ -969,7 +1003,7 @@ module aptos_token::token_v1 {
     public fun create_withdraw_deposit_token(
         creator: signer,
         owner: signer
-    ) acquires Collections, TokenStore, TokenAuthorityStore {
+    ) acquires Collections, TokenStore {
         let token_id = create_collection_and_token(&creator, 1, 1, 1);
 
         let token = withdraw_token(&creator, token_id, 1);
@@ -980,7 +1014,7 @@ module aptos_token::token_v1 {
     public fun create_withdraw_deposit(
         creator: signer,
         owner: signer
-    ) acquires Collections, TokenStore, TokenAuthorityStore {
+    ) acquires Collections, TokenStore {
         let token_id = create_collection_and_token(&creator, 2, 5, 5);
 
         let token_0 = withdraw_token(&creator, token_id, 1);
@@ -993,7 +1027,7 @@ module aptos_token::token_v1 {
 
     #[test(creator = @0x1)]
     #[expected_failure] // (abort_code = 5)]
-    public fun test_collection_maximum(creator: signer) acquires Collections, TokenStore, TokenAuthorityStore {
+    public fun test_collection_maximum(creator: signer) acquires Collections, TokenStore {
         let token_id = create_collection_and_token(&creator, 2, 2, 1);
         let default_keys = vector<String>[ string::utf8(b"attack"), string::utf8(b"num_of_use") ];
         let default_vals = vector<vector<u8>>[ b"10", b"5" ];
@@ -1022,7 +1056,7 @@ module aptos_token::token_v1 {
     public entry fun direct_transfer_test(
         creator: signer,
         owner: signer,
-    ) acquires Collections, TokenStore, TokenAuthorityStore {
+    ) acquires Collections, TokenStore {
         let token_id = create_collection_and_token(&creator, 2, 2, 2);
         direct_transfer(&creator, &owner, token_id, 1);
         let token = withdraw_token(&owner, token_id, 1);
@@ -1045,7 +1079,7 @@ module aptos_token::token_v1 {
         amount: u64,
         collection_max: u64,
         token_max: u64
-    ): TokenId acquires Collections, TokenStore, TokenAuthorityStore {
+    ): TokenId acquires Collections, TokenStore {
         let mutate_setting = vector<bool>[false, false, false];
 
         create_collection(
@@ -1080,7 +1114,7 @@ module aptos_token::token_v1 {
     }
 
     #[test(creator = @0xFF)]
-    fun test_create_events_generation(creator: signer) acquires Collections, TokenStore, TokenAuthorityStore {
+    fun test_create_events_generation(creator: signer) acquires Collections, TokenStore {
         create_collection_and_token(&creator, 1, 2, 1);
         let collections = borrow_global<Collections>(signer::address_of(&creator));
         assert!(event::get_event_handle_counter(&collections.create_collection_events) == 1, 1);
@@ -1088,7 +1122,7 @@ module aptos_token::token_v1 {
     }
 
     #[test(creator = @0xAF)]
-    fun test_create_token_from_tokendata(creator: &signer) acquires Collections, TokenStore, TokenAuthorityStore {
+    fun test_create_token_from_tokendata(creator: &signer) acquires Collections, TokenStore {
         create_collection_and_token(creator, 2, 4, 4);
         let token_data_id = create_token_data_id(
             signer::address_of(creator),
@@ -1104,7 +1138,7 @@ module aptos_token::token_v1 {
         assert!(balance_of(signer::address_of(creator), token_id) == 3, 1);
     }
     #[test(creator = @0xAF, owner = @0xBB)]
-    fun test_mutate_token_property(creator: &signer, owner: &signer) acquires Collections, TokenStore, TokenAuthorityStore {
+    fun test_mutate_token_property(creator: &signer, owner: &signer) acquires Collections, TokenStore {
         // token owner mutate the token property
         let token_id = create_collection_and_token(creator, 2, 4, 4);
         assert!(token_id.serial_number == 0, 1);
@@ -1159,11 +1193,11 @@ module aptos_token::token_v1 {
     public entry fun test_burn_token(
         creator: signer,
         owner: signer
-    ) acquires Collections, TokenStore, TokenAuthorityStore {
+    ) acquires Collections, TokenStore {
         // creator create a token. creator can burn the token
         let token_id = create_collection_and_token(&creator, 2, 1, 2);
 
-        burn_script(&creator, token_id, 1);
+        burn_script(&creator, signer::address_of(&creator), token_id, 1);
 
         // creator transfer the remaining 1 token. owner canot burn the token
         let owner_addr =  signer::address_of(&owner);
@@ -1172,11 +1206,12 @@ module aptos_token::token_v1 {
         initialize_token_store(&owner);
         initialize_token(&owner, token_id);
         transfer(&creator, token_id, owner_addr, 1);
-        initialize_token_authority_store(&owner);
-        assert!(!exist_burn_authority(owner_addr, token_id), 1);
+        assert!(!exist_burn_authority(owner_addr, owner_addr, token_id), 1);
 
-        // creator delegate burn capability and owner can burn
-        delegate_burn_authority(&creator, owner_addr, token_id);
-        burn_script(&owner, token_id, 1);
+        // owner delegate burn authority to creator
+        delegate_burn_authority(&owner, signer::address_of(&creator), token_id);
+
+        //creator can burn token owned by owner after delegation
+        burn_script(&creator, owner_addr, token_id, 1);
     }
 }
