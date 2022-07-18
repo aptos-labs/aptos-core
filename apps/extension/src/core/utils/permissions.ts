@@ -14,7 +14,21 @@ export default class Permissions {
     return tabs[0];
   }
 
+  static isPromptActive(): Promise<boolean> {
+    const { id } = chrome.runtime;
+    return new Promise((resolve) => {
+      chrome.tabs.query({}, (tabs) => {
+        const foundTab = tabs.find((tab) => tab.url?.includes(id));
+        resolve(foundTab !== undefined);
+      });
+    });
+  }
+
   static async promptUser(permission: string): Promise<boolean> {
+    const isPromptActive = await this.isPromptActive();
+    if (isPromptActive) {
+      return false;
+    }
     const { favIconUrl, title, url } = await this.getCurrentTab();
     const window = await chrome.windows.getCurrent();
     const left = (window.left ?? 0) + (window.width ?? 0) - PROMPT_WIDTH;

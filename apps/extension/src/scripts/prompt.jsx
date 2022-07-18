@@ -91,20 +91,20 @@ function PromptState() {
             />
           ) : null}
           {title ? (
-            <Heading noOfLines={1} fontSize="3xl" wordBreak="break-word">{title}</Heading>
+            <Heading noOfLines={1} fontSize="3xl" overflow="ellipses">{title}</Heading>
           ) : null}
           {domain ? (
-            <Text noOfLines={1} fontSize="sm" color="gray.500" wordBreak="break-word">{domain}</Text>
+            <Text noOfLines={1} fontSize="sm" color="gray.500" overflow="ellipses">{domain}</Text>
           ) : null}
         </VStack>
         <VStack flexGrow={1} alignItems="flex-start" width="100%" maxW="100%">
-          <Text fontSize="md" color="gray.500" wordBreak="break-word">
+          <Text fontSize="md" color="gray.500" overflow="ellipses">
             This app would like to:
           </Text>
           {permissions.map((permission) => (
             <HStack key={permission}>
               <InfoIcon w={4} h={4} />
-              <Text fontSize="sm" wordBreak="break-word">
+              <Text fontSize="sm" overflow="ellipses">
                 {permission}
               </Text>
             </HStack>
