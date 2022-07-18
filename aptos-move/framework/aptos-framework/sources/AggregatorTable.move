@@ -1,5 +1,5 @@
 module AptosFramework::AggregatorTable {
-    use Std::Signer;
+    use std::signer;
 
     use AptosFramework::Aggregator::{Self, Aggregator};
     use AptosFramework::Table::{Self, Table};
@@ -19,13 +19,13 @@ module AptosFramework::AggregatorTable {
     }
 
     /// Creates a new table for aggregators.
-    public(script) fun register_aggregator_table(account: &signer) {
+    public entry fun register_aggregator_table(account: &signer) {
         register_aggregator_table_internal(account);
     }
 
     fun register_aggregator_table_internal(account: &signer) {
         assert!(
-            !exists<AggregatorTable>(Signer::address_of(account)),
+            !exists<AggregatorTable>(signer::address_of(account)),
             EAGGREGATOR_TABLE_EXISTS
         );
 
@@ -45,7 +45,7 @@ module AptosFramework::AggregatorTable {
     fun test_can_add_and_read(account: signer) acquires AggregatorTable {
         register_aggregator_table_internal(&account);
 
-        let addr = Signer::address_of(&account);
+        let addr = signer::address_of(&account);
         let aggregator_table = borrow_global_mut<AggregatorTable>(addr);
         
         let aggregator = new_aggregator(aggregator_table, /*limit=*/1000);
@@ -64,7 +64,7 @@ module AptosFramework::AggregatorTable {
     fun test_overflow(account: signer) acquires AggregatorTable {
         register_aggregator_table_internal(&account);
 
-        let addr = Signer::address_of(&account);
+        let addr = signer::address_of(&account);
         let aggregator_table = borrow_global_mut<AggregatorTable>(addr);
     
         let aggregator = new_aggregator(aggregator_table, /*limit=*/10);

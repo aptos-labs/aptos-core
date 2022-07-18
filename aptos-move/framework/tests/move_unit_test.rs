@@ -6,8 +6,12 @@ use aptos_vm::move_vm_ext::{aggregator_natives, NativeAggregatorContext, test_tr
 use framework::path_in_crate;
 use move_deps::move_cli::base::test::run_move_unit_tests;
 use move_deps::{
-    move_stdlib, move_table_extension, move_unit_test::UnitTestingConfig,
-    move_vm_runtime::native_functions::NativeFunctionTable,
+    move_stdlib, move_table_extension, move_unit_test::{UnitTestingConfig, extensions},
+    move_vm_runtime::{
+        native_functions::NativeFunctionTable,
+        native_extensions::NativeContextExtensions,
+    },
+    move_vm_test_utils::BlankStorage,
 };
 use once_cell::sync::Lazy;
 use tempfile::tempdir;
@@ -15,7 +19,7 @@ use tempfile::tempdir;
 fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
     extensions::set_extension_hook(Box::new(add_aggregator_context));
-    cli::run_move_unit_tests(
+    run_move_unit_tests(
         &pkg_path,
         move_deps::move_package::BuildConfig {
             test_mode: true,
