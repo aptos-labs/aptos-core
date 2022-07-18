@@ -32,8 +32,3 @@ cached-framework-packages = { path = "../framework/cached-packages" }
 
 [features]
 default = []
-
-[[bin]]
-name = "generate-transaction-builders"
-path = "src/generate.rs"
-test = false

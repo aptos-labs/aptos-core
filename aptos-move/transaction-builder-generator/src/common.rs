@@ -136,28 +136,6 @@ pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
     }
 }
 
-pub(crate) fn get_external_definitions(aptos_types: &str) -> serde_generate::ExternalDefinitions {
-    let definitions = vec![(
-        aptos_types,
-        vec![
-            "AccountAddress",
-            "TypeTag",
-            "Script",
-            "TransactionArgument",
-            "VecBytes",
-        ],
-    )];
-    definitions
-        .into_iter()
-        .map(|(module, defs)| {
-            (
-                module.to_string(),
-                defs.into_iter().map(String::from).collect(),
-            )
-        })
-        .collect()
-}
-
 pub(crate) fn get_required_helper_types(abis: &[ScriptABI]) -> BTreeSet<&TypeTag> {
     let mut required_types = BTreeSet::new();
     for abi in abis {

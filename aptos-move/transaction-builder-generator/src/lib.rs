@@ -2,25 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::transaction::ScriptABI;
-use serde_generate::CustomCode;
 use std::{ffi::OsStr, fs, io::Read, path::Path};
 
-/// Support for code-generation in C++17.
-pub mod cpp;
-/// Support for code-generation in C#
-pub mod csharp;
-/// Support for code-generation in Go >= 1.13.
-pub mod golang;
-/// Support for code-generation in Java 8.
-pub mod java;
-/// Support for code-generation in Python 3.
-pub mod python3;
 /// Support for code-generation in Rust.
 pub mod rust;
-/// Support for code-generation in Swift.
-pub mod swift;
-/// Support for code-generation in TypeScript.
-pub mod typescript;
 
 /// Internals shared between languages.
 mod common;
@@ -91,33 +76,4 @@ pub trait SourceInstaller {
         name: &str,
         abis: &[ScriptABI],
     ) -> std::result::Result<(), Self::Error>;
-}
-
-/// How to read custom code to inject in Aptos containers.
-pub fn read_custom_code_from_paths<'a, I>(package: &'a [&'a str], paths: I) -> CustomCode
-where
-    I: Iterator<Item = std::path::PathBuf>,
-{
-    paths
-        .map(|path| {
-            let container_name = path
-                .file_stem()
-                .expect("file name must have a non-empty stem")
-                .to_str()
-                .expect("file names must be valid UTF8")
-                .to_string();
-            let mut container_path = package.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-            container_path.push(container_name);
-            let content = std::fs::read_to_string(path).expect("custom code file must be readable");
-            // Skip initial comments (e.g. copyright headers) and empty lines.
-            let lines = content.lines().skip_while(|line| {
-                line.starts_with("// ") || line.starts_with("# ") || line.is_empty()
-            });
-            let mut code = lines.collect::<Vec<_>>().join("\n");
-            if !code.ends_with('\n') {
-                code += "\n";
-            }
-            (container_path, code)
-        })
-        .collect()
 }
