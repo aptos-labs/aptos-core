@@ -18,7 +18,7 @@ use aptos_logger::{prelude::*, Level};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_config::aptos_root_address, account_view::AccountView, chain_id::ChainId,
+    account_config::CORE_CODE_ADDRESS, account_view::AccountView, chain_id::ChainId,
     on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
 };
 use aptos_vm::AptosVM;
@@ -296,7 +296,7 @@ fn fetch_chain_id(db: &DbReaderWriter) -> ChainId {
         .latest_state_checkpoint_view()
         .expect("[aptos-node] failed to create db state view");
     db_state_view
-        .as_account_with_state_view(&aptos_root_address())
+        .as_account_with_state_view(&CORE_CODE_ADDRESS)
         .get_chain_id_resource()
         .expect("[aptos-node] failed to get chain ID resource")
         .expect("[aptos-node] missing chain ID resource")

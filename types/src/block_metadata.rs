@@ -3,7 +3,7 @@
 
 use crate::{
     account_address::AccountAddress,
-    account_config::aptos_root_address,
+    account_config::CORE_CODE_ADDRESS,
     event::{EventHandle, EventKey},
 };
 use aptos_crypto::HashValue;
@@ -99,7 +99,7 @@ impl BlockMetadata {
 }
 
 pub fn new_block_event_key() -> EventKey {
-    EventKey::new_from_address(&aptos_root_address(), 6)
+    EventKey::new_from_address(&CORE_CODE_ADDRESS, 3)
 }
 
 /// The path to the new block event handle under a Block::BlockMetadata resource.

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_transaction_builder::aptos_stdlib;
-use aptos_types::account_config::aptos_root_address;
+use aptos_types::account_config::CORE_CODE_ADDRESS;
 use forge::{AptosContext, AptosTest, Result, Test};
 
 pub struct GetIndex;
@@ -53,7 +53,7 @@ impl AptosTest for BasicClient {
             .unwrap();
 
         client
-            .get_account_resources(aptos_root_address())
+            .get_account_resources(CORE_CODE_ADDRESS)
             .await
             .unwrap();
 

@@ -17,7 +17,7 @@ module AptosFramework::ChainId {
     /// Publish the chain ID `id` of this instance under the SystemAddresses address
     public fun initialize(account: &signer, id: u8) {
         Timestamp::assert_genesis();
-        SystemAddresses::assert_core_resource(account);
+        SystemAddresses::assert_aptos_framework(account);
         assert!(!exists<ChainId>(signer::address_of(account)), errors::already_published(ECHAIN_ID));
         move_to(account, ChainId { id })
     }
@@ -25,6 +25,6 @@ module AptosFramework::ChainId {
     /// Return the chain ID of this instance
     public fun get(): u8 acquires ChainId {
         Timestamp::assert_operating();
-        borrow_global<ChainId>(@CoreResources).id
+        borrow_global<ChainId>(@AptosFramework).id
     }
 }

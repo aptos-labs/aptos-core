@@ -22,13 +22,16 @@ fn initial_aptos_version() {
         );
 
         let account = test_env.dr_account;
+        println!("@@@@@@@@@@@@ account {:?}", account);
         let txn = account
             .transaction()
             .payload(aptos_stdlib::encode_version_set_version(test_env.version_number + 1))
             .sequence_number(test_env.dr_sequence_number)
             .sign();
+        println!("@@@@@@@@@@@@ txn {:?}", txn);
         executor.new_block();
         executor.execute_and_apply(txn);
+        println!("!!!!!!! EXECUTED");
 
         let new_vm = AptosVM::new(executor.get_state_view());
         assert_eq!(

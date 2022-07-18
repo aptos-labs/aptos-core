@@ -326,9 +326,9 @@ module AptosFramework::Voting {
         proposal_id
     }
 
-    #[test(core_resources = @CoreResources, governance = @0x123)]
-    public entry fun test_voting_passed(core_resources: signer, governance: signer) acquires VotingForum {
-        Timestamp::set_time_has_started_for_testing(&core_resources);
+    #[test(aptos_framework = @AptosFramework, governance = @0x123)]
+    public entry fun test_voting_passed(aptos_framework: signer, governance: signer) acquires VotingForum {
+        Timestamp::set_time_has_started_for_testing(&aptos_framework);
 
         // Register voting forum and create a proposal.
         let governance_address = signer::address_of(&governance);
@@ -350,10 +350,10 @@ module AptosFramework::Voting {
         let TestProposal { } = proposal;
     }
 
-    #[test(core_resources = @CoreResources, governance = @0x123)]
+    #[test(aptos_framework = @AptosFramework, governance = @0x123)]
     #[expected_failure(abort_code = 775)]
-    public entry fun test_cannot_resolve_twice(core_resources: signer, governance: signer) acquires VotingForum {
-        Timestamp::set_time_has_started_for_testing(&core_resources);
+    public entry fun test_cannot_resolve_twice(aptos_framework: signer, governance: signer) acquires VotingForum {
+        Timestamp::set_time_has_started_for_testing(&aptos_framework);
 
         // Register voting forum and create a proposal.
         let governance_address = signer::address_of(&governance);
@@ -374,9 +374,9 @@ module AptosFramework::Voting {
         let TestProposal { } = resolve<TestProposal>(governance_address, proposal_id);
     }
 
-    #[test(core_resources = @CoreResources, governance = @0x123)]
-    public entry fun test_voting_passed_early(core_resources: signer, governance: signer) acquires VotingForum {
-        Timestamp::set_time_has_started_for_testing(&core_resources);
+    #[test(aptos_framework = @AptosFramework, governance = @0x123)]
+    public entry fun test_voting_passed_early(aptos_framework: signer, governance: signer) acquires VotingForum {
+        Timestamp::set_time_has_started_for_testing(&aptos_framework);
 
         // Register voting forum and create a proposal.
         let governance_address = signer::address_of(&governance);
@@ -398,10 +398,10 @@ module AptosFramework::Voting {
         let TestProposal { } = proposal;
     }
 
-    #[test(core_resources = @CoreResources, governance = @0x123)]
+    #[test(aptos_framework = @AptosFramework, governance = @0x123)]
     #[expected_failure(abort_code = 519)]
-    public entry fun test_voting_failed(core_resources: signer, governance: signer) acquires VotingForum {
-        Timestamp::set_time_has_started_for_testing(&core_resources);
+    public entry fun test_voting_failed(aptos_framework: signer, governance: signer) acquires VotingForum {
+        Timestamp::set_time_has_started_for_testing(&aptos_framework);
 
         // Register voting forum and create a proposal.
         let governance_address = signer::address_of(&governance);
@@ -420,10 +420,10 @@ module AptosFramework::Voting {
         let TestProposal { } = proposal;
     }
 
-    #[test(core_resources = @CoreResources, governance = @0x123)]
+    #[test(aptos_framework = @AptosFramework, governance = @0x123)]
     #[expected_failure(abort_code = 519)]
-    public entry fun test_voting_failed_early(core_resources: signer, governance: signer) acquires VotingForum {
-        Timestamp::set_time_has_started_for_testing(&core_resources);
+    public entry fun test_voting_failed_early(aptos_framework: signer, governance: signer) acquires VotingForum {
+        Timestamp::set_time_has_started_for_testing(&aptos_framework);
 
         // Register voting forum and create a proposal.
         let governance_address = signer::address_of(&governance);

@@ -167,7 +167,7 @@
     "changes": [
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Block::BlockMetadata",
@@ -179,8 +179,8 @@
               "guid": {
                 "guid": {
                   "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "6"
+                    "addr": "0x1",
+                    "creation_num": "3"
                   }
                 },
                 "len_bytes": 40
@@ -191,7 +191,7 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Stake::ValidatorPerformance",
@@ -205,7 +205,7 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Timestamp::CurrentTimeMicroseconds",
@@ -220,7 +220,7 @@
     "round": "1",
     "events": [
       {
-        "key": "0x0600000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
         "sequence_number": "12",
         "type": "0x1::Block::NewBlockEvent",
         "data": {
@@ -410,7 +410,7 @@
     "changes": [
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Block::BlockMetadata",
@@ -422,8 +422,8 @@
               "guid": {
                 "guid": {
                   "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "6"
+                    "addr": "0x1",
+                    "creation_num": "3"
                   }
                 },
                 "len_bytes": 40
@@ -434,7 +434,7 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Stake::ValidatorPerformance",
@@ -448,7 +448,7 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Timestamp::CurrentTimeMicroseconds",
@@ -463,7 +463,7 @@
     "round": "1",
     "events": [
       {
-        "key": "0x0600000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
         "sequence_number": "13",
         "type": "0x1::Block::NewBlockEvent",
         "data": {
@@ -653,7 +653,7 @@
     "changes": [
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Block::BlockMetadata",
@@ -665,8 +665,8 @@
               "guid": {
                 "guid": {
                   "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "6"
+                    "addr": "0x1",
+                    "creation_num": "3"
                   }
                 },
                 "len_bytes": 40
@@ -677,7 +677,7 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Stake::ValidatorPerformance",
@@ -691,7 +691,7 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Timestamp::CurrentTimeMicroseconds",
@@ -706,7 +706,7 @@
     "round": "1",
     "events": [
       {
-        "key": "0x0600000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
         "sequence_number": "14",
         "type": "0x1::Block::NewBlockEvent",
         "data": {
@@ -896,7 +896,7 @@
     "changes": [
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Block::BlockMetadata",
@@ -908,8 +908,8 @@
               "guid": {
                 "guid": {
                   "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "6"
+                    "addr": "0x1",
+                    "creation_num": "3"
                   }
                 },
                 "len_bytes": 40
@@ -920,7 +920,7 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Stake::ValidatorPerformance",
@@ -934,7 +934,7 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Timestamp::CurrentTimeMicroseconds",
@@ -949,7 +949,7 @@
     "round": "1",
     "events": [
       {
-        "key": "0x0600000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
         "sequence_number": "15",
         "type": "0x1::Block::NewBlockEvent",
         "data": {
@@ -1139,7 +1139,7 @@
     "changes": [
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Block::BlockMetadata",
@@ -1151,8 +1151,8 @@
               "guid": {
                 "guid": {
                   "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "6"
+                    "addr": "0x1",
+                    "creation_num": "3"
                   }
                 },
                 "len_bytes": 40
@@ -1163,7 +1163,7 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Stake::ValidatorPerformance",
@@ -1177,7 +1177,7 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Timestamp::CurrentTimeMicroseconds",
@@ -1192,7 +1192,7 @@
     "round": "1",
     "events": [
       {
-        "key": "0x0600000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
         "sequence_number": "16",
         "type": "0x1::Block::NewBlockEvent",
         "data": {
@@ -1382,7 +1382,7 @@
     "changes": [
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Block::BlockMetadata",
@@ -1394,8 +1394,8 @@
               "guid": {
                 "guid": {
                   "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "6"
+                    "addr": "0x1",
+                    "creation_num": "3"
                   }
                 },
                 "len_bytes": 40
@@ -1406,7 +1406,7 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Stake::ValidatorPerformance",
@@ -1420,7 +1420,7 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Timestamp::CurrentTimeMicroseconds",
@@ -1435,7 +1435,7 @@
     "round": "1",
     "events": [
       {
-        "key": "0x0600000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
         "sequence_number": "17",
         "type": "0x1::Block::NewBlockEvent",
         "data": {
@@ -1625,7 +1625,7 @@
     "changes": [
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Block::BlockMetadata",
@@ -1637,8 +1637,8 @@
               "guid": {
                 "guid": {
                   "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "6"
+                    "addr": "0x1",
+                    "creation_num": "3"
                   }
                 },
                 "len_bytes": 40
@@ -1649,7 +1649,7 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Stake::ValidatorPerformance",
@@ -1663,7 +1663,7 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Timestamp::CurrentTimeMicroseconds",
@@ -1678,7 +1678,7 @@
     "round": "1",
     "events": [
       {
-        "key": "0x0600000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
         "sequence_number": "18",
         "type": "0x1::Block::NewBlockEvent",
         "data": {
@@ -1868,7 +1868,7 @@
     "changes": [
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Block::BlockMetadata",
@@ -1880,8 +1880,8 @@
               "guid": {
                 "guid": {
                   "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "6"
+                    "addr": "0x1",
+                    "creation_num": "3"
                   }
                 },
                 "len_bytes": 40
@@ -1892,7 +1892,7 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Stake::ValidatorPerformance",
@@ -1906,7 +1906,7 @@
       },
       {
         "type": "write_resource",
-        "address": "0xa550c18",
+        "address": "0x1",
         "state_key_hash": "",
         "data": {
           "type": "0x1::Timestamp::CurrentTimeMicroseconds",
@@ -1921,7 +1921,7 @@
     "round": "1",
     "events": [
       {
-        "key": "0x0600000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
         "sequence_number": "19",
         "type": "0x1::Block::NewBlockEvent",
         "data": {

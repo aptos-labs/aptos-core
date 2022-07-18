@@ -90,35 +90,36 @@ module AptosFramework::AptosGovernance {
 
     /// Stores the signer capability for 0x1.
     public fun store_signer_cap(
-        core_framework: &signer,
+        aptos_framework: &signer,
         signer_cap: SignerCapability,
     ) {
-        SystemAddresses::assert_core_framework(core_framework);
-        move_to(core_framework, GovernanceResponsbility { signer_cap });
+        SystemAddresses::assert_aptos_framework(aptos_framework);
+        move_to(aptos_framework, GovernanceResponsbility { signer_cap });
     }
 
     /// Initializes the state for Aptos Governance. Can only be called during Genesis with a signer
-    /// for the CoreFramework (0x1) account.
-    public fun initialize(
-        core_framework: &signer,
+    /// for the AptosFramework (0x1) account.
+    /// This function is private because it's called directly from the vm.
+    fun initialize(
+        aptos_framework: &signer,
         min_voting_threshold: u128,
         required_proposer_stake: u64,
         voting_period_secs: u64,
     ) {
-        SystemAddresses::assert_core_framework(core_framework);
+        SystemAddresses::assert_aptos_framework(aptos_framework);
 
-        Voting::register<GovernanceProposal>(core_framework);
-        move_to(core_framework, GovernanceConfig {
+        Voting::register<GovernanceProposal>(aptos_framework);
+        move_to(aptos_framework, GovernanceConfig {
             voting_period_secs,
             min_voting_threshold,
             required_proposer_stake,
         });
-        move_to(core_framework, GovernanceEvents {
-            create_proposal_events: event::new_event_handle<CreateProposalEvent>(core_framework),
-            update_config_events: event::new_event_handle<UpdateConfigEvent>(core_framework),
-            vote_events: event::new_event_handle<VoteEvent>(core_framework),
+        move_to(aptos_framework, GovernanceEvents {
+            create_proposal_events: event::new_event_handle<CreateProposalEvent>(aptos_framework),
+            update_config_events: event::new_event_handle<UpdateConfigEvent>(aptos_framework),
+            vote_events: event::new_event_handle<VoteEvent>(aptos_framework),
         });
-        move_to(core_framework, VotingRecords {
+        move_to(aptos_framework, VotingRecords {
             votes: Table::new(),
         });
     }
@@ -270,17 +271,17 @@ module AptosFramework::AptosGovernance {
         create_signer_with_capability(&governance_responsibility.signer_cap)
     }
 
-    #[test(core_resources = @CoreResources, core_framework = @AptosFramework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
+    #[test(core_resources = @CoreResources, aptos_framework = @AptosFramework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
     public entry fun test_voting(
         core_resources: signer,
-        core_framework: signer,
+        aptos_framework: signer,
         proposer: signer,
         yes_voter: signer,
         no_voter: signer,
     ) acquires GovernanceConfig, GovernanceEvents, VotingRecords {
         setup_voting(
             &core_resources,
-            &core_framework,
+            &aptos_framework,
             &proposer,
             &yes_voter,
             &no_voter,
@@ -293,22 +294,22 @@ module AptosFramework::AptosGovernance {
         // Once expiration time has passed, the proposal should be considered resolve now as there are more yes votes
         // than no.
         Timestamp::update_global_time_for_test(100001000000);
-        let proposal_state = Voting::get_proposal_state<GovernanceProposal>(signer::address_of(&core_framework), 0);
+        let proposal_state = Voting::get_proposal_state<GovernanceProposal>(signer::address_of(&aptos_framework), 0);
         assert!(proposal_state == 1, proposal_state);
     }
 
-    #[test(core_resources = @CoreResources, core_framework = @AptosFramework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
+    #[test(core_resources = @CoreResources, aptos_framework = @AptosFramework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
     #[expected_failure(abort_code = 1031)]
     public entry fun test_cannot_double_vote(
         core_resources: signer,
-        core_framework: signer,
+        aptos_framework: signer,
         proposer: signer,
         voter_1: signer,
         voter_2: signer,
     ) acquires GovernanceConfig, GovernanceEvents, VotingRecords {
         setup_voting(
             &core_resources,
-            &core_framework,
+            &aptos_framework,
             &proposer,
             &voter_1,
             &voter_2,
@@ -321,18 +322,18 @@ module AptosFramework::AptosGovernance {
         vote(&voter_1, signer::address_of(&voter_1), 0, true);
     }
 
-    #[test(core_resources = @CoreResources, core_framework = @AptosFramework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
+    #[test(core_resources = @CoreResources, aptos_framework = @AptosFramework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
     #[expected_failure(abort_code = 1031)]
     public entry fun test_cannot_double_vote_with_different_voter_addresses(
         core_resources: signer,
-        core_framework: signer,
+        aptos_framework: signer,
         proposer: signer,
         voter_1: signer,
         voter_2: signer,
     ) acquires GovernanceConfig, GovernanceEvents, VotingRecords {
         setup_voting(
             &core_resources,
-            &core_framework,
+            &aptos_framework,
             &proposer,
             &voter_1,
             &voter_2,
@@ -349,7 +350,7 @@ module AptosFramework::AptosGovernance {
     #[test_only]
     fun setup_voting(
         core_resources: &signer,
-        core_framework: &signer,
+        aptos_framework: &signer,
         proposer: &signer,
         yes_voter: &signer,
         no_voter: &signer,
@@ -359,19 +360,19 @@ module AptosFramework::AptosGovernance {
         use AptosFramework::Coin;
         use AptosFramework::TestCoin::{Self, TestCoin};
 
-        Timestamp::set_time_has_started_for_testing(core_resources);
+        Timestamp::set_time_has_started_for_testing(aptos_framework);
 
         // Initialize the governance.
-        initialize(core_framework, 10, 100, 1000);
+        initialize(aptos_framework, 10, 100, 1000);
 
         // Initialize the stake pools for proposer and voters.
         let active_validators = vector::empty<address>();
         vector::push_back(&mut active_validators, signer::address_of(proposer));
         vector::push_back(&mut active_validators, signer::address_of(yes_voter));
         vector::push_back(&mut active_validators, signer::address_of(no_voter));
-        Stake::create_validator_set(core_resources, active_validators);
+        Stake::create_validator_set(aptos_framework, active_validators);
 
-        let (mint_cap, burn_cap) = TestCoin::initialize(core_framework, core_resources);
+        let (mint_cap, burn_cap) = TestCoin::initialize(aptos_framework, core_resources);
         let proposer_stake = Coin::mint(100, &mint_cap);
         let yes_voter_stake = Coin::mint(20, &mint_cap);
         let no_voter_stake = Coin::mint(10, &mint_cap);

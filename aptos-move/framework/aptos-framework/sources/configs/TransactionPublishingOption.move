@@ -22,16 +22,16 @@ module AptosFramework::TransactionPublishingOption {
     const ECONFIG: u64 = 1;
 
     public fun initialize(
-        core_resource_account: &signer,
+        account: &signer,
         script_allow_list: vector<vector<u8>>,
         module_publishing_allowed: bool,
     ) {
         Timestamp::assert_genesis();
-        SystemAddresses::assert_core_resource(core_resource_account);
-        assert!(!exists<TransactionPublishingOption>(@CoreResources), errors::already_published(ECONFIG));
+        SystemAddresses::assert_aptos_framework(account);
+        assert!(!exists<TransactionPublishingOption>(@AptosFramework), errors::already_published(ECONFIG));
 
         move_to(
-            core_resource_account,
+            account,
             TransactionPublishingOption{
                 script_allow_list,
                 module_publishing_allowed
@@ -41,21 +41,21 @@ module AptosFramework::TransactionPublishingOption {
 
     public fun is_script_allowed(script_hash: &vector<u8>): bool acquires TransactionPublishingOption {
         if (vector::is_empty(script_hash)) return true;
-        let publish_option = borrow_global<TransactionPublishingOption>(@CoreResources);
+        let publish_option = borrow_global<TransactionPublishingOption>(@AptosFramework);
         // allowlist empty = open publishing, anyone can send txes
         vector::is_empty(&publish_option.script_allow_list)
         || vector::contains(&publish_option.script_allow_list, script_hash)
     }
 
     public fun is_module_allowed(): bool acquires TransactionPublishingOption {
-        let publish_option = borrow_global<TransactionPublishingOption>(@CoreResources);
+        let publish_option = borrow_global<TransactionPublishingOption>(@AptosFramework);
 
         publish_option.module_publishing_allowed
     }
 
     public entry fun set_module_publishing_allowed(account:signer, is_allowed: bool) acquires TransactionPublishingOption {
         SystemAddresses::assert_core_resource(&account);
-        let publish_option = borrow_global_mut<TransactionPublishingOption>(@CoreResources);
+        let publish_option = borrow_global_mut<TransactionPublishingOption>(@AptosFramework);
         publish_option.module_publishing_allowed = is_allowed;
 
         Reconfiguration::reconfigure();

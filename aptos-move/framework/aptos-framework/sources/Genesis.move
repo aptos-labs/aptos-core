@@ -87,9 +87,18 @@ module AptosFramework::Genesis {
         rewards_rate: u64,
         rewards_rate_denominator: u64,
     ) {
-        // initialize the core resource account
+        // TODO: Only do create the core resources account in testnets
+        Account::create_account_internal(signer::address_of(core_resource_account));
+        Account::rotate_authentication_key_internal(core_resource_account, copy core_resource_account_auth_key);
+
+        // Initialize the aptos framework account. This is the account where system resources and modules will be
+        // deployed to. This will be entirely managed by on-chain governance and no entities have the key or privileges
+        // to use this account.
+        let (aptos_framework_account, framework_signer_cap) = Account::create_core_framework_account();
+
+        // Initialize account configs on aptos framework account.
         Account::initialize(
-            core_resource_account,
+            &aptos_framework_account,
             @AptosFramework,
             b"Account",
             b"script_prologue",
@@ -100,19 +109,15 @@ module AptosFramework::Genesis {
             b"writeset_epilogue",
             false,
         );
-        Account::create_account_internal(signer::address_of(core_resource_account));
-        Account::rotate_authentication_key_internal(core_resource_account, copy core_resource_account_auth_key);
-        // initialize the core framework account
-        let (core_framework_account, framework_signer_cap) = Account::create_core_framework_account();
 
         // Give the decentralized on-chain governance control over the core framework account.
-        AptosGovernance::store_signer_cap(&core_framework_account, framework_signer_cap);
+        AptosGovernance::store_signer_cap(&aptos_framework_account, framework_signer_cap);
 
         // Consensus config setup
-        ConsensusConfig::initialize(core_resource_account);
-        Version::initialize(core_resource_account, initial_version);
+        ConsensusConfig::initialize(&aptos_framework_account);
+        Version::initialize(&aptos_framework_account, initial_version);
         Stake::initialize_validator_set(
-            core_resource_account,
+            &aptos_framework_account,
             minimum_stake,
             maximum_stake,
             min_lockup_duration_secs,
@@ -123,37 +128,36 @@ module AptosFramework::Genesis {
         );
 
         VMConfig::initialize(
-            core_resource_account,
+            &aptos_framework_account,
             instruction_schedule,
             native_schedule,
             min_price_per_gas_unit,
         );
 
-        ConsensusConfig::set(core_resource_account, consensus_config);
-
-        TransactionPublishingOption::initialize(core_resource_account, initial_script_allow_list, is_open_module);
+        ConsensusConfig::set(&aptos_framework_account, consensus_config);
+        TransactionPublishingOption::initialize(&aptos_framework_account, initial_script_allow_list, is_open_module);
 
         // This is testnet-specific configuration and can be skipped for mainnet.
         // Mainnet can call Coin::initialize<MainnetCoin> directly and give mint capability to the Staking module.
-        let (mint_cap, burn_cap) = TestCoin::initialize(&core_framework_account, core_resource_account);
+        let (mint_cap, burn_cap) = TestCoin::initialize(&aptos_framework_account, core_resource_account);
 
-        // Give Stake MintCapability<TestCoin> so it can mint rewards.
-        Stake::store_test_coin_mint_cap(core_resource_account, mint_cap);
+        // Give Stake module MintCapability<TestCoin> so it can mint rewards.
+        Stake::store_test_coin_mint_cap(&aptos_framework_account, mint_cap);
 
         // Give TransactionFee BurnCapability<TestCoin> so it can burn gas.
-        TransactionFee::store_test_coin_burn_cap(&core_framework_account, burn_cap);
+        TransactionFee::store_test_coin_burn_cap(&aptos_framework_account, burn_cap);
 
         // Pad the event counter for the Root account to match DPN. This
         // _MUST_ match the new epoch event counter otherwise all manner of
         // things start to break.
-        event::destroy_handle(event::new_event_handle<u64>(core_resource_account));
-        event::destroy_handle(event::new_event_handle<u64>(core_resource_account));
+        event::destroy_handle(event::new_event_handle<u64>(&aptos_framework_account));
+        event::destroy_handle(event::new_event_handle<u64>(&aptos_framework_account));
 
-        // this needs to be called at the very end
-        ChainId::initialize(core_resource_account, chain_id);
-        Reconfiguration::initialize(core_resource_account);
-        Block::initialize_block_metadata(core_resource_account, epoch_interval);
-        Timestamp::set_time_has_started(core_resource_account);
+        // This needs to be called at the very end.
+        ChainId::initialize(&aptos_framework_account, chain_id);
+        Reconfiguration::initialize(&aptos_framework_account);
+        Block::initialize_block_metadata(&aptos_framework_account, epoch_interval);
+        Timestamp::set_time_has_started(&aptos_framework_account);
     }
 
     /// Sets up the initial validator set for the network.
@@ -167,7 +171,7 @@ module AptosFramework::Genesis {
     /// Network address fields are a vector per account, where each entry is a vector of addresses
     /// encoded in a single BCS byte array.
     public entry fun create_initialize_validators(
-        core_resource_account: signer,
+        aptos_framework_account: signer,
         owners: vector<address>,
         consensus_pubkeys: vector<vector<u8>>,
         proof_of_possession: vector<vector<u8>>,
@@ -206,7 +210,7 @@ module AptosFramework::Genesis {
             // Transfer coins from the root account to the validator, so they can stake and have non-zero voting power
             // and can complete consensus on the genesis block.
             Coin::register<TestCoin>(&owner_account);
-            Coin::transfer<TestCoin>(&core_resource_account, *owner, amount);
+            TestCoin::mint(&aptos_framework_account, *owner, amount);
             Stake::add_stake(&owner_account, amount);
             Stake::join_validator_set_internal(&owner_account, *owner);
 

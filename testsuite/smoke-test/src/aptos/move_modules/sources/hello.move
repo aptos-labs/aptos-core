@@ -1,8 +1,8 @@
 module 0xA550C18::HelloWorld {
-    use AptosFramework::signer;
+    use std::ascii::{Self, String};
+    use std::signer;
     use AptosFramework::Coin;
     use AptosFramework::TestCoin::TestCoin;
-    use AptosFramework::ascii::{Self, String};
 
     struct ModuleData has key, store {
         global_counter: u64,

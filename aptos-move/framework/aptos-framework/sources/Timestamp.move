@@ -33,11 +33,12 @@ module AptosFramework::Timestamp {
 
     /// Marks that time has started and genesis has finished. This can only be called from genesis and with the root
     /// account.
-    public(friend) fun set_time_has_started(root_account: &signer) {
+    public(friend) fun set_time_has_started(account: &signer) {
         assert_genesis();
-        SystemAddresses::assert_core_resource(root_account);
+        SystemAddresses::assert_aptos_framework(account);
+
         let timer = CurrentTimeMicroseconds { microseconds: 0 };
-        move_to(root_account, timer);
+        move_to(account, timer);
     }
      spec set_time_has_started {
         /// This function can't be verified on its own and has to be verified in the context of Genesis execution.
@@ -46,13 +47,13 @@ module AptosFramework::Timestamp {
         /// and need to hold.
         pragma delegate_invariants_to_caller;
         include AbortsIfNotGenesis;
-        include SystemAddresses::AbortsIfNotCoreResource{addr: signer::address_of(root_account)};
+        include SystemAddresses::AbortsIfNotAptosFramework{account: signer::address_of(account)};
         ensures is_operating();
     }
 
     #[test_only]
-    public fun set_time_has_started_for_testing(root_account: &signer) {
-        set_time_has_started(root_account);
+    public fun set_time_has_started_for_testing(account: &signer) {
+        set_time_has_started(account);
     }
     spec set_time_has_started_for_testing {
         pragma verify = false;
@@ -68,7 +69,7 @@ module AptosFramework::Timestamp {
         // Can only be invoked by AptosVM signer.
         SystemAddresses::assert_vm(account);
 
-        let global_timer = borrow_global_mut<CurrentTimeMicroseconds>(@CoreResources);
+        let global_timer = borrow_global_mut<CurrentTimeMicroseconds>(@AptosFramework);
         let now = global_timer.microseconds;
         if (proposer == @VMReserved) {
             // NIL block with null address as proposer. Timestamp must be equal.
@@ -81,7 +82,7 @@ module AptosFramework::Timestamp {
     }
     spec update_global_time {
         pragma opaque;
-        modifies global<CurrentTimeMicroseconds>(@CoreResources);
+        modifies global<CurrentTimeMicroseconds>(@AptosFramework);
 
         let now = spec_now_microseconds();
         let post post_now = spec_now_microseconds();
@@ -105,7 +106,7 @@ module AptosFramework::Timestamp {
     /// Gets the current time in microseconds.
     public fun now_microseconds(): u64 acquires CurrentTimeMicroseconds {
         assert_operating();
-        borrow_global<CurrentTimeMicroseconds>(@CoreResources).microseconds
+        borrow_global<CurrentTimeMicroseconds>(@AptosFramework).microseconds
     }
     spec now_microseconds {
         pragma opaque;
@@ -113,7 +114,7 @@ module AptosFramework::Timestamp {
         ensures result == spec_now_microseconds();
     }
     spec fun spec_now_microseconds(): u64 {
-        global<CurrentTimeMicroseconds>(@CoreResources).microseconds
+        global<CurrentTimeMicroseconds>(@AptosFramework).microseconds
     }
 
     /// Gets the current time in seconds.
@@ -131,7 +132,7 @@ module AptosFramework::Timestamp {
 
     /// Helper function to determine if Aptos is in genesis state.
     public fun is_genesis(): bool {
-        !exists<CurrentTimeMicroseconds>(@CoreResources)
+        !exists<CurrentTimeMicroseconds>(@AptosFramework)
     }
 
     /// Helper function to assert genesis state.
@@ -146,7 +147,7 @@ module AptosFramework::Timestamp {
     /// Helper function to determine if Aptos is operating. This is the same as `!is_genesis()` and is provided
     /// for convenience. Testing `is_operating()` is more frequent than `is_genesis()`.
     public fun is_operating(): bool {
-        exists<CurrentTimeMicroseconds>(@CoreResources)
+        exists<CurrentTimeMicroseconds>(@AptosFramework)
     }
     /// Helper schema to specify that a function aborts if not in genesis.
     spec schema AbortsIfNotGenesis {
@@ -169,7 +170,7 @@ module AptosFramework::Timestamp {
 
     #[test_only]
     public fun update_global_time_for_test(timestamp: u64) acquires CurrentTimeMicroseconds {
-        let global_timer = borrow_global_mut<CurrentTimeMicroseconds>(@CoreResources);
+        let global_timer = borrow_global_mut<CurrentTimeMicroseconds>(@AptosFramework);
         let now = global_timer.microseconds;
         assert!(now < timestamp, errors::invalid_argument(ETIMESTAMP));
         global_timer.microseconds = timestamp;
@@ -181,7 +182,7 @@ module AptosFramework::Timestamp {
 
     spec module {
         /// After genesis, `CurrentTimeMicroseconds` is published forever
-        invariant is_operating() ==> exists<CurrentTimeMicroseconds>(@CoreResources);
+        invariant is_operating() ==> exists<CurrentTimeMicroseconds>(@AptosFramework);
 
         /// After genesis, time progresses monotonically.
         invariant update

@@ -17,11 +17,10 @@ module AptosFramework::Version {
     /// Publishes the Version config.
     public fun initialize(account: &signer, initial_version: u64) {
         Timestamp::assert_genesis();
-
-        SystemAddresses::assert_core_resource(account);
+        SystemAddresses::assert_aptos_framework(account);
 
         assert!(
-            !exists<Version>(@CoreResources),
+            !exists<Version>(@AptosFramework),
             errors::already_published(ECONFIG)
         );
 
@@ -32,17 +31,18 @@ module AptosFramework::Version {
     }
 
     /// Updates the major version to a larger version.
+    /// This is only used in test environments and outside of them, the core resources account shouldn't exist.
     public entry fun set_version(account: signer, major: u64) acquires Version {
         SystemAddresses::assert_core_resource(&account);
-        assert!(exists<Version>(@CoreResources), errors::not_published(ECONFIG));
-        let old_major = *&borrow_global<Version>(@CoreResources).major;
+        assert!(exists<Version>(@AptosFramework), errors::not_published(ECONFIG));
+        let old_major = *&borrow_global<Version>(@AptosFramework).major;
 
         assert!(
             old_major < major,
             errors::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER)
         );
 
-        let config = borrow_global_mut<Version>(@CoreResources);
+        let config = borrow_global_mut<Version>(@AptosFramework);
         config.major = major;
 
         Reconfiguration::reconfigure();

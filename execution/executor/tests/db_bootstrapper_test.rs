@@ -10,13 +10,11 @@ use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{aptos_root_address, CoinStoreResource},
+    account_config::{aptos_root_address, CoinStoreResource, CORE_CODE_ADDRESS},
     account_view::AccountView,
     contract_event::ContractEvent,
     event::EventHandle,
-    on_chain_config::{
-        access_path_for_config, config_address, ConfigurationResource, OnChainConfig, ValidatorSet,
-    },
+    on_chain_config::{access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet},
     state_store::state_key::StateKey,
     test_helpers::transaction_test_helpers::block,
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
@@ -175,9 +173,9 @@ fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
 
 fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
     let db_state_view = db.reader.latest_state_checkpoint_view().unwrap();
-    let config_address = config_address();
-    let config_account_state_view = db_state_view.as_account_with_state_view(&config_address);
-    config_account_state_view
+    let aptos_framework_account_state_view =
+        db_state_view.as_account_with_state_view(&CORE_CODE_ADDRESS);
+    aptos_framework_account_state_view
         .get_configuration_resource()
         .unwrap()
         .unwrap()
@@ -222,7 +220,7 @@ fn test_new_genesis() {
             ),
             (
                 StateKey::AccessPath(AccessPath::new(
-                    config_address(),
+                    CORE_CODE_ADDRESS,
                     ConfigurationResource::resource_path(),
                 )),
                 WriteOp::Value(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),

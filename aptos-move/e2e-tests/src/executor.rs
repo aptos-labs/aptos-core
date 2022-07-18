@@ -321,8 +321,9 @@ impl FakeExecutor {
         match output.status() {
             TransactionStatus::Keep(status) => {
                 self.apply_write_set(output.write_set());
-                assert!(
-                    status == &ExecutionStatus::Success,
+                assert_eq!(
+                    status,
+                    &ExecutionStatus::Success,
                     "transaction failed with {:?}",
                     status
                 );
@@ -457,6 +458,7 @@ impl FakeExecutor {
             .expect("Failed to get the execution result for Block Prologue");
         // check if we emit the expected event, there might be more events for transaction fees
         let event = output.events()[0].clone();
+        println!("@@@@@ EVENTS {:?}", output.events());
         assert_eq!(event.key(), &new_block_event_key());
         assert!(bcs::from_bytes::<NewBlockEvent>(event.event_data()).is_ok());
         self.apply_write_set(output.write_set());

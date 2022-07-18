@@ -10,10 +10,10 @@ use aptos_logger::prelude::*;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     access_path::AccessPath,
-    account_config::aptos_root_address,
+    account_config::CORE_CODE_ADDRESS,
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::{config_address, ConfigurationResource},
+    on_chain_config::ConfigurationResource,
     state_store::state_key::StateKey,
     timestamp::TimestampResource,
     transaction::{Transaction, Version},
@@ -190,7 +190,7 @@ pub fn calculate_genesis<V: VMExecutor>(
 fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
         .get_state_value(&StateKey::AccessPath(AccessPath::new(
-            aptos_root_address(),
+            CORE_CODE_ADDRESS,
             TimestampResource::resource_path(),
         )))?
         .ok_or_else(|| format_err!("TimestampResource missing."))?;
@@ -201,7 +201,7 @@ fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {
 fn get_state_epoch(state_view: &CachedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
         .get_state_value(&StateKey::AccessPath(AccessPath::new(
-            config_address(),
+            CORE_CODE_ADDRESS,
             ConfigurationResource::resource_path(),
         )))?
         .ok_or_else(|| format_err!("ConfigurationResource missing."))?;

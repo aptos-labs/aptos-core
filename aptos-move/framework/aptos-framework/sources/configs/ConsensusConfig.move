@@ -17,10 +17,10 @@ module AptosFramework::ConsensusConfig {
     /// Publishes the ConsensusConfig config.
     public fun initialize(account: &signer) {
         Timestamp::assert_genesis();
-        SystemAddresses::assert_core_resource(account);
+        SystemAddresses::assert_aptos_framework(account);
 
         assert!(
-            !exists<ConsensusConfig>(@CoreResources),
+            !exists<ConsensusConfig>(@AptosFramework),
             errors::already_published(ECONFIG)
         );
         move_to(account, ConsensusConfig { config: vector::empty() });
@@ -28,8 +28,8 @@ module AptosFramework::ConsensusConfig {
 
     /// Update the config.
     public fun set(account: &signer, config: vector<u8>) acquires ConsensusConfig {
-        SystemAddresses::assert_core_resource(account);
-        let config_ref = &mut borrow_global_mut<ConsensusConfig>(@CoreResources).config;
+        SystemAddresses::assert_aptos_framework(account);
+        let config_ref = &mut borrow_global_mut<ConsensusConfig>(@AptosFramework).config;
         *config_ref = config;
         Reconfiguration::reconfigure();
     }
