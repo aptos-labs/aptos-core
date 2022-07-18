@@ -161,9 +161,9 @@ impl PartialBlockIdentifier {
         }
     }
 
-    pub fn by_version(version: u64) -> Self {
+    pub fn block_index(index: u64) -> Self {
         Self {
-            index: Some(version),
+            index: Some(index),
             hash: None,
         }
     }
