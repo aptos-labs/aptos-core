@@ -141,7 +141,6 @@ default-members = [
     "crates/aptos-rosetta",
     "crates/transaction-emitter",
     "aptos-move/framework",
-    "aptos-move/transaction-builder-generator",
     "execution/db-bootstrapper",
     "storage/backup/backup-cli",
     "ecosystem/indexer",
