@@ -91,10 +91,10 @@ function PromptState() {
             />
           ) : null}
           {title ? (
-            <Heading fontSize="3xl">{title}</Heading>
+            <Heading noOfLines={1} fontSize="3xl" wordBreak="break-word">{title}</Heading>
           ) : null}
           {domain ? (
-            <Text fontSize="sm" color="gray.500" wordBreak="break-word">{domain}</Text>
+            <Text noOfLines={1} fontSize="sm" color="gray.500" wordBreak="break-word">{domain}</Text>
           ) : null}
         </VStack>
         <VStack flexGrow={1} alignItems="flex-start" width="100%" maxW="100%">
