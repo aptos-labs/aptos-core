@@ -149,6 +149,7 @@ impl SubmissionWorker {
             &self.client,
             &mut self.accounts,
             wait_for_accounts_sequence_timeout,
+            &mut self.rng,
         )
         .await
         {

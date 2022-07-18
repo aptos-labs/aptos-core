@@ -7,7 +7,7 @@ pub mod submission_worker;
 
 use ::aptos_logger::*;
 use again::RetryPolicy;
-use anyhow::{format_err, Result};
+use anyhow::{anyhow, format_err, Result};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -17,6 +17,7 @@ use aptos_sdk::{
 use futures::future::{try_join_all, FutureExt};
 use itertools::zip;
 use once_cell::sync::Lazy;
+use rand::prelude::SliceRandom;
 use rand_core::SeedableRng;
 use std::{
     cmp::{max, min},
@@ -404,6 +405,36 @@ impl<'t> TxnEmitter<'t> {
     }
 }
 
+/// Waits for a single account to catch up to the expected sequence number
+async fn wait_for_single_account_sequence(
+    client: &RestClient,
+    account: &LocalAccount,
+    wait_timeout: Duration,
+) -> Result<()> {
+    let deadline = Instant::now() + wait_timeout;
+    while Instant::now() <= deadline {
+        time::sleep(Duration::from_millis(500)).await;
+        match query_sequence_numbers(client, &[account.address()]).await {
+            Ok(sequence_numbers) => {
+                if sequence_numbers[0] >= account.sequence_number() {
+                    return Ok(());
+                }
+            }
+            Err(e) => {
+                info!(
+                    "Failed to query sequence number for account {:?} for instance {:?} : {:?}",
+                    account, client, e
+                );
+            }
+        }
+    }
+    Err(anyhow!(
+        "Timed out waiting for single account {:?} sequence number for instance {:?}",
+        account,
+        client
+    ))
+}
+
 /// This function waits for the submitted transactions to be committed, up to
 /// a deadline. If some accounts still have uncommitted transactions when we
 /// hit the deadline, we return a map of account to the info about the number
@@ -420,10 +451,22 @@ async fn wait_for_accounts_sequence(
     client: &RestClient,
     accounts: &mut [LocalAccount],
     wait_timeout: Duration,
+    rng: &mut StdRng,
 ) -> Result<(), HashSet<AccountAddress>> {
     let deadline = Instant::now() + wait_timeout;
     let addresses: Vec<_> = accounts.iter().map(|d| d.address()).collect();
     let mut uncommitted = addresses.clone().into_iter().collect::<HashSet<_>>();
+
+    // Choose a random account and wait for its sequence number to be up to date. After that, we can
+    // query the all the accounts. This will help us ensure we don't hammer the REST API with too many
+    // query for all the accounts.
+    let account = accounts.choose(rng).expect("accounts can't be empty");
+    if wait_for_single_account_sequence(client, account, wait_timeout)
+        .await
+        .is_err()
+    {
+        return Err(uncommitted);
+    }
 
     while Instant::now() <= deadline {
         match query_sequence_numbers(client, &addresses).await {
@@ -445,8 +488,7 @@ async fn wait_for_accounts_sequence(
                 );
             }
         }
-
-        time::sleep(Duration::from_millis(250)).await;
+        time::sleep(Duration::from_millis(500)).await;
     }
 
     Err(uncommitted)
