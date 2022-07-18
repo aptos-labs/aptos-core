@@ -9,6 +9,7 @@ module AptosFramework::Reconfiguration {
     use AptosFramework::Timestamp;
     use AptosFramework::Stake;
 
+    friend AptosFramework::AptosGovernance;
     friend AptosFramework::Block;
     // TODO: migrate all to callback in block prologue
     friend AptosFramework::ConsensusConfig;
