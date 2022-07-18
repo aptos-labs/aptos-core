@@ -5,7 +5,7 @@ use crate::aptos_cli::setup_cli_test;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::HashValue;
-use aptos_rosetta::common::Y2K_SECS;
+use aptos_rosetta::common::{BLOCKCHAIN, Y2K_SECS};
 use aptos_rosetta::types::{
     AccountBalanceResponse, Block, BlockIdentifier, NetworkIdentifier, NetworkRequest,
     PartialBlockIdentifier,
@@ -14,6 +14,7 @@ use aptos_rosetta::{
     client::RosettaClient,
     common::native_coin,
     types::{AccountBalanceRequest, BlockRequest},
+    ROSETTA_VERSION,
 };
 use aptos_types::account_address::AccountAddress;
 use aptos_types::chain_id::ChainId;
@@ -59,6 +60,45 @@ pub async fn setup_test(
         cli.create_account_with_faucet(i).await.unwrap();
     }
     (swarm, cli, faucet, rosetta_client)
+}
+
+#[tokio::test]
+async fn test_network() {
+    let (swarm, _, _, rosetta_client) = setup_test(1, 1).await;
+    let chain_id = swarm.chain_id();
+
+    // We only support one network, this network
+    let networks = rosetta_client.network_list().await.unwrap();
+    assert_eq!(1, networks.network_identifiers.len());
+    let network_id = networks.network_identifiers.first().unwrap();
+    assert_eq!(BLOCKCHAIN, network_id.blockchain);
+    assert_eq!(chain_id.to_string(), network_id.network);
+
+    let request = NetworkRequest {
+        network_identifier: NetworkIdentifier::from(chain_id),
+    };
+    let options = rosetta_client.network_options(&request).await.unwrap();
+    assert_eq!(ROSETTA_VERSION, options.version.rosetta_version);
+
+    // TODO: Check other options
+
+    let request = NetworkRequest {
+        network_identifier: NetworkIdentifier::from(chain_id),
+    };
+    let status = rosetta_client.network_status(&request).await.unwrap();
+    assert!(status.current_block_identifier.index > 0);
+    assert!(status.current_block_timestamp > Y2K_SECS);
+    assert_eq!(
+        BlockIdentifier {
+            index: 0,
+            hash: HashValue::zero().to_hex()
+        },
+        status.genesis_block_identifier
+    );
+    assert_eq!(
+        Some(status.genesis_block_identifier),
+        status.oldest_block_identifier,
+    );
 }
 
 #[tokio::test]
