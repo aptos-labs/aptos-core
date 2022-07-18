@@ -84,7 +84,7 @@ In order to create accounts, the Aptos testnet requires the account's public key
 
 ## Access control with signer
 
-The sender of a transaction is represented by a signer. When a `signer` is specified in a function in a transaction, then the `signer` is the only entity capable of adding or removing resources into an account. See the below Move example code with `&signer` in the `initialize` and `withdraw` functions. When a `signer` is not specified in a function, for example, the below `deposit` function, then no access controls exist for this function:
+The sender of a transaction is represented by a signer. When a signer is specified in a Move module function in a transaction, then the Move VM in the Aptos blockchain will assert that the signer of the transaction (that triggered that function) is the owner of the account. See the below Move example code with `signer` in the `initialize` and `withdraw` functions. When a `signer` is not specified in a function, for example, the below `deposit` function, then no access controls exist for this function:
 
 ```rust
 module Test::Coin {
