@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 
 /// Specifies operation such as +, - to use with `WriteOp::Delta`.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DeltaOperation {
     Addition,
     Subtraction,
