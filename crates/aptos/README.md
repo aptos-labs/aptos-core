@@ -550,7 +550,7 @@ The above command will generate the below terminal output:
 }
 ```
 
-### Compiling & Unit Testing Move
+### Compiling, Unit Testing and Proving Move
 
 The `aptos` CLI can also be used to compile and run unit tests locally.
 In this example, we'll use the `HelloBlockchain` in [move-examples](../../aptos-move/move-examples/).
@@ -567,6 +567,18 @@ Running Move unit tests
 [ PASS    ] 0x8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71::Message::sender_can_set_message
 [ PASS    ] 0x8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71::MessageTests::sender_can_set_message
 Test result: OK. Total tests: 2; passed: 2; failed: 0
+{
+  "Result": "Success"
+}
+```
+
+Moreover, the `aptos` CLI can be used to run [Move Prover](https://github.com/move-language/move/tree/main/language/move-prover) which is a formal verification tool for the Move language. The below example proves the `hello_prover` package in [move-examples](../../aptos-move/move-examples/).
+```bash
+aptos move prove --package-dir aptos-move/move-examples/hello_prover/
+```
+The above command will generate the following terminal output:
+```bash
+SUCCESS proving 1 modules from package `hello_prover` in 1.649s
 {
   "Result": "Success"
 }
