@@ -3,8 +3,8 @@
 
 use crate::{
     move_vm_ext::{
-        MoveResolverExt, NativeTransactionContext, NativeAggregatorContext,
-        SessionExt, SessionId},
+        MoveResolverExt, NativeAggregatorContext, NativeTransactionContext, SessionExt, SessionId,
+    },
     natives::aptos_natives,
 };
 use move_deps::{

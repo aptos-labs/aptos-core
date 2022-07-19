@@ -12,7 +12,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
     transaction::{ChangeSet, SignatureCheckedTransaction},
-    write_set::{WriteOp, WriteSetMut, WriteSet},
+    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use move_deps::{
     move_binary_format::errors::{Location, VMResult},

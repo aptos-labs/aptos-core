@@ -4,15 +4,13 @@
 use aptos_types::{
     state_store::state_key::StateKey,
     vm_status::StatusCode,
-    write_set::{WriteOp, WriteSetMut, WriteSet},
+    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use better_any::{Tid, TidAble};
 use move_deps::{
-    move_binary_format::errors::{PartialVMResult, PartialVMError},
-    move_core_types::{
-        account_address::AccountAddress,
-        gas_schedule::GasCost
-    },
+    move_binary_format::errors::{PartialVMError, PartialVMResult},
+    move_core_types::{account_address::AccountAddress, gas_schedule::GasCost},
+    move_table_extension::{TableHandle, TableResolver},
     move_vm_runtime::{
         native_functions,
         native_functions::{NativeContext, NativeFunctionTable},
@@ -20,21 +18,17 @@ use move_deps::{
     move_vm_types::{
         loaded_data::runtime_types::Type,
         natives::function::NativeResult,
-        values::{Value, Reference, StructRef, IntegerValue, Struct},
         pop_arg,
+        values::{IntegerValue, Reference, Struct, StructRef, Value},
     },
-    move_table_extension::{TableResolver, TableHandle},
 };
 use smallvec::smallvec;
 use std::{
-    collections::{VecDeque, BTreeMap, btree_map::Entry},
-    cell::RefCell, convert::TryInto
+    cell::RefCell,
+    collections::{btree_map::Entry, BTreeMap, VecDeque},
+    convert::TryInto,
 };
 use tiny_keccak::{Hasher, Sha3};
-
-
-/// Internal type used for aggregation, currenlty set to u128 (maximum available).
-type IntegerType = u128;
 
 /// State of the aggregator: `Data` means that aggregator stores an exact value,
 /// `PositiveDelta` means that actual value is not known but must be added later.
@@ -46,35 +40,29 @@ enum AggregatorState {
 
 /// Internal aggregator data structure.
 struct Aggregator {
-    // Identifies aggregator in registry.
+    // Uniquely identifies aggregator in `AggregatorTable`.
     key: u128,
     // Describes state of aggregator: data or delta.
     state: AggregatorState,
     // Describes the value of data or delta.
-    value: IntegerType,
-    // Condition value, exceeding which aggregator overflows.
-    limit: IntegerType,
+    value: u128,
+    // Postondition value, exceeding it aggregator overflows.
+    limit: u128,
 }
 
-/// If `Aggregator` overflows the `limit`.
-const E_AGGREGATOR_OVERFLOW: u64 = 1600;
-
-/// If `Aggregator` fails to resolve its value from storage.
-const E_AGGREGATOR_RESOLVE_FAILURE: u64 = 1601;
-
-/// If `Aggregator` cannot find its value when resolving from storage.
-const E_AGGREGATOR_VALUE_NOT_FOUND: u64 = 1602;
+/// When `Aggregator` overflows the `limit`.
+const EAGGREGATOR_OVERFLOW: u64 = 1600;
 
 impl Aggregator {
     /// Tries to add a `value` to the aggregator, aborting on exceeding the
     /// `limit`.
-    fn add(&mut self, value: IntegerType) -> PartialVMResult<()> {
+    fn add(&mut self, value: u128) -> PartialVMResult<()> {
         match self.state {
             AggregatorState::Data | AggregatorState::PositiveDelta => {
                 if value > self.limit - self.value {
-                    Err(partial_error(
+                    Err(abort_error(
                         "aggregator's value overflowed",
-                        E_AGGREGATOR_OVERFLOW,
+                        EAGGREGATOR_OVERFLOW,
                     ))
                 } else {
                     self.value += value;
@@ -93,7 +81,7 @@ impl Aggregator {
         context: &NativeAggregatorContext,
         handle: &TableHandle,
         key: u128,
-    ) -> PartialVMResult<IntegerType> {
+    ) -> PartialVMResult<u128> {
         // Aggregator knows what it has, return immediately.
         if self.state == AggregatorState::Data {
             return Ok(self.value);
@@ -101,76 +89,99 @@ impl Aggregator {
 
         // Otherwise, we have a delta and have to go to storage.
         let key_bytes = u128::to_be_bytes(key);
-        match context
-                .resolver
-                .resolve_table_entry(handle, &key_bytes) {
-            Err(_) => Err(partial_error(
-                        "error resolving aggregator's value",
-                        E_AGGREGATOR_RESOLVE_FAILURE,
-                      )),
+        match context.resolver.resolve_table_entry(handle, &key_bytes) {
+            Err(_) => Err(extension_error("error resolving aggregator's value")),
             Ok(maybe_bytes) => {
                 match maybe_bytes {
                     Some(bytes) => {
                         // If the value is found, deserialize it back ensuring
                         // all bytes are preserved.
-                        const VALUE_SIZE: usize = std::mem::size_of::<IntegerType>();
+                        const VALUE_SIZE: usize = std::mem::size_of::<u128>();
                         if bytes.len() < VALUE_SIZE {
-                            return Err(partial_error(
-                                "error resolving aggregator's value",
-                                E_AGGREGATOR_RESOLVE_FAILURE,
-                            ));
+                            return Err(extension_error("error resolving aggregator's value"));
                         };
-                        let value = IntegerType::from_be_bytes(bytes[0..VALUE_SIZE]
-                            .try_into()
-                            .expect("not enough bytes"));
-                        
+                        let value = u128::from_be_bytes(
+                            bytes[0..VALUE_SIZE].try_into().expect("not enough bytes"),
+                        );
+
                         // Once value is reconstructed, apply delta to it and change the state.
                         self.state = AggregatorState::Data;
                         self.value += value;
 
                         Ok(self.value)
                     }
-                    None => Err(partial_error(
-                        "aggregator's value not found",
-                        E_AGGREGATOR_VALUE_NOT_FOUND,
-                    )),
+                    None => Err(extension_error("aggregator's value not found")),
                 }
             }
         }
     }
 }
 
-/// Aggregator registry - a collection of aggregators, whose values are stored
-/// in a `Table`.
-struct Registry {
-    // Identifies the `Table` of this registry.
+/// Aggregator table - a top-level collection storing aggregators. It has a
+/// handle and an inner table data structure to actually store the aggregators.
+struct AggregatorTable {
+    // Identifies `Table` Move struct of this `AggregatorTable`.
     table_handle: TableHandle,
-    // Table to store all agregators associated with this registry.
+    // Table to store all agregators associated with this `AggregatorTable`.
     table: BTreeMap<u128, Aggregator>,
 }
 
-/// Top-level struct that is used by the context to maintain the map of all
-/// registries created throughout the VM session.
-#[derive(Default)]
-struct RegistryData {
-    registries: BTreeMap<TableHandle, Registry>,
+impl std::ops::Deref for AggregatorTable {
+    type Target = BTreeMap<u128, Aggregator>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.table
+    }
 }
 
-impl RegistryData {
-    /// Returns a mutable reference to the `Registry` specified by its handle.
-    /// A new registry is created if it doesn't exist in this context.
-    fn get_or_create_registry_mut(
+impl std::ops::DerefMut for AggregatorTable {
+    fn deref_mut(&mut self) -> &mut BTreeMap<u128, Aggregator> {
+        &mut self.table
+    }
+}
+
+impl AggregatorTable {
+    /// Returns a possibly new aggregator instance. If transaction did not
+    /// initialize this aggregator, then the actual value is not known, and the
+    /// aggregator state must be a delta, zero-intialized.
+    fn get_or_create_aggregator(&mut self, key: u128, limit: u128) -> &mut Aggregator {
+        if !self.contains_key(&key) {
+            let aggregator = Aggregator {
+                key,
+                state: AggregatorState::PositiveDelta,
+                value: 0,
+                limit,
+            };
+            self.insert(key, aggregator);
+        };
+        self.get_mut(&key).unwrap()
+    }
+}
+
+/// Top-level struct that is used by the context to maintain the map of all
+/// aggregator tables created throughout the VM session. In theory, only one
+/// is sufficient.
+#[derive(Default)]
+struct AggregatorTableData {
+    aggregator_tables: BTreeMap<TableHandle, AggregatorTable>,
+}
+
+impl AggregatorTableData {
+    /// Returns a mutable reference to the `AggregatorTable` specified by its
+    /// handle. A new aggregator table is created if it doesn't exist in this
+    /// context.
+    fn get_or_create_aggregator_table(
         &mut self,
         table_handle: TableHandle,
-    ) -> &mut Registry {
-        if let Entry::Vacant(e) = self.registries.entry(table_handle) {
-            let registry = Registry {
+    ) -> &mut AggregatorTable {
+        if let Entry::Vacant(e) = self.aggregator_tables.entry(table_handle) {
+            let aggregator_table = AggregatorTable {
                 table_handle,
                 table: BTreeMap::new(),
             };
-            e.insert(registry);
+            e.insert(aggregator_table);
         }
-        self.registries.get_mut(&table_handle).unwrap()
+        self.aggregator_tables.get_mut(&table_handle).unwrap()
     }
 }
 
@@ -178,12 +189,12 @@ impl RegistryData {
 #[derive(Tid)]
 pub struct NativeAggregatorContext<'a> {
     // Reuse table resolver since aggregator values are stored as Table values
-    // internally. 
+    // internally.
     resolver: &'a dyn TableResolver,
     txn_hash: u128,
-    // All existing registries in this context, wrapped in RefCell for internal
-    // mutability.
-    registry_data: RefCell<RegistryData>,
+    // All existing aggregator tables in this context, wrapped in RefCell for
+    // internal mutability.
+    aggregator_table_data: RefCell<AggregatorTableData>,
 }
 
 impl<'a> NativeAggregatorContext<'a> {
@@ -193,51 +204,51 @@ impl<'a> NativeAggregatorContext<'a> {
         Self {
             resolver,
             txn_hash,
-            registry_data: Default::default(),
+            aggregator_table_data: Default::default(),
         }
     }
 
     /// Temporary into_change_set!
     pub fn into_change_set(self) -> WriteSet {
-        let NativeAggregatorContext { registry_data, .. } = self;
-        let RegistryData {
-            registries,
-        } = registry_data.into_inner();
+        // let NativeAggregatorContext { registry_data, .. } = self;
+        // let RegistryData {
+        //     registries,
+        // } = registry_data.into_inner();
 
         let mut write_set_mut = WriteSetMut::new(Vec::new());
-        for (table_handle, registry) in registries {
-            let Registry {
-                table,
-                ..
-            } = registry;
-            for (key, aggregator) in table {
-                let key_bytes = u128::to_be_bytes(key).to_vec();
-                let state_key = StateKey::table_item(table_handle.0, key_bytes);
+        // for (table_handle, registry) in registries {
+        //     let Registry {
+        //         table,
+        //         ..
+        //     } = registry;
+        //     for (key, aggregator) in table {
+        //         let key_bytes = u128::to_be_bytes(key).to_vec();
+        //         let state_key = StateKey::table_item(table_handle.0, key_bytes);
 
-                let Aggregator {
-                    state,
-                    value,
-                    ..
-                } = aggregator;
+        //         let Aggregator {
+        //             state,
+        //             value,
+        //             ..
+        //         } = aggregator;
 
-                // TODO: introduce deltas!
-                assert!(state == AggregatorState::Data);
+        //         // TODO: introduce deltas!
+        //         assert!(state == AggregatorState::Data);
 
-                let value_bytes = u128::to_be_bytes(value).to_vec();
-                write_set_mut.push((state_key, WriteOp::Value(value_bytes)));
-            }
-        }
+        //         let value_bytes = u128::to_be_bytes(value).to_vec();
+        //         write_set_mut.push((state_key, WriteOp::Value(value_bytes)));
+        //     }
+        // }
         write_set_mut.freeze().unwrap()
     }
 }
 
 // ================================= Natives =================================
 
-/// All aggregator native functions. For more details, refer to cod in 
+/// All aggregator native functions. For more details, refer to cod in
 /// AggregatorTable.move.
 pub fn aggregator_natives(aggregator_addr: AccountAddress) -> NativeFunctionTable {
     native_functions::make_table(
-        aggregator_addr, 
+        aggregator_addr,
         &[
             ("AggregatorTable", "new_aggregator", native_new_aggregator),
             ("Aggregator", "add", native_add),
@@ -254,27 +265,16 @@ fn native_add(
     assert!(args.len() == 2);
 
     // Get aggregator fields and a value to add.
-    let value = pop_arg!(args, IntegerValue).value_as::<IntegerType>()?;
+    let value = pop_arg!(args, IntegerValue).value_as::<u128>()?;
     let aggregator_ref = pop_arg!(args, StructRef);
     let (table_handle, key, limit) = get_aggregator_fields(&aggregator_ref)?;
 
-    // Get the current registry. 
+    // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut registry_data = aggregator_context.registry_data.borrow_mut();
-    let registry = registry_data.get_or_create_registry_mut(table_handle);
-    
-    // If transaction did not initialize this aggregator, then the actual value
-    // is not known, and the aggregator state must be a delta, zero-intialized.
-    if !registry.table.contains_key(&key) {
-        let aggregator = Aggregator {
-            key,
-            state: AggregatorState::PositiveDelta,
-            value: 0,
-            limit,
-        };
-        registry.table.insert(key, aggregator);
-    };
-    let aggregator = registry.table.get_mut(&key).unwrap();
+    let mut aggregator_table_data = aggregator_context.aggregator_table_data.borrow_mut();
+    let aggregator = aggregator_table_data
+        .get_or_create_aggregator_table(table_handle)
+        .get_or_create_aggregator(key, limit);
 
     // Try to add a value.
     aggregator.add(value).and_then(|_| {
@@ -292,21 +292,21 @@ fn native_new_aggregator(
     assert!(args.len() == 2);
 
     // Extract fields: `limit` of the new aggregator and a `table_handle`
-    // associated with the associated registry. 
-    let limit = pop_arg!(args, IntegerValue).value_as::<IntegerType>()?;
+    // associated with the associated aggregator table.
+    let limit = pop_arg!(args, IntegerValue).value_as::<u128>()?;
     let table_handle = get_table_handle(&pop_arg!(args, StructRef))?;
 
-    // Get the current registry.
+    // Get the current aggregator table.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut registry_data = aggregator_context.registry_data.borrow_mut();
-    let registry = registry_data.get_or_create_registry_mut(table_handle);
-    
+    let mut aggregator_table_data = aggregator_context.aggregator_table_data.borrow_mut();
+    let aggregator_table = aggregator_table_data.get_or_create_aggregator_table(table_handle);
+
     // Every aggregator instance has a unique key. Here we can reuse the
     // strategy from `Table` implementation: taking hash of transaction and
     // number of aggregator instances created so far and truncating them to
     // 128 bits.
     let txn_hash_buffer = aggregator_context.txn_hash.to_be_bytes();
-    let num_aggregators_buffer = registry.table.len().to_be_bytes();
+    let num_aggregators_buffer = aggregator_table.len().to_be_bytes();
 
     let mut sha3 = Sha3::v256();
     sha3.update(&txn_hash_buffer);
@@ -317,7 +317,7 @@ fn native_new_aggregator(
     let key = u128::from_be_bytes(key_bytes);
 
     // If transaction initializes aggregator, then the actual value is known,
-    // and the aggregator state must be Data. Also, aggregators are
+    // and the aggregator state must be `Data`. Also, aggregators are
     // zero-initialized.
     let aggregator = Aggregator {
         key,
@@ -325,21 +325,19 @@ fn native_new_aggregator(
         value: 0,
         limit,
     };
-    registry.table.insert(key, aggregator);
+    aggregator_table.insert(key, aggregator);
 
     // TODO: charge gas properly.
     let cost = GasCost::new(0, 0).total();
 
     // Return `Aggregator` Move struct to the user.
     Ok(NativeResult::ok(
-        cost, 
-        smallvec![
-            Value::struct_(Struct::pack(vec![
-                Value::u128(table_handle.0),
-                Value::u128(key),
-                Value::u128(limit),
-            ]))
-        ]
+        cost,
+        smallvec![Value::struct_(Struct::pack(vec![
+            Value::u128(table_handle.0),
+            Value::u128(key),
+            Value::u128(limit),
+        ]))],
     ))
 }
 
@@ -350,35 +348,26 @@ fn native_read(
 ) -> PartialVMResult<NativeResult> {
     assert!(args.len() == 1);
     let aggregator_ref = pop_arg!(args, StructRef);
-    
+
     // Extract fields from aggregator struct reference.
     let (table_handle, key, limit) = get_aggregator_fields(&aggregator_ref)?;
 
-    // Get the current registry.
+    // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut registry_data = aggregator_context.registry_data.borrow_mut();
-    let registry = registry_data.get_or_create_registry_mut(table_handle);
-
-    // First, check if aggregator has been used during this VM session. If not,
-    // create one with a zero-itiailized delta.
-    if !registry.table.contains_key(&key) {
-        let aggregator = Aggregator {
-            key,
-            state: AggregatorState::PositiveDelta,
-            value: 0,
-            limit,
-        };
-        registry.table.insert(key, aggregator);
-    };
-    let aggregator = registry.table.get_mut(&key).unwrap();
+    let mut aggregator_table_data = aggregator_context.aggregator_table_data.borrow_mut();
+    let aggregator = aggregator_table_data
+        .get_or_create_aggregator_table(table_handle)
+        .get_or_create_aggregator(key, limit);
 
     // Try to read its value, possibly getting it from the storage and applying
-    // delta.
-    aggregator.read_value(aggregator_context, &table_handle, key).and_then(|result| {
-        // TODO: charge gas properly.
-        let cost = GasCost::new(0, 0).total();
-        Ok(NativeResult::ok(cost, smallvec![Value::u128(result)]))
-    })
+    // the delta.
+    aggregator
+        .read_value(aggregator_context, &table_handle, key)
+        .and_then(|result| {
+            // TODO: charge gas properly.
+            let cost = GasCost::new(0, 0).total();
+            Ok(NativeResult::ok(cost, smallvec![Value::u128(result)]))
+        })
 }
 
 // ================================ Utilities ================================
@@ -388,52 +377,53 @@ fn native_read(
 const TABLE_FIELD_INDEX: usize = 0;
 
 /// The field index of the `handle` field in the `Table` Move struct.
-const TABLE_HANDLE_FIELD_INDEX: usize = 0;
+const HANDLE_FIELD_INDEX: usize = 0;
 
-/// Field indices of `registry_handle`, `key` and `limit` fields in the
+/// Field indices of `table_handle`, `key` and `limit` fields in the
 /// `Aggregator` Move struct.
-const REGISTRY_HANDLE_FIELD_INDEX: usize = 0;
+const TABLE_HANDLE_FIELD_INDEX: usize = 0;
 const KEY_FIELD_INDEX: usize = 1;
 const LIMIT_FIELD_INDEX: usize = 2;
 
-/// Given a reference to `AggregatorTable` Move struct, returns `TableHandle`
-/// (`RegistryHandle`) field value.
-fn get_table_handle(aggregator_registry: &StructRef) -> PartialVMResult<TableHandle> {
-    let table_ref =
-        aggregator_registry
-            .borrow_field(TABLE_FIELD_INDEX)?
-            .value_as::<StructRef>()?;
-    let handle_ref =
-        table_ref
-            .borrow_field(TABLE_HANDLE_FIELD_INDEX)?
-            .value_as::<Reference>()?;
-    handle_ref.read_ref()?.value_as::<u128>().map(TableHandle)
+/// Given a reference to `AggregatorTable` Move struct, returns the value of
+/// `table_handle` field.
+fn get_table_handle(aggregator_table: &StructRef) -> PartialVMResult<TableHandle> {
+    aggregator_table
+        .borrow_field(TABLE_FIELD_INDEX)?
+        .value_as::<StructRef>()?
+        .borrow_field(HANDLE_FIELD_INDEX)?
+        .value_as::<Reference>()?
+        .read_ref()?
+        .value_as::<u128>()
+        .map(TableHandle)
 }
 
-///  Given a reference to `Aggregator` Move struct and field index, returns
-///  its field.
+/// Given a reference to `Aggregator` Move struct and field index, returns
+/// its field specified by `index`.
 fn get_aggregator_field(aggregator: &StructRef, index: usize) -> PartialVMResult<Value> {
-    let field_ref =
-        aggregator
-            .borrow_field(index)?
-            .value_as::<Reference>()?;
+    let field_ref = aggregator.borrow_field(index)?.value_as::<Reference>()?;
     field_ref.read_ref()
 }
 
 ///  Given a reference to `Aggregator` Move struct, returns a tuple of its
 ///  fields: (`table_handle`, `key`, `limit`).
-fn get_aggregator_fields(
-    aggregator: &StructRef
-) -> PartialVMResult<(TableHandle, u128, IntegerType)> {
-    let table_handle = get_aggregator_field(aggregator, REGISTRY_HANDLE_FIELD_INDEX)?.value_as::<u128>().map(TableHandle)?;
+fn get_aggregator_fields(aggregator: &StructRef) -> PartialVMResult<(TableHandle, u128, u128)> {
+    let table_handle = get_aggregator_field(aggregator, TABLE_HANDLE_FIELD_INDEX)?
+        .value_as::<u128>()
+        .map(TableHandle)?;
     let key = get_aggregator_field(aggregator, KEY_FIELD_INDEX)?.value_as::<u128>()?;
-    let limit = get_aggregator_field(aggregator, LIMIT_FIELD_INDEX)?.value_as::<IntegerType>()?;
+    let limit = get_aggregator_field(aggregator, LIMIT_FIELD_INDEX)?.value_as::<u128>()?;
     Ok((table_handle, key, limit))
 }
 
-/// Returns a custom partial VM error with message and code.
-fn partial_error(message: impl ToString, code: u64) -> PartialVMError {
+/// Returns partial VM error on abort.
+fn abort_error(message: &str, code: u64) -> PartialVMError {
     PartialVMError::new(StatusCode::ABORTED)
         .with_message(message.to_string())
         .with_sub_status(code)
+}
+
+/// Returns partial VM error on extension failure.
+fn extension_error(message: &str) -> PartialVMError {
+    PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(message.to_string())
 }

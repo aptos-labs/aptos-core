@@ -2,14 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::account_config::CORE_CODE_ADDRESS;
-use aptos_vm::move_vm_ext::{aggregator_natives, NativeAggregatorContext, test_transaction_context_natives};
+use aptos_vm::move_vm_ext::{
+    aggregator_natives, test_transaction_context_natives, NativeAggregatorContext,
+};
 use framework::path_in_crate;
 use move_deps::move_cli::base::test::run_move_unit_tests;
 use move_deps::{
-    move_stdlib, move_table_extension, move_unit_test::{UnitTestingConfig, extensions},
+    move_stdlib, move_table_extension,
+    move_unit_test::{extensions, UnitTestingConfig},
     move_vm_runtime::{
-        native_functions::NativeFunctionTable,
-        native_extensions::NativeContextExtensions,
+        native_extensions::NativeContextExtensions, native_functions::NativeFunctionTable,
     },
     move_vm_test_utils::BlankStorage,
 };
