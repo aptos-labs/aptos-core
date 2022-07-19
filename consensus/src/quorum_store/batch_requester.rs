@@ -102,8 +102,7 @@ impl BatchRequester {
             "Should never request from self over network"
         );
         let batch = Batch::new(self.epoch, self.my_peer_id, digest, None);
-        let msg = ConsensusMsg::BatchMsg(Box::new(batch));
-        self.network_sender.send(msg, request_peers).await;
+        self.network_sender.send_batch(batch, request_peers).await;
     }
 
     pub(crate) async fn add_request(

@@ -6,6 +6,7 @@ use crate::{
     counters,
     logging::LogEvent,
     network_interface::{ConsensusMsg, ConsensusNetworkEvents, ConsensusNetworkSender},
+    quorum_store::types::Batch,
 };
 use anyhow::{anyhow, ensure};
 use aptos_logger::prelude::*;
@@ -19,6 +20,7 @@ use consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
     common::Author,
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    proof_of_store::SignedDigest,
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
@@ -229,6 +231,18 @@ impl NetworkSender {
         self.send(msg, vec![self.author]).await
     }
 
+    pub async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
+        fail_point!("consensus::send_batch", |_| ());
+        let msg = ConsensusMsg::BatchMsg(Box::new(batch));
+        self.send(msg, recipients).await
+    }
+
+    pub async fn send_signed_digest(&self, signed_digest: SignedDigest, recipients: Vec<Author>) {
+        fail_point!("consensus::send_signed_digest", |_| ());
+        let msg = ConsensusMsg::SignedDigestMsg(Box::new(signed_digest));
+        self.send(msg, recipients).await
+    }
+    
     /// Sends the ledger info to self buffer manager
     pub async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures) {
         fail_point!("consensus::send::commit_proof", |_| ());
