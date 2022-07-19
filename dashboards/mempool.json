@@ -3535,7 +3535,7 @@
         {
           "expr": "rate(aptos_shared_mempool_transaction_broadcast_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_shared_mempool_transaction_broadcast_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}} network:{{recipient}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}})",
           "refId": "A"
         }
       ],
@@ -3638,7 +3638,7 @@
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}} network:{{recipient}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}})",
           "refId": "A"
         }
       ],
@@ -3738,7 +3738,7 @@
         {
           "expr": "rate(aptos_broadcast_latency_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}} network:{{recipient}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}})",
           "refId": "A"
         }
       ],
@@ -3838,7 +3838,7 @@
         {
           "expr": "rate(aptos_broadcast_latency_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_broadcast_latency_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}} network,{{recipient}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}})",
           "refId": "A"
         }
       ],
@@ -3938,7 +3938,7 @@
         {
           "expr": "rate(aptos_shared_mempool_broadcast_roundtrip_latency_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) / rate(aptos_shared_mempool_broadcast_roundtrip_latency_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}} network:{{recipient}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}})",
           "refId": "A"
         }
       ],
@@ -4036,9 +4036,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_shared_mempool_pending_broadcasts_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "expr": "sum by (network) (aptos_shared_mempool_pending_broadcasts_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}}:{{recipient}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}})",
           "refId": "A"
         }
       ],
@@ -4138,7 +4138,7 @@
         {
           "expr": "rate(aptos_shared_mempool_rebroadcast_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"expired\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> {{network}}:{{recipient}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> {{network}}",
           "refId": "A"
         }
       ],
@@ -4238,7 +4238,7 @@
         {
           "expr": "rate(aptos_shared_mempool_rebroadcast_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"retry\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}}:{{recipient}})",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> ({{network}})",
           "refId": "A"
         }
       ],
@@ -4338,7 +4338,7 @@
         {
           "expr": "rate(aptos_shared_mempool_rebroadcast_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", type=\"backpressure\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> {{network}}:{{recipient}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> {{network}}",
           "refId": "A"
         }
       ],
@@ -4455,7 +4455,7 @@
         {
           "expr": "aptos_shared_mempool_ack_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"sent\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> {{network}}:{{recipient}} - {{type}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} -> {{network}} - {{type}}",
           "refId": "A"
         }
       ],
@@ -4555,7 +4555,7 @@
         {
           "expr": "rate(aptos_shared_mempool_ack_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", direction=\"received\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
           "interval": "",
-          "legendFormat": "{{kubernetes_pod_name}}:{{role}} <- {{network}}:{{recipient}} - {{type}}",
+          "legendFormat": "{{kubernetes_pod_name}}:{{role}} <- {{network}} - {{type}}",
           "refId": "A"
         }
       ],
