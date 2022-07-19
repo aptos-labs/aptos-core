@@ -64,6 +64,7 @@ use std::{
 };
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
+static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 
 #[derive(Clone)]
 pub struct AptosVM(pub(crate) AptosVMImpl);
@@ -109,6 +110,23 @@ impl AptosVM {
         match EXECUTION_CONCURRENCY_LEVEL.get() {
             Some(concurrency_level) => *concurrency_level,
             None => 1,
+        }
+    }
+
+    /// Sets the # of async proof reading threads.
+    pub fn set_num_proof_reading_threads_once(mut num_threads: usize) {
+        // TODO(grao): Do more analysis to tune this magic number.
+        num_threads = min(num_threads, 256);
+        // Only the first call succeeds, due to OnceCell semantics.
+        NUM_PROOF_READING_THREADS.set(num_threads).ok();
+    }
+
+    /// Returns the # of async proof reading threads if already set, otherwise return default value
+    /// (32).
+    pub fn get_num_proof_reading_threads() -> usize {
+        match NUM_PROOF_READING_THREADS.get() {
+            Some(num_threads) => *num_threads,
+            None => 32,
         }
     }
 
