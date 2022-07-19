@@ -5,6 +5,7 @@ use crate::{
     common::types::{CliError, CliTypedResult, PromptOptions},
     CliResult,
 };
+use aptos_logger::Level;
 use aptos_rest_client::Client;
 use aptos_telemetry::collect_build_information;
 use aptos_types::chain_id::ChainId;
@@ -290,4 +291,14 @@ pub async fn fund_account(
             response.status()
         )))
     }
+}
+
+pub fn start_logger() {
+    let mut logger = aptos_logger::Logger::new();
+    logger
+        .channel_size(1000)
+        .is_async(false)
+        .level(Level::Warn)
+        .read_env();
+    logger.build();
 }

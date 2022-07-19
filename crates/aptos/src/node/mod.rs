@@ -58,7 +58,7 @@ impl NodeTool {
             ShowValidatorSet(tool) => tool.execute_serialized().await,
             ShowValidatorStake(tool) => tool.execute_serialized().await,
             ShowValidatorConfig(tool) => tool.execute_serialized().await,
-            RunLocalTestnet(tool) => tool.execute_serialized().await,
+            RunLocalTestnet(tool) => tool.execute_serialized_without_logger().await,
         }
     }
 }
@@ -526,7 +526,7 @@ pub struct RunLocalTestnet {
     #[clap(long, parse(from_os_str))]
     config_path: Option<PathBuf>,
     /// The directory to save all files for the node
-    #[clap(long, parse(from_os_str), default_value = "/opt/aptos/testnet")]
+    #[clap(long, parse(from_os_str), default_value = ".aptos/testnet")]
     test_dir: PathBuf,
     /// Randomize ports rather than using defaults of 8080
     #[clap(long)]
@@ -534,9 +534,9 @@ pub struct RunLocalTestnet {
     /// Random seed for key generation in test mode
     #[clap(long, parse(try_from_str = FromHex::from_hex))]
     seed: Option<[u8; 32]>,
-    /// Clean the DB state at the beginning and start with a new DB
+    /// Clean the state and start with a new chain at genesis
     #[clap(long)]
-    clean_db_state: bool,
+    force_restart: bool,
     #[clap(flatten)]
     prompt_options: PromptOptions,
 }
@@ -553,14 +553,14 @@ impl CliCommand<()> for RunLocalTestnet {
             .map(StdRng::from_seed)
             .unwrap_or_else(StdRng::from_entropy);
 
-        let db_dir = self.test_dir.join("db");
-        if self.clean_db_state && db_dir.exists() {
+        if self.force_restart && self.test_dir.exists() {
             prompt_yes_with_override(
-                "Are you sure you want to clean the database state?",
+                "Are you sure you want to delete the existing chain?",
                 self.prompt_options,
             )?;
-            std::fs::remove_dir_all(db_dir)
-                .map_err(|err| CliError::IO("Failed to delete db".to_string(), err))?;
+            std::fs::remove_dir_all(self.test_dir.as_path()).map_err(|err| {
+                CliError::IO(format!("Failed to delete {}", self.test_dir.display()), err)
+            })?;
         }
 
         aptos_node::load_test_environment(
