@@ -4,6 +4,7 @@
 use poem_openapi::Tags;
 
 mod accept_type;
+mod accounts;
 mod basic;
 mod bcs_payload;
 mod index;
@@ -18,6 +19,7 @@ pub enum ApiTags {
     General,
 }
 
+pub use accounts::AccountsApi;
 pub use basic::BasicApi;
 pub use index::IndexApi;
 pub use log::middleware_log;
