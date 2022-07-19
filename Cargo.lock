@@ -143,6 +143,7 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
+ "aptos-faucet",
  "aptos-genesis",
  "aptos-github-client",
  "aptos-keygen",
