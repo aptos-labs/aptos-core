@@ -138,13 +138,10 @@ const sidebars = {
         {
           type: "category",
           label: "Aptos CLI",
-          link: { type: "doc", id: "cli-tools/aptos-cli-tool/index"},
+          link: { type: "doc", id: "cli-tools/aptos-cli-tool/index" },
           collapsible: true,
           collapsed: true,
-          items: [
-            "cli-tools/aptos-cli-tool/install-aptos-cli",
-            "cli-tools/aptos-cli-tool/use-aptos-cli",
-          ],
+          items: ["cli-tools/aptos-cli-tool/install-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
         },
       ],
     },
