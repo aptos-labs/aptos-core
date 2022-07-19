@@ -4753,6 +4753,7 @@ dependencies = [
  "move-stdlib",
  "move-symbol-pool",
  "move-table-extension",
+ "move-transactional-test-runner",
  "move-unit-test",
  "move-vm-runtime",
  "move-vm-test-utils",
@@ -5128,6 +5129,37 @@ dependencies = [
  "once_cell",
  "sha3",
  "smallvec",
+]
+
+[[package]]
+name = "move-transactional-test-runner"
+version = "0.1.0"
+source = "git+https://github.com/move-language/move?rev=a34266fc6c51bfc669d44f4c0faa337058e7833f#a34266fc6c51bfc669d44f4c0faa337058e7833f"
+dependencies = [
+ "anyhow",
+ "clap 3.2.11",
+ "colored",
+ "move-binary-format",
+ "move-bytecode-source-map",
+ "move-bytecode-utils",
+ "move-cli",
+ "move-command-line-common",
+ "move-compiler",
+ "move-core-types",
+ "move-disassembler",
+ "move-ir-compiler",
+ "move-ir-types",
+ "move-resource-viewer",
+ "move-stackless-bytecode-interpreter",
+ "move-stdlib",
+ "move-symbol-pool",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "move-vm-types",
+ "once_cell",
+ "rayon",
+ "regex",
+ "tempfile",
 ]
 
 [[package]]
