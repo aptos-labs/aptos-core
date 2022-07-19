@@ -69,17 +69,15 @@ fn load_modules() -> Vec<Vec<u8>> {
         .collect()
 }
 
-pub fn error_map() -> Vec<u8> {
-    let error_vec = PACKAGE
+pub fn error_map() -> Vec<Vec<u8>> {
+    PACKAGE
         .find("**/error_description.errmap")
         .unwrap()
         .filter_map(|e| match e {
             DirEntry::Dir(_) => None,
             DirEntry::File(file) => Some(file.contents().to_vec()),
         })
-        .flatten()
-        .collect::<Vec<u8>>();
-    error_vec
+        .collect()
 }
 
 pub fn modules() -> &'static [CompiledModule] {
