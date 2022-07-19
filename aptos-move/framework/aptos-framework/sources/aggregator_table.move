@@ -1,4 +1,4 @@
-module aptos_framework::AggregatorTable {
+module aptos_framework::aggregator_table {
     use std::signer;
 
     use aptos_framework::aggregator::{Self, Aggregator};
