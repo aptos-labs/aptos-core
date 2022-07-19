@@ -98,6 +98,8 @@ impl CliCommand<()> for SetGlobalConfig {
     }
 }
 
+const GLOBAL_CONFIG_FILE: &str = "global_config.yaml";
+
 /// A global configuration for global settings related to a user
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct GlobalConfig {
@@ -107,7 +109,7 @@ pub struct GlobalConfig {
 
 impl GlobalConfig {
     pub fn load() -> CliTypedResult<Self> {
-        let path = global_folder()?.join(CONFIG_FOLDER);
+        let path = global_folder()?.join(GLOBAL_CONFIG_FILE);
         if path.exists() {
             from_yaml(&String::from_utf8(read_from_file(path.as_path())?)?)
         } else {
@@ -125,11 +127,11 @@ impl GlobalConfig {
     }
 
     fn save(&self) -> CliTypedResult<()> {
-        let aptos_folder = global_folder()?;
-        create_dir_if_not_exist(aptos_folder.as_path())?;
+        let global_folder = global_folder()?;
+        create_dir_if_not_exist(global_folder.as_path())?;
 
         write_to_user_only_file(
-            aptos_folder.join(CONFIG_FOLDER).as_path(),
+            global_folder.join(GLOBAL_CONFIG_FILE).as_path(),
             "Global Config",
             &to_yaml(&self)?.into_bytes(),
         )
