@@ -1,10 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::{
-    vm_status::StatusCode,
-    write_set::{WriteOp, WriteSet, WriteSetMut},
-};
+use aptos_types::vm_status::StatusCode;
 use better_any::{Tid, TidAble};
 use move_deps::{
     move_binary_format::errors::{PartialVMError, PartialVMResult},
@@ -25,7 +22,6 @@ use smallvec::smallvec;
 use std::{
     cell::RefCell,
     collections::{btree_map::Entry, BTreeMap, VecDeque},
-    convert::TryInto,
 };
 use tiny_keccak::{Hasher, Sha3};
 
@@ -43,7 +39,7 @@ enum Mark {
 /// `NegativeDelta` means that the value is also not known but the value should
 /// be subtracted instead.
 #[derive(Clone, Copy, PartialEq)]
-enum AggregatorState {
+pub enum AggregatorState {
     Data,
     PositiveDelta,
     NegativeDelta,
@@ -293,6 +289,12 @@ impl AggregatorTableData {
     }
 }
 
+/// Contains all changes during this VM session. The change set must be
+/// traversed by VM and converted to appropriate write ops.
+pub struct AggregatorChangeSet {
+    pub changes: BTreeMap<TableHandle, BTreeMap<Vec<u8>, Option<(AggregatorState, Vec<u8>)>>>,
+}
+
 /// Native context that can be attached to VM NativeContextExtensions.
 #[derive(Tid)]
 pub struct NativeAggregatorContext<'a> {
@@ -317,36 +319,46 @@ impl<'a> NativeAggregatorContext<'a> {
     }
 
     /// Temporary into_change_set!
-    pub fn into_change_set(self) -> WriteSet {
-        // let NativeAggregatorContext { registry_data, .. } = self;
-        // let RegistryData {
-        //     registries,
-        // } = registry_data.into_inner();
+    pub fn into_change_set(self) -> AggregatorChangeSet {
+        let NativeAggregatorContext { aggregator_table_data, .. } = self;
+        let AggregatorTableData {
+            aggregator_tables,
+        } = aggregator_table_data.into_inner();
 
-        let mut write_set_mut = WriteSetMut::new(Vec::new());
-        // for (table_handle, registry) in registries {
-        //     let Registry {
-        //         table,
-        //         ..
-        //     } = registry;
-        //     for (key, aggregator) in table {
-        //         let key_bytes = u128::to_be_bytes(key).to_vec();
-        //         let state_key = StateKey::table_item(table_handle.0, key_bytes);
+        let mut changes = BTreeMap::new();
+        for (table_handle, aggregator_table) in aggregator_tables {
 
-        //         let Aggregator {
-        //             state,
-        //             value,
-        //             ..
-        //         } = aggregator;
+            let mut change = BTreeMap::new();
+            let AggregatorTable {
+                inner,
+            } = aggregator_table;
 
-        //         // TODO: introduce deltas!
-        //         assert!(state == AggregatorState::Data);
+            for (key, aggregator) in inner {
+                let key_bytes = serialize(&key);
 
-        //         let value_bytes = u128::to_be_bytes(value).to_vec();
-        //         write_set_mut.push((state_key, WriteOp::Value(value_bytes)));
-        //     }
-        // }
-        write_set_mut.freeze().unwrap()
+                let Aggregator {
+                    state,
+                    value,
+                    mark,
+                    ..
+                } = aggregator;
+
+                let content = match mark {
+                    Mark::Deleted => None,
+                    _ => {
+                        let value_bytes = serialize(&value);
+                        Some((state, value_bytes))
+                    }
+                };
+
+                change.insert(key_bytes, content);
+            }
+            changes.insert(table_handle, change);
+        }
+
+        AggregatorChangeSet {
+            changes,
+        }
     }
 }
 
