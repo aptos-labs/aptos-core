@@ -67,7 +67,7 @@ fn load_modules() -> Vec<Vec<u8>> {
         .collect()
 }
 
-pub fn error_map() -> Vec<u8> {
+pub fn error_map() -> Vec<Vec<u8>> {
     let error_vec = PACKAGE
         .find("**/error_description.errmap")
         .unwrap()
@@ -75,8 +75,7 @@ pub fn error_map() -> Vec<u8> {
             DirEntry::Dir(_) => None,
             DirEntry::File(file) => Some(file.contents().to_vec()),
         })
-        .flatten()
-        .collect::<Vec<u8>>();
+        .collect();
     error_vec
 }
 
