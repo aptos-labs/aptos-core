@@ -3,8 +3,9 @@ module aptos_framework::signature {
 
     /// Return `true` if the bytes in `public_key` can be parsed as a valid Ed25519 public key.
     /// Returns `false` if `public_key` is not 32 bytes OR is 32 bytes, but does not pass
-    /// points-on-curve or small subgroup checks. See the Rust `aptos_crypto::Ed25519PublicKey` type
-    /// for more details.
+    /// points-on-curve or small subgroup checks. This function should NOT be needed for most users
+    /// since ed25519_verify already does all these checks. We leave it here just in case.
+    /// See the Rust `aptos_crypto::Ed25519PublicKey` type for more details.
     /// Does not abort.
     native public fun ed25519_validate_pubkey(public_key: vector<u8>): bool;
 

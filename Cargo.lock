@@ -3229,6 +3229,7 @@ dependencies = [
  "aptos-vm",
  "bcs",
  "clap 3.2.11",
+ "curve25519-dalek",
  "include_dir 0.7.2",
  "libsecp256k1",
  "log",
