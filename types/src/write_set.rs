@@ -10,18 +10,18 @@ use anyhow::Result;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use serde::{Deserialize, Serialize};
 
-/// Specifies operation such as +, - to use with `WriteOp::Delta`.
+/// Specifies partial function such as +X or -X to use with `WriteOp::Delta`.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DeltaOperation {
-    Addition,
-    Subtraction,
+    Addition(u128),
+    Subtraction(u128),
 }
 
 impl std::fmt::Debug for DeltaOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DeltaOperation::Addition => write!(f, "+"),
-            DeltaOperation::Subtraction => write!(f, "-"),
+            DeltaOperation::Addition(value) => write!(f, "+{}", value),
+            DeltaOperation::Subtraction(value) => write!(f, "-{}", value),
         }
     }
 }
@@ -39,7 +39,7 @@ impl std::fmt::Debug for DeltaLimit {
 pub enum WriteOp {
     Deletion,
     #[serde(skip)]
-    Delta(DeltaOperation, DeltaLimit, u128),
+    Delta(DeltaOperation, DeltaLimit),
     Value(#[serde(with = "serde_bytes")] Vec<u8>),
 }
 
@@ -65,8 +65,8 @@ impl std::fmt::Debug for WriteOp {
                     .map(|byte| format!("{:02x}", byte))
                     .collect::<String>()
             ),
-            WriteOp::Delta(op, limit, value) => {
-                write!(f, "Delta({:?}{} ensures {:?})", op, value, limit)
+            WriteOp::Delta(op, limit) => {
+                write!(f, "Delta({:?} ensures {:?})", op, limit)
             }
             WriteOp::Deletion => write!(f, "Deletion"),
         }
