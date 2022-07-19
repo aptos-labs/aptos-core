@@ -8,6 +8,7 @@ pub mod create;
 pub mod fund;
 pub mod list;
 pub mod transfer;
+pub mod create_resource_account;
 
 /// CLI tool for interacting with accounts
 ///
@@ -17,6 +18,7 @@ pub enum AccountTool {
     Fund(fund::FundAccount),
     List(list::ListAccount),
     Transfer(transfer::TransferCoins),
+    CreateResourceAccount(create_resource_account::CreateResourceAccount),
 }
 
 impl AccountTool {
@@ -26,6 +28,7 @@ impl AccountTool {
             AccountTool::Fund(tool) => tool.execute_serialized().await,
             AccountTool::List(tool) => tool.execute_serialized().await,
             AccountTool::Transfer(tool) => tool.execute_serialized().await,
+            AccountTool::CreateResourceAccount(tool) => tool.execute_serialized().await,
         }
     }
 }
