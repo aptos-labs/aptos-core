@@ -417,10 +417,12 @@ async fn test_get_transaction_by_hash() {
     let txn = context.create_user_account(&account);
     let factory = context.transaction_factory();
     let txn2 = account.sign_with_transaction_builder(factory.payload(
-        aptos_stdlib::token_create_unlimited_collection_script(
+        aptos_stdlib::aptos_token_stdlib::token_create_collection_script(
             "my name".into(),
             "awesome collection".into(),
             "http://aptoslabs.com/ifonly.json".into(),
+            u64::MAX,
+            vec![false, false, false],
         ),
     ));
 

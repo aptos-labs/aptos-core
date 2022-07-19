@@ -4,7 +4,7 @@ use crate::transaction_generator::{TransactionGenerator, TransactionGeneratorCre
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
-    transaction_builder::{aptos_stdlib, TransactionFactory},
+    transaction_builder::{aptos_stdlib::aptos_token_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
 
@@ -102,10 +102,12 @@ pub fn create_nft_collection_request(
     txn_factory: &TransactionFactory,
 ) -> SignedTransaction {
     creation_account.sign_with_transaction_builder(txn_factory.payload(
-        aptos_stdlib::token_create_unlimited_collection_script(
+        aptos_token_stdlib::token_create_collection_script(
             collection_name.to_vec(),
             "description".to_owned().into_bytes(),
             "uri".to_owned().into_bytes(),
+            u64::MAX,
+            vec![false, false, false],
         ),
     ))
 }
@@ -117,14 +119,20 @@ pub fn create_nft_token_request(
     txn_factory: &TransactionFactory,
 ) -> SignedTransaction {
     creation_account.sign_with_transaction_builder(txn_factory.payload(
-        aptos_stdlib::token_create_unlimited_token_script(
+        aptos_token_stdlib::token_create_token_script(
             collection_name.to_vec(),
             token_name.to_vec(),
             "collection description".to_owned().into_bytes(),
-            true,
             1_000_000_000,
+            u64::MAX,
             "uri".to_owned().into_bytes(),
+            creation_account.address(),
             0,
+            0,
+            vec![false, false, false, false, false],
+            vec![Vec::new()],
+            vec![Vec::new()],
+            vec![Vec::new()],
         ),
     ))
 }
@@ -138,11 +146,12 @@ pub fn create_nft_transfer_request(
 ) -> SignedTransaction {
     owner_account.sign_multi_agent_with_transaction_builder(
         vec![creation_account],
-        txn_factory.payload(aptos_stdlib::token_direct_transfer_script(
+        txn_factory.payload(aptos_token_stdlib::token_direct_transfer_script(
             creation_account.address(),
             collection_name.to_vec(),
             token_name.to_vec(),
             1,
+            0,
         )),
     )
 }

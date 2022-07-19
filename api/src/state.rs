@@ -205,12 +205,13 @@ impl State {
         let vm_key = converter
             .try_into_vm_value(&key_type, key.clone())
             .map_err(Error::bad_request)?;
+
         let raw_key = vm_key
             .undecorate()
             .simple_serialize()
             .ok_or_else(|| Error::internal(anyhow!("Key failed to serialize.")))?;
-
         let state_key = StateKey::table_item(handle, raw_key);
+
         let bytes = self
             .state_view
             .get_state_value(&state_key)?

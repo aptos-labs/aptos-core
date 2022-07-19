@@ -75,19 +75,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "af-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-vm",
- "bcs",
- "cached-framework-packages",
- "clap 3.2.11",
- "datatest-stable",
- "move-deps",
-]
-
-[[package]]
 name = "again"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

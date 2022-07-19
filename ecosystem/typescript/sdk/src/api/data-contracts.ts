@@ -1081,7 +1081,7 @@ export interface TokenData {
   uri: string;
 }
 
-export interface TokenId {
+export interface TokenDataId {
   /** Token creator address */
   creator: string;
 
@@ -1092,7 +1092,14 @@ export interface TokenId {
   name: string;
 }
 
+export interface TokenId {
+  token_data_id: TokenDataId;
+
+  /** version number of the property map */
+  property_version: string;
+}
+
 export interface Token {
   id: TokenId;
-  value: number;
+  amount: number;
 }

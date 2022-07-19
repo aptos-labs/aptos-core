@@ -273,7 +273,7 @@ class RestClient:
         ]
 
         payload = ScriptFunction.natural(
-            "0x1::token",
+            "0x3::token",
             "create_unlimited_collection_script",
             [],
             transaction_arguments,
@@ -305,7 +305,7 @@ class RestClient:
         ]
 
         payload = ScriptFunction.natural(
-            "0x1::token",
+            "0x3::token",
             "create_unlimited_token_script",
             [],
             transaction_arguments,
@@ -333,7 +333,7 @@ class RestClient:
         ]
 
         payload = ScriptFunction.natural(
-            "0x1::tokenTransfers",
+            "0x3::tokenTransfers",
             "offer_script",
             [],
             transaction_arguments,
@@ -359,7 +359,7 @@ class RestClient:
         ]
 
         payload = ScriptFunction.natural(
-            "0x1::tokenTransfers",
+            "0x3::tokenTransfers",
             "claim_script",
             [],
             transaction_arguments,
@@ -386,7 +386,7 @@ class RestClient:
         ]
 
         payload = ScriptFunction.natural(
-            "0x1::token",
+            "0x3::token",
             "direct_transfer_script",
             [],
             transaction_arguments,
@@ -410,7 +410,7 @@ class RestClient:
         collection_name: str,
         token_name: str,
     ) -> Any:
-        token_store = self.account_resource(owner, "0x1::token::TokenStore")["data"][
+        token_store = self.account_resource(owner, "0x3::token::TokenStore")["data"][
             "tokens"
         ]["handle"]
 
@@ -422,15 +422,15 @@ class RestClient:
 
         return self.get_table_item(
             token_store,
-            "0x1::token::TokenId",
-            "0x1::token::Token",
+            "0x3::token::TokenId",
+            "0x3::token::Token",
             token_id,
         )["value"]
 
     def get_token_data(
         self, creator: AccountAddress, collection_name: str, token_name: str
     ) -> Any:
-        token_data = self.account_resource(creator, "0x1::token::Collections")["data"][
+        token_data = self.account_resource(creator, "0x3::token::Collections")["data"][
             "token_data"
         ]["handle"]
 
@@ -442,20 +442,20 @@ class RestClient:
 
         return self.get_table_item(
             token_data,
-            "0x1::token::TokenId",
-            "0x1::token::TokenData",
+            "0x3::token::TokenId",
+            "0x3::token::TokenData",
             token_id,
         )
 
     def get_collection(self, creator: AccountAddress, collection_name: str) -> Any:
-        token_data = self.account_resource(creator, "0x1::token::Collections")["data"][
+        token_data = self.account_resource(creator, "0x3::token::Collections")["data"][
             "collections"
         ]["handle"]
 
         return self.get_table_item(
             token_data,
             "0x1::string::String",
-            "0x1::token::Collection",
+            "0x3::token::Collection",
             collection_name,
         )
 
