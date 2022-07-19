@@ -7,6 +7,7 @@ use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
+use serde::Serialize;
 
 /// Command to create a resource account
 ///
@@ -24,13 +25,61 @@ pub struct CreateResourceAccount {
     // pub(crate) authentication_key: Vec<u8>,
 }
 
+/// A shortened create resource account output
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct CreateResourceAccountSummary {
+    pub gas_used: Option<u64>,
+    pub sender: Option<AccountAddress>,
+    pub resource_account: Option<AccountAddress>,
+    pub hash: Option<String>,
+    pub success: bool,
+    pub version: Option<u64>,
+    pub vm_status: String,
+}
+
+impl From<Transaction> for CreateResourceAccountSummary {
+    fn from(transaction: Transaction) -> Self {
+        let mut summary = CreateResourceAccountSummary {
+            success: transaction.success(),
+            version: transaction.version(),
+            vm_status: transaction.vm_status(),
+            ..Default::default()
+        };
+
+        if let Transaction::UserTransaction(txn) = transaction {
+            summary.sender = Some(*txn.request.sender.inner());
+            summary.gas_used = Some(txn.info.gas_used.0);
+            summary.version = Some(txn.info.version.0);
+            summary.hash = Some(txn.info.hash.to_string());
+            summary.resource_account = txn
+                .info
+                .changes
+                .iter()
+                .find_map(|change| match change {
+                    WriteSetChange::WriteResource { address, data, .. } => {
+                        if data.typ.name.as_str() == "Account" && *address.inner().to_hex() != *txn.request.sender.inner().to_hex() {
+                            Some(
+                                *address.inner()
+                            )
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                });
+        }
+
+        summary
+    }
+}
+
 #[async_trait]
-impl CliCommand<String> for CreateResourceAccount {
+impl CliCommand<CreateResourceAccountSummary> for CreateResourceAccount {
     fn command_name(&self) -> &'static str {
         "Create Resource Account"
     }
 
-    async fn execute(self) -> CliTypedResult<String> {
+    async fn execute(self) -> CliTypedResult<CreateResourceAccountSummary> {
         self.txn_options
         .submit_transaction(aptos_stdlib::encode_create_resource_account(
             &self.seed,
@@ -38,29 +87,7 @@ impl CliCommand<String> for CreateResourceAccount {
         ))
         .await
         .map(
-            |tx| {
-                let mut res: Option<AccountAddress> = None;
-                let self_address = self.txn_options.profile_options.account_address().unwrap();
-                if let Transaction::UserTransaction(txn) = tx {
-                    res = txn
-                    .info
-                    .changes
-                    .iter()
-                    .find_map(|change| match change {
-                        WriteSetChange::WriteResource { address, data, .. } => {
-                            if data.typ.name.as_str() == "Account" && *address.inner().to_hex() != self_address.to_hex() {
-                                Some(
-                                    *address.inner()
-                                )
-                            } else {
-                                None
-                            }
-                        }
-                        _ => None,
-                    });
-                }
-                format!("resource account key: 0x{}", res.unwrap().to_hex())
-            }
+            CreateResourceAccountSummary::from
         )
     }
 }
