@@ -10,9 +10,14 @@ publish = false
 edition = "2018"
 
 [dependencies]
+assert_unordered = "0.1.1"
 anyhow = "1.0.57"
 bcs = "0.1.3"
+crossbeam-channel = "0.5.4"
+num_cpus = "1.13.1"
+once_cell = "1.10.0"
 parking_lot = "0.12.0"
+rayon = "1.5.2"
 serde = { version = "1.0.137", default-features = false }
 thiserror = "1.0.31"
 
