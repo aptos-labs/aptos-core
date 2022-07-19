@@ -41,6 +41,7 @@ pub enum NodeTool {
     ShowValidatorConfig(ShowValidatorConfig),
     ShowValidatorSet(ShowValidatorSet),
     ShowValidatorStake(ShowValidatorStake),
+    RunLocalTestnet(RunLocalTestnet),
 }
 
 impl NodeTool {
@@ -57,6 +58,7 @@ impl NodeTool {
             ShowValidatorSet(tool) => tool.execute_serialized().await,
             ShowValidatorStake(tool) => tool.execute_serialized().await,
             ShowValidatorConfig(tool) => tool.execute_serialized().await,
+            RunLocalTestnet(tool) => tool.execute_serialized().await,
         }
     }
 }
