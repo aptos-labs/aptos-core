@@ -36,6 +36,7 @@ use std::{
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveResource {
     #[serde(rename = "type")]
+    #[oai(rename = "type")]
     pub typ: MoveStructTag,
     pub data: MoveStructValue,
 }
@@ -777,6 +778,7 @@ impl From<&StructTypeParameter> for MoveStructGenericTypeParam {
 pub struct MoveStructField {
     pub name: IdentifierWrapper,
     #[serde(rename = "type")]
+    #[oai(rename = "type")]
     pub typ: MoveType,
 }
 

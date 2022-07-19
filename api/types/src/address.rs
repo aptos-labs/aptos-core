@@ -7,6 +7,7 @@ use move_deps::move_core_types;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 
+>>>>>>> 7cea2dd9a6 ([API] Add /accounts/{address}/modules endpoint)
 #[derive(Clone, Debug, PartialEq, Copy)]
 pub struct Address(AccountAddress);
 
