@@ -13,19 +13,27 @@ use crate::{
     },
     genesis::git::from_yaml,
 };
+use aptos_config::config::NodeConfig;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
+use aptos_faucet::FaucetArgs;
 use aptos_genesis::config::{HostAndPort, ValidatorConfiguration};
 use aptos_rest_client::{Response, Transaction};
+use aptos_types::chain_id::ChainId;
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use async_trait::async_trait;
 use clap::Parser;
 use hex::FromHex;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
+use reqwest::Url;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::{
     path::PathBuf,
+    thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+use tokio::time::Instant;
 
 /// Tool for manipulating nodes
 ///
@@ -519,7 +527,13 @@ async fn get_resource_migration(
     }
 }
 
+const MAX_WAIT_S: u64 = 30;
+const WAIT_INTERVAL_MS: u64 = 100;
+
 /// Run local testnet
+///
+/// This local testnet will run it's own Genesis and run as a single node
+/// network locally.  Optionally, a faucet can be added for minting coins.
 #[derive(Parser)]
 pub struct RunLocalTestnet {
     /// An overridable config template for the test node
@@ -528,9 +542,6 @@ pub struct RunLocalTestnet {
     /// The directory to save all files for the node
     #[clap(long, parse(from_os_str), default_value = ".aptos/testnet")]
     test_dir: PathBuf,
-    /// Randomize ports rather than using defaults of 8080
-    #[clap(long)]
-    random_ports: bool,
     /// Random seed for key generation in test mode
     #[clap(long, parse(try_from_str = FromHex::from_hex))]
     seed: Option<[u8; 32]>,
@@ -539,6 +550,12 @@ pub struct RunLocalTestnet {
     force_restart: bool,
     #[clap(flatten)]
     prompt_options: PromptOptions,
+    /// Run a faucet alongside the node
+    #[clap(long)]
+    with_faucet: bool,
+    /// Port to run the faucet on
+    #[clap(long, default_value = "8081")]
+    faucet_port: u16,
 }
 
 #[async_trait]
@@ -553,6 +570,7 @@ impl CliCommand<()> for RunLocalTestnet {
             .map(StdRng::from_seed)
             .unwrap_or_else(StdRng::from_entropy);
 
+        // Remove the current test directory and start with a new node
         if self.force_restart && self.test_dir.exists() {
             prompt_yes_with_override(
                 "Are you sure you want to delete the existing chain?",
@@ -563,15 +581,96 @@ impl CliCommand<()> for RunLocalTestnet {
             })?;
         }
 
-        aptos_node::load_test_environment(
-            self.config_path,
-            Some(self.test_dir),
-            self.random_ports,
-            false,
-            cached_framework_packages::module_blobs().to_vec(),
-            rng,
-        )?;
+        // Spawn the node in a separate thread
+        let config_path = self.config_path.clone();
+        let test_dir = self.test_dir.clone();
+        let _node = thread::spawn(move || {
+            aptos_node::load_test_environment(
+                config_path,
+                Some(test_dir),
+                false,
+                false,
+                cached_framework_packages::module_blobs().to_vec(),
+                rng,
+            )
+            .map_err(|err| CliError::UnexpectedError(format!("Node failed to run {}", err)))
+        });
 
+        // Run faucet if selected
+        let _maybe_faucet = if self.with_faucet {
+            let max_wait = Duration::from_secs(MAX_WAIT_S);
+            let wait_interval = Duration::from_millis(WAIT_INTERVAL_MS);
+
+            // Load the config to get the rest port
+            let config_path = self.test_dir.join("0").join("node.yaml");
+
+            // We have to wait for the node to be configured above in the other thread
+            let mut config = None;
+            let start = Instant::now();
+            while start.elapsed() < max_wait {
+                if let Ok(loaded_config) = NodeConfig::load(&config_path) {
+                    config = Some(loaded_config);
+                    break;
+                }
+                tokio::time::sleep(wait_interval).await;
+            }
+
+            // Retrieve the port from the local node
+            let port = if let Some(config) = config {
+                config.api.address.port()
+            } else {
+                return Err(CliError::UnexpectedError(
+                    "Failed to find node configuration to start faucet".to_string(),
+                ));
+            };
+
+            // Check that the REST API is ready
+            let rest_url = Url::parse(&format!("http://localhost:{}", port)).map_err(|err| {
+                CliError::UnexpectedError(format!("Failed to parse localhost URL {}", err))
+            })?;
+            let rest_client = aptos_rest_client::Client::new(rest_url.clone());
+            let start = Instant::now();
+            let mut started_successfully = false;
+
+            while start.elapsed() < max_wait {
+                if rest_client.get_index().await.is_ok() {
+                    started_successfully = true;
+                    break;
+                }
+                tokio::time::sleep(wait_interval).await
+            }
+
+            if !started_successfully {
+                return Err(CliError::UnexpectedError(
+                    "Failed to startup local node before faucet".to_string(),
+                ));
+            }
+
+            // Start the faucet
+            Some(
+                FaucetArgs {
+                    address: "0.0.0.0".to_string(),
+                    port: self.faucet_port,
+                    server_url: rest_url,
+                    mint_key_file_path: self.test_dir.join("mint.key"),
+                    mint_key: None,
+                    mint_account_address: None,
+                    chain_id: ChainId::test(),
+                    maximum_amount: None,
+                    do_not_delegate: false,
+                }
+                .run()
+                .await,
+            )
+        } else {
+            None
+        };
+
+        // Wait for an interrupt
+        let term = Arc::new(AtomicBool::new(false));
+        while !term.load(Ordering::Acquire) {
+            std::thread::park();
+        }
         Ok(())
     }
 }
