@@ -6,6 +6,7 @@ pub mod keys;
 #[cfg(test)]
 mod tests;
 
+use crate::common::utils::dir_default_to_current;
 use crate::{
     common::{
         types::{CliError, CliTypedResult, PromptOptions},
@@ -56,8 +57,8 @@ pub struct GenerateGenesis {
     prompt_options: PromptOptions,
     #[clap(flatten)]
     git_options: GitOptions,
-    #[clap(long, parse(from_os_str), default_value = ".")]
-    output_dir: PathBuf,
+    #[clap(long, parse(from_os_str))]
+    output_dir: Option<PathBuf>,
 }
 
 #[async_trait]
@@ -67,8 +68,9 @@ impl CliCommand<Vec<PathBuf>> for GenerateGenesis {
     }
 
     async fn execute(self) -> CliTypedResult<Vec<PathBuf>> {
-        let genesis_file = self.output_dir.join(GENESIS_FILE);
-        let waypoint_file = self.output_dir.join(WAYPOINT_FILE);
+        let output_dir = dir_default_to_current(self.output_dir.clone())?;
+        let genesis_file = output_dir.join(GENESIS_FILE);
+        let waypoint_file = output_dir.join(WAYPOINT_FILE);
         check_if_file_exists(genesis_file.as_path(), self.prompt_options)?;
         check_if_file_exists(waypoint_file.as_path(), self.prompt_options)?;
 

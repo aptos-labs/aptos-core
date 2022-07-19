@@ -1,7 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::utils::start_logger;
+use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current, start_logger};
+use crate::config::GlobalConfig;
 use crate::{
     common::{
         init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
@@ -18,7 +19,6 @@ use aptos_crypto::{
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
 use aptos_keygen::KeyGen;
-use aptos_logger::debug;
 use aptos_rest_client::{aptos_api_types::WriteSetChange, Client, Transaction};
 use aptos_sdk::{
     move_types::{
@@ -165,7 +165,7 @@ pub struct CliConfig {
 
 const CONFIG_FILE: &str = "config.yaml";
 const LEGACY_CONFIG_FILE: &str = "config.yml";
-const CONFIG_FOLDER: &str = ".aptos";
+pub const CONFIG_FOLDER: &str = ".aptos";
 
 /// An individual profile
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -244,18 +244,7 @@ impl CliConfig {
         let aptos_folder = Self::aptos_folder()?;
 
         // Create if it doesn't exist
-        if !aptos_folder.exists() {
-            std::fs::create_dir(&aptos_folder).map_err(|err| {
-                CliError::CommandArgumentError(format!(
-                    "Unable to create {} directory {}",
-                    aptos_folder.display(),
-                    err
-                ))
-            })?;
-            debug!("Created {} folder", aptos_folder.display());
-        } else {
-            debug!("{} folder already initialized", aptos_folder.display());
-        }
+        create_dir_if_not_exist(aptos_folder.as_path())?;
 
         // Save over previous config file
         let config_file = aptos_folder.join(CONFIG_FILE);
@@ -275,11 +264,8 @@ impl CliConfig {
 
     /// Finds the current directory's .aptos folder
     fn aptos_folder() -> CliTypedResult<PathBuf> {
-        std::env::current_dir()
-            .map_err(|err| {
-                CliError::UnexpectedError(format!("Unable to get current directory {}", err))
-            })
-            .map(|dir| dir.join(CONFIG_FOLDER))
+        let global_config = GlobalConfig::load()?;
+        global_config.get_config_location()
     }
 }
 
@@ -680,8 +666,8 @@ impl RestOptions {
 #[derive(Debug, Parser)]
 pub struct MovePackageDir {
     /// Path to a move package (the folder with a Move.toml file)
-    #[clap(long, parse(from_os_str), default_value = ".")]
-    pub package_dir: PathBuf,
+    #[clap(long, parse(from_os_str))]
+    pub package_dir: Option<PathBuf>,
     /// Path to save the compiled move package
     ///
     /// Defaults to `<package_dir>/build`
@@ -697,6 +683,10 @@ pub struct MovePackageDir {
 }
 
 impl MovePackageDir {
+    pub fn get_package_dir(&self) -> CliTypedResult<PathBuf> {
+        dir_default_to_current(self.package_dir.clone())
+    }
+
     /// Retrieve the NamedAddresses, resolving all the account addresses accordingly
     pub fn named_addresses(&self) -> BTreeMap<String, AccountAddress> {
         self.named_addresses

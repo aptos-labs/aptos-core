@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::utils::create_dir_if_not_exist;
 use crate::{
     common::{
         types::{CliError, CliTypedResult},
@@ -180,10 +181,7 @@ impl Client {
         match self {
             Client::Local(local_repository_path) => {
                 let path = local_repository_path.join(name);
-                if !path.exists() || !path.is_dir() {
-                    std::fs::create_dir(path.as_path())
-                        .map_err(|e| CliError::IO(path.display().to_string(), e))?
-                };
+                create_dir_if_not_exist(path.as_path())?;
             }
             Client::Github(_) => {
                 // There's no such thing as an empty directory in Git, so do nothing

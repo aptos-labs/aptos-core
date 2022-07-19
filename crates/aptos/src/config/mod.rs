@@ -1,8 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{CliCommand, CliError, CliResult, CliTypedResult};
-use crate::common::utils::{read_from_file, write_to_user_only_file};
+use crate::common::types::{CliCommand, CliError, CliResult, CliTypedResult, CONFIG_FOLDER};
+use crate::common::utils::{
+    create_dir_if_not_exist, current_dir, read_from_file, write_to_user_only_file,
+};
 use crate::genesis::git::{from_yaml, to_yaml};
 use crate::Tool;
 use async_trait::async_trait;
@@ -65,6 +67,8 @@ impl CliCommand<()> for GenerateShellCompletions {
 }
 
 /// Set global configuration settings
+///
+/// Any configuration flags that are not provided will not be changed
 #[derive(Parser, Debug)]
 pub struct SetGlobalConfig {
     /// A configuration for where to place and use the config
@@ -94,8 +98,6 @@ impl CliCommand<()> for SetGlobalConfig {
     }
 }
 
-const GLOBAL_CONFIG_PATH: &str = "~/.aptos/global_config.yaml";
-
 /// A global configuration for global settings related to a user
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct GlobalConfig {
@@ -105,8 +107,7 @@ pub struct GlobalConfig {
 
 impl GlobalConfig {
     pub fn load() -> CliTypedResult<Self> {
-        // TODO: Ensure this path works on all platforms
-        let path = PathBuf::from(GLOBAL_CONFIG_PATH);
+        let path = global_folder()?.join(CONFIG_FOLDER);
         if path.exists() {
             from_yaml(&String::from_utf8(read_from_file(path.as_path())?)?)
         } else {
@@ -116,19 +117,32 @@ impl GlobalConfig {
     }
 
     /// Get the config location based on the type
-    pub fn get_config_location(&self) -> PathBuf {
+    pub fn get_config_location(&self) -> CliTypedResult<PathBuf> {
         match self.config_type {
-            ConfigType::Global => PathBuf::from("~/.aptos"),
-            ConfigType::Workspace => PathBuf::from(".aptos"),
+            ConfigType::Global => global_folder(),
+            ConfigType::Workspace => Ok(current_dir()?.join(CONFIG_FOLDER)),
         }
     }
 
     fn save(&self) -> CliTypedResult<()> {
+        let aptos_folder = global_folder()?;
+        create_dir_if_not_exist(aptos_folder.as_path())?;
+
         write_to_user_only_file(
-            PathBuf::from(GLOBAL_CONFIG_PATH).as_path(),
+            aptos_folder.join(CONFIG_FOLDER).as_path(),
             "Global Config",
             &to_yaml(&self)?.into_bytes(),
         )
+    }
+}
+
+fn global_folder() -> CliTypedResult<PathBuf> {
+    if let Some(dir) = dirs::home_dir() {
+        Ok(dir.join(CONFIG_FOLDER))
+    } else {
+        Err(CliError::UnexpectedError(
+            "Unable to retrieve home directory".to_string(),
+        ))
     }
 }
 

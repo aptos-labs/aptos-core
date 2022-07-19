@@ -3,6 +3,7 @@
 
 mod aptos_debug_natives;
 
+use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current};
 use crate::{
     common::{
         types::{
@@ -35,7 +36,6 @@ use move_deps::{
 use std::{
     collections::BTreeMap,
     convert::TryFrom,
-    fs::create_dir_all,
     io::Write,
     path::{Path, PathBuf},
     str::FromStr,
@@ -71,8 +71,8 @@ pub struct InitPackage {
     #[clap(long)]
     name: String,
     /// Path to create the new move package
-    #[clap(long, parse(from_os_str), default_value_os_t = crate::common::utils::current_dir())]
-    package_dir: PathBuf,
+    #[clap(long, parse(from_os_str))]
+    package_dir: Option<PathBuf>,
     /// Named addresses for the move binary
     ///
     /// Example: alice=0x1234, bob=0x5678
@@ -91,23 +91,18 @@ impl CliCommand<()> for InitPackage {
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        let move_toml = self.package_dir.join(SourcePackageLayout::Manifest.path());
+        let package_dir = dir_default_to_current(self.package_dir.clone())?;
+        let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
         check_if_file_exists(move_toml.as_path(), self.prompt_options)?;
-        create_dir_all(self.package_dir.join(SourcePackageLayout::Sources.path())).map_err(
-            |err| {
-                CliError::IO(
-                    format!(
-                        "Failed to create {} move package directories",
-                        self.package_dir.display()
-                    ),
-                    err,
-                )
-            },
+        create_dir_if_not_exist(
+            package_dir
+                .join(SourcePackageLayout::Sources.path())
+                .as_path(),
         )?;
         let mut w = std::fs::File::create(move_toml.as_path()).map_err(|err| {
             CliError::UnexpectedError(format!(
                 "Failed to create {}: {}",
-                self.package_dir.join(Path::new("Move.toml")).display(),
+                package_dir.join(Path::new("Move.toml")).display(),
                 err
             ))
         })?;
@@ -138,7 +133,7 @@ AptosFramework = {{ git = \"https://github.com/aptos-labs/aptos-core.git\", subd
         .map_err(|err| {
             CliError::UnexpectedError(format!(
                 "Failed to write {:?}: {}",
-                self.package_dir.join(Path::new("Move.toml")),
+                package_dir.join(Path::new("Move.toml")),
                 err
             ))
         })
@@ -166,7 +161,8 @@ impl CliCommand<Vec<String>> for CompilePackage {
             install_dir: self.move_options.output_dir.clone(),
             ..Default::default()
         };
-        let compiled_package = compile_move(build_config, self.move_options.package_dir.as_path())?;
+        let compiled_package =
+            compile_move(build_config, self.move_options.get_package_dir()?.as_path())?;
         let mut ids = Vec::new();
         for &module in compiled_package.root_modules_map().iter_modules().iter() {
             verify_module_init_function(module)
@@ -202,7 +198,7 @@ impl CliCommand<&'static str> for TestPackage {
             ..Default::default()
         };
         let result = move_cli::base::test::run_move_unit_tests(
-            self.move_options.package_dir.as_path(),
+            self.move_options.get_package_dir()?.as_path(),
             config,
             UnitTestingConfig {
                 filter: self.filter,
@@ -253,7 +249,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
             install_dir: self.move_options.output_dir.clone(),
             ..Default::default()
         };
-        let package = compile_move(build_config, self.move_options.package_dir.as_path())?;
+        let package = compile_move(build_config, self.move_options.get_package_dir()?.as_path())?;
         let compiled_units: Vec<Vec<u8>> = package
             .root_compiled_units
             .iter()
