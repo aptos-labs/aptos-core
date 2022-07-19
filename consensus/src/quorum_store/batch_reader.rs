@@ -371,8 +371,7 @@ impl BatchReader {
                     digest,
                     Some(value.maybe_payload.clone().expect("BatchReader payload and storage kind mismatch")),
                     );
-                    let msg = ConsensusMsg::BatchMsg(Box::new(batch));
-                network_sender.send(msg, vec![peer_id]).await;
+                    network_sender.send_batch(batch, vec![peer_id]).await;
             }
                     } // TODO: consider returning Nack
                 }
