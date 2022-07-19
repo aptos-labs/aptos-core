@@ -63,8 +63,10 @@ macro_rules! impl_poem_parameter {
     ($($ty:ty),*) => {
         $(
         impl ::poem_openapi::types::ParseFromParameter for $ty {
+            // TODO: Some types don't need to be parsed from parameters, break
+            // up this macro.
             fn parse_from_parameter(value: &str) -> ::poem_openapi::types::ParseResult<Self> {
-                value.parse().map_err(::poem_openapi::types::ParseError::custom)
+                Ok(::serde_json::from_str(value)?)
             }
         }
 
@@ -72,7 +74,7 @@ macro_rules! impl_poem_parameter {
         impl ::poem_openapi::types::ParseFromMultipartField for $ty {
             async fn parse_from_multipart(field: Option<::poem::web::Field>) -> ::poem_openapi::types::ParseResult<Self> {
                 match field {
-                    Some(field) => Ok(field.text().await?.parse()?),
+                    Some(field) => Ok(::serde_json::from_str(&field.text().await?)?),
                     None => Err(::poem_openapi::types::ParseError::expected_input()),
                 }
             }
