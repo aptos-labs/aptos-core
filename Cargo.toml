@@ -45,6 +45,7 @@ members = [
     "crates/aptos-log-derive",
     "crates/aptos-logger",
     "crates/aptos-metrics-core",
+    "crates/aptos-openapi",
     "crates/aptos-proptest-helpers",
     "crates/aptos-rate-limiter",
     "crates/aptos-rest-client",
