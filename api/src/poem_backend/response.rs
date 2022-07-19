@@ -12,7 +12,13 @@ use serde::{Deserialize, Serialize};
 
 use super::bcs_payload::Bcs;
 
-pub type AptosResult<T> = PoemResult<AptosResponse<T>, AptosErrorResponse>;
+// This should be used for endpoints, signalling that they return either a
+// response capturing success or failure.
+pub type AptosResponseResult<T> = PoemResult<AptosResponse<T>, AptosErrorResponse>;
+
+// This should be used for internal functions that need to return just a T
+// but could fail, in which case we bubble an error response up to the client.
+pub type AptosInternalResult<T> = anyhow::Result<T, AptosErrorResponse>;
 
 // TODO: Consdider having more specific error structs for different endpoints.
 /// This is the generic struct we use for all API errors, it contains a string
@@ -116,6 +122,13 @@ impl AptosErrorResponse {
             AptosError::new(format!("{} not found by {}", resource, identifier))
                 .aptos_ledger_version(ledger_version),
         ))
+    }
+
+    pub fn invalid_param<S: Display>(name: &str, value: S) -> Self {
+        Self::BadRequest(Json(AptosError::new(format!(
+            "invalid parameter {}: {}",
+            name, value
+        ))))
     }
 }
 

@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use super::{middleware_log, AccountsApi, BasicApi, IndexApi};
+use super::{middleware_log, AccountsApi, BasicApi, EventsApi, IndexApi};
 
 use crate::context::Context;
 use anyhow::Context as AnyhowContext;
@@ -30,6 +30,9 @@ pub fn attach_poem_to_runtime(
             context: context.clone(),
         },
         BasicApi {
+            context: context.clone(),
+        },
+        EventsApi {
             context: context.clone(),
         },
         IndexApi { context },

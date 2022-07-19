@@ -32,7 +32,7 @@ use storage_interface::{
 };
 use warp::{filters::BoxedFilter, Filter, Reply};
 
-use crate::poem_backend::{AptosError, AptosErrorCode, AptosErrorResponse};
+use crate::poem_backend::{AptosError, AptosErrorCode, AptosErrorResponse, AptosInternalResult};
 
 // Context holds application scope context
 #[derive(Clone)]
@@ -62,6 +62,18 @@ impl Context {
         self.db
             .latest_state_checkpoint_view()
             .map(|state_view| state_view.into_move_resolver())
+    }
+
+    pub fn move_resolver_poem(&self) -> AptosInternalResult<RemoteStorageOwned<DbStateView>> {
+        self.move_resolver().map_err(|e| {
+            AptosErrorResponse::InternalServerError(Json(
+                AptosError::new(
+                    format_err!("Failed to read latest state checkpoint from DB: {}", e)
+                        .to_string(),
+                )
+                .error_code(AptosErrorCode::ReadFromStorageError),
+            ))
+        })
     }
 
     pub fn state_view_at_version(&self, version: Version) -> Result<DbStateView> {
@@ -106,7 +118,7 @@ impl Context {
         }
     }
 
-    pub fn get_latest_ledger_info_poem(&self) -> Result<LedgerInfo, AptosErrorResponse> {
+    pub fn get_latest_ledger_info_poem(&self) -> AptosInternalResult<LedgerInfo> {
         self.get_latest_ledger_info().map_err(|e| {
             AptosErrorResponse::InternalServerError(Json(
                 AptosError::new(format_err!("Failed to retrieve ledger info: {}", e).to_string())
