@@ -19,11 +19,7 @@ module AptosFramework::AggregatorTable {
     }
 
     /// Creates a new table for aggregators.
-    public entry fun register_aggregator_table(account: &signer) {
-        register_aggregator_table_internal(account);
-    }
-
-    fun register_aggregator_table_internal(account: &signer) {
+    public fun register_aggregator_table(account: &signer) {
         assert!(
             !exists<AggregatorTable>(signer::address_of(account)),
             EAGGREGATOR_TABLE_EXISTS
@@ -42,8 +38,8 @@ module AptosFramework::AggregatorTable {
     native fun new_aggregator(aggregator_table: &mut AggregatorTable, limit: u128): Aggregator;
 
     #[test(account = @0xFF)]
-    fun test_can_add_and_read(account: signer) acquires AggregatorTable {
-        register_aggregator_table_internal(&account);
+    fun test_can_add_and_sub_and_read(account: signer) acquires AggregatorTable {
+        register_aggregator_table(&account);
 
         let addr = signer::address_of(&account);
         let aggregator_table = borrow_global_mut<AggregatorTable>(addr);
@@ -56,21 +52,46 @@ module AptosFramework::AggregatorTable {
         Aggregator::add(&mut aggregator, 3);
         assert!(Aggregator::read(&aggregator) == 15, 0);
 
+        Aggregator::add(&mut aggregator, 3);
+        Aggregator::add(&mut aggregator, 2);
+        Aggregator::sub(&mut aggregator, 20);
+        assert!(Aggregator::read(&aggregator) == 0, 0);
+
+        Aggregator::add(&mut aggregator, 1000);
+        Aggregator::sub(&mut aggregator, 1000);
+
         Aggregator::destroy(aggregator);
     }
 
     #[test(account = @0xFF)]
     #[expected_failure(abort_code = 1600)]
     fun test_overflow(account: signer) acquires AggregatorTable {
-        register_aggregator_table_internal(&account);
+        register_aggregator_table(&account);
+
+        let addr = signer::address_of(&account);
+        let aggregator_table = borrow_global_mut<AggregatorTable>(addr);
+
+        let aggregator = new_aggregator(aggregator_table, /*limit=*/10);
+
+        // Overflow!
+        Aggregator::add(&mut aggregator, 12);
+
+        Aggregator::destroy(aggregator);
+    }
+
+    #[test(account = @0xFF)]
+    #[expected_failure(abort_code = 1601)]
+    fun test_underflow(account: signer) acquires AggregatorTable {
+        register_aggregator_table(&account);
 
         let addr = signer::address_of(&account);
         let aggregator_table = borrow_global_mut<AggregatorTable>(addr);
     
         let aggregator = new_aggregator(aggregator_table, /*limit=*/10);
 
-        // Overflow!
-        Aggregator::add(&mut aggregator, 12);
+        // Underflow!
+        Aggregator::sub(&mut aggregator, 100);
+        Aggregator::add(&mut aggregator, 100);
 
         Aggregator::destroy(aggregator);
     }

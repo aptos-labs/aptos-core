@@ -318,7 +318,7 @@ impl<'a> NativeAggregatorContext<'a> {
         }
     }
 
-    /// Temporary into_change_set!
+    /// Returns all changes made during this VM session.
     pub fn into_change_set(self) -> AggregatorChangeSet {
         let NativeAggregatorContext { aggregator_table_data, .. } = self;
         let AggregatorTableData {
