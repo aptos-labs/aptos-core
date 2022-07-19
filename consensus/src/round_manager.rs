@@ -293,7 +293,6 @@ impl RoundManager {
                 proposal_msg.proposal().round(),
                 proposal_msg.sync_info(),
                 proposal_msg.proposer(),
-                true,
             )
             .await
             .context("[RoundManager] Process proposal")?
@@ -308,26 +307,9 @@ impl RoundManager {
         }
     }
 
-    /// Sync to the sync info sending from peer if it has newer certificates, if we have newer certificates
-    /// and help_remote is set, send it back the local sync info.
-    async fn sync_up(
-        &mut self,
-        sync_info: &SyncInfo,
-        author: Author,
-        help_remote: bool,
-    ) -> anyhow::Result<()> {
+    /// Sync to the sync info sending from peer if it has newer certificates.
+    async fn sync_up(&mut self, sync_info: &SyncInfo, author: Author) -> anyhow::Result<()> {
         let local_sync_info = self.block_store.sync_info();
-        if help_remote && local_sync_info.has_newer_certificates(sync_info) {
-            // TODO: we don't need to send them back if we're going to broadcast proposal with newer certificate
-            counters::SYNC_INFO_MSGS_SENT_COUNT.inc();
-            debug!(
-                self.new_log(LogEvent::HelpPeerSync).remote_peer(author),
-                "Remote peer has stale state {}, send it back {}", sync_info, local_sync_info,
-            );
-            self.network
-                .send_sync_info(local_sync_info.clone(), author)
-                .await;
-        }
         if sync_info.has_newer_certificates(&local_sync_info) {
             info!(
                 self.new_log(LogEvent::ReceiveNewCertificate)
@@ -370,12 +352,11 @@ impl RoundManager {
         message_round: Round,
         sync_info: &SyncInfo,
         author: Author,
-        help_remote: bool,
     ) -> anyhow::Result<bool> {
         if message_round < self.round_state.current_round() {
             return Ok(false);
         }
-        self.sync_up(sync_info, author, help_remote).await?;
+        self.sync_up(sync_info, author).await?;
         ensure!(
             message_round == self.round_state.current_round(),
             "After sync, round {} doesn't match local {}",
@@ -398,15 +379,9 @@ impl RoundManager {
             self.new_log(LogEvent::ReceiveSyncInfo).remote_peer(peer),
             "{}", sync_info
         );
-        // To avoid a ping-pong cycle between two peers that move forward together.
-        self.ensure_round_and_sync_up(
-            checked!((sync_info.highest_round()) + 1)?,
-            &sync_info,
-            peer,
-            false,
-        )
-        .await
-        .context("[RoundManager] Failed to process sync info msg")?;
+        self.ensure_round_and_sync_up(checked!((sync_info.highest_round()) + 1)?, &sync_info, peer)
+            .await
+            .context("[RoundManager] Failed to process sync info msg")?;
         Ok(())
     }
 
@@ -632,7 +607,6 @@ impl RoundManager {
                 vote_msg.vote().vote_data().proposed().round(),
                 vote_msg.sync_info(),
                 vote_msg.vote().author(),
-                true,
             )
             .await
             .context("[RoundManager] Stop processing vote")?

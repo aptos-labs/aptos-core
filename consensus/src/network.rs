@@ -212,15 +212,6 @@ impl NetworkSender {
         self.send(msg, recipients).await
     }
 
-    /// Sends the given sync info to the given author.
-    /// The future is fulfilled as soon as the message is added to the internal network channel
-    /// (does not indicate whether the message is delivered or sent out).
-    pub async fn send_sync_info(&self, sync_info: SyncInfo, recipient: Author) {
-        fail_point!("consensus::send_sync_info", |_| ());
-        let msg = ConsensusMsg::SyncInfo(Box::new(sync_info));
-        self.send(msg, vec![recipient]).await
-    }
-
     pub async fn send_proposal(&self, proposal_msg: ProposalMsg, recipients: Vec<Author>) {
         fail_point!("consensus::send_proposal", |_| ());
         let msg = ConsensusMsg::ProposalMsg(Box::new(proposal_msg));
