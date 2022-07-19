@@ -337,10 +337,10 @@ fn create_and_initialize_validators(
 /// Publish all modules that should be available after genesis.
 fn publish_stdlib(session: &mut SessionExt<impl MoveResolver>, stdlib: Vec<CompiledModule>) {
     let map = construct_module_map(stdlib);
-    let root_address = AccountAddress::from_hex_literal("0x1").unwrap();
+    let aptos_framework_address = AccountAddress::from_hex_literal("0x1").unwrap();
     let token_address = AccountAddress::from_hex_literal("0x2").unwrap();
 
-    let framework_modules = map.get(&root_address).unwrap();
+    let framework_modules = map.get(&aptos_framework_address).unwrap();
     let token_modules = map.get(&token_address).unwrap();
 
     // publish core-framework
@@ -357,9 +357,9 @@ fn publish_token_modules(
 ) {
     // module topological order
     let x: HashMap<&str, u32> = HashMap::from([
-        ("PropertyMap", 0u32),
-        ("TokenV1", 1u32),
-        ("TokenCoinSwap", 2u32),
+        ("property_map", 0u32),
+        ("token_v1", 1u32),
+        ("token_coin_swap", 2u32),
     ])
     .into_iter()
     .collect();
@@ -393,7 +393,7 @@ fn publish_module_bundle(session: &mut SessionExt<impl MoveResolver>, lib: Modul
                 assert_eq!(
                     a,
                     addr,
-                    "All genesis modules must be published under the same address, but found modules under both {} and {}",
+                    "All modules must be published under the same address, but found modules under both {} and {}",
                     a.short_str_lossless(),
                     addr.short_str_lossless(),
                 );
