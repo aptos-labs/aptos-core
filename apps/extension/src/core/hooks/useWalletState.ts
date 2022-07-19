@@ -6,7 +6,9 @@ import { useState, useCallback, useMemo } from 'react';
 import constate from 'constate';
 import { getLocalStorageState } from 'core/utils/account';
 import { WALLET_STATE_LOCAL_STORAGE_KEY, WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY } from 'core/constants';
-import { AptosAccountState, LocalStorageState } from 'core/types/stateTypes';
+import {
+  AptosAccountState, LocalStorageState, Mnemonic, WalletAccount,
+} from 'core/types/stateTypes';
 import {
   AptosNetwork, getFaucetNetworkFromAptosNetwork, getLocalStorageNetworkState,
 } from 'core/utils/network';
@@ -15,7 +17,7 @@ import { AptosAccount, FaucetClient } from 'aptos';
 import { toast } from 'core/components/Toast';
 
 const defaultValue: LocalStorageState = {
-  aptosAccounts: undefined,
+  accounts: undefined,
   currAccountAddress: undefined,
 };
 
@@ -25,6 +27,7 @@ export interface UpdateWalletStateProps {
 
 export interface AddAccountProps {
   account: AptosAccount
+  mnemonic?: Mnemonic
 }
 
 export interface RemoveAccountProps {
@@ -38,10 +41,14 @@ export default function useWalletState() {
 
   const { currAccountAddress } = localStorageState;
 
-  const aptosAccount = (localStorageState.aptosAccounts && currAccountAddress)
+  const aptosAccount = (localStorageState.accounts && currAccountAddress)
     ? AptosAccount.fromAptosAccountObject(
-      localStorageState.aptosAccounts[currAccountAddress],
+      localStorageState.accounts[currAccountAddress].aptosAccount,
     ) : undefined;
+
+  const accountMnemonic = (localStorageState.accounts && currAccountAddress)
+    ? localStorageState.accounts[currAccountAddress].mnemonic
+    : undefined;
 
   const [aptosNetwork, setAptosNetwork] = useState<AptosNetwork>(
     () => getLocalStorageNetworkState(),
@@ -53,14 +60,18 @@ export default function useWalletState() {
   );
 
   const addAccount = useCallback(async ({
-    account,
+    account, mnemonic,
   }: AddAccountProps) => {
     const faucetClient = new FaucetClient(aptosNetwork, faucetNetwork);
+    const newAccount: WalletAccount = {
+      aptosAccount: account.toPrivateKeyObject(),
+      mnemonic,
+    };
     let localStorageStateCopy = { ...localStorageState };
     localStorageStateCopy = {
-      aptosAccounts: {
-        ...localStorageStateCopy.aptosAccounts,
-        [account.address().hex()]: account.toPrivateKeyObject(),
+      accounts: {
+        ...localStorageStateCopy.accounts,
+        [account.address().hex()]: newAccount,
       },
       currAccountAddress: account.address().hex(),
     };
@@ -95,8 +106,8 @@ export default function useWalletState() {
 
   const switchAccount = useCallback(({ accountAddress }: RemoveAccountProps) => {
     if (!accountAddress
-      || (localStorageState.aptosAccounts
-         && localStorageState.aptosAccounts[accountAddress] === undefined)
+      || (localStorageState.accounts
+         && localStorageState.accounts[accountAddress] === undefined)
     ) {
       console.error('No account found');
       return;
@@ -150,23 +161,23 @@ export default function useWalletState() {
     let localStorageStateCopy = { ...localStorageState };
     if (
       !accountAddress
-      || !localStorageStateCopy.aptosAccounts
-      || localStorageStateCopy.aptosAccounts[accountAddress] === undefined
+      || !localStorageStateCopy.accounts
+      || localStorageStateCopy.accounts[accountAddress] === undefined
     ) {
       console.error('No account found');
       return;
     }
-    delete localStorageStateCopy.aptosAccounts[accountAddress];
+    delete localStorageStateCopy.accounts[accountAddress];
 
-    if (Object.keys(localStorageStateCopy.aptosAccounts).length === 0) {
+    if (Object.keys(localStorageStateCopy.accounts).length === 0) {
       newAccountAddress = undefined;
       toastMessage = 'No other accounts in wallet, signing out';
     } else if (accountAddress === currAccountAddress) {
       // switch to another account in wallet
-      if (Object.keys(localStorageStateCopy.aptosAccounts).length >= 1) {
-        newAccountAddress = localStorageStateCopy.aptosAccounts[
-          Object.keys(localStorageStateCopy.aptosAccounts)[0]
-        ].address;
+      if (Object.keys(localStorageStateCopy.accounts).length >= 1) {
+        newAccountAddress = localStorageStateCopy.accounts[
+          Object.keys(localStorageStateCopy.accounts)[0]
+        ].aptosAccount.address;
       }
       toastMessage = `Switching to account with address: ${newAccountAddress?.substring(0, 6)}...`;
     } else {
@@ -207,6 +218,7 @@ export default function useWalletState() {
   }, []);
 
   return {
+    accountMnemonic,
     addAccount,
     aptosAccount,
     aptosNetwork,

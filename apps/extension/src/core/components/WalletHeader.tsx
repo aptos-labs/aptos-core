@@ -38,6 +38,7 @@ import { IoIosWallet } from '@react-icons/all-files/io/IoIosWallet';
 import { AptosAccount } from 'aptos';
 import { useNavigate } from 'react-router-dom';
 import Routes from 'core/routes';
+import { createNewMnemonic } from 'core/utils/account';
 import ChakraLink from './ChakraLink';
 import WalletDrawerBody from './WalletDrawerBody';
 
@@ -58,9 +59,10 @@ export default function WalletHeader({
   );
 
   const newWalletOnClick = async () => {
-    const blankAptosAccount = new AptosAccount();
     setIsLoading(true);
-    await addAccount({ account: blankAptosAccount });
+    const mnemonic = await createNewMnemonic();
+    const account = new AptosAccount(mnemonic.seed);
+    await addAccount({ account, mnemonic });
     setIsLoading(false);
     navigate(Routes.login.routePath);
   };

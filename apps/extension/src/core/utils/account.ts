@@ -3,9 +3,20 @@
 
 import { AptosAccount, AptosAccountObject } from 'aptos';
 import { WALLET_STATE_LOCAL_STORAGE_KEY } from 'core/constants';
-import { AptosAccountState, LocalStorageState } from 'core/types/stateTypes';
+import {
+  AptosAccountState, LocalStorageState, Mnemonic, MnemonicState,
+} from 'core/types/stateTypes';
+import * as bip39 from '@scure/bip39';
+import { wordlist } from '@scure/bip39/wordlists/english';
 
 import Browser from 'core/utils/browser';
+
+export async function createNewMnemonic(): Promise<Mnemonic> {
+  const mnemonic = bip39.generateMnemonic(wordlist);
+  const seed = await bip39.mnemonicToSeed(mnemonic);
+  const bufferSeed = new Uint8Array(seed.buffer);
+  return { mnemonic, seed: bufferSeed };
+}
 
 export function createNewAccount(): AptosAccount {
   const account = new AptosAccount();
@@ -35,13 +46,27 @@ export function getCurrentAptosAccountAddress() {
 export function getAptosAccountState(): AptosAccountState {
   const localStorage = getLocalStorageState();
   if (localStorage) {
-    const { aptosAccounts, currAccountAddress } = localStorage;
+    const { accounts, currAccountAddress } = localStorage;
     const currAccountAddressString = currAccountAddress?.toString();
-    if (!currAccountAddressString || !aptosAccounts) {
+    if (!currAccountAddressString || !accounts) {
       return undefined;
     }
-    const aptosAccountObject = aptosAccounts[currAccountAddressString];
+    const aptosAccountObject = accounts[currAccountAddressString].aptosAccount;
     return aptosAccountObject ? AptosAccount.fromAptosAccountObject(aptosAccountObject) : undefined;
+  }
+  return undefined;
+}
+
+export function getMnemonicState(): MnemonicState {
+  const localStorage = getLocalStorageState();
+  if (localStorage) {
+    const { accounts, currAccountAddress } = localStorage;
+    const currAccountAddressString = currAccountAddress?.toString();
+    if (!currAccountAddressString || !accounts) {
+      return undefined;
+    }
+    const { mnemonic } = accounts[currAccountAddressString];
+    return mnemonic;
   }
   return undefined;
 }

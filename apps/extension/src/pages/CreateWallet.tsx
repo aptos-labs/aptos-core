@@ -13,12 +13,13 @@ import {
   useColorMode,
   VStack,
 } from '@chakra-ui/react';
+import { AptosAccount } from 'aptos';
 import React, { useState } from 'react';
 import useWalletState from 'core/hooks/useWalletState';
 import ChakraLink from 'core/components/ChakraLink';
 import CreateWalletHeader from 'core/components/CreateWalletHeader';
 import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
-import { createNewAccount } from 'core/utils/account';
+import { createNewMnemonic } from 'core/utils/account';
 import { secondaryBgColor } from 'core/colors';
 import { ChevronRightIcon } from '@chakra-ui/icons';
 import AuthLayout from 'core/layouts/AuthLayout';
@@ -62,9 +63,10 @@ function NewAccountState() {
 
   const createAccountOnClick = async () => {
     setIsAccountBeingCreated(true);
-    const account = createNewAccount();
+    const mnemonic = await createNewMnemonic();
+    const account = new AptosAccount(mnemonic.seed);
     Analytics.event({ eventType: createAccountEvents.CREATE_ACCOUNT });
-    await addAccount({ account });
+    await addAccount({ account, mnemonic });
     setIsAccountBeingCreated(false);
   };
 

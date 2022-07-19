@@ -13,6 +13,7 @@ import Settings from 'pages/Settings';
 import Token from 'pages/Token';
 import Wallet from 'pages/Wallet';
 import React from 'react';
+import RecoveryPhrase from 'pages/RecoveryPhrase';
 
 export const Routes = Object.freeze({
   activity: {
@@ -46,6 +47,10 @@ export const Routes = Object.freeze({
   password: {
     element: <Password />,
     routePath: '/password',
+  },
+  recovery_phrase: {
+    element: <RecoveryPhrase />,
+    routePath: '/settings/recovery_phrase',
   },
   settings: {
     element: <Settings />,

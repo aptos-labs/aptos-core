@@ -50,7 +50,7 @@ export function CredentialRow({
 }
 
 function Account() {
-  const { aptosAccount } = useWalletState();
+  const { accountMnemonic, aptosAccount } = useWalletState();
 
   const privateKeyObject = aptosAccount?.toPrivateKeyObject();
   const address = privateKeyObject?.address;
@@ -78,7 +78,7 @@ function Account() {
             </Flex>
             <VStack spacing={2}>
               {
-              SettingsPaths.map((value) => (
+              SettingsPaths(accountMnemonic !== undefined).map((value) => (
                 <SettingsListItem
                   key={value.path}
                   {...value}

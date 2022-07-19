@@ -179,7 +179,7 @@ function WalletDrawerBody() {
   const navigate = useNavigate();
 
   const onClick = (address: string) => {
-    if (walletState.aptosAccounts) {
+    if (walletState.accounts) {
       switchAccount({ accountAddress: address });
       navigate(Routes.login.routePath);
     }
@@ -195,7 +195,7 @@ function WalletDrawerBody() {
 
   return (
     <VStack {...group} spacing={2} width="100%" py={2}>
-      {walletState.aptosAccounts && Object.keys(walletState.aptosAccounts).map((address) => {
+      {walletState.accounts && Object.keys(walletState.accounts).map((address) => {
         const radio = getRadioProps({ value: address });
         return (
           <WalletDrawerBodyListItem
