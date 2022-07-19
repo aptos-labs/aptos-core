@@ -24,6 +24,7 @@ transforms:
       - kubernetes_logs
     source: |-
       .k8s = del(.kubernetes)
+      .k8s.cluster = "${K8S_CLUSTER:?err}"
 sinks:
   prom_exporter:
     type: prometheus_exporter

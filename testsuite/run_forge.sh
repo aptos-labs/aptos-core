@@ -53,14 +53,16 @@ FORGE_NAMESPACE=${FORGE_NAMESPACE:0:64}
 [ "$FORGE_ENABLE_HAPROXY" = "true" ] && ENABLE_HAPROXY_ARGS="--enable-haproxy"
 
 if [ -z "$IMAGE_TAG" ]; then
-    echo "IMAGE_TAG not set"
-    exit 1
+    IMAGE_TAG_DEFAULT=$(git rev-parse HEAD)
+    echo "IMAGE_TAG not set, defaulting to current HEAD commit as tag: ${IMAGE_TAG_DEFAULT}"
+    IMAGE_TAG=${IMAGE_TAG_DEFAULT}
 fi
 
 echo "Ensure image exists"
 img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG)
 if [ $? != 0 ]; then
-    echo "IMAGE_TAG does not exist: ${IMAGE_TAG}"
+    echo "IMAGE_TAG does not exist in ECR: ${IMAGE_TAG}. Make sure your commit has been pushed to GitHub previously."
+    echo "If you're trying to run the code from your PR, apply the label 'CICD:build-images' and wait for the builds to finish."
     exit 1
 fi
 
