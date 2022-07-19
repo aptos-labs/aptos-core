@@ -12,6 +12,7 @@
  *
  */
 module AptosFramework::AptosGovernance {
+    use std::string::utf8;
     use std::errors;
     use std::event::{Self, EventHandle};
     use std::option;
@@ -156,6 +157,9 @@ module AptosFramework::AptosGovernance {
         proposer: &signer,
         stake_pool: address,
         execution_hash: vector<u8>,
+        code_location: vector<u8>,
+        title: vector<u8>,
+        description: vector<u8>,
     ) acquires GovernanceConfig, GovernanceEvents {
         let proposer_address = signer::address_of(proposer);
         assert!(Stake::is_delegated_voter(stake_pool, proposer_address), errors::invalid_argument(ENOT_DELEGATED_VOTER));
@@ -189,8 +193,13 @@ module AptosFramework::AptosGovernance {
         };
 
         let proposal_id = Voting::create_proposal(
+            proposer_address,
             @AptosFramework,
-            GovernanceProposal::create_proposal(),
+            GovernanceProposal::create_proposal(
+                utf8(code_location),
+                utf8(title),
+                utf8(description),
+            ),
             execution_hash,
             governance_config.min_voting_threshold,
             proposal_expiration,
@@ -245,7 +254,7 @@ module AptosFramework::AptosGovernance {
         Table::add(&mut voting_records.votes, record_key, true);
 
         Voting::vote<GovernanceProposal>(
-            &GovernanceProposal::create_proposal(),
+            &GovernanceProposal::create_empty_proposal(),
             @AptosFramework,
             proposal_id,
             voting_power,
@@ -292,7 +301,14 @@ module AptosFramework::AptosGovernance {
             &no_voter,
         );
 
-        create_proposal(&proposer, signer::address_of(&proposer), b"");
+        create_proposal(
+            &proposer,
+            signer::address_of(&proposer),
+            b"",
+            b"",
+            b"",
+            b"",
+        );
         vote(&yes_voter, signer::address_of(&yes_voter), 0, true);
         vote(&no_voter, signer::address_of(&no_voter), 0, false);
 
@@ -320,7 +336,14 @@ module AptosFramework::AptosGovernance {
             &voter_2,
         );
 
-        create_proposal(&proposer, signer::address_of(&proposer), b"");
+        create_proposal(
+            &proposer,
+            signer::address_of(&proposer),
+            b"",
+            b"",
+            b"",
+            b"",
+        );
 
         // Double voting should throw an error.
         vote(&voter_1, signer::address_of(&voter_1), 0, true);
@@ -344,7 +367,14 @@ module AptosFramework::AptosGovernance {
             &voter_2,
         );
 
-        create_proposal(&proposer, signer::address_of(&proposer), b"");
+        create_proposal(
+            &proposer,
+            signer::address_of(&proposer),
+            b"",
+            b"",
+            b"",
+            b"",
+        );
 
         // Double voting should throw an error for 2 different voters if they still use the same stake pool.
         vote(&voter_1, signer::address_of(&voter_1), 0, true);
