@@ -105,7 +105,6 @@ impl ExecutedBlock {
         )
     }
 
-
     pub fn transactions_to_commit(
         &self,
         validators: &[AccountAddress],

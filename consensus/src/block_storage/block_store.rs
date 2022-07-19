@@ -30,6 +30,7 @@ use futures::executor::block_on;
 #[cfg(test)]
 use std::collections::VecDeque;
 use std::{sync::Arc, time::Duration};
+use crate::data_manager::DataManager;
 
 #[cfg(test)]
 #[path = "block_store_test.rs"]
