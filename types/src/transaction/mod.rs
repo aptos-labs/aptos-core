@@ -1059,6 +1059,10 @@ impl TransactionInfoV0 {
         self.state_change_hash
     }
 
+    pub fn is_state_checkpoint(&self) -> bool {
+        self.state_checkpoint_hash().is_some()
+    }
+
     pub fn state_checkpoint_hash(&self) -> Option<HashValue> {
         self.state_checkpoint_hash
     }
@@ -1126,7 +1130,7 @@ impl TransactionToCommit {
     }
 
     pub fn is_state_checkpoint(&self) -> bool {
-        self.transaction_info().state_checkpoint_hash.is_some()
+        self.transaction_info().is_state_checkpoint()
     }
 
     #[cfg(any(test, feature = "fuzzing"))]

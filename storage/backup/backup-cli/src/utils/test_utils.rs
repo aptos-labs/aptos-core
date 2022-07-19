@@ -34,8 +34,8 @@ pub fn tmp_db_with_random_content() -> (
 ) {
     let (tmpdir, db) = tmp_db_empty();
     let mut cur_ver: Version = 0;
-    let mut in_memory_state = db.buffered_state();
-    let _ancester = in_memory_state.current.clone().freeze();
+    let mut in_memory_state = db.buffered_state().lock().current_state().clone();
+    let _ancestor = in_memory_state.base.clone();
     let blocks = ValueGenerator::new().generate(arb_blocks_to_commit());
     for (txns_to_commit, ledger_info_with_sigs) in &blocks {
         update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
