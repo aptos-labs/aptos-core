@@ -4,12 +4,8 @@ module AptosFramework::Aggregator {
     /// native code).
     const EAGGREGATOR_OVERFLOW: u64 = 1600;
 
-    /// When resolving aggregator's value fails (raised by native code).
-    const EAGGREGATOR_RESOLVE_FAILURE: u64 = 1601;
-
-    /// When `Aggregator` cannot find its value resolving from storage (raised
-    /// by native code).
-    const EAGGREGATOR_VALUE_NOT_FOUND: u64 = 1602;
+    /// When aggregator's actual value goes below zero (raised by native code).
+    const EAGGREGATOR_UNDERFLOW: u64 = 1601;
 
     /// Aggregator struct that can be uniquely identified by a key, internally
     /// stores an opaque value, initialized to 0, and overflowing on exceeding
@@ -22,6 +18,9 @@ module AptosFramework::Aggregator {
 
     /// Adds `value` to aggregator. Aborts on overflow.
     public native fun add(aggregator: &mut Aggregator, value: u128);
+
+    /// Subtracts `value` from aggregator. Aborts on going below zero.
+    public native fun sub(aggregator: &mut Aggregator, value: u128);
 
     /// Returns a value stored in this aggregator.
     public native fun read(aggregator: &Aggregator): u128;
