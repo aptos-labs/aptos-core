@@ -59,6 +59,17 @@ impl StateDelta {
         )
     }
 
+    pub fn merge(&mut self, other: StateDelta) {
+        assert!(other.follow(self));
+        self.updates_since_base.extend(other.updates_since_base);
+        self.current = other.current;
+        self.current_version = other.current_version;
+    }
+
+    pub fn follow(&self, other: &StateDelta) -> bool {
+        other.base_version == self.current_version && self.current.has_same_root_hash(&other.base)
+    }
+
     pub fn has_same_current_state(&self, other: &StateDelta) -> bool {
         self.current_version == other.current_version
             && self.current.has_same_root_hash(&other.current)

@@ -203,18 +203,33 @@ impl InMemoryStateCalculator {
         Ok((result_state, self.state_cache))
     }
 
-    pub fn calculate_for_write_sets_after_checkpoint(
+    pub fn calculate_for_write_sets_after_snapshot(
         mut self,
+        last_checkpoint_index: Option<usize>,
         write_sets: &[WriteSet],
-    ) -> Result<StateDelta> {
-        for write_set in write_sets {
+    ) -> Result<(Option<HashMap<StateKey, StateValue>>, StateDelta)> {
+        let idx_after_last_checkpoint = last_checkpoint_index.map_or(0, |idx| idx + 1);
+        let updates_before_last_checkpoint = if idx_after_last_checkpoint != 0 {
+            for write_set in write_sets[0..idx_after_last_checkpoint].iter() {
+                let state_updates =
+                    process_write_set(None, &mut self.state_cache, (*write_set).clone())?;
+                self.updates_after_latest.extend(state_updates.into_iter());
+                self.next_version += 1;
+            }
+            let updates = self.updates_after_latest.clone();
+            self.make_checkpoint()?;
+            Some(updates)
+        } else {
+            None
+        };
+        for write_set in write_sets[idx_after_last_checkpoint..].iter() {
             let state_updates =
                 process_write_set(None, &mut self.state_cache, (*write_set).clone())?;
             self.updates_after_latest.extend(state_updates.into_iter());
             self.next_version += 1;
         }
         let (result_state, _) = self.finish()?;
-        Ok(result_state)
+        Ok((updates_before_last_checkpoint, result_state))
     }
 }
 
