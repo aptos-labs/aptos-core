@@ -35,9 +35,9 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
+pub mod async_proof_fetcher;
 pub mod cached_state_view;
 mod executed_trees;
-#[cfg(any(feature = "testing", feature = "fuzzing"))]
 pub mod mock;
 pub mod no_proof_fetcher;
 pub mod proof_fetcher;
