@@ -34,6 +34,8 @@
   ],
   "dependencies": {
     "axios": "^0.27.2",
+    "bip39-light": "^1.0.7",
+    "ed25519-hd-key": "^1.2.0",
     "buffer": "^6.0.3",
     "js-sha3": "^0.8.0",
     "tweetnacl": "^1.0.3",
