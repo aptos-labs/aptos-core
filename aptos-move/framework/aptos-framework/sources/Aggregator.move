@@ -26,10 +26,11 @@ module AptosFramework::Aggregator {
     /// Returns a value stored in this aggregator.
     public native fun read(aggregator: &Aggregator): u128;
 
-    // For now destroy aggregators for tests only, but we actually need to
-    // remove the resource from the `Table` stored under (table_handle, key).
-    #[test_only]
+    /// Destroys aggregator and removes it from its `AggregatorTable`.
     public fun destroy(aggregator: Aggregator) {
-        let Aggregator { table_handle: _, key: _, limit: _ } = aggregator;
+        let Aggregator { table_handle, key, limit, } = aggregator;
+        remove_aggregator(table_handle, key, limit);
     }
+
+    native fun remove_aggregator(table_handle: u128, key: u128, limit: u128);
 }

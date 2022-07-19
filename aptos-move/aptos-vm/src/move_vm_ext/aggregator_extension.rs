@@ -25,10 +25,19 @@ use move_deps::{
 use smallvec::smallvec;
 use std::{
     cell::RefCell,
-    collections::{btree_map::Entry, BTreeMap, VecDeque},
+    collections::{btree_map::Entry, BTreeMap, VecDeque, BTreeSet},
     convert::TryInto,
 };
 use tiny_keccak::{Hasher, Sha3};
+
+/// Specifies if aggregator instance is newly created (`New`), marked for
+/// deletion (`Deleted`), or is currently being used (`Used`).
+#[derive(Clone, Copy, PartialEq)]
+enum Mark {
+    New,
+    Used,
+    Deleted,
+}
 
 /// State of the aggregator: `Data` means that aggregator stores an exact value,
 /// `PositiveDelta` means that actual value is not known but must be added later.
@@ -48,6 +57,8 @@ struct Aggregator {
     value: u128,
     // Postondition value, exceeding it aggregator overflows.
     limit: u128,
+    // Mark to add/remove aggregators easily.
+    mark: Mark,
 }
 
 /// When `Aggregator` overflows the `limit`.
@@ -88,21 +99,13 @@ impl Aggregator {
         }
 
         // Otherwise, we have a delta and have to go to storage.
-        let key_bytes = u128::to_be_bytes(key);
+        let key_bytes = serialize(&key);
         match context.resolver.resolve_table_entry(handle, &key_bytes) {
             Err(_) => Err(extension_error("error resolving aggregator's value")),
             Ok(maybe_bytes) => {
                 match maybe_bytes {
                     Some(bytes) => {
-                        // If the value is found, deserialize it back ensuring
-                        // all bytes are preserved.
-                        const VALUE_SIZE: usize = std::mem::size_of::<u128>();
-                        if bytes.len() < VALUE_SIZE {
-                            return Err(extension_error("error resolving aggregator's value"));
-                        };
-                        let value = u128::from_be_bytes(
-                            bytes[0..VALUE_SIZE].try_into().expect("not enough bytes"),
-                        );
+                        let value = deserialize(&bytes);
 
                         // Once value is reconstructed, apply delta to it and change the state.
                         self.state = AggregatorState::Data;
@@ -151,9 +154,10 @@ impl AggregatorTable {
                 state: AggregatorState::PositiveDelta,
                 value: 0,
                 limit,
+                mark: Mark::Used,
             };
             self.insert(key, aggregator);
-        };
+        }
         self.get_mut(&key).unwrap()
     }
 }
@@ -253,35 +257,9 @@ pub fn aggregator_natives(aggregator_addr: AccountAddress) -> NativeFunctionTabl
             ("AggregatorTable", "new_aggregator", native_new_aggregator),
             ("Aggregator", "add", native_add),
             ("Aggregator", "read", native_read),
+            ("Aggregator", "remove_aggregator", native_remove_aggregator),
         ],
     )
-}
-
-fn native_add(
-    context: &mut NativeContext,
-    _ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    assert!(args.len() == 2);
-
-    // Get aggregator fields and a value to add.
-    let value = pop_arg!(args, IntegerValue).value_as::<u128>()?;
-    let aggregator_ref = pop_arg!(args, StructRef);
-    let (table_handle, key, limit) = get_aggregator_fields(&aggregator_ref)?;
-
-    // Get aggregator.
-    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_table_data = aggregator_context.aggregator_table_data.borrow_mut();
-    let aggregator = aggregator_table_data
-        .get_or_create_aggregator_table(table_handle)
-        .get_or_create_aggregator(key, limit);
-
-    // Try to add a value.
-    aggregator.add(value).and_then(|_| {
-        // TODO: charge gas properly.
-        let cost = GasCost::new(0, 0).total();
-        Ok(NativeResult::ok(cost, smallvec![]))
-    })
 }
 
 fn native_new_aggregator(
@@ -305,8 +283,8 @@ fn native_new_aggregator(
     // strategy from `Table` implementation: taking hash of transaction and
     // number of aggregator instances created so far and truncating them to
     // 128 bits.
-    let txn_hash_buffer = aggregator_context.txn_hash.to_be_bytes();
-    let num_aggregators_buffer = aggregator_table.len().to_be_bytes();
+    let txn_hash_buffer = serialize(&aggregator_context.txn_hash);
+    let num_aggregators_buffer = serialize(&(aggregator_table.len() as u128));
 
     let mut sha3 = Sha3::v256();
     sha3.update(&txn_hash_buffer);
@@ -314,7 +292,7 @@ fn native_new_aggregator(
 
     let mut key_bytes = [0_u8; 16];
     sha3.finalize(&mut key_bytes);
-    let key = u128::from_be_bytes(key_bytes);
+    let key = deserialize(&key_bytes.to_vec());
 
     // If transaction initializes aggregator, then the actual value is known,
     // and the aggregator state must be `Data`. Also, aggregators are
@@ -324,6 +302,7 @@ fn native_new_aggregator(
         state: AggregatorState::Data,
         value: 0,
         limit,
+        mark: Mark::New,
     };
     aggregator_table.insert(key, aggregator);
 
@@ -339,6 +318,33 @@ fn native_new_aggregator(
             Value::u128(limit),
         ]))],
     ))
+}
+
+fn native_add(
+    context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert!(args.len() == 2);
+
+    // Get aggregator fields and a value to add.
+    let value = pop_arg!(args, IntegerValue).value_as::<u128>()?;
+    let aggregator_ref = pop_arg!(args, StructRef);
+    let (table_handle, key, limit) = get_aggregator_fields(&aggregator_ref)?;
+
+    // Get aggregator.
+    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
+    let mut aggregator_table_data = aggregator_context.aggregator_table_data.borrow_mut();
+
+    let aggregator = aggregator_table_data
+        .get_or_create_aggregator_table(table_handle)
+        .get_or_create_aggregator(key, limit);
+
+    aggregator.add(value).and_then(|_| {
+        // TODO: charge gas properly.
+        let cost = GasCost::new(0, 0).total();
+        Ok(NativeResult::ok(cost, smallvec![]))
+    })
 }
 
 fn native_read(
@@ -368,6 +374,40 @@ fn native_read(
             let cost = GasCost::new(0, 0).total();
             Ok(NativeResult::ok(cost, smallvec![Value::u128(result)]))
         })
+}
+
+fn native_remove_aggregator(
+    context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    assert!(args.len() == 3);
+
+    // Get table handle, aggregator key and its limit for removal.
+    let limit = pop_arg!(args, IntegerValue).value_as::<u128>()?;
+    let key = pop_arg!(args, IntegerValue).value_as::<u128>()?;
+    let table_handle = pop_arg!(args, IntegerValue).value_as::<u128>().map(TableHandle)?;
+
+    // Get aggregator table.
+    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
+    let mut aggregator_table_data = aggregator_context.aggregator_table_data.borrow_mut();
+    let aggregator_table = aggregator_table_data
+        .get_or_create_aggregator_table(table_handle);
+
+    if aggregator_table.contains_key(&key)
+       && aggregator_table.get(&key).unwrap().mark == Mark::New {
+        // Aggregator has been created in this context, hence we can simply
+        // remove the entry from the table.
+        aggregator_table.remove(&key);
+    } else {
+        // Aggregator has been created elsewhere. Mark for delition to produce
+        // the right change set.
+        let aggregator = aggregator_table.get_or_create_aggregator(key, limit);
+        aggregator.mark = Mark::Deleted;
+    }
+
+    let cost = GasCost::new(0, 0).total();
+    Ok(NativeResult::ok(cost, smallvec![]))
 }
 
 // ================================ Utilities ================================
@@ -426,4 +466,14 @@ fn abort_error(message: &str, code: u64) -> PartialVMError {
 /// Returns partial VM error on extension failure.
 fn extension_error(message: &str) -> PartialVMError {
     PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(message.to_string())
+}
+
+/// Serializes aggregator value. The function is public so that it can be used by the executor.
+pub fn serialize(value: &u128) -> Vec<u8> {
+    bcs::to_bytes(value).expect("unexpected serialization error")
+}
+
+/// Deserializes aggregator value. The function is public so that it can be used by the executor.
+pub fn deserialize(value_bytes: &Vec<u8>) -> u128{
+    bcs::from_bytes(value_bytes).expect("unexpected deserialization error")
 }
