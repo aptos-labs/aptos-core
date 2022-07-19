@@ -25,8 +25,8 @@ pub fn encode_create_resource_account(
     authentication_key: Option<AccountAddress>,
 ) -> TransactionPayload {
     let seed: Vec<u8> = bcs::to_bytes(seed).unwrap();
-    let authentication_key: Vec<u8> = if authentication_key.is_some() {
-        bcs::to_bytes(&authentication_key.unwrap()).unwrap()
+    let authentication_key: Vec<u8> = if let Some(key) = authentication_key {
+        bcs::to_bytes(&key).unwrap()
     } else {
         vec![]
     };
