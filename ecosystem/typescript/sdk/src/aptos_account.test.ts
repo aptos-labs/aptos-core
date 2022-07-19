@@ -11,11 +11,25 @@ const aptosAccountObject: AptosAccountObject = {
   publicKeyHex: "0xde19e5d1880cac87d57484ce9ed2e84cf0f9599f12e7cc3a52e4e7657a763f2c",
 };
 
+const mnemonic = "shoot island position soft burden budget tooth cruel issue economy destroy above";
+
 test("generates random accounts", () => {
   const a1 = new AptosAccount();
   const a2 = new AptosAccount();
   expect(a1.authKey()).not.toBe(a2.authKey());
   expect(a1.address().hex()).not.toBe(a2.address().hex());
+});
+
+test("generates derive path accounts", () => {
+  const address = "0x07968dab936c1bad187c60ce4082f307d030d780e91e694ae03aef16aba73f30";
+  const a1 = AptosAccount.fromDerivePath("m/44'/637'/0'/0'/0'", mnemonic);
+  expect(a1.address().hex()).toBe(address);
+});
+
+test("generates derive path accounts", () => {
+  expect(() => {
+    AptosAccount.fromDerivePath("", mnemonic);
+  }).toThrow(new Error("Invalid derivation path"));
 });
 
 test("accepts custom address", () => {
