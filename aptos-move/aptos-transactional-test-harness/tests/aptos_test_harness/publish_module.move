@@ -3,7 +3,7 @@
 
 //# publish
 module Alice::M {
-    public(script) fun foo() {
+    public entry fun foo() {
         return
     }
 }

@@ -7,7 +7,7 @@ return values: 0
 task 3 'view'. lines 35-35:
 store key 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::HelloWorld::ModuleData {
     global_counter: 0
-    state: copy drop store 0x1::ASCII::String {
+    state: copy drop store 0x1::ascii::String {
         bytes: 68656c6c6f20776f726c64
     }
 }

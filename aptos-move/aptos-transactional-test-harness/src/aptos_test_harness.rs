@@ -27,7 +27,7 @@ use aptos_vm::{
     AptosVM,
 };
 use clap::StructOpt;
-use language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_FRESH};
+use language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET};
 use move_deps::{
     move_binary_format::file_format::{CompiledModule, CompiledScript},
     move_command_line_common::{
@@ -61,12 +61,9 @@ use std::{
 };
 use vm_genesis::GENESIS_KEYPAIR;
 
-/*************************************************************************************************
- *
+/**
  * Definitions
- *
- *
- ************************************************************************************************/
+ */
 
 /// The Aptos transaction test adapter.
 ///
@@ -172,12 +169,9 @@ enum AptosSubCommand {
     BlockCommand(BlockCommand),
 }
 
-/*************************************************************************************************
- *
+/**
  * Parsing
- *
- *
- ************************************************************************************************/
+ */
 
 fn parse_ed25519_private_key(s: &str) -> Result<Ed25519PrivateKey> {
     Ok(Ed25519PrivateKey::from_encoded_string(s)?)
@@ -233,12 +227,9 @@ impl SignerAndKeyPair {
     }
 }
 
-/*************************************************************************************************
- *
+/**
  * Helpers
- *
- *
- ************************************************************************************************/
+ */
 
 /// Default private key mappings for special Aptos accounts.
 fn aptos_framework_private_key_mapping() -> Vec<(String, Ed25519PrivateKey)> {
@@ -283,12 +274,9 @@ static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
     }
 });
 
-/*************************************************************************************************
- *
+/**
  * Test Adapter Implementation
- *
- *
- ************************************************************************************************/
+ */
 
 impl<'a> AptosTestAdapter<'a> {
     /// Look up the named private key in the mapping.
@@ -555,9 +543,8 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         }
 
         // Genesis modules
-        // TODO: rework vm-genesis and try not to compile the genesis modules twice.
         let mut storage = FakeDataStore::new(HashMap::new()).into_move_resolver();
-        storage.add_write_set(GENESIS_CHANGE_SET_FRESH.write_set());
+        storage.add_write_set(GENESIS_CHANGE_SET.write_set());
 
         // Builtin private key mapping
         let mut private_key_mapping = BTreeMap::new();
@@ -871,12 +858,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
     }
 }
 
-/*************************************************************************************************
- *
+/**
  * Misc
- *
- *
- ************************************************************************************************/
+ */
+
 struct PrettyEvent<'a>(&'a ContractEvent);
 
 impl<'a> fmt::Display for PrettyEvent<'a> {
