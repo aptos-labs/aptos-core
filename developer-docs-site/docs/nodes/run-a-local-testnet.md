@@ -1,11 +1,11 @@
 ---
-title: "Validator on Local Testnet"
+title: "Run a Local Testnet with Validator"
 slug: "run-a-local-testnet"
 sidebar_position: 9
 ---
 import BlockQuote from "@site/src/components/BlockQuote";
 
-# Validator on Local Testnet
+# Run a Local Testnet with Validator
 
 You can run a local testnet of the Aptos Blockchain. This local testnet will not be connected to the Aptos devnet. It will run on your local machine, independent of other Aptos networks. You can use this local testnet for testing and development purposes.
 
