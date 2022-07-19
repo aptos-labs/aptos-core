@@ -29,6 +29,7 @@ use futures::executor::block_on;
 #[cfg(test)]
 use std::collections::VecDeque;
 use std::{sync::Arc, time::Duration};
+use crate::data_manager::DataManager;
 
 #[cfg(test)]
 #[path = "block_store_test.rs"]
@@ -100,6 +101,7 @@ pub struct BlockStore {
     time_service: Arc<dyn TimeService>,
     // consistent with round type
     back_pressure_limit: Round,
+    data_manager: Arc<dyn DataManager>,
 }
 
 impl BlockStore {
@@ -110,6 +112,7 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         back_pressure_limit: Round,
+        data_manager: Arc<dyn DataManager>,
     ) -> Self {
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
         let (root, root_metadata, blocks, quorum_certs) = initial_data.take();
@@ -124,6 +127,7 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             time_service,
             back_pressure_limit,
+            data_manager,
         ));
         block_on(block_store.try_commit());
         block_store
@@ -161,6 +165,7 @@ impl BlockStore {
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         back_pressure_limit: Round,
+        data_manager: Arc<dyn DataManager>,
     ) -> Self {
         let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
 
@@ -215,6 +220,7 @@ impl BlockStore {
             storage,
             time_service,
             back_pressure_limit,
+            data_manager,
         };
         for block in blocks {
             block_store
@@ -308,6 +314,7 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             self.back_pressure_limit,
+            self.data_manager.clone(),
         )
         .await;
 
@@ -372,6 +379,7 @@ impl BlockStore {
             }
             self.time_service.wait_until(block_time);
         }
+        self.data_manager.update_payload(executed_block.block()).await;
         self.storage
             .save_tree(vec![executed_block.block().clone()], vec![])
             .context("Insert block failed when saving block")?;

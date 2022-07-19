@@ -104,10 +104,6 @@ impl ExecutedBlock {
         )
     }
 
-    pub fn get_payload(&self) -> Payload {
-        self.block.get_payload()
-    }
-
     pub fn transactions_to_commit(
         &self,
         validators: &[AccountAddress],
