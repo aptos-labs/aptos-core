@@ -692,6 +692,7 @@ impl EpochManager {
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             onchain_config.back_pressure_limit(),
+            self.data_manager.clone(),
         ));
 
         info!(epoch = epoch, "Create ProposalGenerator");
