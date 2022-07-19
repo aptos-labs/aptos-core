@@ -131,6 +131,25 @@ const sidebars = {
     },
     {
       type: "category",
+      label: "CLIs",
+      collapsible: true,
+      collapsed: true,
+      items: [
+        {
+          type: "category",
+          label: "Aptos CLI",
+          link: { type: "doc", id: "cli-tools/aptos-cli-tool/index"},
+          collapsible: true,
+          collapsed: true,
+          items: [
+            "cli-tools/aptos-cli-tool/install-aptos-cli",
+            "cli-tools/aptos-cli-tool/use-aptos-cli",
+          ],
+        },
+      ],
+    },
+    {
+      type: "category",
       label: "APIs",
       collapsible: true,
       collapsed: true,
