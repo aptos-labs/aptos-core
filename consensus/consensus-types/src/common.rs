@@ -23,16 +23,16 @@ pub struct TransactionSummary {
 
 impl fmt::Display for TransactionSummary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.sender, self.sequence_number,)
+        write!(f, "{}:{}", self.sender, self.sequence_number, )
     }
 }
 
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {
+    Empty,
     DirectMempool(Vec<SignedTransaction>),
     InQuorumStore(Vec<ProofOfStore>),
-    Empty,
 }
 
 impl Payload {
@@ -63,8 +63,8 @@ impl fmt::Display for Payload {
             Payload::DirectMempool(txns) => {
                 write!(f, "InMemory txns: {}", txns.len())
             }
-            Payload::InQuorumStore(poavs) => {
-                write!(f, "InMemory poavs: {}", poavs.len())
+            Payload::InQuorumStore(proofs) => {
+                write!(f, "InMemory poavs: {}", proofs.len())
             }
             Payload::Empty => write!(f, "Empty payload"),
         }
