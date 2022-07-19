@@ -37,7 +37,7 @@ type CommitType = (u64, Round);
 /// Basic communication with the Execution module;
 /// implements StateComputer traits.
 pub struct ExecutionProxy {
-    executor: Box<dyn BlockExecutorTrait>,
+    executor: Arc<dyn BlockExecutorTrait>,
     txn_notifier: Arc<dyn TxnNotifier>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     async_state_sync_notifier: channel::Sender<NotificationType>,
@@ -48,7 +48,7 @@ pub struct ExecutionProxy {
 
 impl ExecutionProxy {
     pub fn new(
-        executor: Box<dyn BlockExecutorTrait>,
+        executor: Arc<dyn BlockExecutorTrait>,
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         commit_notifier: Arc<dyn CommitNotifier>,
@@ -107,23 +107,24 @@ impl StateComputer for ExecutionProxy {
                 error: "Injected error in compute".into(),
             })
         });
+        let block_id = block.id();
         debug!(
-            block_id = block.id(),
-            parent_id = block.parent_id(),
+            block = %block,
+            parent_id = parent_block_id,
             "Executing block",
         );
 
         // TODO: figure out error handling for the prologue txn
+        let executor = self.executor.clone();
+        let transactions_to_execute = block.transactions_to_execute(&self.validators.lock());
         let compute_result = monitor!(
             "execute_block",
-            self.executor.execute_block(
-                (
-                    block.id(),
-                    block.transactions_to_execute(&self.validators.lock())
-                ),
-                parent_block_id
-            )
-        )?;
+            tokio::task::spawn_blocking(move || {
+                executor.execute_block((block_id, transactions_to_execute), parent_block_id)
+            })
+            .await
+        )
+        .expect("spawn_blocking failed")?;
         observe_block(block.timestamp_usecs(), BlockStage::EXECUTED);
 
         // notify mempool about failed transaction
@@ -168,12 +169,18 @@ impl StateComputer for ExecutionProxy {
             }
         }
 
+        let executor = self.executor.clone();
+        let proof = finality_proof.clone();
         monitor!(
             "commit_block",
-            self.executor
-                .commit_blocks(block_ids, finality_proof.clone())
-                .expect("Failed to commit blocks")
-        );
+            tokio::task::spawn_blocking(move || {
+                executor
+                    .commit_blocks(block_ids, proof)
+                    .expect("Failed to commit blocks");
+            })
+            .await
+        )
+        .expect("spawn_blocking failed");
 
         let blocks = blocks.to_vec();
         let wrapped_callback = move || {
