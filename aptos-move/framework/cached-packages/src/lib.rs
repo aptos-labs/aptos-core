@@ -2,19 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use include_dir::{include_dir, Dir, DirEntry};
-use move_deps::{
-    move_binary_format::file_format::CompiledModule, move_bytecode_utils::Modules,
-    move_core_types::abi::ScriptABI,
-};
+use move_deps::{move_binary_format::file_format::CompiledModule, move_core_types::abi::ScriptABI};
 use once_cell::sync::Lazy;
+use std::collections::HashSet;
 
 pub mod aptos_framework_sdk_builder;
 pub mod aptos_stdlib;
 pub mod aptos_token_sdk_builder;
 
-static PACKAGE: Dir<'static> = include_dir!("$OUT_DIR/framework");
+static PACKAGE: Dir<'static> = include_dir!("$OUT_DIR");
 
-static MODULE_BLOBS: Lazy<Vec<Vec<u8>>> = Lazy::new(|| load_modules("build"));
+static MODULE_BLOBS: Lazy<Vec<Vec<u8>>> = Lazy::new(load_modules);
 
 static MODULES: Lazy<Vec<CompiledModule>> = Lazy::new(|| {
     MODULE_BLOBS
@@ -23,16 +21,14 @@ static MODULES: Lazy<Vec<CompiledModule>> = Lazy::new(|| {
         .collect()
 });
 
-static ABIS: Lazy<Vec<ScriptABI>> = Lazy::new(|| load_abis("build"));
+static ABIS: Lazy<Vec<ScriptABI>> = Lazy::new(load_abis);
 
 pub fn abis() -> Vec<ScriptABI> {
     ABIS.clone()
 }
 
-pub fn load_abis(path: &str) -> Vec<ScriptABI> {
+pub fn load_abis() -> Vec<ScriptABI> {
     PACKAGE
-        .get_dir(path)
-        .unwrap()
         .find("**/*abis/*.abi")
         .unwrap()
         .filter_map(|file_module| match file_module {
@@ -44,22 +40,25 @@ pub fn load_abis(path: &str) -> Vec<ScriptABI> {
         .collect::<Vec<_>>()
 }
 
-fn load_modules(path: &str) -> Vec<Vec<u8>> {
-    let modules = PACKAGE
-        .get_dir(path)
-        .unwrap()
-        .find("**/*modules/*.mv")
+fn load_modules() -> Vec<Vec<u8>> {
+    let modules: Vec<CompiledModule> = PACKAGE
+        .find("**/*.mv")
         .unwrap()
         .filter_map(|file_module| match file_module {
             DirEntry::Dir(_) => None,
             DirEntry::File(file) => Some(CompiledModule::deserialize(file.contents()).unwrap()),
         })
-        .collect::<Vec<_>>();
+        .collect();
+    let mut unique_modules = Vec::new();
+    let mut module_keys = HashSet::new();
+    for m in modules {
+        let key = m.self_id();
+        if module_keys.insert(key) {
+            unique_modules.push(m);
+        }
+    }
 
-    Modules::new(modules.iter())
-        .compute_dependency_graph()
-        .compute_topological_order()
-        .unwrap()
+    unique_modules
         .into_iter()
         .map(|module| {
             let mut bytes = vec![];
@@ -69,11 +68,17 @@ fn load_modules(path: &str) -> Vec<Vec<u8>> {
         .collect()
 }
 
-pub fn error_map() -> &'static [u8] {
-    PACKAGE
-        .get_file("error_description/error_description.errmap")
+pub fn error_map() -> Vec<u8> {
+    let error_vec = PACKAGE
+        .find("**/error_description.errmap")
         .unwrap()
-        .contents()
+        .filter_map(|e| match e {
+            DirEntry::Dir(_) => None,
+            DirEntry::File(file) => Some(file.contents().to_vec()),
+        })
+        .flatten()
+        .collect::<Vec<u8>>();
+    error_vec
 }
 
 pub fn modules() -> &'static [CompiledModule] {
