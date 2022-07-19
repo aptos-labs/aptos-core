@@ -4,6 +4,7 @@
 use poem_openapi::Tags;
 
 mod basic;
+mod bcs_payload;
 mod index;
 mod log;
 mod runtime;
