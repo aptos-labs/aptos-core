@@ -533,7 +533,7 @@ pub struct TransactionOutput {
 /// representation should be updated to `val`, and `Deletion` means that
 /// we are going to delete this access path. A special `WriteOp` used by
 /// aggregator - `Delta(op, limit, value)`, means that `value` should be
-/// applied to serialized representation with `op` operation and a
+/// applied to deserialized representation with `op` operation and a
 /// postcondition `result <= limit` must be ensured.
 pub struct WriteSet {
     write_set: Vec<(AccessPath, WriteOp)>,
@@ -551,7 +551,7 @@ pub struct DeltaLimit(pub u128);
 
 pub enum WriteOp {
     Deletion,
-    Delta(DeltaOperation, DeltaLimit, Vec<u8>),
+    Delta(DeltaOperation, DeltaLimit, u128),
     Value(Vec<u8>),
 }
 

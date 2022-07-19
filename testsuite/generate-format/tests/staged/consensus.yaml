@@ -529,25 +529,11 @@ VoteMsg:
         TYPENAME: Vote
     - sync_info:
         TYPENAME: SyncInfo
-DeltaOperation:
-  ENUM:
-    0:
-      addition: UNIT
-    1:
-      subtraction: UNIT
-DeltaLimit:
-  NEWTYPESTRUCT: U128
 WriteOp:
   ENUM:
     0:
       Deletion: UNIT
     1:
-      Delta:
-        TUPLE:
-          - TYPENAME: DeltaOperation
-          - TYPENAME: DeltaLimit
-          - BYTES
-    2:
       Value:
         NEWTYPE: BYTES
 WriteSet:

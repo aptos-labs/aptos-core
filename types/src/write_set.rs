@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 
 /// Specifies operation such as +, - to use with `WriteOp::Delta`.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
 pub enum DeltaOperation {
     Addition,
     Subtraction,
@@ -39,11 +38,8 @@ impl std::fmt::Debug for DeltaLimit {
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {
     Deletion,
-    Delta(
-        DeltaOperation,
-        DeltaLimit,
-        #[serde(with = "serde_bytes")] Vec<u8>,
-    ),
+    #[serde(skip)]
+    Delta(DeltaOperation, DeltaLimit, u128),
     Value(#[serde(with = "serde_bytes")] Vec<u8>),
 }
 
@@ -69,16 +65,9 @@ impl std::fmt::Debug for WriteOp {
                     .map(|byte| format!("{:02x}", byte))
                     .collect::<String>()
             ),
-            WriteOp::Delta(op, limit, value) => write!(
-                f,
-                "Delta({:?}{} ensures {:?})",
-                op,
-                value
-                    .iter()
-                    .map(|byte| format!("{:02x}", byte))
-                    .collect::<String>(),
-                limit
-            ),
+            WriteOp::Delta(op, limit, value) => {
+                write!(f, "Delta({:?}{} ensures {:?})", op, value, limit)
+            }
             WriteOp::Deletion => write!(f, "Deletion"),
         }
     }
