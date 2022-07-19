@@ -4,7 +4,6 @@ resolver = "2"
 members = [
     "api",
     "api/types",
-    "aptos-move/af-cli",
     "aptos-move/aptos-module-verifier",
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-sdk-builder",
@@ -128,7 +127,6 @@ members = [
 #
 # For more, see the "Conditional compilation for tests" section in documentation/coding_guidelines.md.
 default-members = [
-    "aptos-move/af-cli",
     "aptos-move/genesis-viewer",
     "aptos-move/transaction-replay",
     "aptos-node",

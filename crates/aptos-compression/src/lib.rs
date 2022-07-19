@@ -103,6 +103,6 @@ pub fn decompress(compressed_data: &CompressedData) -> Result<Vec<u8>, Compressi
 
 /// Calculates the relative size (%) between the input and output after a
 /// compression/decompression operation, i.e., (output / input) * 100.
-fn calculate_relative_size(input: &Vec<u8>, output: &Vec<u8>) -> f64 {
+fn calculate_relative_size(input: &[u8], output: &[u8]) -> f64 {
     (output.len() as f64 / input.len() as f64) * 100.0
 }

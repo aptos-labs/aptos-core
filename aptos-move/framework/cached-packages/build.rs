@@ -38,10 +38,11 @@ fn main() {
     .unwrap();
 
     println!("cargo:rerun-if-changed=../aptos-token/sources");
+    println!("cargo:rerun-if-changed=../aptos-token/Move.toml");
     let token_release = framework::release::ReleaseOptions {
         no_check_layout_compatibility: false,
-        no_build_docs: true,
-        with_diagram: true,
+        no_build_docs: false,
+        with_diagram: false,
         no_script_builder: false,
         no_script_abis: false,
         no_errmap: false,
@@ -53,8 +54,8 @@ fn main() {
         )),
     };
     token_release.create_release();
-
-    std::fs::copy(
+    // TODO: re-enable file copy after abigen works for string type
+    /* std::fs::copy(
         PathBuf::from(std::env::var("OUT_DIR").unwrap())
             .join("token")
             .join("aptos_sdk_builder.rs"),
@@ -63,5 +64,5 @@ fn main() {
             .join("src")
             .join("aptos_token_sdk_builder.rs"),
     )
-    .unwrap();
+    .unwrap();*/
 }

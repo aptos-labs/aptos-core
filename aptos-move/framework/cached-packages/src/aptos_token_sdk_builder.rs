@@ -34,7 +34,7 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum ScriptFunctionCall {
     /// create a empty token collection with parameters
-    TokenV1CreateCollectionScript {
+    TokenCreateCollectionScript {
         name: Bytes,
         description: Bytes,
         uri: Bytes,
@@ -43,7 +43,7 @@ pub enum ScriptFunctionCall {
     },
 
     /// create token with raw inputs
-    TokenV1CreateTokenScript {
+    TokenCreateTokenScript {
         collection: Bytes,
         name: Bytes,
         description: Bytes,
@@ -59,7 +59,7 @@ pub enum ScriptFunctionCall {
         property_types: Vec<Bytes>,
     },
 
-    TokenV1DirectTransferScript {
+    TokenDirectTransferScript {
         creators_address: AccountAddress,
         collection: Bytes,
         name: Bytes,
@@ -67,14 +67,39 @@ pub enum ScriptFunctionCall {
         serial_number: u64,
     },
 
-    TokenV1InitializeTokenScript {},
+    TokenInitializeTokenScript {},
 
     /// Mint more token from an existing token_data. Mint only adds more token to serial_number 0
-    TokenV1Mint {
+    TokenMint {
         token_data_address: AccountAddress,
         collection: Bytes,
         name: Bytes,
         amount: u64,
+    },
+
+    TokenTransfersCancelOfferScript {
+        receiver: AccountAddress,
+        creator: AccountAddress,
+        collection: Bytes,
+        name: Bytes,
+        serial_number: u64,
+    },
+
+    TokenTransfersClaimScript {
+        sender: AccountAddress,
+        creator: AccountAddress,
+        collection: Bytes,
+        name: Bytes,
+        serial_number: u64,
+    },
+
+    TokenTransfersOfferScript {
+        receiver: AccountAddress,
+        creator: AccountAddress,
+        collection: Bytes,
+        name: Bytes,
+        amount: u64,
+        serial_number: u64,
     },
 }
 
@@ -83,14 +108,14 @@ impl ScriptFunctionCall {
     pub fn encode(self) -> TransactionPayload {
         use ScriptFunctionCall::*;
         match self {
-            TokenV1CreateCollectionScript {
+            TokenCreateCollectionScript {
                 name,
                 description,
                 uri,
                 maximum,
                 mutate_setting,
-            } => token_v1_create_collection_script(name, description, uri, maximum, mutate_setting),
-            TokenV1CreateTokenScript {
+            } => token_create_collection_script(name, description, uri, maximum, mutate_setting),
+            TokenCreateTokenScript {
                 collection,
                 name,
                 description,
@@ -104,7 +129,7 @@ impl ScriptFunctionCall {
                 property_keys,
                 property_values,
                 property_types,
-            } => token_v1_create_token_script(
+            } => token_create_token_script(
                 collection,
                 name,
                 description,
@@ -119,26 +144,61 @@ impl ScriptFunctionCall {
                 property_values,
                 property_types,
             ),
-            TokenV1DirectTransferScript {
+            TokenDirectTransferScript {
                 creators_address,
                 collection,
                 name,
                 amount,
                 serial_number,
-            } => token_v1_direct_transfer_script(
+            } => token_direct_transfer_script(
                 creators_address,
                 collection,
                 name,
                 amount,
                 serial_number,
             ),
-            TokenV1InitializeTokenScript {} => token_v1_initialize_token_script(),
-            TokenV1Mint {
+            TokenInitializeTokenScript {} => token_initialize_token_script(),
+            TokenMint {
                 token_data_address,
                 collection,
                 name,
                 amount,
-            } => token_v1_mint(token_data_address, collection, name, amount),
+            } => token_mint(token_data_address, collection, name, amount),
+            TokenTransfersCancelOfferScript {
+                receiver,
+                creator,
+                collection,
+                name,
+                serial_number,
+            } => token_transfers_cancel_offer_script(
+                receiver,
+                creator,
+                collection,
+                name,
+                serial_number,
+            ),
+            TokenTransfersClaimScript {
+                sender,
+                creator,
+                collection,
+                name,
+                serial_number,
+            } => token_transfers_claim_script(sender, creator, collection, name, serial_number),
+            TokenTransfersOfferScript {
+                receiver,
+                creator,
+                collection,
+                name,
+                amount,
+                serial_number,
+            } => token_transfers_offer_script(
+                receiver,
+                creator,
+                collection,
+                name,
+                amount,
+                serial_number,
+            ),
         }
     }
 
@@ -160,7 +220,7 @@ impl ScriptFunctionCall {
 }
 
 /// create a empty token collection with parameters
-pub fn token_v1_create_collection_script(
+pub fn token_create_collection_script(
     name: Vec<u8>,
     description: Vec<u8>,
     uri: Vec<u8>,
@@ -171,9 +231,9 @@ pub fn token_v1_create_collection_script(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
+                0, 0, 0, 3,
             ]),
-            ident_str!("token_v1").to_owned(),
+            ident_str!("token").to_owned(),
         ),
         ident_str!("create_collection_script").to_owned(),
         vec![],
@@ -188,7 +248,7 @@ pub fn token_v1_create_collection_script(
 }
 
 /// create token with raw inputs
-pub fn token_v1_create_token_script(
+pub fn token_create_token_script(
     collection: Vec<u8>,
     name: Vec<u8>,
     description: Vec<u8>,
@@ -207,9 +267,9 @@ pub fn token_v1_create_token_script(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
+                0, 0, 0, 3,
             ]),
-            ident_str!("token_v1").to_owned(),
+            ident_str!("token").to_owned(),
         ),
         ident_str!("create_token_script").to_owned(),
         vec![],
@@ -231,7 +291,7 @@ pub fn token_v1_create_token_script(
     ))
 }
 
-pub fn token_v1_direct_transfer_script(
+pub fn token_direct_transfer_script(
     creators_address: AccountAddress,
     collection: Vec<u8>,
     name: Vec<u8>,
@@ -242,9 +302,9 @@ pub fn token_v1_direct_transfer_script(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
+                0, 0, 0, 3,
             ]),
-            ident_str!("token_v1").to_owned(),
+            ident_str!("token").to_owned(),
         ),
         ident_str!("direct_transfer_script").to_owned(),
         vec![],
@@ -258,14 +318,14 @@ pub fn token_v1_direct_transfer_script(
     ))
 }
 
-pub fn token_v1_initialize_token_script() -> TransactionPayload {
+pub fn token_initialize_token_script() -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
+                0, 0, 0, 3,
             ]),
-            ident_str!("token_v1").to_owned(),
+            ident_str!("token").to_owned(),
         ),
         ident_str!("initialize_token_script").to_owned(),
         vec![],
@@ -274,7 +334,7 @@ pub fn token_v1_initialize_token_script() -> TransactionPayload {
 }
 
 /// Mint more token from an existing token_data. Mint only adds more token to serial_number 0
-pub fn token_v1_mint(
+pub fn token_mint(
     token_data_address: AccountAddress,
     collection: Vec<u8>,
     name: Vec<u8>,
@@ -284,9 +344,9 @@ pub fn token_v1_mint(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
+                0, 0, 0, 3,
             ]),
-            ident_str!("token_v1").to_owned(),
+            ident_str!("token").to_owned(),
         ),
         ident_str!("mint").to_owned(),
         vec![],
@@ -298,13 +358,96 @@ pub fn token_v1_mint(
         ],
     ))
 }
+
+pub fn token_transfers_cancel_offer_script(
+    receiver: AccountAddress,
+    creator: AccountAddress,
+    collection: Vec<u8>,
+    name: Vec<u8>,
+    serial_number: u64,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 3,
+            ]),
+            ident_str!("token_transfers").to_owned(),
+        ),
+        ident_str!("cancel_offer_script").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&receiver).unwrap(),
+            bcs::to_bytes(&creator).unwrap(),
+            bcs::to_bytes(&collection).unwrap(),
+            bcs::to_bytes(&name).unwrap(),
+            bcs::to_bytes(&serial_number).unwrap(),
+        ],
+    ))
+}
+
+pub fn token_transfers_claim_script(
+    sender: AccountAddress,
+    creator: AccountAddress,
+    collection: Vec<u8>,
+    name: Vec<u8>,
+    serial_number: u64,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 3,
+            ]),
+            ident_str!("token_transfers").to_owned(),
+        ),
+        ident_str!("claim_script").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&sender).unwrap(),
+            bcs::to_bytes(&creator).unwrap(),
+            bcs::to_bytes(&collection).unwrap(),
+            bcs::to_bytes(&name).unwrap(),
+            bcs::to_bytes(&serial_number).unwrap(),
+        ],
+    ))
+}
+
+pub fn token_transfers_offer_script(
+    receiver: AccountAddress,
+    creator: AccountAddress,
+    collection: Vec<u8>,
+    name: Vec<u8>,
+    amount: u64,
+    serial_number: u64,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 3,
+            ]),
+            ident_str!("token_transfers").to_owned(),
+        ),
+        ident_str!("offer_script").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&receiver).unwrap(),
+            bcs::to_bytes(&creator).unwrap(),
+            bcs::to_bytes(&collection).unwrap(),
+            bcs::to_bytes(&name).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+            bcs::to_bytes(&serial_number).unwrap(),
+        ],
+    ))
+}
 mod decoder {
     use super::*;
-    pub fn token_v1_create_collection_script(
+    pub fn token_create_collection_script(
         payload: &TransactionPayload,
     ) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenV1CreateCollectionScript {
+            Some(ScriptFunctionCall::TokenCreateCollectionScript {
                 name: bcs::from_bytes(script.args().get(0)?).ok()?,
                 description: bcs::from_bytes(script.args().get(1)?).ok()?,
                 uri: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -316,11 +459,9 @@ mod decoder {
         }
     }
 
-    pub fn token_v1_create_token_script(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
+    pub fn token_create_token_script(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenV1CreateTokenScript {
+            Some(ScriptFunctionCall::TokenCreateTokenScript {
                 collection: bcs::from_bytes(script.args().get(0)?).ok()?,
                 name: bcs::from_bytes(script.args().get(1)?).ok()?,
                 description: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -340,11 +481,11 @@ mod decoder {
         }
     }
 
-    pub fn token_v1_direct_transfer_script(
+    pub fn token_direct_transfer_script(
         payload: &TransactionPayload,
     ) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenV1DirectTransferScript {
+            Some(ScriptFunctionCall::TokenDirectTransferScript {
                 creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
                 name: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -356,23 +497,72 @@ mod decoder {
         }
     }
 
-    pub fn token_v1_initialize_token_script(
+    pub fn token_initialize_token_script(
         payload: &TransactionPayload,
     ) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(_script) = payload {
-            Some(ScriptFunctionCall::TokenV1InitializeTokenScript {})
+            Some(ScriptFunctionCall::TokenInitializeTokenScript {})
         } else {
             None
         }
     }
 
-    pub fn token_v1_mint(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+    pub fn token_mint(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenV1Mint {
+            Some(ScriptFunctionCall::TokenMint {
                 token_data_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
                 name: bcs::from_bytes(script.args().get(2)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn token_transfers_cancel_offer_script(
+        payload: &TransactionPayload,
+    ) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::TokenTransfersCancelOfferScript {
+                receiver: bcs::from_bytes(script.args().get(0)?).ok()?,
+                creator: bcs::from_bytes(script.args().get(1)?).ok()?,
+                collection: bcs::from_bytes(script.args().get(2)?).ok()?,
+                name: bcs::from_bytes(script.args().get(3)?).ok()?,
+                serial_number: bcs::from_bytes(script.args().get(4)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn token_transfers_claim_script(
+        payload: &TransactionPayload,
+    ) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::TokenTransfersClaimScript {
+                sender: bcs::from_bytes(script.args().get(0)?).ok()?,
+                creator: bcs::from_bytes(script.args().get(1)?).ok()?,
+                collection: bcs::from_bytes(script.args().get(2)?).ok()?,
+                name: bcs::from_bytes(script.args().get(3)?).ok()?,
+                serial_number: bcs::from_bytes(script.args().get(4)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn token_transfers_offer_script(
+        payload: &TransactionPayload,
+    ) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::TokenTransfersOfferScript {
+                receiver: bcs::from_bytes(script.args().get(0)?).ok()?,
+                creator: bcs::from_bytes(script.args().get(1)?).ok()?,
+                collection: bcs::from_bytes(script.args().get(2)?).ok()?,
+                name: bcs::from_bytes(script.args().get(3)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(4)?).ok()?,
+                serial_number: bcs::from_bytes(script.args().get(5)?).ok()?,
             })
         } else {
             None
@@ -393,24 +583,33 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
     once_cell::sync::Lazy::new(|| {
         let mut map: ScriptFunctionDecoderMap = std::collections::HashMap::new();
         map.insert(
-            "token_v1_create_collection_script".to_string(),
-            Box::new(decoder::token_v1_create_collection_script),
+            "token_create_collection_script".to_string(),
+            Box::new(decoder::token_create_collection_script),
         );
         map.insert(
-            "token_v1_create_token_script".to_string(),
-            Box::new(decoder::token_v1_create_token_script),
+            "token_create_token_script".to_string(),
+            Box::new(decoder::token_create_token_script),
         );
         map.insert(
-            "token_v1_direct_transfer_script".to_string(),
-            Box::new(decoder::token_v1_direct_transfer_script),
+            "token_direct_transfer_script".to_string(),
+            Box::new(decoder::token_direct_transfer_script),
         );
         map.insert(
-            "token_v1_initialize_token_script".to_string(),
-            Box::new(decoder::token_v1_initialize_token_script),
+            "token_initialize_token_script".to_string(),
+            Box::new(decoder::token_initialize_token_script),
+        );
+        map.insert("token_mint".to_string(), Box::new(decoder::token_mint));
+        map.insert(
+            "token_transfers_cancel_offer_script".to_string(),
+            Box::new(decoder::token_transfers_cancel_offer_script),
         );
         map.insert(
-            "token_v1_mint".to_string(),
-            Box::new(decoder::token_v1_mint),
+            "token_transfers_claim_script".to_string(),
+            Box::new(decoder::token_transfers_claim_script),
+        );
+        map.insert(
+            "token_transfers_offer_script".to_string(),
+            Box::new(decoder::token_transfers_offer_script),
         );
         map
     });
