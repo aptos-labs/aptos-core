@@ -32,7 +32,6 @@ use crate::{
         signing_phase::{SigningRequest, SigningResponse},
     },
     network::NetworkSender,
-    network_interface::ConsensusMsg,
     round_manager::VerifiedEvent,
     state_replication::StateComputerCommitCallBackType,
 };
@@ -343,9 +342,7 @@ impl BufferManager {
 
                 self.buffer.set(&current_cursor, signed_item);
 
-                self.commit_msg_tx
-                    .broadcast(ConsensusMsg::CommitVoteMsg(Box::new(commit_vote)))
-                    .await;
+                self.commit_msg_tx.broadcast_commit_vote(commit_vote).await;
             } else {
                 self.buffer.set(&current_cursor, item);
             }
@@ -419,9 +416,7 @@ impl BufferManager {
                 }
                 let signed_item = item.unwrap_signed_ref();
                 self.commit_msg_tx
-                    .broadcast(ConsensusMsg::CommitVoteMsg(Box::new(
-                        signed_item.commit_vote.clone(),
-                    )))
+                    .broadcast_commit_vote(signed_item.commit_vote.clone())
                     .await;
             }
             cursor = self.buffer.get_next(&cursor);
