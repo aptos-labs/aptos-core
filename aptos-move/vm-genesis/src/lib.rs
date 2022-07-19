@@ -157,22 +157,6 @@ pub fn encode_genesis_change_set(
     change_set
 }
 
-/// Collect compiledModule based on account address, dedup modules for each address
-fn construct_module_map(
-    modules: Vec<CompiledModule>,
-) -> HashMap<AccountAddress, Vec<CompiledModule>> {
-    let mut module_ids = HashSet::new();
-    let mut map = HashMap::new();
-    for m in modules {
-        if module_ids.insert(m.self_id()) {
-            map.entry(*m.address())
-                .or_insert_with(Vec::new)
-                .push(m.clone());
-        }
-    }
-    map
-}
-
 fn exec_function(
     session: &mut SessionExt<impl MoveResolver>,
     module_name: &str,
@@ -337,47 +321,12 @@ fn create_and_initialize_validators(
 /// Publish all modules that should be available after genesis.
 fn publish_stdlib(session: &mut SessionExt<impl MoveResolver>, stdlib: Vec<CompiledModule>) {
     let map = construct_module_map(stdlib);
-    let root_address = AccountAddress::from_hex_literal("0x1").unwrap();
-    let token_address = AccountAddress::from_hex_literal("0x2").unwrap();
+    let aptos_framework_address = AccountAddress::from_hex_literal("0x1").unwrap();
 
-    let framework_modules = map.get(&root_address).unwrap();
-    let token_modules = map.get(&token_address).unwrap();
+    let framework_modules = map.get(&aptos_framework_address).unwrap();
 
     // publish core-framework
     publish_module_bundle(session, Modules::new(framework_modules));
-    // publish non-core-framework modules
-    publish_token_modules(session, token_modules.clone());
-}
-
-/// publish modules that are not core-framework. assuming core-framework published
-/// the modules has to be sorted by topological order PropertyMap -> TokenV1 -> TokenCoinSwap
-fn publish_token_modules(
-    session: &mut SessionExt<impl MoveResolver>,
-    mut lib: Vec<CompiledModule>,
-) {
-    // module topological order
-    let x: HashMap<&str, u32> = HashMap::from([
-        ("PropertyMap", 0u32),
-        ("TokenV1", 1u32),
-        ("TokenCoinSwap", 2u32),
-    ])
-    .into_iter()
-    .collect();
-
-    lib.sort_by_key(|m| x.get(m.name().as_str()).unwrap());
-
-    for m in lib {
-        let module_id = m.self_id();
-        if module_id.name().as_str() == GENESIS_MODULE_NAME {
-            // Do not publish the Genesis module
-            continue;
-        }
-        let mut bytes = vec![];
-        m.serialize(&mut bytes).unwrap();
-        session
-            .publish_module(bytes, *module_id.address(), &mut GasStatus::new_unmetered())
-            .unwrap_or_else(|e| panic!("Failure publishing module {:?}, {:?}", module_id, e));
-    }
 }
 
 /// publish the core-framework with stdlib
@@ -393,7 +342,7 @@ fn publish_module_bundle(session: &mut SessionExt<impl MoveResolver>, lib: Modul
                 assert_eq!(
                     a,
                     addr,
-                    "All genesis modules must be published under the same address, but found modules under both {} and {}",
+                    "All modules must be published under the same address, but found modules under both {} and {}",
                     a.short_str_lossless(),
                     addr.short_str_lossless(),
                 );
