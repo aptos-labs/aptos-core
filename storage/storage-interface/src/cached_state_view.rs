@@ -13,14 +13,11 @@ use aptos_types::{
 };
 use parking_lot::RwLock;
 use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
 
 /// `CachedStateView` is like a snapshot of the global state comprised of state view at two
 /// levels, persistent storage and memory.
-pub struct CachedStateView {
+pub struct CachedStateView<T> {
     /// For logging and debugging purpose, identifies what this view is for.
     id: StateViewId,
 
@@ -72,19 +69,22 @@ pub struct CachedStateView {
     /// the corresponding key has been deleted. This is a temporary hack until we support deletion
     /// in JMT node.
     state_cache: RwLock<HashMap<StateKey, StateValue>>,
-    proof_fetcher: Arc<dyn ProofFetcher>,
+    proof_fetcher: T,
 }
 
-impl CachedStateView {
+impl<T> CachedStateView<T>
+where
+    T: ProofFetcher,
+{
     /// Constructs a [`CachedStateView`] with persistent state view in the DB and the in-memory
     /// speculative state represented by `speculative_state`. The persistent state view is the
     /// latest one preceding `next_version`
     pub fn new(
         id: StateViewId,
-        reader: Arc<dyn DbReader>,
+        reader: &dyn DbReader,
         next_version: Version,
         speculative_state: SparseMerkleTree<StateValue>,
-        proof_fetcher: Arc<dyn ProofFetcher>,
+        proof_fetcher: T,
     ) -> Result<Self> {
         // n.b. Freeze the state before getting the state snapshot, otherwise it's possible that
         // after we got the snapshot, in-mem trees newer than it gets dropped before being frozen,
@@ -163,7 +163,10 @@ pub struct StateCache {
     pub proofs: HashMap<HashValue, SparseMerkleProof>,
 }
 
-impl StateView for CachedStateView {
+impl<T> StateView for CachedStateView<T>
+where
+    T: ProofFetcher,
+{
     fn id(&self) -> StateViewId {
         self.id
     }
