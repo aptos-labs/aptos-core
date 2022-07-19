@@ -158,7 +158,7 @@ impl Aggregator {
                         // zero. Unlucky! We must materialize the value to
                         // check if the "true" value is large enough for doing
                         // subtraction. If not - abort.
-                        self.materialize(context, handle).and_then(|_|{
+                        self.materialize(context, handle).and_then(|_| {
                             checked_sub(self.value, value).and_then(|result| {
                                 self.value = result;
                                 Ok(())
@@ -205,7 +205,9 @@ impl Aggregator {
                                 // value does not cause underflow.
                                 checked_sub(true_value, self.value)
                             }
-                            AggregatorState::Data => unreachable!("aggregator's value is already materialized"),
+                            AggregatorState::Data => {
+                                unreachable!("aggregator's value is already materialized")
+                            }
                         };
 
                         // If no errors occurred after applying deltas, update
@@ -320,27 +322,22 @@ impl<'a> NativeAggregatorContext<'a> {
 
     /// Returns all changes made during this VM session.
     pub fn into_change_set(self) -> AggregatorChangeSet {
-        let NativeAggregatorContext { aggregator_table_data, .. } = self;
-        let AggregatorTableData {
-            aggregator_tables,
-        } = aggregator_table_data.into_inner();
+        let NativeAggregatorContext {
+            aggregator_table_data,
+            ..
+        } = self;
+        let AggregatorTableData { aggregator_tables } = aggregator_table_data.into_inner();
 
         let mut changes = BTreeMap::new();
         for (table_handle, aggregator_table) in aggregator_tables {
-
             let mut change = BTreeMap::new();
-            let AggregatorTable {
-                inner,
-            } = aggregator_table;
+            let AggregatorTable { inner } = aggregator_table;
 
             for (key, aggregator) in inner {
                 let key_bytes = serialize(&key);
 
                 let Aggregator {
-                    state,
-                    value,
-                    mark,
-                    ..
+                    state, value, mark, ..
                 } = aggregator;
 
                 let content = match mark {
@@ -356,9 +353,7 @@ impl<'a> NativeAggregatorContext<'a> {
             changes.insert(table_handle, change);
         }
 
-        AggregatorChangeSet {
-            changes,
-        }
+        AggregatorChangeSet { changes }
     }
 }
 
@@ -457,11 +452,13 @@ fn native_add(
         .get_or_create_aggregator_table(table_handle)
         .get_or_create_aggregator(key, limit);
 
-    aggregator.add(aggregator_context, &table_handle, value).and_then(|_| {
-        // TODO: charge gas properly.
-        let cost = GasCost::new(0, 0).total();
-        Ok(NativeResult::ok(cost, smallvec![]))
-    })
+    aggregator
+        .add(aggregator_context, &table_handle, value)
+        .and_then(|_| {
+            // TODO: charge gas properly.
+            let cost = GasCost::new(0, 0).total();
+            Ok(NativeResult::ok(cost, smallvec![]))
+        })
 }
 
 fn native_read(
@@ -483,13 +480,18 @@ fn native_read(
         .get_or_create_aggregator(key, limit);
 
     // First, materialize the value.
-    aggregator.materialize(aggregator_context, &table_handle).and_then(|_| {
-        // TODO: charge gas properly.
-        let cost = GasCost::new(0, 0).total();
+    aggregator
+        .materialize(aggregator_context, &table_handle)
+        .and_then(|_| {
+            // TODO: charge gas properly.
+            let cost = GasCost::new(0, 0).total();
 
-        // Value has been materialized, return it.
-        Ok(NativeResult::ok(cost, smallvec![Value::u128(aggregator.value)]))
-    })
+            // Value has been materialized, return it.
+            Ok(NativeResult::ok(
+                cost,
+                smallvec![Value::u128(aggregator.value)],
+            ))
+        })
 }
 
 fn native_sub(
@@ -512,11 +514,13 @@ fn native_sub(
         .get_or_create_aggregator_table(table_handle)
         .get_or_create_aggregator(key, limit);
 
-    aggregator.sub(aggregator_context, &table_handle, value).and_then(|_| {
-        // TODO: charge gas properly.
-        let cost = GasCost::new(0, 0).total();
-        Ok(NativeResult::ok(cost, smallvec![]))
-    })
+    aggregator
+        .sub(aggregator_context, &table_handle, value)
+        .and_then(|_| {
+            // TODO: charge gas properly.
+            let cost = GasCost::new(0, 0).total();
+            Ok(NativeResult::ok(cost, smallvec![]))
+        })
 }
 
 fn native_remove_aggregator(
@@ -529,16 +533,17 @@ fn native_remove_aggregator(
     // Get table handle, aggregator key and its limit for removal.
     let limit = pop_arg!(args, IntegerValue).value_as::<u128>()?;
     let key = pop_arg!(args, IntegerValue).value_as::<u128>()?;
-    let table_handle = pop_arg!(args, IntegerValue).value_as::<u128>().map(TableHandle)?;
+    let table_handle = pop_arg!(args, IntegerValue)
+        .value_as::<u128>()
+        .map(TableHandle)?;
 
     // Get aggregator table.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_table_data = aggregator_context.aggregator_table_data.borrow_mut();
-    let aggregator_table = aggregator_table_data
-        .get_or_create_aggregator_table(table_handle);
+    let aggregator_table = aggregator_table_data.get_or_create_aggregator_table(table_handle);
 
-    if aggregator_table.contains_key(&key)
-       && aggregator_table.get(&key).unwrap().mark == Mark::New {
+    if aggregator_table.contains_key(&key) && aggregator_table.get(&key).unwrap().mark == Mark::New
+    {
         // Aggregator has been created in this context, hence we can simply
         // remove the entry from the table.
         aggregator_table.remove(&key);
@@ -609,8 +614,7 @@ fn abort_error(message: &str, code: u64) -> PartialVMError {
 
 /// Returns partial VM error on extension failure.
 fn extension_error(message: &str) -> PartialVMError {
-    PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
-        .with_message(message.to_string())
+    PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(message.to_string())
 }
 
 /// Serializes aggregator value. The function is public so that it can be used
@@ -621,7 +625,7 @@ pub fn serialize(value: &u128) -> Vec<u8> {
 
 /// Deserializes aggregator value. The function is public so that it can be
 /// used by the executor.
-pub fn deserialize(value_bytes: &Vec<u8>) -> u128{
+pub fn deserialize(value_bytes: &Vec<u8>) -> u128 {
     bcs::from_bytes(value_bytes).expect("unexpected deserialization error")
 }
 
