@@ -37,6 +37,11 @@ pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
         ),
         (
             "signature",
+            "bls12381_verify_signature",
+            signature::native_bls12381_verify_signature,
+        ),
+        (
+            "signature",
             "ed25519_validate_pubkey",
             signature::native_ed25519_publickey_validation,
         ),
