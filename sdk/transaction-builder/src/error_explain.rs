@@ -12,7 +12,7 @@ use once_cell::sync::Lazy;
 
 static RELEASE_ERRMAP: Lazy<ErrorMapping> = Lazy::new(|| {
     let error_map = cached_framework_packages::error_map();
-    bcs::from_bytes(&*error_map).expect("Failed to deserialize static error descriptions")
+    bcs::from_bytes(&error_map[..]).expect("Failed to deserialize static error descriptions")
 });
 
 /// Given the module ID and the abort code raised from that module, returns the
