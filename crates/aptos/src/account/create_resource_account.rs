@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions};
+use aptos_rest_client::{Transaction, aptos_api_types::WriteSetChange};
 use aptos_transaction_builder::aptos_stdlib;
+use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
 
@@ -36,7 +38,29 @@ impl CliCommand<String> for CreateResourceAccount {
         ))
         .await
         .map(
-            |_| format!("weiwu: {}", self.seed)
+            |tx| {
+                let mut res: Option<AccountAddress> = None;
+                let self_address = self.txn_options.profile_options.account_address().unwrap();
+                if let Transaction::UserTransaction(txn) = tx {
+                    res = txn
+                    .info
+                    .changes
+                    .iter()
+                    .find_map(|change| match change {
+                        WriteSetChange::WriteResource { address, data, .. } => {
+                            if data.typ.name.as_str() == "Account" && *address.inner().to_hex() != self_address.to_hex() {
+                                Some(
+                                    *address.inner()
+                                )
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    });
+                }
+                format!("resource account key: 0x{}", res.unwrap().to_hex())
+            }
         )
     }
 }
