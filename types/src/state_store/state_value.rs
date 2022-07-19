@@ -7,25 +7,43 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_crypto_derive::CryptoHasher;
-use serde::{Deserialize, Serialize};
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest::{arbitrary::Arbitrary, prelude::*};
+use serde::{Deserialize, Deserializer, Serialize};
 
-#[derive(
-    Clone,
-    Debug,
-    Default,
-    CryptoHasher,
-    Eq,
-    PartialEq,
-    Serialize,
-    Deserialize,
-    Ord,
-    PartialOrd,
-    Hash,
-)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+#[derive(Clone, Debug, Default, CryptoHasher, Eq, PartialEq, Serialize, Ord, PartialOrd, Hash)]
 pub struct StateValue {
     pub maybe_bytes: Option<Vec<u8>>,
+    #[serde(skip)]
     hash: HashValue,
+}
+
+#[cfg(any(test, feature = "fuzzing"))]
+impl Arbitrary for StateValue {
+    type Parameters = ();
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        any::<Vec<u8>>()
+            .prop_map(|maybe_bytes| StateValue::new(Some(maybe_bytes)))
+            .boxed()
+    }
+
+    type Strategy = BoxedStrategy<Self>;
+}
+
+impl<'de> Deserialize<'de> for StateValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename = "StateValue")]
+        struct MaybeBytes {
+            maybe_bytes: Option<Vec<u8>>,
+        }
+        let bytes = MaybeBytes::deserialize(deserializer)?;
+
+        Ok(Self::new(bytes.maybe_bytes))
+    }
 }
 
 impl StateValue {
