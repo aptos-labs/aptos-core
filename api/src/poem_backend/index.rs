@@ -4,7 +4,7 @@
 use std::{convert::TryFrom, sync::Arc};
 
 use super::accept_type::AcceptType;
-use super::{response::AptosResult, ApiTags, AptosResponse};
+use super::{response::AptosResponseResult, ApiTags, AptosResponse};
 use crate::context::Context;
 use aptos_api_types::IndexResponse;
 use poem::web::Accept;
@@ -25,7 +25,7 @@ impl IndexApi {
         operation_id = "get_ledger_info",
         tag = "ApiTags::General"
     )]
-    async fn get_ledger_info(&self, accept: Accept) -> AptosResult<IndexResponse> {
+    async fn get_ledger_info(&self, accept: Accept) -> AptosResponseResult<IndexResponse> {
         let accept_type = AcceptType::try_from(&accept)?;
         let ledger_info = self.context.get_latest_ledger_info_poem()?;
         let node_role = self.context.node_role();

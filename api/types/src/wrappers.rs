@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::EventKey;
 use aptos_openapi::impl_poem_type;
 use move_deps::move_core_types::identifier::{IdentStr, Identifier};
 

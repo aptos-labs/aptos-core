@@ -21,6 +21,7 @@ use aptos_types::{
     },
 };
 
+use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use std::{
     boxed::Box,
@@ -359,7 +360,7 @@ pub struct BlockMetadataTransaction {
     pub timestamp: U64,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct Event {
     pub key: EventKey,
     pub sequence_number: U64,

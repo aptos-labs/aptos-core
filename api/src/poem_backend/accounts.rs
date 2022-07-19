@@ -6,7 +6,10 @@ use std::sync::Arc;
 
 use super::accept_type::AcceptType;
 use super::response::deserialize_from_bcs;
-use super::{response::AptosResult, ApiTags, AptosResponse};
+use super::{
+    response::{AptosInternalResult, AptosResponseResult},
+    ApiTags, AptosResponse,
+};
 use super::{AptosError, AptosErrorCode, AptosErrorResponse};
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
@@ -49,7 +52,7 @@ impl AccountsApi {
         accept: Accept,
         address: Path<Address>,
         ledger_version: Query<Option<u64>>,
-    ) -> AptosResult<AccountData> {
+    ) -> AptosResponseResult<AccountData> {
         fail_point_poem("endpoint_get_account")?;
         let accept_type = AcceptType::try_from(&accept)?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
@@ -73,7 +76,7 @@ impl AccountsApi {
         accept: Accept,
         address: Path<Address>,
         ledger_version: Query<Option<u64>>,
-    ) -> AptosResult<Vec<MoveResource>> {
+    ) -> AptosResponseResult<Vec<MoveResource>> {
         fail_point_poem("endpoint_get_account_resources")?;
         let accept_type = AcceptType::try_from(&accept)?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
@@ -97,7 +100,7 @@ impl AccountsApi {
         accept: Accept,
         address: Path<Address>,
         ledger_version: Query<Option<u64>>,
-    ) -> AptosResult<Vec<MoveModuleBytecode>> {
+    ) -> AptosResponseResult<Vec<MoveModuleBytecode>> {
         fail_point_poem("endpoint_get_account_resources")?;
         let accept_type = AcceptType::try_from(&accept)?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
@@ -105,7 +108,7 @@ impl AccountsApi {
     }
 }
 
-struct Account {
+pub struct Account {
     context: Arc<Context>,
     address: Address,
     ledger_version: u64,
@@ -140,7 +143,7 @@ impl Account {
 
     // These functions map directly to endpoint functions.
 
-    pub fn account(self, accept_type: &AcceptType) -> AptosResult<AccountData> {
+    pub fn account(self, accept_type: &AcceptType) -> AptosResponseResult<AccountData> {
         let state_key = StateKey::AccessPath(AccessPath::resource_access_path(ResourceKey::new(
             self.address.into(),
             AccountResource::struct_tag(),
@@ -161,18 +164,10 @@ impl Account {
         AptosResponse::try_from_rust_value(account_data, &self.latest_ledger_info, accept_type)
     }
 
-    pub fn resources(self, accept_type: &AcceptType) -> AptosResult<Vec<MoveResource>> {
+    pub fn resources(self, accept_type: &AcceptType) -> AptosResponseResult<Vec<MoveResource>> {
         let account_state = self.account_state()?;
         let resources = account_state.get_resources();
-        let move_resolver = self.context.move_resolver().map_err(|e| {
-            AptosErrorResponse::InternalServerError(Json(
-                AptosError::new(
-                    format_err!("Failed to read latest state checkpoint from DB: {}", e)
-                        .to_string(),
-                )
-                .error_code(AptosErrorCode::ReadFromStorageError),
-            ))
-        })?;
+        let move_resolver = self.context.move_resolver_poem()?;
         let converted_resources = move_resolver
             .as_converter()
             .try_into_resources(resources)
@@ -195,7 +190,7 @@ impl Account {
         )
     }
 
-    pub fn modules(self, accept_type: &AcceptType) -> AptosResult<Vec<MoveModuleBytecode>> {
+    pub fn modules(self, accept_type: &AcceptType) -> AptosResponseResult<Vec<MoveModuleBytecode>> {
         let mut modules = Vec::new();
         for module in self.account_state()?.into_modules() {
             modules.push(
@@ -220,7 +215,7 @@ impl Account {
 
     // Helpers for processing account state.
 
-    fn account_state(&self) -> Result<AccountState, AptosErrorResponse> {
+    fn account_state(&self) -> AptosInternalResult<AccountState> {
         let state = self
             .context
             .get_account_state(self.address.into(), self.ledger_version)

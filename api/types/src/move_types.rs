@@ -3,7 +3,7 @@
 
 use crate::{Address, Bytecode, IdentifierWrapper};
 use anyhow::{bail, format_err};
-use aptos_openapi::impl_poem_type;
+use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use aptos_types::{account_config::CORE_CODE_ADDRESS, event::EventKey, transaction::Module};
 use move_deps::{
     move_binary_format::{
@@ -1317,3 +1317,4 @@ mod tests {
 // from the perspective of the OpenAPI spec, potentially losing some useful
 // type information that the client could use.
 impl_poem_type!(MoveAbility, MoveStructValue, MoveType, HexEncodedBytes);
+impl_poem_parameter!(HexEncodedBytes);
