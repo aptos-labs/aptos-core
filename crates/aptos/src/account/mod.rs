@@ -5,10 +5,10 @@ use crate::common::types::{CliCommand, CliResult};
 use clap::Subcommand;
 
 pub mod create;
+pub mod create_resource_account;
 pub mod fund;
 pub mod list;
 pub mod transfer;
-pub mod create_resource_account;
 
 /// CLI tool for interacting with accounts
 ///

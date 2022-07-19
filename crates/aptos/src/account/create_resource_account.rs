@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions};
-use aptos_rest_client::{Transaction, aptos_api_types::WriteSetChange};
+use aptos_rest_client::{aptos_api_types::WriteSetChange, Transaction};
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
@@ -20,9 +20,9 @@ pub struct CreateResourceAccount {
     #[clap(long)]
     pub(crate) seed: String,
 
-    // /// Resource authentication key.
-    // #[clap(long, requires=false)]
-    // pub(crate) authentication_key: Vec<u8>,
+    /// Optional Resource Account authentication key.
+    #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
+    pub(crate) authentication_key: Option<AccountAddress>,
 }
 
 /// A shortened create resource account output
@@ -51,22 +51,18 @@ impl From<Transaction> for CreateResourceAccountSummary {
             summary.gas_used = Some(txn.info.gas_used.0);
             summary.version = Some(txn.info.version.0);
             summary.hash = Some(txn.info.hash.to_string());
-            summary.resource_account = txn
-                .info
-                .changes
-                .iter()
-                .find_map(|change| match change {
-                    WriteSetChange::WriteResource { address, data, .. } => {
-                        if data.typ.name.as_str() == "Account" && *address.inner().to_hex() != *txn.request.sender.inner().to_hex() {
-                            Some(
-                                *address.inner()
-                            )
-                        } else {
-                            None
-                        }
+            summary.resource_account = txn.info.changes.iter().find_map(|change| match change {
+                WriteSetChange::WriteResource { address, data, .. } => {
+                    if data.typ.name.as_str() == "Account"
+                        && *address.inner().to_hex() != *txn.request.sender.inner().to_hex()
+                    {
+                        Some(*address.inner())
+                    } else {
+                        None
                     }
-                    _ => None,
-                });
+                }
+                _ => None,
+            });
         }
 
         summary
@@ -81,15 +77,11 @@ impl CliCommand<CreateResourceAccountSummary> for CreateResourceAccount {
 
     async fn execute(self) -> CliTypedResult<CreateResourceAccountSummary> {
         self.txn_options
-        .submit_transaction(aptos_stdlib::encode_create_resource_account(
-            &self.seed,
-            None
-        ))
-        .await
-        .map(
-            CreateResourceAccountSummary::from
-        )
+            .submit_transaction(aptos_stdlib::encode_create_resource_account(
+                &self.seed,
+                self.authentication_key,
+            ))
+            .await
+            .map(CreateResourceAccountSummary::from)
     }
 }
-
-

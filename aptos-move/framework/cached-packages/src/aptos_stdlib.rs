@@ -22,14 +22,24 @@ pub fn encode_test_coin_transfer(to: AccountAddress, amount: u64) -> Transaction
 
 pub fn encode_create_resource_account(
     seed: &str,
-    authentication_key: Option<Vec<u8>>,
+    authentication_key: Option<AccountAddress>,
 ) -> TransactionPayload {
     let seed: Vec<u8> = bcs::to_bytes(seed).unwrap();
-    let authentication_key: Vec<u8> = authentication_key.unwrap_or(vec![]);
+    let authentication_key: Vec<u8> = if authentication_key.is_some() {
+        bcs::to_bytes(&authentication_key.unwrap()).unwrap()
+    } else {
+        vec![]
+    };
     TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(AccountAddress::ONE, ident_str!("ResourceAccount").to_owned()),
+        ModuleId::new(
+            AccountAddress::ONE,
+            ident_str!("ResourceAccount").to_owned(),
+        ),
         ident_str!("create_resource_account").to_owned(),
         vec![],
-        vec![bcs::to_bytes(&seed).unwrap(), bcs::to_bytes(&authentication_key).unwrap()],
+        vec![
+            bcs::to_bytes(&seed).unwrap(),
+            bcs::to_bytes(&authentication_key).unwrap(),
+        ],
     ))
 }
