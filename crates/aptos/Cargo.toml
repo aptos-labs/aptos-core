@@ -40,6 +40,7 @@ aptos-github-client = { path = "../../secure/storage/github" }
 aptos-keygen = { path = "../aptos-keygen" }
 aptos-logger = { path = "../aptos-logger" }
 aptos-module-verifier = { path = "../../aptos-move/aptos-module-verifier" }
+aptos-node = { path = "../../aptos-node" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
 aptos-secure-storage = { path = "../../secure/storage" }
