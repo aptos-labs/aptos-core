@@ -568,7 +568,7 @@ impl CliCommand<()> for RunLocalTestnet {
             false,
             cached_framework_packages::module_blobs().to_vec(),
             rng,
-        );
+        )?;
 
         Ok(())
     }
