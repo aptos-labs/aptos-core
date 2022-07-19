@@ -188,8 +188,9 @@ impl BatchStore {
                                 .expect("Failed to send signed digest");
                             debug!("QS: sent signed digest back to quorum store");
                         } else {
-                            let msg = ConsensusMsg::SignedDigestMsg(Box::new(signed_digest));
-                            self.network_sender.send(msg, vec![author]).await;
+                            self.network_sender
+                                .send_signed_digest(signed_digest, vec![author])
+                                .await;
                             debug!("QS: sent signed digest back to sender");
                         }
                     }
@@ -216,8 +217,7 @@ impl BatchStore {
                                     Some(maybe_persisted_value.unwrap().maybe_payload.unwrap()),
                                     // self.validator_signer.clone(),
                                 );
-                                let msg = ConsensusMsg::BatchMsg(Box::new(batch));
-                                self.network_sender.send(msg, vec![peer_id]).await;
+                                self.network_sender.send_batch(batch, vec![peer_id]).await;
                             }
                         }
                         Err(_) => {
