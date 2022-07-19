@@ -409,7 +409,7 @@ $ ./aptos account list --query modules --account superuser
               "address"
             ],
             "return": [
-              "0x1::ascii::String"
+              "0x1::string::String"
             ]
           },
           {
@@ -435,11 +435,11 @@ $ ./aptos account list --query modules --account superuser
             "fields": [
               {
                 "name": "from_message",
-                "type": "0x1::ascii::String"
+                "type": "0x1::string::String"
               },
               {
                 "name": "to_message",
-                "type": "0x1::ascii::String"
+                "type": "0x1::string::String"
               }
             ]
           },
@@ -453,7 +453,7 @@ $ ./aptos account list --query modules --account superuser
             "fields": [
               {
                 "name": "message",
-                "type": "0x1::ascii::String"
+                "type": "0x1::string::String"
               },
               {
                 "name": "message_change_events",

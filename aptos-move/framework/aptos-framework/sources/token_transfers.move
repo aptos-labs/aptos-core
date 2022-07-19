@@ -163,28 +163,28 @@ module aptos_framework::token_transfers {
     }
 
     fun create_token(creator: &signer, amount: u64): TokenId {
-        use std::ascii;
+        use std::string;
         use std::option;
 
-        let collection_name = ascii::string(b"Hello, World");
+        let collection_name = string::utf8(b"Hello, World");
 
         token::create_collection(
             creator,
             *&collection_name,
-            ascii::string(b"Collection: Hello, World"),
-            ascii::string(b"https://aptos.dev"),
+            string::utf8(b"Collection: Hello, World"),
+            string::utf8(b"https://aptos.dev"),
             option::some(1),
         );
 
         token::create_token(
             creator,
             *&collection_name,
-            ascii::string(b"Token: Hello, Token"),
-            ascii::string(b"Hello, Token"),
+            string::utf8(b"Token: Hello, Token"),
+            string::utf8(b"Hello, Token"),
             false,
             amount,
             option::none(),
-            ascii::string(b"https://aptos.dev"),
+            string::utf8(b"https://aptos.dev"),
             0,
         )
     }

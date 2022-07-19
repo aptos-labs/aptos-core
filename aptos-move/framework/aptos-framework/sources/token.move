@@ -1,6 +1,6 @@
 /// This module provides the foundation for Tokens.
 module aptos_framework::token {
-    use std::ascii;
+    use std::string;
     use std::errors;
     use std::event::{Self, EventHandle};
     use std::option::{Self, Option};
@@ -42,9 +42,9 @@ module aptos_framework::token {
         // The creator of this token
         creator: address,
         // The collection or set of related tokens within the creator's account
-        collection: ascii::String,
+        collection: string::String,
         // Unique name within a collection within the creator's account
-        name: ascii::String,
+        name: string::String,
     }
 
     /// Represents token resources owned by token owner
@@ -69,9 +69,9 @@ module aptos_framework::token {
     /// create collection event with creator address and collection name
     struct CreateCollectionEvent has drop, store {
         creator: address,
-        collection_name: ascii::String,
-        uri: ascii::String,
-        description: ascii::String,
+        collection_name: string::String,
+        uri: string::String,
+        description: string::String,
         maximum: Option<u64>,
     }
 
@@ -94,7 +94,7 @@ module aptos_framework::token {
 
     /// Represent collection and token metadata for a creator
     struct Collections has key {
-        collections: Table<ascii::String, Collection>,
+        collections: Table<string::String, Collection>,
         token_data: Table<TokenId, TokenData>,
         burn_capabilities: Table<TokenId, BurnCapability>,
         mint_capabilities: Table<TokenId, MintCapability>,
@@ -106,11 +106,11 @@ module aptos_framework::token {
     /// Represent the collection metadata
     struct Collection has store {
         // Describes the collection
-        description: ascii::String,
+        description: string::String,
         // Unique name within this creators account for this collection
-        name: ascii::String,
+        name: string::String,
         // URL for additional information /media
-        uri: ascii::String,
+        uri: string::String,
         // Total number of distinct Tokens tracked by the collection
         count: u64,
         // Optional maximum number of tokens allowed within this collections
@@ -130,17 +130,17 @@ module aptos_framework::token {
     /// The data associated with the Tokens
     struct TokenData has copy, drop, store {
         // Unique name within this creators account for this Token's collection
-        collection: ascii::String,
+        collection: string::String,
         // Describes this Token
-        description: ascii::String,
+        description: string::String,
         // The name of this Token
-        name: ascii::String,
+        name: string::String,
         // Optional maximum number of this type of Token.
         maximum: Option<u64>,
         // Total number of this type of Token
         supply: Option<u64>,
         // URL for additional information / media
-        uri: ascii::String,
+        uri: string::String,
         // the royalty of the token
         royalty: Royalty,
     }
@@ -168,9 +168,9 @@ module aptos_framework::token {
     ) acquires Collections {
         create_collection(
             creator,
-            ascii::string(name),
-            ascii::string(description),
-            ascii::string(uri),
+            string::utf8(name),
+            string::utf8(description),
+            string::utf8(uri),
             option::some(maximum),
         );
     }
@@ -183,9 +183,9 @@ module aptos_framework::token {
     ) acquires Collections {
         create_collection(
             creator,
-            ascii::string(name),
-            ascii::string(description),
-            ascii::string(uri),
+            string::utf8(name),
+            string::utf8(description),
+            string::utf8(uri),
             option::none(),
         );
     }
@@ -203,13 +203,13 @@ module aptos_framework::token {
     ) acquires Collections, TokenStore {
         create_token(
             creator,
-            ascii::string(collection),
-            ascii::string(name),
-            ascii::string(description),
+            string::utf8(collection),
+            string::utf8(name),
+            string::utf8(description),
             monitor_supply,
             initial_balance,
             option::some(maximum),
-            ascii::string(uri),
+            string::utf8(uri),
             royalty_points_per_million
         );
     }
@@ -226,13 +226,13 @@ module aptos_framework::token {
     ) acquires Collections, TokenStore {
         create_token(
             creator,
-            ascii::string(collection),
-            ascii::string(name),
-            ascii::string(description),
+            string::utf8(collection),
+            string::utf8(name),
+            string::utf8(description),
             monitor_supply,
             initial_balance,
             option::none(),
-            ascii::string(uri),
+            string::utf8(uri),
             royalty_points_per_million,
         );
     }
@@ -462,9 +462,9 @@ module aptos_framework::token {
     /// Create a new collection to hold tokens
     public fun create_collection(
         creator: &signer,
-        name: ascii::String,
-        description: ascii::String,
-        uri: ascii::String,
+        name: string::String,
+        description: string::String,
+        uri: string::String,
         maximum: Option<u64>,
     ) acquires Collections {
         let account_addr = signer::address_of(creator);
@@ -514,13 +514,13 @@ module aptos_framework::token {
 
     public fun create_token(
         account: &signer,
-        collection: ascii::String,
-        name: ascii::String,
-        description: ascii::String,
+        collection: string::String,
+        name: string::String,
+        description: string::String,
         monitor_supply: bool,
         initial_balance: u64,
         maximum: Option<u64>,
-        uri: ascii::String,
+        uri: string::String,
         royalty_points_per_million: u64
     ): TokenId acquires Collections, TokenStore {
         let account_addr = signer::address_of(account);
@@ -597,8 +597,8 @@ module aptos_framework::token {
 
     public fun create_token_id(
         creator: address,
-        collection: ascii::String,
-        name: ascii::String,
+        collection: string::String,
+        name: string::String,
     ): TokenId {
         TokenId { creator, collection, name }
     }
@@ -610,8 +610,8 @@ module aptos_framework::token {
     ): TokenId {
         TokenId {
             creator,
-            collection: ascii::string(collection),
-            name: ascii::string(name),
+            collection: string::utf8(collection),
+            name: string::utf8(name),
         }
     }
 
@@ -709,12 +709,12 @@ module aptos_framework::token {
         create_token(
             &creator,
             token_id.collection,
-            ascii::string(b"Token"),
-            ascii::string(b"Hello, Token"),
+            string::utf8(b"Token"),
+            string::utf8(b"Hello, Token"),
             true,
             2,
             option::some(100),
-            ascii::string(b"https://aptos.dev"),
+            string::utf8(b"https://aptos.dev"),
             0,
         );
 
@@ -738,25 +738,25 @@ module aptos_framework::token {
         collection_max: u64,
         token_max: u64,
     ): TokenId acquires Collections, TokenStore {
-        let collection_name = ascii::string(b"Hello, World");
+        let collection_name = string::utf8(b"Hello, World");
 
         create_collection(
             creator,
             *&collection_name,
-            ascii::string(b"Collection: Hello, World"),
-            ascii::string(b"https://aptos.dev"),
+            string::utf8(b"Collection: Hello, World"),
+            string::utf8(b"https://aptos.dev"),
             option::some(collection_max),
         );
 
         create_token(
             creator,
             *&collection_name,
-            ascii::string(b"Token: Hello, Token"),
-            ascii::string(b"Hello, Token"),
+            string::utf8(b"Token: Hello, Token"),
+            string::utf8(b"Hello, Token"),
             true,
             amount,
             option::some(token_max),
-            ascii::string(b"https://aptos.dev"),
+            string::utf8(b"https://aptos.dev"),
            0,
         )
     }

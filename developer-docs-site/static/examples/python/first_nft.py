@@ -154,7 +154,7 @@ class TokenClient(RestClient):
 
         return self.get_table_item(
             token_data,
-            "0x1::ascii::String",
+            "0x1::string::String",
             "0x1::token::Collection",
             collection_name,
         )

@@ -533,11 +533,11 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     layout
                 );
             };
-        if MoveValue::is_ascii_string(struct_tag) {
+        if MoveValue::is_utf8_string(struct_tag) {
             let string = val
                 .as_str()
-                .ok_or_else(|| format_err!("failed to parse ascii::String."))?;
-            return Ok(new_vm_ascii_string(string));
+                .ok_or_else(|| format_err!("failed to parse string::String."))?;
+            return Ok(new_vm_utf8_string(string));
         }
 
         let mut field_values = if let Value::Object(fields) = val {
@@ -637,7 +637,7 @@ impl<R: MoveResolverExt> AsConverter<R> for R {
     }
 }
 
-pub fn new_vm_ascii_string(string: &str) -> move_core_types::value::MoveValue {
+pub fn new_vm_utf8_string(string: &str) -> move_core_types::value::MoveValue {
     use move_deps::move_core_types::value::{MoveStruct, MoveValue};
 
     let byte_vector = MoveValue::Vector(

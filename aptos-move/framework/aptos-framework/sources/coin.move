@@ -1,6 +1,6 @@
 /// This module provides the foundation for typesafe Coins.
 module aptos_framework::coin {
-    use std::ascii;
+    use std::string;
     use std::errors;
     use std::event::{Self, EventHandle};
     use std::option::{Self, Option};
@@ -64,10 +64,10 @@ module aptos_framework::coin {
 
     /// Information about a specific coin type. Stored on the creator of the coin's account.
     struct CoinInfo<phantom CoinType> has key {
-        name: ascii::String,
+        name: string::String,
         /// Symbol of the coin, usually a shorter version of the name.
         /// For example, Singapore Dollar is SGD.
-        symbol: ascii::String,
+        symbol: string::String,
         /// Number of decimals used to get its user representation.
         /// For example, if `decimals` equals `2`, a balance of `505` coins should
         /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
@@ -123,14 +123,14 @@ module aptos_framework::coin {
     }
 
     /// Returns the name of the coin.
-    public fun name<CoinType>(): ascii::String acquires CoinInfo {
+    public fun name<CoinType>(): string::String acquires CoinInfo {
         let type_info = type_info::type_of<CoinType>();
         let coin_address = type_info::account_address(&type_info);
         borrow_global<CoinInfo<CoinType>>(coin_address).name
     }
 
     /// Returns the symbol of the coin, usually a shorter version of the name.
-    public fun symbol<CoinType>(): ascii::String acquires CoinInfo {
+    public fun symbol<CoinType>(): string::String acquires CoinInfo {
         let type_info = type_info::type_of<CoinType>();
         let coin_address = type_info::account_address(&type_info);
         borrow_global<CoinInfo<CoinType>>(coin_address).symbol
@@ -231,8 +231,8 @@ module aptos_framework::coin {
     /// about the coin (name, supply, etc.).
     public fun initialize<CoinType>(
         account: &signer,
-        name: ascii::String,
-        symbol: ascii::String,
+        name: string::String,
+        symbol: string::String,
         decimals: u64,
         monitor_supply: bool,
     ): (MintCapability<CoinType>, BurnCapability<CoinType>) {
@@ -388,8 +388,8 @@ module aptos_framework::coin {
         destination: &signer,
         amount: u64
     ) acquires CoinEvents, CoinInfo, CoinStore {
-        let name = ascii::string(b"Fake money");
-        let symbol = ascii::string(b"FMD");
+        let name = string::utf8(b"Fake money");
+        let symbol = string::utf8(b"FMD");
 
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             source,
@@ -416,8 +416,8 @@ module aptos_framework::coin {
         let source_addr = signer::address_of(&source);
         let destination_addr = signer::address_of(&destination);
 
-        let name = ascii::string(b"Fake money");
-        let symbol = ascii::string(b"FMD");
+        let name = string::utf8(b"Fake money");
+        let symbol = string::utf8(b"FMD");
 
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
@@ -463,8 +463,8 @@ module aptos_framework::coin {
 
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
-            ascii::string(b"Fake money"),
-            ascii::string(b"FMD"),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
             1,
             false,
         );
@@ -496,8 +496,8 @@ module aptos_framework::coin {
     public fun fail_initialize(source: signer) {
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
-            ascii::string(b"Fake money"),
-            ascii::string(b"FMD"),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
             1,
             true,
         );
@@ -519,8 +519,8 @@ module aptos_framework::coin {
 
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
-            ascii::string(b"Fake money"),
-            ascii::string(b"FMD"),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
             1,
             true,
         );
@@ -545,8 +545,8 @@ module aptos_framework::coin {
 
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
-            ascii::string(b"Fake money"),
-            ascii::string(b"FMD"),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
             1,
             true
         );
@@ -574,8 +574,8 @@ module aptos_framework::coin {
     ) acquires CoinInfo {
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
-            ascii::string(b"Fake money"),
-            ascii::string(b"FMD"),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
             1,
             true,
         );
@@ -597,8 +597,8 @@ module aptos_framework::coin {
 
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
-            ascii::string(b"Fake money"),
-            ascii::string(b"FMD"),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
             1,
             true
         );
@@ -627,8 +627,8 @@ module aptos_framework::coin {
         assert!(!is_coin_initialized<FakeMoney>(), 0);
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
-            ascii::string(b"Fake money"),
-            ascii::string(b"FMD"),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
             1,
             true
         );
