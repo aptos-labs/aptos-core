@@ -80,7 +80,7 @@ impl StateComputer for MockStateComputer {
                 .ok_or_else(|| format_err!("Cannot find block"))?;
             let mut payload_txns = self
                 .data_manager
-                .get_data(payload, LogicalTime::new(block.epoch(), block.round()))
+                .get_data(block.block())
                 .await?;
             txns.append(&mut payload_txns);
         }
