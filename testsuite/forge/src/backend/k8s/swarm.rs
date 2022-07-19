@@ -205,7 +205,7 @@ impl Swarm for K8sSwarm {
 
 /// Amount of time to wait for genesis to complete
 pub fn k8s_wait_genesis_strategy() -> impl Iterator<Item = Duration> {
-    ExponentWithLimitDelay::new(1000, 10 * 1000, 3 * 60 * 1000)
+    ExponentWithLimitDelay::new(1000, 10 * 1000, 10 * 60 * 1000)
 }
 
 /// Amount of time to wait for nodes to respond on the REST API
