@@ -291,12 +291,6 @@ impl BufferManager {
                 return;
             }
         };
-        // if this batch of blocks are all suffix blocks (reconfiguration block is in one of previous batch)
-        // we pause the execution from here and wait for the reconfiguration to be committed.
-        if executed_blocks.first().unwrap().is_reconfiguration_suffix() {
-            debug!("Ignore reconfiguration suffix execution, waiting for epoch to be committed");
-            return;
-        }
         debug!(
             "Receive executed response {}",
             executed_blocks.last().unwrap().block_info()
