@@ -16,6 +16,7 @@ mod move_types;
 mod response;
 mod table;
 mod transaction;
+mod wrappers;
 
 pub use account::AccountData;
 pub use address::Address;
@@ -43,3 +44,4 @@ pub use transaction::{
     TransactionSigningMessage, UserCreateSigningMessageRequest, UserTransaction,
     UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
 };
+pub use wrappers::IdentifierWrapper;

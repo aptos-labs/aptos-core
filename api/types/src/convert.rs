@@ -166,7 +166,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     arguments: json_args,
                     function: ScriptFunctionId {
                         module: module.into(),
-                        name: function,
+                        name: function.into(),
                     },
                     type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
                 })
@@ -353,7 +353,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 let module = function.module.clone();
                 let code = self.inner.get_module(&module.clone().into())? as Rc<dyn Bytecode>;
                 let func = code
-                    .find_script_function(function.name.as_ident_str())
+                    .find_script_function(function.name.0.as_ident_str())
                     .ok_or_else(|| format_err!("could not find script function by {}", function))?;
                 ensure!(
                     func.generic_type_params.len() == type_arguments.len(),
@@ -370,7 +370,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
 
                 Target::ScriptFunction(ScriptFunction::new(
                     module.into(),
-                    function.name,
+                    function.name.into(),
                     type_arguments
                         .into_iter()
                         .map(|v| v.try_into())
