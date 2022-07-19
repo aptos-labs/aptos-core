@@ -17,6 +17,8 @@ use aptos_rest_client::{Response, Transaction};
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use async_trait::async_trait;
 use clap::Parser;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 use std::{
     path::PathBuf,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -509,5 +511,47 @@ async fn get_resource_migration(
         Ok(response)
     } else {
         Ok(client.get_resource(address, new_resource).await?)
+    }
+}
+
+/// Run local testnet
+#[derive(Parser)]
+pub struct RunLocalTestnet {
+    /// An overridable config for the test node
+    #[clap(long, parse(from_os_str))]
+    config_path: Option<PathBuf>,
+    /// The directory to save all files for the node
+    #[clap(long, parse(from_os_str), default_value = "/opt/aptos")]
+    node_dir: PathBuf,
+    /// Randomize ports rather than using defaults of 8080
+    #[clap(long)]
+    random_ports: bool,
+    /// Random seed for key generation in test mode
+    #[clap(long, parse(try_from_str = FromHex::from_hex))]
+    seed: Option<[u8; 32]>,
+}
+
+#[async_trait]
+impl CliCommand<()> for RunLocalTestnet {
+    fn command_name(&self) -> &'static str {
+        "RunLocalTestnet"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<()> {
+        let rng = self
+            .seed
+            .map(StdRng::from_seed)
+            .unwrap_or_else(StdRng::from_entropy);
+
+        aptos_node::load_test_environment(
+            self.config_path,
+            self.node_dir,
+            self.random_ports,
+            false,
+            cached_framework_packages::module_blobs().to_vec(),
+            rng,
+        );
+
+        Ok(())
     }
 }

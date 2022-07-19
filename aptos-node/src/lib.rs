@@ -70,9 +70,16 @@ const MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE: usize = 1_024;
 #[derive(Clone, Debug, Parser)]
 #[clap(name = "Aptos Node", author, version)]
 pub struct AptosNodeArgs {
-    /// Path to node configuration file
-    #[clap(short = 'f', long, required_unless = "test")]
+    /// Path to node configuration file (or template for local test mode)
+    #[clap(short = 'f', long, parse(from_os_str), required_unless = "test")]
     config: Option<PathBuf>,
+
+    /// Directory to run test mode out of
+    ///
+    /// Repeated runs will start up from previous state
+    #[clap(long, parse(from_os_str), requires("test"))]
+    test_dir: Option<PathBuf>,
+
     /// Enable to run a single validator node testnet
     #[clap(long)]
     test: bool,
@@ -114,6 +121,7 @@ impl AptosNodeArgs {
             };
             load_test_environment(
                 self.config,
+                self.test_dir,
                 self.random_ports,
                 self.lazy,
                 genesis_modules,
@@ -191,6 +199,7 @@ const EPOCH_LENGTH_SECS: u64 = 60;
 
 pub fn load_test_environment<R>(
     config_path: Option<PathBuf>,
+    test_dir: Option<PathBuf>,
     random_ports: bool,
     lazy: bool,
     genesis_modules: Vec<Vec<u8>>,
@@ -198,35 +207,38 @@ pub fn load_test_environment<R>(
 ) where
     R: ::rand::RngCore + ::rand::CryptoRng,
 {
-    let config_temp_path = aptos_temppath::TempPath::new();
-
-    let (try_load, config_path) = if let Some(config_path) = config_path {
-        (
-            config_path.join("0").join("node.yaml").exists(),
-            config_path,
-        )
+    // If there wasn't a testnet directory given, create a temp one
+    let test_dir = if let Some(test_dir) = test_dir {
+        test_dir
     } else {
-        (false, config_temp_path.as_ref().to_path_buf())
+        aptos_temppath::TempPath::new().as_ref().to_path_buf()
     };
 
+    // Create the directories for the node
     std::fs::DirBuilder::new()
         .recursive(true)
-        .create(&config_path)
+        .create(&test_dir)
         .unwrap();
+    let test_dir = test_dir.canonicalize().unwrap();
 
-    let config_path = config_path.canonicalize().unwrap();
+    // The validator builder puts the first node in the 0 directory
+    let validator_config_path = test_dir.join("0").join("node.yaml");
+    let aptos_root_key_path = test_dir.join("mint.key");
 
-    let validator_config_path = config_path.join("0").join("node.yaml");
-    let aptos_root_key_path = config_path.join("mint.key");
-
-    let config = if try_load {
+    // If there's already a config, use it
+    let config = if validator_config_path.exists() {
         NodeConfig::load(&validator_config_path).expect("Unable to load config:")
     } else {
-        // Build a single validator network
-        let mut maybe_config = PathBuf::from(&config_path);
-        maybe_config.push("validator_node_template.yaml");
-        let mut template = NodeConfig::load_config(maybe_config)
-            .unwrap_or_else(|_| NodeConfig::default_for_validator());
+        // Build a single validator network with a generated config
+        let mut template = NodeConfig::default_for_validator();
+
+        // If a config path was provided, use that as the template
+        if let Some(config_path) = config_path {
+            if let Ok(config) = NodeConfig::load_config(config_path) {
+                template = config;
+            }
+        }
+
         template.logger.level = Level::Debug;
         // enable REST and JSON-RPC API
         template.api.address = format!("0.0.0.0:{}", template.api.address.port())
@@ -235,11 +247,13 @@ pub fn load_test_environment<R>(
         if lazy {
             template.consensus.quorum_store_poll_count = u64::MAX;
         }
+
+        // Build genesis and validator node
         let now_secs = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        let builder = aptos_genesis::builder::Builder::new(&config_path, genesis_modules)
+        let builder = aptos_genesis::builder::Builder::new(&test_dir, genesis_modules)
             .unwrap()
             .with_allow_new_validators(true)
             .with_epoch_duration_secs(EPOCH_LENGTH_SECS)
@@ -251,12 +265,13 @@ pub fn load_test_environment<R>(
 
         let (root_key, _genesis, genesis_waypoint, validators) = builder.build(rng).unwrap();
 
+        // Write the mint key to disk
         let serialized_keys = bcs::to_bytes(&root_key).unwrap();
         let mut key_file = std::fs::File::create(&aptos_root_key_path).unwrap();
         key_file.write_all(&serialized_keys).unwrap();
 
         // Build a waypoint file so that clients / docker can grab it easily
-        let waypoint_file_path = config_path.join("waypoint.txt");
+        let waypoint_file_path = test_dir.join("waypoint.txt");
         std::io::Write::write_all(
             &mut std::fs::File::create(&waypoint_file_path).unwrap(),
             genesis_waypoint.to_string().as_bytes(),
@@ -267,11 +282,11 @@ pub fn load_test_environment<R>(
     };
 
     // Prepare log file since we cannot automatically route logs to stderr
-    let log_file = config_path.join("validator.log");
+    let log_file = test_dir.join("validator.log");
 
     println!("Completed generating configuration:");
     println!("\tLog file: {:?}", log_file);
-    println!("\tConfig path: {:?}", config_path);
+    println!("\tTest dir: {:?}", test_dir);
     println!("\tAptos root key path: {:?}", aptos_root_key_path);
     println!("\tWaypoint: {}", config.base.waypoint.genesis_waypoint());
     println!("\tChainId: {}", ChainId::test());

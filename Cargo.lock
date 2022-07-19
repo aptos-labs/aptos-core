@@ -148,6 +148,7 @@ dependencies = [
  "aptos-keygen",
  "aptos-logger",
  "aptos-module-verifier",
+ "aptos-node",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-secure-storage",
