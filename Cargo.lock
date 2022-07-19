@@ -248,6 +248,7 @@ dependencies = [
  "aptos-transaction-builder",
  "aptos-types",
  "aptos-vm",
+ "async-trait",
  "bcs",
  "hex",
  "mime",

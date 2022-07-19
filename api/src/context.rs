@@ -16,7 +16,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix},
+    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
     transaction::{SignedTransaction, TransactionWithProof, Version},
     write_set::WriteOp,
 };
@@ -24,7 +24,7 @@ use aptos_vm::data_cache::{IntoMoveResolver, RemoteStorageOwned};
 use futures::{channel::oneshot, SinkExt};
 use move_deps::move_core_types::ident_str;
 use serde::{Deserialize, Serialize};
-use std::{convert::Infallible, sync::Arc};
+use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
     DbReader, Order,
@@ -113,16 +113,21 @@ impl Context {
             .get_state_value(state_key)
     }
 
+    pub fn get_state_values(
+        &self,
+        address: AccountAddress,
+        version: u64,
+    ) -> Result<HashMap<StateKey, StateValue>> {
+        self.db
+            .get_state_values_by_key_prefix(&StateKeyPrefix::from(address), version)
+    }
+
     pub fn get_account_state(
         &self,
         address: AccountAddress,
         version: u64,
     ) -> Result<Option<AccountState>> {
-        AccountState::from_access_paths_and_values(
-            &self
-                .db
-                .get_state_values_by_key_prefix(&StateKeyPrefix::from(address), version)?,
-        )
+        AccountState::from_access_paths_and_values(&self.get_state_values(address, version)?)
     }
 
     pub fn get_block_timestamp(&self, version: u64) -> Result<u64> {
@@ -198,7 +203,7 @@ impl Context {
                     if path.address == CORE_CODE_ADDRESS && typ == block_metadata_type {
                         if let WriteOp::Value(value) = op {
                             if let Ok(mut resource) = converter.try_into_resource(&typ, value) {
-                                if let Some(value) = resource.data.0.remove(height_id) {
+                                if let Some(value) = resource.data.0.remove(&height_id.into()) {
                                     if let Ok(height) = serde_json::from_value::<U64>(value) {
                                         return Some(height.0);
                                     }

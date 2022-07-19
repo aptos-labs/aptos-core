@@ -6,6 +6,8 @@ use move_deps::move_core_types;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 
+use crate::impl_poem_type;
+
 #[derive(Clone, Debug, PartialEq, Copy)]
 pub struct Address(AccountAddress);
 
@@ -74,6 +76,8 @@ impl<'de> Deserialize<'de> for Address {
         address.parse().map_err(D::Error::custom)
     }
 }
+
+impl_poem_type!(Address);
 
 #[cfg(test)]
 mod tests {
