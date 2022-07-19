@@ -40,7 +40,7 @@ pub fn transaction_context_natives(table_addr: AccountAddress) -> NativeFunction
     native_functions::make_table(
         table_addr,
         &[(
-            "TransactionContext",
+            "transaction_context",
             "get_script_hash",
             native_get_script_hash,
         )],
@@ -65,7 +65,7 @@ pub fn test_transaction_context_natives(table_addr: AccountAddress) -> NativeFun
     native_functions::make_table(
         table_addr,
         &[(
-            "TransactionContext",
+            "transaction_context",
             "get_script_hash",
             test_native_get_script_hash,
         )],

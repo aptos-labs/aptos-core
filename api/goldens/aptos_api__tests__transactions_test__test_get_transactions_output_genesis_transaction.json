@@ -15,7 +15,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::Account::Account",
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
             "self_address": "0x1",
@@ -1018,7 +1018,7 @@
                   },
                   {
                     "name": "new_block_events",
-                    "type": "0x1::Event::EventHandle<0x1::Block::NewBlockEvent>"
+                    "type": "0x1::event::EventHandle<0x1::block::NewBlockEvent>"
                   }
                 ]
               },
@@ -1345,7 +1345,7 @@
                 ],
                 "params": [
                   "&signer",
-                  "0x1::Coin::Coin<T0>"
+                  "0x1::coin::Coin<T0>"
                 ],
                 "return": []
               },
@@ -1372,7 +1372,7 @@
                 ],
                 "params": [
                   "address",
-                  "0x1::Coin::Coin<T0>"
+                  "0x1::coin::Coin<T0>"
                 ],
                 "return": []
               },
@@ -1385,7 +1385,7 @@
                   }
                 ],
                 "params": [
-                  "0x1::Coin::Coin<T0>"
+                  "0x1::coin::Coin<T0>"
                 ],
                 "return": []
               },
@@ -1398,11 +1398,11 @@
                   }
                 ],
                 "params": [
-                  "&mut 0x1::Coin::Coin<T0>",
+                  "&mut 0x1::coin::Coin<T0>",
                   "u64"
                 ],
                 "return": [
-                  "0x1::Coin::Coin<T0>"
+                  "0x1::coin::Coin<T0>"
                 ]
               },
               {
@@ -1444,8 +1444,8 @@
                   }
                 ],
                 "params": [
-                  "&mut 0x1::Coin::Coin<T0>",
-                  "0x1::Coin::Coin<T0>"
+                  "&mut 0x1::coin::Coin<T0>",
+                  "0x1::coin::Coin<T0>"
                 ],
                 "return": []
               },
@@ -1540,7 +1540,7 @@
                   }
                 ],
                 "params": [
-                  "&0x1::Coin::Coin<T0>"
+                  "&0x1::coin::Coin<T0>"
                 ],
                 "return": [
                   "u64"
@@ -1559,7 +1559,7 @@
                   "u64"
                 ],
                 "return": [
-                  "0x1::Coin::Coin<T0>"
+                  "0x1::coin::Coin<T0>"
                 ]
               },
               {
@@ -1572,7 +1572,7 @@
                 ],
                 "params": [],
                 "return": [
-                  "0x1::Coin::Coin<T0>"
+                  "0x1::coin::Coin<T0>"
                 ]
               }
             ],
@@ -1627,7 +1627,7 @@
                 "fields": [
                   {
                     "name": "register_events",
-                    "type": "0x1::Event::EventHandle<0x1::Coin::RegisterEvent>"
+                    "type": "0x1::event::EventHandle<0x1::coin::RegisterEvent>"
                   }
                 ]
               },
@@ -1677,15 +1677,15 @@
                 "fields": [
                   {
                     "name": "coin",
-                    "type": "0x1::Coin::Coin<T0>"
+                    "type": "0x1::coin::Coin<T0>"
                   },
                   {
                     "name": "deposit_events",
-                    "type": "0x1::Event::EventHandle<0x1::Coin::DepositEvent>"
+                    "type": "0x1::event::EventHandle<0x1::coin::DepositEvent>"
                   },
                   {
                     "name": "withdraw_events",
-                    "type": "0x1::Event::EventHandle<0x1::Coin::WithdrawEvent>"
+                    "type": "0x1::event::EventHandle<0x1::coin::WithdrawEvent>"
                   }
                 ]
               },
@@ -1736,7 +1736,7 @@
                 "fields": [
                   {
                     "name": "type_info",
-                    "type": "0x1::TypeInfo::TypeInfo"
+                    "type": "0x1::type_info::TypeInfo"
                   }
                 ]
               },
@@ -1958,7 +1958,7 @@
                   }
                 ],
                 "params": [
-                  "0x1::Event::EventHandle<T0>"
+                  "0x1::event::EventHandle<T0>"
                 ],
                 "return": []
               },
@@ -1974,7 +1974,7 @@
                   }
                 ],
                 "params": [
-                  "&mut 0x1::Event::EventHandle<T0>",
+                  "&mut 0x1::event::EventHandle<T0>",
                   "T0"
                 ],
                 "return": []
@@ -1991,7 +1991,7 @@
                   }
                 ],
                 "params": [
-                  "&0x1::Event::EventHandle<T0>"
+                  "&0x1::event::EventHandle<T0>"
                 ],
                 "return": [
                   "&0x1::guid::GUID"
@@ -2012,7 +2012,7 @@
                   "&signer"
                 ],
                 "return": [
-                  "0x1::Event::EventHandle<T0>"
+                  "0x1::event::EventHandle<T0>"
                 ]
               }
             ],
@@ -2039,7 +2039,7 @@
                   },
                   {
                     "name": "guid",
-                    "type": "0x1::Event::GUIDWrapper"
+                    "type": "0x1::event::GUIDWrapper"
                   }
                 ]
               },
@@ -3332,11 +3332,11 @@
             "address": "0x1",
             "name": "Reconfiguration",
             "friends": [
-              "0x1::Block",
+              "0x1::block",
               "0x1::ConsensusConfig",
               "0x1::TransactionPublishingOption",
               "0x1::VMConfig",
-              "0x1::Version"
+              "0x1::version"
             ],
             "exposed_functions": [
               {
@@ -3393,7 +3393,7 @@
                   },
                   {
                     "name": "events",
-                    "type": "0x1::Event::EventHandle<0x1::Reconfiguration::NewEpochEvent>"
+                    "type": "0x1::event::EventHandle<0x1::reconfiguration::NewEpochEvent>"
                   }
                 ]
               },
@@ -3519,7 +3519,7 @@
             "name": "Stake",
             "friends": [
               "0x1::Genesis",
-              "0x1::Reconfiguration"
+              "0x1::reconfiguration"
             ],
             "exposed_functions": [
               {
@@ -3622,7 +3622,7 @@
                   "address"
                 ],
                 "return": [
-                  "0x1::TestCoin::Coin"
+                  "0x1::test_coin::Coin"
                 ]
               }
             ],
@@ -3637,11 +3637,11 @@
                 "fields": [
                   {
                     "name": "coins",
-                    "type": "0x1::TestCoin::Coin"
+                    "type": "0x1::test_coin::Coin"
                   },
                   {
                     "name": "rewards",
-                    "type": "0x1::TestCoin::Coin"
+                    "type": "0x1::test_coin::Coin"
                   },
                   {
                     "name": "locked_until_secs",
@@ -4106,7 +4106,7 @@
                 "generic_type_params": [],
                 "params": [
                   "&signer",
-                  "0x1::TestCoin::Coin"
+                  "0x1::test_coin::Coin"
                 ],
                 "return": []
               },
@@ -4115,7 +4115,7 @@
                 "visibility": "friend",
                 "generic_type_params": [],
                 "params": [
-                  "0x1::TestCoin::Coin"
+                  "0x1::test_coin::Coin"
                 ],
                 "return": []
               },
@@ -4144,7 +4144,7 @@
                 "generic_type_params": [],
                 "params": [
                   "address",
-                  "0x1::TestCoin::Coin"
+                  "0x1::test_coin::Coin"
                 ],
                 "return": []
               },
@@ -4174,8 +4174,8 @@
                 "visibility": "public",
                 "generic_type_params": [],
                 "params": [
-                  "&mut 0x1::TestCoin::Coin",
-                  "0x1::TestCoin::Coin"
+                  "&mut 0x1::test_coin::Coin",
+                  "0x1::test_coin::Coin"
                 ],
                 "return": []
               },
@@ -4235,7 +4235,7 @@
                 "visibility": "public",
                 "generic_type_params": [],
                 "params": [
-                  "&0x1::TestCoin::Coin"
+                  "&0x1::test_coin::Coin"
                 ],
                 "return": [
                   "u64"
@@ -4250,7 +4250,7 @@
                   "u64"
                 ],
                 "return": [
-                  "0x1::TestCoin::Coin"
+                  "0x1::test_coin::Coin"
                 ]
               },
               {
@@ -4259,7 +4259,7 @@
                 "generic_type_params": [],
                 "params": [],
                 "return": [
-                  "0x1::TestCoin::Coin"
+                  "0x1::test_coin::Coin"
                 ]
               }
             ],
@@ -4274,7 +4274,7 @@
                 "fields": [
                   {
                     "name": "coin",
-                    "type": "0x1::TestCoin::Coin"
+                    "type": "0x1::test_coin::Coin"
                   }
                 ]
               },
@@ -4345,7 +4345,7 @@
                 "fields": [
                   {
                     "name": "inner",
-                    "type": "vector<0x1::TestCoin::DelegatedMintCapability>"
+                    "type": "vector<0x1::test_coin::DelegatedMintCapability>"
                   }
                 ]
               },
@@ -4412,11 +4412,11 @@
                 "fields": [
                   {
                     "name": "sent_events",
-                    "type": "0x1::Event::EventHandle<0x1::TestCoin::SentEvent>"
+                    "type": "0x1::event::EventHandle<0x1::test_coin::SentEvent>"
                   },
                   {
                     "name": "received_events",
-                    "type": "0x1::Event::EventHandle<0x1::TestCoin::ReceivedEvent>"
+                    "type": "0x1::event::EventHandle<0x1::test_coin::ReceivedEvent>"
                   }
                 ]
               }
@@ -4544,7 +4544,7 @@
                 "generic_type_params": [],
                 "params": [
                   "&signer",
-                  "0x1::Token::Token"
+                  "0x1::token::Token"
                 ],
                 "return": []
               },
@@ -4605,7 +4605,7 @@
                   "0x1::ascii::String"
                 ],
                 "return": [
-                  "0x1::Token::TokenId"
+                  "0x1::token::TokenId"
                 ]
               },
               {
@@ -4618,7 +4618,7 @@
                   "0x1::ascii::String"
                 ],
                 "return": [
-                  "0x1::Token::TokenId"
+                  "0x1::token::TokenId"
                 ]
               },
               {
@@ -4631,7 +4631,7 @@
                   "vector<u8>"
                 ],
                 "return": [
-                  "0x1::Token::TokenId"
+                  "0x1::token::TokenId"
                 ]
               },
               {
@@ -4667,7 +4667,7 @@
                 "generic_type_params": [],
                 "params": [
                   "&signer",
-                  "0x1::Token::Token"
+                  "0x1::token::Token"
                 ],
                 "return": []
               },
@@ -4677,7 +4677,7 @@
                 "generic_type_params": [],
                 "params": [
                   "address",
-                  "0x1::Token::Token"
+                  "0x1::token::Token"
                 ],
                 "return": []
               },
@@ -4687,7 +4687,7 @@
                 "generic_type_params": [],
                 "params": [
                   "address",
-                  "0x1::Token::Token"
+                  "0x1::token::Token"
                 ],
                 "return": []
               },
@@ -4698,7 +4698,7 @@
                 "params": [
                   "&signer",
                   "&signer",
-                  "&0x1::Token::TokenId",
+                  "&0x1::token::TokenId",
                   "u64"
                 ],
                 "return": []
@@ -4723,7 +4723,7 @@
                 "generic_type_params": [],
                 "params": [
                   "&signer",
-                  "&0x1::Token::TokenId"
+                  "&0x1::token::TokenId"
                 ],
                 "return": []
               },
@@ -4762,8 +4762,8 @@
                 "visibility": "public",
                 "generic_type_params": [],
                 "params": [
-                  "&mut 0x1::Token::Token",
-                  "0x1::Token::Token"
+                  "&mut 0x1::token::Token",
+                  "0x1::token::Token"
                 ],
                 "return": []
               },
@@ -4774,7 +4774,7 @@
                 "params": [
                   "&signer",
                   "address",
-                  "&0x1::Token::TokenId",
+                  "&0x1::token::TokenId",
                   "u64"
                 ],
                 "return": []
@@ -4784,10 +4784,10 @@
                 "visibility": "public",
                 "generic_type_params": [],
                 "params": [
-                  "&0x1::Token::Token"
+                  "&0x1::token::Token"
                 ],
                 "return": [
-                  "&0x1::Token::TokenId"
+                  "&0x1::token::TokenId"
                 ]
               },
               {
@@ -4796,7 +4796,7 @@
                 "generic_type_params": [],
                 "params": [
                   "&signer",
-                  "&0x1::Token::TokenId",
+                  "&0x1::token::TokenId",
                   "address",
                   "u64"
                 ],
@@ -4808,11 +4808,11 @@
                 "generic_type_params": [],
                 "params": [
                   "&signer",
-                  "&0x1::Token::TokenId",
+                  "&0x1::token::TokenId",
                   "u64"
                 ],
                 "return": [
-                  "0x1::Token::Token"
+                  "0x1::token::Token"
                 ]
               },
               {
@@ -4821,11 +4821,11 @@
                 "generic_type_params": [],
                 "params": [
                   "&signer",
-                  "&0x1::Token::TokenId",
+                  "&0x1::token::TokenId",
                   "u64"
                 ],
                 "return": [
-                  "0x1::Token::Token"
+                  "0x1::token::Token"
                 ]
               }
             ],
@@ -4840,7 +4840,7 @@
                 "fields": [
                   {
                     "name": "token_id",
-                    "type": "0x1::Token::TokenId"
+                    "type": "0x1::token::TokenId"
                   }
                 ]
               },
@@ -4884,19 +4884,19 @@
                 "fields": [
                   {
                     "name": "collections",
-                    "type": "0x1::Table::Table<0x1::ascii::String, 0x1::Token::Collection>"
+                    "type": "0x1::Table::Table<0x1::ascii::String, 0x1::token::Collection>"
                   },
                   {
                     "name": "token_data",
-                    "type": "0x1::Table::Table<0x1::Token::TokenId, 0x1::Token::TokenData>"
+                    "type": "0x1::Table::Table<0x1::token::TokenId, 0x1::token::TokenData>"
                   },
                   {
                     "name": "burn_capabilities",
-                    "type": "0x1::Table::Table<0x1::Token::TokenId, 0x1::Token::BurnCapability>"
+                    "type": "0x1::Table::Table<0x1::token::TokenId, 0x1::token::BurnCapability>"
                   },
                   {
                     "name": "mint_capabilities",
-                    "type": "0x1::Table::Table<0x1::Token::TokenId, 0x1::Token::MintCapability>"
+                    "type": "0x1::Table::Table<0x1::token::TokenId, 0x1::token::MintCapability>"
                   }
                 ]
               },
@@ -4911,7 +4911,7 @@
                 "fields": [
                   {
                     "name": "id",
-                    "type": "0x1::Token::TokenId"
+                    "type": "0x1::token::TokenId"
                   },
                   {
                     "name": "amount",
@@ -4929,7 +4929,7 @@
                 "fields": [
                   {
                     "name": "token_id",
-                    "type": "0x1::Token::TokenId"
+                    "type": "0x1::token::TokenId"
                   }
                 ]
               },
@@ -4943,7 +4943,7 @@
                 "fields": [
                   {
                     "name": "id",
-                    "type": "0x1::Token::TokenId"
+                    "type": "0x1::token::TokenId"
                   },
                   {
                     "name": "value",
@@ -5021,15 +5021,15 @@
                 "fields": [
                   {
                     "name": "tokens",
-                    "type": "0x1::Table::Table<0x1::Token::TokenId, 0x1::Token::Token>"
+                    "type": "0x1::Table::Table<0x1::token::TokenId, 0x1::token::Token>"
                   },
                   {
                     "name": "deposit_events",
-                    "type": "0x1::Event::EventHandle<0x1::Token::DepositEvent>"
+                    "type": "0x1::event::EventHandle<0x1::token::DepositEvent>"
                   },
                   {
                     "name": "withdraw_events",
-                    "type": "0x1::Event::EventHandle<0x1::Token::WithdrawEvent>"
+                    "type": "0x1::event::EventHandle<0x1::token::WithdrawEvent>"
                   }
                 ]
               },
@@ -5044,7 +5044,7 @@
                 "fields": [
                   {
                     "name": "id",
-                    "type": "0x1::Token::TokenId"
+                    "type": "0x1::token::TokenId"
                   },
                   {
                     "name": "amount",
@@ -5074,7 +5074,7 @@
                 "params": [
                   "&signer",
                   "address",
-                  "&0x1::Token::TokenId"
+                  "&0x1::token::TokenId"
                 ],
                 "return": []
               },
@@ -5098,7 +5098,7 @@
                 "params": [
                   "&signer",
                   "address",
-                  "&0x1::Token::TokenId"
+                  "&0x1::token::TokenId"
                 ],
                 "return": []
               },
@@ -5122,7 +5122,7 @@
                 "params": [
                   "&signer",
                   "address",
-                  "&0x1::Token::TokenId",
+                  "&0x1::token::TokenId",
                   "u64"
                 ],
                 "return": []
@@ -5153,7 +5153,7 @@
                 "fields": [
                   {
                     "name": "pending_claims",
-                    "type": "0x1::Table::Table<address, 0x1::Table::Table<0x1::Token::TokenId, 0x1::Token::Token>>"
+                    "type": "0x1::Table::Table<address, 0x1::Table::Table<0x1::token::TokenId, 0x1::token::Token>>"
                   }
                 ]
               }
@@ -5171,7 +5171,7 @@
             "address": "0x1",
             "name": "TransactionFee",
             "friends": [
-              "0x1::Account"
+              "0x1::account"
             ],
             "exposed_functions": [
               {
@@ -5179,7 +5179,7 @@
                 "visibility": "friend",
                 "generic_type_params": [],
                 "params": [
-                  "0x1::TestCoin::Coin"
+                  "0x1::test_coin::Coin"
                 ],
                 "return": []
               }
@@ -5280,7 +5280,7 @@
                 "visibility": "public",
                 "generic_type_params": [],
                 "params": [
-                  "&0x1::TypeInfo::TypeInfo"
+                  "&0x1::type_info::TypeInfo"
                 ],
                 "return": [
                   "address"
@@ -5291,7 +5291,7 @@
                 "visibility": "public",
                 "generic_type_params": [],
                 "params": [
-                  "&0x1::TypeInfo::TypeInfo"
+                  "&0x1::type_info::TypeInfo"
                 ],
                 "return": [
                   "vector<u8>"
@@ -5302,7 +5302,7 @@
                 "visibility": "public",
                 "generic_type_params": [],
                 "params": [
-                  "&0x1::TypeInfo::TypeInfo"
+                  "&0x1::type_info::TypeInfo"
                 ],
                 "return": [
                   "vector<u8>"
@@ -5318,7 +5318,7 @@
                 ],
                 "params": [],
                 "return": [
-                  "0x1::TypeInfo::TypeInfo"
+                  "0x1::type_info::TypeInfo"
                 ]
               }
             ],
@@ -5903,7 +5903,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::Account::Account",
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
             "self_address": "0xa550c18",
@@ -5916,7 +5916,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::Account::ChainSpecificAccountInfo",
+          "type": "0x1::account::ChainSpecificAccountInfo",
           "data": {
             "currency_code_required": false,
             "module_addr": "0x1",
@@ -5935,7 +5935,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::Block::BlockMetadata",
+          "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
             "height": "0",
@@ -5959,7 +5959,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::ChainId::ChainId",
+          "type": "0x1::chain_id::ChainId",
           "data": {
             "id": 4
           }
@@ -5992,7 +5992,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::Reconfiguration::Configuration",
+          "type": "0x1::reconfiguration::Configuration",
           "data": {
             "epoch": "1",
             "events": {
@@ -6042,7 +6042,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::TestCoin::Balance",
+          "type": "0x1::test_coin::Balance",
           "data": {
             "coin": {
               "value": "18446744073709551614"
@@ -6055,7 +6055,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::TestCoin::BurnCapability",
+          "type": "0x1::test_coin::BurnCapability",
           "data": {
             "dummy_field": false
           }
@@ -6066,7 +6066,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::TestCoin::CoinInfo",
+          "type": "0x1::test_coin::CoinInfo",
           "data": {
             "scaling_factor": "1000000"
           }
@@ -6077,7 +6077,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::TestCoin::Delegations",
+          "type": "0x1::test_coin::Delegations",
           "data": {
             "inner": []
           }
@@ -6088,7 +6088,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::TestCoin::MintCapability",
+          "type": "0x1::test_coin::MintCapability",
           "data": {
             "dummy_field": false
           }
@@ -6099,7 +6099,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::TestCoin::TransferEvents",
+          "type": "0x1::test_coin::TransferEvents",
           "data": {
             "received_events": {
               "counter": "0",
@@ -6183,7 +6183,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::Version::Version",
+          "type": "0x1::version::Version",
           "data": {
             "major": "4"
           }
@@ -6194,7 +6194,7 @@
         "address": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::Account::Account",
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x2d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9",
             "self_address": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
@@ -6297,7 +6297,7 @@
             "address": "0x1",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::Account::Account",
+              "type": "0x1::account::Account",
               "data": {
                 "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
                 "self_address": "0x1",
@@ -7300,7 +7300,7 @@
                       },
                       {
                         "name": "new_block_events",
-                        "type": "0x1::Event::EventHandle<0x1::Block::NewBlockEvent>"
+                        "type": "0x1::event::EventHandle<0x1::block::NewBlockEvent>"
                       }
                     ]
                   },
@@ -7627,7 +7627,7 @@
                     ],
                     "params": [
                       "&signer",
-                      "0x1::Coin::Coin<T0>"
+                      "0x1::coin::Coin<T0>"
                     ],
                     "return": []
                   },
@@ -7654,7 +7654,7 @@
                     ],
                     "params": [
                       "address",
-                      "0x1::Coin::Coin<T0>"
+                      "0x1::coin::Coin<T0>"
                     ],
                     "return": []
                   },
@@ -7667,7 +7667,7 @@
                       }
                     ],
                     "params": [
-                      "0x1::Coin::Coin<T0>"
+                      "0x1::coin::Coin<T0>"
                     ],
                     "return": []
                   },
@@ -7680,11 +7680,11 @@
                       }
                     ],
                     "params": [
-                      "&mut 0x1::Coin::Coin<T0>",
+                      "&mut 0x1::coin::Coin<T0>",
                       "u64"
                     ],
                     "return": [
-                      "0x1::Coin::Coin<T0>"
+                      "0x1::coin::Coin<T0>"
                     ]
                   },
                   {
@@ -7726,8 +7726,8 @@
                       }
                     ],
                     "params": [
-                      "&mut 0x1::Coin::Coin<T0>",
-                      "0x1::Coin::Coin<T0>"
+                      "&mut 0x1::coin::Coin<T0>",
+                      "0x1::coin::Coin<T0>"
                     ],
                     "return": []
                   },
@@ -7822,7 +7822,7 @@
                       }
                     ],
                     "params": [
-                      "&0x1::Coin::Coin<T0>"
+                      "&0x1::coin::Coin<T0>"
                     ],
                     "return": [
                       "u64"
@@ -7841,7 +7841,7 @@
                       "u64"
                     ],
                     "return": [
-                      "0x1::Coin::Coin<T0>"
+                      "0x1::coin::Coin<T0>"
                     ]
                   },
                   {
@@ -7854,7 +7854,7 @@
                     ],
                     "params": [],
                     "return": [
-                      "0x1::Coin::Coin<T0>"
+                      "0x1::coin::Coin<T0>"
                     ]
                   }
                 ],
@@ -7909,7 +7909,7 @@
                     "fields": [
                       {
                         "name": "register_events",
-                        "type": "0x1::Event::EventHandle<0x1::Coin::RegisterEvent>"
+                        "type": "0x1::event::EventHandle<0x1::coin::RegisterEvent>"
                       }
                     ]
                   },
@@ -7959,15 +7959,15 @@
                     "fields": [
                       {
                         "name": "coin",
-                        "type": "0x1::Coin::Coin<T0>"
+                        "type": "0x1::coin::Coin<T0>"
                       },
                       {
                         "name": "deposit_events",
-                        "type": "0x1::Event::EventHandle<0x1::Coin::DepositEvent>"
+                        "type": "0x1::event::EventHandle<0x1::coin::DepositEvent>"
                       },
                       {
                         "name": "withdraw_events",
-                        "type": "0x1::Event::EventHandle<0x1::Coin::WithdrawEvent>"
+                        "type": "0x1::event::EventHandle<0x1::coin::WithdrawEvent>"
                       }
                     ]
                   },
@@ -8018,7 +8018,7 @@
                     "fields": [
                       {
                         "name": "type_info",
-                        "type": "0x1::TypeInfo::TypeInfo"
+                        "type": "0x1::type_info::TypeInfo"
                       }
                     ]
                   },
@@ -8240,7 +8240,7 @@
                       }
                     ],
                     "params": [
-                      "0x1::Event::EventHandle<T0>"
+                      "0x1::event::EventHandle<T0>"
                     ],
                     "return": []
                   },
@@ -8256,7 +8256,7 @@
                       }
                     ],
                     "params": [
-                      "&mut 0x1::Event::EventHandle<T0>",
+                      "&mut 0x1::event::EventHandle<T0>",
                       "T0"
                     ],
                     "return": []
@@ -8273,7 +8273,7 @@
                       }
                     ],
                     "params": [
-                      "&0x1::Event::EventHandle<T0>"
+                      "&0x1::event::EventHandle<T0>"
                     ],
                     "return": [
                       "&0x1::guid::GUID"
@@ -8294,7 +8294,7 @@
                       "&signer"
                     ],
                     "return": [
-                      "0x1::Event::EventHandle<T0>"
+                      "0x1::event::EventHandle<T0>"
                     ]
                   }
                 ],
@@ -8321,7 +8321,7 @@
                       },
                       {
                         "name": "guid",
-                        "type": "0x1::Event::GUIDWrapper"
+                        "type": "0x1::event::GUIDWrapper"
                       }
                     ]
                   },
@@ -9614,11 +9614,11 @@
                 "address": "0x1",
                 "name": "Reconfiguration",
                 "friends": [
-                  "0x1::Block",
+                  "0x1::block",
                   "0x1::ConsensusConfig",
                   "0x1::TransactionPublishingOption",
                   "0x1::VMConfig",
-                  "0x1::Version"
+                  "0x1::version"
                 ],
                 "exposed_functions": [
                   {
@@ -9675,7 +9675,7 @@
                       },
                       {
                         "name": "events",
-                        "type": "0x1::Event::EventHandle<0x1::Reconfiguration::NewEpochEvent>"
+                        "type": "0x1::event::EventHandle<0x1::reconfiguration::NewEpochEvent>"
                       }
                     ]
                   },
@@ -9801,7 +9801,7 @@
                 "name": "Stake",
                 "friends": [
                   "0x1::Genesis",
-                  "0x1::Reconfiguration"
+                  "0x1::reconfiguration"
                 ],
                 "exposed_functions": [
                   {
@@ -9904,7 +9904,7 @@
                       "address"
                     ],
                     "return": [
-                      "0x1::TestCoin::Coin"
+                      "0x1::test_coin::Coin"
                     ]
                   }
                 ],
@@ -9919,11 +9919,11 @@
                     "fields": [
                       {
                         "name": "coins",
-                        "type": "0x1::TestCoin::Coin"
+                        "type": "0x1::test_coin::Coin"
                       },
                       {
                         "name": "rewards",
-                        "type": "0x1::TestCoin::Coin"
+                        "type": "0x1::test_coin::Coin"
                       },
                       {
                         "name": "locked_until_secs",
@@ -10388,7 +10388,7 @@
                     "generic_type_params": [],
                     "params": [
                       "&signer",
-                      "0x1::TestCoin::Coin"
+                      "0x1::test_coin::Coin"
                     ],
                     "return": []
                   },
@@ -10397,7 +10397,7 @@
                     "visibility": "friend",
                     "generic_type_params": [],
                     "params": [
-                      "0x1::TestCoin::Coin"
+                      "0x1::test_coin::Coin"
                     ],
                     "return": []
                   },
@@ -10426,7 +10426,7 @@
                     "generic_type_params": [],
                     "params": [
                       "address",
-                      "0x1::TestCoin::Coin"
+                      "0x1::test_coin::Coin"
                     ],
                     "return": []
                   },
@@ -10456,8 +10456,8 @@
                     "visibility": "public",
                     "generic_type_params": [],
                     "params": [
-                      "&mut 0x1::TestCoin::Coin",
-                      "0x1::TestCoin::Coin"
+                      "&mut 0x1::test_coin::Coin",
+                      "0x1::test_coin::Coin"
                     ],
                     "return": []
                   },
@@ -10517,7 +10517,7 @@
                     "visibility": "public",
                     "generic_type_params": [],
                     "params": [
-                      "&0x1::TestCoin::Coin"
+                      "&0x1::test_coin::Coin"
                     ],
                     "return": [
                       "u64"
@@ -10532,7 +10532,7 @@
                       "u64"
                     ],
                     "return": [
-                      "0x1::TestCoin::Coin"
+                      "0x1::test_coin::Coin"
                     ]
                   },
                   {
@@ -10541,7 +10541,7 @@
                     "generic_type_params": [],
                     "params": [],
                     "return": [
-                      "0x1::TestCoin::Coin"
+                      "0x1::test_coin::Coin"
                     ]
                   }
                 ],
@@ -10556,7 +10556,7 @@
                     "fields": [
                       {
                         "name": "coin",
-                        "type": "0x1::TestCoin::Coin"
+                        "type": "0x1::test_coin::Coin"
                       }
                     ]
                   },
@@ -10627,7 +10627,7 @@
                     "fields": [
                       {
                         "name": "inner",
-                        "type": "vector<0x1::TestCoin::DelegatedMintCapability>"
+                        "type": "vector<0x1::test_coin::DelegatedMintCapability>"
                       }
                     ]
                   },
@@ -10694,11 +10694,11 @@
                     "fields": [
                       {
                         "name": "sent_events",
-                        "type": "0x1::Event::EventHandle<0x1::TestCoin::SentEvent>"
+                        "type": "0x1::event::EventHandle<0x1::test_coin::SentEvent>"
                       },
                       {
                         "name": "received_events",
-                        "type": "0x1::Event::EventHandle<0x1::TestCoin::ReceivedEvent>"
+                        "type": "0x1::event::EventHandle<0x1::test_coin::ReceivedEvent>"
                       }
                     ]
                   }
@@ -10826,7 +10826,7 @@
                     "generic_type_params": [],
                     "params": [
                       "&signer",
-                      "0x1::Token::Token"
+                      "0x1::token::Token"
                     ],
                     "return": []
                   },
@@ -10887,7 +10887,7 @@
                       "0x1::ascii::String"
                     ],
                     "return": [
-                      "0x1::Token::TokenId"
+                      "0x1::token::TokenId"
                     ]
                   },
                   {
@@ -10900,7 +10900,7 @@
                       "0x1::ascii::String"
                     ],
                     "return": [
-                      "0x1::Token::TokenId"
+                      "0x1::token::TokenId"
                     ]
                   },
                   {
@@ -10913,7 +10913,7 @@
                       "vector<u8>"
                     ],
                     "return": [
-                      "0x1::Token::TokenId"
+                      "0x1::token::TokenId"
                     ]
                   },
                   {
@@ -10949,7 +10949,7 @@
                     "generic_type_params": [],
                     "params": [
                       "&signer",
-                      "0x1::Token::Token"
+                      "0x1::token::Token"
                     ],
                     "return": []
                   },
@@ -10959,7 +10959,7 @@
                     "generic_type_params": [],
                     "params": [
                       "address",
-                      "0x1::Token::Token"
+                      "0x1::token::Token"
                     ],
                     "return": []
                   },
@@ -10969,7 +10969,7 @@
                     "generic_type_params": [],
                     "params": [
                       "address",
-                      "0x1::Token::Token"
+                      "0x1::token::Token"
                     ],
                     "return": []
                   },
@@ -10980,7 +10980,7 @@
                     "params": [
                       "&signer",
                       "&signer",
-                      "&0x1::Token::TokenId",
+                      "&0x1::token::TokenId",
                       "u64"
                     ],
                     "return": []
@@ -11005,7 +11005,7 @@
                     "generic_type_params": [],
                     "params": [
                       "&signer",
-                      "&0x1::Token::TokenId"
+                      "&0x1::token::TokenId"
                     ],
                     "return": []
                   },
@@ -11044,8 +11044,8 @@
                     "visibility": "public",
                     "generic_type_params": [],
                     "params": [
-                      "&mut 0x1::Token::Token",
-                      "0x1::Token::Token"
+                      "&mut 0x1::token::Token",
+                      "0x1::token::Token"
                     ],
                     "return": []
                   },
@@ -11056,7 +11056,7 @@
                     "params": [
                       "&signer",
                       "address",
-                      "&0x1::Token::TokenId",
+                      "&0x1::token::TokenId",
                       "u64"
                     ],
                     "return": []
@@ -11066,10 +11066,10 @@
                     "visibility": "public",
                     "generic_type_params": [],
                     "params": [
-                      "&0x1::Token::Token"
+                      "&0x1::token::Token"
                     ],
                     "return": [
-                      "&0x1::Token::TokenId"
+                      "&0x1::token::TokenId"
                     ]
                   },
                   {
@@ -11078,7 +11078,7 @@
                     "generic_type_params": [],
                     "params": [
                       "&signer",
-                      "&0x1::Token::TokenId",
+                      "&0x1::token::TokenId",
                       "address",
                       "u64"
                     ],
@@ -11090,11 +11090,11 @@
                     "generic_type_params": [],
                     "params": [
                       "&signer",
-                      "&0x1::Token::TokenId",
+                      "&0x1::token::TokenId",
                       "u64"
                     ],
                     "return": [
-                      "0x1::Token::Token"
+                      "0x1::token::Token"
                     ]
                   },
                   {
@@ -11103,11 +11103,11 @@
                     "generic_type_params": [],
                     "params": [
                       "&signer",
-                      "&0x1::Token::TokenId",
+                      "&0x1::token::TokenId",
                       "u64"
                     ],
                     "return": [
-                      "0x1::Token::Token"
+                      "0x1::token::Token"
                     ]
                   }
                 ],
@@ -11122,7 +11122,7 @@
                     "fields": [
                       {
                         "name": "token_id",
-                        "type": "0x1::Token::TokenId"
+                        "type": "0x1::token::TokenId"
                       }
                     ]
                   },
@@ -11166,19 +11166,19 @@
                     "fields": [
                       {
                         "name": "collections",
-                        "type": "0x1::Table::Table<0x1::ascii::String, 0x1::Token::Collection>"
+                        "type": "0x1::Table::Table<0x1::ascii::String, 0x1::token::Collection>"
                       },
                       {
                         "name": "token_data",
-                        "type": "0x1::Table::Table<0x1::Token::TokenId, 0x1::Token::TokenData>"
+                        "type": "0x1::Table::Table<0x1::token::TokenId, 0x1::token::TokenData>"
                       },
                       {
                         "name": "burn_capabilities",
-                        "type": "0x1::Table::Table<0x1::Token::TokenId, 0x1::Token::BurnCapability>"
+                        "type": "0x1::Table::Table<0x1::token::TokenId, 0x1::token::BurnCapability>"
                       },
                       {
                         "name": "mint_capabilities",
-                        "type": "0x1::Table::Table<0x1::Token::TokenId, 0x1::Token::MintCapability>"
+                        "type": "0x1::Table::Table<0x1::token::TokenId, 0x1::token::MintCapability>"
                       }
                     ]
                   },
@@ -11193,7 +11193,7 @@
                     "fields": [
                       {
                         "name": "id",
-                        "type": "0x1::Token::TokenId"
+                        "type": "0x1::token::TokenId"
                       },
                       {
                         "name": "amount",
@@ -11211,7 +11211,7 @@
                     "fields": [
                       {
                         "name": "token_id",
-                        "type": "0x1::Token::TokenId"
+                        "type": "0x1::token::TokenId"
                       }
                     ]
                   },
@@ -11225,7 +11225,7 @@
                     "fields": [
                       {
                         "name": "id",
-                        "type": "0x1::Token::TokenId"
+                        "type": "0x1::token::TokenId"
                       },
                       {
                         "name": "value",
@@ -11303,15 +11303,15 @@
                     "fields": [
                       {
                         "name": "tokens",
-                        "type": "0x1::Table::Table<0x1::Token::TokenId, 0x1::Token::Token>"
+                        "type": "0x1::Table::Table<0x1::token::TokenId, 0x1::token::Token>"
                       },
                       {
                         "name": "deposit_events",
-                        "type": "0x1::Event::EventHandle<0x1::Token::DepositEvent>"
+                        "type": "0x1::event::EventHandle<0x1::token::DepositEvent>"
                       },
                       {
                         "name": "withdraw_events",
-                        "type": "0x1::Event::EventHandle<0x1::Token::WithdrawEvent>"
+                        "type": "0x1::event::EventHandle<0x1::token::WithdrawEvent>"
                       }
                     ]
                   },
@@ -11326,7 +11326,7 @@
                     "fields": [
                       {
                         "name": "id",
-                        "type": "0x1::Token::TokenId"
+                        "type": "0x1::token::TokenId"
                       },
                       {
                         "name": "amount",
@@ -11356,7 +11356,7 @@
                     "params": [
                       "&signer",
                       "address",
-                      "&0x1::Token::TokenId"
+                      "&0x1::token::TokenId"
                     ],
                     "return": []
                   },
@@ -11380,7 +11380,7 @@
                     "params": [
                       "&signer",
                       "address",
-                      "&0x1::Token::TokenId"
+                      "&0x1::token::TokenId"
                     ],
                     "return": []
                   },
@@ -11404,7 +11404,7 @@
                     "params": [
                       "&signer",
                       "address",
-                      "&0x1::Token::TokenId",
+                      "&0x1::token::TokenId",
                       "u64"
                     ],
                     "return": []
@@ -11435,7 +11435,7 @@
                     "fields": [
                       {
                         "name": "pending_claims",
-                        "type": "0x1::Table::Table<address, 0x1::Table::Table<0x1::Token::TokenId, 0x1::Token::Token>>"
+                        "type": "0x1::Table::Table<address, 0x1::Table::Table<0x1::token::TokenId, 0x1::token::Token>>"
                       }
                     ]
                   }
@@ -11453,7 +11453,7 @@
                 "address": "0x1",
                 "name": "TransactionFee",
                 "friends": [
-                  "0x1::Account"
+                  "0x1::account"
                 ],
                 "exposed_functions": [
                   {
@@ -11461,7 +11461,7 @@
                     "visibility": "friend",
                     "generic_type_params": [],
                     "params": [
-                      "0x1::TestCoin::Coin"
+                      "0x1::test_coin::Coin"
                     ],
                     "return": []
                   }
@@ -11562,7 +11562,7 @@
                     "visibility": "public",
                     "generic_type_params": [],
                     "params": [
-                      "&0x1::TypeInfo::TypeInfo"
+                      "&0x1::type_info::TypeInfo"
                     ],
                     "return": [
                       "address"
@@ -11573,7 +11573,7 @@
                     "visibility": "public",
                     "generic_type_params": [],
                     "params": [
-                      "&0x1::TypeInfo::TypeInfo"
+                      "&0x1::type_info::TypeInfo"
                     ],
                     "return": [
                       "vector<u8>"
@@ -11584,7 +11584,7 @@
                     "visibility": "public",
                     "generic_type_params": [],
                     "params": [
-                      "&0x1::TypeInfo::TypeInfo"
+                      "&0x1::type_info::TypeInfo"
                     ],
                     "return": [
                       "vector<u8>"
@@ -11600,7 +11600,7 @@
                     ],
                     "params": [],
                     "return": [
-                      "0x1::TypeInfo::TypeInfo"
+                      "0x1::type_info::TypeInfo"
                     ]
                   }
                 ],
@@ -12185,7 +12185,7 @@
             "address": "0xa550c18",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::Account::Account",
+              "type": "0x1::account::Account",
               "data": {
                 "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
                 "self_address": "0xa550c18",
@@ -12198,7 +12198,7 @@
             "address": "0xa550c18",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::Account::ChainSpecificAccountInfo",
+              "type": "0x1::account::ChainSpecificAccountInfo",
               "data": {
                 "currency_code_required": false,
                 "module_addr": "0x1",
@@ -12217,7 +12217,7 @@
             "address": "0xa550c18",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::Block::BlockMetadata",
+              "type": "0x1::block::BlockMetadata",
               "data": {
                 "epoch_internal": "86400000000",
                 "height": "0",
@@ -12241,7 +12241,7 @@
             "address": "0xa550c18",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::ChainId::ChainId",
+              "type": "0x1::chain_id::ChainId",
               "data": {
                 "id": 4
               }
@@ -12274,7 +12274,7 @@
             "address": "0xa550c18",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::Reconfiguration::Configuration",
+              "type": "0x1::reconfiguration::Configuration",
               "data": {
                 "epoch": "1",
                 "events": {
@@ -12324,7 +12324,7 @@
             "address": "0xa550c18",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::TestCoin::Balance",
+              "type": "0x1::test_coin::Balance",
               "data": {
                 "coin": {
                   "value": "18446744073709551614"
@@ -12337,7 +12337,7 @@
             "address": "0xa550c18",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::TestCoin::BurnCapability",
+              "type": "0x1::test_coin::BurnCapability",
               "data": {
                 "dummy_field": false
               }
@@ -12348,7 +12348,7 @@
             "address": "0xa550c18",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::TestCoin::CoinInfo",
+              "type": "0x1::test_coin::CoinInfo",
               "data": {
                 "scaling_factor": "1000000"
               }
@@ -12359,7 +12359,7 @@
             "address": "0xa550c18",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::TestCoin::Delegations",
+              "type": "0x1::test_coin::Delegations",
               "data": {
                 "inner": []
               }
@@ -12370,7 +12370,7 @@
             "address": "0xa550c18",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::TestCoin::MintCapability",
+              "type": "0x1::test_coin::MintCapability",
               "data": {
                 "dummy_field": false
               }
@@ -12381,7 +12381,7 @@
             "address": "0xa550c18",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::TestCoin::TransferEvents",
+              "type": "0x1::test_coin::TransferEvents",
               "data": {
                 "received_events": {
                   "counter": "0",
@@ -12465,7 +12465,7 @@
             "address": "0xa550c18",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::Version::Version",
+              "type": "0x1::version::Version",
               "data": {
                 "major": "4"
               }
@@ -12476,7 +12476,7 @@
             "address": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
             "state_key_hash": "",
             "data": {
-              "type": "0x1::Account::Account",
+              "type": "0x1::account::Account",
               "data": {
                 "authentication_key": "0x2d133ddd281bb6205558357cc6ac75661817e9aaeac3afebc32842759cbf7fa9",
                 "self_address": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
@@ -12573,7 +12573,7 @@
           {
             "key": "0x0400000000000000000000000000000000000000000000000000000000000000000000000a550c18",
             "sequence_number": "0",
-            "type": "0x1::Reconfiguration::NewEpochEvent",
+            "type": "0x1::reconfiguration::NewEpochEvent",
             "data": {
               "epoch": "1"
             }
@@ -12585,7 +12585,7 @@
       {
         "key": "0x0400000000000000000000000000000000000000000000000000000000000000000000000a550c18",
         "sequence_number": "0",
-        "type": "0x1::Reconfiguration::NewEpochEvent",
+        "type": "0x1::reconfiguration::NewEpochEvent",
         "data": {
           "epoch": "1"
         }

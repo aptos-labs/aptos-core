@@ -14,7 +14,7 @@ pub struct TimestampResource {
 }
 
 impl MoveStructType for TimestampResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("Timestamp");
+    const MODULE_NAME: &'static IdentStr = ident_str!("timestamp");
     const STRUCT_NAME: &'static IdentStr = ident_str!("CurrentTimeMicroseconds");
 }
 

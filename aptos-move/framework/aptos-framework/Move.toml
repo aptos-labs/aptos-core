@@ -4,9 +4,9 @@ version = "1.0.0"
 
 [addresses]
 std = "0x1"
-AptosFramework = "0x1"
-CoreResources = "0xA550C18"
-VMReserved = "0x0"
+aptos_framework = "0x1"
+core_resources = "0xA550C18"
+vm_reserved = "0x0"
 
 [dependencies]
 MoveStdlib = { local = "../move-stdlib" }

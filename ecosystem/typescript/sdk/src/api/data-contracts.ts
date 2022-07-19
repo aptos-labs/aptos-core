@@ -133,7 +133,7 @@ export interface Account {
 
 /**
  * Account resource is a Move struct value belongs to an account.
- * @example {"type":"0x1::AptosAccount::Balance<0x1::XDX::XDX>","data":{"coin":{"value":"8000000000"}}}
+ * @example {"type":"0x1::Aptos0x1::reconfigurationBalance<0x1::XDX::XDX>","data":{"coin":{"value":"8000000000"}}}
  */
 export interface AccountResource {
   /**

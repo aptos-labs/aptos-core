@@ -25,7 +25,7 @@ export class TokenClient {
   async createCollection(account: Account, name: string, description: string, uri: string) {
     const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: "0x1::Token::create_unlimited_collection_script",
+      function: "0x1::token::create_unlimited_collection_script",
       type_arguments: [],
       arguments: [
         Buffer.from(name).toString("hex"),
@@ -48,7 +48,7 @@ export class TokenClient {
   ) {
     const payload: { function: string; arguments: any[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: "0x1::Token::create_unlimited_token_script",
+      function: "0x1::token::create_unlimited_token_script",
       type_arguments: [],
       arguments: [
         Buffer.from(collection_name).toString("hex"),
@@ -75,7 +75,7 @@ export class TokenClient {
   ) {
     const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: "0x1::TokenTransfers::offer_script",
+      function: "0x1::tokenTransfers::offer_script",
       type_arguments: [],
       arguments: [
         receiver,
@@ -93,7 +93,7 @@ export class TokenClient {
   async claimToken(account: Account, sender: string, creator: string, collection_name: string, token_name: string) {
     const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: "0x1::TokenTransfers::claim_script",
+      function: "0x1::tokenTransfers::claim_script",
       type_arguments: [],
       arguments: [
         sender,
@@ -109,7 +109,7 @@ export class TokenClient {
   async cancelTokenOffer(account: Account, receiver: string, creator: string, token_creation_num: number) {
     const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: "0x1::TokenTransfers::cancel_offer_script",
+      function: "0x1::tokenTransfers::cancel_offer_script",
       type_arguments: [],
       arguments: [receiver, creator, token_creation_num.toString()],
     };
@@ -138,7 +138,7 @@ export class TokenClient {
   }
 
   async getTokenBalance(owner: string, creator: string, collection_name: string, token_name: string): Promise<number> {
-    const token_store = await this.restClient.accountResource(creator, "0x1::Token::TokenStore");
+    const token_store = await this.restClient.accountResource(creator, "0x1::token::TokenStore");
 
     const token_id = {
       creator: creator,
@@ -148,15 +148,15 @@ export class TokenClient {
 
     const token = await this.tableItem(
       token_store["data"]["tokens"]["handle"],
-      "0x1::Token::TokenId",
-      "0x1::Token::Token",
+      "0x1::token::TokenId",
+      "0x1::token::Token",
       token_id,
     );
     return token["value"];
   }
 
   async getTokenData(creator: string, collection_name: string, token_name: string): Promise<any> {
-    const collections = await this.restClient.accountResource(creator, "0x1::Token::Collections");
+    const collections = await this.restClient.accountResource(creator, "0x1::token::Collections");
 
     const token_id = {
       creator: creator,
@@ -166,8 +166,8 @@ export class TokenClient {
 
     return await this.tableItem(
       collections["data"]["token_data"]["handle"],
-      "0x1::Token::TokenId",
-      "0x1::Token::TokenData",
+      "0x1::token::TokenId",
+      "0x1::token::TokenData",
       token_id,
     );
   }

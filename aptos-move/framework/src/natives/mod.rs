@@ -27,29 +27,29 @@ pub mod status {
 
 pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
     const NATIVES: &[(&str, &str, NativeFunction)] = &[
-        ("Account", "create_address", account::native_create_address),
-        ("Account", "create_signer", account::native_create_signer),
+        ("account", "create_address", account::native_create_address),
+        ("account", "create_signer", account::native_create_signer),
         (
-            "Signature",
+            "signature",
             "bls12381_validate_pubkey",
             signature::native_bls12381_public_key_validation,
         ),
         (
-            "Signature",
+            "signature",
             "ed25519_validate_pubkey",
             signature::native_ed25519_publickey_validation,
         ),
         (
-            "Signature",
+            "signature",
             "ed25519_verify",
             signature::native_ed25519_signature_verification,
         ),
         (
-            "Signature",
+            "signature",
             "secp256k1_recover",
             signature::native_secp256k1_recover,
         ),
-        ("TypeInfo", "type_of", type_info::type_of),
+        ("type_info", "type_of", type_info::type_of),
         ("hash", "sip_hash", hash::native_sip_hash),
     ];
     NATIVES
@@ -63,5 +63,14 @@ pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
                 func,
             )
         })
+        .collect()
+}
+
+/// A temporary hack to patch Table -> table module name as long as it is not upgraded
+/// in the Move repo.
+pub fn patch_table_module(table: NativeFunctionTable) -> NativeFunctionTable {
+    table
+        .into_iter()
+        .map(|(m, _, f, i)| (m, Identifier::new("table").unwrap(), f, i))
         .collect()
 }

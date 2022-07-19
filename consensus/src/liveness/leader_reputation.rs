@@ -324,6 +324,7 @@ impl NewBlockEventAggregation {
 
 /// If candidate appear in the history, it's assigned active_weight otherwise inactive weight.
 pub struct ActiveInactiveHeuristic {
+    #[allow(unused)]
     author: Author,
     active_weight: u64,
     inactive_weight: u64,
@@ -393,6 +394,7 @@ impl ReputationHeuristic for ActiveInactiveHeuristic {
 ///  * and 33% (much less aggressive exclusion, with 1 failure for every 2 successes, should still reduce failed
 ///    rounds by at least 66%, and is enough to avoid byzantine attacks as well as the rest of the protocol)
 pub struct ProposerAndVoterHeuristic {
+    #[allow(unused)]
     author: Author,
     active_weight: u64,
     inactive_weight: u64,

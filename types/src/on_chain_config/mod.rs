@@ -119,8 +119,13 @@ pub trait ConfigStorage {
 /// that is stored in storage as a serialized byte array
 pub trait OnChainConfig: Send + Sync + DeserializeOwned {
     const ADDRESS: &'static str = "0x1";
-    const IDENTIFIER: &'static str;
-    const CONFIG_ID: ConfigID = ConfigID(Self::ADDRESS, Self::IDENTIFIER, Self::IDENTIFIER);
+    const MODULE_IDENTIFIER: &'static str;
+    const TYPE_IDENTIFIER: &'static str;
+    const CONFIG_ID: ConfigID = ConfigID(
+        Self::ADDRESS,
+        Self::MODULE_IDENTIFIER,
+        Self::TYPE_IDENTIFIER,
+    );
 
     // Single-round BCS deserialization from bytes to `Self`
     // This is the expected deserialization pattern if the Rust representation lives natively in Move.
@@ -232,7 +237,7 @@ impl Default for ConfigurationResource {
 }
 
 impl MoveStructType for ConfigurationResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("Reconfiguration");
+    const MODULE_NAME: &'static IdentStr = ident_str!("reconfiguration");
     const STRUCT_NAME: &'static IdentStr = ident_str!("Configuration");
 }
 

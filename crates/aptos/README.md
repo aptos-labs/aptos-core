@@ -457,7 +457,7 @@ $ ./aptos account list --query modules --account superuser
               },
               {
                 "name": "message_change_events",
-                "type": "0x1::Event::EventHandle<0x7bd2d264eec4088a11c41a7acbcd8ab2d2c887fa4ea1a3ab0d0b4a405ddfb156::Message::MessageChangeEvent>"
+                "type": "0x1::event::EventHandle<0x7bd2d264eec4088a11c41a7acbcd8ab2d2c887fa4ea1a3ab0d0b4a405ddfb156::Message::MessageChangeEvent>"
               }
             ]
           }
