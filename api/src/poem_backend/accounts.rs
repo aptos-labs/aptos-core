@@ -12,7 +12,7 @@ use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use anyhow::format_err;
 use aptos_api_types::{AccountData, Address, AsConverter, TransactionId};
-use aptos_api_types::{LedgerInfo, MoveResource};
+use aptos_api_types::{LedgerInfo, MoveModuleBytecode, MoveResource};
 use aptos_types::access_path::AccessPath;
 use aptos_types::account_config::AccountResource;
 use aptos_types::account_state::AccountState;
@@ -25,6 +25,9 @@ use poem::web::Accept;
 use poem_openapi::param::Query;
 use poem_openapi::payload::Json;
 use poem_openapi::{param::Path, OpenApi};
+
+// TODO: Make a helper that builds an AptosResponse from just an anyhow error,
+// that assumes that it's an internal error. We can use .context() add more info.
 
 pub struct AccountsApi {
     pub context: Arc<Context>,
@@ -75,6 +78,30 @@ impl AccountsApi {
         let accept_type = AcceptType::try_from(&accept)?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
         account.resources(&accept_type)
+    }
+
+    /// Get account modules
+    ///
+    /// This API returns account resources for a specific ledger version (AKA transaction version).
+    /// If not present, the latest version is used. <---- TODO Update this comment
+    /// The Aptos nodes prune account state history, via a configurable time window (link).
+    /// If the requested data has been pruned, the server responds with a 404
+    #[oai(
+        path = "/accounts/:address/modules",
+        method = "get",
+        operation_id = "get_account_modules",
+        tag = "ApiTags::General"
+    )]
+    async fn get_account_modules(
+        &self,
+        accept: Accept,
+        address: Path<Address>,
+        ledger_version: Query<Option<u64>>,
+    ) -> AptosResult<Vec<MoveModuleBytecode>> {
+        fail_point_poem("endpoint_get_account_resources")?;
+        let accept_type = AcceptType::try_from(&accept)?;
+        let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
+        account.modules(&accept_type)
     }
 }
 
@@ -163,6 +190,29 @@ impl Account {
             })?;
         AptosResponse::<Vec<MoveResource>>::try_from_rust_value(
             converted_resources,
+            &self.latest_ledger_info,
+            accept_type,
+        )
+    }
+
+    pub fn modules(self, accept_type: &AcceptType) -> AptosResult<Vec<MoveModuleBytecode>> {
+        let mut modules = Vec::new();
+        for module in self.account_state()?.into_modules() {
+            modules.push(
+                MoveModuleBytecode::new(module)
+                    .try_parse_abi()
+                    .map_err(|e| {
+                        AptosErrorResponse::InternalServerError(Json(
+                            AptosError::new(
+                                format_err!("Failed to parse move module ABI: {}", e).to_string(),
+                            )
+                            .error_code(AptosErrorCode::InvalidBcsInStorageError),
+                        ))
+                    })?,
+            );
+        }
+        AptosResponse::<Vec<MoveModuleBytecode>>::try_from_rust_value(
+            modules,
             &self.latest_ledger_info,
             accept_type,
         )
