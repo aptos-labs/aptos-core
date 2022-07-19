@@ -1,8 +1,8 @@
-module AptosFramework::AggregatorTable {
+module aptos_framework::AggregatorTable {
     use std::signer;
 
-    use AptosFramework::Aggregator::{Self, Aggregator};
-    use AptosFramework::Table::{Self, Table};
+    use aptos_framework::aggregator::{Self, Aggregator};
+    use aptos_framework::table::{Self, Table};
 
     /// When aggregator table has already been published. 
     const EAGGREGATOR_TABLE_EXISTS: u64 = 1500;
@@ -26,9 +26,9 @@ module AptosFramework::AggregatorTable {
         );
 
         let aggregator_table = AggregatorTable {
-            // Note that calling `Table::new()` only generates a new table
+            // Note that calling `table::new()` only generates a new table
             // handle.
-            table: Table::new()
+            table: table::new()
         };
         move_to(account, aggregator_table);
     }
@@ -46,21 +46,21 @@ module AptosFramework::AggregatorTable {
         
         let aggregator = new_aggregator(aggregator_table, /*limit=*/1000);
 
-        Aggregator::add(&mut aggregator, 12);
-        assert!(Aggregator::read(&aggregator) == 12, 0);
+        aggregator::add(&mut aggregator, 12);
+        assert!(aggregator::read(&aggregator) == 12, 0);
 
-        Aggregator::add(&mut aggregator, 3);
-        assert!(Aggregator::read(&aggregator) == 15, 0);
+        aggregator::add(&mut aggregator, 3);
+        assert!(aggregator::read(&aggregator) == 15, 0);
 
-        Aggregator::add(&mut aggregator, 3);
-        Aggregator::add(&mut aggregator, 2);
-        Aggregator::sub(&mut aggregator, 20);
-        assert!(Aggregator::read(&aggregator) == 0, 0);
+        aggregator::add(&mut aggregator, 3);
+        aggregator::add(&mut aggregator, 2);
+        aggregator::sub(&mut aggregator, 20);
+        assert!(aggregator::read(&aggregator) == 0, 0);
 
-        Aggregator::add(&mut aggregator, 1000);
-        Aggregator::sub(&mut aggregator, 1000);
+        aggregator::add(&mut aggregator, 1000);
+        aggregator::sub(&mut aggregator, 1000);
 
-        Aggregator::destroy(aggregator);
+        aggregator::destroy(aggregator);
     }
 
     #[test(account = @0xFF)]
@@ -74,9 +74,9 @@ module AptosFramework::AggregatorTable {
         let aggregator = new_aggregator(aggregator_table, /*limit=*/10);
 
         // Overflow!
-        Aggregator::add(&mut aggregator, 12);
+        aggregator::add(&mut aggregator, 12);
 
-        Aggregator::destroy(aggregator);
+        aggregator::destroy(aggregator);
     }
 
     #[test(account = @0xFF)]
@@ -90,9 +90,9 @@ module AptosFramework::AggregatorTable {
         let aggregator = new_aggregator(aggregator_table, /*limit=*/10);
 
         // Underflow!
-        Aggregator::sub(&mut aggregator, 100);
-        Aggregator::add(&mut aggregator, 100);
+        aggregator::sub(&mut aggregator, 100);
+        aggregator::add(&mut aggregator, 100);
 
-        Aggregator::destroy(aggregator);
+        aggregator::destroy(aggregator);
     }
 }

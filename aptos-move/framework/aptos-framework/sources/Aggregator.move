@@ -1,4 +1,4 @@
-module AptosFramework::Aggregator {
+module aptos_framework::aggregator {
 
     /// When aggregator's value (actual or accumulated) overflows (raised by
     /// native code).

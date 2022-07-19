@@ -370,11 +370,11 @@ pub fn aggregator_natives(aggregator_addr: AccountAddress) -> NativeFunctionTabl
     native_functions::make_table(
         aggregator_addr,
         &[
-            ("AggregatorTable", "new_aggregator", native_new_aggregator),
-            ("Aggregator", "add", native_add),
-            ("Aggregator", "read", native_read),
-            ("Aggregator", "sub", native_sub),
-            ("Aggregator", "remove_aggregator", native_remove_aggregator),
+            ("aggregator_table", "new_aggregator", native_new_aggregator),
+            ("aggregator", "add", native_add),
+            ("aggregator", "read", native_read),
+            ("aggregator", "sub", native_sub),
+            ("aggregator", "remove_aggregator", native_remove_aggregator),
         ],
     )
 }
