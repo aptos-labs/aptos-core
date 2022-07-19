@@ -3,6 +3,7 @@
 
 //! This file defines state store APIs that are related account state Merkle tree.
 
+use std::ops::Deref;
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{anyhow, ensure, format_err, Result};
@@ -191,10 +192,10 @@ impl StateStore {
             let mut buffered_state = self.buffered_state.lock();
             let latest_snapshot_state_view = CachedStateView::new(
                 StateViewId::Miscellaneous,
-                self.clone(),
+                self.deref(),
                 num_transactions,
                 buffered_state.current.clone(),
-                Arc::new(SyncProofFetcher::new(self.clone())),
+                SyncProofFetcher::new(self.deref()),
             )?;
             let write_sets = TransactionStore::new(Arc::clone(&self.ledger_db))
                 .get_write_sets(snapshot_next_version, num_transactions)?;

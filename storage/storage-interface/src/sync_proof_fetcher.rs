@@ -9,17 +9,17 @@ use aptos_types::{
     transaction::Version,
 };
 use parking_lot::RwLock;
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 /// An implementation of proof fetcher, which synchronously fetches proofs from the underlying persistent
 /// storage.
-pub struct SyncProofFetcher {
-    reader: Arc<dyn DbReader>,
+pub struct SyncProofFetcher<'a> {
+    reader: &'a dyn DbReader,
     state_proof_cache: RwLock<HashMap<HashValue, SparseMerkleProof>>,
 }
 
-impl SyncProofFetcher {
-    pub fn new(reader: Arc<dyn DbReader>) -> Self {
+impl<'a> SyncProofFetcher<'a> {
+    pub fn new(reader: &'a dyn DbReader) -> Self {
         Self {
             reader,
             state_proof_cache: RwLock::new(HashMap::new()),
@@ -27,7 +27,7 @@ impl SyncProofFetcher {
     }
 }
 
-impl ProofFetcher for SyncProofFetcher {
+impl<'a> ProofFetcher for SyncProofFetcher<'a> {
     fn fetch_state_value_and_proof(
         &self,
         state_key: &StateKey,

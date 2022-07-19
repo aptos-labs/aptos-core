@@ -8,7 +8,8 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 /// An implementation of proof fetcher, which just reads the state value without fetching the proof.
 /// This can be useful for mempool validation, when we don't need to fetch the proof.

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use std::ops::Deref;
 use std::{collections::BTreeMap, iter::once};
 
 use proptest::prelude::*;
@@ -387,7 +388,7 @@ fn apply_transaction_by_writeset(
         .collect();
 
     let state_view = ledger_view
-        .verified_state_view(StateViewId::Miscellaneous, db.reader.clone())
+        .verified_state_view(StateViewId::Miscellaneous, db.reader.deref())
         .unwrap();
 
     let chunk_output =
@@ -526,7 +527,7 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
         let out = ChunkOutput::by_transaction_execution::<MockVM>(
             vec![txn],
             ledger_view
-                .verified_state_view(StateViewId::Miscellaneous, db.reader.clone())
+                .verified_state_view(StateViewId::Miscellaneous, db.reader.deref())
                 .unwrap(),
         )
         .unwrap();
