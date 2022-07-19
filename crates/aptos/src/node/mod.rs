@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::types::PromptOptions;
+use crate::common::utils::prompt_yes_with_override;
 use crate::{
     common::{
         types::{
@@ -17,6 +19,7 @@ use aptos_rest_client::{Response, Transaction};
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use async_trait::async_trait;
 use clap::Parser;
+use hex::FromHex;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::{
@@ -517,18 +520,23 @@ async fn get_resource_migration(
 /// Run local testnet
 #[derive(Parser)]
 pub struct RunLocalTestnet {
-    /// An overridable config for the test node
+    /// An overridable config template for the test node
     #[clap(long, parse(from_os_str))]
     config_path: Option<PathBuf>,
     /// The directory to save all files for the node
-    #[clap(long, parse(from_os_str), default_value = "/opt/aptos")]
-    node_dir: PathBuf,
+    #[clap(long, parse(from_os_str), default_value = "/opt/aptos/testnet")]
+    test_dir: PathBuf,
     /// Randomize ports rather than using defaults of 8080
     #[clap(long)]
     random_ports: bool,
     /// Random seed for key generation in test mode
     #[clap(long, parse(try_from_str = FromHex::from_hex))]
     seed: Option<[u8; 32]>,
+    /// Clean the DB state at the beginning and start with a new DB
+    #[clap(long)]
+    clean_db_state: bool,
+    #[clap(flatten)]
+    prompt_options: PromptOptions,
 }
 
 #[async_trait]
@@ -543,9 +551,19 @@ impl CliCommand<()> for RunLocalTestnet {
             .map(StdRng::from_seed)
             .unwrap_or_else(StdRng::from_entropy);
 
+        let db_dir = self.test_dir.join("db");
+        if self.clean_db_state && db_dir.exists() {
+            prompt_yes_with_override(
+                "Are you sure you want to clean the database state?",
+                self.prompt_options,
+            )?;
+            std::fs::remove_dir_all(db_dir)
+                .map_err(|err| CliError::IO("Failed to delete db".to_string(), err))?;
+        }
+
         aptos_node::load_test_environment(
             self.config_path,
-            self.node_dir,
+            Some(self.test_dir),
             self.random_ports,
             false,
             cached_framework_packages::module_blobs().to_vec(),
