@@ -3,10 +3,10 @@
 
 //# publish
 module Alice::HelloWorld {
-    use AptosFramework::Signer;
+    use AptosFramework::signer;
     use AptosFramework::Coin;
     use AptosFramework::TestCoin::TestCoin;
-    use AptosFramework::ASCII::{Self, String};
+    use std::ascii::{Self, String};
 
     struct ModuleData has key, store {
         global_counter: u64,
@@ -16,7 +16,7 @@ module Alice::HelloWorld {
     fun init_module(sender: &signer) {
         move_to(
             sender,
-            ModuleData { global_counter: 0, state: ASCII::string(b"init") }
+            ModuleData { global_counter: 0, state: ascii::string(b"init") }
         );
     }
 
@@ -24,8 +24,8 @@ module Alice::HelloWorld {
         Coin::balance<TestCoin>(addr)
     }
 
-    public(script) fun hi(sender: &signer, msg: String) acquires ModuleData {
-        borrow_global_mut<ModuleData>(Signer::address_of(sender)).state = msg;
+    public entry fun hi(sender: &signer, msg: String) acquires ModuleData {
+        borrow_global_mut<ModuleData>(signer::address_of(sender)).state = msg;
     }
 }
 
