@@ -7,6 +7,7 @@ pub mod account;
 pub mod common;
 pub mod config;
 pub mod genesis;
+pub mod governance;
 pub mod move_tool;
 pub mod node;
 pub mod op;
