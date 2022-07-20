@@ -5,17 +5,14 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use super::accept_type::AcceptType;
+use super::accounts::Account;
 use super::page::Page;
-use super::{
-    response::{AptosInternalResult, AptosResponseResult},
-    ApiTags, AptosResponse,
-};
+use super::{response::AptosResponseResult, ApiTags, AptosResponse};
 use super::{AptosError, AptosErrorCode, AptosErrorResponse};
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use anyhow::format_err;
-use aptos_api_types::EventKey;
-use aptos_api_types::LedgerInfo;
+use aptos_api_types::{Address, EventKey, IdentifierWrapper, MoveStructTagWrapper};
 use aptos_api_types::{AsConverter, Event};
 use poem::web::Accept;
 use poem_openapi::param::Query;
@@ -53,43 +50,62 @@ impl EventsApi {
         fail_point_poem("endpoint_get_events_by_event_key")?;
         let accept_type = AcceptType::try_from(&accept)?;
         let page = Page::new(start.0, limit.0);
-        let events = Events::new(self.context.clone(), event_key.0)?;
-        events.list(&accept_type, page)
+        self.list(&accept_type, page, event_key.0)
+    }
+
+    /// Get events by event handle
+    ///
+    /// This API extracts event key from the account resource identified
+    /// by the `event_handle_struct` and `field_name`, then returns
+    /// events identified by the event key.
+    #[oai(
+        path = "/accounts/:address/events/:event_handle/:field_name",
+        method = "get",
+        operation_id = "get_events_by_event_handle",
+        tag = "ApiTags::General"
+    )]
+    async fn get_events_by_event_handle(
+        &self,
+        accept: Accept,
+        address: Path<Address>,
+        event_handle: Path<MoveStructTagWrapper>,
+        field_name: Path<IdentifierWrapper>,
+        start: Query<Option<u64>>,
+        limit: Query<Option<u16>>,
+    ) -> AptosResponseResult<Vec<Event>> {
+        fail_point_poem("endpoint_get_events_by_event_handle")?;
+        let accept_type = AcceptType::try_from(&accept)?;
+        let page = Page::new(start.0, limit.0);
+        let account = Account::new(self.context.clone(), address.0, None)?;
+        let key = account
+            .find_event_key(event_handle.0.into(), field_name.0.into())?
+            .into();
+        self.list(&accept_type, page, key)
     }
 }
 
-struct Events {
-    context: Arc<Context>,
-    event_key: EventKey,
-    latest_ledger_info: LedgerInfo,
-}
-
-impl Events {
-    pub fn new(context: Arc<Context>, event_key: EventKey) -> AptosInternalResult<Self> {
-        let latest_ledger_info = context.get_latest_ledger_info_poem()?;
-
-        Ok(Self {
-            context,
-            event_key,
-            latest_ledger_info,
-        })
-    }
-
-    pub fn list(self, accept_type: &AcceptType, page: Page) -> AptosResponseResult<Vec<Event>> {
+impl EventsApi {
+    fn list(
+        &self,
+        accept_type: &AcceptType,
+        page: Page,
+        event_key: EventKey,
+    ) -> AptosResponseResult<Vec<Event>> {
+        let latest_ledger_info = self.context.get_latest_ledger_info_poem()?;
         let contract_events = self
             .context
             .get_events(
-                &self.event_key.into(),
+                &event_key.into(),
                 page.start(0, u64::MAX)?,
                 page.limit()?,
-                self.latest_ledger_info.version(),
+                latest_ledger_info.version(),
             )
             // TODO: Previously this was a 500, but I'm making this a 400. I suspect
             // both could be true depending on the error. Make this more specific.
             .map_err(|e| {
                 AptosErrorResponse::BadRequest(Json(
                     AptosError::new(
-                        format_err!("Failed to find events by key {}: {}", self.event_key, e)
+                        format_err!("Failed to find events by key {}: {}", event_key, e)
                             .to_string(),
                     )
                     .error_code(AptosErrorCode::InvalidBcsInStorageError),
@@ -110,6 +126,6 @@ impl Events {
                 ))
             })?;
 
-        AptosResponse::try_from_rust_value(events, &self.latest_ledger_info, accept_type)
+        AptosResponse::try_from_rust_value(events, &latest_ledger_info, accept_type)
     }
 }

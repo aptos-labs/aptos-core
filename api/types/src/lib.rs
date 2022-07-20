@@ -44,4 +44,4 @@ pub use transaction::{
     TransactionSigningMessage, UserCreateSigningMessageRequest, UserTransaction,
     UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
 };
-pub use wrappers::IdentifierWrapper;
+pub use wrappers::{IdentifierWrapper, MoveStructTagWrapper};
