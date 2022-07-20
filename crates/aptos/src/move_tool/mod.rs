@@ -122,7 +122,7 @@ name = \"{}\"
 version = \"0.0.0\"
 
 [dependencies]
-AptosFramework = {{ git = \"https://github.com/aptos-labs/aptos-core.git\", subdir = \"aptos-move/framework/aptos-framework/\", rev = \"main\" }}
+AptosFramework = {{ git = \"https://github.com/aptos-labs/aptos-core.git\", subdir = \"aptos-move/framework/aptos-framework/\", rev = \"devnet\" }}
 
 [addresses]
 {}
