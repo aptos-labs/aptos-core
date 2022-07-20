@@ -22,7 +22,7 @@ import {
 import { bcsToBytes, Bytes, Deserializer, Serializer, Uint64, Uint8 } from "./bcs";
 import { ScriptABI, ScriptFunctionABI, TransactionScriptABI } from "./aptos_types/abi";
 import { HexString } from "../hex_string";
-import { argToTransactionArgument, parseTypeTag, serializeArg } from "./builder_utils";
+import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder_utils";
 
 const RAW_TRANSACTION_SALT = "APTOS::RawTransaction";
 const RAW_TRANSACTION_WITH_DATA_SALT = "APTOS::RawTransactionWithData";
@@ -226,7 +226,7 @@ export class TransactionBuilderABI {
 
     const senderAccount = sender instanceof HexString ? AccountAddress.fromHex(sender) : sender;
 
-    const typeTags = ty_tags.map((ty_arg) => parseTypeTag(ty_arg));
+    const typeTags = ty_tags.map((ty_arg) => new TypeTagParser(ty_arg).parseTypeTag());
 
     const expTimetampSec = BigInt(Math.floor(Date.now() / 1000) + Number(expSecFromNow));
 
