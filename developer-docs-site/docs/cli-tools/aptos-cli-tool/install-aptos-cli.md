@@ -5,13 +5,13 @@ id: "install-aptos-cli"
 
 # Install Aptos CLI
 
-The `aptos` tool is a command line interface (CLI) for debugging, development, and node operation.
+The `aptos` tool is a command line interface (CLI) for debugging, development, and node operations.
 This document describes how to install the `aptos` CLI tool. See [Use Aptos CLI](use-aptos-cli) for how to use the CLI.
 
 ## Install precompiled binary (easy mode)
 
 * Navigate to the [release page](https://github.com/aptos-labs/aptos-core/releases) for Aptos CLI.
-* Download the latest release for your computer.
+* Download the latest release for your platform.
 * Place this at a location for you to run it e.g. `~/bin/aptos` in Linux.
 * On Linux and Mac, make this executable `chmod +x ~/bin/aptos`.
 * Now type `~/bin/aptos help` to read help instructions.
