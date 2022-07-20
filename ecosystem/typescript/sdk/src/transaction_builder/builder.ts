@@ -18,6 +18,8 @@ import {
   Script,
   TransactionPayload,
   TransactionArgument,
+  TransactionPayloadScriptFunction,
+  TransactionPayloadScript,
 } from "./aptos_types";
 import { bcsToBytes, Bytes, Deserializer, Serializer, Uint64, Uint8 } from "./bcs";
 import { ScriptABI, ScriptFunctionABI, TransactionScriptABI } from "./aptos_types/abi";
@@ -154,6 +156,8 @@ export class TransactionBuilderABI {
    * @param builderConfig Configs for creating a raw transaction.
    */
   constructor(abis: Bytes[], builderConfig: ABIBuilderConfig) {
+    this.abiMap = new Map<string, ScriptABI>();
+
     abis.forEach((abi) => {
       const deserializer = new Deserializer(abi);
       const scriptABI = ScriptABI.deserialize(deserializer);
@@ -213,9 +217,9 @@ export class TransactionBuilderABI {
    * @example Below are valid value examples
    * ```
    * // Structs are in format `AccountAddress::ModuleName::StructName`
-   * 0x1::TestCoin::TestCoin
+   * 0x1::aptos_coin::AptosCoin
    * // Vectors are in format `vector<other_tag_string>`
-   * vector<0x1::TestCoin::TestCoin>
+   * vector<0x1::aptos_coin::AptosCoin>
    * bool
    * u8
    * u64
@@ -245,14 +249,16 @@ export class TransactionBuilderABI {
     if (scriptABI instanceof ScriptFunctionABI) {
       const funcABI = scriptABI as ScriptFunctionABI;
       const bcsArgs = TransactionBuilderABI.toBCSArgs(funcABI.args, args);
-      payload = new ScriptFunction(funcABI.module_name, new Identifier(funcABI.name), typeTags, bcsArgs);
+      payload = new TransactionPayloadScriptFunction(
+        new ScriptFunction(funcABI.module_name, new Identifier(funcABI.name), typeTags, bcsArgs),
+      );
     }
 
     if (scriptABI instanceof TransactionScriptABI) {
       const funcABI = scriptABI as TransactionScriptABI;
       const scriptArgs = TransactionBuilderABI.toTransactionArguments(funcABI.args, args);
 
-      payload = new Script(funcABI.code, typeTags, scriptArgs);
+      payload = new TransactionPayloadScript(new Script(funcABI.code, typeTags, scriptArgs));
     }
 
     if (payload) {
