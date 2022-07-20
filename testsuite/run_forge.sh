@@ -107,8 +107,8 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
     # this will pre-empt the existing forge test in the same namespace and ensures
     # we do not have any dangling test runners
     FORGE_POD_NAME=$FORGE_NAMESPACE
-    kubectl delete pod $FORGE_POD_NAME || true
-    kubectl wait --for=delete "pod/${FORGE_POD_NAME}" || true
+    kubectl delete pod -n default $FORGE_POD_NAME || true
+    kubectl wait -n default --for=delete "pod/${FORGE_POD_NAME}" || true
 
     specfile=$(mktemp)
     echo "Forge test-runner pod Spec : ${specfile}"
@@ -122,16 +122,16 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
         -e "s/{ENABLE_HAPROXY_ARGS}/${ENABLE_HAPROXY_ARGS}/g" \
         testsuite/forge-test-runner-template.yaml > ${specfile}
     
-    kubectl apply -f $specfile
+    kubectl apply -n default -f $specfile
 
     # wait for enough time for the pod to start and potentially new nodes to come online
-    kubectl wait --timeout=5m --for=condition=Ready "pod/${FORGE_POD_NAME}"
+    kubectl wait -n default --timeout=5m --for=condition=Ready "pod/${FORGE_POD_NAME}"
 
     # tail the logs and tee them for further parsing
-    kubectl logs -f $FORGE_POD_NAME | tee $FORGE_OUTPUT
+    kubectl logs -n default -f $FORGE_POD_NAME | tee $FORGE_OUTPUT
 
     # parse the pod status: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
-    forge_pod_status=$(kubectl get pod $FORGE_POD_NAME -o jsonpath="{.status.phase}")
+    forge_pod_status=$(kubectl get pod -n default $FORGE_POD_NAME -o jsonpath="{.status.phase}")
     echo "Forge pod status: ${forge_pod_status}"
     if [ "$forge_pod_status" = "Succeeded" ]; then
         FORGE_EXIT_CODE=0
