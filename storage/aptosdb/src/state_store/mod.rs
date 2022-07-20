@@ -3,6 +3,7 @@
 
 //! This file defines state store APIs that are related account state Merkle tree.
 
+use crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema;
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
@@ -25,6 +26,7 @@ use aptos_types::{
     transaction::Version,
 };
 use executor_types::in_memory_state_calculator::InMemoryStateCalculator;
+use rayon::prelude::*;
 use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::{collections::HashMap, sync::Arc};
 use storage_interface::{
@@ -35,7 +37,7 @@ use storage_interface::{
 use crate::{
     change_set::ChangeSet,
     schema::{stale_node_index::StaleNodeIndexSchema, state_value::StateValueSchema},
-    state_merkle_db::{add_node_batch, StateMerkleDb},
+    state_merkle_db::StateMerkleDb,
     AptosDbError, LedgerStore, TransactionStore, OTHER_TIMERS_SECONDS,
 };
 
@@ -342,25 +344,29 @@ impl StateStore {
                 .batch_put_value_set(value_set, node_hashes, base_version, version)
         }?;
 
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["serialize_jmt_commit"])
                 .start_timer();
 
-            add_node_batch(
-                &mut batch,
-                tree_update_batch
-                    .node_batch
-                    .iter()
-                    .flatten()
-                    .map(|(k, v)| (k, v)),
-            )?;
+            tree_update_batch
+                .node_batch
+                .iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .par_iter()
+                .with_min_len(128)
+                .map(|(node_key, node)| batch.put::<JellyfishMerkleNodeSchema>(node_key, node))
+                .collect::<Result<Vec<_>>>()?;
 
             tree_update_batch
                 .stale_node_index_batch
                 .iter()
                 .flatten()
+                .collect::<Vec<_>>()
+                .par_iter()
+                .with_min_len(128)
                 .map(|row| batch.put::<StaleNodeIndexSchema>(row, &()))
                 .collect::<Result<Vec<()>>>()?;
         }
