@@ -109,6 +109,7 @@ members = [
     "aptos-retrier",
     "aptos-rosetta-cli",
     "aptos-transaction-benchmarks",
+    "aptos-transactional-test-harness",
     "aptos-writeset-generator",
     "executor-benchmark",
     "executor-test-helpers",

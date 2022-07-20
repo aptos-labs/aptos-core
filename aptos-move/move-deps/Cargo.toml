@@ -28,6 +28,7 @@ move-stackless-bytecode-interpreter = { git = "https://github.com/move-language/
 move-stdlib = { git = "https://github.com/move-language/move", rev = "c51b11589554c6acfef15c74fca211def4ea0731" }
 move-symbol-pool = { git = "https://github.com/move-language/move", rev = "c51b11589554c6acfef15c74fca211def4ea0731" }
 move-table-extension = { git = "https://github.com/move-language/move", rev = "c51b11589554c6acfef15c74fca211def4ea0731" }
+move-transactional-test-runner = { git = "https://github.com/move-language/move", rev = "c51b11589554c6acfef15c74fca211def4ea0731" }
 move-unit-test = { git = "https://github.com/move-language/move", rev = "c51b11589554c6acfef15c74fca211def4ea0731" }
 move-vm-runtime = { git = "https://github.com/move-language/move", rev = "c51b11589554c6acfef15c74fca211def4ea0731" }
 move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "c51b11589554c6acfef15c74fca211def4ea0731" }

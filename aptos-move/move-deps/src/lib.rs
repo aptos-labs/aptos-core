@@ -20,6 +20,7 @@ pub use move_stackless_bytecode_interpreter;
 pub use move_stdlib;
 pub use move_symbol_pool;
 pub use move_table_extension;
+pub use move_transactional_test_runner;
 pub use move_unit_test;
 pub use move_vm_runtime;
 pub use move_vm_test_utils;
