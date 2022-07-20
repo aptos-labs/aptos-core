@@ -483,14 +483,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", namespace=~\"$namespace\", index=\"system_ttl\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "aptos_core_mempool_index_size{chain_name=~\"$chain_name\", namespace=~\"$namespace\", index=\"system_ttl\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", namespace=~\"$namespace\", index=\"system_ttl\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "aptos_core_mempool_index_size{chain_name=~\"$chain_name\", namespace=~\"$namespace\", index=\"system_ttl\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{job}}",
@@ -573,14 +573,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "core_mempool_txn_commit_latency_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} / core_mempool_txn_commit_latency_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "aptos_core_mempool_txn_commit_latency_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} / aptos_core_mempool_txn_commit_latency_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", kubernetes_pod_name=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "core_mempool_txn_commit_latency_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} / core_mempool_txn_commit_latency_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "expr": "aptos_core_mempool_txn_commit_latency_sum{chain_name=~\"$chain_name\", namespace=~\"$namespace\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"} / aptos_core_mempool_txn_commit_latency_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", job=~\".*fullnode.*\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}-{{job}}",

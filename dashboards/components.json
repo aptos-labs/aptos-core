@@ -1560,7 +1560,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\",kubernetes_pod_name=~\"$kubernetes_pod_name\",index=\"system_ttl\"}",
+          "expr": "aptos_core_mempool_index_size{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\",kubernetes_pod_name=~\"$kubernetes_pod_name\",index=\"system_ttl\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
