@@ -52,7 +52,7 @@ module aptos_framework::block {
     /// Update the epoch interval.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
     public fun update_epoch_interval(
-        _gov_proposal: GovernanceProposal,
+        _gov_proposal: &GovernanceProposal,
         new_epoch_interval: u64,
     ) acquires BlockMetadata {
         let block_metadata = borrow_global_mut<BlockMetadata>(@aptos_framework);
@@ -114,5 +114,15 @@ module aptos_framework::block {
     public fun get_current_block_height(): u64 acquires BlockMetadata {
         assert!(is_initialized(), errors::not_published(EBLOCK_METADATA));
         borrow_global<BlockMetadata>(@aptos_framework).height
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    public entry fun test_update_epoch_interval(aptos_framework: signer) acquires BlockMetadata {
+        use aptos_framework::governance_proposal;
+
+        initialize_block_metadata(&aptos_framework, 1);
+        assert!(borrow_global<BlockMetadata>(@aptos_framework).epoch_internal == 1, 0);
+        update_epoch_interval(&governance_proposal::create_test_proposal(), 2);
+        assert!(borrow_global<BlockMetadata>(@aptos_framework).epoch_internal == 2, 1);
     }
 }
