@@ -16,35 +16,35 @@ import {
   TypeTagVector,
 } from "./aptos_types";
 import { Serializer } from "./bcs";
-import { argToTransactionArgument, parseTypeTag, serializeArg } from "./builder_utils";
+import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder_utils";
 
 describe("BuilderUtils", () => {
   it("parses a bool TypeTag", async () => {
-    expect(parseTypeTag("bool") instanceof TypeTagBool).toBeTruthy();
+    expect(new TypeTagParser("bool").parseTypeTag() instanceof TypeTagBool).toBeTruthy();
   });
 
   it("parses a u8 TypeTag", async () => {
-    expect(parseTypeTag("u8") instanceof TypeTagU8).toBeTruthy();
+    expect(new TypeTagParser("u8").parseTypeTag() instanceof TypeTagU8).toBeTruthy();
   });
 
   it("parses a u64 TypeTag", async () => {
-    expect(parseTypeTag("u64") instanceof TypeTagU64).toBeTruthy();
+    expect(new TypeTagParser("u64").parseTypeTag() instanceof TypeTagU64).toBeTruthy();
   });
 
   it("parses a u128 TypeTag", async () => {
-    expect(parseTypeTag("u128") instanceof TypeTagU128).toBeTruthy();
+    expect(new TypeTagParser("u128").parseTypeTag() instanceof TypeTagU128).toBeTruthy();
   });
 
   it("parses a address TypeTag", async () => {
-    expect(parseTypeTag("address") instanceof TypeTagAddress).toBeTruthy();
+    expect(new TypeTagParser("address").parseTypeTag() instanceof TypeTagAddress).toBeTruthy();
   });
 
   it("parses a vector TypeTag", async () => {
-    const vectorAddress = parseTypeTag("vector<address>");
+    const vectorAddress = new TypeTagParser("vector<address>").parseTypeTag();
     expect(vectorAddress instanceof TypeTagVector).toBeTruthy();
     expect((vectorAddress as TypeTagVector).value instanceof TypeTagAddress).toBeTruthy();
 
-    const vectorU64 = parseTypeTag(" vector < u64 > ");
+    const vectorU64 = new TypeTagParser(" vector < u64 > ").parseTypeTag();
     expect(vectorU64 instanceof TypeTagVector).toBeTruthy();
     expect((vectorU64 as TypeTagVector).value instanceof TypeTagU64).toBeTruthy();
   });
@@ -55,13 +55,21 @@ describe("BuilderUtils", () => {
       expect(struct.value.module_name.value).toBe(moduleName);
       expect(struct.value.name.value).toBe(structName);
     };
-    const coin = parseTypeTag("0x1::TestCoin::Coin");
+    const coin = new TypeTagParser("0x1::TestCoin::Coin").parseTypeTag();
     expect(coin instanceof TypeTagStruct).toBeTruthy();
     assertStruct(coin as TypeTagStruct, "0x1", "TestCoin", "Coin");
 
-    const testCoin = parseTypeTag("0x1::Coin::CoinStore < 0x1::TestCoin::TestCoin1 ,  0x1::TestCoin::TestCoin2 > ");
+    const testCoin = new TypeTagParser(
+      "0x1::Coin::CoinStore < 0x1::TestCoin::TestCoin1 ,  0x1::TestCoin::TestCoin2 > ",
+    ).parseTypeTag();
     expect(testCoin instanceof TypeTagStruct).toBeTruthy();
     assertStruct(testCoin as TypeTagStruct, "0x1", "Coin", "CoinStore");
+
+    const testCoinTrailingComma = new TypeTagParser(
+      "0x1::Coin::CoinStore < 0x1::TestCoin::TestCoin1 ,  0x1::TestCoin::TestCoin2, > ",
+    ).parseTypeTag();
+    expect(testCoinTrailingComma instanceof TypeTagStruct).toBeTruthy();
+    assertStruct(testCoinTrailingComma as TypeTagStruct, "0x1", "Coin", "CoinStore");
 
     const structTypeTags = (testCoin as TypeTagStruct).value.type_args;
     expect(structTypeTags.length).toBe(2);
@@ -72,17 +80,58 @@ describe("BuilderUtils", () => {
     const structTypeTag2 = structTypeTags[1];
     assertStruct(structTypeTag2 as TypeTagStruct, "0x1", "TestCoin", "TestCoin2");
 
-    expect(() => {
-      parseTypeTag("0x1::TestCoin");
-    }).toThrow("Invalid struct tag string literal.");
+    const coinComplex = new TypeTagParser(
+      "0x1::Coin::CoinStore < 0x2::Coin::LPCoin < 0x1::TestCoin::TestCoin1 <u8>, vector<0x1::TestCoin::TestCoin2 > > >",
+    ).parseTypeTag();
+
+    expect(coinComplex instanceof TypeTagStruct).toBeTruthy();
+    assertStruct(coinComplex as TypeTagStruct, "0x1", "Coin", "CoinStore");
+    const coinComplexTypeTag = (coinComplex as TypeTagStruct).value.type_args[0];
+    assertStruct(coinComplexTypeTag as TypeTagStruct, "0x2", "Coin", "LPCoin");
 
     expect(() => {
-      parseTypeTag("0x1::TestCoin::CoinStore<0x1::TestCoin::TestCoin");
-    }).toThrow("Invalid struct tag string literal.");
+      new TypeTagParser("0x1::TestCoin").parseTypeTag();
+    }).toThrow("Invalid type tag.");
 
     expect(() => {
-      parseTypeTag("0x1::TestCoin::CoinStore<0x1::TestCoin>");
-    }).toThrow("Invalid struct tag string literal.");
+      new TypeTagParser("0x1::TestCoin::CoinStore<0x1::TestCoin::TestCoin").parseTypeTag();
+    }).toThrow("Invalid type tag.");
+
+    expect(() => {
+      new TypeTagParser("0x1::TestCoin::CoinStore<0x1::TestCoin>").parseTypeTag();
+    }).toThrow("Invalid type tag.");
+
+    expect(() => {
+      new TypeTagParser("0x1:TestCoin::TestCoin").parseTypeTag();
+    }).toThrow("Unrecognized token.");
+
+    expect(() => {
+      new TypeTagParser("0x!::TestCoin::TestCoin").parseTypeTag();
+    }).toThrow("Unrecognized token.");
+
+    expect(() => {
+      new TypeTagParser("0x1::TestCoin::TestCoin<").parseTypeTag();
+    }).toThrow("Invalid type tag.");
+
+    expect(() => {
+      new TypeTagParser("0x1::TestCoin::CoinStore<0x1::TestCoin::TestCoin,").parseTypeTag();
+    }).toThrow("Invalid type tag.");
+
+    expect(() => {
+      new TypeTagParser("").parseTypeTag();
+    }).toThrow("Invalid type tag.");
+
+    expect(() => {
+      new TypeTagParser("0x1::<::CoinStore<0x1::TestCoin::TestCoin,").parseTypeTag();
+    }).toThrow("Invalid type tag.");
+
+    expect(() => {
+      new TypeTagParser("0x1::TestCoin::><0x1::TestCoin::TestCoin,").parseTypeTag();
+    }).toThrow("Invalid type tag.");
+
+    expect(() => {
+      new TypeTagParser("u32").parseTypeTag();
+    }).toThrow("Invalid type tag.");
   });
 
   it("serializes a boolean arg", async () => {

@@ -28,69 +28,183 @@ function assertType(val: any, types: string[] | string, message?: string) {
   }
 }
 
+function bail(message: string) {
+  throw new Error(message);
+}
+
+function isWhiteSpace(c: string): boolean {
+  if (c.match(/\s/)) {
+    return true;
+  }
+  return false;
+}
+
+function isValidAlphabetic(c: string): boolean {
+  if (c.match(/[_A-Za-z0-9]/g)) {
+    return true;
+  }
+  return false;
+}
+
+type TokenType = string;
+type TokenValue = string;
+type Token = [TokenType, TokenValue];
+
+// A simple tokenizer, we don't do special processing for cases like 0x...
+function nextToken(tagStr: string, pos: number): [Token, number] {
+  const c = tagStr[pos];
+  if (c === ":") {
+    if (tagStr.slice(pos, pos + 2) === "::") {
+      return [["COLON", "::"], 2];
+    }
+    bail("Unrecognized token.");
+  } else if (c === "<") {
+    return [["LT", "<"], 1];
+  } else if (c === ">") {
+    return [["GT", ">"], 1];
+  } else if (c === ",") {
+    return [["COMMA", ","], 1];
+  } else if (isWhiteSpace(c)) {
+    let res = "";
+    for (let i = pos; i < tagStr.length; i += 1) {
+      const char = tagStr[i];
+      if (isWhiteSpace(char)) {
+        res = `${res}${char}`;
+      } else {
+        break;
+      }
+    }
+    return [["SPACE", res], res.length];
+  } else if (isValidAlphabetic(c)) {
+    let res = "";
+    for (let i = pos; i < tagStr.length; i += 1) {
+      const char = tagStr[i];
+      if (isValidAlphabetic(char)) {
+        res = `${res}${char}`;
+      } else {
+        break;
+      }
+    }
+    return [["IDENT", res], res.length];
+  }
+  throw new Error("Unrecognized token.");
+}
+
+function tokenize(tagStr: string): Token[] {
+  let pos = 0;
+  const tokens = [];
+  while (pos < tagStr.length) {
+    const [token, size] = nextToken(tagStr, pos);
+    if (token[0] !== "SPACE") {
+      tokens.push(token);
+    }
+    pos += size;
+  }
+  return tokens;
+}
+
 /**
- * Parses a tag string
- * @param typeTagStr A string represented tag, e.g. bool
- * @returns
+ * Parser to parse a type tag string
  */
-export function parseTypeTag(typeTagStr: string): TypeTag {
-  const typeTag = typeTagStr.trim();
+export class TypeTagParser {
+  private readonly tokens: Token[];
 
-  if (typeTag.startsWith("vector")) {
-    // Strips off 'vector'
-    let innerTagStr = typeTag.substring(6).trim();
-    // Strips off '<' and '>'
-    innerTagStr = innerTagStr.substring(1, innerTagStr.length - 1);
-    return new TypeTagVector(parseTypeTag(innerTagStr));
+  constructor(tagStr: string) {
+    this.tokens = tokenize(tagStr);
   }
 
-  if (typeTag.includes("::")) {
-    if (!typeTag.includes("<")) {
-      return new TypeTagStruct(StructTag.fromString(typeTag));
+  private consume(targetToken: string) {
+    const token = this.tokens.shift();
+    if (!token || token[1] !== targetToken) {
+      bail("Invalid type tag.");
     }
-
-    const [structStr, tempStrNotEndTrimmed] = typeTag.split("<", 2);
-
-    // "0x1::Coin::CoinStore".match(/::/g) produces ['::', '::']
-    if ((structStr.match(/::/g) || []).length !== 2) {
-      throw new Error("Invalid struct tag string literal.");
-    }
-
-    const [address, module, name] = structStr.trim().split("::");
-
-    const pos = tempStrNotEndTrimmed.lastIndexOf(">");
-    if (pos === -1) {
-      throw new Error("Invalid struct tag string literal.");
-    }
-
-    const tempStr = tempStrNotEndTrimmed.trim().substring(0, pos - 1);
-
-    const tempStrParts = tempStr.split(",");
-
-    const typeArgs = tempStrParts.map((temp) => parseTypeTag(temp));
-    const structTag = new StructTag(
-      AccountAddress.fromHex(address),
-      new Identifier(module),
-      new Identifier(name),
-      typeArgs,
-    );
-
-    return new TypeTagStruct(structTag);
   }
 
-  switch (typeTag) {
-    case "bool":
-      return new TypeTagBool();
-    case "u8":
+  private parseCommaList(endToken: TokenValue, allowTraillingComma: boolean): TypeTag[] {
+    const res: TypeTag[] = [];
+    if (this.tokens.length <= 0) {
+      bail("Invalid type tag.");
+    }
+
+    while (this.tokens[0][1] !== endToken) {
+      res.push(this.parseTypeTag());
+
+      if (this.tokens.length > 0 && this.tokens[0][1] === endToken) {
+        break;
+      }
+
+      this.consume(",");
+      if (this.tokens.length > 0 && this.tokens[0][1] === endToken && allowTraillingComma) {
+        break;
+      }
+
+      if (this.tokens.length <= 0) {
+        bail("Invalid type tag.");
+      }
+    }
+    return res;
+  }
+
+  parseTypeTag(): TypeTag {
+    if (this.tokens.length === 0) {
+      bail("Invalid type tag.");
+    }
+
+    // Pop left most element out
+    const [tokenTy, tokenVal] = this.tokens.shift();
+
+    if (tokenVal === "u8") {
       return new TypeTagU8();
-    case "u64":
+    }
+    if (tokenVal === "u64") {
       return new TypeTagU64();
-    case "u128":
+    }
+    if (tokenVal === "u128") {
       return new TypeTagU128();
-    case "address":
+    }
+    if (tokenVal === "bool") {
+      return new TypeTagBool();
+    }
+    if (tokenVal === "address") {
       return new TypeTagAddress();
-    default:
-      throw new Error("Unknown type tag.");
+    }
+    if (tokenVal === "vector") {
+      this.consume("<");
+      const res = this.parseTypeTag();
+      this.consume(">");
+      return new TypeTagVector(res);
+    }
+    if (tokenTy === "IDENT" && (tokenVal.startsWith("0x") || tokenVal.startsWith("0X"))) {
+      const address = tokenVal;
+      this.consume("::");
+      const [moduleTokenTy, module] = this.tokens.shift();
+      if (moduleTokenTy !== "IDENT") {
+        bail("Invalid type tag.");
+      }
+      this.consume("::");
+      const [nameTokenTy, name] = this.tokens.shift();
+      if (nameTokenTy !== "IDENT") {
+        bail("Invalid type tag.");
+      }
+
+      let tyTags: TypeTag[] = [];
+      // Check if the struct has ty args
+      if (this.tokens.length > 0 && this.tokens[0][1] === "<") {
+        this.consume("<");
+        tyTags = this.parseCommaList(">", true);
+        this.consume(">");
+      }
+
+      const structTag = new StructTag(
+        AccountAddress.fromHex(address),
+        new Identifier(module),
+        new Identifier(name),
+        tyTags,
+      );
+      return new TypeTagStruct(structTag);
+    }
+
+    throw new Error("Invalid type tag.");
   }
 }
 
