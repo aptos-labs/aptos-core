@@ -5,7 +5,7 @@ use crate::aptos_cli::setup_cli_test;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::HashValue;
-use aptos_rosetta::common::{BLOCKCHAIN, Y2K_SECS};
+use aptos_rosetta::common::{BLOCKCHAIN, Y2K_MS};
 use aptos_rosetta::types::{
     AccountBalanceResponse, Block, BlockIdentifier, NetworkIdentifier, NetworkRequest,
     PartialBlockIdentifier,
@@ -21,6 +21,7 @@ use aptos_types::chain_id::ChainId;
 use forge::{LocalSwarm, Node};
 use std::{future::Future, time::Duration};
 use tokio::task::JoinHandle;
+use tokio::time::Instant;
 
 pub async fn setup_test(
     num_nodes: usize,
@@ -87,7 +88,7 @@ async fn test_network() {
     };
     let status = rosetta_client.network_status(&request).await.unwrap();
     assert!(status.current_block_identifier.index > 0);
-    assert!(status.current_block_timestamp > Y2K_SECS);
+    assert!(status.current_block_timestamp > Y2K_MS);
     assert_eq!(
         BlockIdentifier {
             index: 0,
@@ -121,9 +122,9 @@ async fn test_account_balance() {
         }
     );
 
-    // At some time before version 100, the account should exist
+    // At some time before version 1000, the account should exist
     let mut successful_version = None;
-    for i in 1..100 {
+    for i in 1..1000 {
         let response = get_balance(&rosetta_client, chain_id, account, i)
             .await
             .unwrap();
@@ -171,7 +172,9 @@ async fn test_block() {
     let request_genesis = BlockRequest::by_index(chain_id, 0);
     let genesis_block = try_until_ok(|| rosetta_client.block(&request_genesis))
         .await
-        .unwrap().block.unwrap();
+        .unwrap()
+        .block
+        .unwrap();
     assert_genesis_block(&genesis_block);
 
     // Get genesis txn by hash
@@ -180,14 +183,27 @@ async fn test_block() {
     let genesis_block_by_hash = rosetta_client
         .block(&request_genesis_by_hash)
         .await
-        .unwrap().block.unwrap();
+        .unwrap()
+        .block
+        .unwrap();
 
     // Both blocks should be the same
-    assert_eq!(genesis_block, genesis_block_by_hash, "Genesis by hash or by index should be the same");
+    assert_eq!(
+        genesis_block, genesis_block_by_hash,
+        "Genesis by hash or by index should be the same"
+    );
 
     // Responses should be idempotent
-    let idempotent_block = rosetta_client.block(&request_genesis).await.unwrap().block.unwrap();
-    assert_eq!(idempotent_block, genesis_block_by_hash, "Blocks should be idempotent");
+    let idempotent_block = rosetta_client
+        .block(&request_genesis)
+        .await
+        .unwrap()
+        .block
+        .unwrap();
+    assert_eq!(
+        idempotent_block, genesis_block_by_hash,
+        "Blocks should be idempotent"
+    );
 
     // Block 1 is always a reconfig with exactly 1 txn
     let block_1 = get_block(&rosetta_client, chain_id, 1).await;
@@ -221,7 +237,7 @@ async fn test_block() {
     );
 
     // There should be at least 1 txn
-    assert!(latest_block.transactions.len() > 1);
+    assert!(!latest_block.transactions.is_empty());
 
     // We should be able to query it again by hash or by version and it is the same
     let request_latest_by_version =
@@ -248,16 +264,26 @@ async fn test_block() {
     let network_request = NetworkRequest {
         network_identifier: NetworkIdentifier::from(chain_id),
     };
-    while rosetta_client
-        .network_status(&network_request)
-        .await
-        .unwrap()
-        .current_block_identifier
-        .index
-        == latest_block.block_identifier.index
-    {
+
+    let start = Instant::now();
+    let max_wait = Duration::from_secs(1);
+    let mut successful = false;
+    while start.elapsed() < max_wait {
+        if rosetta_client
+            .network_status(&network_request)
+            .await
+            .unwrap()
+            .current_block_identifier
+            .index
+            == latest_block.block_identifier.index
+        {
+            successful = true;
+            break;
+        }
         tokio::time::sleep(Duration::from_micros(10)).await
     }
+
+    assert!(successful, "Failed to get the next block");
 
     // And querying latest again should get yet another transaction in the future
     let newer_block = rosetta_client
@@ -272,7 +298,7 @@ async fn test_block() {
 
 fn assert_genesis_block(block: &Block) {
     assert_eq!(
-        genesis_block.block_identifier, genesis_block.parent_block_identifier,
+        block.block_identifier, block.parent_block_identifier,
         "The genesis block is also it's own parent"
     );
     assert_eq!(
@@ -286,7 +312,7 @@ fn assert_genesis_block(block: &Block) {
     );
 
     assert_eq!(
-        Y2K_SECS, block.timestamp,
+        Y2K_MS, block.timestamp,
         "The genesis timestamp should be Y2K seconds"
     );
     assert_eq!(
