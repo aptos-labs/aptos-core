@@ -3,13 +3,12 @@
 
 use std::fmt::Display;
 
+use super::accept_type::AcceptType;
 use anyhow::format_err;
 use aptos_api_types::{LedgerInfo, U64};
 use poem::Result as PoemResult;
 use poem_openapi::{payload::Json, types::ToJSON, ApiResponse, Enum, Object, ResponseContent};
 use serde::{Deserialize, Serialize};
-
-use super::accept_type::AcceptType;
 
 use super::bcs_payload::Bcs;
 
@@ -135,12 +134,12 @@ impl<T: ToJSON + Send + Sync + Serialize> AptosResponse<T> {
     /// Construct a response from bytes that you know ahead of time a BCS
     /// encoded value.
     pub fn from_bcs(value: Vec<u8>, ledger_info: &LedgerInfo) -> Self {
-        Self::from_ledger_info(AptosResponseContent::Bcs(Bcs(value)), &ledger_info)
+        Self::from_ledger_info(AptosResponseContent::Bcs(Bcs(value)), ledger_info)
     }
 
     /// Construct an Aptos response from a Rust type, serializing it to JSON.
     pub fn from_json(value: T, ledger_info: &LedgerInfo) -> Self {
-        Self::from_ledger_info(AptosResponseContent::Json(Json(value)), &ledger_info)
+        Self::from_ledger_info(AptosResponseContent::Json(Json(value)), ledger_info)
     }
 
     /// This is a convenience function for creating a response when you have
@@ -178,7 +177,7 @@ pub fn serialize_to_bcs<T: Serialize>(value: T) -> Result<Vec<u8>, AptosErrorRes
 pub fn deserialize_from_bcs<T: for<'b> Deserialize<'b>>(
     bytes: &[u8],
 ) -> Result<T, AptosErrorResponse> {
-    bcs::from_bytes(&bytes).map_err(|e| {
+    bcs::from_bytes(bytes).map_err(|e| {
         AptosErrorResponse::InternalServerError(Json(
             AptosError::new(format_err!("Data in storage was not valid BCS: {}", e).to_string())
                 .error_code(AptosErrorCode::InvalidBcsInStorageError),

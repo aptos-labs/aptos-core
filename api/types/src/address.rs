@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_openapi::impl_poem_type;
+use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use aptos_types::account_address::AccountAddress;
 use move_deps::move_core_types;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
@@ -77,6 +77,7 @@ impl<'de> Deserialize<'de> for Address {
 }
 
 impl_poem_type!(Address);
+impl_poem_parameter!(Address);
 
 #[cfg(test)]
 mod tests {

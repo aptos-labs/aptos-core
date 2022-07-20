@@ -23,6 +23,7 @@ use aptos_types::{
 use aptos_vm::data_cache::{IntoMoveResolver, RemoteStorageOwned};
 use futures::{channel::oneshot, SinkExt};
 use move_deps::move_core_types::ident_str;
+use poem_openapi::payload::Json;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use storage_interface::{
@@ -30,6 +31,8 @@ use storage_interface::{
     DbReader, Order,
 };
 use warp::{filters::BoxedFilter, Filter, Reply};
+
+use crate::poem_backend::{AptosError, AptosErrorCode, AptosErrorResponse};
 
 // Context holds application scope context
 #[derive(Clone)]
@@ -103,6 +106,15 @@ impl Context {
         }
     }
 
+    pub fn get_latest_ledger_info_poem(&self) -> Result<LedgerInfo, AptosErrorResponse> {
+        self.get_latest_ledger_info().map_err(|e| {
+            AptosErrorResponse::InternalServerError(Json(
+                AptosError::new(format_err!("Failed to retrieve ledger info: {}", e).to_string())
+                    .error_code(AptosErrorCode::ReadFromStorageError),
+            ))
+        })
+    }
+
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {
         self.db.get_latest_ledger_info()
     }
@@ -111,6 +123,19 @@ impl Context {
         self.db
             .state_view_at_version(Some(version))?
             .get_state_value(state_key)
+    }
+
+    pub fn get_state_value_poem(
+        &self,
+        state_key: &StateKey,
+        version: u64,
+    ) -> Result<Option<Vec<u8>>, AptosErrorResponse> {
+        self.get_state_value(state_key, version).map_err(|e| {
+            AptosErrorResponse::InternalServerError(Json(
+                AptosError::new(format_err!("Failed to retrieve state value: {}", e).to_string())
+                    .error_code(AptosErrorCode::ReadFromStorageError),
+            ))
+        })
     }
 
     pub fn get_state_values(
