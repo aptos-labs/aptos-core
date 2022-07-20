@@ -1,5 +1,5 @@
 module 0xA550C18::HelloWorld {
-    use std::ascii::{Self, String};
+    use std::string::{Self, String};
     use std::signer;
     use aptos_framework::coin;
     use aptos_framework::test_coin::TestCoin;
@@ -12,7 +12,7 @@ module 0xA550C18::HelloWorld {
     fun init_module(sender: &signer) {
         move_to(
             sender,
-            ModuleData { global_counter: 0, state: ascii::string(b"init") }
+            ModuleData { global_counter: 0, state: string::utf8(b"init") }
         );
     }
 

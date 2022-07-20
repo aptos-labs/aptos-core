@@ -2,7 +2,7 @@
 /// It contains scripts you will need to initialize, mint, burn, transfer coins.
 /// By utilizing this current module, a developer can create his own coin and care less about mint and burn capabilities,
 module aptos_framework::managed_coin {
-    use std::ascii;
+    use std::string;
     use std::errors;
     use std::signer;
 
@@ -59,8 +59,8 @@ module aptos_framework::managed_coin {
     ) {
         let (mint_cap, burn_cap) = coin::initialize<CoinType>(
             account,
-            ascii::string(name),
-            ascii::string(symbol),
+            string::utf8(name),
+            string::utf8(symbol),
             decimals,
             monitor_supply,
         );
