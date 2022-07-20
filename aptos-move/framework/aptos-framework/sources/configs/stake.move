@@ -314,7 +314,7 @@ module aptos_framework::stake {
     /// Update the min and max stake amounts.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
     public fun update_required_stake(
-        _gov_proposal: GovernanceProposal,
+        _gov_proposal: &GovernanceProposal,
         minimum_stake: u64,
         maximum_stake: u64,
     ) acquires ValidatorSetConfiguration {
@@ -328,7 +328,7 @@ module aptos_framework::stake {
     /// Update the min and max lockup duration.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
     public fun update_required_lockup(
-        _gov_proposal: GovernanceProposal,
+        _gov_proposal: &GovernanceProposal,
         min_lockup_duration_secs: u64,
         max_lockup_duration_secs: u64,
     ) acquires ValidatorSetConfiguration {
@@ -342,7 +342,7 @@ module aptos_framework::stake {
     /// Update the rewards rate.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
     public fun update_rewards_rate(
-        _gov_proposal: GovernanceProposal,
+        _gov_proposal: &GovernanceProposal,
         new_rewards_rate: u64,
         new_rewards_rate_denominator: u64,
     ) acquires ValidatorSetConfiguration {
@@ -1556,9 +1556,9 @@ module aptos_framework::stake {
 
         initialize_validator_set(&aptos_framework, 0, 1, 0, 1, false, 1, 1);
 
-        update_required_stake(governance_proposal::create_test_proposal(), 100, 1000);
-        update_required_lockup(governance_proposal::create_test_proposal(), 1000, 10000);
-        update_rewards_rate(governance_proposal::create_test_proposal(), 10, 100);
+        update_required_stake(&governance_proposal::create_test_proposal(), 100, 1000);
+        update_required_lockup(&governance_proposal::create_test_proposal(), 1000, 10000);
+        update_rewards_rate(&governance_proposal::create_test_proposal(), 10, 100);
         let config = borrow_global<ValidatorSetConfiguration>(@aptos_framework);
         assert!(config.minimum_stake == 100, 0);
         assert!(config.maximum_stake == 1000, 1);
@@ -1571,25 +1571,25 @@ module aptos_framework::stake {
     #[test]
     #[expected_failure(abort_code = 4359)]
     public entry fun test_update_required_stake_invalid_range_should_fail() acquires ValidatorSetConfiguration {
-        update_required_stake(governance_proposal::create_test_proposal(), 10, 5);
+        update_required_stake(&governance_proposal::create_test_proposal(), 10, 5);
     }
 
     #[test]
     #[expected_failure(abort_code = 4359)]
     public entry fun test_update_required_stake_zero_max_stake_should_fail() acquires ValidatorSetConfiguration {
-        update_required_stake(governance_proposal::create_test_proposal(), 0, 0);
+        update_required_stake(&governance_proposal::create_test_proposal(), 0, 0);
     }
 
     #[test]
     #[expected_failure(abort_code = 4615)]
     public entry fun test_update_required_lockup_invalid_range_should_fail() acquires ValidatorSetConfiguration {
-        update_required_lockup(governance_proposal::create_test_proposal(), 10, 5);
+        update_required_lockup(&governance_proposal::create_test_proposal(), 10, 5);
     }
 
     #[test]
     #[expected_failure(abort_code = 4615)]
     public entry fun test_update_required_lockup_zero_max_lockup_should_fail() acquires ValidatorSetConfiguration {
-        update_required_lockup(governance_proposal::create_test_proposal(), 0, 0);
+        update_required_lockup(&governance_proposal::create_test_proposal(), 0, 0);
     }
 
     #[test_only]
