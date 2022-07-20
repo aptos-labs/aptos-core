@@ -260,8 +260,11 @@ impl RestClient {
     //:!:>section_5
     /// Returns the test coin balance associated with the account
     pub fn account_balance(&self, account_address: &str) -> Option<u64> {
-        self.account_resource(account_address, "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>")
-            .unwrap()["data"]["coin"]["value"]
+        self.account_resource(
+            account_address,
+            "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+        )
+        .unwrap()["data"]["coin"]["value"]
             .as_str()
             .and_then(|s| s.parse::<u64>().ok())
     }
@@ -271,8 +274,8 @@ impl RestClient {
     pub fn transfer(&self, account_from: &mut Account, recipient: &str, amount: u64) -> String {
         let payload = serde_json::json!({
             "type": "script_function_payload",
-            "function": "0x1::Coin::transfer",
-            "type_arguments": ["0x1::TestCoin::TestCoin"],
+            "function": "0x1::coin::transfer",
+            "type_arguments": ["0x1::test_coin::TestCoin"],
             "arguments": [format!("0x{}", recipient), amount.to_string()]
         });
         let txn_request = self.generate_transaction(&account_from.address(), payload);

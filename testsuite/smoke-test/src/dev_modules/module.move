@@ -9,7 +9,7 @@
 address {{sender}} {
 
 module MyModule {
-    use AptosFramework::Aptos::Aptos;
+    use aptos_framework::Aptos::Aptos;
 
     // The identity function for coins: takes a Aptos<T> as input and hands it back
     public fun id<T>(c: Aptos<T>): Aptos<T> {

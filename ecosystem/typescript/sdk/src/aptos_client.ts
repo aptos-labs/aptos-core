@@ -321,7 +321,7 @@ export class AptosClient {
    * `event_handle_struct` and `field_name`, then returns events identified by the event key
    * @param address Hex-encoded 16 bytes Aptos account from which events are queried
    * @param eventHandleStruct String representation of an on-chain Move struct type.
-   * (e.g. `0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>`)
+   * (e.g. `0x1::coin::CoinStore<0x1::test_coin::TestCoin>`)
    * @param fieldName The field name of the EventHandle in the struct
    * @param query Optional query object
    * @param query.start The start sequence number in the EVENT STREAM, defaulting to the latest event.

@@ -13,8 +13,8 @@
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
 
 # for calculating regression
-TPS_THRESHOLD=4000
-P99_LATENCY_MS_THRESHOLD=5000
+TPS_THRESHOLD=5000
+P99_LATENCY_MS_THRESHOLD=6000
 
 FORGE_OUTPUT=${FORGE_OUTPUT:-forge_output.txt}
 FORGE_REPORT=${FORGE_REPORT:-forge_report.json}
@@ -164,8 +164,9 @@ P99_LATENCY=$(cat $FORGE_REPORT | grep -oE '[0-9]+ ms p99 latency' | awk '{print
 if [ -n "$AVG_TPS" ]; then
     echo "AVG_TPS: ${AVG_TPS}"
     echo "forge_job_avg_tps {FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\",GITHUB_RUN_ID=\"$GITHUB_RUN_ID\"} $AVG_TPS" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
-    if [[ "$AVG_TPS" -lt "$AVG_TPS_MS_THRESHOLD" ]]; then
+    if [[ "$AVG_TPS" -lt "$TPS_THRESHOLD" ]]; then
         echo "(\!) AVG_TPS: ${avg_tps} < ${TPS_THRESHOLD} tps"
+        FORGE_EXIT_CODE=1
     fi
 fi
 if [ -n "$P99_LATENCY" ]; then
@@ -173,6 +174,7 @@ if [ -n "$P99_LATENCY" ]; then
     echo "forge_job_p99_latency {FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\",GITHUB_RUN_ID=\"$GITHUB_RUN_ID\"} $P99_LATENCY" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
     if [[ "$P99_LATENCY" -gt "$P99_LATENCY_MS_THRESHOLD" ]]; then
         echo "(\!) P99_LATENCY: ${P99_LATENCY} > ${P99_LATENCY_MS_THRESHOLD} ms"
+        FORGE_EXIT_CODE=1
     fi
 fi
 

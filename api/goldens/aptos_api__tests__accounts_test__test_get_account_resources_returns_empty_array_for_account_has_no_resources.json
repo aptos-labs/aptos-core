@@ -1,6 +1,6 @@
 [
   {
-    "type": "0x1::Coin::CoinInfo<0x1::TestCoin::TestCoin>",
+    "type": "0x1::coin::CoinInfo<0x1::test_coin::TestCoin>",
     "data": {
       "decimals": "6",
       "name": "Test Coin",
@@ -17,7 +17,7 @@
     }
   },
   {
-    "type": "0x1::Block::BlockMetadata",
+    "type": "0x1::block::BlockMetadata",
     "data": {
       "epoch_internal": "86400000000",
       "height": "0",
@@ -33,7 +33,7 @@
     }
   },
   {
-    "type": "0x1::Stake::ValidatorSet",
+    "type": "0x1::stake::ValidatorSet",
     "data": {
       "active_validators": [
         {
@@ -53,7 +53,7 @@
     }
   },
   {
-    "type": "0x1::Stake::TestCoinCapabilities",
+    "type": "0x1::stake::TestCoinCapabilities",
     "data": {
       "mint_cap": {
         "dummy_field": false
@@ -61,7 +61,7 @@
     }
   },
   {
-    "type": "0x1::Stake::ValidatorPerformance",
+    "type": "0x1::stake::ValidatorPerformance",
     "data": {
       "missed_votes": [
         "0"
@@ -70,7 +70,7 @@
     }
   },
   {
-    "type": "0x1::Stake::ValidatorSetConfiguration",
+    "type": "0x1::stake::ValidatorSetConfiguration",
     "data": {
       "allow_validator_set_change": false,
       "max_lockup_duration_secs": "86400",
@@ -82,7 +82,7 @@
     }
   },
   {
-    "type": "0x1::Voting::VotingForum<0x1::GovernanceProposal::GovernanceProposal>",
+    "type": "0x1::voting::VotingForum<0x1::governance_proposal::GovernanceProposal>",
     "data": {
       "events": {
         "create_proposal_events": {
@@ -130,7 +130,7 @@
     }
   },
   {
-    "type": "0x1::Account::Account",
+    "type": "0x1::account::Account",
     "data": {
       "authentication_key": "0x0000000000000000000000000000000000000000000000000000000000000001",
       "self_address": "0x1",
@@ -138,11 +138,11 @@
     }
   },
   {
-    "type": "0x1::Account::ChainSpecificAccountInfo",
+    "type": "0x1::account::ChainSpecificAccountInfo",
     "data": {
       "currency_code_required": false,
       "module_addr": "0x1",
-      "module_name": "0x4163636f756e74",
+      "module_name": "0x6163636f756e74",
       "module_prologue_name": "0x6d6f64756c655f70726f6c6f677565",
       "multi_agent_prologue_name": "0x6d756c74695f6167656e745f7363726970745f70726f6c6f677565",
       "script_prologue_name": "0x7363726970745f70726f6c6f677565",
@@ -152,19 +152,19 @@
     }
   },
   {
-    "type": "0x1::ChainId::ChainId",
-    "data": {
-      "id": 4
-    }
-  },
-  {
-    "type": "0x1::Version::Version",
+    "type": "0x1::version::Version",
     "data": {
       "major": "4"
     }
   },
   {
-    "type": "0x1::TestCoin::Capabilities",
+    "type": "0x1::chain_id::ChainId",
+    "data": {
+      "id": 4
+    }
+  },
+  {
+    "type": "0x1::test_coin::Capabilities",
     "data": {
       "mint_cap": {
         "dummy_field": false
@@ -172,7 +172,13 @@
     }
   },
   {
-    "type": "0x1::VMConfig::VMConfig",
+    "type": "0x1::timestamp::CurrentTimeMicroseconds",
+    "data": {
+      "microseconds": "0"
+    }
+  },
+  {
+    "type": "0x1::vm_config::VMConfig",
     "data": {
       "gas_schedule": {
         "gas_constants": {
@@ -194,13 +200,23 @@
     }
   },
   {
-    "type": "0x1::Timestamp::CurrentTimeMicroseconds",
+    "type": "0x1::reconfiguration::Configuration",
     "data": {
-      "microseconds": "0"
+      "epoch": "1",
+      "events": {
+        "counter": "1",
+        "guid": {
+          "id": {
+            "addr": "0x1",
+            "creation_num": "2"
+          }
+        }
+      },
+      "last_reconfiguration_time": "0"
     }
   },
   {
-    "type": "0x1::TransactionFee::TestCoinCapabilities",
+    "type": "0x1::transaction_fee::TestCoinCapabilities",
     "data": {
       "burn_cap": {
         "dummy_field": false
@@ -208,7 +224,7 @@
     }
   },
   {
-    "type": "0x1::AptosGovernance::VotingRecords",
+    "type": "0x1::aptos_governance::VotingRecords",
     "data": {
       "votes": {
         "handle": "250572580766766989648150312918132283230",
@@ -217,7 +233,7 @@
     }
   },
   {
-    "type": "0x1::AptosGovernance::GovernanceConfig",
+    "type": "0x1::aptos_governance::GovernanceConfig",
     "data": {
       "min_voting_threshold": "0",
       "required_proposer_stake": "0",
@@ -225,7 +241,7 @@
     }
   },
   {
-    "type": "0x1::AptosGovernance::GovernanceEvents",
+    "type": "0x1::aptos_governance::GovernanceEvents",
     "data": {
       "create_proposal_events": {
         "counter": "0",
@@ -257,7 +273,7 @@
     }
   },
   {
-    "type": "0x1::AptosGovernance::GovernanceResponsbility",
+    "type": "0x1::aptos_governance::GovernanceResponsbility",
     "data": {
       "signer_cap": {
         "account": "0x1"
@@ -265,29 +281,13 @@
     }
   },
   {
-    "type": "0x1::ConsensusConfig::ConsensusConfig",
+    "type": "0x1::consensus_config::ConsensusConfig",
     "data": {
       "config": "0x00010a0000000000000014000000000000000201e8030000000000000a0000000000000001000000000000000a0000000a0000000000000001000000000000000a00000000000000"
     }
   },
   {
-    "type": "0x1::Reconfiguration::Configuration",
-    "data": {
-      "epoch": "1",
-      "events": {
-        "counter": "1",
-        "guid": {
-          "id": {
-            "addr": "0x1",
-            "creation_num": "2"
-          }
-        }
-      },
-      "last_reconfiguration_time": "0"
-    }
-  },
-  {
-    "type": "0x1::TransactionPublishingOption::TransactionPublishingOption",
+    "type": "0x1::transaction_publishing_option::TransactionPublishingOption",
     "data": {
       "module_publishing_allowed": true,
       "script_allow_list": []

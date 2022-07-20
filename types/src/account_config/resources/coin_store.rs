@@ -44,7 +44,7 @@ impl CoinStoreResource {
 }
 
 impl MoveStructType for CoinStoreResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("Coin");
+    const MODULE_NAME: &'static IdentStr = ident_str!("coin");
     const STRUCT_NAME: &'static IdentStr = ident_str!("CoinStore");
 
     fn type_params() -> Vec<TypeTag> {

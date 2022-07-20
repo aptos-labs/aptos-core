@@ -35,7 +35,7 @@ class FirstCoin(RestClient):
 
         payload = {
             "type": "script_function_payload",
-            "function": "0x1::Coin::register",
+            "function": "0x1::coin::register",
             "type_arguments": [f"0x{coin_type_address}::MoonCoin::MoonCoin"],
             "arguments": []
         }
@@ -73,7 +73,7 @@ class FirstCoin(RestClient):
     ) -> str:
         """ Returns the coin balance of the given account """
 
-        return self.account_resource(account_address, f"0x1::Coin::CoinStore<0x{coin_type_address}::MoonCoin::MoonCoin>")
+        return self.account_resource(account_address, f"0x1::coin::CoinStore<0x{coin_type_address}::MoonCoin::MoonCoin>")
 #<:!:section_4
 
 if __name__ == "__main__":

@@ -194,6 +194,28 @@ resource "helm_release" "logger" {
   }
 }
 
+locals {
+  vector_daemonset_chart_path = "${path.module}/../../helm/vector-daemonset"
+}
+
+resource "helm_release" "vector_daemonset" {
+  count            = var.enable_vector_daemonset_logger ? 1 : 0
+  name             = "${local.helm_release_name}-vector-daemonset"
+  chart            = local.vector_daemonset_chart_path
+  max_history      = 5
+  namespace        = "vector"
+  create_namespace = true
+  wait             = false
+
+  values = var.vector_daemonset_helm_values
+
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
+  set {
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.vector_daemonset_chart_path, "**") : filesha1("${local.vector_daemonset_chart_path}/${f}")]))
+  }
+}
+
 resource "helm_release" "monitoring" {
   count       = var.enable_monitoring ? 1 : 0
   name        = "${local.helm_release_name}-mon"
@@ -210,7 +232,7 @@ resource "helm_release" "monitoring" {
         name = var.validator_name
       }
       service = {
-        domain   = local.domain
+        domain = local.domain
       }
       monitoring = {
         prometheus = {

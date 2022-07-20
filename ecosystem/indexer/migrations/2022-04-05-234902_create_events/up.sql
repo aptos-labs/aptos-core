@@ -4,7 +4,7 @@
 {
   "key": "0x0400000000000000000000000000000000000000000000000000000000000000000000000a550c18",
   "sequence_number": "0",
-  "type": "0x1::Reconfiguration::NewEpochEvent",
+  "type": "0x1::reconfiguration::NewEpochEvent",
   "data": {
     "epoch": "1"
   }

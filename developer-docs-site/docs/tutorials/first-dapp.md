@@ -298,7 +298,7 @@ You can also verify that the module was published by going to the [Aptos Explore
         },
         {
           "name": "message_change_events",
-          "type": "0x1::Event::EventHandle<0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::Message::MessageChangeEvent>"
+          "type": "0x1::event::EventHandle<0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::Message::MessageChangeEvent>"
         }
       ]
     }

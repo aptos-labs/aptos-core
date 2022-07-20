@@ -227,16 +227,16 @@ impl RoundManager {
             .proposer_election
             .is_valid_proposer(self.proposal_generator.author(), new_round_event.round)
         {
-            let proposal_msg = Box::new(self.generate_proposal(new_round_event).await?);
+            let proposal_msg = self.generate_proposal(new_round_event).await?;
             let mut network = self.network.clone();
             #[cfg(feature = "failpoints")]
             {
-                self.attempt_to_inject_reconfiguration_error(&proposal_msg)
-                    .await?;
+                if self.check_whether_to_inject_reconfiguration_error() {
+                    self.attempt_to_inject_reconfiguration_error(&proposal_msg)
+                        .await?;
+                }
             }
-            network
-                .broadcast(ConsensusMsg::ProposalMsg(proposal_msg))
-                .await;
+            network.broadcast_proposal(proposal_msg).await;
             counters::PROPOSALS_COUNT.inc();
         }
         Ok(())
@@ -250,9 +250,7 @@ impl RoundManager {
         let sync_info = self.block_store.sync_info();
         let mut sender = self.network.clone();
         let callback = async move {
-            sender
-                .broadcast(ConsensusMsg::SyncInfo(Box::new(sync_info)))
-                .await;
+            sender.broadcast_sync_info(sync_info).await;
         }
         .boxed();
 
@@ -448,9 +446,7 @@ impl RoundManager {
 
         if self.sync_only() {
             self.network
-                .broadcast(ConsensusMsg::SyncInfo(Box::new(
-                    self.block_store.sync_info(),
-                )))
+                .broadcast_sync_info(self.block_store.sync_info())
                 .await;
             bail!("[RoundManager] sync_only flag is set, broadcasting SyncInfo");
         }
@@ -489,11 +485,8 @@ impl RoundManager {
         }
 
         self.round_state.record_vote(timeout_vote.clone());
-        let timeout_vote_msg = ConsensusMsg::VoteMsg(Box::new(VoteMsg::new(
-            timeout_vote,
-            self.block_store.sync_info(),
-        )));
-        self.network.broadcast(timeout_vote_msg).await;
+        let timeout_vote_msg = VoteMsg::new(timeout_vote, self.block_store.sync_info());
+        self.network.broadcast_timeout_vote(timeout_vote_msg).await;
         error!(
             round = round,
             remote_peer = self.proposer_election.get_valid_proposer(round),
@@ -827,6 +820,12 @@ impl RoundManager {
         info!(epoch = self.epoch_state().epoch, "RoundManager stopped");
     }
 
+    #[cfg(feature = "failpoints")]
+    fn check_whether_to_inject_reconfiguration_error(&self) -> bool {
+        fail_point!("consensus::inject_reconfiguration_error", |_| true);
+        false
+    }
+
     /// Given R1 <- B2 if R1 has the reconfiguration txn, we inject error on B2 if R1.round + 1 = B2.round
     /// Direct suffix is checked by parent.has_reconfiguration && !parent.parent.has_reconfiguration
     /// The error is injected by sending proposals to half of the validators to force a timeout.
@@ -855,10 +854,7 @@ impl RoundManager {
             half_peers.truncate(half_peers.len() / 2);
             self.network
                 .clone()
-                .send(
-                    ConsensusMsg::ProposalMsg(Box::new(proposal_msg.clone())),
-                    half_peers,
-                )
+                .send_proposal(proposal_msg.clone(), half_peers)
                 .await;
             Err(anyhow::anyhow!("Injected error in reconfiguration suffix"))
         } else {

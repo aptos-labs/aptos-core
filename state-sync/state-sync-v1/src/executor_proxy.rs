@@ -791,6 +791,7 @@ mod tests {
     }
 
     impl OnChainConfig for TestOnChainConfig {
-        const IDENTIFIER: &'static str = "TestOnChainConfig";
+        const MODULE_IDENTIFIER: &'static str = "test_on_chain_config";
+        const TYPE_IDENTIFIER: &'static str = "TestOnChainConfig";
     }
 }

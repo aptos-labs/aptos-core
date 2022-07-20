@@ -45,7 +45,7 @@ class RestClient:
     def account_balance(self, account_address: str) -> int:
         """Returns the test coin balance associated with the account"""
         return self.account_resource(
-            account_address, "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>"
+            account_address, "0x1::coin::CoinStore<0x1::test_coin::TestCoin>"
         )["data"]["coin"]["value"]
 
     def account_sequence_number(self, account_address: AccountAddress) -> int:
@@ -228,8 +228,8 @@ class RestClient:
 
         payload = {
             "type": "script_function_payload",
-            "function": "0x1::Coin::transfer",
-            "type_arguments": ["0x1::TestCoin::TestCoin"],
+            "function": "0x1::coin::transfer",
+            "type_arguments": ["0x1::test_coin::TestCoin"],
             "arguments": [
                 f"{recipient}",
                 str(amount),
@@ -246,9 +246,9 @@ class RestClient:
         ]
 
         payload = ScriptFunction.natural(
-            "0x1::Coin",
+            "0x1::coin",
             "transfer",
-            [TypeTag(StructTag.from_str("0x1::TestCoin::TestCoin"))],
+            [TypeTag(StructTag.from_str("0x1::test_coin::TestCoin"))],
             transaction_arguments,
         )
 
@@ -273,7 +273,7 @@ class RestClient:
         ]
 
         payload = ScriptFunction.natural(
-            "0x1::Token",
+            "0x1::token",
             "create_unlimited_collection_script",
             [],
             transaction_arguments,
@@ -305,7 +305,7 @@ class RestClient:
         ]
 
         payload = ScriptFunction.natural(
-            "0x1::Token",
+            "0x1::token",
             "create_unlimited_token_script",
             [],
             transaction_arguments,
@@ -333,7 +333,7 @@ class RestClient:
         ]
 
         payload = ScriptFunction.natural(
-            "0x1::TokenTransfers",
+            "0x1::tokenTransfers",
             "offer_script",
             [],
             transaction_arguments,
@@ -359,7 +359,7 @@ class RestClient:
         ]
 
         payload = ScriptFunction.natural(
-            "0x1::TokenTransfers",
+            "0x1::tokenTransfers",
             "claim_script",
             [],
             transaction_arguments,
@@ -386,7 +386,7 @@ class RestClient:
         ]
 
         payload = ScriptFunction.natural(
-            "0x1::Token",
+            "0x1::token",
             "direct_transfer_script",
             [],
             transaction_arguments,
@@ -410,7 +410,7 @@ class RestClient:
         collection_name: str,
         token_name: str,
     ) -> Any:
-        token_store = self.account_resource(owner, "0x1::Token::TokenStore")["data"][
+        token_store = self.account_resource(owner, "0x1::token::TokenStore")["data"][
             "tokens"
         ]["handle"]
 
@@ -422,15 +422,15 @@ class RestClient:
 
         return self.get_table_item(
             token_store,
-            "0x1::Token::TokenId",
-            "0x1::Token::Token",
+            "0x1::token::TokenId",
+            "0x1::token::Token",
             token_id,
         )["value"]
 
     def get_token_data(
         self, creator: AccountAddress, collection_name: str, token_name: str
     ) -> Any:
-        token_data = self.account_resource(creator, "0x1::Token::Collections")["data"][
+        token_data = self.account_resource(creator, "0x1::token::Collections")["data"][
             "token_data"
         ]["handle"]
 
@@ -442,20 +442,20 @@ class RestClient:
 
         return self.get_table_item(
             token_data,
-            "0x1::Token::TokenId",
-            "0x1::Token::TokenData",
+            "0x1::token::TokenId",
+            "0x1::token::TokenData",
             token_id,
         )
 
     def get_collection(self, creator: AccountAddress, collection_name: str) -> Any:
-        token_data = self.account_resource(creator, "0x1::Token::Collections")["data"][
+        token_data = self.account_resource(creator, "0x1::token::Collections")["data"][
             "collections"
         ]["handle"]
 
         return self.get_table_item(
             token_data,
             "0x1::ascii::String",
-            "0x1::Token::Collection",
+            "0x1::token::Collection",
             collection_name,
         )
 

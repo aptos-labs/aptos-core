@@ -66,7 +66,8 @@ impl Default for OnChainConsensusConfig {
 }
 
 impl OnChainConfig for OnChainConsensusConfig {
-    const IDENTIFIER: &'static str = "ConsensusConfig";
+    const MODULE_IDENTIFIER: &'static str = "consensus_config";
+    const TYPE_IDENTIFIER: &'static str = "ConsensusConfig";
 
     /// The Move resource is
     /// ```ignore

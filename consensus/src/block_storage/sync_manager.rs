@@ -110,12 +110,10 @@ impl BlockStore {
             if qc.ends_epoch() {
                 retriever
                     .network
-                    .broadcast(ConsensusMsg::EpochChangeProof(Box::new(
-                        EpochChangeProof::new(
-                            vec![qc.ledger_info().clone()],
-                            /* more = */ false,
-                        ),
-                    )))
+                    .broadcast_epoch_change(EpochChangeProof::new(
+                        vec![qc.ledger_info().clone()],
+                        /* more = */ false,
+                    ))
                     .await;
             }
         }

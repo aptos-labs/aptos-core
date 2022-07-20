@@ -169,7 +169,7 @@ async fn test_get_table_item() {
         ctx,
         &tt["table_table"],
         "u8",
-        "0x1::Table::Table<u8, u8>",
+        "0x1::table::Table<u8, u8>",
         1u8,
     )
     .await;

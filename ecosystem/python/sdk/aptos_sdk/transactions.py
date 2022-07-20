@@ -389,9 +389,9 @@ class Test(unittest.TestCase):
         ]
 
         payload = ScriptFunction.natural(
-            "0x1::Coin",
+            "0x1::coin",
             "transfer",
-            [TypeTag(StructTag.from_str("0x1::TestCoin::TestCoin"))],
+            [TypeTag(StructTag.from_str("0x1::test_coin::TestCoin"))],
             transaction_arguments,
         )
 
@@ -444,9 +444,9 @@ class Test(unittest.TestCase):
         ]
 
         payload = ScriptFunction.natural(
-            "0x1::Coin",
+            "0x1::coin",
             "transfer",
-            [TypeTag(StructTag.from_str("0x1::TestCoin::TestCoin"))],
+            [TypeTag(StructTag.from_str("0x1::test_coin::TestCoin"))],
             transaction_arguments,
         )
 
@@ -517,7 +517,7 @@ class Test(unittest.TestCase):
         ]
 
         payload = ScriptFunction.natural(
-            "0x1::Token",
+            "0x1::token",
             "direct_transfer_script",
             [],
             transaction_arguments,

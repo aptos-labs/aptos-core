@@ -1002,7 +1002,7 @@ mod tests {
 
         assert_serialize(
             Struct(create_nested_struct()),
-            json!("0x1::Home::ABC<address, 0x1::Account::Base<u128, vector<u64>, vector<0x1::Type::String>, 0x1::Type::String>>"),
+            json!("0x1::Home::ABC<address, 0x1::account::Base<u128, vector<u64>, vector<0x1::type::String>, 0x1::type::String>>"),
         );
     }
 
@@ -1049,7 +1049,7 @@ mod tests {
         assert_json(
             value,
             json!({
-                "type": "0x1::Type::Values",
+                "type": "0x1::type::Values",
                 "data": {
                     "field_u8": 7,
                     "field_u64": "7",
@@ -1080,7 +1080,7 @@ mod tests {
         assert_json(
             value,
             json!({
-                "type": "0x1::Type::Values",
+                "type": "0x1::type::Values",
                 "data": {
                     "address_0x0": "0x0",
                 }
@@ -1249,7 +1249,7 @@ mod tests {
     fn create_generic_type_struct() -> StructTag {
         StructTag {
             address: address("0x1"),
-            module: identifier("Account"),
+            module: identifier("account"),
             name: identifier("Base"),
             type_params: vec![
                 TypeTag::U128,
@@ -1263,7 +1263,7 @@ mod tests {
     fn type_struct(t: &str) -> StructTag {
         StructTag {
             address: address("0x1"),
-            module: identifier("Type"),
+            module: identifier("type"),
             name: identifier(t),
             type_params: vec![],
         }

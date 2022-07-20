@@ -9,6 +9,7 @@ use anyhow::Result;
 use aptos_crypto::{hash::TransactionAccumulatorHasher, HashValue};
 use aptos_state_view::StateViewId;
 use aptos_types::{proof::accumulator::InMemoryAccumulator, transaction::Version};
+use std::ops::Deref;
 use std::sync::Arc;
 
 /// A wrapper of the in-memory state sparse merkle tree and the transaction accumulator that
@@ -87,31 +88,31 @@ impl ExecutedTrees {
             && self.transaction_accumulator.root_hash() == rhs.transaction_accumulator.root_hash()
     }
 
-    pub fn verified_state_view(
+    pub fn verified_state_view<'a>(
         &self,
         id: StateViewId,
-        reader: Arc<dyn DbReader>,
-    ) -> Result<CachedStateView> {
+        reader: &'a dyn DbReader,
+    ) -> Result<CachedStateView<SyncProofFetcher<'a>>> {
         CachedStateView::new(
             id,
-            reader.clone(),
+            reader,
             self.transaction_accumulator.num_leaves(),
             self.state.current.clone(),
-            Arc::new(SyncProofFetcher::new(reader)),
+            SyncProofFetcher::new(reader),
         )
     }
 
     pub fn state_view(
         &self,
         id: StateViewId,
-        reader: Arc<dyn DbReader>,
-    ) -> Result<CachedStateView> {
+        reader: &Arc<dyn DbReader>,
+    ) -> Result<CachedStateView<NoProofFetcher>> {
         CachedStateView::new(
             id,
-            reader.clone(),
+            reader.deref(),
             self.transaction_accumulator.num_leaves(),
             self.state.current.clone(),
-            Arc::new(NoProofFetcher::new(reader)),
+            NoProofFetcher::new(reader.clone()),
         )
     }
 }
