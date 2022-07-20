@@ -38,10 +38,11 @@ pub use response::{
 };
 pub use table::TableItemRequest;
 pub use transaction::{
-    BlockMetadataTransaction, DirectWriteSet, Event, GenesisTransaction, PendingTransaction,
-    ScriptFunctionPayload, ScriptPayload, ScriptWriteSet, Transaction, TransactionData,
-    TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
-    TransactionSigningMessage, UserCreateSigningMessageRequest, UserTransaction,
-    UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
+    BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem, DirectWriteSet, Event,
+    GenesisTransaction, PendingTransaction, ScriptFunctionPayload, ScriptPayload, ScriptWriteSet,
+    Transaction, TransactionData, TransactionId, TransactionInfo, TransactionOnChainData,
+    TransactionPayload, TransactionSigningMessage, UserCreateSigningMessageRequest,
+    UserTransaction, UserTransactionRequest, WriteModule, WriteResource, WriteSet, WriteSetChange,
+    WriteSetPayload, WriteTableItem,
 };
 pub use wrappers::{IdentifierWrapper, MoveStructTagWrapper};
