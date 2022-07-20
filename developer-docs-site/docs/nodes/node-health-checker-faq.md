@@ -1,7 +1,6 @@
 ---
 title: "Node Health Checker FAQ"
 slug: "node-health-checker-faq"
-sidebar_position: 10
 ---
 import BlockQuote from "@site/src/components/BlockQuote";
 

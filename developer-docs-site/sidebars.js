@@ -113,6 +113,7 @@ const sidebars = {
           ],
         },
         "nodes/run-a-local-testnet",
+        "nodes/node-health-checker",
         "nodes/node-health-checker-faq",
       ],
     },
