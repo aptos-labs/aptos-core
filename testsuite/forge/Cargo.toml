@@ -10,6 +10,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
+again = "0.1.2"
 anyhow = { version = "1.0.57", features = ["backtrace"] }
 async-trait = "0.1.53"
 either = "1.6.1"
@@ -28,6 +29,7 @@ serde_json = "1.0.81"
 structopt = "0.3.21"
 tempfile = "3.3.0"
 termcolor = "1.1.2"
+thiserror = "1.0.31"
 tokio = { version = "1.18.2", features = ["full"] }
 url = "2.2.2"
 
