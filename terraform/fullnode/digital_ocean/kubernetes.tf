@@ -1,5 +1,5 @@
 provider "kubernetes" {
-  host                   = "${digitalocean_kubernetes_cluster.aptos.endpoint}"
+  host                   = digitalocean_kubernetes_cluster.aptos.endpoint
   cluster_ca_certificate = base64decode(digitalocean_kubernetes_cluster.aptos.kube_config[0].cluster_ca_certificate)
   token                  = digitalocean_kubernetes_cluster.aptos.kube_config[0].token
 }
@@ -12,16 +12,20 @@ resource "kubernetes_namespace" "aptos" {
 
 provider "helm" {
   kubernetes {
-    host                   = "${digitalocean_kubernetes_cluster.aptos.endpoint}"
+    host                   = digitalocean_kubernetes_cluster.aptos.endpoint
     cluster_ca_certificate = base64decode(digitalocean_kubernetes_cluster.aptos.kube_config[0].cluster_ca_certificate)
     token                  = digitalocean_kubernetes_cluster.aptos.kube_config[0].token
   }
 }
 
+locals {
+  fullnode_helm_chart_path = "${path.module}/../../helm/fullnode"
+}
+
 resource "helm_release" "fullnode" {
   count            = var.num_fullnodes
   name             = "${terraform.workspace}${count.index}"
-  chart            = "${path.module}/../../helm/fullnode"
+  chart            = local.fullnode_helm_chart_path
   max_history      = 100
   wait             = false
   namespace        = var.k8s_namespace
@@ -30,7 +34,7 @@ resource "helm_release" "fullnode" {
   values = [
     jsonencode({
       chain = {
-        era  = var.era
+        era = var.era
       }
       image = {
         tag = var.image_tag
@@ -39,7 +43,7 @@ resource "helm_release" "fullnode" {
         "doks.digitalocean.com/node-pool" = digitalocean_kubernetes_cluster.aptos.node_pool[0].name
       }
       storageClass = {
-          class = "do-block-storage"
+        class = "do-block-storage"
       }
       service = {
         type = "LoadBalancer"
@@ -52,8 +56,9 @@ resource "helm_release" "fullnode" {
     jsonencode(var.fullnode_helm_values_list == {} ? {} : var.fullnode_helm_values_list[count.index]),
   ]
 
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
-    name  = "timestamp"
-    value = var.helm_force_update ? timestamp() : ""
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.fullnode_helm_chart_path, "**") : filesha1("${local.fullnode_helm_chart_path}/${f}")]))
   }
 }
