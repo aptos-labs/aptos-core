@@ -12,174 +12,154 @@ import {
   DrawerOverlay,
   Flex,
   Grid,
+  HStack,
   Input,
-  InputGroup,
   SimpleGrid,
+  Spinner,
   Text,
   useColorMode,
   useDisclosure,
   VStack,
 } from '@chakra-ui/react';
 import { SubmitHandler, useForm } from 'react-hook-form';
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo } from 'react';
 import { IoIosSend } from '@react-icons/all-files/io/IoIosSend';
-import useWalletState from 'core/hooks/useWalletState';
 import {
-  getAccountExists,
-  getAccountResources,
-  getTestCoinTokenBalanceFromAccountResources,
+  useAccountCoinBalance,
   useAccountExists,
-  useAccountResources,
 } from 'core/queries/account';
-import { useSubmitTestCoinTransfer } from 'core/mutations/transaction';
+import {
+  useCoinTransferSimulation,
+  useCoinTransferTransaction,
+} from 'core/mutations/transaction';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
-import { STATIC_GAS_AMOUNT } from 'core/constants';
-import { secondaryErrorMessageColor, secondaryTextColor } from 'core/colors';
+import { secondaryDividerColor, secondaryErrorMessageColor, secondaryTextColor } from 'core/colors';
 import { GraceHopperBoringAvatar } from 'core/components/BoringAvatar';
 import numeral from 'numeral';
+import useDebounce from 'core/hooks/useDebounce';
 
-export const secondaryDividerColor = {
-  dark: 'whiteAlpha.300',
-  light: 'gray.200',
-};
+interface CoinTransferFormData {
+  amount?: number;
+  recipient?: string;
+}
 
-interface FormValues {
-  toAddress: string;
-  transferAmount: string;
+function isAddressValid(address?: string) {
+  return address
+    ? address.slice(0, 2) === '0x' && address.length === 66
+    : false;
+}
+
+function getAmountInputFontSize(amount?: number) {
+  if (!amount || amount < 1e7) {
+    return 64;
+  }
+  if (amount < 1e11) {
+    return 48;
+  }
+  return 36;
 }
 
 function TransferDrawer() {
   const { colorMode } = useColorMode();
-  const { aptosAccount, aptosNetwork } = useWalletState();
   const {
-    formState: { errors }, handleSubmit, register, setError, watch,
-  } = useForm<FormValues>();
-  const addressInputRef = useRef<HTMLInputElement>();
-  const { isOpen, onClose, onOpen } = useDisclosure();
-  const {
-    isLoading: isTransferLoading,
-    mutateAsync: submitSendTransaction,
-  } = useSubmitTestCoinTransfer();
-  const {
-    data: accountResources,
-  } = useAccountResources();
-
-  const tokenBalance = getTestCoinTokenBalanceFromAccountResources({ accountResources });
-  const tokenBalanceString = numeral(tokenBalance).format('0,0.0000');
-
-  const transferAmount: string | undefined | null = watch('transferAmount');
-  const transferAmountNumeral = numeral(transferAmount).format('0,0');
-  const transferAmountInputFontSize = useMemo(() => {
-    if (!transferAmount) {
-      return 64;
-    }
-    if (transferAmount.length <= 6) {
-      return 64;
-    }
-    if (transferAmount.length > 6 && transferAmount.length <= 10) {
-      return 48;
-    }
-    return 36;
-  }, [transferAmount]);
+    isOpen: isDrawerOpen,
+    onClose: closeDrawer,
+    onOpen: openDrawer,
+  } = useDisclosure();
 
   const {
-    onChange: addressOnChange,
-    ref: toAddressRef,
-    ...toAddressRest
-  } = { ...register('toAddress') };
-  const toAddress: string | undefined | null = watch('toAddress');
-  const explorerAddress = `https://explorer.devnet.aptos.dev/account/${toAddress}`;
-  const { data: toAddressAccountExists } = useAccountExists({
-    address: toAddress || '',
-    debounceTimeout: 5000,
+    formState: { isSubmitting },
+    handleSubmit,
+    register,
+    watch,
+  } = useForm<CoinTransferFormData>();
+
+  const recipient = watch('recipient');
+  const validRecipientAddress = isAddressValid(recipient) ? recipient : undefined;
+  const {
+    data: doesRecipientAccountExist,
+  } = useAccountExists({ address: validRecipientAddress });
+  const validRecipient = doesRecipientAccountExist ? recipient : undefined;
+
+  const amount = watch('amount');
+  const amountInputFontSize = useMemo(getAmountInputFontSize, [amount]);
+  const debouncedAmount = useDebounce(amount, 500);
+  const amountNumeral = numeral(debouncedAmount).format('0,0');
+
+  const { data: coinBalance } = useAccountCoinBalance();
+  const coinBalanceString = numeral(coinBalance).format('0,0.0000');
+
+  const {
+    data: simulatedTxn,
+    isFetching: isSimulationLoading,
+  } = useCoinTransferSimulation({
+    amount: debouncedAmount,
+    enabled: isDrawerOpen,
+    recipient: validRecipient,
   });
 
-  const onSubmit: SubmitHandler<Record<string, any>> = async (data, event) => {
+  const {
+    isReady: canSubmitTransaction,
+    mutateAsync: submitCoinTransfer,
+  } = useCoinTransferTransaction();
+
+  const onSubmit: SubmitHandler<CoinTransferFormData> = async (data, event) => {
     event?.preventDefault();
-    if (toAddress && aptosAccount && transferAmount) {
-      const toAccountExists = await getAccountExists({ address: toAddress, nodeUrl: aptosNetwork });
-      if (!toAccountExists) {
-        setError('toAddress', { message: 'Invalid account address', type: 'custom' });
-        return;
-      }
-      const fromAccountResources = await getAccountResources({
-        address: aptosAccount.address().hex(),
-        nodeUrl: aptosNetwork,
-      });
-      const currentTokenBalance = getTestCoinTokenBalanceFromAccountResources({
-        accountResources: fromAccountResources,
-      });
-      if (Number(transferAmount) >= Number(currentTokenBalance) - STATIC_GAS_AMOUNT) {
-        setError('toAddress', { message: 'Insufficient balance', type: 'custom' });
-        return;
-      }
-      await submitSendTransaction({
-        amount: transferAmount,
-        fromAccount: aptosAccount,
-        nodeUrl: aptosNetwork,
-        onClose,
-        toAddress,
-      });
+    if (!validRecipient || !debouncedAmount) {
+      return;
+    }
+    const onChainTxn = await submitCoinTransfer({
+      amount: debouncedAmount,
+      recipient: validRecipient,
+    });
+    if (onChainTxn && onChainTxn.success) {
+      closeDrawer();
     }
   };
 
-  const toAddressStatus = useMemo(() => {
-    if (!toAddress) {
-      return 'Please enter an address';
-    } if (toAddressAccountExists && toAddress) {
-      return toAddress;
-    }
-    return 'Invalid address';
-  }, [toAddressAccountExists, toAddress]);
+  const explorerAddress = `https://explorer.devnet.aptos.dev/account/${recipient}`;
+  const estimatedGasFee = debouncedAmount && simulatedTxn && Number(simulatedTxn.gas_used);
+  const maxAmount = coinBalance && estimatedGasFee && coinBalance - estimatedGasFee;
+  const isBalanceEnough = !maxAmount || debouncedAmount < maxAmount;
+
+  const canSubmitForm = canSubmitTransaction
+    && debouncedAmount
+    && isBalanceEnough
+    && simulatedTxn?.success;
 
   return (
     <>
       <Button
-        isLoading={isTransferLoading}
-        isDisabled={isTransferLoading}
         leftIcon={<IoIosSend />}
-        onClick={onOpen}
+        onClick={openDrawer}
       >
         Send
       </Button>
       <Drawer
         size="xl"
-        onClose={onClose}
-        isOpen={isOpen}
+        isOpen={isDrawerOpen}
+        onClose={closeDrawer}
         placement="bottom"
-        initialFocusRef={(addressInputRef as React.RefObject<HTMLInputElement>)}
       >
         <DrawerOverlay />
         <form onSubmit={handleSubmit(onSubmit)}>
           <DrawerContent>
             <DrawerHeader borderBottomWidth="1px" px={4}>
-              <Grid templateColumns="32px 1fr" gap={4} maxW="100%">
-                <Box pt={1}>
-                  <Box width="32px">
-                    <GraceHopperBoringAvatar type={(toAddressAccountExists) ? 'beam' : 'marble'} />
-                  </Box>
+              <HStack spacing={4}>
+                <Box width="32px">
+                  <GraceHopperBoringAvatar type={(doesRecipientAccountExist) ? 'beam' : 'marble'} />
                 </Box>
-                <VStack boxSizing="border-box" spacing={0} alignItems="flex-start" width="100%" maxW="100%">
-                  <InputGroup pb={1}>
-                    <Input
-                      fontWeight={600}
-                      size="sm"
-                      variant="unstyled"
-                      placeholder={toAddressStatus}
-                      required
-                      maxLength={70}
-                      minLength={60}
-                      onChange={addressOnChange}
-                      autoComplete="off"
-                      ref={(e) => {
-                        toAddressRef(e);
-                        addressInputRef.current = e || undefined;
-                      }}
-                      textOverflow="ellipsis"
-                      {...toAddressRest}
-                    />
-                  </InputGroup>
-                  {toAddressAccountExists ? (
+                <VStack boxSizing="border-box" spacing={0} alignItems="flex-start" flexGrow={1}>
+                  <Input
+                    pb={1}
+                    variant="unstyled"
+                    size="sm"
+                    fontWeight={600}
+                    autoComplete="off"
+                    placeholder="Please enter an address"
+                    {...register('recipient')}
+                  />
+                  {doesRecipientAccountExist ? (
                     <Button
                       color={secondaryTextColor[colorMode]}
                       fontSize="sm"
@@ -191,6 +171,7 @@ function TransferDrawer() {
                       variant="unstyled"
                       cursor="pointer"
                       href={explorerAddress}
+                      tabIndex={-1}
                     >
                       View on explorer
                     </Button>
@@ -203,39 +184,29 @@ function TransferDrawer() {
                       variant="unstyled"
                       cursor="default"
                     >
-                      Account not found
+                      { validRecipientAddress ? 'Account not found' : 'Invalid address' }
                     </Button>
                   )}
                 </VStack>
-              </Grid>
+              </HStack>
             </DrawerHeader>
             <DrawerBody px={0} py={0}>
-              <VStack width="100%" spacing={0}>
-                <VStack
-                  spacing={8}
-                  width="100%"
-                >
-                  <InputGroup>
-                    <Input
-                      textAlign="center"
-                      type="number"
-                      variant="filled"
-                      placeholder="0"
-                      min={0}
-                      py={32}
-                      fontSize={transferAmountInputFontSize}
-                      borderRadius="0px"
-                      required
-                      size="lg"
-                      _focusVisible={{
-                        outline: 'none',
-                      }}
-                      {...register('transferAmount', {
-                        max: 10000000,
-                      })}
-                    />
-                  </InputGroup>
-                </VStack>
+              <VStack spacing={0}>
+                <Input
+                  autoComplete="off"
+                  textAlign="center"
+                  type="number"
+                  variant="filled"
+                  placeholder="0"
+                  py={32}
+                  fontSize={amountInputFontSize}
+                  borderRadius="0px"
+                  size="lg"
+                  _focusVisible={{
+                    outline: 'none',
+                  }}
+                  {...register('amount', { valueAsNumber: true })}
+                />
                 <VStack
                   borderTopWidth="1px"
                   borderTopColor={secondaryDividerColor[colorMode]}
@@ -244,7 +215,7 @@ function TransferDrawer() {
                   spacing={0}
                   mt={0}
                 >
-                  <SimpleGrid width="100%" columns={2}>
+                  <SimpleGrid width="100%" columns={2} gap={1}>
                     <Flex>
                       <Text fontWeight={600} fontSize="md">
                         Balance
@@ -252,9 +223,18 @@ function TransferDrawer() {
                     </Flex>
                     <Flex justifyContent="right">
                       <Text color={secondaryTextColor[colorMode]} fontSize="md">
-                        {tokenBalanceString}
-                        {' '}
-                        coins
+                        {`${coinBalanceString} coins`}
+                      </Text>
+                    </Flex>
+                    <Flex>
+                      <Text fontWeight={600} fontSize="md">
+                        Fee
+                      </Text>
+                    </Flex>
+                    <Flex justifyContent="right">
+                      <Text color={secondaryTextColor[colorMode]} fontSize="md" as="span">
+                        { isSimulationLoading ? (<Spinner size="xs" />) : estimatedGasFee || 0 }
+                        { ' coins' }
                       </Text>
                     </Flex>
                   </SimpleGrid>
@@ -264,7 +244,7 @@ function TransferDrawer() {
                       color={secondaryErrorMessageColor[colorMode]}
                       wordBreak="break-word"
                     >
-                      {errors?.toAddress?.message}
+                      { isBalanceEnough || 'Insufficient funds' }
                     </Text>
                   </Flex>
                 </VStack>
@@ -272,14 +252,15 @@ function TransferDrawer() {
             </DrawerBody>
             <DrawerFooter borderTopColor={secondaryDividerColor[colorMode]} borderTopWidth="1px" px={4}>
               <Grid gap={4} width="100%" templateColumns="2fr 1fr">
-                <Button colorScheme="teal" isLoading={isTransferLoading} isDisabled={isTransferLoading} type="submit">
-                  Send
-                  {' '}
-                  {transferAmountNumeral}
-                  {' '}
-                  coins
+                <Button
+                  colorScheme="teal"
+                  isLoading={isSubmitting}
+                  isDisabled={!canSubmitForm}
+                  type="submit"
+                >
+                  { `Send ${amountNumeral} coins` }
                 </Button>
-                <Button onClick={onClose} isDisabled={isTransferLoading}>
+                <Button onClick={closeDrawer} isDisabled={isSubmitting}>
                   Cancel
                 </Button>
               </Grid>

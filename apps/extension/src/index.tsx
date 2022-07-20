@@ -17,6 +17,8 @@ import { StepsStyleConfig as Steps } from 'chakra-ui-steps';
 
 const { ToastContainer } = createStandaloneToast();
 
+const isProductionEnv = process.env.NODE_ENV === 'production';
+
 // todo: fix for extension
 // ReactGA.initialize('G-VFLV1PF59M');
 // ReactGA.send({
@@ -34,7 +36,7 @@ const theme: ThemeConfig = extendTheme({
     global: {
       'html, body': {
         margin: 0,
-        overflow: (process.env.NODE_ENV !== 'development') ? 'hidden' : undefined,
+        overflow: isProductionEnv ? 'hidden' : undefined,
         padding: 0,
       },
     },
@@ -42,7 +44,13 @@ const theme: ThemeConfig = extendTheme({
   useSystemColorMode: false,
 });
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: isProductionEnv,
+    },
+  },
+});
 
 const root = createRoot(document.getElementById('root') as Element);
 

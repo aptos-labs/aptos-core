@@ -54,7 +54,7 @@ export const useSwitchNetwork = () => {
       }
     }
     updateNetworkState(newAptosNetwork);
-    queryClient.invalidateQueries(queryKeys.getAccountResources);
+    queryClient.invalidateQueries(queryKeys.getAccountCoinBalance);
   };
 
   return useMutation(mutation);

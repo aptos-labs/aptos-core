@@ -9,6 +9,7 @@ import { ScriptFunctionPayload, UserTransaction } from 'aptos/dist/api/data-cont
 
 export const transactionQueryKeys = Object.freeze({
   getAccountLatestTransactionTimestamp: 'getAccountLatestTransactionTimestamp',
+  getCoinTransferSimulation: 'getCoinTransferSimulation',
   getCoinTransferTransactions: 'getCoinTransferTransactions',
   getUserTransaction: 'getUserTransaction',
 } as const);

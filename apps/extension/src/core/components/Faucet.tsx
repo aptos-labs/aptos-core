@@ -10,7 +10,7 @@ import { faFaucet } from '@fortawesome/free-solid-svg-icons/faFaucet';
 import useWalletState from 'core/hooks/useWalletState';
 import { fundAccountWithFaucet } from 'core/queries/faucet';
 import { useMutation, useQueryClient } from 'react-query';
-import { LOCAL_FAUCET_URL } from 'core/constants';
+import { aptosCoinStructTag, LOCAL_FAUCET_URL } from 'core/constants';
 import Analytics from 'core/utils/analytics/analytics';
 import { faucetEvents } from 'core/utils/analytics/events';
 import { toast } from './Toast';
@@ -36,7 +36,7 @@ export default function Faucet() {
         params: {
           address: aptosAccount?.address().hex(),
           amount: 5000,
-          coinType: '0x1::test_coin::TestCoin',
+          coinType: aptosCoinStructTag,
           network: aptosNetwork,
         },
       });

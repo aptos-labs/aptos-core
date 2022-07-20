@@ -25,7 +25,9 @@ import {
 } from '@chakra-ui/react';
 import { secondaryTextColor, secondaryBgColor } from 'core/colors';
 import useWalletState from 'core/hooks/useWalletState';
-import { getTestCoinTokenBalanceFromAccountResources, useAccountResources } from 'core/queries/account';
+import {
+  useAccountCoinBalance,
+} from 'core/queries/account';
 import { useAccountLatestTransactionTimestamp } from 'core/queries/transaction';
 import Routes from 'core/routes';
 import numeral from 'numeral';
@@ -61,15 +63,9 @@ function WalletDrawerBodyListItem(
     address,
     refetchInterval: 4000,
   });
-  const {
-    data: accountResources,
-  } = useAccountResources({
-    address,
-    refetchInterval: 4000,
-  });
 
-  const tokenBalance = getTestCoinTokenBalanceFromAccountResources({ accountResources });
-  const tokenBalanceString = numeral(tokenBalance).format('0,0');
+  const { data: coinBalance } = useAccountCoinBalance({ refetchInterval: 4000 });
+  const coinBalanceString = numeral(coinBalance).format('0,0');
 
   const walletAddressFormatted = `Wallet: ${address.substring(0, 15)}...`;
 
@@ -157,7 +153,7 @@ function WalletDrawerBodyListItem(
               <Text noOfLines={1} fontSize="sm">
                 Balance:
                 {' '}
-                {tokenBalanceString}
+                {coinBalanceString}
               </Text>
               <Text noOfLines={1} fontSize="sm">
                 {
@@ -172,7 +168,7 @@ function WalletDrawerBodyListItem(
       </Box>
     );
   }, [input, checkbox, colorMode, isChecked, walletAddressFormatted,
-    onOpen, isOpen, onClose, address, tokenBalanceString,
+    onOpen, isOpen, onClose, address, coinBalanceString,
     latestTransactionTimestamp, removeAccount, navigate]);
 }
 

@@ -23,6 +23,11 @@ export const secondaryErrorMessageColor = {
   light: 'red.500',
 };
 
+export const secondaryExtensionBodyTextColor = {
+  dark: 'gray.400',
+  light: 'gray.400',
+};
+
 // Button
 
 export const secondaryButtonColor = {
@@ -72,7 +77,9 @@ export const secondaryGridBgColor = {
   light: 'gray.100',
 };
 
-export const secondaryExtensionBodyTextColor = {
-  dark: 'gray.400',
-  light: 'gray.400',
+// Other
+
+export const secondaryDividerColor = {
+  dark: 'whiteAlpha.300',
+  light: 'gray.200',
 };
