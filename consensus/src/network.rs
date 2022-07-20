@@ -5,6 +5,7 @@ use crate::{
     counters,
     logging::LogEvent,
     network_interface::{ConsensusMsg, ConsensusNetworkEvents, ConsensusNetworkSender},
+    quorum_store::types::Batch,
 };
 use anyhow::{anyhow, ensure};
 use aptos_logger::prelude::*;
@@ -19,6 +20,7 @@ use consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
     common::Author,
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    proof_of_store::SignedDigest,
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
@@ -120,6 +122,21 @@ impl NetworkSender {
         Ok(response)
     }
 
+    pub async fn broadcast_without_self(&mut self, msg: ConsensusMsg) {
+        // Get the list of validators excluding our own account address. Note the
+        // ordering is not important in this case.
+        let self_author = self.author;
+        let other_validators = self
+            .validators
+            .get_ordered_account_addresses_iter()
+            .filter(|author| author != &self_author);
+
+        // Broadcast message over direct-send to all other validators.
+        if let Err(err) = self.network_sender.send_to_many(other_validators, msg) {
+            error!(error = ?err, "Error broadcasting message");
+        }
+    }
+
     /// Tries to send the given msg to all the participants.
     ///
     /// The future is fulfilled as soon as the message put into the mpsc channel to network
@@ -133,18 +150,7 @@ impl NetworkSender {
             error!("Error broadcasting to self: {:?}", err);
         }
 
-        // Get the list of validators excluding our own account address. Note the
-        // ordering is not important in this case.
-        let self_author = self.author;
-        let other_validators = self
-            .validators
-            .get_ordered_account_addresses_iter()
-            .filter(|author| author != &self_author);
-
-        // Broadcast message over direct-send to all other validators.
-        if let Err(err) = self.network_sender.send_to_many(other_validators, msg) {
-            error!(error = ?err, "Error broadcasting message");
-        }
+        self.broadcast_without_self(msg).await;
     }
 
     /// Tries to send msg to given recipients.
@@ -215,6 +221,18 @@ impl NetworkSender {
     pub async fn send_proposal(&self, proposal_msg: ProposalMsg, recipients: Vec<Author>) {
         fail_point!("consensus::send_proposal", |_| ());
         let msg = ConsensusMsg::ProposalMsg(Box::new(proposal_msg));
+        self.send(msg, recipients).await
+    }
+
+    pub async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
+        fail_point!("consensus::send_batch", |_| ());
+        let msg = ConsensusMsg::BatchMsg(Box::new(batch));
+        self.send(msg, recipients).await
+    }
+
+    pub async fn send_signed_digest(&self, signed_digest: SignedDigest, recipients: Vec<Author>) {
+        fail_point!("consensus::send_signed_digest", |_| ());
+        let msg = ConsensusMsg::SignedDigestMsg(Box::new(signed_digest));
         self.send(msg, recipients).await
     }
 

@@ -33,10 +33,10 @@ pub fn quorum_store_service_latency(label: &'static str, result: &str, duration:
 }
 
 /// Duration of each run of the event loop.
-pub static MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
+pub static WRAPPER_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
     DurationHistogram::new(
         register_histogram!(
-            "quorum_store_main_loop",
+            "quorum_store_wrapper_main_loop",
             "Duration of the each run of the event loop"
         )
         .unwrap(),

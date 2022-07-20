@@ -162,6 +162,7 @@ impl ProposalGenerator {
             let payload = self
                 .payload_manager
                 .pull_payload(
+                    round,
                     self.max_block_size,
                     payload_filter,
                     wait_callback,

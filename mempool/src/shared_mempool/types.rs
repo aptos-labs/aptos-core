@@ -159,6 +159,7 @@ pub enum QuorumStoreRequest {
         // callback to respond to
         oneshot::Sender<Result<QuorumStoreResponse>>,
     ),
+    // TODO: Do we use it in the real QS as well?
     /// Notifications about *rejected* committed txns.
     RejectNotification(
         // rejected transactions from consensus
