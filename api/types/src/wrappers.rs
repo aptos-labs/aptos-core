@@ -1,8 +1,18 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::EventKey;
-use aptos_openapi::impl_poem_type;
+//! The purpose of this file is to define wrappers that we can use in the
+//! endpoint handlers, specifically for accepting these types as parameters.
+//! In Poem, it is not enough to impl FromStr for the types we want to use
+//! as path parameters, as that does not describe anything about the input.
+//! These wrappers say "I don't care" and use the impl_poem_type and
+//! impl_poem_parameter macros to make it that we declare these inputs as
+//! just strings, using the FromStr impl to parse the path param. They can
+//! then be unpacked to the real type beneath.
+
+use crate::MoveStructTag;
+
+use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use move_deps::move_core_types::identifier::{IdentStr, Identifier};
 
 use serde::{Deserialize, Serialize};
@@ -63,3 +73,36 @@ impl fmt::Display for IdentifierWrapper {
 }
 
 impl_poem_type!(IdentifierWrapper);
+impl_poem_parameter!(IdentifierWrapper);
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct MoveStructTagWrapper(pub MoveStructTag);
+
+impl FromStr for MoveStructTagWrapper {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> anyhow::Result<Self, anyhow::Error> {
+        Ok(MoveStructTagWrapper(MoveStructTag::from_str(s)?))
+    }
+}
+
+impl From<MoveStructTagWrapper> for MoveStructTag {
+    fn from(value: MoveStructTagWrapper) -> MoveStructTag {
+        value.0
+    }
+}
+
+impl From<MoveStructTag> for MoveStructTagWrapper {
+    fn from(value: MoveStructTag) -> MoveStructTagWrapper {
+        Self(value)
+    }
+}
+
+impl fmt::Display for MoveStructTagWrapper {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        MoveStructTag::fmt(&self.0, f)
+    }
+}
+
+impl_poem_type!(MoveStructTagWrapper);
+impl_poem_parameter!(MoveStructTagWrapper);

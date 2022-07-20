@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
 use super::accept_type::AcceptType;
@@ -14,13 +14,17 @@ use super::{AptosError, AptosErrorCode, AptosErrorResponse};
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use anyhow::format_err;
-use aptos_api_types::{AccountData, Address, AsConverter, TransactionId};
+use aptos_api_types::{AccountData, Address, AsConverter, MoveStructTag, TransactionId};
 use aptos_api_types::{LedgerInfo, MoveModuleBytecode, MoveResource};
 use aptos_types::access_path::AccessPath;
 use aptos_types::account_config::AccountResource;
 use aptos_types::account_state::AccountState;
+use aptos_types::event::EventHandle;
+use aptos_types::event::EventKey;
 use aptos_types::state_store::state_key::StateKey;
+use move_deps::move_core_types::value::MoveValue;
 use move_deps::move_core_types::{
+    identifier::Identifier,
     language_storage::{ResourceKey, StructTag},
     move_resource::MoveStructType,
 };
@@ -253,6 +257,84 @@ impl Account {
             ),
             self.latest_ledger_info.version(),
         )
+    }
+
+    fn field_not_found(
+        &self,
+        struct_tag: &StructTag,
+        field_name: &Identifier,
+    ) -> AptosErrorResponse {
+        AptosErrorResponse::not_found(
+            "resource",
+            format!(
+                "address({}), struct tag({}), field name({}) and ledger version({})",
+                self.address, struct_tag, field_name, self.ledger_version
+            ),
+            self.latest_ledger_info.version(),
+        )
+    }
+
+    // TODO: Break this up into 3 structs / traits. There is common stuff,
+    // account specific stuff, and event specific stuff.
+
+    // Events specific stuff.
+
+    pub fn find_event_key(
+        &self,
+        event_handle: MoveStructTag,
+        field_name: Identifier,
+    ) -> AptosInternalResult<EventKey> {
+        let struct_tag: StructTag = event_handle.try_into().map_err(|e| {
+            AptosErrorResponse::BadRequest(Json(AptosError::new(
+                format_err!("Given event handle was invalid: {}", e).to_string(),
+            )))
+        })?;
+
+        let resource = self.find_resource(&struct_tag)?;
+
+        let (_id, value) = resource
+            .into_iter()
+            .find(|(id, _)| id == &field_name)
+            .ok_or_else(|| self.field_not_found(&struct_tag, &field_name))?;
+
+        // serialization should not fail, otherwise it's internal bug
+        // TODO: don't unwrap
+        let event_handle_bytes = bcs::to_bytes(&value).unwrap();
+        // deserialization may fail because the bytes are not EventHandle struct type.
+        let event_handle: EventHandle = bcs::from_bytes(&event_handle_bytes).map_err(|e| {
+            AptosErrorResponse::BadRequest(Json(AptosError::new(
+                format_err!(
+                    "Deserialization error, field({}) type is not EventHandle struct: {}",
+                    field_name,
+                    e
+                )
+                .to_string(),
+            )))
+        })?;
+        Ok(*event_handle.key())
+    }
+
+    fn find_resource(
+        &self,
+        struct_tag: &StructTag,
+    ) -> AptosInternalResult<Vec<(Identifier, MoveValue)>> {
+        let account_state = self.account_state()?;
+        let (typ, data) = account_state
+            .get_resources()
+            .find(|(tag, _data)| tag == struct_tag)
+            .ok_or_else(|| self.resource_not_found(struct_tag))?;
+        let move_resolver = self.context.move_resolver_poem()?;
+        move_resolver
+            .as_converter()
+            .move_struct_fields(&typ, data)
+            .map_err(|e| {
+                AptosErrorResponse::InternalServerError(Json(
+                    AptosError::new(
+                        format_err!("Failed to convert move structs: {}", e).to_string(),
+                    )
+                    .error_code(AptosErrorCode::ReadFromStorageError),
+                ))
+            })
     }
 }
 
