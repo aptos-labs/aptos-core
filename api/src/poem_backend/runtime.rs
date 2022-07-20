@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 use super::{middleware_log, AccountsApi, BasicApi, EventsApi, IndexApi};
 
@@ -18,11 +18,12 @@ use poem::{
 use poem_openapi::{ContactObject, LicenseObject, OpenApiService};
 use tokio::runtime::Runtime;
 
+/// Returns address it is running at.
 pub fn attach_poem_to_runtime(
     runtime: &Runtime,
     context: Context,
     config: &NodeConfig,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<SocketAddr> {
     let context = Arc::new(context);
 
     let apis = (
@@ -55,7 +56,11 @@ pub fn attach_poem_to_runtime(
     let spec_json = api_service.spec_endpoint();
     let spec_yaml = api_service.spec_endpoint_yaml();
 
-    let address = config.api.address;
+    let mut address = config.api.address;
+
+    // TODO: This is temporary while we serve both APIs simulatenously.
+    // Doing this means the OS assigns it an unused port.
+    address.set_port(0);
 
     let listener = match (&config.api.tls_cert_path, &config.api.tls_key_path) {
         (Some(tls_cert_path), Some(tls_key_path)) => {
@@ -78,24 +83,35 @@ pub fn attach_poem_to_runtime(
         }
     };
 
+    let acceptor = runtime
+        .block_on(async move { listener.into_acceptor().await })
+        .context("Failed to bind Poem to address with OS assigned port")?;
+
+    let actual_address = &acceptor.local_addr()[0];
+    let actual_address = *actual_address
+        .as_socket_addr()
+        .context("Failed to get socket addr from local addr for Poem webserver")?;
+
     runtime.spawn(async move {
         let cors = Cors::new()
             .allow_methods(vec![Method::GET, Method::POST])
             .allow_headers(vec![header::CONTENT_TYPE, header::ACCEPT]);
         let route = Route::new()
             .nest("/", api_service)
-            // TODO: I prefer "spec" here but it's not backwards compatible.
-            // Consider doing it later if we cut over to this entirely.
-            // TODO: Consider making these part of the API itself.
-            .at("/openapi.json", spec_json)
-            .at("/openapi.yaml", spec_yaml)
+            .at("/spec.json", spec_json)
+            .at("/spec.yaml", spec_yaml)
             .with(cors)
             .around(middleware_log);
-        Server::new(listener)
+        Server::new_with_acceptor(acceptor)
             .run(route)
             .await
             .map_err(anyhow::Error::msg)
     });
 
-    Ok(())
+    info!(
+        "Poem is running at {}, behind the reverse proxy at the API port",
+        actual_address
+    );
+
+    Ok(actual_address)
 }

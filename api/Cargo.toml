@@ -27,6 +27,7 @@ serde_json = { version = "1.0.81", features = ["preserve_order"] }
 tokio = { version = "1.18.2", features = ["full"] }
 url = "2.2.2"
 warp = { version = "0.3.2", features = ["default", "tls"] }
+warp-reverse-proxy = "0.5.0"
 
 aptos-api-types = { path = "./types", package = "aptos-api-types" }
 aptos-config = { path = "../config" }

@@ -238,6 +238,7 @@ dependencies = [
  "url",
  "vm-validator",
  "warp",
+ "warp-reverse-proxy",
 ]
 
 [[package]]
@@ -9258,6 +9259,20 @@ dependencies = [
  "tokio-util 0.6.10",
  "tower-service",
  "tracing",
+]
+
+[[package]]
+name = "warp-reverse-proxy"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21bb86f4c86d0fb386acf34fa5360ea0e8a082835e05296da2286c38a3316283"
+dependencies = [
+ "hyper",
+ "once_cell",
+ "reqwest",
+ "thiserror",
+ "unicase",
+ "warp",
 ]
 
 [[package]]
