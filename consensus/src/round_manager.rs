@@ -673,6 +673,7 @@ impl RoundManager {
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
                 self.new_2chain_tc_aggregated(tc).await
             }
+            VoteReceptionResult::EchoTimeout(_) => self.process_local_timeout(round).await,
             _ => Ok(()),
         }
     }
