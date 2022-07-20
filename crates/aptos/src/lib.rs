@@ -7,6 +7,7 @@ pub mod account;
 pub mod common;
 pub mod config;
 pub mod genesis;
+pub mod governance;
 pub mod move_tool;
 pub mod node;
 pub mod op;
@@ -30,6 +31,8 @@ pub enum Tool {
     Config(config::ConfigTool),
     #[clap(subcommand)]
     Genesis(genesis::GenesisTool),
+    #[clap(subcommand)]
+    Governance(governance::GovernanceTool),
     Info(InfoTool),
     Init(common::init::InitTool),
     #[clap(subcommand)]
@@ -47,6 +50,7 @@ impl Tool {
             Account(tool) => tool.execute().await,
             Config(tool) => tool.execute().await,
             Genesis(tool) => tool.execute().await,
+            Governance(tool) => tool.execute().await,
             Info(tool) => tool.execute_serialized().await,
             // TODO: Replace entirely with config init
             Init(tool) => tool.execute_serialized_success().await,
