@@ -3,12 +3,12 @@
 /// 2. List token for swapping with a targeted CoinType.
 /// 3. Execute the swapping
 module aptos_token::token_coin_swap {
-    use std::event::{Self, EventHandle};
+    use aptos_std::event::{Self, EventHandle};
     use std::signer;
-    use aptos_framework::table::{Self, Table};
+    use aptos_std::table::{Self, Table};
     use aptos_framework::coin;
     use aptos_framework::timestamp;
-    use aptos_framework::type_info::{Self, TypeInfo};
+    use aptos_std::type_info::{Self, TypeInfo};
     use aptos_token::token_v1::{Self, Token, TokenId, deposit_token, withdraw_token, merge, split};
 
     const ETOKEN_ALREADY_LISTED: u64 = 1;

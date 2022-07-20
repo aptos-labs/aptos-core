@@ -2,7 +2,7 @@
 /// modified from https://github.com/move-language/move/tree/main/language/documentation/tutorial
 module aptos_framework::aptos_coin {
     use std::string;
-    use std::errors;
+    use std::error;
     use std::signer;
     use std::vector;
     use std::option::{Self, Option};
@@ -73,7 +73,7 @@ module aptos_framework::aptos_coin {
 
         assert!(
             exists<Capabilities>(account_addr),
-            errors::not_published(ENO_CAPABILITIES),
+            error::not_found(ENO_CAPABILITIES),
         );
 
         let capabilities = borrow_global<Capabilities>(account_addr);
@@ -88,7 +88,7 @@ module aptos_framework::aptos_coin {
         let i = 0;
         while (i < vector::length(delegations)) {
             let element = vector::borrow(delegations, i);
-            assert!(element.to != to, errors::invalid_argument(EALREADY_DELEGATED));
+            assert!(element.to != to, error::invalid_argument(EALREADY_DELEGATED));
             i = i + 1;
         };
         vector::push_back(delegations, DelegatedMintCapability { to });

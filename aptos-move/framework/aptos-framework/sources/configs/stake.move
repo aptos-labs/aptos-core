@@ -17,15 +17,15 @@
  * 9. Owner can always switch operators by calling Stake::set_operator.
 */
 module aptos_framework::stake {
-    use std::errors;
-    use std::event::{Self, EventHandle};
+    use std::error;
     use std::option::{Self, Option};
     use std::signer;
     use std::vector;
+    use aptos_std::comparator;
+    use aptos_std::event::{Self, EventHandle};
+    use aptos_std::signature;
     use aptos_framework::governance_proposal::{GovernanceProposal};
     use aptos_framework::coin::{Self, Coin, MintCapability};
-    use aptos_framework::comparator;
-    use aptos_framework::signature;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::aptos_coin::AptosCoin;
@@ -348,7 +348,7 @@ module aptos_framework::stake {
     ) acquires ValidatorSetConfiguration {
         assert!(
             new_rewards_rate_denominator > 0,
-            errors::invalid_argument(EINVALID_REWARDS_RATE),
+            error::invalid_argument(EINVALID_REWARDS_RATE),
         );
 
         let validator_set_config = borrow_global_mut<ValidatorSetConfiguration>(@aptos_framework);
@@ -374,7 +374,7 @@ module aptos_framework::stake {
         validate_required_lockup(min_lockup_duration_secs, max_lockup_duration_secs);
         assert!(
             rewards_rate_denominator > 0,
-            errors::invalid_argument(EINVALID_REWARDS_RATE),
+            error::invalid_argument(EINVALID_REWARDS_RATE),
         );
 
         move_to(aptos_framework, ValidatorSet {
@@ -414,8 +414,8 @@ module aptos_framework::stake {
         fullnode_addresses: vector<u8>,
     ) {
         let account_address = signer::address_of(account);
-        assert!(!exists<StakePool>(account_address), errors::invalid_argument(EALREADY_REGISTERED));
-        assert!(signature::bls12381_validate_pubkey(consensus_pubkey, proof_of_possession), errors::invalid_argument(EINVALID_PUBLIC_KEY));
+        assert!(!exists<StakePool>(account_address), error::invalid_argument(EALREADY_REGISTERED));
+        assert!(signature::bls12381_validate_pubkey(consensus_pubkey, proof_of_possession), error::invalid_argument(EINVALID_PUBLIC_KEY));
 
         move_to(account, StakePool {
             active: coin::zero<AptosCoin>(),
@@ -477,7 +477,7 @@ module aptos_framework::stake {
         owner_cap: &OwnerCapability,
         new_operator: address,
     ) acquires StakePool, StakePoolEvents {
-        assert!(owner_cap.pool_address == pool_address, errors::invalid_argument(ENOT_OWNER));
+        assert!(owner_cap.pool_address == pool_address, error::invalid_argument(ENOT_OWNER));
 
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         let old_operator = stake_pool.operator_address;
@@ -510,7 +510,7 @@ module aptos_framework::stake {
         owner_cap: &OwnerCapability,
         new_delegated_voter: address,
     ) acquires StakePool {
-        assert!(owner_cap.pool_address == pool_address, errors::invalid_argument(ENOT_OWNER));
+        assert!(owner_cap.pool_address == pool_address, error::invalid_argument(ENOT_OWNER));
 
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         stake_pool.delegated_voter = new_delegated_voter;
@@ -532,10 +532,10 @@ module aptos_framework::stake {
         owner_cap: &OwnerCapability,
         coins: Coin<AptosCoin>,
     ) acquires StakePool, StakePoolEvents, ValidatorSet, ValidatorSetConfiguration {
-        assert!(owner_cap.pool_address == pool_address, errors::invalid_argument(ENOT_OWNER));
+        assert!(owner_cap.pool_address == pool_address, error::invalid_argument(ENOT_OWNER));
 
         let amount = coin::value<AptosCoin>(&coins);
-        assert!(amount > 0, errors::invalid_argument(EINVALID_STAKE_AMOUNT));
+        assert!(amount > 0, error::invalid_argument(EINVALID_STAKE_AMOUNT));
 
         // Add to pending_active if it's a current validator because the stake is not counted until the next epoch.
         // Otherwise, the delegation can be added to active directly as the validator is also activated in the epoch.
@@ -549,7 +549,7 @@ module aptos_framework::stake {
         let maximum_stake = borrow_global<ValidatorSetConfiguration>(@aptos_framework).maximum_stake;
         let total_stake = coin::value<AptosCoin>(&stake_pool.active) +
                           coin::value<AptosCoin>(&stake_pool.pending_active);
-        assert!(total_stake <= maximum_stake, errors::invalid_argument(ESTAKE_EXCEEDS_MAX));
+        assert!(total_stake <= maximum_stake, error::invalid_argument(ESTAKE_EXCEEDS_MAX));
 
         let stake_pool_events = borrow_global_mut<StakePoolEvents>(pool_address);
         event::emit_event<AddStakeEvent>(
@@ -569,12 +569,12 @@ module aptos_framework::stake {
         proof_of_possession: vector<u8>,
     ) acquires StakePool, StakePoolEvents, ValidatorConfig {
         let stake_pool = borrow_global<StakePool>(pool_address);
-        assert!(signer::address_of(account) == stake_pool.operator_address, errors::invalid_argument(ENOT_OPERATOR));
+        assert!(signer::address_of(account) == stake_pool.operator_address, error::invalid_argument(ENOT_OPERATOR));
 
-        assert!(exists<ValidatorConfig>(pool_address), errors::not_published(EVALIDATOR_CONFIG));
+        assert!(exists<ValidatorConfig>(pool_address), error::not_found(EVALIDATOR_CONFIG));
         let validator_info = borrow_global_mut<ValidatorConfig>(pool_address);
         let old_consensus_pubkey = validator_info.consensus_pubkey;
-        assert!(signature::bls12381_validate_pubkey(new_consensus_pubkey, proof_of_possession), errors::invalid_argument(EINVALID_PUBLIC_KEY));
+        assert!(signature::bls12381_validate_pubkey(new_consensus_pubkey, proof_of_possession), error::invalid_argument(EINVALID_PUBLIC_KEY));
         validator_info.consensus_pubkey = new_consensus_pubkey;
 
         let stake_pool_events = borrow_global_mut<StakePoolEvents>(pool_address);
@@ -596,9 +596,9 @@ module aptos_framework::stake {
         new_fullnode_addresses: vector<u8>,
     ) acquires StakePool, StakePoolEvents, ValidatorConfig {
         let stake_pool = borrow_global<StakePool>(pool_address);
-        assert!(signer::address_of(account) == stake_pool.operator_address, errors::invalid_argument(ENOT_OPERATOR));
+        assert!(signer::address_of(account) == stake_pool.operator_address, error::invalid_argument(ENOT_OPERATOR));
 
-        assert!(exists<ValidatorConfig>(pool_address), errors::not_published(EVALIDATOR_CONFIG));
+        assert!(exists<ValidatorConfig>(pool_address), error::not_found(EVALIDATOR_CONFIG));
         let validator_info = borrow_global_mut<ValidatorConfig>(pool_address);
         let old_network_addresses = validator_info.network_addresses;
         validator_info.network_addresses = new_network_addresses;
@@ -635,7 +635,7 @@ module aptos_framework::stake {
         owner_cap: &OwnerCapability,
         new_locked_until_secs: u64,
     ) acquires StakePool, StakePoolEvents, ValidatorSetConfiguration {
-        assert!(owner_cap.pool_address == pool_address, errors::invalid_argument(ENOT_OWNER));
+        assert!(owner_cap.pool_address == pool_address, error::invalid_argument(ENOT_OWNER));
         let validator_set_config = borrow_global<ValidatorSetConfiguration>(@aptos_framework);
         validate_lockup_time(new_locked_until_secs, validator_set_config);
 
@@ -662,7 +662,7 @@ module aptos_framework::stake {
         let validator_set_config = borrow_global<ValidatorSetConfiguration>(@aptos_framework);
         assert!(
             validator_set_config.allow_validator_set_change,
-            errors::invalid_argument(ENO_POST_GENESIS_VALIDATOR_SET_CHANGE_ALLOWED),
+            error::invalid_argument(ENO_POST_GENESIS_VALIDATOR_SET_CHANGE_ALLOWED),
         );
 
         join_validator_set_internal(account, pool_address);
@@ -680,7 +680,7 @@ module aptos_framework::stake {
     ) acquires StakePool, StakePoolEvents, ValidatorConfig, ValidatorSet, ValidatorSetConfiguration {
         let stake_pool = borrow_global<StakePool>(pool_address);
         // Account has to be the operator.
-        assert!(signer::address_of(account) == stake_pool.operator_address, errors::invalid_argument(ENOT_OPERATOR));
+        assert!(signer::address_of(account) == stake_pool.operator_address, error::invalid_argument(ENOT_OPERATOR));
 
         // Requires the validator to have a lockup more than the minimum.
         let validator_set_config = borrow_global<ValidatorSetConfiguration>(@aptos_framework);
@@ -689,13 +689,13 @@ module aptos_framework::stake {
         // Throw an error is the validator is already active.
         assert!(
             get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE,
-            errors::invalid_argument(EALREADY_ACTIVE_VALIDATOR),
+            error::invalid_argument(EALREADY_ACTIVE_VALIDATOR),
         );
 
         // The validator is not yet activated so all added stake should be in active.
         let voting_power = coin::value<AptosCoin>(&stake_pool.active);
-        assert!(voting_power >= validator_set_config.minimum_stake, errors::invalid_argument(ESTAKE_TOO_LOW));
-        assert!(voting_power <= validator_set_config.maximum_stake, errors::invalid_argument(ESTAKE_TOO_HIGH));
+        assert!(voting_power >= validator_set_config.minimum_stake, error::invalid_argument(ESTAKE_TOO_LOW));
+        assert!(voting_power <= validator_set_config.maximum_stake, error::invalid_argument(ESTAKE_TOO_HIGH));
 
         // Add validator to pending_active, to be activated in the next epoch.
         let validator_config = borrow_global_mut<ValidatorConfig>(pool_address);
@@ -722,7 +722,7 @@ module aptos_framework::stake {
         amount: u64,
         owner_cap: &OwnerCapability,
     ) acquires StakePool, StakePoolEvents, ValidatorSet {
-        assert!(owner_cap.pool_address == pool_address, errors::invalid_argument(ENOT_OWNER));
+        assert!(owner_cap.pool_address == pool_address, error::invalid_argument(ENOT_OWNER));
 
         // Short-circuit if amount to unlock is 0 so we don't emit events.
         if (amount == 0) {
@@ -736,7 +736,7 @@ module aptos_framework::stake {
         // This is also enforced even if the validator is not active in order to prevent a validator from intentionally
         // leave the set early to be able to unlock.
         if (stake_pool.locked_until_secs > timestamp::now_seconds()) {
-            abort errors::invalid_argument(EWITHDRAW_NOT_ALLOWED)
+            abort error::invalid_argument(EWITHDRAW_NOT_ALLOWED)
         };
 
         // Move requested amount to pending_inactive if the validator is already active.
@@ -770,11 +770,11 @@ module aptos_framework::stake {
         pool_address: address,
         owner_cap: &OwnerCapability,
     ): Coin<AptosCoin> acquires StakePool, StakePoolEvents {
-        assert!(owner_cap.pool_address == pool_address, errors::invalid_argument(ENOT_OWNER));
+        assert!(owner_cap.pool_address == pool_address, error::invalid_argument(ENOT_OWNER));
 
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         let withdraw_amount = coin::value<AptosCoin>(&stake_pool.inactive);
-        assert!(withdraw_amount > 0, errors::invalid_argument(ENO_COINS_TO_WITHDRAW));
+        assert!(withdraw_amount > 0, error::invalid_argument(ENO_COINS_TO_WITHDRAW));
 
         let stake_pool_events = borrow_global_mut<StakePoolEvents>(pool_address);
         event::emit_event<WithdrawStakeEvent>(
@@ -801,20 +801,20 @@ module aptos_framework::stake {
         let validator_set_config = borrow_global_mut<ValidatorSetConfiguration>(@aptos_framework);
         assert!(
             validator_set_config.allow_validator_set_change,
-            errors::invalid_argument(ENO_POST_GENESIS_VALIDATOR_SET_CHANGE_ALLOWED),
+            error::invalid_argument(ENO_POST_GENESIS_VALIDATOR_SET_CHANGE_ALLOWED),
         );
         let stake_pool = borrow_global<StakePool>(pool_address);
         // Account has to be the operator.
-        assert!(signer::address_of(account) == stake_pool.operator_address, errors::invalid_argument(ENOT_OPERATOR));
+        assert!(signer::address_of(account) == stake_pool.operator_address, error::invalid_argument(ENOT_OPERATOR));
 
         let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
         // Validate that the validator is already part of the validator set.
         let maybe_index = find_validator(&validator_set.active_validators, pool_address);
-        assert!(option::is_some(&maybe_index), errors::invalid_argument(ENOT_VALIDATOR));
+        assert!(option::is_some(&maybe_index), error::invalid_argument(ENOT_VALIDATOR));
         let index = option::extract(&mut maybe_index);
 
         let validator_info = vector::swap_remove(&mut validator_set.active_validators, index);
-        assert!(vector::length(&validator_set.active_validators) > 0, errors::invalid_argument(ELAST_VALIDATOR));
+        assert!(vector::length(&validator_set.active_validators) > 0, error::invalid_argument(ELAST_VALIDATOR));
         vector::push_back(&mut validator_set.pending_inactive, validator_info);
 
         let stake_pool_events = borrow_global_mut<StakePoolEvents>(pool_address);
@@ -1078,22 +1078,22 @@ module aptos_framework::stake {
 
         assert!(
             current_time + validator_set_config.min_lockup_duration_secs <= locked_until_secs,
-            errors::invalid_argument(ELOCK_TIME_TOO_SHORT),
+            error::invalid_argument(ELOCK_TIME_TOO_SHORT),
         );
         assert!(
             locked_until_secs <= current_time + validator_set_config.max_lockup_duration_secs,
-            errors::invalid_argument(ELOCK_TIME_TOO_LONG),
+            error::invalid_argument(ELOCK_TIME_TOO_LONG),
         );
     }
 
     fun validate_required_stake(minimum_stake: u64, maximum_stake: u64) {
-        assert!(minimum_stake <= maximum_stake && maximum_stake > 0, errors::invalid_argument(EINVALID_STAKE_RANGE));
+        assert!(minimum_stake <= maximum_stake && maximum_stake > 0, error::invalid_argument(EINVALID_STAKE_RANGE));
     }
 
     fun validate_required_lockup(min_lockup_duration_secs: u64, max_lockup_duration_secs: u64) {
         assert!(
             min_lockup_duration_secs <= max_lockup_duration_secs && max_lockup_duration_secs > 0,
-            errors::invalid_argument(EINVALID_LOCKUP_RANGE),
+            error::invalid_argument(EINVALID_LOCKUP_RANGE),
         );
     }
 
@@ -1356,7 +1356,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @0x1, core_resources = @core_resources, validator = @0x123)]
-    #[expected_failure(abort_code = 3847)]
+    #[expected_failure(abort_code = 0x1000f)]
     public entry fun test_validator_cannot_join_post_genesis(
         aptos_framework: signer,
         core_resources: signer,
@@ -1376,7 +1376,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @0x1, core_resources = @core_resources, validator = @0x123)]
-    #[expected_failure(abort_code = 3847)]
+    #[expected_failure(abort_code = 0x1000f)]
     public entry fun test_validator_cannot_leave_post_genesis(
         aptos_framework: signer,
         core_resources: signer,
@@ -1569,25 +1569,25 @@ module aptos_framework::stake {
     }
 
     #[test]
-    #[expected_failure(abort_code = 4359)]
+    #[expected_failure(abort_code = 0x10011)]
     public entry fun test_update_required_stake_invalid_range_should_fail() acquires ValidatorSetConfiguration {
         update_required_stake(&governance_proposal::create_test_proposal(), 10, 5);
     }
 
     #[test]
-    #[expected_failure(abort_code = 4359)]
+    #[expected_failure(abort_code = 0x10011)]
     public entry fun test_update_required_stake_zero_max_stake_should_fail() acquires ValidatorSetConfiguration {
         update_required_stake(&governance_proposal::create_test_proposal(), 0, 0);
     }
 
     #[test]
-    #[expected_failure(abort_code = 4615)]
+    #[expected_failure(abort_code = 0x10012)]
     public entry fun test_update_required_lockup_invalid_range_should_fail() acquires ValidatorSetConfiguration {
         update_required_lockup(&governance_proposal::create_test_proposal(), 10, 5);
     }
 
     #[test]
-    #[expected_failure(abort_code = 4615)]
+    #[expected_failure(abort_code = 0x10012)]
     public entry fun test_update_required_lockup_zero_max_lockup_should_fail() acquires ValidatorSetConfiguration {
         update_required_lockup(&governance_proposal::create_test_proposal(), 0, 0);
     }

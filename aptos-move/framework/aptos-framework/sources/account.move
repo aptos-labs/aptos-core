@@ -1,6 +1,6 @@
 module aptos_framework::account {
     use std::bcs;
-    use std::errors;
+    use std::error;
     use std::hash;
     use std::signer;
     use std::vector;
@@ -115,7 +115,7 @@ module aptos_framework::account {
         );
         assert!(
             vector::length(&authentication_key) == 32,
-            errors::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
+            error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
         );
         authentication_key
     }
@@ -125,14 +125,14 @@ module aptos_framework::account {
     /// `new_address`.
     public(friend) fun create_account_internal(new_address: address): signer {
         // there cannot be an Account resource under new_addr already.
-        assert!(!exists<Account>(new_address), errors::already_published(EACCOUNT));
+        assert!(!exists<Account>(new_address), error::already_exists(EACCOUNT));
         assert!(
             new_address != @vm_reserved,
-            errors::invalid_argument(ECANNOT_CREATE_AT_VM_RESERVED)
+            error::invalid_argument(ECANNOT_CREATE_AT_VM_RESERVED)
         );
         assert!(
             new_address != @aptos_framework,
-            errors::invalid_argument(ECANNOT_CREATE_AT_CORE_CODE)
+            error::invalid_argument(ECANNOT_CREATE_AT_CORE_CODE)
         );
 
         create_account_unchecked(new_address)
@@ -143,7 +143,7 @@ module aptos_framework::account {
         let authentication_key = bcs::to_bytes(&new_address);
         assert!(
             vector::length(&authentication_key) == 32,
-            errors::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
+            error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
         );
         move_to(
             &new_account,
@@ -178,10 +178,10 @@ module aptos_framework::account {
         new_auth_key: vector<u8>,
     ) acquires Account {
         let addr = signer::address_of(account);
-        assert!(exists_at(addr), errors::not_published(EACCOUNT));
+        assert!(exists_at(addr), error::not_found(EACCOUNT));
         assert!(
             vector::length(&new_auth_key) == 32,
-            errors::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
+            error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
         );
         let account_resource = borrow_global_mut<Account>(addr);
         account_resource.authentication_key = new_auth_key;
@@ -198,39 +198,39 @@ module aptos_framework::account {
     ) acquires Account {
         assert!(
             timestamp::now_seconds() < txn_expiration_time,
-            errors::invalid_argument(PROLOGUE_ETRANSACTION_EXPIRED),
+            error::invalid_argument(PROLOGUE_ETRANSACTION_EXPIRED),
         );
         let transaction_sender = signer::address_of(&sender);
-        assert!(chain_id::get() == chain_id, errors::invalid_argument(PROLOGUE_EBAD_CHAIN_ID));
-        assert!(exists<Account>(transaction_sender), errors::invalid_argument(PROLOGUE_EACCOUNT_DNE));
+        assert!(chain_id::get() == chain_id, error::invalid_argument(PROLOGUE_EBAD_CHAIN_ID));
+        assert!(exists<Account>(transaction_sender), error::invalid_argument(PROLOGUE_EACCOUNT_DNE));
         let sender_account = borrow_global<Account>(transaction_sender);
         assert!(
             hash::sha3_256(txn_public_key) == *&sender_account.authentication_key,
-            errors::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
+            error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
         );
         assert!(
             (txn_sequence_number as u128) < MAX_U64,
-            errors::limit_exceeded(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG)
+            error::out_of_range(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG)
         );
 
         assert!(
             txn_sequence_number >= sender_account.sequence_number,
-            errors::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD)
+            error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD)
         );
 
         // [PCA12]: Check that the transaction's sequence number matches the
         // current sequence number. Otherwise sequence number is too new by [PCA11].
         assert!(
             txn_sequence_number == sender_account.sequence_number,
-            errors::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
+            error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
         );
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
         assert!(
             coin::is_account_registered<AptosCoin>(transaction_sender),
-            errors::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
+            error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
         );
         let balance = coin::balance<AptosCoin>(transaction_sender);
-        assert!(balance >= max_transaction_fee, errors::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
+        assert!(balance >= max_transaction_fee, error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -245,7 +245,7 @@ module aptos_framework::account {
         txn_expiration_time: u64,
         chain_id: u8,
     ) acquires Account {
-        assert!(transaction_publishing_option::is_module_allowed(), errors::invalid_state(PROLOGUE_EMODULE_NOT_ALLOWED));
+        assert!(transaction_publishing_option::is_module_allowed(), error::invalid_state(PROLOGUE_EMODULE_NOT_ALLOWED));
         prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
@@ -259,7 +259,7 @@ module aptos_framework::account {
         chain_id: u8,
         script_hash: vector<u8>,
     ) acquires Account {
-        assert!(transaction_publishing_option::is_script_allowed(&script_hash), errors::invalid_state(PROLOGUE_ESCRIPT_NOT_ALLOWED));
+        assert!(transaction_publishing_option::is_script_allowed(&script_hash), error::invalid_state(PROLOGUE_ESCRIPT_NOT_ALLOWED));
         prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
@@ -270,7 +270,7 @@ module aptos_framework::account {
         _txn_expiration_time: u64,
         _chain_id: u8,
     ) {
-        assert!(false, errors::invalid_argument(PROLOGUE_EINVALID_WRITESET_SENDER));
+        assert!(false, error::invalid_argument(PROLOGUE_EINVALID_WRITESET_SENDER));
     }
 
     fun multi_agent_script_prologue(
@@ -290,19 +290,19 @@ module aptos_framework::account {
 
         assert!(
             vector::length(&secondary_signer_public_key_hashes) == num_secondary_signers,
-            errors::invalid_argument(PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH),
+            error::invalid_argument(PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH),
         );
 
         let i = 0;
         while (i < num_secondary_signers) {
             let secondary_address = *vector::borrow(&secondary_signer_addresses, i);
-            assert!(exists_at(secondary_address), errors::invalid_argument(PROLOGUE_EACCOUNT_DNE));
+            assert!(exists_at(secondary_address), error::invalid_argument(PROLOGUE_EACCOUNT_DNE));
 
             let signer_account = borrow_global<Account>(secondary_address);
             let signer_public_key_hash = *vector::borrow(&secondary_signer_public_key_hashes, i);
             assert!(
                 signer_public_key_hash == *&signer_account.authentication_key,
-                errors::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
+                error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
             );
             i = i + 1;
         }
@@ -313,7 +313,7 @@ module aptos_framework::account {
         _txn_sequence_number: u64,
         _should_trigger_reconfiguration: bool,
     ) {
-        assert!(false, errors::invalid_argument(EWRITESET_NOT_ALLOWED));
+        assert!(false, error::invalid_argument(EWRITESET_NOT_ALLOWED));
     }
 
     /// Epilogue function is run after a transaction is successfully executed.
@@ -325,12 +325,12 @@ module aptos_framework::account {
         txn_max_gas_units: u64,
         gas_units_remaining: u64
     ) acquires Account {
-        assert!(txn_max_gas_units >= gas_units_remaining, errors::invalid_argument(EGAS));
+        assert!(txn_max_gas_units >= gas_units_remaining, error::invalid_argument(EGAS));
         let gas_used = txn_max_gas_units - gas_units_remaining;
 
         assert!(
             (txn_gas_price as u128) * (gas_used as u128) <= MAX_U64,
-            errors::limit_exceeded(EGAS)
+            error::out_of_range(EGAS)
         );
         let transaction_fee_amount = txn_gas_price * gas_used;
         let addr = signer::address_of(&account);
@@ -338,7 +338,7 @@ module aptos_framework::account {
         // to do failed transaction cleanup.
         assert!(
             coin::balance<AptosCoin>(addr) >= transaction_fee_amount,
-            errors::limit_exceeded(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
+            error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
         );
         transaction_fee::burn_fee(addr, transaction_fee_amount);
 
@@ -346,7 +346,7 @@ module aptos_framework::account {
 
         assert!(
             (old_sequence_number as u128) < MAX_U64,
-            errors::limit_exceeded(ESEQUENCE_NUMBER_TOO_BIG)
+            error::out_of_range(ESEQUENCE_NUMBER_TOO_BIG)
         );
 
         // Increment sequence number

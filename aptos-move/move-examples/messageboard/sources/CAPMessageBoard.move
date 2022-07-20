@@ -12,7 +12,7 @@
 ///     (1) message cap update event, this event contains the board address and participant offered capability
 ///     (2) message change event, this event contains the board, message and message author
 module MessageBoard::CapBasedMB {
-    use std::event::{Self, EventHandle};
+    use aptos_std::event::{Self, EventHandle};
     use std::offer;
     use std::signer;
     use std::vector;
