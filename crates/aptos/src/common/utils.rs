@@ -5,7 +5,7 @@ use crate::{
     common::types::{CliError, CliTypedResult, PromptOptions},
     CliResult,
 };
-use aptos_logger::Level;
+use aptos_logger::{debug, Level};
 use aptos_rest_client::Client;
 use aptos_telemetry::collect_build_information;
 use aptos_types::chain_id::ChainId;
@@ -255,8 +255,29 @@ where
     Ok(map)
 }
 
-pub fn current_dir() -> PathBuf {
-    env::current_dir().unwrap()
+pub fn current_dir() -> CliTypedResult<PathBuf> {
+    env::current_dir().map_err(|err| {
+        CliError::UnexpectedError(format!("Failed to get current directory {}", err))
+    })
+}
+
+pub fn dir_default_to_current(maybe_dir: Option<PathBuf>) -> CliTypedResult<PathBuf> {
+    if let Some(dir) = maybe_dir {
+        Ok(dir)
+    } else {
+        current_dir()
+    }
+}
+
+pub fn create_dir_if_not_exist(dir: &Path) -> CliTypedResult<()> {
+    // Check if the directory exists, if it's not a dir, it will also fail here
+    if !dir.exists() || !dir.is_dir() {
+        std::fs::create_dir_all(dir).map_err(|e| CliError::IO(dir.display().to_string(), e))?;
+        debug!("Created {} folder", dir.display());
+    } else {
+        debug!("{} folder already exists", dir.display());
+    }
+    Ok(())
 }
 
 /// Reads a line from input

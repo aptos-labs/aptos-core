@@ -19,13 +19,13 @@ pub enum VerifyError {
     /// The author for this signature is unknown by this validator.
     UnknownAuthor,
     #[error(
-        "The voting power ({}) is less than quorum voting power ({})",
+        "The voting power ({}) is less than expected voting power ({})",
         voting_power,
-        quorum_voting_power
+        expected_voting_power
     )]
     TooLittleVotingPower {
         voting_power: u64,
-        quorum_voting_power: u64,
+        expected_voting_power: u64,
     },
     #[error(
         "The number of signatures ({}) is greater than total number of authors ({})",
@@ -215,6 +215,7 @@ impl ValidatorVerifier {
         }
         Ok(())
     }
+
     /// Ensure there is at least quorum_voting_power in the provided signatures and there
     /// are only known authors. According to the threshold verification policy,
     /// invalid public keys are not allowed.
@@ -234,7 +235,7 @@ impl ValidatorVerifier {
         if aggregated_voting_power < self.quorum_voting_power {
             return Err(VerifyError::TooLittleVotingPower {
                 voting_power: aggregated_voting_power,
-                quorum_voting_power: self.quorum_voting_power,
+                expected_voting_power: self.quorum_voting_power,
             });
         }
         Ok(())
@@ -274,6 +275,11 @@ impl ValidatorVerifier {
     /// Returns quorum voting power.
     pub fn quorum_voting_power(&self) -> u64 {
         self.quorum_voting_power
+    }
+
+    /// Returns total voting power.
+    pub fn total_voting_power(&self) -> u64 {
+        self.total_voting_power
     }
 }
 
@@ -390,7 +396,7 @@ mod tests {
                 .unwrap_err(),
             VerifyError::TooLittleVotingPower {
                 voting_power: 0,
-                quorum_voting_power: 2,
+                expected_voting_power: 2,
             }
         );
 
@@ -514,7 +520,7 @@ mod tests {
                 .batch_verify_aggregated_signatures(&dummy_struct, &author_to_signature_map),
             Err(VerifyError::TooLittleVotingPower {
                 voting_power: 4,
-                quorum_voting_power: 5
+                expected_voting_power: 5
             })
         );
 
@@ -641,7 +647,7 @@ mod tests {
                 .batch_verify_aggregated_signatures(&dummy_struct, &author_to_signature_map),
             Err(VerifyError::TooLittleVotingPower {
                 voting_power: 3,
-                quorum_voting_power: 5
+                expected_voting_power: 5
             })
         );
 

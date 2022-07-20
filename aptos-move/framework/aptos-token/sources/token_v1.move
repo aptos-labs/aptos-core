@@ -1,6 +1,6 @@
 /// This module provides the foundation for Tokens.
 module aptos_token::token_v1 {
-    use std::ascii::{String, Self};
+    use std::string::{String, Self};
     use std::errors;
     use std::event::{Self, EventHandle};
     use std::signer;
@@ -222,9 +222,9 @@ module aptos_token::token_v1 {
     ) acquires Collections {
         create_collection(
             creator,
-            ascii::string(name),
-            ascii::string(description),
-            ascii::string(uri),
+            string::utf8(name),
+            string::utf8(description),
+            string::utf8(uri),
             maximum,
             mutate_setting
         );
@@ -249,12 +249,12 @@ module aptos_token::token_v1 {
     ) acquires Collections, TokenStore, TokenAuthorityStore {
         create_token(
             creator,
-            ascii::string(collection),
-            ascii::string(name),
-            ascii::string(description),
+            string::utf8(collection),
+            string::utf8(name),
+            string::utf8(description),
             balance,
             maximum,
-            ascii::string(uri),
+            string::utf8(uri),
             royalty_payee_address,
             royalty_points_denominator,
             royalty_points_nominator,
@@ -275,8 +275,8 @@ module aptos_token::token_v1 {
     ) acquires Collections, TokenStore {
         let token_data_id = create_token_data_id(
             token_data_address,
-            ascii::string(collection),
-            ascii::string(name),
+            string::utf8(collection),
+            string::utf8(name),
         );
         // TODO: check based on mint_capability
         assert!(token_data_id.creator == signer::address_of(account), ENO_MINT_CAPABILITY);
@@ -804,7 +804,7 @@ module aptos_token::token_v1 {
         serial_number: u64,
     ): TokenId {
         TokenId{
-            token_data_id: create_token_data_id(creator, ascii::string(collection), ascii::string(name)),
+            token_data_id: create_token_data_id(creator, string::utf8(collection), string::utf8(name)),
             serial_number,
         }
     }
@@ -995,19 +995,19 @@ module aptos_token::token_v1 {
     #[expected_failure] // (abort_code = 5)]
     public fun test_collection_maximum(creator: signer) acquires Collections, TokenStore, TokenAuthorityStore {
         let token_id = create_collection_and_token(&creator, 2, 2, 1);
-        let default_keys = vector<String>[ ascii::string(b"attack"), ascii::string(b"num_of_use") ];
+        let default_keys = vector<String>[ string::utf8(b"attack"), string::utf8(b"num_of_use") ];
         let default_vals = vector<vector<u8>>[ b"10", b"5" ];
-        let default_types = vector<String>[ ascii::string(b"integer"), ascii::string(b"integer") ];
+        let default_types = vector<String>[ string::utf8(b"integer"), string::utf8(b"integer") ];
         let mutate_setting = vector<bool>[ false, false, false, false, false, false ];
 
         create_token(
             &creator,
             token_id.token_data_id.collection,
-            ascii::string(b"Token"),
-            ascii::string(b"Hello, Token"),
+            string::utf8(b"Token"),
+            string::utf8(b"Hello, Token"),
             100,
             2,
-            ascii::string(b"https://aptos.dev"),
+            string::utf8(b"https://aptos.dev"),
             signer::address_of(&creator),
             100,
             0,
@@ -1031,12 +1031,12 @@ module aptos_token::token_v1 {
 
     #[test_only]
     public fun get_collection_name(): String {
-        ascii::string(b"Hello, World")
+        string::utf8(b"Hello, World")
     }
 
     #[test_only]
     public fun get_token_name(): String {
-        ascii::string(b"Token")
+        string::utf8(b"Token")
     }
 
     #[test_only]
@@ -1051,24 +1051,24 @@ module aptos_token::token_v1 {
         create_collection(
             creator,
             get_collection_name(),
-            ascii::string(b"Collection: Hello, World"),
-            ascii::string(b"https://aptos.dev"),
+            string::utf8(b"Collection: Hello, World"),
+            string::utf8(b"https://aptos.dev"),
             collection_max,
             mutate_setting
         );
 
-        let default_keys = vector<String>[ascii::string(b"attack"), ascii::string(b"num_of_use")];
+        let default_keys = vector<String>[string::utf8(b"attack"), string::utf8(b"num_of_use")];
         let default_vals = vector<vector<u8>>[b"10", b"5"];
-        let default_types = vector<String>[ascii::string(b"integer"), ascii::string(b"integer")];
+        let default_types = vector<String>[string::utf8(b"integer"), string::utf8(b"integer")];
         let mutate_setting = vector<bool>[false, false, false, false, true];
         create_token(
             creator,
             get_collection_name(),
             get_token_name(),
-            ascii::string(b"Hello, Token"),
+            string::utf8(b"Hello, Token"),
             amount,
             token_max,
-            ascii::string(b"https://aptos.dev"),
+            string::utf8(b"https://aptos.dev"),
             signer::address_of(creator),
             100,
             0,
@@ -1109,13 +1109,13 @@ module aptos_token::token_v1 {
         let token_id = create_collection_and_token(creator, 2, 4, 4);
         assert!(token_id.serial_number == 0, 1);
         let new_keys = vector<String>[
-            ascii::string(b"attack"), ascii::string(b"num_of_use")
+            string::utf8(b"attack"), string::utf8(b"num_of_use")
         ];
         let new_vals = vector<vector<u8>>[
             b"1", b"1"
         ];
         let new_types = vector<String>[
-            ascii::string(b"integer"), ascii::string(b"integer")
+            string::utf8(b"integer"), string::utf8(b"integer")
         ];
 
         mutate_token_properties(

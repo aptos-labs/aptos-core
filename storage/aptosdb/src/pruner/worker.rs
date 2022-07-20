@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use aptos_types::transaction::Version;
-use schemadb::{SchemaBatch, DB};
+use schemadb::DB;
 
 use crate::pruner::{db_pruner::DBPruner, utils};
 use aptos_config::config::StoragePrunerConfig;
@@ -12,7 +12,6 @@ use std::sync::{mpsc::Receiver, Arc};
 /// Maintains all the DBPruners and periodically calls the db_pruner's prune method to prune the DB.
 /// This also exposes API to report the progress to the parent thread.
 pub struct Worker {
-    ledger_db: Arc<DB>,
     command_receiver: Receiver<Command>,
     /// Keeps tracks of all the DB pruners. The order of the pruners are defined in PrunerIndex.
     /// If a pruner is not enabled, its value will be None.
@@ -37,9 +36,8 @@ impl Worker {
         storage_pruner_config: StoragePrunerConfig,
     ) -> Self {
         let db_pruners =
-            utils::create_db_pruners(ledger_db.clone(), state_merkle_db, storage_pruner_config);
+            utils::create_db_pruners(ledger_db, state_merkle_db, storage_pruner_config);
         Self {
-            ledger_db: Arc::clone(&ledger_db),
             db_pruners,
             command_receiver,
             min_readable_versions,
@@ -53,18 +51,10 @@ impl Worker {
             // Process a reasonably small batch of work before trying to receive commands again,
             // in case `Command::Quit` is received (that's when we should quit.)
             let mut error_in_pruning = false;
-            let mut ledger_db_batch = SchemaBatch::new();
             for db_pruner in self.db_pruners.iter().flatten() {
-                let result = db_pruner
-                    .lock()
-                    .prune(&mut ledger_db_batch, self.max_version_to_prune_per_batch);
+                let result = db_pruner.lock().prune(self.max_version_to_prune_per_batch);
                 result.map_err(|_| error_in_pruning = true).ok();
             }
-            // Commit all the changes to DB atomically
-            self.ledger_db
-                .write_schemas(ledger_db_batch)
-                .map_err(|_| error_in_pruning = true)
-                .ok();
             let mut pruning_pending = false;
             for db_pruner in self.db_pruners.iter().flatten() {
                 // if any of the pruner has pending pruning, then we don't block on receive

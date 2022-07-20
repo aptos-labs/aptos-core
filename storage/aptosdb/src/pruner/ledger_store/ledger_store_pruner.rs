@@ -36,29 +36,38 @@ impl DBPruner for LedgerPruner {
         LEDGER_PRUNER_NAME
     }
 
-    fn prune(&self, db_batch: &mut SchemaBatch, max_versions: u64) -> anyhow::Result<Version> {
+    fn prune(&self, max_versions: u64) -> anyhow::Result<Version> {
         if !self.is_pruning_pending() {
             return Ok(self.min_readable_version());
         }
+        let mut db_batch = SchemaBatch::new();
         let min_readable_version = self.min_readable_version();
         // Current target version might be less than the target version to ensure we don't prune
         // more than max_version in one go.
         let current_target_version = self.get_currrent_batch_target(max_versions);
 
         self.transaction_store_pruner.prune(
-            db_batch,
+            &mut db_batch,
             min_readable_version,
             current_target_version,
         )?;
         self.write_set_pruner
-            .prune(db_batch, min_readable_version, current_target_version)?;
-        self.ledger_counter_pruner
-            .prune(db_batch, min_readable_version, current_target_version)?;
+            .prune(&mut db_batch, min_readable_version, current_target_version)?;
+        self.ledger_counter_pruner.prune(
+            &mut db_batch,
+            min_readable_version,
+            current_target_version,
+        )?;
 
-        self.event_store_pruner
-            .prune(db_batch, min_readable_version, current_target_version)?;
+        self.event_store_pruner.prune(
+            &mut db_batch,
+            min_readable_version,
+            current_target_version,
+        )?;
 
         self.record_progress(current_target_version);
+        // Commit all the changes to DB atomically
+        self.db.write_schemas(db_batch)?;
         Ok(current_target_version)
     }
 

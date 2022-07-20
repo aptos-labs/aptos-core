@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{bls12381, ed25519, traits::*};
+use curve25519_dalek::edwards::CompressedEdwardsY;
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
     move_core_types::gas_schedule::GasCost,
@@ -65,8 +66,25 @@ pub fn native_ed25519_publickey_validation(
         key_bytes.len(),
     );
 
-    // This deserialization performs point-on-curve and small subgroup checks
-    let valid = ed25519::Ed25519PublicKey::try_from(&key_bytes[..]).is_ok();
+    let key_bytes_slice = match <[u8; 32]>::try_from(key_bytes) {
+        Ok(slice) => slice,
+        Err(_) => {
+            return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
+        }
+    };
+
+    // This deserialization only performs point-on-curve checks, so we check for small subgroup below
+    let point = match CompressedEdwardsY(key_bytes_slice).decompress() {
+        Some(point) => point,
+        None => {
+            return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
+        }
+    };
+
+    // Check if the point lies on a small subgroup. This is required when using curves with a
+    // small cofactor (e.g., in Ed25519, cofactor = 8).
+    let valid = !point.is_small_order();
+
     Ok(NativeResult::ok(cost, smallvec![Value::bool(valid)]))
 }
 

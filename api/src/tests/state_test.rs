@@ -131,8 +131,8 @@ async fn test_get_table_item() {
     assert_table_item(
         ctx,
         &tt["string_table"],
-        "0x1::ascii::String",
-        "0x1::ascii::String",
+        "0x1::string::String",
+        "0x1::string::String",
         "abc",
         "abc",
     )
@@ -149,8 +149,8 @@ async fn test_get_table_item() {
     assert_table_item(
         ctx,
         &tt["vector_string_table"],
-        "vector<0x1::ascii::String>",
-        "vector<0x1::ascii::String>",
+        "vector<0x1::string::String>",
+        "vector<0x1::string::String>",
         ["abc", "abc"],
         ["abc", "abc"],
     )

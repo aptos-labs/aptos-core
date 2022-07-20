@@ -3,6 +3,7 @@
 
 use crate::common::types::PromptOptions;
 use crate::common::utils::prompt_yes_with_override;
+use crate::config::GlobalConfig;
 use crate::{
     common::{
         types::{
@@ -529,6 +530,7 @@ async fn get_resource_migration(
 
 const MAX_WAIT_S: u64 = 30;
 const WAIT_INTERVAL_MS: u64 = 100;
+const TESTNET_FOLDER: &str = "testnet";
 
 /// Run local testnet
 ///
@@ -540,8 +542,8 @@ pub struct RunLocalTestnet {
     #[clap(long, parse(from_os_str))]
     config_path: Option<PathBuf>,
     /// The directory to save all files for the node
-    #[clap(long, parse(from_os_str), default_value = ".aptos/testnet")]
-    test_dir: PathBuf,
+    #[clap(long, parse(from_os_str))]
+    test_dir: Option<PathBuf>,
     /// Random seed for key generation in test mode
     #[clap(long, parse(try_from_str = FromHex::from_hex))]
     seed: Option<[u8; 32]>,
@@ -570,24 +572,27 @@ impl CliCommand<()> for RunLocalTestnet {
             .map(StdRng::from_seed)
             .unwrap_or_else(StdRng::from_entropy);
 
+        let global_config = GlobalConfig::load()?;
+        let test_dir = global_config.get_config_location()?.join(TESTNET_FOLDER);
+
         // Remove the current test directory and start with a new node
-        if self.force_restart && self.test_dir.exists() {
+        if self.force_restart && test_dir.exists() {
             prompt_yes_with_override(
                 "Are you sure you want to delete the existing chain?",
                 self.prompt_options,
             )?;
-            std::fs::remove_dir_all(self.test_dir.as_path()).map_err(|err| {
-                CliError::IO(format!("Failed to delete {}", self.test_dir.display()), err)
+            std::fs::remove_dir_all(test_dir.as_path()).map_err(|err| {
+                CliError::IO(format!("Failed to delete {}", test_dir.display()), err)
             })?;
         }
 
         // Spawn the node in a separate thread
         let config_path = self.config_path.clone();
-        let test_dir = self.test_dir.clone();
+        let test_dir_copy = test_dir.clone();
         let _node = thread::spawn(move || {
             aptos_node::load_test_environment(
                 config_path,
-                Some(test_dir),
+                Some(test_dir_copy),
                 false,
                 false,
                 cached_framework_packages::module_blobs().to_vec(),
@@ -602,7 +607,7 @@ impl CliCommand<()> for RunLocalTestnet {
             let wait_interval = Duration::from_millis(WAIT_INTERVAL_MS);
 
             // Load the config to get the rest port
-            let config_path = self.test_dir.join("0").join("node.yaml");
+            let config_path = test_dir.join("0").join("node.yaml");
 
             // We have to wait for the node to be configured above in the other thread
             let mut config = None;
@@ -652,7 +657,7 @@ impl CliCommand<()> for RunLocalTestnet {
                     address: "0.0.0.0".to_string(),
                     port: self.faucet_port,
                     server_url: rest_url,
-                    mint_key_file_path: self.test_dir.join("mint.key"),
+                    mint_key_file_path: test_dir.join("mint.key"),
                     mint_key: None,
                     mint_account_address: None,
                     chain_id: ChainId::test(),

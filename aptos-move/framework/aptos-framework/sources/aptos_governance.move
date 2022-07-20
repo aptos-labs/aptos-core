@@ -162,7 +162,7 @@ module aptos_framework::aptos_governance {
         description: vector<u8>,
     ) acquires GovernanceConfig, GovernanceEvents {
         let proposer_address = signer::address_of(proposer);
-        assert!(stake::is_delegated_voter(stake_pool, proposer_address), errors::invalid_argument(ENOT_DELEGATED_VOTER));
+        assert!(stake::get_delegated_voter(stake_pool) == proposer_address, errors::invalid_argument(ENOT_DELEGATED_VOTER));
 
         // The proposer's stake needs to be at least the required bond amount.
         let governance_config = borrow_global<GovernanceConfig>(@aptos_framework);
@@ -226,7 +226,7 @@ module aptos_framework::aptos_governance {
         should_pass: bool,
     ) acquires GovernanceEvents, VotingRecords {
         let voter_address = signer::address_of(voter);
-        assert!(stake::is_delegated_voter(stake_pool, voter_address), errors::invalid_argument(ENOT_DELEGATED_VOTER));
+        assert!(stake::get_delegated_voter(stake_pool) == voter_address, errors::invalid_argument(ENOT_DELEGATED_VOTER));
 
         // Voting power does not include pending_active or pending_inactive balances.
         // In general, the stake pool should not have pending_inactive balance if it still has lockup (required to vote)

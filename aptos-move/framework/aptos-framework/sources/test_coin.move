@@ -1,7 +1,7 @@
 /// This module defines a minimal and generic Coin and Balance.
 /// modified from https://github.com/move-language/move/tree/main/language/documentation/tutorial
 module aptos_framework::test_coin {
-    use std::ascii;
+    use std::string;
     use std::errors;
     use std::signer;
     use std::vector;
@@ -39,8 +39,8 @@ module aptos_framework::test_coin {
 
         let (mint_cap, burn_cap) = coin::initialize<TestCoin>(
             aptos_framework,
-            ascii::string(b"Test Coin"),
-            ascii::string(b"TC"),
+            string::utf8(b"Test Coin"),
+            string::utf8(b"TC"),
             6, /* decimals */
             false, /* monitor_supply */
         );

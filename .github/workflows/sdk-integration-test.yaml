@@ -16,7 +16,7 @@ jobs:
       id-token: write
     env:
       APTOS_NODE_URL: http://localhost:8080
-      APTOS_FAUCET_URL: http://localhost:8000
+      APTOS_FAUCET_URL: http://localhost:8081
     steps:
       - uses: actions/checkout@v3
         with:
@@ -31,12 +31,7 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - run: docker-compose up --detach
-        working-directory: docker/compose/validator-testnet
-        env:
-          IMAGE_TAG: ${{ inputs.GIT_SHA }}
-          VALIDATOR_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/validator
-          FAUCET_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/faucet
+      - run: docker run --rm -p 8080:8080 -p 8081:8081 --name=local-testnet --detach ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos node run-local-testnet --with-faucet 
 
       # Run package install, test, build
       - run: cd ./ecosystem/typescript/sdk && yarn install
@@ -50,4 +45,4 @@ jobs:
       - name: print docker-compose testnet logs when previous steps failed
         if: ${{ failure() }}
         working-directory: docker/compose/validator-testnet
-        run: docker-compose logs
+        run: docker logs local-testnet

@@ -54,6 +54,8 @@ pub struct RocksdbOpt {
     state_merkle_db_max_open_files: i32,
     #[structopt(long, default_value = "1073741824")] // 1GB
     state_merkle_db_max_total_wal_size: u64,
+    #[structopt(long, default_value = "16")]
+    max_background_jobs: i32,
 }
 
 impl From<RocksdbOpt> for RocksdbConfigs {
@@ -62,10 +64,12 @@ impl From<RocksdbOpt> for RocksdbConfigs {
             ledger_db_config: RocksdbConfig {
                 max_open_files: opt.ledger_db_max_open_files,
                 max_total_wal_size: opt.ledger_db_max_total_wal_size,
+                max_background_jobs: opt.max_background_jobs,
             },
             state_merkle_db_config: RocksdbConfig {
                 max_open_files: opt.state_merkle_db_max_open_files,
                 max_total_wal_size: opt.state_merkle_db_max_total_wal_size,
+                max_background_jobs: opt.max_background_jobs,
             },
         }
     }

@@ -27,7 +27,7 @@ use std::{
 #[derive(Debug, PartialEq)]
 pub enum VoteReceptionResult {
     /// The vote has been added but QC has not been formed yet. Return the amount of voting power
-    /// the given (proposal, execution) pair.
+    /// QC currently has.
     VoteAdded(u64),
     /// The very same vote message has been processed in past.
     DuplicateVote,
@@ -41,6 +41,8 @@ pub enum VoteReceptionResult {
     ErrorAddingVote(VerifyError),
     /// The vote is not for the current round.
     UnexpectedRound(u64, u64),
+    /// Receive f+1 timeout to trigger a local timeout, return the amount of voting power TC currently has.
+    EchoTimeout(u64),
 }
 
 /// A PendingVotes structure keep track of votes
@@ -53,6 +55,8 @@ pub struct PendingVotes {
     maybe_partial_2chain_tc: Option<TwoChainTimeoutCertificate>,
     /// Map of Author to vote. This is useful to discard multiple votes.
     author_to_vote: HashMap<Author, Vote>,
+    /// Whether we have echoed timeout for this round.
+    echo_timeout: bool,
 }
 
 impl PendingVotes {
@@ -62,6 +66,7 @@ impl PendingVotes {
             li_digest_to_votes: HashMap::new(),
             maybe_partial_2chain_tc: None,
             author_to_vote: HashMap::new(),
+            echo_timeout: false,
         }
     }
 
@@ -153,19 +158,31 @@ impl PendingVotes {
                 .maybe_partial_2chain_tc
                 .get_or_insert_with(|| TwoChainTimeoutCertificate::new(timeout.clone()));
             partial_tc.add(vote.author(), timeout.clone(), signature.clone());
-            match validator_verifier.check_voting_power(partial_tc.signers()) {
+            let tc_voting_power = match validator_verifier.check_voting_power(partial_tc.signers())
+            {
                 Ok(_) => {
                     return VoteReceptionResult::New2ChainTimeoutCertificate(Arc::new(
                         partial_tc.clone(),
                     ))
                 }
-                Err(VerifyError::TooLittleVotingPower { .. }) => (),
+                Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => voting_power,
                 Err(error) => {
                     error!(
                         "MUST_FIX: 2-chain timeout vote received could not be added: {}, vote: {}",
                         error, vote
                     );
                     return VoteReceptionResult::ErrorAddingVote(error);
+                }
+            };
+
+            // Echo timeout if receive f+1 timeout message.
+            if !self.echo_timeout {
+                let f_plus_one = validator_verifier.total_voting_power()
+                    - validator_verifier.quorum_voting_power()
+                    + 1;
+                if tc_voting_power >= f_plus_one {
+                    self.echo_timeout = true;
+                    return VoteReceptionResult::EchoTimeout(tc_voting_power);
                 }
             }
         }
@@ -313,48 +330,66 @@ mod tests {
         ::aptos_logger::Logger::init_for_testing();
 
         // set up 4 validators
-        let (signers, validator) = random_validator_verifier(4, Some(2), false);
+        let (signers, validator) = random_validator_verifier(4, None, false);
         let mut pending_votes = PendingVotes::new();
 
         // submit a new vote from validator[0] -> VoteAdded
-        let li1 = random_ledger_info();
-        let vote1 = random_vote_data();
-        let mut vote1_author_0 = Vote::new(vote1, signers[0].author(), li1, &signers[0]);
+        let li0 = random_ledger_info();
+        let vote0 = random_vote_data();
+        let mut vote0_author_0 = Vote::new(vote0, signers[0].author(), li0, &signers[0]);
 
         assert_eq!(
-            pending_votes.insert_vote(&vote1_author_0, &validator),
+            pending_votes.insert_vote(&vote0_author_0, &validator),
             VoteReceptionResult::VoteAdded(1)
         );
 
         // submit the same vote but enhanced with a timeout -> VoteAdded
-        let timeout = vote1_author_0.generate_2chain_timeout(certificate_for_genesis());
+        let timeout = vote0_author_0.generate_2chain_timeout(certificate_for_genesis());
         let signature = timeout.sign(&signers[0]);
-        vote1_author_0.add_2chain_timeout(timeout, signature);
+        vote0_author_0.add_2chain_timeout(timeout, signature);
 
         assert_eq!(
-            pending_votes.insert_vote(&vote1_author_0, &validator),
+            pending_votes.insert_vote(&vote0_author_0, &validator),
             VoteReceptionResult::VoteAdded(1)
         );
 
         // another vote for a different block cannot form a TC if it doesn't have a timeout signature
-        let li2 = random_ledger_info();
-        let vote2 = random_vote_data();
-        let mut vote2_author_1 = Vote::new(vote2, signers[1].author(), li2, &signers[1]);
+        let li1 = random_ledger_info();
+        let vote1 = random_vote_data();
+        let mut vote1_author_1 = Vote::new(vote1, signers[1].author(), li1, &signers[1]);
         assert_eq!(
-            pending_votes.insert_vote(&vote2_author_1, &validator),
+            pending_votes.insert_vote(&vote1_author_1, &validator),
             VoteReceptionResult::VoteAdded(1)
         );
 
-        // if that vote is now enhanced with a timeout signature -> NewTimeoutCertificate
-        let timeout = vote2_author_1.generate_2chain_timeout(certificate_for_genesis());
+        // if that vote is now enhanced with a timeout signature -> EchoTimeout.
+        let timeout = vote1_author_1.generate_2chain_timeout(certificate_for_genesis());
         let signature = timeout.sign(&signers[1]);
-        vote2_author_1.add_2chain_timeout(timeout, signature);
-        match pending_votes.insert_vote(&vote2_author_1, &validator) {
+        vote1_author_1.add_2chain_timeout(timeout, signature);
+        match pending_votes.insert_vote(&vote1_author_1, &validator) {
+            VoteReceptionResult::EchoTimeout(voting_power) => {
+                assert_eq!(voting_power, 2);
+            }
+            _ => {
+                panic!("Should echo timeout");
+            }
+        };
+
+        let li2 = random_ledger_info();
+        let vote2 = random_vote_data();
+        let mut vote2_author_2 = Vote::new(vote2, signers[2].author(), li2, &signers[2]);
+
+        // if that vote is now enhanced with a timeout signature -> NewTimeoutCertificate.
+        let timeout = vote2_author_2.generate_2chain_timeout(certificate_for_genesis());
+        let signature = timeout.sign(&signers[2]);
+        vote2_author_2.add_2chain_timeout(timeout, signature);
+
+        match pending_votes.insert_vote(&vote2_author_2, &validator) {
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
                 assert!(validator.check_voting_power(tc.signers()).is_ok());
             }
             _ => {
-                panic!("No TC formed.");
+                panic!("Should form TC");
             }
         };
     }

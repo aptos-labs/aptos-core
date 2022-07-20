@@ -2,7 +2,7 @@
 /// It maps a String key to a PropertyValue that consists of type (string) and value (vecotr<u8>)
 module aptos_token::property_map {
     use std::vector;
-    use std::ascii::{Self, String};
+    use std::string::{Self, String};
     use aptos_framework::simple_map::{Self, SimpleMap};
 
     const MAX_PROPERTY_MAP_SIZE: u64 = 1000;
@@ -121,7 +121,7 @@ module aptos_token::property_map {
         let vals: vector<String> = vector::empty<String>();
         let i = 0;
         while (i < vector::length(&values)) {
-            vector::push_back(&mut vals, ascii::string(*vector::borrow(&mut values, i )));
+            vector::push_back(&mut vals, string::utf8(*vector::borrow(&mut values, i )));
             i = i + 1;
         };
         vals
@@ -129,36 +129,36 @@ module aptos_token::property_map {
 
     #[test_only]
     fun create_property_list(): PropertyMap {
-        use std::ascii::string;
-        let keys = vector<String>[ string(b"attack"), string(b"durability"), string(b"type")];
+        use std::string::utf8;
+        let keys = vector<String>[ utf8(b"attack"), utf8(b"durability"), utf8(b"type")];
         let values = vector<vector<u8>>[ b"10", b"5", b"weapon" ];
-        let types = vector<String>[ string(b"integer"), string(b"integer"), string(b"String") ];
+        let types = vector<String>[ utf8(b"integer"), utf8(b"integer"), utf8(b"String") ];
         new(keys, values, types)
     }
 
     #[test]
     fun test_add_property(): PropertyMap {
-        use std::ascii::string;
+        use std::string::utf8;
         let properties = create_property_list();
         add(
-            &mut properties, string(b"level"),
+            &mut properties, utf8(b"level"),
             PropertyValue{
                 value: b"1",
-                type: string(b"integer")
+                type: utf8(b"integer")
             });
         assert!(
-            borrow(&properties, &string(b"level")).value == b"1",
+            borrow(&properties, &utf8(b"level")).value == b"1",
             EPROPERTY_NOT_EXIST);
         properties
     }
 
     #[test]
     fun test_update_property(): PropertyMap {
-        use std::ascii::string;
+        use std::string::utf8;
         let properties = create_property_list();
-        update_property_value(&mut properties, &string(b"attack"), PropertyValue{ value: b"7", type: string(b"integer") });
+        update_property_value(&mut properties, &utf8(b"attack"), PropertyValue{ value: b"7", type: utf8(b"integer") });
         assert!(
-            borrow(&properties, &string(b"attack")).value == b"7",
+            borrow(&properties, &utf8(b"attack")).value == b"7",
             1
         );
         properties
@@ -166,10 +166,10 @@ module aptos_token::property_map {
 
     #[test]
     fun test_remove_property(): PropertyMap {
-        use std::ascii::string;
+        use std::string::utf8;
         let properties = create_property_list();
         assert!(length(&mut properties) == 3, 1);
-        let (_, _) = remove(&mut properties, &string(b"attack"));
+        let (_, _) = remove(&mut properties, &utf8(b"attack"));
         assert!(length(&properties) == 2, 1);
         properties
     }

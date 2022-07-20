@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::fmt::Display;
 use storage_service::UnexpectedResponseError;
 use storage_service_types::{self as storage_service, CompleteDataRange, Epoch};
 use thiserror::Error;
@@ -298,6 +299,16 @@ impl GlobalDataSummary {
     }
 }
 
+impl Display for GlobalDataSummary {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}, {:?}",
+            self.advertised_data, self.optimal_chunk_sizes
+        )
+    }
+}
+
 /// Holds the optimal chunk sizes that clients should use when
 /// requesting data. This makes the request *more likely* to succeed.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -349,14 +360,48 @@ pub struct AdvertisedData {
 
 impl fmt::Debug for AdvertisedData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let sync_lis = (&self.synced_ledger_infos)
+        let synced_ledger_infos = (&self.synced_ledger_infos)
             .iter()
-            .map(|LedgerInfoWithSignatures::V0(ledger)| format!("{}", ledger))
+            .map(|LedgerInfoWithSignatures::V0(ledger)| {
+                let version = ledger.commit_info().version();
+                let epoch = ledger.commit_info().epoch();
+                let ends_epoch = ledger.commit_info().next_epoch_state().is_some();
+                format!(
+                    "(Version: {:?}, Epoch: {:?}, Ends epoch: {:?})",
+                    version, epoch, ends_epoch
+                )
+            })
             .join(", ");
         write!(
             f,
             "epoch_ending_ledger_infos: {:?}, states: {:?}, synced_ledger_infos: [{}], transactions: {:?}, transaction_outputs: {:?}",
-            &self.epoch_ending_ledger_infos, &self.states, sync_lis, &self.transactions, &self.transaction_outputs
+            &self.epoch_ending_ledger_infos, &self.states, synced_ledger_infos, &self.transactions, &self.transaction_outputs
+        )
+    }
+}
+
+/// Provides an aggregated version of all advertised data (i.e, highest and lowest)
+impl Display for AdvertisedData {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Calculate the highest advertised data
+        let highest_epoch_ending_ledger_info = self.highest_epoch_ending_ledger_info();
+        let highest_synced_ledger_info = self.highest_synced_ledger_info();
+        let highest_synced_version = highest_synced_ledger_info
+            .as_ref()
+            .map(|li| li.ledger_info().version());
+        let highest_synced_epoch = highest_synced_ledger_info.map(|li| li.ledger_info().epoch());
+
+        // Calculate the lowest advertised data
+        let lowest_transaction_version = self.lowest_transaction_version();
+        let lowest_output_version = self.lowest_transaction_output_version();
+        let lowest_states_version = self.lowest_state_version();
+
+        write!(
+            f,
+            "AdvertisedData {{ Highest epoch ending ledger info, epoch: {:?}. Highest synced ledger info, epoch: {:?}, version: {:?}. \
+            Lowest transaction version: {:?}, Lowest transaction output version: {:?}, Lowest states version: {:?} }}",
+            highest_epoch_ending_ledger_info, highest_synced_epoch, highest_synced_version,
+            lowest_transaction_version, lowest_output_version, lowest_states_version
         )
     }
 }

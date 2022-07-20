@@ -61,11 +61,11 @@ module aptos_framework::comparator {
 
     #[test]
     public fun test_strings() {
-        use std::ascii;
+        use std::string;
 
-        let value0 = ascii::string(b"alpha");
-        let value1 = ascii::string(b"beta");
-        let value2 = ascii::string(b"betaa");
+        let value0 = string::utf8(b"alpha");
+        let value1 = string::utf8(b"beta");
+        let value2 = string::utf8(b"betaa");
 
         assert!(is_equal(&compare(&value0, &value0)), 0);
         assert!(is_equal(&compare(&value1, &value1)), 1);

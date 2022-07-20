@@ -166,8 +166,9 @@ spec:
             - --watch-config
             - --config-dir
             - /etc/vector/
-            - -v
           env:
+            - name: K8S_CLUSTER
+              value: "{{ .Values.k8s_cluster }}"
             - name: VECTOR_SELF_NODE_NAME
               valueFrom:
                 fieldRef:

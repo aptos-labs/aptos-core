@@ -280,17 +280,17 @@ impl MoveValue {
         Ok(serde_json::to_value(self)?)
     }
 
-    pub fn is_ascii_string(st: &StructTag) -> bool {
+    pub fn is_utf8_string(st: &StructTag) -> bool {
         st.address == CORE_CODE_ADDRESS
             && st.name.to_string() == "String"
-            && st.module.to_string() == "ascii"
+            && st.module.to_string() == "string"
     }
 
-    pub fn convert_ascii_string(v: AnnotatedMoveStruct) -> anyhow::Result<MoveValue> {
+    pub fn convert_utf8_string(v: AnnotatedMoveStruct) -> anyhow::Result<MoveValue> {
         if let Some((_, AnnotatedMoveValue::Bytes(bytes))) = v.value.into_iter().next() {
             Ok(MoveValue::String(String::from_utf8(bytes)?))
         } else {
-            bail!("expect ascii::String, but failed to decode struct value");
+            bail!("expect string::String, but failed to decode struct value");
         }
     }
 }
@@ -312,8 +312,8 @@ impl TryFrom<AnnotatedMoveValue> for MoveValue {
             ),
             AnnotatedMoveValue::Bytes(v) => MoveValue::Bytes(HexEncodedBytes(v)),
             AnnotatedMoveValue::Struct(v) => {
-                if MoveValue::is_ascii_string(&v.type_) {
-                    MoveValue::convert_ascii_string(v)?
+                if MoveValue::is_utf8_string(&v.type_) {
+                    MoveValue::convert_utf8_string(v)?
                 } else {
                     MoveValue::Struct(v.try_into()?)
                 }

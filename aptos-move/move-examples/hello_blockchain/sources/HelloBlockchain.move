@@ -1,30 +1,30 @@
 module HelloBlockchain::Message {
-    use std::ascii;
+    use std::string;
     use std::errors;
     use std::event;
     use std::signer;
 
     struct MessageHolder has key {
-        message: ascii::String,
+        message: string::String,
         message_change_events: event::EventHandle<MessageChangeEvent>,
     }
 
     struct MessageChangeEvent has drop, store {
-        from_message: ascii::String,
-        to_message: ascii::String,
+        from_message: string::String,
+        to_message: string::String,
     }
 
     /// There is no message present
     const ENO_MESSAGE: u64 = 0;
 
-    public fun get_message(addr: address): ascii::String acquires MessageHolder {
+    public fun get_message(addr: address): string::String acquires MessageHolder {
         assert!(exists<MessageHolder>(addr), errors::not_published(ENO_MESSAGE));
         *&borrow_global<MessageHolder>(addr).message
     }
 
     public entry fun set_message(account: signer, message_bytes: vector<u8>)
     acquires MessageHolder {
-        let message = ascii::string(message_bytes);
+        let message = string::utf8(message_bytes);
         let account_addr = signer::address_of(&account);
         if (!exists<MessageHolder>(account_addr)) {
             move_to(&account, MessageHolder {
@@ -48,7 +48,7 @@ module HelloBlockchain::Message {
         set_message(account,  b"Hello, Blockchain");
 
         assert!(
-          get_message(addr) == ascii::string(b"Hello, Blockchain"),
+          get_message(addr) == string::utf8(b"Hello, Blockchain"),
           ENO_MESSAGE
         );
     }

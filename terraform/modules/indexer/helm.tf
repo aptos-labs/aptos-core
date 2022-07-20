@@ -1,6 +1,10 @@
+locals {
+  indexer_helm_chart_path = "${path.module}/../../helm/indexer"
+}
+
 resource "helm_release" "indexer" {
   name        = "indexer-${local.workspace_name}"
-  chart       = "${path.module}/../../helm/indexer"
+  chart       = local.indexer_helm_chart_path
   max_history = 2
   wait        = false
 
@@ -35,8 +39,9 @@ resource "helm_release" "indexer" {
     jsonencode(var.indexer_helm_values),
   ]
 
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
-    name  = "timestamp"
-    value = timestamp()
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.indexer_helm_chart_path, "**") : filesha1("${local.indexer_helm_chart_path}/${f}")]))
   }
 }

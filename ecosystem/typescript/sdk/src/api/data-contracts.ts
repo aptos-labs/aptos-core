@@ -878,7 +878,7 @@ For example:
 
 **Special serialization for Move stdlib types:**
 
-* [0x1::ascii::String](https://github.com/aptos-labs/aptos-core/blob/main/language/move-stdlib/docs/ascii.md) is serialized into `string`. For example, struct value `0x1::ascii::String{bytes: b"hello world"}` is serialized as `"hello world"` in JSON.
+* [0x1::string::String](https://github.com/aptos-labs/aptos-core/blob/main/language/move-stdlib/docs/ascii.md) is serialized into `string`. For example, struct value `0x1::string::String{bytes: b"hello world"}` is serialized as `"hello world"` in JSON.
 * @example 3344000000
 */
 export type MoveValue = any;
@@ -963,7 +963,7 @@ export interface Event {
    *   ```
    *   `{ "created": "0xa550c18", "role_id": "0" }`
    * **Special serialization for Move stdlib types:**
-   * * [0x1::ascii::String](https://github.com/aptos-labs/aptos-core/blob/main/language/move-stdlib/docs/ascii.md) is serialized into `string`. For example, struct value `0x1::ascii::String{bytes: b"hello world"}` is serialized as `"hello world"` in JSON.
+   * * [0x1::string::String](https://github.com/aptos-labs/aptos-core/blob/main/language/move-stdlib/docs/ascii.md) is serialized into `string`. For example, struct value `0x1::string::String{bytes: b"hello world"}` is serialized as `"hello world"` in JSON.
    */
   data: MoveValue;
 }
@@ -1168,7 +1168,7 @@ export interface TableItemRequest {
    *   ```
    *   `{ "created": "0xa550c18", "role_id": "0" }`
    * **Special serialization for Move stdlib types:**
-   * * [0x1::ascii::String](https://github.com/aptos-labs/aptos-core/blob/main/language/move-stdlib/docs/ascii.md) is serialized into `string`. For example, struct value `0x1::ascii::String{bytes: b"hello world"}` is serialized as `"hello world"` in JSON.
+   * * [0x1::string::String](https://github.com/aptos-labs/aptos-core/blob/main/language/move-stdlib/docs/ascii.md) is serialized into `string`. For example, struct value `0x1::string::String{bytes: b"hello world"}` is serialized as `"hello world"` in JSON.
    */
   key: MoveValue;
 }

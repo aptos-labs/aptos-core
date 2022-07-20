@@ -16,11 +16,6 @@ variable "fullnode_helm_values_list" {
   default     = {}
 }
 
-variable "helm_force_update" {
-  description = "Force Terraform to update the Helm deployment"
-  default     = false
-}
-
 variable "k8s_namespace" {
   default     = "aptos"
   description = "Kubernetes namespace that the fullnode will be deployed into"
