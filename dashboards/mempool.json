@@ -5282,7 +5282,7 @@
     ]
   },
   "timezone": "",
-  "title": "aptos_mempool",
-  "uid": "aptos_mempool",
+  "title": "Mempool",
+  "uid": "mempool",
   "version": 2
 }
