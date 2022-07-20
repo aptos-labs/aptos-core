@@ -115,7 +115,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "aptos_mempool size",
+      "title": "Mempool size",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -635,7 +635,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "aptos_mempool Service Timeout",
+      "title": "Mempool Service Timeout",
       "tooltip": {
         "shared": true,
         "sort": 0,
