@@ -23,7 +23,7 @@ module aptos_framework::table {
     /// Create a new Table.
     public fun new<K: copy + drop, V: store>(): Table<K, V> {
         Table{
-            handle: new_table_handle(),
+            handle: new_table_handle<K, V>(),
             length: 0,
         }
     }
@@ -103,7 +103,7 @@ module aptos_framework::table {
 
     // Primitives which take as an additional type parameter `Box<V>`, so the implementation
     // can use this to determine serialization layout.
-    native fun new_table_handle(): u128;
+    native fun new_table_handle<K, V>(): u128;
     native fun add_box<K: copy + drop, V, B>(table: &mut Table<K, V>, key: K, val: Box<V>);
     native fun borrow_box<K: copy + drop, V, B>(table: &Table<K, V>, key: K): &Box<V>;
     native fun borrow_box_mut<K: copy + drop, V, B>(table: &mut Table<K, V>, key: K): &mut Box<V>;
