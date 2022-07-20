@@ -115,7 +115,7 @@ export const useUserTransaction = ({ txnHashOrVersion }: UseUserTransactionProps
     }
 
     return transaction as UserTransaction;
-  }, [aptosNetwork]);
+  }, [aptosNetwork, txnHashOrVersion]);
 
   return useQuery([transactionQueryKeys.getUserTransaction, txnHashOrVersion], getTransactionQuery);
 };

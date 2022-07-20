@@ -102,7 +102,7 @@ export default function useWalletState() {
       });
       console.error(err);
     }
-  }, []);
+  }, [aptosNetwork, faucetNetwork, localStorageState]);
 
   const switchAccount = useCallback(({ accountAddress }: RemoveAccountProps) => {
     if (!accountAddress
@@ -142,7 +142,7 @@ export default function useWalletState() {
       });
       console.error(error);
     }
-  }, []);
+  }, [localStorageState]);
 
   const updateNetworkState = useCallback((network: AptosNetwork) => {
     try {
@@ -215,7 +215,7 @@ export default function useWalletState() {
       });
       console.error(err);
     }
-  }, []);
+  }, [currAccountAddress, localStorageState]);
 
   return {
     accountMnemonic,

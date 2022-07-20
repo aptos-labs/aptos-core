@@ -135,7 +135,7 @@ export const useCreateTokenAndCollection = () => {
         ...data,
       },
     });
-  }, [queryClient]);
+  }, [aptosNetwork, queryClient]);
 
   return useMutation<
   CombinedEventParams | undefined,

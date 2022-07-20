@@ -52,64 +52,60 @@ function withSimulatedExtensionContainer<T>({
       setSimulatedDimensions(fullscreenDimensions);
     };
 
-    const desktopComponent = (
-      <VStack w="100vw" h="100vh" spacing={0}>
-        <Flex
-          flexDirection="row-reverse"
-          w="100%"
-          py={4}
-          bgColor={secondaryHeaderBgColor[colorMode]}
-        >
-          <HStack spacing={4} pr={4}>
-            <Button onClick={changeDimensionsToExtension}>
-              Extension
-            </Button>
-            <Button onClick={changeDimensionsToFullscreen}>
-              Full screen
-            </Button>
-            <IconButton
-              aria-label="dark mode"
-              icon={colorMode === 'dark' ? <SunIcon /> : <MoonIcon />}
-              onClick={() => setColorMode((colorMode === 'dark') ? 'light' : 'dark')}
-            />
-          </HStack>
-        </Flex>
-        <Center
-          w="100%"
-          h="100%"
-          bgColor={secondaryFlexBgColor[colorMode]}
-        >
-          <Center
-            maxW={simulatedDimensions[0]}
-            maxH={simulatedDimensions[1]}
-            w={simulatedDimensions[0]}
-            h={simulatedDimensions[1]}
-            borderRadius=".5rem"
-            overflow="auto"
-            boxShadow={isFullScreen ? undefined : boxShadow}
-          >
-            <Component {...hocProps} />
-          </Center>
-        </Center>
-      </VStack>
-    );
-
-    const extensionComponent = (
-      <VStack w="100vw" h="100vh" spacing={0}>
-        <Component {...hocProps} />
-      </VStack>
-    );
-
     const trueComponent = useMemo(() => {
+      const desktopComponent = (
+        <VStack w="100vw" h="100vh" spacing={0}>
+          <Flex
+            flexDirection="row-reverse"
+            w="100%"
+            py={4}
+            bgColor={secondaryHeaderBgColor[colorMode]}
+          >
+            <HStack spacing={4} pr={4}>
+              <Button onClick={changeDimensionsToExtension}>
+                Extension
+              </Button>
+              <Button onClick={changeDimensionsToFullscreen}>
+                Full screen
+              </Button>
+              <IconButton
+                aria-label="dark mode"
+                icon={colorMode === 'dark' ? <SunIcon /> : <MoonIcon />}
+                onClick={() => setColorMode((colorMode === 'dark') ? 'light' : 'dark')}
+              />
+            </HStack>
+          </Flex>
+          <Center
+            w="100%"
+            h="100%"
+            bgColor={secondaryFlexBgColor[colorMode]}
+          >
+            <Center
+              maxW={simulatedDimensions[0]}
+              maxH={simulatedDimensions[1]}
+              w={simulatedDimensions[0]}
+              h={simulatedDimensions[1]}
+              borderRadius=".5rem"
+              overflow="auto"
+              boxShadow={isFullScreen ? undefined : boxShadow}
+            >
+              <Component {...hocProps} />
+            </Center>
+          </Center>
+        </VStack>
+      );
+
+      const extensionComponent = (
+        <VStack w="100vw" h="100vh" spacing={0}>
+          <Component {...hocProps} />
+        </VStack>
+      );
+
       if ((!process.env.NODE_ENV || process.env.NODE_ENV === 'development')) {
         return desktopComponent;
       }
       return extensionComponent;
-    }, [
-      process.env.NODE_ENV,
-      desktopComponent,
-      extensionComponent,
-    ]);
+    }, [colorMode, hocProps, isFullScreen, setColorMode, simulatedDimensions]);
 
     return trueComponent;
   }

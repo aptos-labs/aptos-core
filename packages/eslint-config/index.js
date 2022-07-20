@@ -24,11 +24,14 @@ module.exports = {
     'sort-keys-fix',
     'sort-destructure-keys',
     'react',
+    'react-hooks',
     '@typescript-eslint'
   ],
   rules: {
     "react/require-default-props": 0,
     "react/jsx-props-no-spreading": "off",
+    "react-hooks/exhaustive-deps": "warn",
+    "react-hooks/rules-of-hooks": "error",
     "sort-destructure-keys/sort-destructure-keys": 2,
     "sort-keys-fix/sort-keys-fix": "warn",
     "sort-keys": ["error", "asc", { caseSensitive: true, minKeys: 2, natural: false }]

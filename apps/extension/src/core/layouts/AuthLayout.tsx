@@ -36,7 +36,7 @@ export default function AuthLayout({
       default:
         return '/';
     }
-  }, []);
+  }, [routePath]);
 
   const redirect = <Navigate to={redirectPath} />;
 

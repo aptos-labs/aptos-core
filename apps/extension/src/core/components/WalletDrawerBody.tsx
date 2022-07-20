@@ -71,107 +71,109 @@ function WalletDrawerBodyListItem(
   const tokenBalance = getTestCoinTokenBalanceFromAccountResources({ accountResources });
   const tokenBalanceString = numeral(tokenBalance).format('0,0');
 
-  const deleteOnClick = () => {
-    // prompt password
-    removeAccount({ accountAddress: address });
-    onClose();
-    navigate(Routes.login.routePath);
-  };
-
   const walletAddressFormatted = `Wallet: ${address.substring(0, 15)}...`;
 
-  const memoizedInternal = useMemo(() => (
-    <Box as="label" width="100%">
-      <input {...input} />
-      <Box
-        {...checkbox}
-        cursor="pointer"
-        bgColor={secondaryBgColor[colorMode]}
-        _checked={{
-          bg: 'teal.600',
-          color: 'white',
-        }}
-        _hover={{
-          bg: (isChecked) ? 'teal.700' : secondaryHoverBgColor[colorMode],
-        }}
-        _focus={{
-          boxShadow: 'outline',
-        }}
-        borderRadius="md"
-      >
-        <Grid
-          templateColumns="1fr 18px"
-          borderRadius=".5rem"
-          paddingTop={4}
-          paddingX={4}
-          cursor="pointer"
-        >
-          <VStack alignItems="flex-start">
-            <Heading fontSize="lg" fontWeight={500} noOfLines={1} maxW={80}>
-              {walletAddressFormatted}
-            </Heading>
-          </VStack>
-          <DeleteIcon
-            fontSize="lg"
-            cursor="pointer"
-            onClick={onOpen}
-            _hover={{
-              color: 'red.400',
-            }}
-          />
-          <Modal isOpen={isOpen} onClose={onClose}>
-            <ModalOverlay />
-            <ModalContent>
-              <ModalHeader>
-                Are you sure you want to delete this wallet with address
-                {' '}
-                {address}
-                ?
-              </ModalHeader>
-              <ModalCloseButton />
-              <ModalBody>
-                <Text fontSize="md">
-                  PLEASE NOTE: You will not be able to recover this
-                  account unless you have stored the
-                  private key or mnemonic associated with
-                  this wallet address.
-                </Text>
-              </ModalBody>
-              <ModalFooter>
-                <Button colorScheme="red" mr={3} onClick={deleteOnClick}>
-                  Yes, I understand
-                </Button>
-                <Button onClick={onClose}>
-                  Close
-                </Button>
-              </ModalFooter>
-            </ModalContent>
-          </Modal>
-        </Grid>
-        <Grid templateColumns="1fr" borderRadius=".5rem" padding={4} pt={2}>
-          <HStack
-            color={isChecked ? 'gray.300' : secondaryTextColor[colorMode]}
-            divider={<span>&nbsp;&nbsp;&bull;&nbsp;&nbsp;</span>}
-          >
-            <Text noOfLines={1} fontSize="sm">
-              Balance:
-              {' '}
-              {tokenBalanceString}
-            </Text>
-            <Text noOfLines={1} fontSize="sm">
-              {
-                (latestTransactionTimestamp?.toDateString())
-                  ? `Last txn: ${latestTransactionTimestamp?.toDateString()}`
-                  : 'No transactions'
-              }
-            </Text>
-          </HStack>
-        </Grid>
-      </Box>
-    </Box>
-  ), [accountResources, isOpen, colorMode, deleteOnClick]);
+  return useMemo(() => {
+    const deleteOnClick = () => {
+      // prompt password
+      removeAccount({ accountAddress: address });
+      onClose();
+      navigate(Routes.login.routePath);
+    };
 
-  return memoizedInternal;
+    return (
+      <Box as="label" width="100%">
+        <input {...input} />
+        <Box
+          {...checkbox}
+          cursor="pointer"
+          bgColor={secondaryBgColor[colorMode]}
+          _checked={{
+            bg: 'teal.600',
+            color: 'white',
+          }}
+          _hover={{
+            bg: (isChecked) ? 'teal.700' : secondaryHoverBgColor[colorMode],
+          }}
+          _focus={{
+            boxShadow: 'outline',
+          }}
+          borderRadius="md"
+        >
+          <Grid
+            templateColumns="1fr 18px"
+            borderRadius=".5rem"
+            paddingTop={4}
+            paddingX={4}
+            cursor="pointer"
+          >
+            <VStack alignItems="flex-start">
+              <Heading fontSize="lg" fontWeight={500} noOfLines={1} maxW={80}>
+                {walletAddressFormatted}
+              </Heading>
+            </VStack>
+            <DeleteIcon
+              fontSize="lg"
+              cursor="pointer"
+              onClick={onOpen}
+              _hover={{
+                color: 'red.400',
+              }}
+            />
+            <Modal isOpen={isOpen} onClose={onClose}>
+              <ModalOverlay />
+              <ModalContent>
+                <ModalHeader>
+                  Are you sure you want to delete this wallet with address
+                  {' '}
+                  {address}
+                  ?
+                </ModalHeader>
+                <ModalCloseButton />
+                <ModalBody>
+                  <Text fontSize="md">
+                    PLEASE NOTE: You will not be able to recover this
+                    account unless you have stored the
+                    private key or mnemonic associated with
+                    this wallet address.
+                  </Text>
+                </ModalBody>
+                <ModalFooter>
+                  <Button colorScheme="red" mr={3} onClick={deleteOnClick}>
+                    Yes, I understand
+                  </Button>
+                  <Button onClick={onClose}>
+                    Close
+                  </Button>
+                </ModalFooter>
+              </ModalContent>
+            </Modal>
+          </Grid>
+          <Grid templateColumns="1fr" borderRadius=".5rem" padding={4} pt={2}>
+            <HStack
+              color={isChecked ? 'gray.300' : secondaryTextColor[colorMode]}
+              divider={<span>&nbsp;&nbsp;&bull;&nbsp;&nbsp;</span>}
+            >
+              <Text noOfLines={1} fontSize="sm">
+                Balance:
+                {' '}
+                {tokenBalanceString}
+              </Text>
+              <Text noOfLines={1} fontSize="sm">
+                {
+                  (latestTransactionTimestamp?.toDateString())
+                    ? `Last txn: ${latestTransactionTimestamp?.toDateString()}`
+                    : 'No transactions'
+                }
+              </Text>
+            </HStack>
+          </Grid>
+        </Box>
+      </Box>
+    );
+  }, [input, checkbox, colorMode, isChecked, walletAddressFormatted,
+    onOpen, isOpen, onClose, address, tokenBalanceString,
+    latestTransactionTimestamp, removeAccount, navigate]);
 }
 
 function WalletDrawerBody() {

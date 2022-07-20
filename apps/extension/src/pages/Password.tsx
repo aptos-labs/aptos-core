@@ -20,7 +20,7 @@ function Password() {
       // eslint-disable-next-line no-alert
       alert(pin);
     }
-  }, []);
+  }, [pin]);
 
   return (
     <VStack

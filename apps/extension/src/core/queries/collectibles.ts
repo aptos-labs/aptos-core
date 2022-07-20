@@ -136,7 +136,7 @@ export const useTokenData = ({
   tokenId,
 }: UseTokenDataProps) => {
   const { aptosNetwork } = useWalletState();
-  const tokenIdDict = useMemo(() => getTokenIdDictFromString({ tokenId }), []);
+  const tokenIdDict = useMemo(() => getTokenIdDictFromString({ tokenId }), [tokenId]);
 
   const getGalleryItemsQuery = useCallback(async () => {
     const tokenData = await getTokenData({
