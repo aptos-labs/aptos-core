@@ -555,7 +555,11 @@ export class AptosClient {
 
   // Only cache for a short period to avoid excessive amount of memory usage
   @MemoizeExpiring(2 * 60 * 1000) // Cache for 2min
-  private async getTransactionBuilder(accountFrom: AptosAccount): Promise<TransactionBuilderEd25519> {
+  async getTxnBuilderWithABI(accountFrom: AptosAccount): Promise<TransactionBuilderEd25519> {
+    if (this.abis.length === 0) {
+      throw new Error("ABIs are not provided.");
+    }
+
     const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
       this.getAccount(accountFrom.address()),
       this.getChainId(),
@@ -584,7 +588,7 @@ export class AptosClient {
     args: any[],
   ): Promise<Types.PendingTransaction> {
     const [txnBuilder, { sequence_number: sequenceNumber }] = await Promise.all([
-      this.getTransactionBuilder(accountFrom),
+      this.getTxnBuilderWithABI(accountFrom),
       this.getAccount(accountFrom.address()),
     ]);
     txnBuilder.rawTxnBuilder?.setSequenceNumber(sequenceNumber);

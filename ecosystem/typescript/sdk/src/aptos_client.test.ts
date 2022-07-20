@@ -10,6 +10,7 @@ import { AptosAccount } from "./aptos_account";
 import { TxnBuilderTypes, TransactionBuilderMultiEd25519, BCS, TransactionBuilder } from "./transaction_builder";
 import { TransactionPayload, WriteResource } from "./api/data-contracts";
 import { TokenClient } from "./token_client";
+import { HexString } from "./hex_string";
 
 test("gets genesis account", async () => {
   const client = new AptosClient(NODE_URL);
@@ -486,6 +487,43 @@ test(
 
     const bobTokenTableItem = await client.getTableItem(handle, getTokenTableItemRequest);
     expect(bobTokenTableItem?.data?.value).toBe("1");
+  },
+  30 * 1000,
+);
+
+test(
+  "submits ABI transaction",
+  async () => {
+    const coinTransferABI =
+      // eslint-disable-next-line max-len
+      "01087472616E73666572000000000000000000000000000000000000000000000000000000000000000104636F696E3C205472616E73666572732060616D6F756E7460206F6620636F696E732060436F696E54797065602066726F6D206066726F6D6020746F2060746F602E0109636F696E5F747970650202746F0406616D6F756E7402";
+    const client = new AptosClient(NODE_URL, {}, { abis: [new HexString(coinTransferABI).toUint8Array()] });
+    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL, null);
+
+    const account1 = new AptosAccount();
+    await faucetClient.fundAccount(account1.address(), 1000);
+    let resources = await client.getAccountResources(account1.address());
+    let accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
+    expect((accountResource.data as any).coin.value).toBe("1000");
+
+    const account2 = new AptosAccount();
+    await faucetClient.fundAccount(account2.address(), 0);
+    resources = await client.getAccountResources(account2.address());
+    accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
+    expect((accountResource.data as any).coin.value).toBe("0");
+
+    const transactionRes = await client.sendABITransaction(
+      account1,
+      "0x1::coin::transfer",
+      ["0x1::aptos_coin::AptosCoin"],
+      [account2.address(), 144],
+    );
+
+    await client.waitForTransaction(transactionRes.hash);
+
+    resources = await client.getAccountResources(account2.address());
+    accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
+    expect((accountResource.data as any).coin.value).toBe("144");
   },
   30 * 1000,
 );

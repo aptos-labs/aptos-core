@@ -1,3 +1,4 @@
+import { HexString } from "../hex_string";
 import {
   TypeTag,
   TypeTagBool,
@@ -50,7 +51,7 @@ type TokenType = string;
 type TokenValue = string;
 type Token = [TokenType, TokenValue];
 
-// A simple tokenizer, we don't do special processing for cases like 0x...
+// Returns Token and Token byte size
 function nextToken(tagStr: string, pos: number): [Token, number] {
   const c = tagStr[pos];
   if (c === ":") {
@@ -231,7 +232,7 @@ export function serializeArg(argVal: any, argType: TypeTag, serializer: Serializ
   }
   if (argType instanceof TypeTagAddress) {
     let addr: AccountAddress;
-    if (typeof argVal === "string") {
+    if (typeof argVal === "string" || argVal instanceof HexString) {
       addr = AccountAddress.fromHex(argVal);
     } else if (argVal instanceof AccountAddress) {
       addr = argVal;

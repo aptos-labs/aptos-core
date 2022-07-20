@@ -55,66 +55,66 @@ describe("BuilderUtils", () => {
       expect(struct.value.module_name.value).toBe(moduleName);
       expect(struct.value.name.value).toBe(structName);
     };
-    const coin = new TypeTagParser("0x1::TestCoin::Coin").parseTypeTag();
+    const coin = new TypeTagParser("0x1::test_coin::Coin").parseTypeTag();
     expect(coin instanceof TypeTagStruct).toBeTruthy();
-    assertStruct(coin as TypeTagStruct, "0x1", "TestCoin", "Coin");
+    assertStruct(coin as TypeTagStruct, "0x1", "test_coin", "Coin");
 
-    const testCoin = new TypeTagParser(
-      "0x1::Coin::CoinStore < 0x1::TestCoin::TestCoin1 ,  0x1::TestCoin::TestCoin2 > ",
+    const aptosCoin = new TypeTagParser(
+      "0x1::coin::CoinStore < 0x1::test_coin::AptosCoin1 ,  0x1::test_coin::AptosCoin2 > ",
     ).parseTypeTag();
-    expect(testCoin instanceof TypeTagStruct).toBeTruthy();
-    assertStruct(testCoin as TypeTagStruct, "0x1", "Coin", "CoinStore");
+    expect(aptosCoin instanceof TypeTagStruct).toBeTruthy();
+    assertStruct(aptosCoin as TypeTagStruct, "0x1", "coin", "CoinStore");
 
-    const testCoinTrailingComma = new TypeTagParser(
-      "0x1::Coin::CoinStore < 0x1::TestCoin::TestCoin1 ,  0x1::TestCoin::TestCoin2, > ",
+    const aptosCoinTrailingComma = new TypeTagParser(
+      "0x1::coin::CoinStore < 0x1::test_coin::AptosCoin1 ,  0x1::test_coin::AptosCoin2, > ",
     ).parseTypeTag();
-    expect(testCoinTrailingComma instanceof TypeTagStruct).toBeTruthy();
-    assertStruct(testCoinTrailingComma as TypeTagStruct, "0x1", "Coin", "CoinStore");
+    expect(aptosCoinTrailingComma instanceof TypeTagStruct).toBeTruthy();
+    assertStruct(aptosCoinTrailingComma as TypeTagStruct, "0x1", "coin", "CoinStore");
 
-    const structTypeTags = (testCoin as TypeTagStruct).value.type_args;
+    const structTypeTags = (aptosCoin as TypeTagStruct).value.type_args;
     expect(structTypeTags.length).toBe(2);
 
     const structTypeTag1 = structTypeTags[0];
-    assertStruct(structTypeTag1 as TypeTagStruct, "0x1", "TestCoin", "TestCoin1");
+    assertStruct(structTypeTag1 as TypeTagStruct, "0x1", "test_coin", "AptosCoin1");
 
     const structTypeTag2 = structTypeTags[1];
-    assertStruct(structTypeTag2 as TypeTagStruct, "0x1", "TestCoin", "TestCoin2");
+    assertStruct(structTypeTag2 as TypeTagStruct, "0x1", "test_coin", "AptosCoin2");
 
     const coinComplex = new TypeTagParser(
-      "0x1::Coin::CoinStore < 0x2::Coin::LPCoin < 0x1::TestCoin::TestCoin1 <u8>, vector<0x1::TestCoin::TestCoin2 > > >",
+      "0x1::coin::CoinStore < 0x2::coin::LPCoin < 0x1::test_coin::AptosCoin1 <u8>, vector<0x1::test_coin::AptosCoin2 > > >",
     ).parseTypeTag();
 
     expect(coinComplex instanceof TypeTagStruct).toBeTruthy();
-    assertStruct(coinComplex as TypeTagStruct, "0x1", "Coin", "CoinStore");
+    assertStruct(coinComplex as TypeTagStruct, "0x1", "coin", "CoinStore");
     const coinComplexTypeTag = (coinComplex as TypeTagStruct).value.type_args[0];
-    assertStruct(coinComplexTypeTag as TypeTagStruct, "0x2", "Coin", "LPCoin");
+    assertStruct(coinComplexTypeTag as TypeTagStruct, "0x2", "coin", "LPCoin");
 
     expect(() => {
-      new TypeTagParser("0x1::TestCoin").parseTypeTag();
+      new TypeTagParser("0x1::test_coin").parseTypeTag();
     }).toThrow("Invalid type tag.");
 
     expect(() => {
-      new TypeTagParser("0x1::TestCoin::CoinStore<0x1::TestCoin::TestCoin").parseTypeTag();
+      new TypeTagParser("0x1::test_coin::CoinStore<0x1::test_coin::AptosCoin").parseTypeTag();
     }).toThrow("Invalid type tag.");
 
     expect(() => {
-      new TypeTagParser("0x1::TestCoin::CoinStore<0x1::TestCoin>").parseTypeTag();
+      new TypeTagParser("0x1::test_coin::CoinStore<0x1::test_coin>").parseTypeTag();
     }).toThrow("Invalid type tag.");
 
     expect(() => {
-      new TypeTagParser("0x1:TestCoin::TestCoin").parseTypeTag();
+      new TypeTagParser("0x1:test_coin::AptosCoin").parseTypeTag();
     }).toThrow("Unrecognized token.");
 
     expect(() => {
-      new TypeTagParser("0x!::TestCoin::TestCoin").parseTypeTag();
+      new TypeTagParser("0x!::test_coin::AptosCoin").parseTypeTag();
     }).toThrow("Unrecognized token.");
 
     expect(() => {
-      new TypeTagParser("0x1::TestCoin::TestCoin<").parseTypeTag();
+      new TypeTagParser("0x1::test_coin::AptosCoin<").parseTypeTag();
     }).toThrow("Invalid type tag.");
 
     expect(() => {
-      new TypeTagParser("0x1::TestCoin::CoinStore<0x1::TestCoin::TestCoin,").parseTypeTag();
+      new TypeTagParser("0x1::test_coin::CoinStore<0x1::test_coin::AptosCoin,").parseTypeTag();
     }).toThrow("Invalid type tag.");
 
     expect(() => {
@@ -122,11 +122,11 @@ describe("BuilderUtils", () => {
     }).toThrow("Invalid type tag.");
 
     expect(() => {
-      new TypeTagParser("0x1::<::CoinStore<0x1::TestCoin::TestCoin,").parseTypeTag();
+      new TypeTagParser("0x1::<::CoinStore<0x1::test_coin::AptosCoin,").parseTypeTag();
     }).toThrow("Invalid type tag.");
 
     expect(() => {
-      new TypeTagParser("0x1::TestCoin::><0x1::TestCoin::TestCoin,").parseTypeTag();
+      new TypeTagParser("0x1::test_coin::><0x1::test_coin::AptosCoin,").parseTypeTag();
     }).toThrow("Invalid type tag.");
 
     expect(() => {
