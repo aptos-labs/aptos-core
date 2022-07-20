@@ -1,7 +1,7 @@
 /// Maintains the consensus config for the blockchain. The config is stored in a
 /// Reconfiguration, and may be updated by root.
 module aptos_framework::consensus_config {
-    use std::errors;
+    use std::error;
     use std::vector;
     use aptos_framework::reconfiguration;
     use aptos_framework::timestamp;
@@ -21,7 +21,7 @@ module aptos_framework::consensus_config {
 
         assert!(
             !exists<ConsensusConfig>(@aptos_framework),
-            errors::already_published(ECONFIG)
+            error::already_exists(ECONFIG)
         );
         move_to(account, ConsensusConfig { config: vector::empty() });
     }

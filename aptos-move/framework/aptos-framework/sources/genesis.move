@@ -1,7 +1,7 @@
 module aptos_framework::genesis {
     use std::signer;
-    use std::errors;
-    use std::event;
+    use std::error;
+    use aptos_std::event;
     use std::vector;
 
     use aptos_framework::account;
@@ -43,7 +43,7 @@ module aptos_framework::genesis {
         rewards_rate_denominator: u64,
     ) {
         // This can fail genesis but is necessary so that any misconfigurations can be corrected before genesis succeeds
-        assert!(epoch_interval > 0, errors::invalid_argument(EINVALID_EPOCH_DURATION));
+        assert!(epoch_interval > 0, error::invalid_argument(EINVALID_EPOCH_DURATION));
 
         initialize_internal(
             &core_resource_account,

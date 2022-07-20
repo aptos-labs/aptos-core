@@ -25,7 +25,3 @@ datatest-stable = "0.1.1"
 [[bin]]
 name = "af-cli"
 path = "src/main.rs"
-
-[[test]]
-name = "cli_testsuite"
-harness = false

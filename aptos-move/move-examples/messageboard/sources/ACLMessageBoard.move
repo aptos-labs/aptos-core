@@ -11,7 +11,7 @@
 ///     (1) message change event, this event contains the board, message and message author
 module MessageBoard::ACLBasedMB{
     use std::acl::Self;
-    use std::event::{Self, EventHandle};
+    use aptos_std::event::{Self, EventHandle};
     use std::signer;
     use std::vector;
 
