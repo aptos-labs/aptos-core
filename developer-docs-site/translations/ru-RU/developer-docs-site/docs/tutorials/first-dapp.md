@@ -250,7 +250,7 @@ You can also verify that the module was published by going to the [Aptos Explore
         "address"
       ],
       "_return": [
-        "0x1::ascii::String"
+        "0x1::string::String"
       ]
     },
     {
@@ -276,11 +276,11 @@ You can also verify that the module was published by going to the [Aptos Explore
       "fields": [
         {
           "name": "from_message",
-          "type": "0x1::ascii::String"
+          "type": "0x1::string::String"
         },
         {
           "name": "to_message",
-          "type": "0x1::ascii::String"
+          "type": "0x1::string::String"
         }
       ]
     },
@@ -294,7 +294,7 @@ You can also verify that the module was published by going to the [Aptos Explore
       "fields": [
         {
           "name": "message",
-          "type": "0x1::ascii::String"
+          "type": "0x1::string::String"
         },
         {
           "name": "message_change_events",
