@@ -20,8 +20,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{convert::Infallible, fmt::LowerHex, future::Future, str::FromStr};
 use warp::Filter;
 
-/// The year 2000 in seconds, as this is the lower limit for Rosetta API implementations
-pub const Y2K_SECS: u64 = 946713600000;
+/// The year 2000 in milliseconds, as this is the lower limit for Rosetta API implementations
+pub const Y2K_MS: u64 = 946713600000;
 pub const BLOCKCHAIN: &str = "aptos";
 
 /// Checks the request network matches the server network
@@ -109,8 +109,8 @@ pub fn get_timestamp(block_info: BlockInfo) -> u64 {
     let mut timestamp = block_info.block_timestamp / 1000;
 
     // Rosetta doesn't like timestamps before 2000
-    if timestamp < Y2K_SECS {
-        timestamp = Y2K_SECS;
+    if timestamp < Y2K_MS {
+        timestamp = Y2K_MS;
     }
     timestamp
 }
