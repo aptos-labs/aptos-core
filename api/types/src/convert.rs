@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    transaction::{ModuleBundlePayload, StateCheckpointTransaction},
+    transaction::{
+        DeleteModule, DeleteResource, DeleteTableItem, ModuleBundlePayload,
+        StateCheckpointTransaction, WriteModule, WriteResource, WriteTableItem,
+    },
     Bytecode, DirectWriteSet, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode,
     MoveResource, MoveScriptBytecode, MoveValue, ScriptFunctionId, ScriptFunctionPayload,
     ScriptPayload, ScriptWriteSet, Transaction, TransactionInfo, TransactionOnChainData,
@@ -233,28 +236,28 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     ) -> Result<WriteSetChange> {
         let ret = match op {
             WriteOp::Deletion => match access_path.get_path() {
-                Path::Code(module_id) => WriteSetChange::DeleteModule {
+                Path::Code(module_id) => WriteSetChange::DeleteModule(DeleteModule {
                     address: access_path.address.into(),
                     state_key_hash,
                     module: module_id.into(),
-                },
-                Path::Resource(typ) => WriteSetChange::DeleteResource {
+                }),
+                Path::Resource(typ) => WriteSetChange::DeleteResource(DeleteResource {
                     address: access_path.address.into(),
                     state_key_hash,
                     resource: typ.into(),
-                },
+                }),
             },
             WriteOp::Value(val) => match access_path.get_path() {
-                Path::Code(_) => WriteSetChange::WriteModule {
+                Path::Code(_) => WriteSetChange::WriteModule(WriteModule {
                     address: access_path.address.into(),
                     state_key_hash,
                     data: MoveModuleBytecode::new(val).try_parse_abi()?,
-                },
-                Path::Resource(typ) => WriteSetChange::WriteResource {
+                }),
+                Path::Resource(typ) => WriteSetChange::WriteResource(WriteResource {
                     address: access_path.address.into(),
                     state_key_hash,
                     data: self.try_into_resource(&typ, &val)?,
-                },
+                }),
             },
         };
         Ok(ret)
@@ -270,17 +273,17 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         let handle = handle.to_be_bytes().to_vec().into();
         let key = key.into();
         let ret = match op {
-            WriteOp::Deletion => WriteSetChange::DeleteTableItem {
+            WriteOp::Deletion => WriteSetChange::DeleteTableItem(DeleteTableItem {
                 state_key_hash,
                 handle,
                 key,
-            },
-            WriteOp::Value(value) => WriteSetChange::WriteTableItem {
+            }),
+            WriteOp::Value(value) => WriteSetChange::WriteTableItem(WriteTableItem {
                 state_key_hash,
                 handle,
                 key,
                 value: value.into(),
-            },
+            }),
         };
         Ok(ret)
     }

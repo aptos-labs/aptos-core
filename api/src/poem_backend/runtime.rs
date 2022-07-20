@@ -5,7 +5,7 @@ use std::{net::SocketAddr, sync::Arc};
 
 use super::{middleware_log, AccountsApi, BasicApi, EventsApi, IndexApi};
 
-use crate::context::Context;
+use crate::{context::Context, poem_backend::TransactionsApi};
 use anyhow::Context as AnyhowContext;
 use aptos_config::config::NodeConfig;
 use aptos_logger::info;
@@ -36,7 +36,10 @@ pub fn attach_poem_to_runtime(
         EventsApi {
             context: context.clone(),
         },
-        IndexApi { context },
+        IndexApi {
+            context: context.clone(),
+        },
+        TransactionsApi { context },
     );
 
     let version = std::env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.1.0".to_string());
