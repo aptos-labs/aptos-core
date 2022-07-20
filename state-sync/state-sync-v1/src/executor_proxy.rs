@@ -744,7 +744,7 @@ mod tests {
             sequence_number,
             genesis_key.clone(),
             genesis_key.public_key(),
-            Some(aptos_stdlib::encode_test_coin_transfer(
+            Some(aptos_stdlib::encode_aptos_coin_transfer(
                 validator_account,
                 1_000_000,
             )),

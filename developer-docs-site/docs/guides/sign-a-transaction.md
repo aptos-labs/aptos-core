@@ -191,7 +191,7 @@ function createRawTransaction(): RawTransaction {
   const payload: ScriptFunction = {
     module: {
       address: hexToAccountAddress("0x01"),
-      name: "TestCoin"
+      name: "AptosCoin"
     },
     function: "transfer",
     ty_args: [],

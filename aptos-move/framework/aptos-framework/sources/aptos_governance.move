@@ -25,7 +25,7 @@ module aptos_framework::aptos_governance {
     use aptos_framework::stake;
     use aptos_framework::system_addresses;
     use aptos_framework::table::{Self, Table};
-    use aptos_framework::test_coin::TestCoin;
+    use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::timestamp;
     use aptos_framework::voting;
 
@@ -184,7 +184,7 @@ module aptos_framework::aptos_governance {
         // has voted. This doesn't take into subsequent inflation/deflation (rewards are issued every epoch and gas fees
         // are burnt after every transaction), but inflation/delation is very unlikely to have a major impact on total
         // supply during the voting period.
-        let total_voting_token_supply = coin::supply<TestCoin>();
+        let total_voting_token_supply = coin::supply<AptosCoin>();
         let early_resolution_vote_threshold = option::none<u128>();
         if (option::is_some(&total_voting_token_supply)) {
             let total_supply = *option::borrow(&total_voting_token_supply);
@@ -391,9 +391,8 @@ module aptos_framework::aptos_governance {
         no_voter: &signer,
     ) {
         use std::vector;
-
         use aptos_framework::coin;
-        use aptos_framework::test_coin::{Self, TestCoin};
+        use aptos_framework::aptos_coin::{Self, AptosCoin};
 
         timestamp::set_time_has_started_for_testing(aptos_framework);
 
@@ -407,14 +406,14 @@ module aptos_framework::aptos_governance {
         vector::push_back(&mut active_validators, signer::address_of(no_voter));
         stake::create_validator_set(aptos_framework, active_validators);
 
-        let (mint_cap, burn_cap) = test_coin::initialize(aptos_framework, core_resources);
+        let (mint_cap, burn_cap) = aptos_coin::initialize(aptos_framework, core_resources);
         let proposer_stake = coin::mint(100, &mint_cap);
         let yes_voter_stake = coin::mint(20, &mint_cap);
         let no_voter_stake = coin::mint(10, &mint_cap);
         stake::create_stake_pool(proposer, proposer_stake, 10000);
         stake::create_stake_pool(yes_voter, yes_voter_stake, 10000);
         stake::create_stake_pool(no_voter, no_voter_stake, 10000);
-        coin::destroy_mint_cap<TestCoin>(mint_cap);
-        coin::destroy_burn_cap<TestCoin>(burn_cap);
+        coin::destroy_mint_cap<AptosCoin>(mint_cap);
+        coin::destroy_burn_cap<AptosCoin>(burn_cap);
     }
 }

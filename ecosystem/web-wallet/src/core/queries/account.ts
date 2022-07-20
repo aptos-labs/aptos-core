@@ -24,7 +24,7 @@ export const getAccountBalanceFromAccountResources = (
   accountResources: Types.AccountResource[] | undefined,
 ): Number => {
   if (accountResources) {
-    const accountResource = (accountResources) ? accountResources?.find((r) => r.type === '0x1::coin::CoinStore<0x1::test_coin::TestCoin>') : undefined;
+    const accountResource = (accountResources) ? accountResources?.find((r) => r.type === '0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>') : undefined;
     const tokenBalance = (accountResource)
       ? (accountResource.data as { coin: { value: string } }).coin.value
       : undefined;
@@ -45,19 +45,16 @@ export const getResourceFromAccountResources = ({
   ? accountResources?.find((r) => r.type === resource)
   : undefined);
 
-export type GetTestCoinTokenBalanceFromAccountResourcesProps = Omit<GetResourceFromAccountResources, 'resource'>;
+export type GetAptosCoinTokenBalanceFromAccountResourcesProps = Omit<GetResourceFromAccountResources, 'resource'>;
 
-export const getTestCoinTokenBalanceFromAccountResources = ({
+export const getAptosCoinTokenBalanceFromAccountResources = ({
   accountResources,
-}: GetTestCoinTokenBalanceFromAccountResourcesProps) => {
-  const testCoinResource = getResourceFromAccountResources({
+}: GetAptosCoinTokenBalanceFromAccountResourcesProps) => {
+  const aptosCoinResource = getResourceFromAccountResources({
     accountResources,
-    resource: '0x1::coin::CoinStore<0x1::test_coin::TestCoin>',
+    resource: '0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>',
   });
-  const tokenBalance = (testCoinResource)
-    ? (testCoinResource.data as { coin: { value: string } }).coin.value
-    : undefined;
-  return tokenBalance;
+  return aptosCoinResource ? (aptosCoinResource.data as { coin: { value: string } }).coin.value : undefined;
 };
 
 export const getAccountExists = async ({

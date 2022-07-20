@@ -277,7 +277,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             10,
         )
         .unwrap();
-    // Account1 has one deposit event since TestCoin was minted to it.
+    // Account1 has one deposit event since AptosCoin was minted to it.
     assert_eq!(account1_received_events.len(), 1);
 
     let account2_received_events = db

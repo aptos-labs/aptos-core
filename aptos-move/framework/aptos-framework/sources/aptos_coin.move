@@ -1,6 +1,6 @@
 /// This module defines a minimal and generic Coin and Balance.
 /// modified from https://github.com/move-language/move/tree/main/language/documentation/tutorial
-module aptos_framework::test_coin {
+module aptos_framework::aptos_coin {
     use std::string;
     use std::errors;
     use std::signer;
@@ -15,10 +15,10 @@ module aptos_framework::test_coin {
     const EALREADY_DELEGATED: u64 = 2;
     const EDELEGATION_NOT_FOUND: u64 = 3;
 
-    struct TestCoin has key { }
+    struct AptosCoin has key { }
 
     struct Capabilities has key {
-        mint_cap: MintCapability<TestCoin>,
+        mint_cap: MintCapability<AptosCoin>,
     }
 
     /// Delegation token created by delegator and can be claimed by the delegatee as MintCapability.
@@ -34,28 +34,29 @@ module aptos_framework::test_coin {
     public fun initialize(
         aptos_framework: &signer,
         core_resource: &signer,
-    ): (MintCapability<TestCoin>, BurnCapability<TestCoin>) {
+    ): (MintCapability<AptosCoin>, BurnCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        let (mint_cap, burn_cap) = coin::initialize<TestCoin>(
+        let (mint_cap, burn_cap) = coin::initialize<AptosCoin>(
             aptos_framework,
-            string::utf8(b"Test Coin"),
-            string::utf8(b"TC"),
-            6, /* decimals */
+            string::utf8(b"Aptos Coin"),
+            string::utf8(b"APTOS"),
+            8, /* decimals */
             false, /* monitor_supply */
         );
 
         // Aptos framework needs mint cap to mint coins to initial validators.
         move_to(aptos_framework, Capabilities { mint_cap: copy mint_cap });
 
-        // Mint the core resource account TestCoin for gas so it can execute system transactions.
+        // Mint the core resource account AptosCoin for gas so it can execute system transactions.
         // TODO: Only do this for testnets.
-        coin::register_internal<TestCoin>(core_resource);
-        let coins = coin::mint<TestCoin>(
+        coin::register_internal<AptosCoin>(core_resource);
+        let coins = coin::mint<AptosCoin>(
             18446744073709551615,
             &mint_cap,
         );
-        coin::deposit<TestCoin>(signer::address_of(core_resource), coins);
+        coin::deposit<AptosCoin>(signer::address_of(core_resource), coins);
+
         move_to(core_resource, Capabilities { mint_cap: copy mint_cap });
         move_to(core_resource, Delegations { inner: vector::empty() });
 
@@ -76,8 +77,8 @@ module aptos_framework::test_coin {
         );
 
         let capabilities = borrow_global<Capabilities>(account_addr);
-        let coins_minted = coin::mint<TestCoin>(amount, &capabilities.mint_cap);
-        coin::deposit<TestCoin>(dst_addr, coins_minted);
+        let coins_minted = coin::mint<AptosCoin>(amount, &capabilities.mint_cap);
+        coin::deposit<AptosCoin>(dst_addr, coins_minted);
     }
 
     /// Create delegated token for the address so the account could claim MintCapability later.

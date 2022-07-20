@@ -109,32 +109,32 @@ module shared_account::SharedAccount {
 
     #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113, core_resources = @core_resources, core_framework = @aptos_framework)]
     public entry fun test_disperse(user: signer, test_user1: signer, test_user2: signer, core_resources: signer, core_framework: signer) acquires SharedAccount, SharedAccountEvent {
-        use aptos_framework::test_coin::{Self, TestCoin};
+        use aptos_framework::aptos_coin::{Self, AptosCoin};
         let user_addr1 = signer::address_of(&test_user1);
         let user_addr2 = signer::address_of(&test_user2);
         let resource_addr = set_up(user, test_user1, test_user2);
-        let (mint_cap, burn_cap) = test_coin::initialize(&core_framework, &core_resources);
+        let (mint_cap, burn_cap) = aptos_coin::initialize(&core_framework, &core_resources);
 
         let shared_account = borrow_global<SharedAccount>(resource_addr);
         let resource_signer = account::create_signer_with_capability(&shared_account.signer_capability);
-        coin::register<TestCoin>(&resource_signer);
-        test_coin::mint(&core_framework, resource_addr, 1000);
-        disperse<TestCoin>(resource_addr);
-        coin::destroy_mint_cap<TestCoin>(mint_cap);
-        coin::destroy_burn_cap<TestCoin>(burn_cap);
+        coin::register<AptosCoin>(&resource_signer);
+        aptos_coin::mint(&core_framework, resource_addr, 1000);
+        disperse<AptosCoin>(resource_addr);
+        coin::destroy_mint_cap<AptosCoin>(mint_cap);
+        coin::destroy_burn_cap<AptosCoin>(burn_cap);
 
-        assert!(coin::balance<TestCoin>(user_addr1) == 200, 0);
-        assert!(coin::balance<TestCoin>(user_addr2) == 800, 1);
+        assert!(coin::balance<AptosCoin>(user_addr1) == 200, 0);
+        assert!(coin::balance<AptosCoin>(user_addr2) == 800, 1);
     }
 
     #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113)]
     #[expected_failure]
     public entry fun test_disperse_insufficient_balance(user: signer, test_user1: signer, test_user2: signer) acquires SharedAccount, SharedAccountEvent {
-        use aptos_framework::test_coin::TestCoin;
+        use aptos_framework::aptos_coin::AptosCoin;
         let resource_addr = set_up(user, test_user1, test_user2);
         let shared_account = borrow_global<SharedAccount>(resource_addr);
         let resource_signer = account::create_signer_with_capability(&shared_account.signer_capability);
-        coin::register<TestCoin>(&resource_signer);
-        disperse<TestCoin>(resource_addr);
+        coin::register<AptosCoin>(&resource_signer);
+        disperse<AptosCoin>(resource_addr);
     }
 }

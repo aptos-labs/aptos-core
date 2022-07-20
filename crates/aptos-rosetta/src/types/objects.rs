@@ -7,8 +7,8 @@
 
 use crate::common::{native_coin_tag, native_coin_tag_lower};
 use crate::types::{
-    account_identifier_lower, coin_identifier_lower, create_account_identifier,
-    test_coin_identifier, test_coin_identifier_lower, transfer_identifier,
+    account_identifier_lower, aptos_coin_identifier, aptos_coin_identifier_lower,
+    coin_identifier_lower, create_account_identifier, transfer_identifier,
 };
 use crate::{
     common::{is_native_coin, native_coin},
@@ -611,9 +611,9 @@ fn parse_operations_from_txn_payload(
             })) = inner.type_arguments.first()
             {
                 if *address.inner() == AccountAddress::ONE
-                    && (*module == test_coin_identifier()
-                        || *module == test_coin_identifier_lower())
-                    && *name == test_coin_identifier()
+                    && (*module == aptos_coin_identifier()
+                        || *module == aptos_coin_identifier_lower())
+                    && *name == aptos_coin_identifier()
                 {
                     let receiver =
                         serde_json::from_value::<Address>(inner.arguments.get(0).cloned().unwrap())

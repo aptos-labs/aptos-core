@@ -519,7 +519,7 @@ pub fn gen_transfer_txn_request(
 ) -> SignedTransaction {
     sender.sign_with_transaction_builder(
         txn_factory
-            .payload(aptos_stdlib::encode_test_coin_transfer(
+            .payload(aptos_stdlib::encode_aptos_coin_transfer(
                 *receiver, num_coins,
             ))
             .gas_unit_price(gas_price),

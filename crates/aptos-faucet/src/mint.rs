@@ -172,7 +172,7 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
         if amount != 0 {
             txns.push(
                 faucet_account.sign_with_transaction_builder(service.transaction_factory.payload(
-                    aptos_stdlib::encode_test_coin_mint(receiver_address, amount),
+                    aptos_stdlib::encode_aptos_coin_mint(receiver_address, amount),
                 )),
             );
         }

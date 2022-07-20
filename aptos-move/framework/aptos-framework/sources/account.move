@@ -6,7 +6,7 @@ module aptos_framework::account {
     use std::vector;
     use aptos_framework::chain_id;
     use aptos_framework::coin;
-    use aptos_framework::test_coin::TestCoin;
+    use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
     use aptos_framework::transaction_publishing_option;
@@ -225,8 +225,11 @@ module aptos_framework::account {
             errors::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
         );
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
-        assert!(coin::is_account_registered<TestCoin>(transaction_sender), errors::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
-        let balance = coin::balance<TestCoin>(transaction_sender);
+        assert!(
+            coin::is_account_registered<AptosCoin>(transaction_sender),
+            errors::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
+        );
+        let balance = coin::balance<AptosCoin>(transaction_sender);
         assert!(balance >= max_transaction_fee, errors::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
     }
 
@@ -333,7 +336,10 @@ module aptos_framework::account {
         let addr = signer::address_of(&account);
         // it's important to maintain the error code consistent with vm
         // to do failed transaction cleanup.
-        assert!(coin::balance<TestCoin>(addr) >= transaction_fee_amount, errors::limit_exceeded(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
+        assert!(
+            coin::balance<AptosCoin>(addr) >= transaction_fee_amount,
+            errors::limit_exceeded(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
+        );
         transaction_fee::burn_fee(addr, transaction_fee_amount);
 
         let old_sequence_number = get_sequence_number(addr);
@@ -354,7 +360,7 @@ module aptos_framework::account {
 
     public entry fun create_account(auth_key: address) {
         let signer = create_account_internal(auth_key);
-        coin::register<TestCoin>(&signer);
+        coin::register<AptosCoin>(&signer);
     }
 
     /// A resource account is used to manage resources independent of an account managed by a user.
@@ -392,7 +398,7 @@ module aptos_framework::account {
     public entry fun test_create_resource_account(user: signer) {
         let (resource_account, _) = create_resource_account(&user, x"01");
         assert!(signer::address_of(&resource_account) != signer::address_of(&user), 0);
-        coin::register<TestCoin>(&resource_account);
+        coin::register<AptosCoin>(&resource_account);
     }
 
     #[test_only]
@@ -405,7 +411,7 @@ module aptos_framework::account {
 
         let resource_account_from_cap = create_signer_with_capability(&signer_cap);
         assert!(&resource_account == &resource_account_from_cap, 1);
-        coin::register<TestCoin>(&resource_account_from_cap);
+        coin::register<AptosCoin>(&resource_account_from_cap);
 
         move_to(&resource_account_from_cap, DummyResource { });
         borrow_global<DummyResource>(signer::address_of(&resource_account));

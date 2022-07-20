@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::test_coin_identifier_lower;
+use crate::types::aptos_coin_identifier_lower;
 use crate::{
     error::{ApiError, ApiResult},
     types::{
-        test_coin_identifier, Currency, CurrencyMetadata, MetadataRequest, NetworkIdentifier,
+        aptos_coin_identifier, Currency, CurrencyMetadata, MetadataRequest, NetworkIdentifier,
         PartialBlockIdentifier,
     },
     RosettaContext,
@@ -137,8 +137,8 @@ pub fn decode_key<T: DeserializeOwned + ValidCryptoMaterial>(
     T::from_encoded_string(str).map_err(|_| ApiError::deserialization_failed(type_name))
 }
 
-const DEFAULT_COIN: &str = "TC";
-const DEFAULT_DECIMALS: u64 = 6;
+const DEFAULT_COIN: &str = "APTOS";
+const DEFAULT_DECIMALS: u64 = 8;
 
 pub fn native_coin() -> Currency {
     Currency {
@@ -153,8 +153,8 @@ pub fn native_coin() -> Currency {
 pub fn native_coin_tag() -> TypeTag {
     TypeTag::Struct(StructTag {
         address: AccountAddress::ONE,
-        module: test_coin_identifier(),
-        name: test_coin_identifier(),
+        module: aptos_coin_identifier(),
+        name: aptos_coin_identifier(),
         type_params: vec![],
     })
 }
@@ -162,8 +162,8 @@ pub fn native_coin_tag() -> TypeTag {
 pub fn native_coin_tag_lower() -> TypeTag {
     TypeTag::Struct(StructTag {
         address: AccountAddress::ONE,
-        module: test_coin_identifier_lower(),
-        name: test_coin_identifier(),
+        module: aptos_coin_identifier_lower(),
+        name: aptos_coin_identifier(),
         type_params: vec![],
     })
 }

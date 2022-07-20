@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::AccountAddress;
-use framework::{encode_test_coin_transfer, ScriptFunctionCall};
+use framework::{encode_aptos_coin_transfer, ScriptFunctionCall};
 
 fn demo_p2p_script_function() {
     let payee = AccountAddress([
@@ -13,10 +13,10 @@ fn demo_p2p_script_function() {
     let amount = 1234567;
 
     // Now encode and decode a peer to peer transaction script function.
-    let payload = encode_test_coin_transfer(payee.clone(), amount);
+    let payload = encode_aptos_coin_transfer(payee.clone(), amount);
     let function_call = ScriptFunctionCall::decode(&payload);
     match function_call {
-        Some(ScriptFunctionCall::TestCoinTransfer { amount: a, to: p }) => {
+        Some(ScriptFunctionCall::AptosCoinTransfer { amount: a, to: p }) => {
             assert_eq!(a, amount);
             assert_eq!(p, payee.clone());
         }

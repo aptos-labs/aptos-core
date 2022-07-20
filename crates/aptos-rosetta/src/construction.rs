@@ -385,8 +385,8 @@ fn parse_transfer_operation(
     {
         // Currency must be the native coin for now
         if *address != AccountAddress::ONE
-            || (*module != test_coin_identifier() && *module != test_coin_identifier_lower())
-            || *name != test_coin_identifier()
+            || (*module != aptos_coin_identifier() && *module != aptos_coin_identifier_lower())
+            || *name != aptos_coin_identifier()
             || !type_params.is_empty()
         {
             return Err(ApiError::TransactionParseError(Some(
@@ -450,7 +450,7 @@ async fn construction_payloads(
         InternalOperation::Transfer(transfer) => {
             is_native_coin(&transfer.currency)?;
             (
-                aptos_stdlib::encode_test_coin_transfer(transfer.receiver, transfer.amount),
+                aptos_stdlib::encode_aptos_coin_transfer(transfer.receiver, transfer.amount),
                 transfer.sender,
             )
         }
