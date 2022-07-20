@@ -22,7 +22,7 @@ impl BasicApi {
     ///
     /// Provides a UI that you can use to explore the API. You can also retrieve the API directly at `/openapi.yaml` and `/openapi.json`.
     #[oai(
-        path = "/openapi",
+        path = "/spec",
         method = "get",
         operation_id = "openapi",
         tag = "ApiTags::General"
