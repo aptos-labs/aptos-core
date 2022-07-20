@@ -1,5 +1,5 @@
 import { AxiosRequestConfig, AxiosResponse } from "axios";
-import { MemoizeExpiring } from "typescript-memoize";
+import { Memoize, MemoizeExpiring } from "typescript-memoize";
 import { Accounts } from "./api/Accounts";
 import { Events } from "./api/Events";
 import { Transactions } from "./api/Transactions";
@@ -10,7 +10,8 @@ import { AptosAccount } from "./aptos_account";
 import { Types } from "./types";
 import { Tables } from "./api/Tables";
 import { AptosError } from "./api/data-contracts";
-import { TxnBuilderTypes, TransactionBuilderEd25519 } from "./transaction_builder";
+import { TxnBuilderTypes, TransactionBuilderEd25519, TransactionBuilderABI } from "./transaction_builder";
+import { Bytes } from "./transaction_builder/bcs";
 
 export class RequestError extends Error {
   response?: AxiosResponse<any, Types.AptosError>;
@@ -28,6 +29,10 @@ export class RequestError extends Error {
 }
 
 export type AptosClientConfig = Omit<AxiosRequestConfig, "data" | "cancelToken" | "method">;
+
+type ExtraConfig = {
+  abis: Bytes[];
+};
 
 export function raiseForStatus<T>(
   expectedStatus: number,
@@ -60,13 +65,15 @@ export class AptosClient {
 
   transactions: Transactions;
 
+  abis: Bytes[];
+
   /**
    * Establishes a connection to Aptos node
    * @param nodeUrl A url of the Aptos Node API endpoint
    * @param config An optional config for inner axios instance.
    * Detailed `config` description: {@link https://github.com/axios/axios#request-config}
    */
-  constructor(nodeUrl: string, config?: AptosClientConfig) {
+  constructor(nodeUrl: string, config?: AptosClientConfig, extraConfig?: ExtraConfig) {
     this.nodeUrl = nodeUrl;
 
     // `withCredentials` ensures cookie handling
@@ -82,6 +89,8 @@ export class AptosClient {
     this.tables = new Tables(this.client);
     this.events = new Events(this.client);
     this.transactions = new Transactions(this.client);
+
+    this.abis = extraConfig?.abis;
   }
 
   /**
@@ -522,7 +531,7 @@ export class AptosClient {
    * @param params Request params
    * @returns Current chain id
    */
-  @MemoizeExpiring(5 * 60 * 1000) // cache result for 5 minutes
+  @Memoize()
   async getChainId(params: RequestParams = {}): Promise<number> {
     const result = await this.getLedgerInfo(params);
     return result.chain_id;
@@ -542,5 +551,46 @@ export class AptosClient {
   async getTableItem(handle: string, data: Types.TableItemRequest, params?: RequestParams): Promise<any> {
     const tableItem = await this.tables.getTableItem(handle, data, params);
     return tableItem;
+  }
+
+  // Only cache for a short period to avoid excessive amount of memory usage
+  @MemoizeExpiring(2 * 60 * 1000) // Cache for 2min
+  private async getTransactionBuilder(accountFrom: AptosAccount): Promise<TransactionBuilderEd25519> {
+    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
+      this.getAccount(accountFrom.address()),
+      this.getChainId(),
+    ]);
+
+    const rawTxnBuilder = new TransactionBuilderABI(this.abis, {
+      sender: accountFrom.address(),
+      sequenceNumber,
+      chainId,
+    });
+
+    return new TransactionBuilderEd25519(
+      (signingMessage: TxnBuilderTypes.SigningMessage) => {
+        const sigHexStr = accountFrom.signBuffer(signingMessage);
+        return new TxnBuilderTypes.Ed25519Signature(sigHexStr.toUint8Array());
+      },
+      accountFrom.pubKey().toUint8Array(),
+      rawTxnBuilder,
+    );
+  }
+
+  async sendABITransaction(
+    accountFrom: AptosAccount,
+    func: string,
+    ty_tags: string[],
+    args: any[],
+  ): Promise<Types.PendingTransaction> {
+    const [txnBuilder, { sequence_number: sequenceNumber }] = await Promise.all([
+      this.getTransactionBuilder(accountFrom),
+      this.getAccount(accountFrom.address()),
+    ]);
+    txnBuilder.rawTxnBuilder?.setSequenceNumber(sequenceNumber);
+
+    const rawTxn = txnBuilder.build(func, ty_tags, args);
+
+    return this.submitSignedBCSTransaction(txnBuilder.sign(rawTxn));
   }
 }

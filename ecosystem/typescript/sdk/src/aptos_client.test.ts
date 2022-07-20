@@ -76,15 +76,19 @@ test("test raiseForStatus", async () => {
   // an error, oh no!
   fakeResponse.status = 500;
   expect(() => raiseForStatus(200, fakeResponse, testData)).toThrow(
+    // eslint-disable-next-line quotes
     'Status Text - "some string" @ host/path : {"hello":"wow"}',
   );
 
+  // eslint-disable-next-line quotes
   expect(() => raiseForStatus(200, fakeResponse)).toThrow('Status Text - "some string" @ host/path');
 
   // Just a wild test to make sure it doesn't break: request is `any`!
   delete fakeResponse.request;
+  // eslint-disable-next-line quotes
   expect(() => raiseForStatus(200, fakeResponse, testData)).toThrow('Status Text - "some string" : {"hello":"wow"}');
 
+  // eslint-disable-next-line quotes
   expect(() => raiseForStatus(200, fakeResponse)).toThrow('Status Text - "some string"');
 });
 
@@ -117,14 +121,14 @@ test(
       ),
     );
 
-    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
+    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
       client.getAccount(account1.address()),
       client.getChainId(),
     ]);
 
     const rawTxn = new TxnBuilderTypes.RawTransaction(
       TxnBuilderTypes.AccountAddress.fromHex(account1.address()),
-      BigInt(sequnceNumber),
+      BigInt(sequenceNumber),
       scriptFunctionPayload,
       1000n,
       1n,
@@ -188,14 +192,14 @@ test(
       ),
     );
 
-    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
+    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
       client.getAccount(mutisigAccountAddress),
       client.getChainId(),
     ]);
 
     const rawTxn = new TxnBuilderTypes.RawTransaction(
       TxnBuilderTypes.AccountAddress.fromHex(mutisigAccountAddress),
-      BigInt(sequnceNumber),
+      BigInt(sequenceNumber),
       scriptFunctionPayload,
       1000n,
       1n,
@@ -317,14 +321,14 @@ test(
       ),
     );
 
-    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
+    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
       client.getAccount(account1.address()),
       client.getChainId(),
     ]);
 
     const rawTxn = new TxnBuilderTypes.RawTransaction(
       TxnBuilderTypes.AccountAddress.fromHex(account1.address()),
-      BigInt(sequnceNumber),
+      BigInt(sequenceNumber),
       scriptFunctionPayload,
       1000n,
       1n,
@@ -412,14 +416,14 @@ test(
       ),
     );
 
-    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
+    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
       client.getAccount(alice.address()),
       client.getChainId(),
     ]);
 
     const rawTxn = new TxnBuilderTypes.RawTransaction(
       aliceAccountAddress,
-      BigInt(sequnceNumber),
+      BigInt(sequenceNumber),
       scriptFunctionPayload,
       1000n,
       1n,

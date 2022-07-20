@@ -79,8 +79,8 @@ export class TransactionBuilder<F extends SigningFn> {
 export class TransactionBuilderEd25519 extends TransactionBuilder<SigningFn> {
   private readonly publicKey: Uint8Array;
 
-  constructor(signingFunction: SigningFn, publicKey: Uint8Array) {
-    super(signingFunction);
+  constructor(signingFunction: SigningFn, publicKey: Uint8Array, rawTxnBuilder?: TransactionBuilderABI) {
+    super(signingFunction, rawTxnBuilder);
     this.publicKey = publicKey;
   }
 
@@ -200,6 +200,10 @@ export class TransactionBuilderABI {
     }
 
     return args.map((arg, i) => argToTransactionArgument(arg, abiArgs[i].type_tag));
+  }
+
+  setSequenceNumber(seqNumber: Uint64 | string) {
+    this.builderConfig.sequenceNumber = BigInt(seqNumber);
   }
 
   /**

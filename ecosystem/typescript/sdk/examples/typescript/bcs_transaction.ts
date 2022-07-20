@@ -58,7 +58,7 @@ const {
     ),
   );
 
-  const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
+  const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
     client.getAccount(account1.address()),
     client.getChainId(),
   ]);
@@ -68,7 +68,7 @@ const {
   const rawTxn = new RawTransaction(
     // Transaction sender account address
     AccountAddress.fromHex(account1.address()),
-    BigInt(sequnceNumber),
+    BigInt(sequenceNumber),
     scriptFunctionPayload,
     // Max gas unit to spend
     1000n,
