@@ -74,6 +74,12 @@ module aptos_framework::stake {
     /// Invalid stake amount (usuaully 0).
     const EINVALID_STAKE_AMOUNT: u64 = 20;
 
+    /// Validator status enum. We can switch to proper enum later once Move supports it.
+    const VALIDATOR_STATUS_PENDING_ACTIVE: u64 = 1;
+    const VALIDATOR_STATUS_ACTIVE: u64 = 2;
+    const VALIDATOR_STATUS_PENDING_INACTIVE: u64 = 3;
+    const VALIDATOR_STATUS_INACTIVE: u64 = 4;
+
     /// Capability that represents ownership and can be used to control the validator and the associated stake pool.
     /// Having this be separate from the signer for the account that the validator resources are hosted at allows
     /// modules to have control over a validator.
@@ -258,21 +264,51 @@ module aptos_framework::stake {
         borrow_global<StakePool>(pool_address).locked_until_secs
     }
 
+    /// Return the different stake amounts for `pool_address` (whether the validator is active or not).
+    /// The returned amounts are for (active, inactive, pending_active, pending_inactive) stake respectively.
+    public fun get_stake(pool_address: address): (u64, u64, u64, u64) acquires StakePool {
+        let stake_pool = borrow_global<StakePool>(pool_address);
+        (
+            coin::value<TestCoin>(&stake_pool.active),
+            coin::value<TestCoin>(&stake_pool.inactive),
+            coin::value<TestCoin>(&stake_pool.pending_active),
+            coin::value<TestCoin>(&stake_pool.pending_inactive),
+        )
+    }
+
+    public fun get_validator_state(pool_address: address): u64 acquires ValidatorSet {
+        let validator_set = borrow_global<ValidatorSet>(@aptos_framework);
+        if (option::is_some(&find_validator(&validator_set.pending_active, pool_address))) {
+            VALIDATOR_STATUS_PENDING_ACTIVE
+        } else if (option::is_some(&find_validator(&validator_set.active_validators, pool_address))) {
+            VALIDATOR_STATUS_ACTIVE
+        } else if (option::is_some(&find_validator(&validator_set.pending_inactive, pool_address))) {
+            VALIDATOR_STATUS_PENDING_INACTIVE
+        } else {
+            VALIDATOR_STATUS_INACTIVE
+        }
+    }
+
     /// Return the active staked balance of the stake pool at `pool_address`. Any pending_inactive and pending_active
     /// stake are not considered.
     ///
     /// If the stake pool is not yet active, the voting power will be 0.
     public fun get_active_staked_balance(pool_address: address): u64 acquires StakePool, ValidatorSet {
-        if (is_validator_inactive(pool_address)) {
+        if (get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE) {
             0
         } else {
             coin::value<TestCoin>(&borrow_global<StakePool>(pool_address).active)
         }
     }
 
-    /// Return true if `voter_address` is the delegated voter for the stake pool at `pool_address`.
-    public fun is_delegated_voter(pool_address: address, voter_address: address): bool acquires StakePool {
-        borrow_global<StakePool>(pool_address).delegated_voter == voter_address
+    /// Return the delegated voter of the validator at `pool_address`.
+    public fun get_delegated_voter(pool_address: address): address acquires StakePool {
+        borrow_global<StakePool>(pool_address).delegated_voter
+    }
+
+    /// Return the operator of the validator at `pool_address`.
+    public fun get_operator(pool_address: address): address acquires StakePool {
+        borrow_global<StakePool>(pool_address).operator_address
     }
 
     /// Update the min and max stake amounts.
@@ -651,7 +687,10 @@ module aptos_framework::stake {
         validate_lockup_time(stake_pool.locked_until_secs, validator_set_config);
 
         // Throw an error is the validator is already active.
-        assert!(is_validator_inactive(pool_address), errors::invalid_argument(EALREADY_ACTIVE_VALIDATOR));
+        assert!(
+            get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE,
+            errors::invalid_argument(EALREADY_ACTIVE_VALIDATOR),
+        );
 
         // The validator is not yet activated so all added stake should be in active.
         let voting_power = coin::value<TestCoin>(&stake_pool.active);
@@ -1045,14 +1084,6 @@ module aptos_framework::stake {
             locked_until_secs <= current_time + validator_set_config.max_lockup_duration_secs,
             errors::invalid_argument(ELOCK_TIME_TOO_LONG),
         );
-    }
-
-    /// Return true if the current validator is inactive (not pending_active or pending_inactive either).
-    public fun is_validator_inactive(pool_address: address): bool acquires ValidatorSet {
-        let validator_set = borrow_global<ValidatorSet>(@aptos_framework);
-        option::is_none(&find_validator(&validator_set.active_validators, pool_address)) &&
-            option::is_none(&find_validator(&validator_set.pending_inactive, pool_address)) &&
-            option::is_none(&find_validator(&validator_set.pending_active, pool_address))
     }
 
     fun validate_required_stake(minimum_stake: u64, maximum_stake: u64) {
