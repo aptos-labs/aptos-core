@@ -37,6 +37,10 @@ export const getOwnershipsByToken = async (request: any, response: any) => {
   await Controller.handleRequest(request, response, service.getOwnershipsByToken);
 };
 
+export const getOwnershipsByOwner = async (request: any, response: any) => {
+  await Controller.handleRequest(request, response, service.getOwnershipsByOwner);
+};
+
 export const getTokenById = async (request: any, response: any) => {
   await Controller.handleRequest(request, response, service.getTokenById);
 };
@@ -64,6 +68,7 @@ export const DefaultController = {
   getCollectionById,
   getOwnershipById,
   getOwnershipsByIds,
+  getOwnershipsByOwner,
   getOwnershipsByToken,
   getTokenById,
   getTokenByIds,
@@ -81,6 +86,7 @@ export default {
   getCollectionById,
   getOwnershipById,
   getOwnershipsByIds,
+  getOwnershipsByOwner,
   getOwnershipsByToken,
   getTokenById,
   getTokenByIds,

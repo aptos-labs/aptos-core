@@ -69,38 +69,61 @@ const cleanupMetadata = async (tokenId: string) => {
 
 const createRandomOwnership = async () => {
   const token_name = `Ape${Math.random() * 10000000}`;
+  const token_id = `${creator_address}::${collection_name}::${token_name}`
+  const ownership_id = `${token_id}::${creator_address}`
+
   const ownership = await prisma.ownerships.create({
     data: {
       amount: 1,
       inserted_at: new Date(),
       owner: creator_address,
-      token_id: `${creator_address}::${collection_name}::${token_name}`,
+      token_id: token_id,
       updated_at: new Date(),
+      ownership_id,
+    },
+  });
+  return ownership;
+};
+
+const createRandomEmptyOwnership = async () => {
+  const token_name = `Ape${Math.random() * 10000000}`;
+  const token_id = `${creator_address}::${collection_name}::${token_name}`
+  const ownership_id = `${token_id}::${creator_address}`
+
+  const ownership = await prisma.ownerships.create({
+    data: {
+      amount: 0,
+      inserted_at: new Date(),
+      owner: creator_address,
+      token_id: token_id,
+      updated_at: new Date(),
+      ownership_id,
     },
   });
   return ownership;
 };
 
 const cleanupOwnership = async (owner: string, token_id: string) => {
+  const ownership_id = `${token_id}::${owner}`
   await prisma.ownerships.delete({
     where: {
-      token_id_owner: {
-        owner,
-        token_id,
-      },
+      ownership_id,
     },
   });
 };
 
 const createRandomCollection = async () => {
+  const name = collection_name + (Math.random() * 10000000)
+  const collection_id = `${creator_address}::${name}`
   const collection = await prisma.collections.create({
     data: {
       created_at: new Date(),
       creator: creator_address,
       description,
       inserted_at: new Date(),
-      name: collection_name + (Math.random() * 10000000),
+      name,
       uri,
+      collection_id,
     },
   });
   return collection;
@@ -110,13 +133,9 @@ const cleanupCollection = async (
   creatorAddress: string,
   collectionName: string,
 ) => {
+  const collection_id = `${creatorAddress}::${collectionName}`
   await prisma.collections.delete({
-    where: {
-      creator_name: {
-        creator: creatorAddress,
-        name: collectionName,
-      },
-    },
+    where: { collection_id },
   });
 };
 
@@ -205,19 +224,53 @@ test('/ownerships/all', async () => {
   } = ownership2;
   const fetchedOwnerships = await axios.get<ownerships[]>(`http://localhost:${URL_PORT}/${version}/ownerships/all`);
   expect(fetchedOwnerships.data.length).toBeGreaterThan(1);
-  await cleanupOwnership(owner1, token_id1);
-  await cleanupOwnership(owner2, token_id2);
+  await cleanupOwnership(owner1!, token_id1!);
+  await cleanupOwnership(owner2!, token_id2!);
 });
 
-test('/ownerships/{ownershipId}', async () => {
+test('/ownerships/byId', async () => {
   const ownership = await createRandomOwnership();
   const {
     owner,
     token_id,
   } = ownership;
-  const fetchedOwnership = await axios.get<ownerships>(`http://localhost:${URL_PORT}/${version}/ownerships/${token_id}::${owner}`);
+  const ownership_id = `${token_id}::${owner}`
+  const fetchedOwnership = await axios.get<ownerships>(`http://localhost:${URL_PORT}/${version}/ownerships/byId`, {
+    params: {
+      ownershipId: ownership_id,
+    }
+  });
   expect(fetchedOwnership.data.owner).toBe(owner);
-  await cleanupOwnership(owner, token_id);
+  await cleanupOwnership(owner!, token_id!);
+});
+
+test('/ownerships/byOwner', async () => {
+  const ownership = await createRandomOwnership();
+  const ownership1 = await createRandomOwnership();
+  const ownership2 = await createRandomEmptyOwnership();
+  const {
+    owner,
+    token_id,
+  } = ownership;
+  const {
+    owner: owner1,
+    token_id: token_id1,
+  } = ownership1;
+  const {
+    owner: owner2,
+    token_id: token_id2,
+  } = ownership2;
+  const fetchedOwnerships = await axios.get<ownerships[]>(`http://localhost:${URL_PORT}/${version}/ownerships/byOwner`, {
+    params: {
+      ownerAddress: owner,
+    }
+  });
+  const token_ids = fetchedOwnerships.data.map((value) => value.token_id)
+  expect(token_ids).toEqual(expect.arrayContaining([token_id, token_id1]));
+  expect(token_ids).not.toContain(token_id2);
+  await cleanupOwnership(owner!, token_id!);
+  await cleanupOwnership(owner1!, token_id1!);
+  await cleanupOwnership(owner2!, token_id2!);
 });
 
 test('/ownerships/byIds', async () => {
@@ -239,8 +292,8 @@ test('/ownerships/byIds', async () => {
   });
   const fetchedOwnershipsData = fetchedOwnerships.data.map((value) => `${value.token_id}::${value.owner}`);
   expect(fetchedOwnershipsData).toEqual(ownershipIds);
-  await cleanupOwnership(owner1, token_id1);
-  await cleanupOwnership(owner2, token_id2);
+  await cleanupOwnership(owner1!, token_id1!);
+  await cleanupOwnership(owner2!, token_id2!);
 });
 
 test('/collections/{collectionId}', async () => {

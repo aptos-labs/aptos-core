@@ -14,8 +14,9 @@ const createRouter = ({
     const substring = openApiPath.match(/{.*}/)?.toString();
     // custom regex to exclude the <resource>/all path
     const routerPath = (substring)
-      ? openApiPath.replace(/{.*}/, `:${substring}`).replace('{', '').replace('}', '')
-      : openApiPath;
+    ? openApiPath.replace(/{.*}/, `:${substring}`).replace('{', '').replace('}', '')
+    : openApiPath;
+    console.log(routerPath);
 
     if (pathObject.post) {
       const controllerName: ControllerType | undefined = pathObject?.post['x-eov-operation-handler']?.replace('controllers/', '');
