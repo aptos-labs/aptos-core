@@ -25,6 +25,7 @@ pub enum ConfigTool {
     Init(crate::common::init::InitTool),
     GenerateShellCompletions(GenerateShellCompletions),
     SetGlobalConfig(SetGlobalConfig),
+    ShowGlobalConfig(ShowGlobalConfig),
 }
 
 impl ConfigTool {
@@ -33,6 +34,7 @@ impl ConfigTool {
             ConfigTool::Init(tool) => tool.execute_serialized_success().await,
             ConfigTool::GenerateShellCompletions(tool) => tool.execute_serialized_success().await,
             ConfigTool::SetGlobalConfig(tool) => tool.execute_serialized_success().await,
+            ConfigTool::ShowGlobalConfig(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -95,6 +97,22 @@ impl CliCommand<()> for SetGlobalConfig {
         }
 
         config.save()
+    }
+}
+
+/// Shows the properties in the global config
+#[derive(Parser, Debug)]
+pub struct ShowGlobalConfig {}
+
+#[async_trait]
+impl CliCommand<GlobalConfig> for ShowGlobalConfig {
+    fn command_name(&self) -> &'static str {
+        "ShowGlobalConfig"
+    }
+
+    async fn execute(self) -> CliTypedResult<GlobalConfig> {
+        // Load the global config
+        GlobalConfig::load()
     }
 }
 
