@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions};
-use aptos_rest_client::{aptos_api_types::WriteSetChange, Transaction};
+use aptos_rest_client::{
+    aptos_api_types::{WriteResource, WriteSetChange},
+    Transaction,
+};
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use cached_framework_packages::aptos_stdlib;
@@ -77,7 +80,7 @@ impl From<Transaction> for TransferSummary {
                 .changes
                 .iter()
                 .filter_map(|change| match change {
-                    WriteSetChange::WriteResource { address, data, .. } => {
+                    WriteSetChange::WriteResource(WriteResource { address, data, .. }) => {
                         if SUPPORTED_COINS.contains(&data.typ.to_string().as_str()) {
                             Some((
                                 *address.inner(),

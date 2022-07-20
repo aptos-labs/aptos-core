@@ -52,7 +52,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveResource {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Copy, NewType)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Copy, NewType)]
 pub struct U64(pub u64);
 
 impl U64 {
@@ -119,7 +119,7 @@ impl<'de> Deserialize<'de> for U64 {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Copy)]
+#[derive(Clone, Debug, Default, PartialEq, Copy)]
 pub struct U128(u128);
 
 impl U128 {
@@ -893,7 +893,7 @@ impl From<Module> for MoveModuleBytecode {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveScriptBytecode {
     pub bytecode: HexEncodedBytes,
     // We don't need deserialize MoveModule as it should be serialized
@@ -923,7 +923,7 @@ impl MoveScriptBytecode {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Object)]
 pub struct ScriptFunctionId {
     pub module: MoveModuleId,
     pub name: IdentifierWrapper,

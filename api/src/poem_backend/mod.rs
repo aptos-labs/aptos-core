@@ -14,6 +14,7 @@ mod page;
 mod post;
 mod response;
 mod runtime;
+mod transactions;
 
 #[derive(Tags)]
 pub enum ApiTags {
@@ -32,6 +33,7 @@ pub use response::{
     AptosResponseContent,
 };
 pub use runtime::attach_poem_to_runtime;
+pub use transactions::TransactionsApi;
 
 // TODO: Move these impls throughout each of the files in the parent directory.
 // The only reason I do it here right now is the existing handler functions return

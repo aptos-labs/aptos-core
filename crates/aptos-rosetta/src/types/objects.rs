@@ -25,7 +25,7 @@ use crate::{
 use anyhow::anyhow;
 use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
 use aptos_rest_client::aptos_api_types::{
-    Address, Event, MoveStructTag, MoveType, TransactionPayload,
+    Address, Event, MoveStructTag, MoveType, TransactionPayload, WriteResource,
 };
 use aptos_rest_client::{
     aptos::Balance,
@@ -666,7 +666,7 @@ fn parse_operations_from_write_set(
     mut operation_index: u64,
 ) -> Vec<Operation> {
     let mut operations = vec![];
-    if let WriteSetChange::WriteResource { address, data, .. } = change {
+    if let WriteSetChange::WriteResource(WriteResource { address, data, .. }) = change {
         // Determine operation
         let address = *address.inner();
         let account_tag = MoveStructTag::new(
