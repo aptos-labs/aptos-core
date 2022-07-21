@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Result};
+use aptos_api_types::AsConverter;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     hash::HashValue,
@@ -23,7 +24,7 @@ use aptos_types::{
     utility_coin::TEST_COIN_TYPE,
 };
 use aptos_vm::{
-    data_cache::{IntoMoveResolver, RemoteStorageOwned},
+    data_cache::{AsMoveResolver, IntoMoveResolver, RemoteStorageOwned},
     AptosVM,
 };
 use clap::StructOpt;
@@ -52,6 +53,7 @@ use move_deps::{
     move_vm_runtime::session::SerializedReturnValues,
 };
 use once_cell::sync::Lazy;
+use serde_json;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
@@ -60,7 +62,6 @@ use std::{
     string::String,
 };
 use vm_genesis::GENESIS_KEYPAIR;
-
 /**
  * Definitions
  */
@@ -162,11 +163,21 @@ struct BlockCommand {
     time: u64,
 }
 
+/// Command to view a table item.
+#[derive(StructOpt, Debug)]
+struct ViewTableCommand {
+    #[structopt(long = "table_handle")]
+    table_handle: u128,
+}
+
 /// Custom commands for the transactional test flow.
 #[derive(StructOpt, Debug)]
 enum AptosSubCommand {
     #[structopt(name = "block")]
     BlockCommand(BlockCommand),
+
+    #[structopt(name = "view_table")]
+    ViewTableCommand(ViewTableCommand),
 }
 
 /**
@@ -356,7 +367,7 @@ impl<'a> AptosTestAdapter<'a> {
     fn fetch_account_balance(&self, signer_addr: &AccountAddress) -> Result<u64> {
         let test_coin_tag = StructTag {
             address: AccountAddress::ONE,
-            module: Identifier::new("Coin").unwrap(),
+            module: Identifier::new("coin").unwrap(),
             name: Identifier::new("CoinStore").unwrap(),
             type_params: vec![TEST_COIN_TYPE.clone()],
         };
@@ -853,6 +864,48 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                 let output = self.run_transaction(Transaction::BlockMetadata(metadata))?;
 
                 Ok(render_events(output.events()))
+            }
+            AptosSubCommand::ViewTableCommand(view_table_cmd) => {
+                let key_type_struct = StructTag {
+                    address: AccountAddress::from_hex_literal("0x1").unwrap(),
+                    module: Identifier::new("string").unwrap(),
+                    name: Identifier::new("String").unwrap(),
+                    type_params: vec![],
+                };
+
+                let key_type = TypeTag::Struct(key_type_struct);
+
+                let value_type_struct = StructTag {
+                    address: AccountAddress::from_hex_literal("0x1").unwrap(),
+                    module: Identifier::new("token").unwrap(),
+                    name: Identifier::new("Collection").unwrap(),
+                    type_params: vec![],
+                };
+
+                let value_type = TypeTag::Struct(value_type_struct);
+
+                let resolver = self.storage.as_move_resolver();
+                let converter = resolver.as_converter();
+
+                let vm_key = converter
+                    .try_into_vm_value(
+                        &key_type,
+                        serde_json::Value::String("aptos_punks".to_string()),
+                    )
+                    .unwrap();
+                let raw_key = vm_key.undecorate().simple_serialize().unwrap();
+
+                let state_key = StateKey::table_item(view_table_cmd.table_handle, raw_key);
+
+                let bytes = self
+                    .storage
+                    .get_state_value(&state_key)
+                    .unwrap()
+                    .ok_or_else(|| format_err!("Failed to fetch table item.",))?;
+
+                let move_value = converter.try_into_move_value(&value_type, &bytes)?;
+
+                Ok(Some(format!("{:?}", move_value)))
             }
         }
     }

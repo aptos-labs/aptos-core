@@ -2,14 +2,9 @@
 //#      --private-keys Alice=56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f Bob=952aaf3a98a27903dd078d76fc9e411740d2ae9dd9ecb87b96c7cd6b791ffc69
 //#      --initial-coins 10000
 
-//# run --script --signers Alice  --args @Bob 100
-script {
-    use aptos_framework::coin;
-    use aptos_framework::test_coin::TestCoin;
 
-    fun main(sender: &signer, receiver: address, amount: u64) {
-        coin::transfer<TestCoin>(sender, receiver, amount);
-    }
-}
+//# run --signers Alice --args x"6170746f735f70756e6b73" x"" x"" --show-events -- 0x1::token::create_unlimited_collection_script
 
-//# view --address Bob  --resource 0x1::coin::CoinStore<0x1::test_coin::TestCoin>
+//# view --address Alice  --resource 0x1::token::Collections
+
+//# view_table --table_handle 5713946181763753045826830927579154558
