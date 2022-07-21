@@ -72,6 +72,8 @@ module aptos_framework::aptos_governance {
         stake_pool: address,
         proposal_id: u64,
         execution_hash: vector<u8>,
+        metadata_location: vector<u8>,
+        metadata_hash: vector<u8>,
     }
 
     /// Event emitted when there's a vote on a proposa;
@@ -157,9 +159,8 @@ module aptos_framework::aptos_governance {
         proposer: &signer,
         stake_pool: address,
         execution_hash: vector<u8>,
-        code_location: vector<u8>,
-        title: vector<u8>,
-        description: vector<u8>,
+        metadata_location: vector<u8>,
+        metadata_hash: vector<u8>,
     ) acquires GovernanceConfig, GovernanceEvents {
         let proposer_address = signer::address_of(proposer);
         assert!(stake::get_delegated_voter(stake_pool) == proposer_address, error::invalid_argument(ENOT_DELEGATED_VOTER));
@@ -196,9 +197,8 @@ module aptos_framework::aptos_governance {
             proposer_address,
             @aptos_framework,
             governance_proposal::create_proposal(
-                utf8(code_location),
-                utf8(title),
-                utf8(description),
+                utf8(metadata_location),
+                utf8(metadata_hash),
             ),
             execution_hash,
             governance_config.min_voting_threshold,
@@ -214,6 +214,8 @@ module aptos_framework::aptos_governance {
                 proposer: proposer_address,
                 stake_pool,
                 execution_hash,
+                metadata_location,
+                metadata_hash,
             },
         );
     }
@@ -307,7 +309,6 @@ module aptos_framework::aptos_governance {
             b"",
             b"",
             b"",
-            b"",
         );
         vote(&yes_voter, signer::address_of(&yes_voter), 0, true);
         vote(&no_voter, signer::address_of(&no_voter), 0, false);
@@ -342,7 +343,6 @@ module aptos_framework::aptos_governance {
             b"",
             b"",
             b"",
-            b"",
         );
 
         // Double voting should throw an error.
@@ -370,7 +370,6 @@ module aptos_framework::aptos_governance {
         create_proposal(
             &proposer,
             signer::address_of(&proposer),
-            b"",
             b"",
             b"",
             b"",
