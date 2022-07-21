@@ -44,7 +44,7 @@ pub fn type_of(
 }
 
 /// Returns a string representing the TypeTag of the parameter.
-pub fn full_name(
+pub fn type_name(
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     arguments: VecDeque<Value>,
