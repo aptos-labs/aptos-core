@@ -9,7 +9,7 @@ module aptos_token::token_coin_swap {
     use aptos_framework::coin;
     use aptos_framework::timestamp;
     use aptos_std::type_info::{Self, TypeInfo};
-    use aptos_token::token_v1::{Self, Token, TokenId, deposit_token, withdraw_token, merge, split};
+    use aptos_token::token::{Self, Token, TokenId, deposit_token, withdraw_token, merge, split};
 
     const ETOKEN_ALREADY_LISTED: u64 = 1;
     const ETOKEN_LISTING_NOT_EXIST: u64 = 2;
@@ -87,14 +87,14 @@ module aptos_token::token_coin_swap {
         deposit_token(coin_owner, tokens);
 
         // handle the royalty
-        let royalty = token_v1::get_royalty(token_id);
+        let royalty = token::get_royalty(token_id);
 
         let total_cost = token_swap.min_price_per_token * token_amount;
-        let royalty_fee = total_cost * token_v1::get_royalty_nominator(&royalty) / token_v1::get_royalty_denominator(&royalty);
+        let royalty_fee = total_cost * token::get_royalty_nominator(&royalty) / token::get_royalty_denominator(&royalty);
         let remaining = total_cost - royalty_fee;
 
         //deposite to the original creators
-        let royalty_payee = token_v1::get_royalty_payee(&royalty);
+        let royalty_payee = token::get_royalty_payee(&royalty);
         let coin = coin::withdraw<CoinType>(coin_owner, royalty_fee);
         coin::deposit(royalty_payee, coin);
 
@@ -244,8 +244,8 @@ module aptos_token::token_coin_swap {
     public entry fun test_exchange_coin_for_token(token_owner: signer, coin_owner: signer, aptos_framework: signer) acquires TokenStoreEscrow, TokenListings {
         timestamp::set_time_has_started_for_testing(&aptos_framework);
         timestamp::update_global_time_for_test(10000000);
-        let token_id = token_v1::create_collection_and_token(&token_owner, 100, 100, 100);
-        token_v1::initialize_token_store(&coin_owner);
+        let token_id = token::create_collection_and_token(&token_owner, 100, 100, 100);
+        token::initialize_token_store(&coin_owner);
         coin::create_fake_money(&coin_owner, &token_owner, 100);
 
         list_token_for_swap<coin::FakeMoney>(&token_owner, token_id, 100, 1, 0);
@@ -253,7 +253,7 @@ module aptos_token::token_coin_swap {
         // coin owner only has 50 coins left
         assert!(coin::balance<coin::FakeMoney>(signer::address_of(&coin_owner)) == 50, 1);
         // all tokens in token escrow or transferred. Token owner has 0 token in token_store
-        assert!(token_v1::balance_of(signer::address_of(&token_owner), token_id) == 0, 1);
+        assert!(token::balance_of(signer::address_of(&token_owner), token_id) == 0, 1);
 
         let token_listing = &borrow_global<TokenListings<coin::FakeMoney>>(signer::address_of(&token_owner)).listings;
 
