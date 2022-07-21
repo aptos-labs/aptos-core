@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
@@ -8,6 +9,15 @@ import bip39 from "bip39-light";
 import { derivePath } from "ed25519-hd-key";
 import { HexString, MaybeHexString } from "./hex_string";
 import * as Gen from "./generated/index";
+=======
+import * as Nacl from "tweetnacl";
+import * as SHA3 from "js-sha3";
+import * as bip39 from "@scure/bip39";
+import { Buffer } from "buffer/"; // the trailing slash is important!
+import { derivePath } from "ed25519-hd-key";
+import { HexString, MaybeHexString } from "./hex_string";
+import { Types } from "./types";
+>>>>>>> bf26ff4b51 (remove bip39-light)
 
 export interface AptosAccountObject {
   address?: Gen.HexEncodedBytes;
@@ -36,10 +46,27 @@ export class AptosAccount {
   }
 
   static isValidPath = (path: string): boolean => {
+<<<<<<< HEAD
     if (!/^m\/44'\/637'\/[0-9]+'\/[0-9]+'\/[0-9]+'+$/.test(path)) {
       return false;
     }
     return true;
+=======
+    if (
+      // eslint-disable-next-line prefer-regex-literals
+      !new RegExp("^m\\/44+'\\/637+'\\/[0-9]+'\\/[0-9]+'\\/[0-9]+'+$").test(
+        path,
+      )
+    ) {
+      return false;
+    }
+    return !path
+      .split("/")
+      .slice(1)
+      .map((val: string): string => val.replace("'", ""))
+      // eslint-disable-next-line no-restricted-globals
+      .some(isNaN as any);
+>>>>>>> bf26ff4b51 (remove bip39-light)
   };
 
   static fromDerivePath(path: string, mnemonics: string): AptosAccount {
@@ -53,7 +80,7 @@ export class AptosAccount {
       .map((part) => part.toLowerCase())
       .join(" ");
 
-    const { key } = derivePath(path, bip39.mnemonicToSeedHex(normalizeMnemonics));
+    const { key } = derivePath(path, Buffer.from(bip39.mnemonicToSeedSync(normalizeMnemonics)).toString("hex"));
 
     return new AptosAccount(new Uint8Array(key));
   }
