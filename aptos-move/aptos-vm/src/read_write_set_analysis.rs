@@ -30,6 +30,7 @@ pub struct ReadWriteSetAnalysis<'a, R: ModuleResolver> {
     blockchain_view: &'a R,
 }
 
+const TRANSACTION_FEES_MODULE_NAME: &IdentStr = ident_str!("transaction_fee");
 const TRANSACTION_FEES_NAME: &IdentStr = ident_str!("TransactionFee");
 
 pub fn add_on_functions_list() -> Vec<(ModuleId, Identifier)> {
@@ -272,7 +273,7 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
         if tx.gas_unit_price() == 0 {
             let tx_fees_tag = StructTag {
                 address: account_config::CORE_CODE_ADDRESS,
-                module: TRANSACTION_FEES_NAME.to_owned(),
+                module: TRANSACTION_FEES_MODULE_NAME.to_owned(),
                 name: TRANSACTION_FEES_NAME.to_owned(),
                 type_params: vec![],
             };

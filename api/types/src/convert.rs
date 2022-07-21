@@ -11,6 +11,7 @@ use crate::{
 use anyhow::{bail, ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_transaction_builder::error_explain;
+use aptos_types::state_store::table::TableHandle;
 use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
@@ -99,7 +100,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 (info, payload, events).into()
             }
             BlockMetadata(txn) => (&txn, info, events).into(),
-            StateCheckpoint => {
+            StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,
                     timestamp: timestamp.into(),
@@ -263,11 +264,11 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     pub fn try_table_item_into_write_set_change(
         &self,
         state_key_hash: String,
-        handle: u128,
+        handle: TableHandle,
         key: Vec<u8>,
         op: WriteOp,
     ) -> Result<WriteSetChange> {
-        let handle = handle.to_be_bytes().to_vec().into();
+        let handle = handle.0.to_be_bytes().to_vec().into();
         let key = key.into();
         let ret = match op {
             WriteOp::Deletion => WriteSetChange::DeleteTableItem {
@@ -533,11 +534,11 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     layout
                 );
             };
-        if MoveValue::is_ascii_string(struct_tag) {
+        if MoveValue::is_utf8_string(struct_tag) {
             let string = val
                 .as_str()
-                .ok_or_else(|| format_err!("failed to parse ASCII::String."))?;
-            return Ok(new_vm_ascii_string(string));
+                .ok_or_else(|| format_err!("failed to parse string::String."))?;
+            return Ok(new_vm_utf8_string(string));
         }
 
         let mut field_values = if let Value::Object(fields) = val {
@@ -570,12 +571,13 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     let explanation = error_explain::get_explanation(module_id, *code);
                     explanation
                         .map(|ec| {
+                            // TODO(wrwg): category and reason where removed from Move apis,
+                            //   instead we have only single code_name/description. Need to
+                            //   verify whether error reporting in the api is still reasonable.
                             format!(
-                                "Move abort by {} - {}\n{}\n{}",
-                                ec.category.code_name,
-                                ec.reason.code_name,
-                                ec.category.code_description,
-                                ec.reason.code_description
+                                "Move abort by {}\n{}",
+                                ec.code_name,
+                                ec.code_description,
                             )
                         })
                         .unwrap_or_else(|| {
@@ -636,7 +638,7 @@ impl<R: MoveResolverExt> AsConverter<R> for R {
     }
 }
 
-pub fn new_vm_ascii_string(string: &str) -> move_core_types::value::MoveValue {
+pub fn new_vm_utf8_string(string: &str) -> move_core_types::value::MoveValue {
     use move_deps::move_core_types::value::{MoveStruct, MoveValue};
 
     let byte_vector = MoveValue::Vector(

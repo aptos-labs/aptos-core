@@ -29,18 +29,12 @@ pub fn storage(config: &SafetyRulesConfig) -> PersistentSafetyStorage {
             .as_ref()
             .expect("Missing consensus key in test config")
             .private_key();
-        let execution_private_key = test_config
-            .execution_key
-            .as_ref()
-            .expect("Missing execution key in test config")
-            .private_key();
         let waypoint = test_config.waypoint.expect("No waypoint in config");
 
         PersistentSafetyStorage::initialize(
             internal_storage,
             author,
             consensus_private_key,
-            execution_private_key,
             waypoint,
             config.enable_cached_safety_data,
         )
@@ -68,9 +62,6 @@ pub fn storage(config: &SafetyRulesConfig) -> PersistentSafetyStorage {
                 identity_blob
                     .consensus_private_key
                     .expect("Consensus key needed for safety rules"),
-                identity_blob
-                    .account_private_key
-                    .expect("Account key needed for safety rules"),
                 waypoint,
                 config.enable_cached_safety_data,
             )
@@ -100,39 +91,16 @@ impl SafetyRulesManager {
         }
 
         let storage = storage(config);
-        let verify_vote_proposal_signature = config.verify_vote_proposal_signature;
-        let export_consensus_key = config.export_consensus_key;
         match config.service {
-            SafetyRulesService::Local => Self::new_local(
-                storage,
-                verify_vote_proposal_signature,
-                export_consensus_key,
-            ),
-            SafetyRulesService::Serializer => Self::new_serializer(
-                storage,
-                verify_vote_proposal_signature,
-                export_consensus_key,
-            ),
-            SafetyRulesService::Thread => Self::new_thread(
-                storage,
-                verify_vote_proposal_signature,
-                export_consensus_key,
-                config.network_timeout_ms,
-            ),
+            SafetyRulesService::Local => Self::new_local(storage),
+            SafetyRulesService::Serializer => Self::new_serializer(storage),
+            SafetyRulesService::Thread => Self::new_thread(storage, config.network_timeout_ms),
             _ => panic!("Unimplemented SafetyRulesService: {:?}", config.service),
         }
     }
 
-    pub fn new_local(
-        storage: PersistentSafetyStorage,
-        verify_vote_proposal_signature: bool,
-        export_consensus_key: bool,
-    ) -> Self {
-        let safety_rules = SafetyRules::new(
-            storage,
-            verify_vote_proposal_signature,
-            export_consensus_key,
-        );
+    pub fn new_local(storage: PersistentSafetyStorage) -> Self {
+        let safety_rules = SafetyRules::new(storage);
         Self {
             internal_safety_rules: SafetyRulesWrapper::Local(Arc::new(RwLock::new(safety_rules))),
         }
@@ -145,16 +113,8 @@ impl SafetyRulesManager {
         }
     }
 
-    pub fn new_serializer(
-        storage: PersistentSafetyStorage,
-        verify_vote_proposal_signature: bool,
-        export_consensus_key: bool,
-    ) -> Self {
-        let safety_rules = SafetyRules::new(
-            storage,
-            verify_vote_proposal_signature,
-            export_consensus_key,
-        );
+    pub fn new_serializer(storage: PersistentSafetyStorage) -> Self {
+        let safety_rules = SafetyRules::new(storage);
         let serializer_service = SerializerService::new(safety_rules);
         Self {
             internal_safety_rules: SafetyRulesWrapper::Serializer(Arc::new(RwLock::new(
@@ -163,18 +123,8 @@ impl SafetyRulesManager {
         }
     }
 
-    pub fn new_thread(
-        storage: PersistentSafetyStorage,
-        verify_vote_proposal_signature: bool,
-        export_consensus_key: bool,
-        timeout_ms: u64,
-    ) -> Self {
-        let thread = ThreadService::new(
-            storage,
-            verify_vote_proposal_signature,
-            export_consensus_key,
-            timeout_ms,
-        );
+    pub fn new_thread(storage: PersistentSafetyStorage, timeout_ms: u64) -> Self {
+        let thread = ThreadService::new(storage, timeout_ms);
         Self {
             internal_safety_rules: SafetyRulesWrapper::Thread(thread),
         }

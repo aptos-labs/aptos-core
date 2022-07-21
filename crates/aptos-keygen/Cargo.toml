@@ -15,4 +15,4 @@ rand = "0.7.3"
 
 aptos-crypto = { path = "../aptos-crypto" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }
+

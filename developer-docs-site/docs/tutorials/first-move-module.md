@@ -70,18 +70,18 @@ This module enables users to create a `String` resource under their account and 
 
 ```rust
 module HelloBlockchain::Message {
-    use Std::ASCII;
-    use Std::Errors;
-    use Std::Signer;
+    use std::string;
+    use std::error;
+    use std::signer;
 
     struct MessageHolder has key {
-        message: ASCII::String,
+        message: string::String,
     }
 
-    public(script) fun set_message(account: signer, message_bytes: vector<u8>)
+    public entry fun set_message(account: signer, message_bytes: vector<u8>)
     acquires MessageHolder {
-        let message = ASCII::string(message_bytes);
-        let account_addr = Signer::address_of(&account);
+        let message = string::utf8(message_bytes);
+        let account_addr = signer::address_of(&account);
         if (!exists<MessageHolder>(account_addr)) {
             move_to(&account, MessageHolder {
                 message,
@@ -107,7 +107,7 @@ Note: `sender_can_set_message` is a `script` function in order to call the `scri
 ```rust
     const ENO_MESSAGE: u64 = 0;
 
-    public fun get_message(addr: address): ASCII::String acquires MessageHolder {
+    public fun get_message(addr: address): string::String acquires MessageHolder {
         assert!(exists<MessageHolder>(addr), Errors::not_published(ENO_MESSAGE));
         *&borrow_global<MessageHolder>(addr).message
     }
@@ -118,7 +118,7 @@ Note: `sender_can_set_message` is a `script` function in order to call the `scri
         set_message(account,  b"Hello, Blockchain");
 
         assert!(
-          get_message(addr) == ASCII::string(b"Hello, Blockchain"),
+          get_message(addr) == string::utf8(b"Hello, Blockchain"),
           0
         );
     }
@@ -153,6 +153,18 @@ Now we return to our application to deploy and interact with the module on the A
 
   </TabItem>
 </Tabs>
+
+:::tip
+To initialize the module, you can write a `init_module` function. This private function is executed automatically when the module is published. This `init_module` function must be private, it must only take signer or signer reference as a parameter, and it must not return any value. Here is an example:
+```asm
+ fun init_module(creator: &signer) {
+        move_to(
+            creator,
+            ModuleData { global_counter: 0 }
+        );
+    }
+```
+:::
 
 ### Step 2.2) Reading a resource
 

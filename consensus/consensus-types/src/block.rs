@@ -7,7 +7,7 @@ use crate::{
     quorum_cert::QuorumCert,
 };
 use anyhow::{bail, ensure, format_err};
-use aptos_crypto::{ed25519::Ed25519Signature, hash::CryptoHash, HashValue};
+use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
 use aptos_infallible::duration_since_epoch;
 use aptos_types::{
     account_address::AccountAddress,
@@ -47,7 +47,7 @@ pub struct Block {
     block_data: BlockData,
     /// Signature that the hash of this block has been authored by the owner of the private key,
     /// this is only set within Proposal blocks
-    signature: Option<Ed25519Signature>,
+    signature: Option<bls12381::Signature>,
 }
 
 impl fmt::Debug for Block {
@@ -110,7 +110,7 @@ impl Block {
         self.block_data.round()
     }
 
-    pub fn signature(&self) -> Option<&Ed25519Signature> {
+    pub fn signature(&self) -> Option<&bls12381::Signature> {
         self.signature.as_ref()
     }
 
@@ -168,7 +168,7 @@ impl Block {
     pub fn new_for_testing(
         id: HashValue,
         block_data: BlockData,
-        signature: Option<Ed25519Signature>,
+        signature: Option<bls12381::Signature>,
     ) -> Self {
         Block {
             id,
@@ -179,8 +179,12 @@ impl Block {
 
     /// The NIL blocks are special: they're not carrying any real payload and are generated
     /// independently by different validators just to fill in the round with some QC.
-    pub fn new_nil(round: Round, quorum_cert: QuorumCert) -> Self {
-        let block_data = BlockData::new_nil(round, quorum_cert);
+    pub fn new_nil(
+        round: Round,
+        quorum_cert: QuorumCert,
+        failed_authors: Vec<(Round, Author)>,
+    ) -> Self {
+        let block_data = BlockData::new_nil(round, quorum_cert, failed_authors);
 
         Block {
             id: block_data.hash(),
@@ -219,7 +223,7 @@ impl Block {
 
     pub fn new_proposal_from_block_data_and_signature(
         block_data: BlockData,
-        signature: Ed25519Signature,
+        signature: bls12381::Signature,
     ) -> Self {
         Block {
             id: block_data.hash(),
@@ -233,7 +237,7 @@ impl Block {
     pub fn validate_signature(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         match self.block_data.block_type() {
             BlockType::Genesis => bail!("We should not accept genesis from others"),
-            BlockType::NilBlock => self.quorum_cert().verify(validator),
+            BlockType::NilBlock { .. } => self.quorum_cert().verify(validator),
             BlockType::Proposal { author, .. } => {
                 let signature = self
                     .signature
@@ -274,7 +278,8 @@ impl Block {
             // but don't allow anything that shouldn't be there.
             //
             // we validate the full correctness of this field in round_manager.process_proposal()
-            let skipped_rounds = self.round().checked_sub(parent.round() + 1);
+            let succ_round = self.round() + (if self.is_nil_block() { 1 } else { 0 });
+            let skipped_rounds = succ_round.checked_sub(parent.round() + 1);
             ensure!(
                 skipped_rounds.is_some(),
                 "Block round is smaller than block's parent round"
@@ -286,7 +291,7 @@ impl Block {
             let mut bound = parent.round();
             for (round, _) in failed_authors {
                 ensure!(
-                    bound < *round && *round < self.round(),
+                    bound < *round && *round < succ_round,
                     "Incorrect round in failed authors"
                 );
                 bound = *round;
@@ -336,7 +341,7 @@ impl Block {
                 .into_iter()
                 .map(Transaction::UserTransaction),
         )
-        .chain(once(Transaction::StateCheckpoint))
+        .chain(once(Transaction::StateCheckpoint(self.id)))
         .collect()
     }
 
@@ -426,7 +431,7 @@ impl<'de> Deserialize<'de> for Block {
         #[serde(rename = "Block")]
         struct BlockWithoutId {
             block_data: BlockData,
-            signature: Option<Ed25519Signature>,
+            signature: Option<bls12381::Signature>,
         }
 
         let BlockWithoutId {

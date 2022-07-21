@@ -14,6 +14,7 @@ use anyhow::{bail, Result};
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Version, waypoint::Waypoint};
 use backup_cli::metadata::view::BackupStorageState;
+use consensus::CONSENSUS_DB_NAME;
 use forge::{NodeExt, Swarm, SwarmExt};
 use std::{
     fs,
@@ -94,7 +95,7 @@ async fn test_db_restore() {
     node0_config.save(node0_config_path).unwrap();
     let db_dir = node0_config.storage.dir();
     fs::remove_dir_all(db_dir.clone()).unwrap();
-    fs::remove_dir_all(db_dir.join("consensusdb")).unwrap();
+    fs::remove_dir_all(db_dir.join(CONSENSUS_DB_NAME)).unwrap();
 
     // restore db from backup
     db_restore(backup_path.path(), db_dir.as_path(), &[]);

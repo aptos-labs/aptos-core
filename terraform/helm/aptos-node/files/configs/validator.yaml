@@ -43,6 +43,9 @@ execution:
 
 validator_network:
   discovery_method: "onchain"
+  {{- if $.Values.validator.config.networking_runtime_thread }}
+  runtime_threads: {{ $.Values.validator.config.networking_runtime_thread}}
+  {{- end }}
   mutual_authentication: true
   {{- if $.Values.haproxy.config.send_proxy_protocol }}
   enable_proxy_protocol: true

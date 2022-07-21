@@ -31,8 +31,8 @@ pub struct Error {
 /// Error details that are specific to the instance
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ErrorDetails {
-    /// Detailed error message
-    pub error: String,
+    /// Related error details
+    pub details: String,
 }
 
 /// Status of an operation
@@ -77,18 +77,25 @@ pub struct Version {
     pub middleware_version: String,
 }
 
+/// An internal enum to support Operation typing
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum OperationType {
+    CreateAccount,
     Deposit,
     Withdraw,
 }
 
 impl OperationType {
+    const CREATE_ACCOUNT: &'static str = "create_account";
     const DEPOSIT: &'static str = "deposit";
     const WITHDRAW: &'static str = "withdraw";
 
     pub fn all() -> Vec<OperationType> {
-        vec![OperationType::Deposit, OperationType::Withdraw]
+        vec![
+            OperationType::CreateAccount,
+            OperationType::Deposit,
+            OperationType::Withdraw,
+        ]
     }
 }
 
@@ -97,12 +104,13 @@ impl FromStr for OperationType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().trim() {
+            Self::CREATE_ACCOUNT => Ok(OperationType::CreateAccount),
             Self::DEPOSIT => Ok(OperationType::Deposit),
             Self::WITHDRAW => Ok(OperationType::Withdraw),
-            _ => Err(ApiError::DeserializationFailed(format!(
+            _ => Err(ApiError::DeserializationFailed(Some(format!(
                 "Invalid OperationType: {}",
                 s
-            ))),
+            )))),
         }
     }
 }
@@ -110,15 +118,19 @@ impl FromStr for OperationType {
 impl Display for OperationType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
+            OperationType::CreateAccount => Self::CREATE_ACCOUNT,
             OperationType::Deposit => Self::DEPOSIT,
             OperationType::Withdraw => Self::WITHDRAW,
         })
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// An internal type to support typing of Operation statuses
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum OperationStatusType {
+    /// Operation was part of a successfully committed transaction
     Success,
+    /// Operation was not part of a successfully committed transaction
     Failure,
 }
 
@@ -160,10 +172,10 @@ impl FromStr for OperationStatusType {
         match s.to_lowercase().trim() {
             Self::SUCCESS => Ok(OperationStatusType::Success),
             Self::FAILURE => Ok(OperationStatusType::Failure),
-            _ => Err(ApiError::DeserializationFailed(format!(
+            _ => Err(ApiError::DeserializationFailed(Some(format!(
                 "Invalid OperationStatusType: {}",
                 s
-            ))),
+            )))),
         }
     }
 }

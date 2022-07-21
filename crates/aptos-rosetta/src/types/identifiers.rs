@@ -1,12 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+//! Identifiers for the Rosetta spec
+//!
+//! [Spec](https://www.rosetta-api.org/docs/api_identifiers.html)
+
 use crate::{
-    block::version_to_block_index,
-    common::{strip_hex_prefix, BLOCKCHAIN},
+    common::{to_hex_lower, BLOCKCHAIN},
     error::{ApiError, ApiResult},
 };
-use aptos_rest_client::{aptos_api_types::TransactionInfo, Transaction};
+use aptos_rest_client::aptos_api_types::{BlockInfo, TransactionInfo};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -37,16 +40,19 @@ impl TryFrom<&AccountIdentifier> for AccountAddress {
 
     fn try_from(account: &AccountIdentifier) -> Result<Self, Self::Error> {
         // Allow 0x in front of account address
-        Ok(AccountAddress::from_str(strip_hex_prefix(
-            &account.address,
-        ))?)
+        if let Ok(address) = AccountAddress::from_hex_literal(&account.address) {
+            Ok(address)
+        } else {
+            Ok(AccountAddress::from_str(&account.address)
+                .map_err(|_| ApiError::AptosError(Some("Invalid account address".to_string())))?)
+        }
     }
 }
 
 impl From<AccountAddress> for AccountIdentifier {
     fn from(address: AccountAddress) -> Self {
         AccountIdentifier {
-            address: format!("{:#x}", address),
+            address: to_hex_lower(&address),
             sub_account: None,
         }
     }
@@ -65,30 +71,11 @@ pub struct BlockIdentifier {
 }
 
 impl BlockIdentifier {
-    pub fn genesis_txn() -> BlockIdentifier {
-        // TODO: We may possibly get the real hash, but this works for now
-        // It must be unique,
+    pub fn from_block_info(block_info: BlockInfo) -> BlockIdentifier {
         BlockIdentifier {
-            index: 0,
-            hash: "0xGenesis".to_string(),
+            index: block_info.block_height,
+            hash: to_hex_lower(&block_info.block_hash),
         }
-    }
-    pub fn from_transaction_info(block_size: u64, info: &TransactionInfo) -> BlockIdentifier {
-        if info.version.0 == 0 {
-            BlockIdentifier::genesis_txn()
-        } else {
-            BlockIdentifier {
-                index: version_to_block_index(block_size, info.version.0),
-                hash: info.accumulator_root_hash.to_string(),
-            }
-        }
-    }
-
-    pub fn from_transaction(block_size: u64, txn: &Transaction) -> ApiResult<BlockIdentifier> {
-        let txn_info = txn
-            .transaction_info()
-            .map_err(|err| ApiError::AptosError(err.to_string()))?;
-        Ok(Self::from_transaction_info(block_size, txn_info))
     }
 }
 
@@ -101,6 +88,7 @@ pub struct NetworkIdentifier {
     pub blockchain: String,
     /// Network name which we use ChainId for it
     pub network: String,
+    /// Can be used in the future for a shard identifier
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sub_network_identifier: Option<SubNetworkIdentifier>,
 }
@@ -116,7 +104,7 @@ impl TryFrom<&NetworkIdentifier> for ChainId {
 
     fn try_from(network_identifier: &NetworkIdentifier) -> Result<Self, Self::Error> {
         ChainId::from_str(network_identifier.network.trim())
-            .map_err(|err| ApiError::AptosError(err.to_string()))
+            .map_err(|err| ApiError::AptosError(Some(err.to_string())))
     }
 }
 
@@ -153,6 +141,7 @@ pub struct OperationIdentifier {
 pub struct PartialBlockIdentifier {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<u64>,
+    /// Hash of the block
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<String>,
 }
@@ -201,13 +190,14 @@ pub struct SubNetworkIdentifier {
 /// [API Spec](https://www.rosetta-api.org/docs/models/TransactionIdentifier.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TransactionIdentifier {
+    /// The hash of the transaction so it can be looked up in mempool
     pub hash: String,
 }
 
 impl From<&TransactionInfo> for TransactionIdentifier {
     fn from(txn: &TransactionInfo) -> Self {
         TransactionIdentifier {
-            hash: txn.accumulator_root_hash.to_string(),
+            hash: to_hex_lower(&txn.hash),
         }
     }
 }

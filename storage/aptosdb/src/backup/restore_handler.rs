@@ -6,7 +6,7 @@ use crate::{
     state_store::StateStore, transaction_store::TransactionStore, AptosDB,
 };
 use anyhow::Result;
-use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_crypto::HashValue;
 use aptos_jellyfish_merkle::restore::StateSnapshotRestore;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -17,7 +17,7 @@ use aptos_types::{
 };
 use schemadb::DB;
 use std::sync::Arc;
-use storage_interface::{DbReader, TreeState};
+use storage_interface::DbReader;
 
 /// Provides functionalities for AptosDB data restore.
 #[derive(Clone)]
@@ -62,6 +62,10 @@ impl RestoreHandler {
         )
     }
 
+    pub fn maybe_reset_state_store(&self, latest_snapshot_version: Option<Version>) {
+        self.state_store.maybe_reset(latest_snapshot_version);
+    }
+
     pub fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {
         restore_utils::save_ledger_infos(
             self.ledger_db.clone(),
@@ -99,22 +103,6 @@ impl RestoreHandler {
             txn_infos,
             events,
         )
-    }
-
-    pub fn get_tree_state(&self, version: Option<Version>) -> Result<TreeState> {
-        let num_transactions: LeafCount = version.map_or(0, |v| v + 1);
-        let frozen_subtrees = self
-            .ledger_store
-            .get_frozen_subtree_hashes(num_transactions)?;
-        let state_root_hash = match version {
-            None => *SPARSE_MERKLE_PLACEHOLDER_HASH,
-            Some(ver) => self.state_store.get_root_hash(ver)?,
-        };
-        Ok(TreeState::new_at_state_checkpoint(
-            num_transactions,
-            frozen_subtrees,
-            state_root_hash,
-        ))
     }
 
     pub fn get_next_expected_transaction_version(&self) -> Result<Version> {

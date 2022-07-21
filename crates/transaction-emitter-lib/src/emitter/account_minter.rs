@@ -29,6 +29,7 @@ use rand::{rngs::StdRng, seq::SliceRandom};
 use rand_core::SeedableRng;
 use std::path::Path;
 
+#[derive(Debug)]
 pub struct AccountMinter<'t> {
     txn_factory: TransactionFactory,
     rng: StdRng,

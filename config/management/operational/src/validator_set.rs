@@ -5,7 +5,7 @@ use crate::{
     rest_client::RestClient,
     validator_config::{fullnode_addresses, validator_addresses, DecodedValidatorConfig},
 };
-use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_crypto::bls12381;
 use aptos_management::{config::ConfigPath, error::Error};
 use aptos_types::{
     account_address::AccountAddress, network_address::NetworkAddress, validator_info::ValidatorInfo,
@@ -98,7 +98,7 @@ async fn validator_set_addresses<F: Fn(ValidatorInfo) -> Result<Vec<NetworkAddre
 pub struct DecryptedValidatorInfo {
     pub name: String,
     pub account_address: AccountAddress,
-    pub consensus_public_key: Ed25519PublicKey,
+    pub consensus_public_key: bls12381::PublicKey,
     pub fullnode_network_address: NetworkAddress,
     pub validator_network_address: NetworkAddress,
 }

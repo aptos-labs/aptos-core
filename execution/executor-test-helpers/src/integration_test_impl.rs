@@ -47,7 +47,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let parent_block_id = executor.committed_block_id();
     let signer = aptos_types::validator_signer::ValidatorSigner::new(
         validators[0].data.address,
-        validators[0].key.clone(),
+        validators[0].consensus_key.clone(),
     );
 
     // This generates accounts that do not overlap with genesis
@@ -182,6 +182,29 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .unwrap();
     verify_committed_txn_status(t6.as_ref(), &block1[8]).unwrap();
 
+    // test the initial balance.
+    let db_state_view = db.reader.state_view_at_version(Some(6)).unwrap();
+    let account1_state_view = db_state_view.as_account_with_state_view(&account1_address);
+    verify_account_balance(get_account_balance(&account1_state_view), |x| {
+        x == 2_000_000
+    })
+    .unwrap();
+
+    let account2_state_view = db_state_view.as_account_with_state_view(&account2_address);
+
+    verify_account_balance(get_account_balance(&account2_state_view), |x| {
+        x == 1_200_000
+    })
+    .unwrap();
+
+    let account3_state_view = db_state_view.as_account_with_state_view(&account3_address);
+
+    verify_account_balance(get_account_balance(&account3_state_view), |x| {
+        x == 1_000_000
+    })
+    .unwrap();
+
+    // test the final balance.
     let db_state_view = db
         .reader
         .state_view_at_version(Some(current_version))
@@ -215,7 +238,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account1_sent_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account1.address(), 2),
+            &EventKey::new(2, account1.address()),
             0,
             Order::Ascending,
             10,
@@ -226,7 +249,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account2_sent_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account2.address(), 2),
+            &EventKey::new(2, account2.address()),
             0,
             Order::Ascending,
             10,
@@ -237,7 +260,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account3_sent_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account3.address(), 2),
+            &EventKey::new(2, account3.address()),
             0,
             Order::Ascending,
             10,
@@ -248,19 +271,19 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account1_received_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account1.address(), 1),
+            &EventKey::new(1, account1.address()),
             0,
             Order::Ascending,
             10,
         )
         .unwrap();
-    // Account1 has one deposit event since TestCoin was minted to it.
+    // Account1 has one deposit event since AptosCoin was minted to it.
     assert_eq!(account1_received_events.len(), 1);
 
     let account2_received_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account2.address(), 1),
+            &EventKey::new(1, account2.address()),
             0,
             Order::Ascending,
             10,
@@ -272,7 +295,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account3_received_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account3.address(), 1),
+            &EventKey::new(1, account3.address()),
             0,
             Order::Ascending,
             10,
@@ -298,7 +321,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account4_sent_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account4.address(), 2),
+            &EventKey::new(2, account4.address()),
             0,
             Order::Ascending,
             10,
@@ -364,7 +387,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account1_sent_events_batch1 = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account1.address(), 2),
+            &EventKey::new(2, account1.address()),
             0,
             Order::Ascending,
             10,
@@ -375,7 +398,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account1_sent_events_batch2 = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account1.address(), 2),
+            &EventKey::new(2, account1.address()),
             10,
             Order::Ascending,
             10,
@@ -386,7 +409,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account3_received_events_batch1 = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account3.address(), 1),
+            &EventKey::new(1, account3.address()),
             u64::MAX,
             Order::Descending,
             10,
@@ -402,7 +425,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account3_received_events_batch2 = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account3.address(), 1),
+            &EventKey::new(1, account3.address()),
             6,
             Order::Descending,
             10,

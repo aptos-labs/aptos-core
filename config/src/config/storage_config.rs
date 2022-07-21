@@ -15,6 +15,7 @@ use std::{
 pub struct RocksdbConfig {
     pub max_open_files: i32,
     pub max_total_wal_size: u64,
+    pub max_background_jobs: i32,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -33,6 +34,9 @@ impl Default for RocksdbConfigs {
                 // For now we set the max total WAL size to be 1G. This config can be useful when column
                 // families are updated at non-uniform frequencies.
                 max_total_wal_size: 1u64 << 30,
+                // This includes threads for flashing and compaction. Rocksdb will decide the # of
+                // threads to use internally.
+                max_background_jobs: 16,
             },
             state_merkle_db_config: RocksdbConfig {
                 // Allow db to close old sst files, saving memory.
@@ -40,6 +44,9 @@ impl Default for RocksdbConfigs {
                 // For now we set the max total WAL size to be 1G. This config can be useful when column
                 // families are updated at non-uniform frequencies.
                 max_total_wal_size: 1u64 << 30,
+                // This includes threads for flashing and compaction. Rocksdb will decide the # of
+                // threads to use internally.
+                max_background_jobs: 16,
             },
         }
     }

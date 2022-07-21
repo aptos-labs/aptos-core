@@ -18,7 +18,7 @@ aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-operational-tool = { path = "../../config/management/operational", features = ["testing"] }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 forge = { path = "../forge" }
 
 [[test]]

@@ -6,7 +6,7 @@
   "event_root_hash": "",
   "gas_used": "1",
   "success": false,
-  "vm_status": "Transaction Executed and Committed with Error FAILED_TO_DESERIALIZE_ARGUMENT",
+  "vm_status": "Transaction Executed and Committed with Error LINKER_ERROR",
   "accumulator_root_hash": "",
   "changes": [
     {
@@ -14,48 +14,11 @@
       "address": "0xa550c18",
       "state_key_hash": "",
       "data": {
-        "type": "0x1::Account::Account",
+        "type": "0x1::account::Account",
         "data": {
           "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
           "self_address": "0xa550c18",
           "sequence_number": "1"
-        }
-      }
-    },
-    {
-      "type": "write_resource",
-      "address": "0xa550c18",
-      "state_key_hash": "",
-      "data": {
-        "type": "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>",
-        "data": {
-          "coin": {
-            "value": "18446744073709551614"
-          },
-          "deposit_events": {
-            "counter": "1",
-            "guid": {
-              "guid": {
-                "id": {
-                  "addr": "0xa550c18",
-                  "creation_num": "1"
-                }
-              },
-              "len_bytes": 40
-            }
-          },
-          "withdraw_events": {
-            "counter": "1",
-            "guid": {
-              "guid": {
-                "id": {
-                  "addr": "0xa550c18",
-                  "creation_num": "2"
-                }
-              },
-              "len_bytes": 40
-            }
-          }
         }
       }
     }
@@ -69,7 +32,7 @@
     "type": "script_function_payload",
     "function": "0x1::Coin::transfer",
     "type_arguments": [
-      "0x1::TestCoin::TestCoin"
+      "0x1::aptos_coin::AptosCoin"
     ],
     "arguments": [
       "0x00000000000000000000000000000000000000000000000000000000000000dd",
@@ -79,7 +42,7 @@
   "signature": {
     "type": "ed25519_signature",
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0xc092753608ea42033b0dd1338a92190d1bb515e018c047434de6485644e96515ece0ab071859561dfb6d2293ade5861f04ab4f27ecd3df568074663d49f91603"
+    "signature": "0x3c35dac714b10a5f491970adea109f1f8fc739e56fa7d66810ac01455639188517ebb4cbdfd3c34e773d6ab637afa1a4817f0882308020ba5dd4f8e32d805907"
   },
   "events": [],
   "timestamp": "1"

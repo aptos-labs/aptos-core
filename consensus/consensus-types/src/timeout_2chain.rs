@@ -3,7 +3,7 @@
 
 use crate::{common::Author, quorum_cert::QuorumCert};
 use anyhow::{ensure, Context};
-use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_crypto::bls12381;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     block_info::Round, validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier,
@@ -51,7 +51,7 @@ impl TwoChainTimeout {
         &self.quorum_cert
     }
 
-    pub fn sign(&self, signer: &ValidatorSigner) -> Ed25519Signature {
+    pub fn sign(&self, signer: &ValidatorSigner) -> bls12381::Signature {
         signer.sign(&self.signing_format())
     }
 
@@ -100,7 +100,7 @@ pub struct TimeoutSigningRepr {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct TwoChainTimeoutCertificate {
     timeout: TwoChainTimeout,
-    signatures: BTreeMap<Author, (Round, Ed25519Signature)>,
+    signatures: BTreeMap<Author, (Round, bls12381::Signature)>,
 }
 
 impl Display for TwoChainTimeoutCertificate {
@@ -176,7 +176,12 @@ impl TwoChainTimeoutCertificate {
     }
 
     /// Add a new timeout message from author, the timeout should already be verified in upper layer.
-    pub fn add(&mut self, author: Author, timeout: TwoChainTimeout, signature: Ed25519Signature) {
+    pub fn add(
+        &mut self,
+        author: Author,
+        timeout: TwoChainTimeout,
+        signature: bls12381::Signature,
+    ) {
         debug_assert_eq!(
             self.timeout.epoch(),
             timeout.epoch(),
@@ -244,7 +249,7 @@ fn test_2chain_timeout_certificate() {
         .signatures
         .get_mut(&signers[0].author())
         .unwrap()
-        .1 = Ed25519Signature::dummy_signature();
+        .1 = bls12381::Signature::dummy_signature();
     invalid_timeout_cert.verify(&validators).unwrap_err();
 
     // not enough signatures

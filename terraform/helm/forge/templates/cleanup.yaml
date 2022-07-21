@@ -1,0 +1,24 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ include "forge.fullname" . }}-auto-cleanup
+  labels:
+    {{- include "forge.labels" . | nindent 4 }}
+spec:
+  schedule: "*/15 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: {{ include "forge.serviceAccountName" . }}
+          containers:
+          - name: main
+            image: {{ .Values.forge.image.repo }}:{{ required "forge.image.tag must be set" .Values.forge.image.tag }}
+            imagePullPolicy: {{ .Values.forge.image.pullPolicy }}
+            command:
+            - /bin/bash
+            - -c
+            - |
+              # invoke the forge operator cleanup command
+              forge operator clean-up
+          restartPolicy: OnFailure

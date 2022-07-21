@@ -3,7 +3,7 @@
 
 use crate::{
     account_address::AccountAddress,
-    account_config::aptos_root_address,
+    account_config::CORE_CODE_ADDRESS,
     event::{EventHandle, EventKey},
 };
 use aptos_crypto::HashValue;
@@ -85,6 +85,10 @@ impl BlockMetadata {
         &self.previous_block_votes
     }
 
+    pub fn failed_proposer_indices(&self) -> &Vec<u32> {
+        &self.failed_proposer_indices
+    }
+
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
@@ -95,7 +99,7 @@ impl BlockMetadata {
 }
 
 pub fn new_block_event_key() -> EventKey {
-    EventKey::new_from_address(&aptos_root_address(), 6)
+    EventKey::new(3, CORE_CODE_ADDRESS)
 }
 
 /// The path to the new block event handle under a Block::BlockMetadata resource.
@@ -123,61 +127,8 @@ impl BlockResource {
 }
 
 impl MoveStructType for BlockResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("Block");
+    const MODULE_NAME: &'static IdentStr = ident_str!("block");
     const STRUCT_NAME: &'static IdentStr = ident_str!("BlockMetadata");
 }
 
 impl MoveResource for BlockResource {}
-
-#[derive(Clone, Deserialize, Serialize)]
-pub struct NewBlockEvent {
-    epoch: u64,
-    round: u64,
-    previous_block_votes: Vec<bool>,
-    proposer: AccountAddress,
-    failed_proposer_indices: Vec<u64>,
-    timestamp: u64,
-}
-
-impl NewBlockEvent {
-    pub fn new(
-        epoch: u64,
-        round: u64,
-        previous_block_votes: Vec<bool>,
-        proposer: AccountAddress,
-        failed_proposer_indices: Vec<u64>,
-        timestamp: u64,
-    ) -> Self {
-        Self {
-            epoch,
-            round,
-            previous_block_votes,
-            proposer,
-            failed_proposer_indices,
-            timestamp,
-        }
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.epoch
-    }
-
-    pub fn round(&self) -> u64 {
-        self.round
-    }
-
-    pub fn previous_block_votes(&self) -> &Vec<bool> {
-        &self.previous_block_votes
-    }
-
-    pub fn proposer(&self) -> AccountAddress {
-        self.proposer
-    }
-
-    /// The list of indices in the validators list,
-    /// of consecutive proposers from the immediately preceeding
-    /// rounds that didn't produce a successful block
-    pub fn failed_proposer_indices(&self) -> &Vec<u64> {
-        &self.failed_proposer_indices
-    }
-}

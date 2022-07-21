@@ -28,9 +28,9 @@ fn end_to_end() {
     backup_dir.create_as_dir().unwrap();
     let store: Arc<dyn BackupStorage> = Arc::new(LocalFs::new(backup_dir.path().to_path_buf()));
 
-    let latest_tree_state = src_db.get_latest_tree_state().unwrap();
-    let version = latest_tree_state.num_transactions - 1;
-    let state_root_hash = latest_tree_state.state_checkpoint_hash;
+    let latest_executed_trees = src_db.get_latest_executed_trees().unwrap();
+    let version = latest_executed_trees.version().unwrap();
+    let state_root_hash = latest_executed_trees.state().base_root_hash();
 
     let (rt, port) = start_local_backup_service(src_db);
     let client = Arc::new(BackupServiceClient::new(format!(
@@ -75,10 +75,10 @@ fn end_to_end() {
     )
     .unwrap();
 
-    let tgt_db = AptosDB::new_for_test(&tgt_db_dir);
+    let tgt_db = AptosDB::new_readonly_for_test(&tgt_db_dir);
     assert_eq!(
         tgt_db
-            .get_latest_state_checkpoint()
+            .get_state_snapshot_before(version + 1) // We cannot use get_latest_snapshot() because it searches backward from the latest txn_info version
             .unwrap()
             .map(|(_, hash)| hash)
             .unwrap(),

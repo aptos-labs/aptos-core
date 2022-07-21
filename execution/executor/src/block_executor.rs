@@ -17,6 +17,7 @@ use executor_types::{BlockExecutorTrait, Error, StateComputeResult, StateSnapsho
 use fail::fail_point;
 use scratchpad::SparseMerkleTree;
 use std::marker::PhantomData;
+use std::ops::Deref;
 
 use crate::{
     components::{block_tree::BlockTree, chunk_output::ChunkOutput},
@@ -108,7 +109,7 @@ where
             let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
             let state_view = parent_view.verified_state_view(
                 StateViewId::BlockExecution { block_id },
-                self.db.reader.clone(),
+                self.db.reader.deref(),
             )?;
 
             let chunk_output = {
@@ -184,16 +185,20 @@ where
             fail_point!("executor::commit_blocks", |_| {
                 Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
             });
+            let result_in_memory_state = self
+                .block_tree
+                .get_block(block_id_to_commit)?
+                .output
+                .result_view
+                .state()
+                .clone();
             self.db.writer.save_transactions_ext(
                 &txns_to_commit,
                 first_version,
-                committed_block
-                    .output
-                    .result_view
-                    .state()
-                    .checkpoint_version,
+                committed_block.output.result_view.state().base_version,
                 Some(&ledger_info_with_sigs),
                 save_state_snapshots,
+                result_in_memory_state,
             )?;
             self.block_tree
                 .prune(ledger_info_with_sigs.ledger_info())

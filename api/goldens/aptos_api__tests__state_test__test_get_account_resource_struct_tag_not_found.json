@@ -1,5 +1,5 @@
 {
   "code": 404,
-  "message": "Resource not found by 0xa550c19/0x1::GUID::GeneratorX",
+  "message": "Resource not found by 0xa550c19/0x1::guid::GeneratorX",
   "aptos_ledger_version": "0"
 }

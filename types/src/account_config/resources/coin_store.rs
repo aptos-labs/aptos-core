@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{event::EventHandle, utility_coin::TEST_COIN_TYPE};
+use crate::{event::EventHandle, utility_coin::APTOS_COIN_TYPE};
 use move_deps::move_core_types::{
     ident_str,
     identifier::IdentStr,
@@ -44,11 +44,11 @@ impl CoinStoreResource {
 }
 
 impl MoveStructType for CoinStoreResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("Coin");
+    const MODULE_NAME: &'static IdentStr = ident_str!("coin");
     const STRUCT_NAME: &'static IdentStr = ident_str!("CoinStore");
 
     fn type_params() -> Vec<TypeTag> {
-        vec![TEST_COIN_TYPE.clone()]
+        vec![APTOS_COIN_TYPE.clone()]
     }
 }
 

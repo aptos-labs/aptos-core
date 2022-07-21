@@ -33,11 +33,30 @@ pub trait Evaluator: Debug + Sync + Send {
     /// as such.
     async fn evaluate(&self, input: &Self::Input) -> Result<Vec<EvaluationResult>, Self::Error>;
 
-    /// All evaluators must have a name. We use this to select evaluators
-    /// when building them from the initial configuration.
-    fn get_name() -> String
+    /// All evaluators must have a category. This is used for building
+    /// EvaluationResults.
+    fn get_category_name() -> String
     where
         Self: Sized;
+
+    /// All evaluators must have a name. We use this to select evaluators
+    /// when building them from the initial configuration.
+    fn get_evaluator_name() -> String
+    where
+        Self: Sized;
+
+    /// This is the "fully qualified" identifier used for specifying that you
+    /// want to use this evaluator.
+    fn get_identifier() -> String
+    where
+        Self: Sized,
+    {
+        format!(
+            "{}_{}",
+            Self::get_category_name(),
+            Self::get_evaluator_name()
+        )
+    }
 
     // It would be better to require From<&EvaluatorArgs> on the trait
     // itself, but that has a few issues. First, it would introduce a
@@ -62,17 +81,52 @@ pub trait Evaluator: Debug + Sync + Send {
     /// There should be no reason to override the default impl.
     fn add_from_evaluator_args(
         evaluators: &mut Vec<EvaluatorType>,
-        evaluator_names: &mut HashSet<String>,
+        evaluator_identifiers: &mut HashSet<String>,
         evaluator_args: &EvaluatorArgs,
     ) -> anyhow::Result<()>
     where
         Self: Sized,
     {
-        let name = Self::get_name();
-        match evaluator_names.take(&name) {
+        let identifier = Self::get_identifier();
+        match evaluator_identifiers.take(&identifier) {
             Some(_) => evaluators.push(Self::evaluator_type_from_evaluator_args(evaluator_args)?),
-            None => info!("Did not build evaluator {}", name),
+            None => info!("Did not build evaluator {}", identifier),
         };
         Ok(())
+    }
+
+    // Helper for building EvaluationResults with the name already filled in.
+    fn build_evaluation_result(
+        &self,
+        headline: String,
+        score: u8,
+        explanation: String,
+    ) -> EvaluationResult
+    where
+        Self: Sized,
+    {
+        self.build_evaluation_result_with_links(headline, score, explanation, vec![])
+    }
+
+    // Helper for building EvaluationResults with the name already filled in
+    // and optionally with links.
+    fn build_evaluation_result_with_links(
+        &self,
+        headline: String,
+        score: u8,
+        explanation: String,
+        links: Vec<String>,
+    ) -> EvaluationResult
+    where
+        Self: Sized,
+    {
+        EvaluationResult {
+            headline,
+            score,
+            explanation,
+            category: Self::get_category_name(),
+            evaluator_name: Self::get_evaluator_name(),
+            links,
+        }
     }
 }

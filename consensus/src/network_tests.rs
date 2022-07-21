@@ -302,6 +302,8 @@ impl NetworkPlayground {
         match msg {
             ConsensusMsg::ProposalMsg(proposal_msg) => Some(proposal_msg.proposal().round()),
             ConsensusMsg::VoteMsg(vote_msg) => Some(vote_msg.vote().vote_data().proposed().round()),
+            ConsensusMsg::SyncInfo(sync_info) => Some(sync_info.highest_certified_round()),
+            ConsensusMsg::CommitVoteMsg(commit_vote) => Some(commit_vote.commit_info().round()),
             _ => None,
         }
     }
@@ -638,9 +640,7 @@ mod tests {
                     _ => panic!("unexpected messages"),
                 }
             }
-            nodes[0]
-                .broadcast(ConsensusMsg::ProposalMsg(Box::new(proposal.clone())))
-                .await;
+            nodes[0].broadcast_proposal(proposal.clone()).await;
             playground
                 .wait_for_messages(4, NetworkPlayground::take_all)
                 .await;

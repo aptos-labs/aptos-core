@@ -54,16 +54,16 @@ fn mock_storage_summary(version: Version) -> StorageServerSummary {
     StorageServerSummary {
         protocol_metadata: ProtocolMetadata {
             max_epoch_chunk_size: 1000,
+            max_state_chunk_size: 1000,
             max_transaction_chunk_size: 1000,
             max_transaction_output_chunk_size: 1000,
-            max_account_states_chunk_size: 1000,
         },
         data_summary: DataSummary {
             synced_ledger_info: Some(mock_ledger_info(version)),
             epoch_ending_ledger_infos: None,
             transactions: Some(CompleteDataRange::new(0, version).unwrap()),
             transaction_outputs: Some(CompleteDataRange::new(0, version).unwrap()),
-            account_states: None,
+            states: None,
         },
     }
 }
@@ -1084,16 +1084,16 @@ async fn bad_peer_is_eventually_added_back() {
 #[tokio::test]
 async fn optimal_chunk_size_calculations() {
     // Create a test storage service config
-    let max_account_states_chunk_sizes = 500;
     let max_epoch_chunk_size = 600;
+    let max_state_chunk_size = 500;
     let max_transaction_chunk_size = 700;
     let max_transaction_output_chunk_size = 800;
     let storage_service_config = StorageServiceConfig {
-        max_account_states_chunk_sizes,
         max_concurrent_requests: 0,
         max_epoch_chunk_size,
         max_lru_cache_size: 0,
         max_network_channel_size: 0,
+        max_state_chunk_size,
         max_subscription_period_ms: 0,
         max_transaction_chunk_size,
         max_transaction_output_chunk_size,
@@ -1103,12 +1103,12 @@ async fn optimal_chunk_size_calculations() {
     // Test median calculations
     let optimal_chunk_sizes = calculate_optimal_chunk_sizes(
         &storage_service_config,
-        vec![100, 200, 300, 100],
         vec![7, 5, 6, 8, 10],
+        vec![100, 200, 300, 100],
         vec![900, 700, 500],
         vec![40],
     );
-    assert_eq!(200, optimal_chunk_sizes.account_states_chunk_size);
+    assert_eq!(200, optimal_chunk_sizes.state_chunk_size);
     assert_eq!(7, optimal_chunk_sizes.epoch_chunk_size);
     assert_eq!(700, optimal_chunk_sizes.transaction_chunk_size);
     assert_eq!(40, optimal_chunk_sizes.transaction_output_chunk_size);
@@ -1116,10 +1116,7 @@ async fn optimal_chunk_size_calculations() {
     // Test no advertised data
     let optimal_chunk_sizes =
         calculate_optimal_chunk_sizes(&storage_service_config, vec![], vec![], vec![], vec![]);
-    assert_eq!(
-        max_account_states_chunk_sizes,
-        optimal_chunk_sizes.account_states_chunk_size
-    );
+    assert_eq!(max_state_chunk_size, optimal_chunk_sizes.state_chunk_size);
     assert_eq!(max_epoch_chunk_size, optimal_chunk_sizes.epoch_chunk_size);
     assert_eq!(
         max_transaction_chunk_size,
@@ -1133,15 +1130,12 @@ async fn optimal_chunk_size_calculations() {
     // Verify the config caps the amount of chunks
     let optimal_chunk_sizes = calculate_optimal_chunk_sizes(
         &storage_service_config,
-        vec![1000, 1000, 2000, 3000],
         vec![70, 50, 60, 80, 100],
+        vec![1000, 1000, 2000, 3000],
         vec![9000, 7000, 5000],
         vec![400],
     );
-    assert_eq!(
-        max_account_states_chunk_sizes,
-        optimal_chunk_sizes.account_states_chunk_size
-    );
+    assert_eq!(max_state_chunk_size, optimal_chunk_sizes.state_chunk_size);
     assert_eq!(70, optimal_chunk_sizes.epoch_chunk_size);
     assert_eq!(
         max_transaction_chunk_size,

@@ -143,7 +143,7 @@ impl BlockStore {
                     qc.ledger_info()
                 );
 
-                if let Err(e) = self.commit(qc.ledger_info().clone()).await {
+                if let Err(e) = self.commit(qc.clone()).await {
                     error!("Error in try-committing blocks. {}", e.to_string());
                 }
             }
@@ -162,7 +162,7 @@ impl BlockStore {
         time_service: Arc<dyn TimeService>,
         back_pressure_limit: Round,
     ) -> Self {
-        let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_li) = root;
+        let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
 
         //verify root is correct
         assert!(
@@ -204,7 +204,7 @@ impl BlockStore {
             executed_root_block,
             root_qc,
             root_ordered_cert,
-            root_commit_li,
+            root_commit_cert,
             max_pruned_blocks_in_mem,
             highest_2chain_timeout_cert.map(Arc::new),
         );
@@ -237,8 +237,8 @@ impl BlockStore {
     }
 
     /// Commit the given block id with the proof, returns () on success or error
-    pub async fn commit(&self, finality_proof: LedgerInfoWithSignatures) -> anyhow::Result<()> {
-        let block_id_to_commit = finality_proof.ledger_info().consensus_block_id();
+    pub async fn commit(&self, finality_proof: QuorumCert) -> anyhow::Result<()> {
+        let block_id_to_commit = finality_proof.commit_info().id();
         let block_to_commit = self
             .get_block(block_id_to_commit)
             .ok_or_else(|| format_err!("Committed block id not found"))?;
@@ -263,13 +263,14 @@ impl BlockStore {
         self.state_computer
             .commit(
                 &blocks_to_commit,
-                finality_proof,
+                finality_proof.ledger_info().clone(),
                 Box::new(
                     move |committed_blocks: &[Arc<ExecutedBlock>],
                           commit_decision: LedgerInfoWithSignatures| {
                         block_tree.write().commit_callback(
                             storage,
                             committed_blocks,
+                            finality_proof,
                             commit_decision,
                         );
                     },
@@ -514,8 +515,8 @@ impl BlockReader for BlockStore {
         self.inner.read().highest_ordered_cert()
     }
 
-    fn highest_ledger_info(&self) -> LedgerInfoWithSignatures {
-        self.inner.read().highest_ledger_info()
+    fn highest_commit_cert(&self) -> Arc<QuorumCert> {
+        self.inner.read().highest_commit_cert()
     }
 
     fn highest_2chain_timeout_cert(&self) -> Option<Arc<TwoChainTimeoutCertificate>> {
@@ -526,7 +527,7 @@ impl BlockReader for BlockStore {
         SyncInfo::new_decoupled(
             self.highest_quorum_cert().as_ref().clone(),
             self.highest_ordered_cert().as_ref().clone(),
-            Some(self.highest_ledger_info()),
+            self.highest_commit_cert().as_ref().clone(),
             self.highest_2chain_timeout_cert()
                 .map(|tc| tc.as_ref().clone()),
         )

@@ -47,7 +47,7 @@ fn test_data_strategy() -> impl Strategy<Value = TestData> {
         .into_iter()
         .enumerate()
         .filter_map(|(idx, txn)| match txn {
-            Transaction::GenesisTransaction(..) | Transaction::StateCheckpoint => {
+            Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => {
                 Some(idx as Version)
             }
             _ => None,
@@ -160,7 +160,7 @@ fn test_end_to_end_impl(d: TestData) {
     .unwrap();
 
     // Check
-    let tgt_db = AptosDB::new_for_test(&tgt_db_dir);
+    let tgt_db = AptosDB::new_readonly_for_test(&tgt_db_dir);
     assert_eq!(
         d.db.get_transactions(
             d.txn_start_ver,

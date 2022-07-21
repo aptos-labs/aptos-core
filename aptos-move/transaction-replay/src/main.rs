@@ -5,7 +5,6 @@ use anyhow::{bail, Result};
 use aptos_transaction_replay::AptosDebugger;
 use aptos_types::{
     account_address::AccountAddress,
-    event::EventKey,
     transaction::{TransactionPayload, Version},
 };
 use difference::Changeset;
@@ -162,7 +161,7 @@ fn main() -> Result<()> {
         }
         Command::AnnotateEvents { key, start, limit } => {
             debugger.pretty_print_events(
-                &EventKey::from_bytes(hex::decode(key.as_str())?)?,
+                &bcs::from_bytes(&hex::decode(key.as_str())?)?,
                 start,
                 limit,
             )?;

@@ -11,9 +11,7 @@ mod determinator;
 mod guppy;
 mod license;
 mod toml;
-mod whitespace;
 mod workspace_classify;
-mod workspace_hack;
 
 #[derive(Debug, StructOpt)]
 pub struct Args {
@@ -27,7 +25,6 @@ pub fn run(args: Args, xctx: XContext) -> crate::Result<()> {
     let project_linters: &[&dyn ProjectLinter] = &[
         &guppy::BannedDeps::new(&workspace_config.banned_deps),
         &guppy::DirectDepDups::new(&workspace_config.direct_dep_dups)?,
-        &workspace_hack::GenerateWorkspaceHack,
     ];
 
     let package_linters: &[&dyn PackageLinter] = &[
@@ -35,8 +32,8 @@ pub fn run(args: Args, xctx: XContext) -> crate::Result<()> {
         &guppy::CrateNamesPaths,
         &guppy::IrrelevantBuildDeps,
         &guppy::OverlayFeatures::new(&workspace_config.overlay),
-        &guppy::UnpublishedPackagesOnlyUsePathDependencies::new(xctx.core()),
-        &guppy::PublishedPackagesDontDependOnUnpublishedPackages::new(xctx.core()),
+        &guppy::UnpublishedPackagesOnlyUsePathDependencies::new(),
+        &guppy::PublishedPackagesDontDependOnUnpublishedPackages::new(),
         &guppy::OnlyPublishToCratesIo,
         &guppy::CratesInCratesDirectory,
         &guppy::MoveCratesDontDependOnAptosCrates::new(&workspace_config.move_to_aptos_deps),
@@ -44,7 +41,6 @@ pub fn run(args: Args, xctx: XContext) -> crate::Result<()> {
             xctx.core().package_graph()?,
             &workspace_config.test_only,
         )?,
-        &workspace_hack::WorkspaceHackDep::new(xctx.core())?,
     ];
 
     let file_path_linters: &[&dyn FilePathLinter] = &[
@@ -55,14 +51,10 @@ pub fn run(args: Args, xctx: XContext) -> crate::Result<()> {
         )?,
     ];
 
-    let whitespace_exceptions =
-        whitespace::build_exceptions(&workspace_config.whitespace_exceptions)?;
     let license_exceptions = license::build_exceptions(&workspace_config.license_exceptions)?;
     let content_linters: &[&dyn ContentLinter] = &[
         &license::LicenseHeader::new(&license_exceptions),
         &toml::RootToml,
-        &whitespace::EofNewline::new(&whitespace_exceptions),
-        &whitespace::TrailingWhitespace::new(&whitespace_exceptions),
     ];
 
     let engine = LintEngineConfig::new(xctx.core())

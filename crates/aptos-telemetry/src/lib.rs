@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-mod build_information;
+pub mod build_information;
 pub mod cli_metrics;
 mod constants;
 mod core_metrics;

@@ -32,9 +32,7 @@ pub struct RootArgs {
 async fn main() -> Result<()> {
     let root_args = RootArgs::parse();
 
-    env_logger::Builder::new()
-        .filter_level(log::LevelFilter::Info)
-        .init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     let command = root_args.command;
     let result: Result<()> = match command {

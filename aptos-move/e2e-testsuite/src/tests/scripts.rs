@@ -164,7 +164,7 @@ fn script_non_existing_function_dep() {
     script
         .address_identifiers
         .push(account_config::CORE_CODE_ADDRESS);
-    script.identifiers.push(Identifier::new("BCS").unwrap());
+    script.identifiers.push(Identifier::new("bcs").unwrap());
     let module_handle = ModuleHandle {
         address: AddressIdentifierIndex((script.address_identifiers.len() - 1) as u16),
         name: IdentifierIndex((script.identifiers.len() - 1) as u16),
@@ -242,7 +242,7 @@ fn script_bad_sig_function_dep() {
     script
         .address_identifiers
         .push(account_config::CORE_CODE_ADDRESS);
-    script.identifiers.push(Identifier::new("BCS").unwrap());
+    script.identifiers.push(Identifier::new("bcs").unwrap());
     let module_handle = ModuleHandle {
         address: AddressIdentifierIndex((script.address_identifiers.len() - 1) as u16),
         name: IdentifierIndex((script.identifiers.len() - 1) as u16),

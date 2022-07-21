@@ -15,7 +15,7 @@ anyhow = "1.0.57"
 aptos-config = { path = "../../config" }
 aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 aptosdb = { path = "../../storage/aptosdb" }
 move-deps = { path = "../move-deps" }
 storage-interface = { path = "../../storage/storage-interface" }

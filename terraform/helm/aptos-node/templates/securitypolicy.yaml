@@ -1,3 +1,4 @@
+{{- if .Values.podSecurityPolicy }}
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
@@ -52,27 +53,6 @@ rules:
   verbs: ["use"]
   resourceNames:
   - {{ include "aptos-validator.fullname" . }}
-
----
-
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: {{ include "aptos-validator.fullname" . }}-psp
-roleRef:
-  kind: ClusterRole
-  name: {{ include "aptos-validator.fullname" . }}-psp
-  apiGroup: rbac.authorization.k8s.io
-subjects:
-- kind: ServiceAccount
-  namespace: {{ .Release.Namespace }}
-  name: {{ include "aptos-validator.serviceAccountName" . }}
-- kind: ServiceAccount
-  namespace: {{ .Release.Namespace }}
-  name: {{ include "aptos-validator.fullname" . }}-validator
-- kind: ServiceAccount
-  namespace: {{ .Release.Namespace }}
-  name: {{ include "aptos-validator.fullname" . }}-fullnode
 
 ---
 
@@ -134,10 +114,32 @@ rules:
   resourceNames:
   - {{ include "aptos-validator.fullname" . }}-haproxy
 
+{{- end }}
 ---
 
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
+metadata:
+  name: {{ include "aptos-validator.fullname" . }}-psp
+roleRef:
+  kind: ClusterRole
+  name: {{ include "aptos-validator.fullname" . }}-psp
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  namespace: {{ .Release.Namespace }}
+  name: {{ include "aptos-validator.serviceAccountName" . }}
+- kind: ServiceAccount
+  namespace: {{ .Release.Namespace }}
+  name: {{ include "aptos-validator.fullname" . }}-validator
+- kind: ServiceAccount
+  namespace: {{ .Release.Namespace }}
+  name: {{ include "aptos-validator.fullname" . }}-fullnode
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
 metadata:
   name: {{ include "aptos-validator.fullname" . }}-psp-haproxy
 roleRef:
@@ -152,7 +154,7 @@ subjects:
 ---
 {{- if .Values.enablePrivilegedMode }}
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   name: {{ include "aptos-validator.fullname" . }}-psp-privileged
 roleRef:

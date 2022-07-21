@@ -76,12 +76,25 @@ where
     }
 }
 
-use crate::traits;
+#[cfg(any(test, feature = "fuzzing"))]
+use crate::signing_message;
+#[cfg(any(test, feature = "fuzzing"))]
+use curve25519_dalek::constants::EIGHT_TORSION;
+#[cfg(any(test, feature = "fuzzing"))]
+use curve25519_dalek::edwards::EdwardsPoint;
+#[cfg(any(test, feature = "fuzzing"))]
+use curve25519_dalek::scalar::Scalar;
+#[cfg(any(test, feature = "fuzzing"))]
+use curve25519_dalek::traits::Identity;
+#[cfg(any(test, feature = "fuzzing"))]
+use digest::Digest;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;
 use rand::prelude::IteratorRandom;
 #[cfg(any(test, feature = "fuzzing"))]
 use rand::{rngs::StdRng, SeedableRng};
+#[cfg(any(test, feature = "fuzzing"))]
+use sha2::Sha512;
 
 /// Produces a uniformly random keypair from a seed
 #[cfg(any(test, feature = "fuzzing"))]
@@ -98,6 +111,47 @@ where
             KeyPair::<Priv, Pub>::generate(&mut rng)
         })
         .no_shrink()
+}
+
+/// Produces a small order group element
+#[cfg(any(test, feature = "fuzzing"))]
+pub fn small_order_strategy() -> impl Strategy<Value = EdwardsPoint> {
+    (0..EIGHT_TORSION.len())
+        .prop_map(|exp| {
+            let generator = EIGHT_TORSION[1]; // generator of size-8 subgroup is at index 1
+            Scalar::from(exp as u64) * generator
+        })
+        .no_shrink()
+}
+
+/// Produces a small order R, public key A and a hash h = H(R, A, m) such that sB - hA = R when s is
+/// zero.
+#[allow(non_snake_case)]
+#[cfg(any(test, feature = "fuzzing"))]
+pub fn small_order_pk_with_adversarial_message(
+) -> impl Strategy<Value = (EdwardsPoint, EdwardsPoint, TestAptosCrypto)> {
+    (
+        small_order_strategy(),
+        small_order_strategy(),
+        random_serializable_struct(),
+    )
+        .prop_filter(
+            "Filtering messages by hash * pk == R",
+            |(R, pk_point, msg)| {
+                let pk_bytes = pk_point.compress().to_bytes();
+
+                let msg_bytes = signing_message(msg);
+
+                let mut h: Sha512 = Sha512::new();
+                h.update(R.compress().as_bytes());
+                h.update(pk_bytes);
+                h.update(&msg_bytes);
+
+                let k = Scalar::from_hash(h);
+
+                k * pk_point + (*R) == EdwardsPoint::identity()
+            },
+        )
 }
 
 /// Produces a uniformly random keypair from a seed and the user can alter this sleed slightly.
@@ -147,7 +201,7 @@ pub fn random_keypairs<R, PrivKey, PubKey>(
 where
     R: ::rand::RngCore + ::rand::CryptoRng,
     PubKey: for<'a> std::convert::From<&'a PrivKey>,
-    PrivKey: traits::Uniform,
+    PrivKey: Uniform,
 {
     let mut key_pairs = vec![];
     for _ in 0..num_signers {

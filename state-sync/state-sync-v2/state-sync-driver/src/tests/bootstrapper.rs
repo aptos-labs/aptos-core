@@ -11,10 +11,10 @@ use crate::{
             MockStorageSynchronizer, MockStreamingClient,
         },
         utils::{
-            create_data_stream_listener, create_full_node_driver_configuration,
-            create_global_summary, create_output_list_with_proof,
-            create_random_epoch_ending_ledger_info, create_startup_info, create_transaction_info,
-            create_transaction_list_with_proof,
+            create_data_stream_listener, create_empty_epoch_state, create_epoch_ending_ledger_info,
+            create_full_node_driver_configuration, create_global_summary,
+            create_output_list_with_proof, create_random_epoch_ending_ledger_info,
+            create_transaction_info, create_transaction_list_with_proof,
         },
     },
 };
@@ -188,15 +188,15 @@ async fn test_critical_timeout() {
 }
 
 #[tokio::test]
-async fn test_data_stream_accounts() {
+async fn test_data_stream_state_values() {
     // Create test data
     let notification_id = 50043;
     let highest_version = 10000;
     let highest_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 1);
 
-    // Create a driver configuration with a genesis waypoint and account state syncing
+    // Create a driver configuration with a genesis waypoint and state syncing
     let mut driver_configuration = create_full_node_driver_configuration();
-    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestAccountStates;
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
 
     // Create the mock streaming client
     let mut mock_streaming_client = create_mock_streaming_client();
@@ -233,7 +233,7 @@ async fn test_data_stream_accounts() {
     let mut global_data_summary = create_global_summary(1);
     global_data_summary.advertised_data.synced_ledger_infos = vec![highest_ledger_info.clone()];
 
-    // Drive progress to initialize the account states stream
+    // Drive progress to initialize the state values stream
     drive_progress(&mut bootstrapper, &global_data_summary, false)
         .await
         .unwrap();
@@ -251,7 +251,7 @@ async fn test_data_stream_accounts() {
         .unwrap_err();
     assert_matches!(error, Error::VerificationError(_));
 
-    // Drive progress to initialize the account states stream
+    // Drive progress to initialize the state value stream
     drive_progress(&mut bootstrapper, &global_data_summary, false)
         .await
         .unwrap();
@@ -570,8 +570,11 @@ fn create_bootstrapper(
     // Create the mock db reader with only genesis loaded
     let mut mock_database_reader = create_mock_db_reader();
     mock_database_reader
-        .expect_get_startup_info()
-        .returning(|| Ok(Some(create_startup_info())));
+        .expect_get_latest_epoch_state()
+        .returning(|| Ok(create_empty_epoch_state()));
+    mock_database_reader
+        .expect_get_latest_ledger_info()
+        .returning(|| Ok(create_epoch_ending_ledger_info()));
     mock_database_reader
         .expect_get_latest_transaction_info_option()
         .returning(|| Ok(Some((0, create_transaction_info()))));

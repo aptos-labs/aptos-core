@@ -19,9 +19,7 @@ mod config;
 mod context;
 mod diff_summary;
 mod fix;
-mod fmt;
 mod generate_summaries;
-mod generate_workspace_hack;
 mod installer;
 mod lint;
 mod nextest;
@@ -63,9 +61,6 @@ enum Command {
     #[structopt(name = "fix")]
     /// Run `cargo fix`
     Fix(fix::Args),
-    #[structopt(name = "fmt")]
-    /// Run `cargo fmt`
-    Fmt(fmt::Args),
     #[structopt(name = "test")]
     /// Run tests
     Test(test::Args),
@@ -86,9 +81,6 @@ enum Command {
     #[structopt(name = "diff-summary")]
     /// Diff build summaries for important subsets
     DiffSummary(diff_summary::Args),
-    #[structopt(name = "generate-workspace-hack")]
-    /// Update workspace-hack contents
-    GenerateWorkspaceHack(generate_workspace_hack::Args),
 }
 
 fn main() -> Result<()> {
@@ -125,12 +117,10 @@ fn main() -> Result<()> {
         Command::Check(args) => check::run(args, xctx),
         Command::Clippy(args) => clippy::run(args, xctx),
         Command::Fix(args) => fix::run(args, xctx),
-        Command::Fmt(args) => fmt::run(args, xctx),
         Command::Bench(args) => bench::run(args, xctx),
         Command::Lint(args) => lint::run(args, xctx),
         Command::Playground(args) => playground::run(args, xctx),
         Command::GenerateSummaries(args) => generate_summaries::run(args, xctx),
         Command::DiffSummary(args) => diff_summary::run(args, xctx),
-        Command::GenerateWorkspaceHack(args) => generate_workspace_hack::run(args, xctx),
     }
 }

@@ -1,6 +1,6 @@
 script {
-    use AptosFramework::ParallelExecutionConfig;
+    use aptos_framework::parallel_execution_config;
     fun main(aptos_root: signer, _execute_as: signer) {
-        ParallelExecutionConfig::initialize_parallel_execution(&aptos_root);
+        parallel_execution_config::initialize_parallel_execution(&aptos_root);
     }
 }

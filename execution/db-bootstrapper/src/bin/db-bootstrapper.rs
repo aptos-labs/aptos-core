@@ -68,20 +68,20 @@ fn main() -> Result<()> {
     .with_context(|| format_err!("Failed to open DB."))?;
     let db = DbReaderWriter::new(db);
 
-    let tree_state = db
+    let executed_trees = db
         .reader
-        .get_latest_tree_state()
+        .get_latest_executed_trees()
         .with_context(|| format_err!("Failed to get latest tree state."))?;
     if let Some(waypoint) = opt.waypoint_to_verify {
         ensure!(
-            waypoint.version() == tree_state.num_transactions,
+            waypoint.version() == executed_trees.num_transactions(),
             "Trying to generate waypoint at version {}, but DB has {} transactions.",
             waypoint.version(),
-            tree_state.num_transactions,
+            executed_trees.num_transactions(),
         )
     }
 
-    let committer = calculate_genesis::<AptosVM>(&db, tree_state, &genesis_txn)
+    let committer = calculate_genesis::<AptosVM>(&db, executed_trees, &genesis_txn)
         .with_context(|| format_err!("Failed to calculate genesis."))?;
     println!(
         "Successfully calculated genesis. Got waypoint: {}",

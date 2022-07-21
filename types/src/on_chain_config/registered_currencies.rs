@@ -7,6 +7,8 @@ use move_deps::move_core_types::identifier::Identifier;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+// TODO: check whether this can be removed, as the resource does not exist (any longer)
+// in the framework.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RegisteredCurrencies {
     currency_codes: Vec<Identifier>,
@@ -34,5 +36,6 @@ impl RegisteredCurrencies {
 
 impl OnChainConfig for RegisteredCurrencies {
     // registered currencies address
-    const IDENTIFIER: &'static str = "RegisteredCurrencies";
+    const MODULE_IDENTIFIER: &'static str = "registered_currencies";
+    const TYPE_IDENTIFIER: &'static str = "RegisteredCurrencies";
 }

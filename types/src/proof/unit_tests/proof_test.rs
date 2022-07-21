@@ -548,6 +548,6 @@ fn create_transaction_info(
 }
 
 fn create_event() -> ContractEvent {
-    let event_key = EventKey::new_from_address(&AccountAddress::random(), 0);
+    let event_key = EventKey::new(0, AccountAddress::random());
     ContractEvent::new(event_key, 0, TypeTag::Bool, bcs::to_bytes(&0).unwrap())
 }

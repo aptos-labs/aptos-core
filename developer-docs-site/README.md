@@ -28,17 +28,10 @@ brew install node
 brew install yarn
 ```
 
-## Fork and clone the Aptos repo
-
->**NOTE**: See this [GitHub documentation for how to configure for a fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/syncing-a-fork).
-
-1. Fork the Aptos Core repo by clicking on the **Fork** on the top right of this repo page:
-https://github.com/aptos-labs/aptos-core
-
-2. Clone your fork.
+## Clone the Aptos repo
 
   ```
-  git clone https://github.com/<YOUR-GITHUB-USERID>/aptos-core
+  git clone https://github.com/aptos-labs/aptos-core.git
 
   ```
 
@@ -64,7 +57,7 @@ This step will configure the Docusaurus static site generator.
   yarn start
   ```
 
-## Build static html files
+## (Optional) Build static html files
 
 Execute the below steps if you want to generate static html documentation files. A `build` directory will be created with the static html files and assets contained in it.
 

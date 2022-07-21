@@ -1,3 +1,4 @@
+{{- if .Values.haproxy.enabled }}
 {{- range $i, $e := until (int .Values.numValidators) }}
 ---
 # make the validator index available in tpl using $.Values.i 
@@ -46,13 +47,17 @@ spec:
     targetPort: 8180
   {{- end }}
   type: {{ $.Values.service.validator.external.type }}
-  externalTrafficPolicy: Local
+  # Use externalTrafficPolicy if service type is LoadBalancer or Nodeport
+  {{- if and (ne "ClusterIP" $.Values.service.validator.external.type) $.Values.service.validator.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ $.Values.service.validator.externalTrafficPolicy }}
+  {{- end }}
   {{- with $.Values.service.validator.loadBalancerSourceRanges }}
   loadBalancerSourceRanges:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 
 {{- range $index, $config := $.Values.fullnode.groups }}
+{{- if lt $i (int $.Values.numFullnodeGroups) }}
 ---
 apiVersion: v1
 kind: Service
@@ -91,12 +96,16 @@ spec:
   {{- end }}
   {{- end }}
   type: {{ $.Values.service.fullnode.external.type }}
-  externalTrafficPolicy: Local
+  # Use externalTrafficPolicy if service type is LoadBalancer or Nodeport
+  {{- if and (ne "ClusterIP" $.Values.service.fullnode.external.type) $.Values.service.fullnode.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ $.Values.service.fullnode.externalTrafficPolicy }}
+  {{- end }}  
   {{- with (index $.Values.service $config.name).loadBalancerSourceRanges }}
   loadBalancerSourceRanges:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 
+{{- end }}
 {{- end }}
 
 ---
@@ -200,4 +209,5 @@ spec:
       imagePullSecrets:
       - name: {{ $.Values.imagePullSecret }}
       {{- end }}
+{{- end }}
 {{- end }}

@@ -15,7 +15,7 @@ bcs = "0.1.3"
 clap = "3.1.8"
 
 aptos-vm = { path = "../aptos-vm" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 cached-framework-packages =  { path = "../framework/cached-packages" }
 move-deps = { path = "../move-deps", features = ["address32"] }
 
@@ -25,7 +25,3 @@ datatest-stable = "0.1.1"
 [[bin]]
 name = "af-cli"
 path = "src/main.rs"
-
-[[test]]
-name = "cli_testsuite"
-harness = false

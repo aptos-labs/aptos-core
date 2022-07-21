@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Result};
-use aptos_api_types::mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE;
-pub use aptos_api_types::{self, MoveModuleBytecode, PendingTransaction, Transaction};
+pub use aptos_api_types::{
+    self, IndexResponse, MoveModuleBytecode, PendingTransaction, Transaction,
+};
+use aptos_api_types::{mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, BlockInfo};
 use aptos_crypto::HashValue;
 use aptos_types::{
-    account_address::AccountAddress, account_config::aptos_root_address,
+    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
     transaction::SignedTransaction,
 };
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
@@ -48,13 +50,18 @@ impl Client {
     }
 
     pub async fn get_aptos_version(&self) -> Result<Response<AptosVersion>> {
-        self.get_resource::<AptosVersion>(aptos_root_address(), "0x1::Version::Version")
+        self.get_resource::<AptosVersion>(CORE_CODE_ADDRESS, "0x1::version::Version")
+            .await
+    }
+
+    pub async fn get_block_info(&self, version: u64) -> Result<Response<BlockInfo>> {
+        self.get(self.base_url.join(&format!("blocks/{}", version))?)
             .await
     }
 
     pub async fn get_account_balance(&self, address: AccountAddress) -> Result<Response<Balance>> {
         let resp = self
-            .get_account_resource(address, "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>")
+            .get_account_resource(address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>")
             .await?;
         resp.and_then(|resource| {
             if let Some(res) = resource {
@@ -63,6 +70,10 @@ impl Client {
                 Err(anyhow!("No data returned"))
             }
         })
+    }
+
+    pub async fn get_index(&self) -> Result<Response<IndexResponse>> {
+        self.get(self.base_url.clone()).await
     }
 
     pub async fn get_ledger_information(&self) -> Result<Response<State>> {
@@ -78,15 +89,16 @@ impl Client {
             oldest_ledger_version: u64,
         }
 
-        let response = self.inner.get(self.base_url.clone()).send().await?;
-
-        let response = self.json::<Response>(response).await?.map(|r| State {
-            chain_id: r.chain_id,
-            epoch: r.epoch,
-            version: r.ledger_version,
-            timestamp_usecs: r.ledger_timestamp,
-            oldest_ledger_version: Some(r.oldest_ledger_version),
-        });
+        let response = self
+            .get::<Response>(self.base_url.clone())
+            .await?
+            .map(|r| State {
+                chain_id: r.chain_id,
+                epoch: r.epoch,
+                version: r.ledger_version,
+                timestamp_usecs: r.ledger_timestamp,
+                oldest_ledger_version: Some(r.oldest_ledger_version),
+            });
 
         Ok(response)
     }
@@ -177,7 +189,7 @@ impl Client {
     pub async fn get_transactions(
         &self,
         start: Option<u64>,
-        limit: Option<u64>,
+        limit: Option<u16>,
     ) -> Result<Response<Vec<Transaction>>> {
         let url = self.base_url.join("transactions")?;
 
@@ -396,6 +408,10 @@ impl Client {
         }
 
         Ok(())
+    }
+
+    async fn get<T: DeserializeOwned>(&self, url: Url) -> Result<Response<T>> {
+        self.json(self.inner.get(url).send().await?).await
     }
 }
 

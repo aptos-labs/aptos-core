@@ -42,7 +42,7 @@ aptos-proptest-helpers = { path = "../crates/aptos-proptest-helpers", optional =
 aptos-rate-limiter = { path = "../crates/aptos-rate-limiter" }
 aptos-time-service = { path = "../crates/aptos-time-service", features = ["async"] }
 aptos-types = { path = "../types" }
-aptos-workspace-hack = { path = "../crates/aptos-workspace-hack" }
+
 bitvec = { path = "../crates/aptos-bitvec", package = "aptos-bitvec" }
 channel = { path = "../crates/channel" }
 memsocket = { path = "./memsocket", optional = true }
@@ -51,12 +51,10 @@ num-variants = { path = "../crates/num-variants" }
 short-hex-str = { path = "../crates/short-hex-str" }
 
 [dev-dependencies]
-criterion = "0.3.5"
 maplit = "1.0.2"
 proptest = { version = "1.0.0", default-features = true }
 proptest-derive = { version = "0.3.0" }
 rand_core = "0.5.1"
-serial_test = "0.6.0"
 
 aptos-config = { path = "../config", features = ["testing"] }
 aptos-proptest-helpers = { path = "../crates/aptos-proptest-helpers" }
@@ -65,7 +63,6 @@ aptos-types = { path = "../types", features = ["fuzzing"] }
 bitvec = { path = "../crates/aptos-bitvec", package = "aptos-bitvec", features = ["fuzzing"] }
 memsocket = { path = "./memsocket" }
 netcore = { path = "./netcore", features = ["testing"] }
-network-builder = { path = "./builder" }
 
 [features]
 default = []

@@ -13,7 +13,7 @@ clap = "3.1.8"
 
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../aptos-vm" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 move-deps = { path = "../../aptos-move/move-deps", features = ["table-extension"] }
 
 [dev-dependencies]

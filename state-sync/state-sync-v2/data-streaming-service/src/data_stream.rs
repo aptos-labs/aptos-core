@@ -4,10 +4,10 @@
 use crate::{
     data_notification,
     data_notification::{
-        AccountsWithProofRequest, DataClientRequest, DataNotification, DataPayload,
-        EpochEndingLedgerInfosRequest, NewTransactionOutputsWithProofRequest,
-        NewTransactionsWithProofRequest, NotificationId, NumberOfAccountsRequest,
-        TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+        DataClientRequest, DataNotification, DataPayload, EpochEndingLedgerInfosRequest,
+        NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest, NotificationId,
+        NumberOfStatesRequest, StateValuesWithProofRequest, TransactionOutputsWithProofRequest,
+        TransactionsWithProofRequest,
     },
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
@@ -630,12 +630,6 @@ fn sanity_check_client_response(
     data_client_response: &Response<ResponsePayload>,
 ) -> bool {
     match data_client_request {
-        DataClientRequest::AccountsWithProof(_) => {
-            matches!(
-                data_client_response.payload,
-                ResponsePayload::AccountStatesWithProof(_)
-            )
-        }
         DataClientRequest::EpochEndingLedgerInfos(_) => {
             matches!(
                 data_client_response.payload,
@@ -654,10 +648,16 @@ fn sanity_check_client_response(
                 ResponsePayload::NewTransactionsWithProof(_)
             )
         }
-        DataClientRequest::NumberOfAccounts(_) => {
+        DataClientRequest::NumberOfStates(_) => {
             matches!(
                 data_client_response.payload,
-                ResponsePayload::NumberOfAccountStates(_)
+                ResponsePayload::NumberOfStates(_)
+            )
+        }
+        DataClientRequest::StateValuesWithProof(_) => {
+            matches!(
+                data_client_response.payload,
+                ResponsePayload::StateValuesWithProof(_)
             )
         }
         DataClientRequest::TransactionsWithProof(_) => {
@@ -712,9 +712,6 @@ fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
 
         // Fetch the client response
         let client_response = match data_client_request {
-            DataClientRequest::AccountsWithProof(request) => {
-                get_account_states_with_proof(aptos_data_client, request).await
-            }
             DataClientRequest::EpochEndingLedgerInfos(request) => {
                 get_epoch_ending_ledger_infos(aptos_data_client, request).await
             }
@@ -724,8 +721,11 @@ fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
             DataClientRequest::NewTransactionOutputsWithProof(request) => {
                 get_new_transaction_outputs_with_proof(aptos_data_client, request).await
             }
-            DataClientRequest::NumberOfAccounts(request) => {
-                get_number_of_account_states(aptos_data_client, request).await
+            DataClientRequest::NumberOfStates(request) => {
+                get_number_of_states(aptos_data_client, request).await
+            }
+            DataClientRequest::StateValuesWithProof(request) => {
+                get_states_values_with_proof(aptos_data_client, request).await
             }
             DataClientRequest::TransactionOutputsWithProof(request) => {
                 get_transaction_outputs_with_proof(aptos_data_client, request).await
@@ -753,11 +753,11 @@ fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
     })
 }
 
-async fn get_account_states_with_proof<T: AptosDataClient + Send + Clone + 'static>(
+async fn get_states_values_with_proof<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
-    request: AccountsWithProofRequest,
+    request: StateValuesWithProofRequest,
 ) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
-    let client_response = aptos_data_client.get_account_states_with_proof(
+    let client_response = aptos_data_client.get_state_values_with_proof(
         request.version,
         request.start_index,
         request.end_index,
@@ -803,11 +803,11 @@ async fn get_new_transactions_with_proof<T: AptosDataClient + Send + Clone + 'st
         .map(|response| response.map(ResponsePayload::from))
 }
 
-async fn get_number_of_account_states<T: AptosDataClient + Send + Clone + 'static>(
+async fn get_number_of_states<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
-    request: NumberOfAccountsRequest,
+    request: NumberOfStatesRequest,
 ) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
-    let client_response = aptos_data_client.get_number_of_account_states(request.version);
+    let client_response = aptos_data_client.get_number_of_states(request.version);
     client_response
         .await
         .map(|response| response.map(ResponsePayload::from))

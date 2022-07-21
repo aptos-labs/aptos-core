@@ -102,6 +102,17 @@ variable "logger_helm_values" {
   default     = {}
 }
 
+variable "enable_vector_daemonset_logger" {
+  description = "Enable vector-daemonset logger"
+  default     = false
+}
+
+variable "vector_daemonset_helm_values" {
+  description = "Map of helm values to pass to vector-daemonset chart"
+  type        = list(string)
+  default     = []
+}
+
 variable "monitoring_helm_values" {
   description = "Map of values to pass to monitoring helm chart"
   type        = any
@@ -118,7 +129,13 @@ variable "testnet_addons_helm_values" {
 ### EKS nodegroups
 
 variable "num_validators" {
-  default = 4
+  description = "The number of validator nodes to create"
+  default     = 4
+}
+
+variable "num_fullnode_groups" {
+  description = "The number of fullnode groups to create"
+  default     = 1
 }
 
 variable "num_utility_instance" {

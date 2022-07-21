@@ -438,7 +438,7 @@ mod tests {
 
     fn create_contract_event() -> ContractEvent {
         ContractEvent::new(
-            EventKey::new_from_address(&AccountAddress::random(), 0),
+            EventKey::new(0, AccountAddress::random()),
             0,
             TypeTag::Bool,
             b"some event bytes".to_vec(),

@@ -14,5 +14,5 @@ serde = { version = "1.0.124", default-features = false }
 thiserror = "1.0.24"
 
 aptos-config = { path = "../../../config" }
-aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
+
 network = { path = "../../../network" }

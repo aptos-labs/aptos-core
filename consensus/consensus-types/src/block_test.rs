@@ -35,7 +35,7 @@ fn test_nil_block() {
     let genesis_block = Block::make_genesis_block();
     let quorum_cert = certificate_for_genesis();
 
-    let nil_block = Block::new_nil(1, quorum_cert);
+    let nil_block = Block::new_nil(1, quorum_cert, vec![]);
     assert_eq!(
         nil_block.quorum_cert().certified_block().id(),
         genesis_block.id()
@@ -222,7 +222,7 @@ fn test_block_metadata_bitmaps() {
 #[test]
 fn test_nil_block_metadata_bitmaps() {
     let quorum_cert = certificate_for_genesis();
-    let nil_block = Block::new_nil(1, quorum_cert);
+    let nil_block = Block::new_nil(1, quorum_cert, vec![]);
     let nil_block_metadata = nil_block.new_block_metadata(&Vec::new());
     assert_eq!(AccountAddress::ZERO, nil_block_metadata.proposer());
     assert_eq!(0, nil_block_metadata.previous_block_votes().len());

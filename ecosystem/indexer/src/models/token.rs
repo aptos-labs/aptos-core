@@ -143,19 +143,19 @@ impl TokenEvent {
     pub fn from_event(event: &Event) -> Option<TokenEvent> {
         let data = event.data.clone();
         match event.type_.as_str() {
-            "0x1::Token::WithdrawEvent" => {
+            "0x1::token::WithdrawEvent" => {
                 let event = serde_json::from_value::<WithdrawEventType>(data).unwrap();
                 Some(TokenEvent::WithdrawEvent(event))
             }
-            "0x1::Token::DepositEvent" => {
+            "0x1::token::DepositEvent" => {
                 let event = serde_json::from_value::<DepositEventType>(data).unwrap();
                 Some(TokenEvent::DepositEvent(event))
             }
-            "0x1::Token::CreateTokenEvent" => {
+            "0x1::token::CreateTokenEvent" => {
                 let event = serde_json::from_value::<CreationEventType>(data).unwrap();
                 Some(TokenEvent::CreationEvent(event))
             }
-            "0x1::Token::CreateCollectionEvent" => {
+            "0x1::token::CreateCollectionEvent" => {
                 let event = serde_json::from_value::<CreateCollectionEventType>(data).unwrap();
                 Some(TokenEvent::CollectionCreationEvent(event))
             }

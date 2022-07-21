@@ -1,3 +1,4 @@
+{{- if .Values.podSecurityPolicy }}
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
@@ -53,10 +54,11 @@ rules:
   resourceNames:
   - {{ include "aptos-genesis.fullname" . }}
 
+{{- end }}
 ---
 
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   name: {{ include "aptos-genesis.fullname" . }}-psp
 roleRef:

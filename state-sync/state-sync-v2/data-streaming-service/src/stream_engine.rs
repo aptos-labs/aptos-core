@@ -3,20 +3,21 @@
 
 use crate::{
     data_notification::{
-        AccountsWithProofRequest, DataClientRequest,
+        DataClientRequest,
         DataClientRequest::{
-            AccountsWithProof, EpochEndingLedgerInfos, NewTransactionOutputsWithProof,
-            NewTransactionsWithProof, NumberOfAccounts, TransactionOutputsWithProof,
+            EpochEndingLedgerInfos, NewTransactionOutputsWithProof, NewTransactionsWithProof,
+            NumberOfStates, StateValuesWithProof, TransactionOutputsWithProof,
             TransactionsWithProof,
         },
         DataNotification, DataPayload, EpochEndingLedgerInfosRequest,
         NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest,
-        NumberOfAccountsRequest, TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+        NumberOfStatesRequest, StateValuesWithProofRequest, TransactionOutputsWithProofRequest,
+        TransactionsWithProofRequest,
     },
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
     streaming_client::{
-        Epoch, GetAllAccountsRequest, GetAllEpochEndingLedgerInfosRequest, StreamRequest,
+        Epoch, GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, StreamRequest,
     },
 };
 use aptos_data_client::{AdvertisedData, GlobalDataSummary, ResponsePayload};
@@ -89,9 +90,9 @@ pub trait DataStreamEngine {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum StreamEngine {
-    AccountsStreamEngine,
     ContinuousTransactionStreamEngine,
     EpochEndingStreamEngine,
+    StateStreamEngine,
     TransactionStreamEngine,
 }
 
@@ -107,9 +108,7 @@ impl StreamEngine {
             StreamRequest::ContinuouslyStreamTransactions(_) => {
                 Ok(ContinuousTransactionStreamEngine::new(stream_request)?.into())
             }
-            StreamRequest::GetAllAccounts(request) => {
-                Ok(AccountsStreamEngine::new(request)?.into())
-            }
+            StreamRequest::GetAllStates(request) => Ok(StateStreamEngine::new(request)?.into()),
             StreamRequest::GetAllEpochEndingLedgerInfos(request) => {
                 Ok(EpochEndingStreamEngine::new(request, advertised_data)?.into())
             }
@@ -128,34 +127,34 @@ impl StreamEngine {
 }
 
 #[derive(Clone, Debug)]
-pub struct AccountsStreamEngine {
-    // The original accounts request made by the client
-    pub request: GetAllAccountsRequest,
+pub struct StateStreamEngine {
+    // The original states request made by the client
+    pub request: GetAllStatesRequest,
 
-    // True iff a request has been created to fetch the number of accounts
-    pub account_num_requested: bool,
+    // True iff a request has been created to fetch the number of states
+    pub state_num_requested: bool,
 
-    // The total number of accounts to fetch at this version
-    pub number_of_accounts: Option<u64>,
+    // The total number of states to fetch at this version
+    pub number_of_states: Option<u64>,
 
-    // The next account index that we're waiting to send to the client along the
-    // stream. All accounts before this index have already been sent.
+    // The next state index that we're waiting to send to the client along the
+    // stream. All states before this index have already been sent.
     pub next_stream_index: u64,
 
-    // The next account index that we're waiting to request from the network.
-    // All accounts before this index have already been requested.
+    // The next state index that we're waiting to request from the network.
+    // All states before this index have already been requested.
     pub next_request_index: u64,
 
     // True iff all data has been sent across the stream.
     pub stream_is_complete: bool,
 }
 
-impl AccountsStreamEngine {
-    fn new(request: &GetAllAccountsRequest) -> Result<Self, Error> {
-        Ok(AccountsStreamEngine {
+impl StateStreamEngine {
+    fn new(request: &GetAllStatesRequest) -> Result<Self, Error> {
+        Ok(StateStreamEngine {
             request: request.clone(),
-            account_num_requested: false,
-            number_of_accounts: None,
+            state_num_requested: false,
+            number_of_states: None,
             next_stream_index: request.start_index,
             next_request_index: request.start_index,
             stream_is_complete: false,
@@ -168,7 +167,7 @@ impl AccountsStreamEngine {
     ) -> Result<(), Error> {
         for client_request in client_requests {
             match client_request {
-                AccountsWithProof(request) => {
+                StateValuesWithProof(request) => {
                     self.next_request_index =
                         request.end_index.checked_add(1).ok_or_else(|| {
                             Error::IntegerOverflow("Next request index has overflown!".into())
@@ -180,35 +179,33 @@ impl AccountsStreamEngine {
         Ok(())
     }
 
-    fn get_number_of_accounts(&self) -> u64 {
-        self.number_of_accounts
-            .expect("Number of accounts is not initialized!")
+    fn get_number_of_states(&self) -> u64 {
+        self.number_of_states
+            .expect("Number of states is not initialized!")
     }
 }
 
-impl DataStreamEngine for AccountsStreamEngine {
+impl DataStreamEngine for StateStreamEngine {
     fn create_data_client_requests(
         &mut self,
         max_number_of_requests: u64,
         global_data_summary: &GlobalDataSummary,
     ) -> Result<Vec<DataClientRequest>, Error> {
-        if self.number_of_accounts.is_none() && self.account_num_requested {
-            return Ok(vec![]); // Wait for the number of accounts to be returned
+        if self.number_of_states.is_none() && self.state_num_requested {
+            return Ok(vec![]); // Wait for the number of states to be returned
         }
 
-        if let Some(number_of_accounts) = self.number_of_accounts {
-            let end_account_index = number_of_accounts
+        if let Some(number_of_states) = self.number_of_states {
+            let end_state_index = number_of_states
                 .checked_sub(1)
-                .ok_or_else(|| Error::IntegerOverflow("End account index has overflown!".into()))?;
+                .ok_or_else(|| Error::IntegerOverflow("End state index has overflown!".into()))?;
 
             // Create the client requests
             let client_requests = create_data_client_requests(
                 self.next_request_index,
-                end_account_index,
+                end_state_index,
                 max_number_of_requests,
-                global_data_summary
-                    .optimal_chunk_sizes
-                    .account_states_chunk_size,
+                global_data_summary.optimal_chunk_sizes.state_chunk_size,
                 self.clone().into(),
             )?;
             self.update_request_tracking(&client_requests)?;
@@ -219,13 +216,13 @@ impl DataStreamEngine for AccountsStreamEngine {
                 (LogSchema::new(LogEntry::AptosDataClient)
                     .event(LogEvent::Pending)
                     .message(&format!(
-                        "Requested the number of accounts at version: {:?}",
+                        "Requested the number of states at version: {:?}",
                         self.request.version
                     )))
             );
-            self.account_num_requested = true;
-            Ok(vec![DataClientRequest::NumberOfAccounts(
-                NumberOfAccountsRequest {
+            self.state_num_requested = true;
+            Ok(vec![DataClientRequest::NumberOfStates(
+                NumberOfStatesRequest {
                     version: self.request.version,
                 },
             )])
@@ -236,7 +233,7 @@ impl DataStreamEngine for AccountsStreamEngine {
         AdvertisedData::contains_range(
             self.request.version,
             self.request.version,
-            &advertised_data.account_states,
+            &advertised_data.states,
         )
     }
 
@@ -251,7 +248,7 @@ impl DataStreamEngine for AccountsStreamEngine {
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
         match client_request {
-            AccountsWithProof(request) => {
+            StateValuesWithProof(request) => {
                 verify_client_request_indices(
                     self.next_stream_index,
                     request.start_index,
@@ -266,7 +263,7 @@ impl DataStreamEngine for AccountsStreamEngine {
                 // Check if the stream is complete
                 if request.end_index
                     == self
-                        .get_number_of_accounts()
+                        .get_number_of_states()
                         .checked_sub(1)
                         .ok_or_else(|| Error::IntegerOverflow("End index has overflown!".into()))?
                 {
@@ -282,27 +279,27 @@ impl DataStreamEngine for AccountsStreamEngine {
                 );
                 return Ok(Some(data_notification));
             }
-            NumberOfAccounts(request) => {
-                if let ResponsePayload::NumberOfAccountStates(number_of_accounts) =
-                    client_response_payload
-                {
+            NumberOfStates(request) => {
+                if let ResponsePayload::NumberOfStates(number_of_states) = client_response_payload {
                     info!(
                         (LogSchema::new(LogEntry::ReceivedDataResponse)
                             .event(LogEvent::Success)
-                            .message(&format!("Received number of accounts at version: {:?}. Total accounts: {:?}",
-                                              request.version, number_of_accounts)))
+                            .message(&format!(
+                                "Received number of states at version: {:?}. Total states: {:?}",
+                                request.version, number_of_states
+                            )))
                     );
-                    self.account_num_requested = false;
+                    self.state_num_requested = false;
 
                     // Sanity check the response before saving it.
-                    if number_of_accounts < self.next_request_index {
+                    if number_of_states < self.next_request_index {
                         return Err(Error::NoDataToFetch(format!(
-                            "The next account index to fetch is higher than the \
-                            total number of accounts. Next index: {:?}, total accounts: {:?}",
-                            self.next_request_index, number_of_accounts
+                            "The next state index to fetch is higher than the \
+                            total number of states. Next index: {:?}, total states: {:?}",
+                            self.next_request_index, number_of_states
                         )));
                     } else {
-                        self.number_of_accounts = Some(number_of_accounts);
+                        self.number_of_states = Some(number_of_states);
                     }
                 }
             }
@@ -1298,8 +1295,8 @@ fn create_data_client_request(
     stream_engine: &StreamEngine,
 ) -> DataClientRequest {
     match stream_engine {
-        StreamEngine::AccountsStreamEngine(stream_engine) => {
-            DataClientRequest::AccountsWithProof(AccountsWithProofRequest {
+        StreamEngine::StateStreamEngine(stream_engine) => {
+            DataClientRequest::StateValuesWithProof(StateValuesWithProofRequest {
                 version: stream_engine.request.version,
                 start_index,
                 end_index,
@@ -1369,8 +1366,8 @@ fn create_data_notification(
 
     let client_response_type = client_response.get_label();
     let data_payload = match client_response {
-        ResponsePayload::AccountStatesWithProof(accounts_chunk) => {
-            DataPayload::AccountStatesWithProof(accounts_chunk)
+        ResponsePayload::StateValuesWithProof(states_chunk) => {
+            DataPayload::StateValuesWithProof(states_chunk)
         }
         ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
             DataPayload::EpochEndingLedgerInfos(ledger_infos)

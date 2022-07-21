@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    cached_state_view::CachedStateView, in_memory_state::InMemoryState,
-    no_proof_fetcher::NoProofFetcher, sync_proof_fetcher::SyncProofFetcher, DbReader,
+    cached_state_view::CachedStateView, no_proof_fetcher::NoProofFetcher, state_delta::StateDelta,
+    sync_proof_fetcher::SyncProofFetcher, DbReader,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::TransactionAccumulatorHasher, HashValue};
 use aptos_state_view::StateViewId;
 use aptos_types::{proof::accumulator::InMemoryAccumulator, transaction::Version};
+use std::ops::Deref;
 use std::sync::Arc;
 
 /// A wrapper of the in-memory state sparse merkle tree and the transaction accumulator that
@@ -16,7 +17,7 @@ use std::sync::Arc;
 #[derive(Clone, Debug)]
 pub struct ExecutedTrees {
     /// The in-memory representation of state after execution.
-    state: InMemoryState,
+    state: StateDelta,
 
     /// The in-memory Merkle Accumulator representing a blockchain state consistent with the
     /// `state_tree`.
@@ -24,7 +25,7 @@ pub struct ExecutedTrees {
 }
 
 impl ExecutedTrees {
-    pub fn state(&self) -> &InMemoryState {
+    pub fn state(&self) -> &StateDelta {
         &self.state
     }
 
@@ -33,8 +34,11 @@ impl ExecutedTrees {
     }
 
     pub fn version(&self) -> Option<Version> {
-        let num_elements = self.txn_accumulator().num_leaves() as u64;
-        num_elements.checked_sub(1)
+        self.num_transactions().checked_sub(1)
+    }
+
+    pub fn num_transactions(&self) -> u64 {
+        self.txn_accumulator().num_leaves() as u64
     }
 
     pub fn state_id(&self) -> HashValue {
@@ -42,9 +46,13 @@ impl ExecutedTrees {
     }
 
     pub fn new(
-        state: InMemoryState,
+        state: StateDelta,
         transaction_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
     ) -> Self {
+        assert_eq!(
+            state.current_version.map_or(0, |v| v + 1),
+            transaction_accumulator.num_leaves()
+        );
         Self {
             state,
             transaction_accumulator,
@@ -56,7 +64,7 @@ impl ExecutedTrees {
         frozen_subtrees_in_accumulator: Vec<HashValue>,
         num_leaves_in_accumulator: u64,
     ) -> Self {
-        let state = InMemoryState::new_at_checkpoint(
+        let state = StateDelta::new_at_checkpoint(
             state_root_hash,
             num_leaves_in_accumulator.checked_sub(1),
         );
@@ -70,40 +78,41 @@ impl ExecutedTrees {
 
     pub fn new_empty() -> Self {
         Self::new(
-            InMemoryState::new_empty(),
+            StateDelta::new_empty(),
             Arc::new(InMemoryAccumulator::new_empty()),
         )
     }
 
     pub fn is_same_view(&self, rhs: &Self) -> bool {
-        self.transaction_accumulator.root_hash() == rhs.transaction_accumulator.root_hash()
+        self.state().has_same_current_state(rhs.state())
+            && self.transaction_accumulator.root_hash() == rhs.transaction_accumulator.root_hash()
     }
 
-    pub fn verified_state_view(
+    pub fn verified_state_view<'a>(
         &self,
         id: StateViewId,
-        reader: Arc<dyn DbReader>,
-    ) -> Result<CachedStateView> {
+        reader: &'a dyn DbReader,
+    ) -> Result<CachedStateView<SyncProofFetcher<'a>>> {
         CachedStateView::new(
             id,
-            reader.clone(),
+            reader,
             self.transaction_accumulator.num_leaves(),
             self.state.current.clone(),
-            Arc::new(SyncProofFetcher::new(reader)),
+            SyncProofFetcher::new(reader),
         )
     }
 
     pub fn state_view(
         &self,
         id: StateViewId,
-        reader: Arc<dyn DbReader>,
-    ) -> Result<CachedStateView> {
+        reader: &Arc<dyn DbReader>,
+    ) -> Result<CachedStateView<NoProofFetcher>> {
         CachedStateView::new(
             id,
-            reader.clone(),
+            reader.deref(),
             self.transaction_accumulator.num_leaves(),
             self.state.current.clone(),
-            Arc::new(NoProofFetcher::new(reader)),
+            NoProofFetcher::new(reader.clone()),
         )
     }
 }

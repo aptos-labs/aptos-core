@@ -78,9 +78,20 @@ impl ProposalGenerator {
     }
 
     /// Creates a NIL block proposal extending the highest certified block from the block store.
-    pub fn generate_nil_block(&self, round: Round) -> anyhow::Result<Block> {
+    pub fn generate_nil_block(
+        &self,
+        round: Round,
+        proposer_election: &mut UnequivocalProposerElection,
+    ) -> anyhow::Result<Block> {
         let hqc = self.ensure_highest_quorum_cert(round)?;
-        Ok(Block::new_nil(round, hqc.as_ref().clone()))
+        let quorum_cert = hqc.as_ref().clone();
+        let failed_authors = self.compute_failed_authors(
+            round, // to include current round, as that is what failed
+            quorum_cert.certified_block().round(),
+            true,
+            proposer_election,
+        );
+        Ok(Block::new_nil(round, quorum_cert, failed_authors))
     }
 
     /// The function generates a new proposal block: the returned future is fulfilled when the
@@ -166,6 +177,7 @@ impl ProposalGenerator {
         let failed_authors = self.compute_failed_authors(
             round,
             quorum_cert.certified_block().round(),
+            false,
             proposer_election,
         );
         // create block proposal
@@ -201,14 +213,16 @@ impl ProposalGenerator {
         &self,
         round: Round,
         previous_round: Round,
+        include_cur_round: bool,
         proposer_election: &mut UnequivocalProposerElection,
     ) -> Vec<(Round, Author)> {
+        let end_round = round + (if include_cur_round { 1 } else { 0 });
         let mut failed_authors = Vec::new();
         let start = std::cmp::max(
             previous_round + 1,
-            round.saturating_sub(self.max_failed_authors_to_store as u64),
+            end_round.saturating_sub(self.max_failed_authors_to_store as u64),
         );
-        for i in start..round {
+        for i in start..end_round {
             failed_authors.push((i, proposer_election.get_valid_proposer(i)));
         }
 

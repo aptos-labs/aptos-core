@@ -31,7 +31,7 @@ Block:
         TYPENAME: BlockData
     - signature:
         OPTION:
-          TYPENAME: Ed25519Signature
+          TYPENAME: Signature
 BlockData:
   STRUCT:
     - epoch: U64
@@ -107,7 +107,13 @@ BlockType:
                   - U64
                   - TYPENAME: AccountAddress
     1:
-      NilBlock: UNIT
+      NilBlock:
+        STRUCT:
+          - failed_authors:
+              SEQ:
+                TUPLE:
+                  - U64
+                  - TYPENAME: AccountAddress
     2:
       Genesis: UNIT
 ChainId:
@@ -130,7 +136,7 @@ CommitVote:
     - ledger_info:
         TYPENAME: LedgerInfo
     - signature:
-        TYPENAME: Ed25519Signature
+        TYPENAME: Signature
 ConsensusMsg:
   ENUM:
     0:
@@ -203,7 +209,10 @@ EpochState:
     - verifier:
         TYPENAME: ValidatorVerifier
 EventKey:
-  NEWTYPESTRUCT: BYTES
+  STRUCT:
+    - creation_number: U64
+    - account_address:
+        TYPENAME: AccountAddress
 HashValue:
   NEWTYPESTRUCT: BYTES
 Identifier:
@@ -229,7 +238,7 @@ LedgerInfoWithV0:
           KEY:
             TYPENAME: AccountAddress
           VALUE:
-            TYPENAME: Ed25519Signature
+            TYPENAME: Signature
 Module:
   STRUCT:
     - code: BYTES
@@ -269,6 +278,8 @@ ProposalMsg:
         TYPENAME: Block
     - sync_info:
         TYPENAME: SyncInfo
+PublicKey:
+  NEWTYPESTRUCT: BYTES
 QuorumCert:
   STRUCT:
     - vote_data:
@@ -307,6 +318,8 @@ ScriptFunction:
           TYPENAME: TypeTag
     - args:
         SEQ: BYTES
+Signature:
+  NEWTYPESTRUCT: BYTES
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -322,7 +335,8 @@ StateKey:
     1:
       TableItem:
         STRUCT:
-          - handle: U128
+          - handle:
+              TYPENAME: TableHandle
           - key: BYTES
     2:
       Raw:
@@ -345,12 +359,13 @@ SyncInfo:
     - highest_ordered_cert:
         OPTION:
           TYPENAME: QuorumCert
-    - highest_ledger_info:
-        OPTION:
-          TYPENAME: LedgerInfoWithSignatures
+    - highest_commit_cert:
+        TYPENAME: QuorumCert
     - highest_2chain_timeout_cert:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
+TableHandle:
+  NEWTYPESTRUCT: U128
 Transaction:
   ENUM:
     0:
@@ -366,7 +381,9 @@ Transaction:
         NEWTYPE:
           TYPENAME: BlockMetadata
     3:
-      StateCheckpoint: UNIT
+      StateCheckpoint:
+        NEWTYPE:
+          TYPENAME: HashValue
 TransactionArgument:
   ENUM:
     0:
@@ -450,7 +467,7 @@ TwoChainTimeoutCertificate:
           VALUE:
             TUPLE:
               - U64
-              - TYPENAME: Ed25519Signature
+              - TYPENAME: Signature
 TypeTag:
   ENUM:
     0:
@@ -476,7 +493,7 @@ TypeTag:
 ValidatorConsensusInfo:
   STRUCT:
     - public_key:
-        TYPENAME: Ed25519PublicKey
+        TYPENAME: PublicKey
     - voting_power: U64
 ValidatorVerifier:
   STRUCT:
@@ -497,12 +514,12 @@ Vote:
     - ledger_info:
         TYPENAME: LedgerInfo
     - signature:
-        TYPENAME: Ed25519Signature
+        TYPENAME: Signature
     - two_chain_timeout:
         OPTION:
           TUPLE:
             - TYPENAME: TwoChainTimeout
-            - TYPENAME: Ed25519Signature
+            - TYPENAME: Signature
 VoteData:
   STRUCT:
     - proposed:

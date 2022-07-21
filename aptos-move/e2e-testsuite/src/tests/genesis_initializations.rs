@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::account_config;
+use aptos_types::account_config::CORE_CODE_ADDRESS;
 use language_e2e_tests::executor::FakeExecutor;
 use move_deps::move_core_types::{
     account_address::AccountAddress,
@@ -15,32 +15,28 @@ fn test_timestamp_time_has_started() {
 
     // Invalid address used to call `Timestamp::set_time_has_started`
     let output = executor.try_exec(
-        "Timestamp",
+        "timestamp",
         "set_time_has_started",
         vec![],
         serialize_values(&vec![MoveValue::Signer(account_address)]),
     );
-    assert_eq!(output.unwrap_err().move_abort_code(), Some(2));
+    assert_eq!(output.unwrap_err().move_abort_code(), Some(327682));
 
     executor.exec(
-        "Timestamp",
+        "timestamp",
         "set_time_has_started",
         vec![],
-        serialize_values(&vec![MoveValue::Signer(
-            account_config::aptos_root_address(),
-        )]),
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
     );
 
     let output = executor.try_exec(
-        "Timestamp",
+        "timestamp",
         "set_time_has_started",
         vec![],
-        serialize_values(&vec![MoveValue::Signer(
-            account_config::aptos_root_address(),
-        )]),
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
     );
 
-    assert_eq!(output.unwrap_err().move_abort_code(), Some(1));
+    assert_eq!(output.unwrap_err().move_abort_code(), Some(196608));
 }
 
 #[test]
@@ -48,24 +44,24 @@ fn test_block_double_init() {
     let mut executor = FakeExecutor::stdlib_only_genesis();
 
     executor.exec(
-        "Block",
+        "block",
         "initialize_block_metadata",
         vec![],
         serialize_values(&vec![
-            MoveValue::Signer(account_config::aptos_root_address()),
+            MoveValue::Signer(CORE_CODE_ADDRESS),
             MoveValue::U64(0),
         ]),
     );
 
     let output = executor.try_exec(
-        "Block",
+        "block",
         "initialize_block_metadata",
         vec![],
         serialize_values(&vec![
-            MoveValue::Signer(account_config::aptos_root_address()),
+            MoveValue::Signer(CORE_CODE_ADDRESS),
             MoveValue::U64(0),
         ]),
     );
 
-    assert_eq!(output.unwrap_err().move_abort_code(), Some(6));
+    assert_eq!(output.unwrap_err().move_abort_code(), Some(524288));
 }

@@ -23,21 +23,31 @@ pub const INITIAL_BALANCE: u64 = 1000000;
 fn executor_benchmark<M: Measurement + 'static>(c: &mut Criterion<M>) {
     let (config, genesis_key) = aptos_genesis::test_utils::test_config();
 
-    let (_db, executor) = init_db_and_executor(&config);
+    let (db, executor) = init_db_and_executor(&config);
     let parent_block_id = executor.committed_block_id();
     let executor = Arc::new(executor);
 
-    let mut generator = TransactionGenerator::new(genesis_key, NUM_ACCOUNTS);
+    let mut generator = TransactionGenerator::new(genesis_key);
     let (commit_tx, _commit_rx) = std::sync::mpsc::sync_channel(50 /* bound */);
 
     let mut executor = TransactionExecutor::new(executor, parent_block_id, 0, Some(commit_tx));
 
-    let txns = generator.create_seed_accounts(SMALL_BLOCK_SIZE, INITIAL_BALANCE * 10_000);
+    let txns = generator.create_seed_accounts(
+        db.reader,
+        NUM_ACCOUNTS,
+        SMALL_BLOCK_SIZE,
+        INITIAL_BALANCE * 10_000,
+    );
     for txn_block in txns {
         executor.execute_block(txn_block);
     }
 
-    let txns = generator.create_and_fund_accounts(INITIAL_BALANCE, SMALL_BLOCK_SIZE);
+    let txns = generator.create_and_fund_accounts(
+        /*num_existing_accounts=*/ 0,
+        NUM_ACCOUNTS,
+        INITIAL_BALANCE,
+        SMALL_BLOCK_SIZE,
+    );
     for txn_block in txns {
         executor.execute_block(txn_block);
     }

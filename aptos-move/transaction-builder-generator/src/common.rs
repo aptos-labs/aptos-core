@@ -39,6 +39,10 @@ fn quote_type_as_format(type_tag: &TypeTag) -> Format {
                     type_not_allowed(type_tag)
                 }
             }
+            Bool => Format::Seq(Box::new(Format::Bool)),
+            U64 => Format::Seq(Box::new(Format::U64)),
+            U128 => Format::Seq(Box::new(Format::U128)),
+            Address => Format::Seq(Box::new(Format::TypeName("AccountAddress".into()))),
             _ => type_not_allowed(type_tag),
         },
         Struct(_) | Signer => type_not_allowed(type_tag),
@@ -130,28 +134,6 @@ pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
         },
         Struct(_) | Signer => type_not_allowed(type_tag),
     }
-}
-
-pub(crate) fn get_external_definitions(aptos_types: &str) -> serde_generate::ExternalDefinitions {
-    let definitions = vec![(
-        aptos_types,
-        vec![
-            "AccountAddress",
-            "TypeTag",
-            "Script",
-            "TransactionArgument",
-            "VecBytes",
-        ],
-    )];
-    definitions
-        .into_iter()
-        .map(|(module, defs)| {
-            (
-                module.to_string(),
-                defs.into_iter().map(String::from).collect(),
-            )
-        })
-        .collect()
 }
 
 pub(crate) fn get_required_helper_types(abis: &[ScriptABI]) -> BTreeSet<&TypeTag> {

@@ -8,13 +8,15 @@ use crate::{
     error::Error,
     logging::{LogEntry, LogSchema},
     metrics,
+    metrics::ExecutingComponent,
     notification_handlers::{
-        CommitNotification, CommitNotificationListener, CommittedAccounts, CommittedTransactions,
+        CommitNotification, CommitNotificationListener, CommittedStates, CommittedTransactions,
         ConsensusNotificationHandler, ErrorNotification, ErrorNotificationListener,
         MempoolNotificationHandler,
     },
     storage_synchronizer::StorageSynchronizerInterface,
     utils,
+    utils::PENDING_DATA_LOG_FREQ_SECS,
 };
 use aptos_config::config::{RoleType, StateSyncDriverConfig};
 use aptos_data_client::AptosDataClient;
@@ -96,6 +98,9 @@ pub struct StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer, Streaming
 
     // The interface to read from storage
     storage: Arc<dyn DbReader>,
+
+    // The storage synchronizer used to update local storage
+    storage_synchronizer: StorageSyncer,
 }
 
 impl<
@@ -128,7 +133,7 @@ impl<
             driver_configuration.clone(),
             streaming_client,
             storage.clone(),
-            storage_synchronizer,
+            storage_synchronizer.clone(),
         );
 
         Self {
@@ -144,6 +149,7 @@ impl<
             mempool_notification_handler,
             start_time: None,
             storage,
+            storage_synchronizer,
         }
     }
 
@@ -307,11 +313,7 @@ impl<
             .reconfiguration_events
             .is_empty()
         {
-            metrics::increment_gauge(
-                &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                metrics::StorageSynchronizerOperations::SyncedEpoch.get_label(),
-                1,
-            );
+            utils::update_new_epoch_metrics(self.storage.clone());
         }
     }
 
@@ -365,39 +367,38 @@ impl<
     }
 
     /// Handles a commit notification sent by the storage synchronizer for new
-    /// accounts.
+    /// state values.
     async fn handle_commit_notification(&mut self, commit_notification: CommitNotification) {
-        let CommitNotification::CommittedAccounts(committed_accounts) = commit_notification;
+        let CommitNotification::CommittedStates(committed_states) = commit_notification;
         info!(
             LogSchema::new(LogEntry::SynchronizerNotification).message(&format!(
-                "Received an account commit notification from the storage synchronizer. \
+                "Received a state commit notification from the storage synchronizer. \
                         All synced: {:?}, last committed index: {:?}.",
-                committed_accounts.all_accounts_synced,
-                committed_accounts.last_committed_account_index,
+                committed_states.all_states_synced, committed_states.last_committed_state_index,
             ))
         );
-        self.handle_committed_accounts(committed_accounts).await;
+        self.handle_committed_states(committed_states).await;
     }
 
-    /// Handles a notification sent by the storage synchronizer for committed accounts
-    async fn handle_committed_accounts(&mut self, committed_accounts: CommittedAccounts) {
+    /// Handles a notification sent by the storage synchronizer for committed states
+    async fn handle_committed_states(&mut self, committed_states: CommittedStates) {
         // Forward the notification to the bootstrapper
         if let Err(error) = self
             .bootstrapper
-            .handle_committed_accounts(committed_accounts.clone())
+            .handle_committed_state_values(committed_states.clone())
         {
             error!(LogSchema::new(LogEntry::SynchronizerNotification)
                 .error(&error)
-                .message("Failed to handle an account commit notification!"));
+                .message("Failed to handle a state commit notification!"));
         }
 
-        // If we've finished syncing all accounts, we'll have a single new committed
+        // If we've finished syncing all state values, we'll have a single new committed
         // transaction at the syncing version. In this case, we need to handle the
         // new committed transaction and events.
-        if committed_accounts.all_accounts_synced {
-            let committed_transactions = committed_accounts
-                .committed_transaction
-                .expect("Committed transaction should exist for last committed account chunk!");
+        if committed_states.all_states_synced {
+            let committed_transactions = committed_states.committed_transaction.expect(
+                "Committed transaction should exist for last committed state values chunk!",
+            );
 
             // Handle the commit notification
             utils::handle_committed_transactions(
@@ -444,15 +445,38 @@ impl<
 
     /// Checks if the node has successfully reached the sync target
     async fn check_sync_request_progress(&mut self) -> Result<(), Error> {
-        if !self.consensus_notification_handler.active_sync_request() {
+        if !self.active_sync_request() {
             return Ok(());
         }
 
+        // There's an active sync request. Before checking if we've hit the target,
+        // wait for the storage synchronizer to drain first (to avoid preemptively
+        // notifying consensus).
+        while self.storage_synchronizer.pending_storage_data() {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(PENDING_DATA_LOG_FREQ_SECS)),
+                info!("Waiting for the storage synchronizer to handle pending data!")
+            );
+        }
+
+        // Check if we've hit the target
         let latest_synced_ledger_info =
             utils::fetch_latest_synced_ledger_info(self.storage.clone())?;
         self.consensus_notification_handler
             .check_sync_request_progress(latest_synced_ledger_info)
-            .await
+            .await?;
+
+        // If the sync request was successfully handled, reset the continuous syncer
+        // so that in the event another sync request occurs, we have a fresh state.
+        if !self.active_sync_request() {
+            self.continuous_syncer.reset_active_stream();
+        }
+        Ok(())
+    }
+
+    /// Returns true iff there's an active sync request from consensus
+    fn active_sync_request(&self) -> bool {
+        self.consensus_notification_handler.active_sync_request()
     }
 
     /// Returns true iff this node is a validator
@@ -462,9 +486,7 @@ impl<
 
     /// Returns true iff consensus is currently executing
     fn check_if_consensus_executing(&self) -> bool {
-        self.is_validator()
-            && self.bootstrapper.is_bootstrapped()
-            && !self.consensus_notification_handler.active_sync_request()
+        self.is_validator() && self.bootstrapper.is_bootstrapped() && !self.active_sync_request()
     }
 
     /// Checks if the connection deadline has passed. If so, validators with
@@ -525,6 +547,10 @@ impl<
         if self.check_if_consensus_executing() {
             trace!(LogSchema::new(LogEntry::Driver)
                 .message("Consensus is executing. There's nothing to do."));
+            metrics::increment_counter(
+                &metrics::EXECUTING_COMPONENT,
+                ExecutingComponent::Consensus.get_label(),
+            );
             return;
         }
 
@@ -536,6 +562,10 @@ impl<
                 .get_consensus_sync_request();
 
             // Attempt to continuously sync
+            metrics::increment_counter(
+                &metrics::EXECUTING_COMPONENT,
+                ExecutingComponent::ContinuousSyncer.get_label(),
+            );
             if let Err(error) = self
                 .continuous_syncer
                 .drive_progress(consensus_sync_request)
@@ -549,14 +579,20 @@ impl<
                 );
                 metrics::increment_counter(&metrics::CONTINUOUS_SYNCER_ERRORS, error.get_label());
             }
-        } else if let Err(error) = self.bootstrapper.drive_progress(&global_data_summary).await {
-            sample!(
-                    SampleRate::Duration(Duration::from_secs(DRIVER_ERROR_LOG_FREQ_SECS)),
-                    error!(LogSchema::new(LogEntry::Driver)
-                        .error(&error)
-                        .message("Error found when checking the bootstrapper progress!"));
+        } else {
+            metrics::increment_counter(
+                &metrics::EXECUTING_COMPONENT,
+                ExecutingComponent::Bootstrapper.get_label(),
             );
-            metrics::increment_counter(&metrics::BOOTSTRAPPER_ERRORS, error.get_label());
+            if let Err(error) = self.bootstrapper.drive_progress(&global_data_summary).await {
+                sample!(
+                        SampleRate::Duration(Duration::from_secs(DRIVER_ERROR_LOG_FREQ_SECS)),
+                        error!(LogSchema::new(LogEntry::Driver)
+                            .error(&error)
+                            .message("Error found when checking the bootstrapper progress!"));
+                );
+                metrics::increment_counter(&metrics::BOOTSTRAPPER_ERRORS, error.get_label());
+            }
         };
     }
 }

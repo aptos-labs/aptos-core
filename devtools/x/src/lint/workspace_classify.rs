@@ -36,10 +36,6 @@ impl<'cfg> PackageLinter for DefaultOrTestOnly<'cfg> {
         out: &mut LintFormatter<'l, '_>,
     ) -> Result<RunStatus<'l>> {
         let package = ctx.metadata();
-        if package.name() == ctx.project_ctx().workspace_hack_name() {
-            // Skip over the workspace-hack package.
-            return Ok(RunStatus::Executed);
-        }
 
         let default_members = ctx.project_ctx().default_members()?;
 

@@ -23,7 +23,6 @@ ureq = { version = "1.5.4", features = ["json", "native-tls"], default-features 
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
 aptos-proptest-helpers = { path = "../../../crates/aptos-proptest-helpers", optional = true }
 aptos-types = { path = "../../../types", optional = true }
-aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
 proptest = "1.0.0"

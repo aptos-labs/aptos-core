@@ -10,7 +10,6 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
-    event::EventKey,
     state_store::state_key::StateKey,
     transaction::{ChangeSet, SignatureCheckedTransaction},
     write_set::{WriteOp, WriteSetMut},
@@ -28,7 +27,7 @@ use move_deps::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    convert::{TryFrom, TryInto},
+    convert::TryInto,
     ops::{Deref, DerefMut},
 };
 
@@ -37,6 +36,7 @@ pub enum SessionId {
     Txn {
         sender: AccountAddress,
         sequence_number: u64,
+        script_hash: Vec<u8>,
     },
     BlockMeta {
         // block id
@@ -52,16 +52,14 @@ pub enum SessionId {
 
 impl SessionId {
     pub fn txn(txn: &SignatureCheckedTransaction) -> Self {
-        Self::Txn {
-            sender: txn.sender(),
-            sequence_number: txn.sequence_number(),
-        }
+        Self::txn_meta(&TransactionMetadata::new(&txn.clone().into_inner()))
     }
 
     pub fn txn_meta(txn_data: &TransactionMetadata) -> Self {
         Self::Txn {
             sender: txn_data.sender,
             sequence_number: txn_data.sequence_number,
+            script_hash: txn_data.script_hash.clone(),
         }
     }
 
@@ -171,7 +169,7 @@ impl SessionOutput {
 
         for (handle, change) in table_change_set.changes {
             for (key, value_opt) in change.entries {
-                let state_key = StateKey::table_item(handle.0, key);
+                let state_key = StateKey::table_item(handle.into(), key);
                 if let Some(bytes) = value_opt {
                     write_set_mut.push((state_key, WriteOp::Value(bytes)))
                 } else {
@@ -187,7 +185,7 @@ impl SessionOutput {
         let events = events
             .into_iter()
             .map(|(guid, seq_num, ty_tag, blob)| {
-                let key = EventKey::try_from(guid.as_slice())
+                let key = bcs::from_bytes(guid.as_slice())
                     .map_err(|_| VMStatus::Error(StatusCode::EVENT_KEY_MISMATCH))?;
                 Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
             })

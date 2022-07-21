@@ -1,0 +1,3 @@
+apiVersion: v2
+name: aptos-vector-daemonset
+version: 0.1.0

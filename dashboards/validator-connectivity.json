@@ -236,7 +236,7 @@
       "pluginVersion": "v1.0",
       "targets": [
         {
-          "expr": "up{chain_name=~\"$chain_name\", job=\"federate\"} == 0 or up{chain_name=~\"$chain_name\", job=\"aptos-procs\", role=\"validator\"} == 0",
+          "expr": "up{chain_name=~\"$chain_name\", namespace=~\"$namespace\", job=\"federate\"} == 0 or up{chain_name=~\"$chain_name\", namespace=~\"$namespace\", job=\"aptos-procs\", role=\"validator\"} == 0",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -315,7 +315,7 @@
       "pluginVersion": "v1.0",
       "targets": [
         {
-          "expr": "rate(aptos_consensus_current_round{chain_name=~\"$chain_name\", role=\"validator\"}[1m]) == 0",
+          "expr": "rate(aptos_consensus_current_round{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=\"validator\"}[1m]) == 0",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -413,7 +413,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})\n",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\"})\n",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -503,7 +503,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"})",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"inbound\"})",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
@@ -592,7 +592,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"})",
+          "expr": "sum by (kubernetes_pod_name, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\", kubernetes_pod_name=~\"$kubernetes_pod_name\", direction=\"outbound\"})",
           "interval": "",
           "legendFormat": "{{kubernetes_pod_name}}",
           "refId": "A"
@@ -741,7 +741,7 @@
       "pluginVersion": "v1.0",
       "targets": [
         {
-          "expr": "# Filter out extraneous fields.\nsum by (kubernetes_pod_name, remote_kubernetes_pod_name) (\n  (\n    aptos_network_peer_connected{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\"}\n\n  # Do a left join on a table containing labels [\"remote_peer_id\", \"remote_kubernetes_pod_name\"]\n  # to join in \"remote_kubernetes_pod_name\" for each \"remote_peer_id\".\n  ) + on(remote_peer_id) group_left(remote_kubernetes_pod_name) (\n\n    # We can only left join with certain bin-ops, so we force all values to zero\n    # here so we can add without messing up the connection values.\n    clamp_max(\n      # Filter out extraneous fields.\n      sum by (remote_kubernetes_pod_name, remote_peer_id) (\n        sum without (direction) (\n          # Rename \"peer_id\" -> \"remote_peer_id\" and \"kubernetes_pod_name\" -> \"remote_kubernetes_pod_name\" so\n          # these fields don't conflict with those from peer_connected.\n          label_replace(\n            label_replace(\n              aptos_connections{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\"},\n              \"remote_peer_id\", \"$1\",\n              \"peer_id\", \"(.*)\"\n            ),\n            \"remote_kubernetes_pod_name\", \"$1\",\n            \"kubernetes_pod_name\", \"(.*)\"\n          )\n        )\n      ),\n      0\n    )\n  )\n)",
+          "expr": "# Filter out extraneous fields.\nsum by (kubernetes_pod_name, remote_kubernetes_pod_name) (\n  (\n    aptos_network_peer_connected{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\"}\n\n  # Do a left join on a table containing labels [\"remote_peer_id\", \"remote_kubernetes_pod_name\"]\n  # to join in \"remote_kubernetes_pod_name\" for each \"remote_peer_id\".\n  ) + on(remote_peer_id) group_left(remote_kubernetes_pod_name) (\n\n    # We can only left join with certain bin-ops, so we force all values to zero\n    # here so we can add without messing up the connection values.\n    clamp_max(\n      # Filter out extraneous fields.\n      sum by (remote_kubernetes_pod_name, remote_peer_id) (\n        sum without (direction) (\n          # Rename \"peer_id\" -> \"remote_peer_id\" and \"kubernetes_pod_name\" -> \"remote_kubernetes_pod_name\" so\n          # these fields don't conflict with those from peer_connected.\n          label_replace(\n            label_replace(\n              aptos_connections{chain_name=~\"$chain_name\", namespace=~\"$namespace\", network_id=\"Validator\", role_type=\"validator\"},\n              \"remote_peer_id\", \"$1\",\n              \"peer_id\", \"(.*)\"\n            ),\n            \"remote_kubernetes_pod_name\", \"$1\",\n            \"kubernetes_pod_name\", \"(.*)\"\n          )\n        )\n      ),\n      0\n    )\n  )\n)",
           "format": "time_series",
           "instant": true,
           "interval": "",
@@ -823,6 +823,40 @@
         "regex": "",
         "skipUrlSync": false,
         "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(namespace)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "query": "label_values(namespace)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
       },
       {
         "current": {

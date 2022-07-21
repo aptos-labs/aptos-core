@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_transaction_builder::aptos_stdlib;
-use aptos_types::account_config::aptos_root_address;
+use aptos_types::account_config::CORE_CODE_ADDRESS;
 use forge::{AptosContext, AptosTest, Result, Test};
 
 pub struct GetIndex;
@@ -41,7 +41,7 @@ impl AptosTest for BasicClient {
         let account2 = ctx.create_and_fund_user_account(10_000).await?;
 
         let tx = account1.sign_with_transaction_builder(ctx.transaction_factory().payload(
-            aptos_stdlib::encode_test_coin_transfer(account2.address(), 1),
+            aptos_stdlib::encode_aptos_coin_transfer(account2.address(), 1),
         ));
         let pending_txn = client.submit(&tx).await.unwrap().into_inner();
 
@@ -53,7 +53,7 @@ impl AptosTest for BasicClient {
             .unwrap();
 
         client
-            .get_account_resources(aptos_root_address())
+            .get_account_resources(CORE_CODE_ADDRESS)
             .await
             .unwrap();
 

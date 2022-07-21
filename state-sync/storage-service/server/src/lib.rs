@@ -32,10 +32,10 @@ use std::{
 };
 use storage_interface::DbReader;
 use storage_service_types::{
-    AccountStatesChunkWithProofRequest, CompleteDataRange, DataSummary,
-    EpochEndingLedgerInfoRequest, ProtocolMetadata, Result, ServerProtocolVersion,
-    StorageServerSummary, StorageServiceError, StorageServiceRequest, StorageServiceResponse,
-    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+    CompleteDataRange, DataSummary, EpochEndingLedgerInfoRequest, ProtocolMetadata, Result,
+    ServerProtocolVersion, StateValuesWithProofRequest, StorageServerSummary, StorageServiceError,
+    StorageServiceRequest, StorageServiceResponse, TransactionOutputsWithProofRequest,
+    TransactionsWithProofRequest,
 };
 use thiserror::Error;
 use tokio::runtime::Handle;
@@ -560,8 +560,8 @@ fn refresh_cached_storage_summary<T: StorageReaderInterface>(
     let protocol_metadata = ProtocolMetadata {
         max_epoch_chunk_size: storage_config.max_epoch_chunk_size,
         max_transaction_chunk_size: storage_config.max_transaction_chunk_size,
+        max_state_chunk_size: storage_config.max_state_chunk_size,
         max_transaction_output_chunk_size: storage_config.max_transaction_output_chunk_size,
-        max_account_states_chunk_size: storage_config.max_account_states_chunk_sizes,
     };
 
     // Save the storage server summary
@@ -740,14 +740,14 @@ impl<T: StorageReaderInterface> Handler<T> {
 
         // Fetch the response from storage
         let response = match request {
-            StorageServiceRequest::GetAccountStatesChunkWithProof(request) => {
-                self.get_account_states_chunk_with_proof(request)
+            StorageServiceRequest::GetStateValuesWithProof(request) => {
+                self.get_state_value_chunk_with_proof(request)
             }
             StorageServiceRequest::GetEpochEndingLedgerInfos(request) => {
                 self.get_epoch_ending_ledger_infos(request)
             }
-            StorageServiceRequest::GetNumberOfAccountsAtVersion(version) => {
-                self.get_number_of_accounts_at_version(*version)
+            StorageServiceRequest::GetNumberOfStatesAtVersion(version) => {
+                self.get_number_of_states_at_version(*version)
             }
             StorageServiceRequest::GetTransactionOutputsWithProof(request) => {
                 self.get_transaction_outputs_with_proof(request)
@@ -767,18 +767,18 @@ impl<T: StorageReaderInterface> Handler<T> {
         Ok(response)
     }
 
-    fn get_account_states_chunk_with_proof(
+    fn get_state_value_chunk_with_proof(
         &self,
-        request: &AccountStatesChunkWithProofRequest,
+        request: &StateValuesWithProofRequest,
     ) -> Result<StorageServiceResponse, Error> {
-        let account_states_chunk_with_proof = self.storage.get_account_states_chunk_with_proof(
+        let state_value_chunk_with_proof = self.storage.get_state_value_chunk_with_proof(
             request.version,
-            request.start_account_index,
-            request.end_account_index,
+            request.start_index,
+            request.end_index,
         )?;
 
-        Ok(StorageServiceResponse::AccountStatesChunkWithProof(
-            account_states_chunk_with_proof,
+        Ok(StorageServiceResponse::StateValueChunkWithProof(
+            state_value_chunk_with_proof,
         ))
     }
 
@@ -795,14 +795,14 @@ impl<T: StorageReaderInterface> Handler<T> {
         ))
     }
 
-    fn get_number_of_accounts_at_version(
+    fn get_number_of_states_at_version(
         &self,
         version: Version,
     ) -> Result<StorageServiceResponse, Error> {
-        let number_of_accounts = self.storage.get_number_of_accounts(version)?;
+        let number_of_states = self.storage.get_number_of_states(version)?;
 
-        Ok(StorageServiceResponse::NumberOfAccountsAtVersion(
-            number_of_accounts,
+        Ok(StorageServiceResponse::NumberOfStatesAtVersion(
+            number_of_states,
         ))
     }
 
@@ -892,18 +892,17 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         end_version: u64,
     ) -> Result<TransactionOutputListWithProof, Error>;
 
-    /// Returns the number of accounts in the account state tree at the
-    /// specified version.
-    fn get_number_of_accounts(&self, version: u64) -> Result<u64, Error>;
+    /// Returns the number of states in the state tree at the specified version.
+    fn get_number_of_states(&self, version: u64) -> Result<u64, Error>;
 
-    /// Returns a chunk holding a list of account states starting at the
-    /// specified `start_account_index` and ending at
-    /// `end_account_index` (inclusive).
-    fn get_account_states_chunk_with_proof(
+    /// Returns a chunk holding a list of states starting at the
+    /// specified `start_index` and ending at
+    /// `end_index` (inclusive).
+    fn get_state_value_chunk_with_proof(
         &self,
         version: u64,
-        start_account_index: u64,
-        end_account_index: u64,
+        start_index: u64,
+        end_index: u64,
     ) -> Result<StateValueChunkWithProof, Error>;
 }
 
@@ -920,10 +919,10 @@ impl StorageReader {
         Self { config, storage }
     }
 
-    /// Returns the account states range held in the database (lowest to highest).
+    /// Returns the state values range held in the database (lowest to highest).
     /// Note: it is currently assumed that if a node contains a transaction at a
-    /// version, V, the node also contains all account states at V.
-    fn fetch_account_states_range(
+    /// version, V, the node also contains all state values at V.
+    fn fetch_state_values_range(
         &self,
         latest_version: Version,
         transactions_range: &Option<CompleteDataRange<Version>>,
@@ -935,24 +934,21 @@ impl StorageReader {
             .map(|window| window as u64);
         if let Some(pruning_window) = pruning_window {
             if latest_version > pruning_window {
-                // lowest_account_version = latest_version - pruning_window + 1;
-                let mut lowest_account_version =
+                // lowest_state_version = latest_version - pruning_window + 1;
+                let mut lowest_state_version =
                     latest_version.checked_sub(pruning_window).ok_or_else(|| {
                         Error::UnexpectedErrorEncountered(
-                            "Lowest account states version has overflown!".into(),
+                            "Lowest state version has overflown!".into(),
                         )
                     })?;
-                lowest_account_version =
-                    lowest_account_version.checked_add(1).ok_or_else(|| {
-                        Error::UnexpectedErrorEncountered(
-                            "Lowest account states version has overflown!".into(),
-                        )
-                    })?;
+                lowest_state_version = lowest_state_version.checked_add(1).ok_or_else(|| {
+                    Error::UnexpectedErrorEncountered("Lowest state version has overflown!".into())
+                })?;
 
-                // Create the account range
-                let account_range = CompleteDataRange::new(lowest_account_version, latest_version)
+                // Create the state range
+                let state_range = CompleteDataRange::new(lowest_state_version, latest_version)
                     .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
-                return Ok(Some(account_range));
+                return Ok(Some(state_range));
             }
         }
 
@@ -1026,8 +1022,8 @@ impl StorageReaderInterface for StorageReader {
         let transactions = self.fetch_transaction_range(latest_version)?;
         let transaction_outputs = self.fetch_transaction_output_range(latest_version)?;
 
-        // Fetch the account states range
-        let account_states = self.fetch_account_states_range(latest_version, &transactions)?;
+        // Fetch the state values range
+        let states = self.fetch_state_values_range(latest_version, &transactions)?;
 
         // Return the relevant data summary
         let data_summary = DataSummary {
@@ -1035,7 +1031,7 @@ impl StorageReaderInterface for StorageReader {
             epoch_ending_ledger_infos,
             transactions,
             transaction_outputs,
-            account_states,
+            states,
         };
 
         Ok(data_summary)
@@ -1120,39 +1116,39 @@ impl StorageReaderInterface for StorageReader {
         Ok(output_list_with_proof)
     }
 
-    fn get_number_of_accounts(&self, version: u64) -> Result<u64, Error> {
-        let number_of_accounts = self
+    fn get_number_of_states(&self, version: u64) -> Result<u64, Error> {
+        let number_of_states = self
             .storage
             .get_state_leaf_count(version)
             .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
-        Ok(number_of_accounts as u64)
+        Ok(number_of_states as u64)
     }
 
-    fn get_account_states_chunk_with_proof(
+    fn get_state_value_chunk_with_proof(
         &self,
         version: u64,
-        start_account_index: u64,
-        end_account_index: u64,
+        start_index: u64,
+        end_index: u64,
     ) -> Result<StateValueChunkWithProof, Error> {
-        let expected_num_accounts = inclusive_range_len(start_account_index, end_account_index)?;
-        let max_account_chunk_size = self.config.max_account_states_chunk_sizes;
-        if expected_num_accounts > max_account_chunk_size {
+        let expected_num_states = inclusive_range_len(start_index, end_index)?;
+        let max_state_chunk_size = self.config.max_state_chunk_size;
+        if expected_num_states > max_state_chunk_size {
             return Err(Error::InvalidRequest(format!(
-                "Requested number of accounts is larger than the maximum! \
+                "Requested number of states is larger than the maximum! \
              Requested: {:?}, maximum: {:?}.",
-                expected_num_accounts, max_account_chunk_size
+                expected_num_states, max_state_chunk_size
             )));
         }
 
-        let account_states_chunk_with_proof = self
+        let state_value_chunk_with_proof = self
             .storage
             .get_state_value_chunk_with_proof(
                 version,
-                start_account_index as usize,
-                expected_num_accounts as usize,
+                start_index as usize,
+                expected_num_states as usize,
             )
             .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
-        Ok(account_states_chunk_with_proof)
+        Ok(state_value_chunk_with_proof)
     }
 }
 

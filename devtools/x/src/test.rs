@@ -92,11 +92,9 @@ pub fn run(mut args: Args, xctx: XContext) -> Result<()> {
         args.build_args.add_args(&mut direct_args);
 
         let build = CargoCommand::Build {
-            cargo_config: xctx.config().cargo_config(),
             direct_args: direct_args.as_slice(),
             args: &[],
             env: build_env_vars.as_slice(),
-            skip_sccache: true,
         };
         let build_result = build.run_on_packages(&packages);
 
@@ -124,11 +122,9 @@ pub fn run(mut args: Args, xctx: XContext) -> Result<()> {
     }
 
     let cmd = CargoCommand::Test {
-        cargo_config: xctx.config().cargo_config(),
         direct_args: direct_args.as_slice(),
         args: &args.args,
         env: &env_vars,
-        skip_sccache: generate_coverage,
     };
 
     let cmd_result = cmd.run_on_packages(&packages);

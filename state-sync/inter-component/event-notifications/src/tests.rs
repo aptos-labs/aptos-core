@@ -420,7 +420,8 @@ pub struct TestOnChainConfig {
 }
 
 impl OnChainConfig for TestOnChainConfig {
-    const IDENTIFIER: &'static str = "TestOnChainConfig";
+    const MODULE_IDENTIFIER: &'static str = "test_on_chain_config";
+    const TYPE_IDENTIFIER: &'static str = "TestOnChainConfig";
 }
 
 // Counts the number of event notifications received by the listener. Also ensures that
@@ -534,7 +535,7 @@ fn create_test_event(event_key: EventKey) -> ContractEvent {
 }
 
 fn create_random_event_key() -> EventKey {
-    EventKey::new_from_address(&AccountAddress::random(), 0)
+    EventKey::new(0, AccountAddress::random())
 }
 
 fn create_event_subscription_service() -> EventSubscriptionService {

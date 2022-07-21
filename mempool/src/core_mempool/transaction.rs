@@ -14,7 +14,6 @@ pub struct MempoolTransaction {
     pub txn: SignedTransaction,
     // System expiration time of the transaction. It should be removed from mempool by that time.
     pub expiration_time: Duration,
-    pub gas_amount: u64,
     pub ranking_score: u64,
     pub timeline_state: TimelineState,
     pub sequence_info: SequenceInfo,
@@ -24,7 +23,6 @@ impl MempoolTransaction {
     pub(crate) fn new(
         txn: SignedTransaction,
         expiration_time: Duration,
-        gas_amount: u64,
         ranking_score: u64,
         timeline_state: TimelineState,
         seqno_type: AccountSequenceInfo,
@@ -36,7 +34,6 @@ impl MempoolTransaction {
             },
             txn,
             expiration_time,
-            gas_amount,
             ranking_score,
             timeline_state,
         }
