@@ -24,7 +24,7 @@ use std::{future::Future, time::Duration};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
-const DEFAULT_MAX_WAIT_MS: u64 = 2000;
+const DEFAULT_MAX_WAIT_MS: u64 = 5000;
 const DEFAULT_INTERVAL_MS: u64 = 100;
 static DEFAULT_MAX_WAIT_DURATION: Duration = Duration::from_millis(DEFAULT_MAX_WAIT_MS);
 static DEFAULT_INTERVAL_DURATION: Duration = Duration::from_millis(DEFAULT_INTERVAL_MS);
@@ -117,14 +117,15 @@ async fn test_network() {
 
 #[tokio::test]
 async fn test_account_balance() {
-    let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 1).await;
+    let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 2).await;
 
     cli.create_account_with_faucet(0).await.unwrap();
-    let account = CliTestFramework::account_id(0);
+    let account_1 = CliTestFramework::account_id(0);
+    let account_2 = CliTestFramework::account_id(1);
     let chain_id = swarm.chain_id();
 
     // At time 0, there should be 0 balance
-    let response = get_balance(&rosetta_client, chain_id, account, Some(0))
+    let response = get_balance(&rosetta_client, chain_id, account_1, Some(0))
         .await
         .unwrap();
     assert_eq!(
@@ -135,17 +136,40 @@ async fn test_account_balance() {
         }
     );
 
-    // At some time the account should exist
+    // At some time both accounts should exist with initial amounts
     try_until_ok(Duration::from_secs(5), DEFAULT_INTERVAL_DURATION, || {
-        account_created(&rosetta_client, chain_id, account)
+        account_created(&rosetta_client, chain_id, account_1)
     })
     .await
     .unwrap();
+    try_until_ok_default(|| account_created(&rosetta_client, chain_id, account_2))
+        .await
+        .unwrap();
 
-    // TODO: Send money
-    // TODO: Fail request due to bad transaction
-    // TODO: Receive money
-    // TODO: Recieve money by faucet
+    // Send money, and expect the gas and fees to show up accordingly
+    const TRANSFER_AMOUNT: u64 = 5000;
+    let response = cli.transfer_coins(0, 1, TRANSFER_AMOUNT).await.unwrap();
+    let gas_used = response.gas_used.unwrap();
+
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        account_1,
+        DEFAULT_FUNDED_COINS - TRANSFER_AMOUNT - gas_used,
+    )
+    .await
+    .unwrap();
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        account_2,
+        DEFAULT_FUNDED_COINS + TRANSFER_AMOUNT,
+    )
+    .await
+    .unwrap();
+
+    // TODO: Receive money by faucet
+    // TODO: Make a bad transaction, which will cause gas to be spent but no transfer
 }
 
 async fn account_created(
@@ -153,14 +177,28 @@ async fn account_created(
     chain_id: ChainId,
     account: AccountAddress,
 ) -> anyhow::Result<u64> {
+    account_has_balance(rosetta_client, chain_id, account, DEFAULT_FUNDED_COINS).await
+}
+
+async fn account_has_balance(
+    rosetta_client: &RosettaClient,
+    chain_id: ChainId,
+    account: AccountAddress,
+    expected_balance: u64,
+) -> anyhow::Result<u64> {
     let response = get_balance(rosetta_client, chain_id, account, None).await?;
 
     if response.balances.iter().any(|amount| {
-        amount.currency == native_coin() && amount.value == DEFAULT_FUNDED_COINS.to_string()
+        amount.currency == native_coin() && amount.value == expected_balance.to_string()
     }) {
         Ok(response.block_identifier.index)
     } else {
-        Err(anyhow!("Failed to find account, received {:?}", response))
+        Err(anyhow!(
+            "Failed to find account with {} {:?}, received {:?}",
+            expected_balance,
+            native_coin(),
+            response
+        ))
     }
 }
 
@@ -185,23 +223,16 @@ async fn test_block() {
     let chain_id = swarm.chain_id();
 
     // Genesis by version
-    let request_genesis = BlockRequest::by_index(chain_id, 0);
-    let genesis_block = try_until_ok_default(|| rosetta_client.block(&request_genesis))
-        .await
-        .unwrap()
-        .block
-        .unwrap();
+    let genesis_block = get_block(&rosetta_client, chain_id, 0).await;
     assert_genesis_block(&genesis_block);
 
     // Get genesis txn by hash
-    let request_genesis_by_hash =
-        BlockRequest::by_hash(chain_id, genesis_block.block_identifier.hash.clone());
-    let genesis_block_by_hash = rosetta_client
-        .block(&request_genesis_by_hash)
-        .await
-        .unwrap()
-        .block
-        .unwrap();
+    let genesis_block_by_hash = get_block_by_hash(
+        &rosetta_client,
+        chain_id,
+        genesis_block.block_identifier.hash.clone(),
+    )
+    .await;
 
     // Both blocks should be the same
     assert_eq!(
@@ -210,12 +241,7 @@ async fn test_block() {
     );
 
     // Responses should be idempotent
-    let idempotent_block = rosetta_client
-        .block(&request_genesis)
-        .await
-        .unwrap()
-        .block
-        .unwrap();
+    let idempotent_block = get_block(&rosetta_client, chain_id, 0).await;
     assert_eq!(
         idempotent_block, genesis_block_by_hash,
         "Blocks should be idempotent"
@@ -239,8 +265,12 @@ async fn test_block() {
 
     // No input should give the latest version, not the genesis txn
     let request_latest = BlockRequest::latest(chain_id);
-    let response = rosetta_client.block(&request_latest).await.unwrap();
-    let latest_block = response.block.unwrap();
+    let latest_block = rosetta_client
+        .block(&request_latest)
+        .await
+        .unwrap()
+        .block
+        .unwrap();
 
     // The latest block should always come after genesis
     assert!(latest_block.block_identifier.index >= block_2.block_identifier.index);
@@ -256,22 +286,18 @@ async fn test_block() {
     assert!(!latest_block.transactions.is_empty());
 
     // We should be able to query it again by hash or by version and it is the same
-    let request_latest_by_version =
-        BlockRequest::by_index(chain_id, latest_block.block_identifier.index);
-    let latest_block_by_version = rosetta_client
-        .block(&request_latest_by_version)
-        .await
-        .unwrap()
-        .block
-        .unwrap();
-    let request_latest_by_hash =
-        BlockRequest::by_hash(chain_id, latest_block.block_identifier.hash.clone());
-    let latest_block_by_hash = rosetta_client
-        .block(&request_latest_by_hash)
-        .await
-        .unwrap()
-        .block
-        .unwrap();
+    let latest_block_by_version = get_block(
+        &rosetta_client,
+        chain_id,
+        latest_block.block_identifier.index,
+    )
+    .await;
+    let latest_block_by_hash = get_block_by_hash(
+        &rosetta_client,
+        chain_id,
+        latest_block.block_identifier.hash.clone(),
+    )
+    .await;
 
     assert_eq!(latest_block, latest_block_by_version);
     assert_eq!(latest_block_by_hash, latest_block_by_version);
@@ -358,6 +384,20 @@ fn assert_genesis_block(block: &Block) {
 async fn get_block(rosetta_client: &RosettaClient, chain_id: ChainId, index: u64) -> Block {
     let rosetta_client = (*rosetta_client).clone();
     let request = BlockRequest::by_index(chain_id, index);
+    try_until_ok_default(|| rosetta_client.block(&request))
+        .await
+        .unwrap()
+        .block
+        .unwrap()
+}
+
+async fn get_block_by_hash(
+    rosetta_client: &RosettaClient,
+    chain_id: ChainId,
+    hash: String,
+) -> Block {
+    let rosetta_client = (*rosetta_client).clone();
+    let request = BlockRequest::by_hash(chain_id, hash);
     try_until_ok_default(|| rosetta_client.block(&request))
         .await
         .unwrap()
