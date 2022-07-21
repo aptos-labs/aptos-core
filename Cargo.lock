@@ -1282,6 +1282,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c07dab4369547dbe5114677b33fbbf724971019f3818172d59a97a61c774ffd"
 
 [[package]]
+name = "assert_unordered"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "89464e809410174509672bc79d06dec8cde36332819c9bfd0e6eee2b4e0b50e0"
+
+[[package]]
 name = "async-stream"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7933,9 +7939,14 @@ dependencies = [
  "aptos-secure-net",
  "aptos-state-view",
  "aptos-types",
+ "aptos-vm",
+ "assert_unordered",
  "bcs",
+ "crossbeam-channel",
  "move-deps",
+ "once_cell",
  "parking_lot 0.12.0",
+ "rayon",
  "scratchpad",
  "serde 1.0.137",
  "thiserror",
