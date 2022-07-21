@@ -34,7 +34,7 @@ macro_rules! collect_build_information {
 
         // Get Git metadata from environment variables set during build-time.
         // This is applicable for docker based builds.
-        const GIT_COMMIT_HASH: Option<&str> = option_env!("GIT_COMMIT_HASH");
+        const GIT_SHA: Option<&str> = option_env!("GIT_SHA");
         const GIT_BRANCH: Option<&str> = option_env!("GIT_BRANCH");
         const GIT_TAG: Option<&str> = option_env!("GIT_TAG");
 
@@ -54,7 +54,7 @@ macro_rules! collect_build_information {
         );
         build_information.insert(
             aptos_telemetry::build_information::BUILD_COMMIT_HASH.into(),
-            GIT_COMMIT_HASH.unwrap_or(build::COMMIT_HASH).into(),
+            GIT_SHA.unwrap_or(build::COMMIT_HASH).into(),
         );
         build_information.insert(
             aptos_telemetry::build_information::BUILD_OS.into(),

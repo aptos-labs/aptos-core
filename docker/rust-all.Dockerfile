@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-
 FROM rust-base as builder
 COPY --link . /aptos/
 
-ARG GIT_COMMIT_HASH
-ENV GIT_COMMIT_HASH ${GIT_COMMIT_HASH}
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
 
 ARG GIT_BRANCH
 ENV GIT_BRANCH ${GIT_BRANCH}

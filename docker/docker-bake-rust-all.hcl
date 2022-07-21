@@ -47,7 +47,7 @@ target "builder" {
   cache-to   = generate_cache_to("builder")
   tags       = generate_tags("builder")
   args       = {
-    GIT_COMMIT_HASH = "${GIT_SHA}"
+    GIT_SHA = "${GIT_SHA}"
     GIT_BRANCH      = "${GIT_BRANCH}"
     GIT_TAG         = "${GIT_TAG}"
   }
