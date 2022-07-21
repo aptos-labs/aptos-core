@@ -1,0 +1,27 @@
+{{- if .Values.continuous_test.enabled }}
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ include "forge.fullname" . }}-continuous-test
+  labels:
+    {{- include "forge.labels" . | nindent 4 }}
+spec:
+  schedule: {{ printf "*/%d * * * *" (int .Values.continuous_test.intervalMins) | quote }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: {{ include "forge.serviceAccountName" . }}
+          containers:
+          - name: main
+            image: {{ .Values.forge.image.repo }}:{{ required "forge.image.tag must be set" .Values.forge.image.tag }}
+            imagePullPolicy: {{ .Values.forge.image.pullPolicy }}
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -x
+              FORGE_NAMESPACE=$HOSTNAME
+              forge test k8s-swarm --image-tag {{ .Values.forge.image.tag }} --namespace $FORGE_NAMESPACE --enable-haproxy
+          restartPolicy: OnFailure
+{{- end }}

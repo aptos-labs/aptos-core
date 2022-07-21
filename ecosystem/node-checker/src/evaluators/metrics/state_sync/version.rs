@@ -6,7 +6,7 @@ use super::{
         common::{get_metric, GetMetricResult, Label},
         types::{MetricsEvaluatorError, MetricsEvaluatorInput},
     },
-    types::CATEGORY,
+    CATEGORY,
 };
 use crate::{
     configuration::EvaluatorArgs,
@@ -64,22 +64,6 @@ impl StateSyncVersionEvaluator {
             Some(&SYNC_VERSION_METRIC_LABEL),
             evaluation_on_missing_fn,
         )
-    }
-
-    fn build_evaluation_result(
-        &self,
-        headline: String,
-        score: u8,
-        explanation: String,
-    ) -> EvaluationResult {
-        EvaluationResult {
-            headline,
-            score,
-            explanation,
-            category: CATEGORY.to_string(),
-            evaluator_name: Self::get_name(),
-            links: vec![],
-        }
     }
 
     fn build_state_sync_version_evaluation(
@@ -150,24 +134,14 @@ impl Evaluator for StateSyncVersionEvaluator {
         let mut evaluation_results = vec![];
 
         // Get previous version from the target node.
-        let previous_target_version =
-            match self.get_sync_version(&input.previous_target_metrics, "first") {
-                GetMetricResult::Present(metric) => Some(metric),
-                GetMetricResult::Missing(evaluation_result) => {
-                    evaluation_results.push(evaluation_result);
-                    None
-                }
-            };
+        let previous_target_version = self
+            .get_sync_version(&input.previous_target_metrics, "first")
+            .unwrap(&mut evaluation_results);
 
         // Get the latest version from the target node.
-        let latest_target_version =
-            match self.get_sync_version(&input.latest_target_metrics, "second") {
-                GetMetricResult::Present(metric) => Some(metric),
-                GetMetricResult::Missing(evaluation_result) => {
-                    evaluation_results.push(evaluation_result);
-                    None
-                }
-            };
+        let latest_target_version = self
+            .get_sync_version(&input.latest_target_metrics, "second")
+            .unwrap(&mut evaluation_results);
 
         // Get the latest version from the baseline node. In this case, if we
         // cannot find the value, we return an error instead of a negative evalution,
@@ -202,8 +176,12 @@ impl Evaluator for StateSyncVersionEvaluator {
         Ok(evaluation_results)
     }
 
-    fn get_name() -> String {
-        format!("{}_version", CATEGORY)
+    fn get_category_name() -> String {
+        CATEGORY.to_string()
+    }
+
+    fn get_evaluator_name() -> String {
+        "version".to_string()
     }
 
     fn from_evaluator_args(evaluator_args: &EvaluatorArgs) -> Result<Self> {

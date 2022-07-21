@@ -128,7 +128,6 @@ impl Mempool {
     pub(crate) fn add_txn(
         &mut self,
         txn: SignedTransaction,
-        gas_amount: u64,
         ranking_score: u64,
         crsn_or_seqno: AccountSequenceInfo,
         timeline_state: TimelineState,
@@ -168,7 +167,6 @@ impl Mempool {
         let txn_info = MempoolTransaction::new(
             txn,
             expiration_time,
-            gas_amount,
             ranking_score,
             timeline_state,
             sequence_number,

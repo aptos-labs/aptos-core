@@ -1,0 +1,14 @@
+name: "Find Packages with undeclared feature dependencies"
+on:
+  workflow_dispatch:
+  schedule:
+    # every day at 3am PST
+    - cron: "0 10 * * *"
+
+jobs:
+  find-packages-with-undeclared-feature-dependencies:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/rust-setup
+      - run: scripts/find-packages-with-undeclared-feature-dependencies.sh

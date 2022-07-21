@@ -33,7 +33,7 @@ aptos-metrics-core = { path = "../crates/aptos-metrics-core" }
 aptos-state-view = { path = "../storage/state-view" }
 aptos-types = { path = "../types" }
 aptos-vm = { path = "../aptos-move/aptos-vm" }
-aptos-workspace-hack = { path = "../crates/aptos-workspace-hack" }
+
 move-deps = { path = "../aptos-move/move-deps", features = ["address32"] }
 storage-interface = { path = "../storage/storage-interface" }
 

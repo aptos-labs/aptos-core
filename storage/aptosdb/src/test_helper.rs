@@ -17,7 +17,56 @@ use aptos_types::{
 };
 use executor_types::ProofReader;
 use proptest::{collection::vec, prelude::*};
-use scratchpad::SparseMerkleTree;
+
+pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[TransactionToCommit]) {
+    let mut next_version = state.current_version.map_or(0, |v| v + 1);
+    for txn_to_commit in txns_to_commit {
+        txn_to_commit
+            .state_updates()
+            .iter()
+            .for_each(|(key, value)| {
+                state.updates_since_base.insert(key.clone(), value.clone());
+            });
+        next_version += 1;
+        if txn_to_commit.is_state_checkpoint() {
+            state.current = state
+                .current
+                .clone()
+                .freeze()
+                .batch_update(
+                    state
+                        .updates_since_base
+                        .iter()
+                        .map(|(k, v)| (k.hash(), v))
+                        .collect(),
+                    &ProofReader::new_empty(),
+                )
+                .unwrap()
+                .unfreeze();
+            state.current_version = next_version.checked_sub(1);
+            state.base = state.current.clone();
+            state.base_version = state.current_version;
+            state.updates_since_base.clear();
+        }
+    }
+    if next_version.checked_sub(1) != state.current_version {
+        state.current = state
+            .current
+            .clone()
+            .freeze()
+            .batch_update(
+                state
+                    .updates_since_base
+                    .iter()
+                    .map(|(k, v)| (k.hash(), v))
+                    .collect(),
+                &ProofReader::new_empty(),
+            )
+            .unwrap()
+            .unfreeze();
+        state.current_version = next_version.checked_sub(1);
+    }
+}
 
 prop_compose! {
     /// This returns a [`proptest`](https://altsysrq.github.io/proptest-book/intro.html)
@@ -37,12 +86,16 @@ prop_compose! {
         type EventAccumulator = InMemoryAccumulator<EventAccumulatorHasher>;
         type TxnAccumulator = InMemoryAccumulator<TransactionAccumulatorHasher>;
 
-        let mut smt = SparseMerkleTree::<StateValue>::default().freeze();
         let mut txn_accumulator = TxnAccumulator::new_empty();
         let mut result = Vec::new();
 
+    let mut in_memory_state = StateDelta::new_empty();
+    let _ancester = in_memory_state.current.clone().freeze();
+
         for block_gen in block_gens {
             let (mut txns_to_commit, mut ledger_info) = block_gen.materialize(&mut universe);
+            update_in_memory_state(&mut in_memory_state, &txns_to_commit);
+            let state_checkpoint_root_hash = in_memory_state.root_hash();
 
             // make real txn_info's
             for txn in txns_to_commit.iter_mut() {
@@ -52,14 +105,11 @@ prop_compose! {
                 let event_hashes: Vec<_> = txn.events().iter().map(CryptoHash::hash).collect();
                 let event_root_hash = EventAccumulator::from_leaves(&event_hashes).root_hash();
 
-                // calculate state checkpoint hash
-                let state_checkpoint_hash = if txn.state_updates().is_empty() {
-                    None
+                // calculate state checkpoint hash and this must be the last txn
+                let state_checkpoint_hash = if txn.is_state_checkpoint() {
+                    Some(state_checkpoint_root_hash)
                 } else {
-                    let updates = txn.state_updates().iter().map(|(key, value)| {(key.hash(), value)}).collect();
-                    smt = smt.batch_update(updates, &ProofReader::new_empty()).unwrap();
-
-                    Some(smt.root_hash())
+                    None
                 };
 
                 let txn_info = TransactionInfo::new(
@@ -155,15 +205,19 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
 
+    let mut in_memory_state = (*db.state_store.buffered_state().lock()).clone();
+    let _ancester = in_memory_state.current.clone();
     let num_batches = input.len();
-    let mut cur_ver = 0;
+    let mut cur_ver: Version = 0;
     let mut all_committed_txns = vec![];
     for (batch_idx, (txns_to_commit, ledger_info_with_sigs)) in input.iter().enumerate() {
+        update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
         db.save_transactions(
             txns_to_commit,
             cur_ver,                /* first_version */
             cur_ver.checked_sub(1), /* base_state_version */
             Some(ledger_info_with_sigs),
+            in_memory_state.clone(),
         )
         .unwrap();
 
@@ -437,6 +491,7 @@ pub fn verify_committed_transactions(
     );
 
     let mut cur_ver = first_version;
+    let mut updates = HashMap::new();
     for txn_to_commit in txns_to_commit {
         let txn_info = db.ledger_store.get_transaction_info(cur_ver).unwrap();
 
@@ -445,82 +500,94 @@ pub fn verify_committed_transactions(
             txn_info.transaction_hash(),
             txn_to_commit.transaction().hash()
         );
-        if matches!(txn_to_commit.transaction(), Transaction::StateCheckpoint) {
-            continue;
-        }
-
-        // Fetch and verify transaction itself.
-        let txn = txn_to_commit.transaction().as_signed_user_txn().unwrap();
-        let txn_with_proof = db
-            .get_transaction_by_hash(txn_to_commit.transaction().hash(), ledger_version, true)
-            .unwrap()
-            .unwrap();
-        assert_eq!(
-            txn_with_proof.transaction.hash(),
-            txn_to_commit.transaction().hash()
-        );
-        txn_with_proof
-            .verify_user_txn(ledger_info, cur_ver, txn.sender(), txn.sequence_number())
-            .unwrap();
-        let txn_with_proof = db
-            .get_transaction_with_proof(cur_ver, ledger_version, true)
-            .unwrap();
-        txn_with_proof
-            .verify_user_txn(ledger_info, cur_ver, txn.sender(), txn.sequence_number())
-            .unwrap();
-
-        let txn_with_proof = db
-            .get_account_transaction(txn.sender(), txn.sequence_number(), true, ledger_version)
-            .unwrap()
-            .expect("Should exist.");
-        txn_with_proof
-            .verify_user_txn(ledger_info, cur_ver, txn.sender(), txn.sequence_number())
-            .unwrap();
-
-        let acct_txns_with_proof = db
-            .get_account_transactions(txn.sender(), txn.sequence_number(), 1, true, ledger_version)
-            .unwrap();
-        acct_txns_with_proof
-            .verify(
-                ledger_info,
-                txn.sender(),
-                txn.sequence_number(),
-                1,
-                true,
-                ledger_version,
-            )
-            .unwrap();
-        assert_eq!(acct_txns_with_proof.len(), 1);
-
-        let txn_list_with_proof = db
-            .get_transactions(cur_ver, 1, ledger_version, true /* fetch_events */)
-            .unwrap();
-        txn_list_with_proof
-            .verify(ledger_info, Some(cur_ver))
-            .unwrap();
-        assert_eq!(txn_list_with_proof.transactions.len(), 1);
-
-        let txn_output_list_with_proof = db
-            .get_transaction_outputs(cur_ver, 1, ledger_version)
-            .unwrap();
-        txn_output_list_with_proof
-            .verify(ledger_info, Some(cur_ver))
-            .unwrap();
-        assert_eq!(txn_output_list_with_proof.transactions_and_outputs.len(), 1);
 
         // Fetch and verify account states.
         for (state_key, state_value) in txn_to_commit.state_updates() {
-            let (state_value_in_db, proof) = db
-                .get_state_value_with_proof_by_version(state_key, cur_ver)
-                .unwrap();
+            updates.insert(state_key, state_value);
+            let state_value_in_db = db.get_state_value_by_version(state_key, cur_ver).unwrap();
             assert_eq!(state_value_in_db, Some(state_value.clone()));
-            proof
-                .verify(
-                    txn_info.state_checkpoint_hash().unwrap(),
-                    state_key.hash(),
-                    state_value_in_db.as_ref(),
+        }
+
+        if txn_to_commit.is_state_checkpoint() {
+            for (state_key, state_value) in &updates {
+                let (state_value_in_db, proof) = db
+                    .get_state_value_with_proof_by_version(state_key, cur_ver)
+                    .unwrap();
+                assert_eq!(state_value_in_db, Some((*state_value).clone()));
+                proof
+                    .verify(
+                        txn_info.state_checkpoint_hash().unwrap(),
+                        state_key.hash(),
+                        state_value_in_db.as_ref(),
+                    )
+                    .unwrap();
+            }
+            updates.clear();
+        } else {
+            // Fetch and verify transaction itself.
+            let txn = txn_to_commit.transaction().as_signed_user_txn().unwrap();
+            let txn_with_proof = db
+                .get_transaction_by_hash(txn_to_commit.transaction().hash(), ledger_version, true)
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                txn_with_proof.transaction.hash(),
+                txn_to_commit.transaction().hash()
+            );
+            txn_with_proof
+                .verify_user_txn(ledger_info, cur_ver, txn.sender(), txn.sequence_number())
+                .unwrap();
+            let txn_with_proof = db
+                .get_transaction_with_proof(cur_ver, ledger_version, true)
+                .unwrap();
+            txn_with_proof
+                .verify_user_txn(ledger_info, cur_ver, txn.sender(), txn.sequence_number())
+                .unwrap();
+
+            let txn_with_proof = db
+                .get_account_transaction(txn.sender(), txn.sequence_number(), true, ledger_version)
+                .unwrap()
+                .expect("Should exist.");
+            txn_with_proof
+                .verify_user_txn(ledger_info, cur_ver, txn.sender(), txn.sequence_number())
+                .unwrap();
+
+            let acct_txns_with_proof = db
+                .get_account_transactions(
+                    txn.sender(),
+                    txn.sequence_number(),
+                    1,
+                    true,
+                    ledger_version,
                 )
                 .unwrap();
+            acct_txns_with_proof
+                .verify(
+                    ledger_info,
+                    txn.sender(),
+                    txn.sequence_number(),
+                    1,
+                    true,
+                    ledger_version,
+                )
+                .unwrap();
+            assert_eq!(acct_txns_with_proof.len(), 1);
+
+            let txn_list_with_proof = db
+                .get_transactions(cur_ver, 1, ledger_version, true /* fetch_events */)
+                .unwrap();
+            txn_list_with_proof
+                .verify(ledger_info, Some(cur_ver))
+                .unwrap();
+            assert_eq!(txn_list_with_proof.transactions.len(), 1);
+
+            let txn_output_list_with_proof = db
+                .get_transaction_outputs(cur_ver, 1, ledger_version)
+                .unwrap();
+            txn_output_list_with_proof
+                .verify(ledger_info, Some(cur_ver))
+                .unwrap();
+            assert_eq!(txn_output_list_with_proof.transactions_and_outputs.len(), 1);
         }
 
         cur_ver += 1;
@@ -551,9 +618,16 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
     db.state_merkle_db
         .put::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version), &leaf_node)
         .unwrap();
-    db.ledger_db
-        .put::<StateValueSchema>(&(key, version), &value)
+    let smt = SparseMerkleTree::<StateValue>::default()
+        .batch_update(vec![(key.hash(), &value)], &ProofReader::new_empty())
         .unwrap();
+    db.ledger_db
+        .put::<StateValueSchema>(&(key.clone(), version), &value)
+        .unwrap();
+    let mut in_memory_state = db.state_store.buffered_state().lock();
+    in_memory_state.current = smt;
+    in_memory_state.current_version = Some(version);
+    in_memory_state.updates_since_base.insert(key, value);
 }
 
 pub fn test_sync_transactions_impl(
@@ -562,6 +636,8 @@ pub fn test_sync_transactions_impl(
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
 
+    let mut in_memory_state = (*db.state_store.buffered_state().lock()).clone();
+    let _ancester = in_memory_state.current.clone().freeze();
     let num_batches = input.len();
     let mut cur_ver: Version = 0;
     for (batch_idx, (txns_to_commit, ledger_info_with_sigs)) in input.iter().enumerate() {
@@ -569,19 +645,23 @@ pub fn test_sync_transactions_impl(
         let batch1_len = txns_to_commit.len() / 2;
         let base_state_version = cur_ver.checked_sub(1);
         if batch1_len > 0 {
+            update_in_memory_state(&mut in_memory_state, &txns_to_commit[..batch1_len]);
             db.save_transactions(
                 &txns_to_commit[..batch1_len],
                 cur_ver, /* first_version */
                 base_state_version,
                 None,
+                in_memory_state.clone(),
             )
             .unwrap();
         }
+        update_in_memory_state(&mut in_memory_state, &txns_to_commit[batch1_len..]);
         db.save_transactions(
             &txns_to_commit[batch1_len..],
             cur_ver + batch1_len as u64, /* first_version */
             base_state_version,
             Some(ledger_info_with_sigs),
+            in_memory_state.clone(),
         )
         .unwrap();
 

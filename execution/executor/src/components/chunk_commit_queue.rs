@@ -5,7 +5,7 @@
 
 use anyhow::{anyhow, Result};
 
-use executor_types::{in_memory_state_calculator::IntoLedgerView, ExecutedChunk};
+use executor_types::ExecutedChunk;
 use std::{collections::VecDeque, sync::Arc};
 use storage_interface::{DbReader, ExecutedTrees};
 
@@ -19,8 +19,7 @@ impl ChunkCommitQueue {
         let persisted_view = db
             .get_startup_info()?
             .ok_or_else(|| anyhow!("DB not bootstrapped."))?
-            .into_latest_tree_state()
-            .into_ledger_view(db)?;
+            .into_latest_executed_trees();
         Ok(Self::new(persisted_view))
     }
 

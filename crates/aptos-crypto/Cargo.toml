@@ -36,7 +36,6 @@ tiny-keccak = { version = "2.0.2", features = ["sha3"] }
 x25519-dalek = { version = "1.2.0" }
 
 aptos-crypto-derive = { path = "../aptos-crypto-derive", version = "0.0.3" }
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }
 
 [dev-dependencies]
 bitvec = "0.19.4"
@@ -44,7 +43,6 @@ byteorder = "1.4.3"
 criterion = "0.3.5"
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
-ripemd160 = "0.9.1"
 serde_json = "1.0.81"
 sha3 = "0.9.1"
 trybuild = "1.0.41"

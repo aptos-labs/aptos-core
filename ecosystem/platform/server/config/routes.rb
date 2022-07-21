@@ -7,7 +7,8 @@ Rails.application.routes.draw do
   devise_for :users, {
     controllers: {
       omniauth_callbacks: 'users/omniauth_callbacks',
-      sessions: 'users/sessions'
+      sessions: 'users/sessions',
+      confirmations: 'users/confirmations'
     }
   }
   ActiveAdmin.routes(self)
@@ -17,6 +18,9 @@ Rails.application.routes.draw do
   namespace :user do
     root to: redirect('/it2') # creates user_root_path, where users go after confirming email
   end
+
+  # CMS
+  resources :articles, param: :slug, only: %i[index show]
 
   # Settings
   get 'settings', to: redirect('/settings/profile')
@@ -41,7 +45,6 @@ Rails.application.routes.draw do
 
   resources :it2_profiles, except: %i[index destroy]
   resources :it2_surveys, except: %i[index destroy]
-  resource :it2, only: %i[show]
 
   resources :nfts, only: %i[show update]
   resources :nft_offers, only: %i[show update]
@@ -49,7 +52,10 @@ Rails.application.routes.draw do
   get 'nft-nyc', to: 'nft_nyc#show'
 
   get 'leaderboard/it1', to: redirect('/it1')
+  get 'leaderboard/it2', to: redirect('/it2')
 
   get 'it1', to: 'leaderboard#it1'
+  get 'it2', to: 'leaderboard#it2'
+
   root 'static_page#community'
 end

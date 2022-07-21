@@ -93,13 +93,10 @@ impl MempoolNotificationSender for MempoolNotifier {
             })
             .collect();
 
-        // Only send a notification if user transactions have been committed
-        if user_transactions.is_empty() {
-            return Ok(());
-        }
-
         // Construct a oneshot channel to receive a mempool response
         let (callback, callback_receiver) = oneshot::channel();
+        // Mempool needs to be notified about all transactions (user and non-user transactions).
+        // See https://github.com/aptos-labs/aptos-core/issues/1882 for more details.
         let commit_notification = MempoolCommitNotification {
             transactions: user_transactions,
             block_timestamp_usecs,
@@ -264,35 +261,23 @@ mod tests {
     }
 
     #[test]
-    fn test_no_transactions() {
+    fn test_no_transaction_filtering() {
         // Create runtime and mempool notifier
         let runtime = create_runtime();
         let _enter = runtime.enter();
         let (mempool_notifier, _mempool_listener) = crate::new_mempool_notifier_listener_pair();
 
-        // Send a notification and verify no timeout because no notification was sent!
-        let notify_result = block_on(mempool_notifier.notify_new_commit(vec![], 0, 1000));
-        assert_ok!(notify_result);
-    }
-
-    #[test]
-    fn test_transaction_filtering() {
-        // Create runtime and mempool notifier
-        let runtime = create_runtime();
-        let _enter = runtime.enter();
-        let (mempool_notifier, _mempool_listener) = crate::new_mempool_notifier_listener_pair();
-
-        // Create several transactions that should be filtered out
+        // Create several non-user transactions
         let mut transactions = vec![];
         for _ in 0..5 {
             transactions.push(create_block_metadata_transaction());
             transactions.push(create_genesis_transaction());
         }
 
-        // Send a notification and verify no timeout because no notification was sent!
+        // Send a notification and verify we get a timeout because mempool didn't respond
         let notify_result =
             block_on(mempool_notifier.notify_new_commit(transactions.clone(), 0, 1000));
-        assert_ok!(notify_result);
+        assert_matches!(notify_result, Err(Error::TimeoutWaitingForMempool));
 
         // Send another notification with a single user transaction now included.
         transactions.push(create_user_transaction());

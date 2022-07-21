@@ -10,7 +10,7 @@ use move_deps::{
             AddressIdentifierIndex, CompiledModule, CompiledScript, FieldDefinition,
             FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle,
             ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, StructDefinition,
-            StructFieldInformation, StructHandle, StructHandleIndex, Visibility,
+            StructFieldInformation, StructHandle, StructHandleIndex,
         },
     },
     move_core_types::{account_address::AccountAddress, identifier::IdentStr},
@@ -125,6 +125,7 @@ pub trait Bytecode {
         MoveFunction {
             name,
             visibility: def.visibility.into(),
+            is_entry: def.is_entry,
             generic_type_params: fhandle
                 .type_parameters
                 .iter()
@@ -174,7 +175,7 @@ impl Bytecode for CompiledModule {
     fn find_script_function(&self, name: &IdentStr) -> Option<MoveFunction> {
         self.function_defs
             .iter()
-            .filter(|def| matches!(def.visibility, Visibility::Script))
+            .filter(|def| def.is_entry)
             .find(|def| {
                 let fhandle = ModuleAccess::function_handle_at(self, def.function);
                 ModuleAccess::identifier_at(self, fhandle.name) == name

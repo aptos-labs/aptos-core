@@ -10,28 +10,32 @@ use aptos_logger::prelude::*;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     access_path::AccessPath,
-    account_config::aptos_root_address,
+    account_config::CORE_CODE_ADDRESS,
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::{config_address, ConfigurationResource},
+    on_chain_config::ConfigurationResource,
     state_store::state_key::StateKey,
     timestamp::TimestampResource,
     transaction::{Transaction, Version},
     waypoint::Waypoint,
 };
 use aptos_vm::VMExecutor;
-use executor_types::{in_memory_state_calculator::IntoLedgerView, ExecutedChunk};
+use executor_types::ExecutedChunk;
 use move_deps::move_core_types::move_resource::MoveResource;
+use std::ops::Deref;
 use std::{collections::btree_map::BTreeMap, sync::Arc};
-use storage_interface::{cached_state_view::CachedStateView, DbReaderWriter, DbWriter, TreeState};
+use storage_interface::sync_proof_fetcher::SyncProofFetcher;
+use storage_interface::{
+    cached_state_view::CachedStateView, DbReaderWriter, DbWriter, ExecutedTrees,
+};
 
 pub fn generate_waypoint<V: VMExecutor>(
     db: &DbReaderWriter,
     genesis_txn: &Transaction,
 ) -> Result<Waypoint> {
-    let tree_state = db.reader.get_latest_tree_state()?;
+    let executed_trees = db.reader.get_latest_executed_trees()?;
 
-    let committer = calculate_genesis::<V>(db, tree_state, genesis_txn)?;
+    let committer = calculate_genesis::<V>(db, executed_trees, genesis_txn)?;
     Ok(committer.waypoint)
 }
 
@@ -43,15 +47,15 @@ pub fn maybe_bootstrap<V: VMExecutor>(
     genesis_txn: &Transaction,
     waypoint: Waypoint,
 ) -> Result<bool> {
-    let tree_state = db.reader.get_latest_tree_state()?;
+    let executed_trees = db.reader.get_latest_executed_trees()?;
     // if the waypoint is not targeted with the genesis txn, it may be either already bootstrapped, or
     // aiming for state sync to catch up.
-    if tree_state.num_transactions != waypoint.version() {
+    if executed_trees.version().map_or(0, |v| v + 1) != waypoint.version() {
         info!(waypoint = %waypoint, "Skip genesis txn.");
         return Ok(false);
     }
 
-    let committer = calculate_genesis::<V>(db, tree_state, genesis_txn)?;
+    let committer = calculate_genesis::<V>(db, executed_trees, genesis_txn)?;
     ensure!(
         waypoint == committer.waypoint(),
         "Waypoint verification failed. Expected {:?}, got {:?}.",
@@ -100,6 +104,7 @@ impl GenesisCommitter {
             self.output.result_view.txn_accumulator().version(),
             self.base_state_version,
             self.output.ledger_info.as_ref(),
+            self.output.result_view.state().clone(),
         )?;
         info!("Genesis commited.");
         // DB bootstrapped, avoid anything that could fail after this.
@@ -110,16 +115,15 @@ impl GenesisCommitter {
 
 pub fn calculate_genesis<V: VMExecutor>(
     db: &DbReaderWriter,
-    tree_state: TreeState,
+    executed_trees: ExecutedTrees,
     genesis_txn: &Transaction,
 ) -> Result<GenesisCommitter> {
     // DB bootstrapper works on either an empty transaction accumulator or an existing block chain.
     // In the very extreme and sad situation of losing quorum among validators, we refer to the
     // second use case said above.
-    let genesis_version = tree_state.num_transactions;
-    let base_view = tree_state.into_ledger_view(&db.reader)?;
+    let genesis_version = executed_trees.version().map_or(0, |v| v + 1);
     let base_state_view =
-        base_view.verified_state_view(StateViewId::Miscellaneous, db.reader.clone())?;
+        executed_trees.verified_state_view(StateViewId::Miscellaneous, db.reader.deref())?;
 
     let epoch = if genesis_version == 0 {
         GENESIS_EPOCH
@@ -129,7 +133,7 @@ pub fn calculate_genesis<V: VMExecutor>(
 
     let (mut output, _, _) =
         ChunkOutput::by_transaction_execution::<V>(vec![genesis_txn.clone()], base_state_view)?
-            .apply_to_ledger(&base_view)?;
+            .apply_to_ledger(&executed_trees)?;
     ensure!(
         !output.to_commit.is_empty(),
         "Genesis txn execution failed."
@@ -141,7 +145,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     } else {
         let state_view = output
             .result_view
-            .verified_state_view(StateViewId::Miscellaneous, db.reader.clone())?;
+            .verified_state_view(StateViewId::Miscellaneous, db.reader.deref())?;
         let next_epoch = epoch
             .checked_add(1)
             .ok_or_else(|| format_err!("integer overflow occurred"))?;
@@ -176,7 +180,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     let committer = GenesisCommitter::new(
         db.writer.clone(),
         output,
-        base_view.state().checkpoint_version,
+        executed_trees.state().base_version,
     )?;
     info!(
         "Genesis calculated: ledger_info_with_sigs {:?}, waypoint {:?}",
@@ -185,10 +189,10 @@ pub fn calculate_genesis<V: VMExecutor>(
     Ok(committer)
 }
 
-fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {
+fn get_state_timestamp(state_view: &CachedStateView<SyncProofFetcher>) -> Result<u64> {
     let rsrc_bytes = &state_view
         .get_state_value(&StateKey::AccessPath(AccessPath::new(
-            aptos_root_address(),
+            CORE_CODE_ADDRESS,
             TimestampResource::resource_path(),
         )))?
         .ok_or_else(|| format_err!("TimestampResource missing."))?;
@@ -196,10 +200,10 @@ fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {
     Ok(rsrc.timestamp.microseconds)
 }
 
-fn get_state_epoch(state_view: &CachedStateView) -> Result<u64> {
+fn get_state_epoch(state_view: &CachedStateView<SyncProofFetcher>) -> Result<u64> {
     let rsrc_bytes = &state_view
         .get_state_value(&StateKey::AccessPath(AccessPath::new(
-            config_address(),
+            CORE_CODE_ADDRESS,
             ConfigurationResource::resource_path(),
         )))?
         .ok_or_else(|| format_err!("ConfigurationResource missing."))?;

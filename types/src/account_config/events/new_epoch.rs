@@ -27,6 +27,6 @@ impl NewEpochEvent {
 }
 
 impl MoveStructType for NewEpochEvent {
-    const MODULE_NAME: &'static IdentStr = ident_str!("Reconfiguration");
+    const MODULE_NAME: &'static IdentStr = ident_str!("reconfiguration");
     const STRUCT_NAME: &'static IdentStr = ident_str!("NewEpochEvent");
 }

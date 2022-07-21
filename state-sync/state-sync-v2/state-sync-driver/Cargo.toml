@@ -24,12 +24,13 @@ aptos-infallible = { path = "../../../crates/aptos-infallible" }
 aptos-logger = { path = "../../../crates/aptos-logger" }
 aptos-metrics-core = { path = "../../../crates/aptos-metrics-core" }
 aptos-types = { path = "../../../types" }
-aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
+
 consensus-notifications = { path = "../../inter-component/consensus-notifications" }
 data-streaming-service = { path = "../data-streaming-service" }
 event-notifications = { path = "../../inter-component/event-notifications" }
 executor-types = { path = "../../../execution/executor-types" }
 mempool-notifications = { path = "../../inter-component/mempool-notifications" }
+scratchpad = { path = "../../../storage/scratchpad" }
 storage-interface = { path = "../../../storage/storage-interface" }
 
 [dev-dependencies]

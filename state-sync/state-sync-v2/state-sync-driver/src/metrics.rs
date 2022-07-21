@@ -12,12 +12,29 @@ pub const DRIVER_CONSENSUS_COMMIT_NOTIFICATION: &str = "driver_consensus_commit_
 pub const DRIVER_CONSENSUS_SYNC_NOTIFICATION: &str = "driver_consensus_sync_notification";
 pub const STORAGE_SYNCHRONIZER_PENDING_DATA: &str = "storage_synchronizer_pending_data";
 
+/// An enum representing the component currently executing
+pub enum ExecutingComponent {
+    Bootstrapper,
+    Consensus,
+    ContinuousSyncer,
+}
+
+impl ExecutingComponent {
+    pub fn get_label(&self) -> &'static str {
+        match self {
+            ExecutingComponent::Bootstrapper => "bootstrapper",
+            ExecutingComponent::Consensus => "consensus",
+            ExecutingComponent::ContinuousSyncer => "continuous_syncer",
+        }
+    }
+}
+
 /// An enum of storage synchronizer operations performed by state sync
 pub enum StorageSynchronizerOperations {
     AppliedTransactionOutputs, // Applied a chunk of transactions outputs.
     ExecutedTransactions,      // Executed a chunk of transactions.
     Synced,                    // Wrote a chunk of transactions and outputs to storage.
-    SyncedAccounts,            // Wrote a chunk of accounts to storage.
+    SyncedStates,              // Wrote a chunk of state values to storage.
     SyncedEpoch, // Wrote a chunk of transactions and outputs to storage that resulted in a new epoch.
 }
 
@@ -29,8 +46,8 @@ impl StorageSynchronizerOperations {
             }
             StorageSynchronizerOperations::ExecutedTransactions => "executed_transactions",
             StorageSynchronizerOperations::Synced => "synced",
-            StorageSynchronizerOperations::SyncedAccounts => "synced_accounts",
             StorageSynchronizerOperations::SyncedEpoch => "synced_epoch",
+            StorageSynchronizerOperations::SyncedStates => "synced_states",
         }
     }
 }
@@ -60,6 +77,26 @@ pub static DRIVER_COUNTERS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_state_sync_driver_counters",
         "Counters related to the state sync driver",
+        &["label"]
+    )
+    .unwrap()
+});
+
+/// Gauges related to the current epoch state
+pub static EPOCH_STATE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_state_sync_epoch_state_gauges",
+        "Gauges related to the storage synchronizer",
+        &["epoch", "validator_address", "validator_weight"]
+    )
+    .unwrap()
+});
+
+/// Counters related to the currently executing component
+pub static EXECUTING_COMPONENT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_state_sync_executing_component_counters",
+        "Counters related to the currently executing component",
         &["label"]
     )
     .unwrap()
@@ -112,7 +149,19 @@ pub fn decrement_gauge(gauge: &Lazy<IntGaugeVec>, label: &str, delta: u64) {
     gauge.with_label_values(&[label]).sub(delta as i64);
 }
 
+/// Reads the gauge with the specific label
+pub fn read_gauge(gauge: &Lazy<IntGaugeVec>, label: &str) -> i64 {
+    gauge.with_label_values(&[label]).get()
+}
+
 /// Sets the gauge with the specific label to the given value
 pub fn set_gauge(gauge: &Lazy<IntGaugeVec>, label: &str, value: u64) {
     gauge.with_label_values(&[label]).set(value as i64);
+}
+
+/// Sets the gauge for the epoch state
+pub fn set_epoch_state_gauge(epoch: &str, validator_address: &str, validator_weight: &str) {
+    EPOCH_STATE
+        .with_label_values(&[epoch, validator_address, validator_weight])
+        .set(1);
 }

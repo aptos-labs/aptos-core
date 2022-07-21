@@ -9,7 +9,7 @@ use anyhow::{anyhow, Result};
 use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config,
+    account_config::CORE_CODE_ADDRESS,
     account_state::AccountState,
     account_view::AccountView,
     contract_event::EventWithVersion,
@@ -55,7 +55,7 @@ pub trait AptosValidatorInterface: Sync {
     fn get_framework_modules_by_version(&self, version: Version) -> Result<Vec<CompiledModule>> {
         let mut acc = vec![];
         for module_bytes in self
-            .get_account_state_by_version(account_config::CORE_CODE_ADDRESS, version)?
+            .get_account_state_by_version(CORE_CODE_ADDRESS, version)?
             .ok_or_else(|| anyhow!("Failure reading aptos root address state"))?
             .get_modules()
         {
@@ -69,26 +69,24 @@ pub trait AptosValidatorInterface: Sync {
 
     /// Get the account states of the most critical accounts, including:
     /// 1. Aptos Framework code address
-    /// 2. Aptos Root address
-    /// 3. All validator addresses
+    /// 2. All validator addresses
     fn get_admin_accounts(&self, version: Version) -> Result<Vec<(AccountAddress, AccountState)>> {
         let mut result = vec![];
-        let aptos_root = self
-            .get_account_state_by_version(account_config::aptos_root_address(), version)?
-            .ok_or_else(|| anyhow!("aptos_root_address doesn't exist"))?;
+        let aptos_framework = self
+            .get_account_state_by_version(CORE_CODE_ADDRESS, version)?
+            .ok_or_else(|| anyhow!("Aptos framework account doesn't exist"))?;
 
         // Get all validator accounts
-        let validators = aptos_root
+        let validators = aptos_framework
             .get_config::<ValidatorSet>()?
             .ok_or_else(|| anyhow!("validator_config doesn't exist"))?;
 
-        // Get code account, aptos_root
+        // Get code account
         result.push((
-            account_config::CORE_CODE_ADDRESS,
-            self.get_account_state_by_version(account_config::CORE_CODE_ADDRESS, version)?
+            CORE_CODE_ADDRESS,
+            self.get_account_state_by_version(CORE_CODE_ADDRESS, version)?
                 .ok_or_else(|| anyhow!("core_code_address doesn't exist"))?,
         ));
-        result.push((account_config::aptos_root_address(), aptos_root));
 
         // Get all validator accounts
         for validator_info in validators.payload() {

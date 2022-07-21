@@ -27,7 +27,6 @@ members = [
     "config",
     "config/global-constants",
     "config/management",
-    "config/management/genesis",
     "config/management/operational",
     "config/seed-peer-generator",
     "consensus",
@@ -55,7 +54,6 @@ members = [
     "crates/aptos-telemetry",
     "crates/aptos-temppath",
     "crates/aptos-time-service",
-    "crates/aptos-workspace-hack",
     "crates/bounded-executor",
     "crates/channel",
     "crates/crash-handler",
@@ -133,7 +131,6 @@ default-members = [
     "aptos-move/genesis-viewer",
     "aptos-move/transaction-replay",
     "aptos-node",
-    "config/management/genesis",
     "config/management/operational",
     "config/seed-peer-generator",
     "consensus/safety-rules",
@@ -144,7 +141,6 @@ default-members = [
     "crates/aptos-rosetta",
     "crates/transaction-emitter",
     "aptos-move/framework",
-    "aptos-move/transaction-builder-generator",
     "execution/db-bootstrapper",
     "storage/backup/backup-cli",
     "ecosystem/indexer",
@@ -153,6 +149,7 @@ default-members = [
 
 [profile.release]
 debug = true
+overflow-checks = true
 
 [profile.cli]
 inherits = "release"

@@ -149,11 +149,11 @@ impl TransactionFactory {
     }
 
     pub fn transfer(&self, to: AccountAddress, amount: u64) -> TransactionBuilder {
-        self.payload(aptos_stdlib::encode_test_coin_transfer(to, amount))
+        self.payload(aptos_stdlib::encode_aptos_coin_transfer(to, amount))
     }
 
     pub fn mint(&self, to: AccountAddress, amount: u64) -> TransactionBuilder {
-        self.payload(aptos_stdlib::encode_test_coin_mint(to, amount))
+        self.payload(aptos_stdlib::encode_aptos_coin_mint(to, amount))
     }
 
     //

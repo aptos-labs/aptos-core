@@ -11,8 +11,6 @@ class DiscourseController < ApplicationController
   before_action :ensure_confirmed!
 
   def sso
-    secret = ENV.fetch('DISCOURSE_SECRET', nil)
-
     query_str = cookies['FORUM-SSO'] || request.query_string
 
     # This allows hitting this sso for the first time from our side, we redirect to forum, which redirects back to us
@@ -24,13 +22,19 @@ class DiscourseController < ApplicationController
       return
     end
 
-    sso = DiscourseApi::SingleSignOn.parse(query_str, secret)
+    sso = DiscourseApi::SingleSignOn.parse(query_str, DiscourseHelper.sso_secret)
     cookies.delete 'FORUM-SSO'
 
     sso.email = current_user.email
-    sso.username = current_user.username.presence || current_user.authorizations.pluck(:username).first
+    sso.username = current_user.username
     sso.external_id = current_user.external_id # unique id for each user of your application
-    sso.sso_secret = secret
+    sso.sso_secret = DiscourseHelper.sso_secret
+
+    sso.admin = current_user.is_root?
+
+    add_groups = []
+    add_groups.append('ait2_eligible') if current_user.ait2_registration_complete?
+    sso.add_groups = add_groups if add_groups.present?
 
     redirect_to sso.to_url(DiscourseHelper.discourse_url('/session/sso_login')), allow_other_host: true
   end

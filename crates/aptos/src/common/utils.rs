@@ -5,13 +5,14 @@ use crate::{
     common::types::{CliError, CliTypedResult, PromptOptions},
     CliResult,
 };
+use aptos_logger::{debug, Level};
 use aptos_rest_client::Client;
+use aptos_telemetry::collect_build_information;
 use aptos_types::chain_id::ChainId;
 use itertools::Itertools;
 use move_deps::move_core_types::account_address::AccountAddress;
 use reqwest::Url;
 use serde::Serialize;
-use shadow_rs::shadow;
 use std::{
     collections::BTreeMap,
     env,
@@ -20,10 +21,8 @@ use std::{
     os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
     str::FromStr,
-    time::Instant,
+    time::{Duration, Instant},
 };
-
-shadow!(build);
 
 /// Prompts for confirmation until a yes or no is given explicitly
 pub fn prompt_yes(prompt: &str) -> bool {
@@ -67,8 +66,7 @@ pub async fn to_common_result<T: Serialize>(
     } else {
         None
     };
-    aptos_telemetry::cli_metrics::send_cli_telemetry_event(command.into(), latency, !is_err, error)
-        .await;
+    send_telemetry_event(command, latency, !is_err, error).await;
     let result: ResultWrapper<T> = result.into();
     let string = serde_json::to_string_pretty(&result).unwrap();
     if is_err {
@@ -76,6 +74,27 @@ pub async fn to_common_result<T: Serialize>(
     } else {
         Ok(string)
     }
+}
+
+/// Sends a telemetry event about the CLI build, command and result
+async fn send_telemetry_event(
+    command: &str,
+    latency: Duration,
+    success: bool,
+    error: Option<String>,
+) {
+    // Collect the build information
+    let build_information = collect_build_information!();
+
+    // Send the event
+    aptos_telemetry::cli_metrics::send_cli_telemetry_event(
+        build_information,
+        command.into(),
+        latency,
+        success,
+        error,
+    )
+    .await;
 }
 
 /// A result wrapper for displaying either a correct execution result or an error.
@@ -236,8 +255,29 @@ where
     Ok(map)
 }
 
-pub fn current_dir() -> PathBuf {
-    env::current_dir().unwrap()
+pub fn current_dir() -> CliTypedResult<PathBuf> {
+    env::current_dir().map_err(|err| {
+        CliError::UnexpectedError(format!("Failed to get current directory {}", err))
+    })
+}
+
+pub fn dir_default_to_current(maybe_dir: Option<PathBuf>) -> CliTypedResult<PathBuf> {
+    if let Some(dir) = maybe_dir {
+        Ok(dir)
+    } else {
+        current_dir()
+    }
+}
+
+pub fn create_dir_if_not_exist(dir: &Path) -> CliTypedResult<()> {
+    // Check if the directory exists, if it's not a dir, it will also fail here
+    if !dir.exists() || !dir.is_dir() {
+        std::fs::create_dir_all(dir).map_err(|e| CliError::IO(dir.display().to_string(), e))?;
+        debug!("Created {} folder", dir.display());
+    } else {
+        debug!("{} folder already exists", dir.display());
+    }
+    Ok(())
 }
 
 /// Reads a line from input
@@ -272,4 +312,14 @@ pub async fn fund_account(
             response.status()
         )))
     }
+}
+
+pub fn start_logger() {
+    let mut logger = aptos_logger::Logger::new();
+    logger
+        .channel_size(1000)
+        .is_async(false)
+        .level(Level::Warn)
+        .read_env();
+    logger.build();
 }

@@ -272,12 +272,13 @@ async fn handle_network_event<V>(
                 } => {
                     let smp_clone = smp.clone();
                     let peer = PeerNetworkId::new(network_id, peer_id);
-                    let timeline_state = match (smp.validator_broadcast()
+                    let ineligible_for_broadcast = (!smp.broadcast_within_validator_network()
                         && smp.network_interface.is_validator())
-                        || smp.network_interface.is_upstream_peer(&peer, None)
-                    {
-                        true => TimelineState::NonQualified,
-                        false => TimelineState::NotReady,
+                        || smp.network_interface.is_upstream_peer(&peer, None);
+                    let timeline_state = if ineligible_for_broadcast {
+                        TimelineState::NonQualified
+                    } else {
+                        TimelineState::NotReady
                     };
                     // This timer measures how long it took for the bounded executor to
                     // *schedule* the task.

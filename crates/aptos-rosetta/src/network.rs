@@ -2,39 +2,47 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block::{block_index_to_version, version_to_block_index},
-    common::{
-        check_network, get_timestamp, handle_request, with_context, with_empty_request,
-        EmptyRequest,
-    },
+    common::{check_network, get_timestamp, handle_request, with_context, with_empty_request},
     error::ApiError,
     types::{
-        Allow, BlockIdentifier, NetworkListResponse, NetworkOptionsResponse, NetworkRequest,
-        NetworkStatusResponse, OperationStatusType, OperationType, Peer, Version,
+        Allow, BlockIdentifier, MetadataRequest, NetworkListResponse, NetworkOptionsResponse,
+        NetworkRequest, NetworkStatusResponse, OperationStatusType, OperationType, Version,
     },
-    RosettaContext, MIDDLEWARE_VERSION, NODE_VERSION, ROSETTA_VERSION,
+    RosettaContext, NODE_VERSION, ROSETTA_VERSION,
 };
 use aptos_logger::{debug, trace};
 use warp::Filter;
 
-pub fn routes(
+shadow_rs::shadow!(build);
+
+pub fn list_route(
     server_context: RosettaContext,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::post()
-        .and(
-            warp::path!("network" / "list")
-                .and(with_empty_request())
-                .and(with_context(server_context.clone()))
-                .and_then(handle_request(network_list)),
-        )
-        .or(warp::path!("network" / "options")
-            .and(warp::body::json())
-            .and(with_context(server_context.clone()))
-            .and_then(handle_request(network_options)))
-        .or(warp::path!("network" / "status")
-            .and(warp::body::json())
-            .and(with_context(server_context))
-            .and_then(handle_request(network_status)))
+    warp::path!("network" / "list")
+        .and(warp::post())
+        .and(with_empty_request())
+        .and(with_context(server_context))
+        .and_then(handle_request(network_list))
+}
+
+pub fn options_route(
+    server_context: RosettaContext,
+) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::path!("network" / "options")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_context(server_context))
+        .and_then(handle_request(network_options))
+}
+
+pub fn status_route(
+    server_context: RosettaContext,
+) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::path!("network" / "status")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_context(server_context))
+        .and_then(handle_request(network_status))
 }
 
 /// List [`NetworkIdentifier`]s supported by this proxy aka [`ChainId`]s
@@ -43,7 +51,7 @@ pub fn routes(
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/NetworkApi.html#networklist)
 async fn network_list(
-    _empty: EmptyRequest,
+    _empty: MetadataRequest,
     server_context: RosettaContext,
 ) -> Result<NetworkListResponse, ApiError> {
     debug!("/network/list");
@@ -82,8 +90,7 @@ async fn network_options(
         rosetta_version: ROSETTA_VERSION.to_string(),
         // TODO: Get from node via REST API
         node_version: NODE_VERSION.to_string(),
-        // TODO: Get from the binary directly
-        middleware_version: MIDDLEWARE_VERSION.to_string(),
+        middleware_version: build::PKG_VERSION.to_string(),
     };
 
     let operation_statuses = OperationStatusType::all()
@@ -134,55 +141,37 @@ async fn network_status(
     );
 
     check_network(request.network_identifier, &server_context)?;
-    let block_size = server_context.block_size;
-
     let rest_client = server_context.rest_client()?;
-    let genesis_txn = BlockIdentifier::genesis_txn();
+    let block_cache = server_context.block_cache()?;
+    let genesis_block_info = block_cache.get_block_info(0).await?;
+    let genesis_block_identifier = BlockIdentifier::from_block_info(genesis_block_info);
     let response = rest_client.get_ledger_information().await?;
     let state = response.state();
 
-    // Get the last "block"
-    let previous_block = version_to_block_index(block_size, state.version) - 1;
-    let block_version = block_index_to_version(block_size, previous_block);
-    let response = rest_client
-        .get_transaction_by_version(block_version)
-        .await?;
-    let transaction = response.inner();
-    let latest_txn = BlockIdentifier::from_transaction(block_size, transaction)?;
-
-    let current_block_timestamp = get_timestamp(&response);
-
-    let oldest_block_identifier = if let Some(mut version) = state.oldest_ledger_version {
-        // For non-genesis versions we have to ensure that really the next "block" is the oldest
-        if version != 0 {
-            let block_index = version_to_block_index(block_size, version);
-            // If the txn is the first in the block include it, otherwise, return the next block
-            if block_index_to_version(block_size, block_index) != version {
-                version = block_index_to_version(block_size, block_index + 1);
-            }
-        }
-
-        Some(BlockIdentifier::from_transaction(
-            block_size,
-            rest_client
-                .get_transaction_by_version(version)
-                .await?
-                .inner(),
-        )?)
+    // Get the oldest block
+    let oldest_block_identifier = if let Some(version) = state.oldest_ledger_version {
+        let block_info = block_cache.get_block_info_by_version(version).await?;
+        Some(BlockIdentifier::from_block_info(block_info))
     } else {
         None
     };
 
-    // TODO: add peers
-    let peers: Vec<Peer> = vec![];
+    // Get the latest block
+    let latest_version = state.version;
+    // Get the latest block
+    let block_info = block_cache
+        .get_block_info_by_version(latest_version)
+        .await?;
+    let current_block_identifier = BlockIdentifier::from_block_info(block_info);
+    let current_block_timestamp = get_timestamp(block_info);
 
     let response = NetworkStatusResponse {
-        current_block_identifier: latest_txn,
+        current_block_identifier,
         current_block_timestamp,
-        genesis_block_identifier: genesis_txn,
+        genesis_block_identifier,
         oldest_block_identifier,
         sync_status: None,
-        peers,
+        peers: vec![],
     };
 
     Ok(response)

@@ -7,23 +7,30 @@
 //!
 
 use crate::{
-    block::{block_index_to_version, version_to_block_index},
-    common::{check_network, handle_request, with_context},
+    common::{
+        check_network, get_block_index_from_request, handle_request, native_coin, native_coin_tag,
+        with_context,
+    },
     error::{ApiError, ApiResult},
     types::{
-        AccountBalanceRequest, AccountBalanceResponse, Amount, BlockIdentifier, Currency,
-        PartialBlockIdentifier,
+        coin_identifier_lower, coin_store_identifier, AccountBalanceRequest,
+        AccountBalanceResponse, Amount, BlockIdentifier, Currency, CurrencyMetadata,
     },
     RosettaContext,
 };
-use aptos_crypto::HashValue;
 use aptos_logger::{debug, trace};
-use aptos_rest_client::{aptos::Balance, aptos_api_types::U64};
-use aptos_sdk::move_types::{identifier::Identifier, language_storage::TypeTag};
+use aptos_rest_client::{
+    aptos::{AptosCoin, Balance},
+    aptos_api_types::U64,
+};
+use aptos_sdk::move_types::language_storage::TypeTag;
 use aptos_types::account_address::AccountAddress;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, str::FromStr, sync::RwLock};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, RwLock},
+};
 use warp::Filter;
 
 /// Account routes e.g. balance
@@ -56,32 +63,58 @@ async fn account_balance(
     let network_identifier = request.network_identifier;
 
     check_network(network_identifier, &server_context)?;
-    let block_size = server_context.block_size;
     let rest_client = server_context.rest_client()?;
 
     // Retrieve the block index to read
     let block_index =
-        get_block_index_from_request(rest_client, request.block_identifier.clone(), block_size)
-            .await?;
+        get_block_index_from_request(&server_context, request.block_identifier.clone()).await?;
 
     // Version to grab is the last entry in the block (balance is at end of block)
-    let block_version = block_index_to_version(block_size, block_index);
-    let balance_version = block_index_to_version(block_size, block_index + 1) - 1;
+    let block_info = server_context
+        .block_cache()?
+        .get_block_info(block_index)
+        .await?;
+    let balance_version = block_info.end_version;
 
     let balances = get_balances(
-        rest_client,
+        &rest_client,
         request.account_identifier.account_address()?,
         balance_version,
     )
     .await?;
 
-    let mut amounts = vec![];
+    let amounts = convert_balances_to_amounts(
+        &rest_client,
+        server_context.coin_cache.clone(),
+        request.currencies,
+        balances,
+        balance_version,
+    )
+    .await?;
+
+    // Get the block identifier
+    let block_identifier = BlockIdentifier::from_block_info(block_info);
+
+    Ok(AccountBalanceResponse {
+        block_identifier,
+        balances: amounts,
+    })
+}
+
+/// Lookup currencies and convert them to Rosetta types
+async fn convert_balances_to_amounts(
+    rest_client: &aptos_rest_client::Client,
+    coin_cache: Arc<CoinCache>,
+    maybe_filter_currencies: Option<Vec<Currency>>,
+    balances: HashMap<TypeTag, Balance>,
+    balance_version: u64,
+) -> ApiResult<Vec<Amount>> {
+    let mut amounts = Vec::new();
 
     // Lookup coins, and fill in currency codes
     for (coin, balance) in balances {
-        if let Some(currency) = server_context
-            .coin_cache
-            .get_currency(rest_client, coin, balance_version)
+        if let Some(currency) = coin_cache
+            .get_currency(rest_client, coin, Some(balance_version))
             .await?
         {
             amounts.push(Amount {
@@ -91,104 +124,75 @@ async fn account_balance(
         }
     }
 
-    // Get the block identifier
-    let response = rest_client
-        .get_transaction_by_version(block_version)
-        .await?;
-    let block_identifier = BlockIdentifier::from_transaction(block_size, response.inner())?;
+    // Filter based on requested currencies
+    if let Some(currencies) = maybe_filter_currencies {
+        let mut currencies: HashSet<Currency> = currencies.into_iter().collect();
+        // Remove extra currencies not requested
+        amounts = amounts
+            .into_iter()
+            .filter(|amount| currencies.contains(&amount.currency))
+            .collect();
 
-    Ok(AccountBalanceResponse {
-        block_identifier,
-        balances: amounts,
-    })
+        // Zero out currencies that weren't in the account yet
+        for amount in amounts.iter() {
+            currencies.remove(&amount.currency);
+        }
+        for currency in currencies {
+            amounts.push(Amount {
+                value: 0.to_string(),
+                currency,
+            });
+        }
+    }
+
+    Ok(amounts)
 }
 
-async fn get_block_index_from_request(
-    rest_client: &aptos_rest_client::Client,
-    partial_block_identifier: Option<PartialBlockIdentifier>,
-    block_size: u64,
-) -> ApiResult<u64> {
-    Ok(match partial_block_identifier {
-        Some(PartialBlockIdentifier {
-            index: Some(_),
-            hash: Some(_),
-        }) => {
-            return Err(ApiError::HistoricBalancesUnsupported);
-        }
-        Some(PartialBlockIdentifier {
-            index: Some(block_index),
-            hash: None,
-        }) => block_index,
-        Some(PartialBlockIdentifier {
-            index: None,
-            hash: Some(hash),
-        }) => {
-            if hash == BlockIdentifier::genesis_txn().hash {
-                0
-            } else {
-                // Lookup by hash doesn't work since we're faking blocks, need to verify that it's a
-                // block
-                let response = rest_client
-                    .get_transaction(
-                        HashValue::from_str(&hash)
-                            .map_err(|err| ApiError::DeserializationFailed(err.to_string()))?,
-                    )
-                    .await?;
-                let version = response.inner().version();
-
-                if let Some(version) = version {
-                    let block_index = version_to_block_index(block_size, version);
-                    // If it's not the beginning of a block, then it's invalid
-                    if version != block_index_to_version(block_size, block_index) {
-                        return Err(ApiError::BadBlockRequest);
-                    }
-
-                    block_index
-                } else {
-                    // If the transaction is pending, it's incomplete
-                    return Err(ApiError::BlockIncomplete);
-                }
-            }
-        }
-        _ => {
-            let response = rest_client.get_ledger_information().await?;
-            let state = response.state();
-            version_to_block_index(block_size, state.version) - 1
-        }
-    })
-}
-
+/// Retrieve the balances for an account
 async fn get_balances(
     rest_client: &aptos_rest_client::Client,
     address: AccountAddress,
     version: u64,
 ) -> ApiResult<HashMap<TypeTag, Balance>> {
-    let response = rest_client
+    if let Ok(response) = rest_client
         .get_account_resources_at_version(address, version)
-        .await?;
-    let resources = response.inner();
-    let coin_identifier = Identifier::new("Coin").unwrap();
-    let coinstore_identifier = Identifier::new("CoinStore").unwrap();
-
-    // Retrieve balances
-    Ok(resources
-        .iter()
-        .filter(|resource| {
-            resource.resource_type.address == AccountAddress::ONE
-                && resource.resource_type.module == coin_identifier
-                && resource.resource_type.name == coinstore_identifier
-        })
-        .filter_map(|resource| {
-            // Coin must have a type
-            let coin = resource.resource_type.type_params.first().unwrap();
-            match serde_json::from_value::<Balance>(resource.data.clone()) {
-                Ok(resource) => Some((coin.clone(), resource)),
-                Err(_) => None,
-            }
-        })
-        .collect())
+        .await
+    {
+        // Retrieve balances
+        Ok(response
+            .inner()
+            .iter()
+            .filter(|resource| {
+                resource.resource_type.address == AccountAddress::ONE
+                    && resource.resource_type.module == coin_identifier_lower()
+                    && resource.resource_type.name == coin_store_identifier()
+            })
+            .filter_map(|resource| {
+                // Currency must have a type
+                if let Some(coin_type) = resource.resource_type.type_params.first() {
+                    match serde_json::from_value::<Balance>(resource.data.clone()) {
+                        Ok(resource) => Some((coin_type.clone(), resource)),
+                        Err(_) => None,
+                    }
+                } else {
+                    // Skip currencies that don't match
+                    None
+                }
+            })
+            .collect())
+    } else {
+        let mut currency_map = HashMap::new();
+        currency_map.insert(
+            native_coin_tag(),
+            Balance {
+                coin: AptosCoin { value: U64(0) },
+            },
+        );
+        Ok(currency_map)
+    }
 }
 
+/// A cache for currencies, so we don't have to keep looking up the status of it
 #[derive(Debug)]
 pub struct CoinCache {
     currencies: RwLock<HashMap<TypeTag, Option<Currency>>>,
@@ -206,8 +210,13 @@ impl CoinCache {
         &self,
         rest_client: &aptos_rest_client::Client,
         coin: TypeTag,
-        version: u64,
+        version: Option<u64>,
     ) -> ApiResult<Option<Currency>> {
+        // Short circuit for the default coin
+        if coin == native_coin_tag() {
+            return Ok(Some(native_coin()));
+        }
+
         {
             let currencies = self.currencies.read().unwrap();
             if let Some(currency) = currencies.get(&coin) {
@@ -230,7 +239,7 @@ impl CoinCache {
         &self,
         rest_client: &aptos_rest_client::Client,
         coin: TypeTag,
-        version: u64,
+        version: Option<u64>,
     ) -> ApiResult<Option<Currency>> {
         /// Type for deserializing coin info
         #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -241,7 +250,7 @@ impl CoinCache {
         }
 
         let struct_tag = match coin {
-            TypeTag::Struct(tag) => tag,
+            TypeTag::Struct(ref tag) => tag,
             // This is a poorly formed coin, and we'll just skip over it
             _ => return Ok(None),
         };
@@ -254,24 +263,40 @@ impl CoinCache {
         // Retrieve the coin type
         const ENCODE_CHARS: &AsciiSet = &CONTROLS.add(b'<').add(b'>');
         let address = struct_tag.address;
-        let resource_tag = format!("0x1::Coin::CoinInfo<{}>", struct_tag);
+        let resource_tag = format!("0x1::coin::CoinInfo<{}>", struct_tag);
         let encoded_resource_tag = utf8_percent_encode(&resource_tag, ENCODE_CHARS).to_string();
 
-        let response = rest_client
-            .get_account_resource_at_version(address, &encoded_resource_tag, version)
-            .await?;
+        let response = if let Some(version) = version {
+            rest_client
+                .get_account_resource_at_version(address, &encoded_resource_tag, version)
+                .await?
+        } else {
+            rest_client
+                .get_account_resource(address, &encoded_resource_tag)
+                .await?
+        };
 
         // At this point if we've retrieved it and it's bad, we error out
         if let Some(resource) = response.into_inner() {
-            let coin_info =
-                serde_json::from_value::<CoinInfo>(resource.data).map_err(|_| ApiError::BadCoin)?;
+            let coin_info = serde_json::from_value::<CoinInfo>(resource.data).map_err(|_| {
+                ApiError::DeserializationFailed(Some(format!(
+                    "CoinInfo failed to deserialize for {}",
+                    coin
+                )))
+            })?;
 
             Ok(Some(Currency {
                 symbol: coin_info.symbol,
                 decimals: coin_info.decimals.0,
+                metadata: Some(CurrencyMetadata {
+                    move_type: resource_tag.to_string(),
+                }),
             }))
         } else {
-            Err(ApiError::BadCoin)
+            Err(ApiError::DeserializationFailed(Some(format!(
+                "Currency {} not found",
+                coin
+            ))))
         }
     }
 }

@@ -15,6 +15,7 @@ use aptos_api_types::{
     AsConverter, Error, LedgerInfo, MoveModuleBytecode, Response, TableItemRequest, TransactionId,
 };
 use aptos_state_view::StateView;
+use aptos_types::state_store::table::TableHandle;
 use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
 use aptos_vm::data_cache::AsMoveResolver;
 use move_deps::move_core_types::{
@@ -180,7 +181,11 @@ impl State {
         Response::new(self.latest_ledger_info, &module)
     }
 
-    pub fn table_item(self, handle: u128, body: TableItemRequest) -> Result<impl Reply, Error> {
+    pub fn table_item(
+        self,
+        handle: TableHandle,
+        body: TableItemRequest,
+    ) -> Result<impl Reply, Error> {
         let TableItemRequest {
             key_type,
             value_type,

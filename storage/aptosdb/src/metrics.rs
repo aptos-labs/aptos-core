@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter, register_int_gauge, register_int_gauge_vec,
-    HistogramVec, IntCounter, IntGauge, IntGaugeVec,
+    exponential_buckets, register_histogram_vec, register_int_counter, register_int_gauge,
+    register_int_gauge_vec, HistogramVec, IntCounter, IntGauge, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
@@ -94,7 +94,8 @@ pub static API_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
         // metric description
         "Aptos storage api latency in seconds",
         // metric labels (dimensions)
-        &["api_name", "result"]
+        &["api_name", "result"],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
     )
     .unwrap()
 });
@@ -106,7 +107,8 @@ pub static OTHER_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
         // metric description
         "Various timers below public API level.",
         // metric labels (dimensions)
-        &["name"]
+        &["name"],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
     )
     .unwrap()
 });

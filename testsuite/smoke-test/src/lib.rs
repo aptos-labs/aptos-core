@@ -17,13 +17,9 @@ mod aptos_cli;
 #[cfg(test)]
 mod client;
 #[cfg(test)]
-mod consensus;
-#[cfg(test)]
 mod full_nodes;
 #[cfg(test)]
 mod network;
-#[cfg(test)]
-mod operational_tooling;
 #[cfg(test)]
 mod rosetta;
 #[cfg(test)]

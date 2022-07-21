@@ -114,7 +114,7 @@ function App() {
   // Retrieve aptos.account on initial render and store it.
   const [address, setAddress] = React.useState<string | null>(null);
   React.useEffect(() => {
-    window.aptos.account().then(setAddress);
+    window.aptos.account().then((data : {address: string}) => setAddress(data.address));
   }, []);
 
   return (
@@ -250,7 +250,7 @@ You can also verify that the module was published by going to the [Aptos Explore
         "address"
       ],
       "_return": [
-        "0x1::ASCII::String"
+        "0x1::string::String"
       ]
     },
     {
@@ -276,11 +276,11 @@ You can also verify that the module was published by going to the [Aptos Explore
       "fields": [
         {
           "name": "from_message",
-          "type": "0x1::ASCII::String"
+          "type": "0x1::string::String"
         },
         {
           "name": "to_message",
-          "type": "0x1::ASCII::String"
+          "type": "0x1::string::String"
         }
       ]
     },
@@ -294,11 +294,11 @@ You can also verify that the module was published by going to the [Aptos Explore
       "fields": [
         {
           "name": "message",
-          "type": "0x1::ASCII::String"
+          "type": "0x1::string::String"
         },
         {
           "name": "message_change_events",
-          "type": "0x1::Event::EventHandle<0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::Message::MessageChangeEvent>"
+          "type": "0x1::event::EventHandle<0x5af503b5c379bd69f46184304975e1ef1fa57f422dd193cdad67dc139d532481::Message::MessageChangeEvent>"
         }
       ]
     }
@@ -527,7 +527,7 @@ function App() {
     if (urlAddress) {
       setAddress(urlAddress);
     } else {
-      window.aptos.account().then(setAddress);
+      window.aptos.account().then((data : {address: string}) => setAddress(data.address));
     }
   }, [urlAddress]);
 

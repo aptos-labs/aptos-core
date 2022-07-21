@@ -8,31 +8,32 @@ sidebar_position: 14
 
 Do this only if you received the confirmation email from Aptos team for your eligibility. Nodes not selected will not have enough tokens to join the testnet. You can still run public fullnode in this case if you want.
 
-## Boostrapping validator node
+## Bootstrapping validator node
 
-Before joining the testnet, you need to bootstrap your node with the genesis blob and waypoint provided by Aptos Labs team. This will convert your node from test mode to prod mode.
+Before joining the testnet, you need to bootstrap your node with the genesis blob and waypoint provided by Aptos Labs team. This will convert your node from test mode to prod mode. AIT2 network Chain ID is 41.
 
 ### Using source code
 
 - Stop your node and remove the data directory.
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- Pull the latest changes on `testnet` branch, make sure you're at commit `3b53225b5a1effcce5dee9597a129216510dc424`
-- Close the metrics port `9101` and REST API port `80` for your validator and fullnode
+- Pull the latest changes on `testnet` branch, make sure you're at commit `6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6`
+- Close the metrics port `9101` and REST API port `80` for your validator (you can leave it open for fullnode).
 - Restarting the node
 
 ### Using Docker
 
 - Stop your node and remove the data volumes, `docker compose down --volumes`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- Update your docker image to use tag `testnet_3b53225b5a1effcce5dee9597a129216510dc424`. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_3b53225b5a1effcce5dee9597a129216510dc424/images/sha256-1625f70457a6060ae2e64e699274e1ddca02cb7856406a40d1891b6bf84ae072?context=explore)
-- Close metrics port on 9101 and REST API port `80` for your validator and fullnode (remove it from the docker compose file)
+- Update your docker image to use tag `testnet_6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6`. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6/images/sha256-5a97797af8dea7465ac011fec3fac11c0d4cdb42f3883292a6e0ed3e27be4b51?context=explore)
+- Close metrics port on 9101 and REST API port `80` for your validator (remove it from the docker compose file), you can leave it open for fullnode.
 - Restarting the node: `docker compose up`
 
 ### Using Terraform
 
 - Increase `era` number in your Terraform config, this will wipe the data once applied.
-- Update your docker image to use tag `testnet_3b53225b5a1effcce5dee9597a129216510dc424` in the Terraform config. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_3b53225b5a1effcce5dee9597a129216510dc424/images/sha256-1625f70457a6060ae2e64e699274e1ddca02cb7856406a40d1891b6bf84ae072?context=explore)
-- Close metrics port and REST API port for validator and fullnode, add the helm values in your `main.tf ` file, for example:
+- Update `chain_id` to 41.
+- Update your docker image to use tag `testnet_6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6` in the Terraform config. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6/images/sha256-5a97797af8dea7465ac011fec3fac11c0d4cdb42f3883292a6e0ed3e27be4b51?context=explore)
+- Close metrics port and REST API port for validator (you can leave it open for fullnode), add the helm values in your `main.tf ` file, for example:
     ```
     module "aptos-node" {
         ...
@@ -63,19 +64,34 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 ## Joining Validator Set
 
-All the selected validator node will be receiving sufficient amount of test token (101,000,000) airdrop from Aptos Labs team to stake their node.
+All the selected validator node will be receiving sufficient amount of test coin (100,100,000) airdrop from Aptos Labs team to stake their node. The coin airdrop will happen in batches to make sure we don't have too many nodes joining at the same time, please check your balance before exeucting those steps. You can see your balance on explorer: `https://explorer.devnet.aptos.dev/account/<Your-Account-Address>?network=ait2`
 
 1. Initialize Aptos CLI
 
     ```
     aptos init --profile ait2 \
-    --private-key <account-private-key> \
+    --private-key <account_private_key> \
     --rest-url http://ait2.aptosdev.com \
-    --faucet-url http://ait2.aptosdev.com \
-    --assume-yes
+    --skip-faucet
+    ```
+    
+    Note: `account_private_key` can be found in the `private-keys.yaml` file.
+
+2. Check your validator account balance
+
+    ```
+    aptos account list --profile ait2
+    ```
+    
+    This will show you the coin balance you have in the validator account. You should be able to see something like:
+    
+    ```
+    "coin": {
+        "value": "100100000"
+      }
     ```
 
-2. Register validator candidate on chain
+3. Register validator candidate on chain
 
     ```
     aptos node register-validator-candidate \
@@ -85,7 +101,7 @@ All the selected validator node will be receiving sufficient amount of test toke
 
     Replace `aptosbot.yaml` with your validator node config file.
 
-3. Add stake to your validator node
+4. Add stake to your validator node
 
     ```
     aptos node add-stake --amount 100000000 --profile ait2
@@ -93,26 +109,38 @@ All the selected validator node will be receiving sufficient amount of test toke
 
     Please don't add too much stake to make sure you still have sufficient token to pay gas fee.
 
-4. Set lockup time for your stake, minimal of 72 hours is required to join validator set.
+5. Set lockup time for your stake. Longer lockup time will result in more staking reward. Minimal lockup time is 24 hours, and maximal is 5 days.
 
     ```
     aptos node increase-lockup \
     --profile ait2 \
-    --lockup-duration 75h
+    --lockup-duration 72h
     ```
 
-5. Join validator set
+6. Join validator set
 
     ```
-    aptos -- node join-validator-set --profile ait2
+    aptos node join-validator-set --profile ait2
     ```
 
     ValidatorSet will be updated at every epoch change, which is **once every hour**. You will only see your node joining the validator set in next epoch. Both Validator and fullnode will start syncing once your validator is in the validator set.
 
+7. Check validator set
+
+    ```
+    aptos node show-validator-set --profile ait2 | jq -r '.Result.pending_active' | grep <account_address>
+    ```
+    
+    You should be able to see your validator node in "pending_active" list. And when the next epoch change happens, the node will be moved into "active_validators" list. This should happen within one hour from the completion of previous step. During this time, you might see errors like "No connected AptosNet peers", which is normal.
+    
+    ```
+    aptos node show-validator-set --profile ait2 | jq -r '.Result.active_validators' | grep <account_address>
+    ```
+
 
 ## Verify node connections
 
-You can check the details about node liveness definition [here](https://aptos.dev/reference/node-liveness-criteria/#verifying-the-liveness-of-your-node).
+You can check the details about node liveness definition [here](https://aptos.dev/reference/node-liveness-criteria/#verifying-the-liveness-of-your-node). Once your validator node joined the validator set, you can verify the correctness following those steps:
 
 1. Verify that your node is connecting to other peers on testnet. (Replace `127.0.0.1` with your Validator IP/DNS if deployed on the cloud)
 
@@ -135,10 +163,12 @@ You can check the details about node liveness definition [here](https://aptos.de
     curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_network_peer_connected{.*remote_peer_id=\"<Aptos Peer ID>\".*}"
     ```
 
-3. Once we have enough nodes coming online to form consensus, you can also check if consensus is making progress
+3. Once your node state sync to the latest version, you can also check if consensus is making progress, and your node is proposing
 
     ```
     curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_consensus_current_round"
+
+    curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_consensus_proposals_count"
     ```
 
     You should expect to see this number keep increasing.

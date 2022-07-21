@@ -12,7 +12,7 @@
     "lint": "eslint \"**/*.ts\"",
     "push": "yarn publish --non-interactive --new-version",
     "test": "jest",
-    "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts'",
+    "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.js'",
     "fmt": "yarn _fmt --write",
     "fmt:check": "yarn _fmt --check",
     "cov:clean": "rm -rf coverage",
@@ -40,6 +40,7 @@
     "eslint": "^7.32.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-airbnb-typescript": "^17.0.0",
+    "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-import": "^2.25.4",
     "jest": "^27.5.1",
     "prettier": "^2.6.2",
@@ -50,8 +51,8 @@
     "typescript": "^4.6.3"
   },
   "dependencies": {
+    "@scure/bip39": "^1.1.0",
     "axios": "^0.26.1",
-    "bip39-light": "^1.0.7",
     "buffer": "^6.0.3",
     "ed25519-hd-key": "^1.2.0",
     "js-sha3": "^0.8.0",

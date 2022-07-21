@@ -72,9 +72,22 @@ where
     }
 }
 
+#[derive(Debug)]
 pub enum GetMetricResult {
     Present(u64),
     Missing(EvaluationResult),
+}
+
+impl GetMetricResult {
+    pub fn unwrap(self, evaluation_results: &mut Vec<EvaluationResult>) -> Option<u64> {
+        match self {
+            GetMetricResult::Present(value) => Some(value),
+            GetMetricResult::Missing(evaluation_result) => {
+                evaluation_results.push(evaluation_result);
+                None
+            }
+        }
+    }
 }
 
 pub fn parse_metrics(metrics: Vec<String>) -> Result<PrometheusScrape> {

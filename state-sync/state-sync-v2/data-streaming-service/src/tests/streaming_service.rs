@@ -11,10 +11,10 @@ use crate::{
     streaming_service::DataStreamingService,
     tests::utils::{
         create_ledger_info, get_data_notification, initialize_logger, MockAptosDataClient,
-        MAX_ADVERTISED_ACCOUNTS, MAX_ADVERTISED_EPOCH_END, MAX_ADVERTISED_TRANSACTION,
+        MAX_ADVERTISED_EPOCH_END, MAX_ADVERTISED_STATES, MAX_ADVERTISED_TRANSACTION,
         MAX_ADVERTISED_TRANSACTION_OUTPUT, MAX_REAL_EPOCH_END, MAX_REAL_TRANSACTION,
-        MAX_REAL_TRANSACTION_OUTPUT, MIN_ADVERTISED_ACCOUNTS, MIN_ADVERTISED_EPOCH_END,
-        MIN_ADVERTISED_TRANSACTION, MIN_ADVERTISED_TRANSACTION_OUTPUT, TOTAL_NUM_ACCOUNTS,
+        MAX_REAL_TRANSACTION_OUTPUT, MIN_ADVERTISED_EPOCH_END, MIN_ADVERTISED_STATES,
+        MIN_ADVERTISED_TRANSACTION, MIN_ADVERTISED_TRANSACTION_OUTPUT, TOTAL_NUM_STATE_VALUES,
     },
 };
 use aptos_config::config::DataStreamingServiceConfig;
@@ -27,13 +27,13 @@ macro_rules! unexpected_payload_type {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_notifications_accounts() {
+async fn test_notifications_state_values() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
 
-    // Request an account stream and get a data stream listener
+    // Request a state value stream and get a data stream listener
     let mut stream_listener = streaming_client
-        .get_all_accounts(MAX_ADVERTISED_ACCOUNTS, None)
+        .get_all_state_values(MAX_ADVERTISED_STATES, None)
         .await
         .unwrap();
 
@@ -42,50 +42,55 @@ async fn test_notifications_accounts() {
     loop {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
         match data_notification.data_payload {
-            DataPayload::AccountStatesWithProof(accounts_with_proof) => {
-                // Verify the account start index matches the expected index
-                assert_eq!(accounts_with_proof.first_index, next_expected_index);
+            DataPayload::StateValuesWithProof(state_values_with_proof) => {
+                // Verify the start index matches the expected index
+                assert_eq!(state_values_with_proof.first_index, next_expected_index);
 
-                // Verify the last account index matches the account list length
-                let num_accounts = accounts_with_proof.raw_values.len() as u64;
+                // Verify the last index matches the state value list length
+                let num_state_values = state_values_with_proof.raw_values.len() as u64;
                 assert_eq!(
-                    accounts_with_proof.last_index,
-                    next_expected_index + num_accounts - 1,
+                    state_values_with_proof.last_index,
+                    next_expected_index + num_state_values - 1,
                 );
 
-                // Verify the number of account blobs is as expected
-                assert_eq!(accounts_with_proof.raw_values.len() as u64, num_accounts);
+                // Verify the number of state values is as expected
+                assert_eq!(
+                    state_values_with_proof.raw_values.len() as u64,
+                    num_state_values
+                );
 
-                next_expected_index += num_accounts;
+                next_expected_index += num_state_values;
             }
-            DataPayload::EndOfStream => return assert_eq!(next_expected_index, TOTAL_NUM_ACCOUNTS),
+            DataPayload::EndOfStream => {
+                return assert_eq!(next_expected_index, TOTAL_NUM_STATE_VALUES)
+            }
             data_payload => unexpected_payload_type!(data_payload),
         }
     }
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_notifications_accounts_multiple_streams() {
+async fn test_notifications_state_values_multiple_streams() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
 
-    // Request a new account stream starting at the next expected index.
+    // Request a new state value stream starting at the next expected index.
     let mut next_expected_index = 0;
     let mut stream_listener = streaming_client
-        .get_all_accounts(MAX_ADVERTISED_ACCOUNTS, Some(next_expected_index))
+        .get_all_state_values(MAX_ADVERTISED_STATES, Some(next_expected_index))
         .await
         .unwrap();
 
-    // Terminate and request new account streams at increasing versions
+    // Terminate and request new state value streams at increasing versions
     loop {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
         match data_notification.data_payload {
-            DataPayload::AccountStatesWithProof(accounts_with_proof) => {
+            DataPayload::StateValuesWithProof(state_values_with_proof) => {
                 // Verify the indices
-                assert_eq!(accounts_with_proof.first_index, next_expected_index);
-                next_expected_index += accounts_with_proof.raw_values.len() as u64;
+                assert_eq!(state_values_with_proof.first_index, next_expected_index);
+                next_expected_index += state_values_with_proof.raw_values.len() as u64;
 
-                if next_expected_index < TOTAL_NUM_ACCOUNTS {
+                if next_expected_index < TOTAL_NUM_STATE_VALUES {
                     // Terminate the stream
                     streaming_client
                         .terminate_stream_with_feedback(
@@ -97,12 +102,14 @@ async fn test_notifications_accounts_multiple_streams() {
 
                     // Fetch a new stream
                     stream_listener = streaming_client
-                        .get_all_accounts(MAX_ADVERTISED_ACCOUNTS, Some(next_expected_index))
+                        .get_all_state_values(MAX_ADVERTISED_STATES, Some(next_expected_index))
                         .await
                         .unwrap();
                 }
             }
-            DataPayload::EndOfStream => return assert_eq!(next_expected_index, TOTAL_NUM_ACCOUNTS),
+            DataPayload::EndOfStream => {
+                return assert_eq!(next_expected_index, TOTAL_NUM_STATE_VALUES)
+            }
             data_payload => unexpected_payload_type!(data_payload),
         }
     }
@@ -715,25 +722,25 @@ async fn test_notifications_transactions_multiple_streams() {
 }
 
 #[tokio::test]
-async fn test_stream_accounts() {
+async fn test_stream_states() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
 
-    // Request an account stream and verify we get a data stream listener
+    // Request a state value stream and verify we get a data stream listener
     let result = streaming_client
-        .get_all_accounts(MAX_ADVERTISED_ACCOUNTS - 1, None)
+        .get_all_state_values(MAX_ADVERTISED_STATES - 1, None)
         .await;
     assert_ok!(result);
 
-    // Request a stream where accounts are missing (we are lower than advertised)
+    // Request a stream where states are missing (we are lower than advertised)
     let result = streaming_client
-        .get_all_accounts(MIN_ADVERTISED_ACCOUNTS - 1, None)
+        .get_all_state_values(MIN_ADVERTISED_STATES - 1, None)
         .await;
     assert_matches!(result, Err(Error::DataIsUnavailable(_)));
 
-    // Request a stream where accounts are missing (we are lower than advertised)
+    // Request a stream where states are missing (we are higher than advertised)
     let result = streaming_client
-        .get_all_accounts(MAX_ADVERTISED_EPOCH_END + 1, None)
+        .get_all_state_values(MAX_ADVERTISED_EPOCH_END + 1, None)
         .await;
     assert_matches!(result, Err(Error::DataIsUnavailable(_)));
 }
@@ -1027,16 +1034,16 @@ async fn test_terminate_stream() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
 
-    // Request an account stream
+    // Request a state value stream
     let mut stream_listener = streaming_client
-        .get_all_accounts(MAX_ADVERTISED_ACCOUNTS - 1, None)
+        .get_all_state_values(MAX_ADVERTISED_STATES - 1, None)
         .await
         .unwrap();
 
-    // Fetch the first account notification and then terminate the stream
+    // Fetch the first state value notification and then terminate the stream
     let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
     match data_notification.data_payload {
-        DataPayload::AccountStatesWithProof(_) => {}
+        DataPayload::StateValuesWithProof(_) => {}
         data_payload => unexpected_payload_type!(data_payload),
     }
 
@@ -1053,7 +1060,7 @@ async fn test_terminate_stream() {
     loop {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
         match data_notification.data_payload {
-            DataPayload::AccountStatesWithProof(_) => {}
+            DataPayload::StateValuesWithProof(_) => {}
             DataPayload::EndOfStream => panic!("The stream should have terminated!"),
             data_payload => unexpected_payload_type!(data_payload),
         }

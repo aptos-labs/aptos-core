@@ -26,7 +26,7 @@ aptos-secure-net = { path = "../../secure/net" }
 aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 consensus-types = { path = "../../consensus/consensus-types" }
 executor-types = { path = "../executor-types" }
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }

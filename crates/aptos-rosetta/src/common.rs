@@ -1,24 +1,27 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::types::aptos_coin_identifier_lower;
 use crate::{
     error::{ApiError, ApiResult},
-    types::NetworkIdentifier,
+    types::{
+        aptos_coin_identifier, Currency, CurrencyMetadata, MetadataRequest, NetworkIdentifier,
+        PartialBlockIdentifier,
+    },
     RosettaContext,
 };
-use aptos_crypto::ValidCryptoMaterial;
+use aptos_crypto::{ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_logger::debug;
-use aptos_rest_client::{aptos::Balance, Account, Response};
+use aptos_rest_client::{aptos_api_types::BlockInfo, Account, Response};
+use aptos_sdk::move_types::language_storage::{StructTag, TypeTag};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{
-    convert::{Infallible, TryInto},
-    future::Future,
-    str::FromStr,
-};
+use std::{convert::Infallible, fmt::LowerHex, future::Future, str::FromStr};
 use warp::Filter;
 
+/// The year 2000 in seconds, as this is the lower limit for Rosetta API implementations
+const Y2K_SECS: u64 = 946713600000;
 pub const BLOCKCHAIN: &str = "aptos";
 
 /// Checks the request network matches the server network
@@ -27,12 +30,13 @@ pub fn check_network(
     server_context: &RosettaContext,
 ) -> ApiResult<()> {
     if network_identifier.blockchain == BLOCKCHAIN
-        || ChainId::from_str(network_identifier.network.trim()).map_err(|_| ApiError::BadNetwork)?
+        || ChainId::from_str(network_identifier.network.trim())
+            .map_err(|_| ApiError::NetworkIdentifierMismatch)?
             == server_context.chain_id
     {
         Ok(())
     } else {
-        Err(ApiError::BadNetwork)
+        Err(ApiError::NetworkIdentifierMismatch)
     }
 }
 
@@ -43,11 +47,9 @@ pub fn with_context(
     warp::any().map(move || context.clone())
 }
 
-#[derive(Deserialize, Serialize)]
-pub struct EmptyRequest;
-
-pub fn with_empty_request() -> impl Filter<Extract = (EmptyRequest,), Error = Infallible> + Clone {
-    warp::any().map(move || EmptyRequest)
+pub fn with_empty_request() -> impl Filter<Extract = (MetadataRequest,), Error = Infallible> + Clone
+{
+    warp::any().map(move || MetadataRequest {})
 }
 
 /// Handles a generic request to warp
@@ -98,23 +100,19 @@ pub async fn get_account(
     rest_client
         .get_account(address)
         .await
-        .map_err(|_| ApiError::AccountNotFound)
-}
-
-pub async fn get_account_balance(
-    rest_client: &aptos_rest_client::Client,
-    address: AccountAddress,
-) -> ApiResult<Response<Balance>> {
-    rest_client
-        .get_account_balance(address)
-        .await
-        .map_err(|_| ApiError::AccountNotFound)
+        .map_err(|_| ApiError::AccountNotFound(Some(address.to_string())))
 }
 
 /// Retrieve the timestamp according ot the Rosetta spec (milliseconds)
-pub fn get_timestamp<T>(response: &Response<T>) -> u64 {
+pub fn get_timestamp(block_info: BlockInfo) -> u64 {
     // note: timestamps are in microseconds, so we convert to milliseconds
-    response.state().timestamp_usecs / 1000
+    let mut timestamp = block_info.block_timestamp / 1000;
+
+    // Rosetta doesn't like timestamps before 2000
+    if timestamp < Y2K_SECS {
+        timestamp = Y2K_SECS;
+    }
+    timestamp
 }
 
 /// Strips the `0x` prefix on hex strings
@@ -136,8 +134,94 @@ pub fn decode_key<T: DeserializeOwned + ValidCryptoMaterial>(
     str: &str,
     type_name: &'static str,
 ) -> ApiResult<T> {
-    hex::decode(str)?
-        .as_slice()
-        .try_into()
-        .map_err(|_| ApiError::deserialization_failed(type_name))
+    T::from_encoded_string(str).map_err(|_| ApiError::deserialization_failed(type_name))
+}
+
+const DEFAULT_COIN: &str = "APTOS";
+const DEFAULT_DECIMALS: u64 = 8;
+
+pub fn native_coin() -> Currency {
+    Currency {
+        symbol: DEFAULT_COIN.to_string(),
+        decimals: DEFAULT_DECIMALS,
+        metadata: Some(CurrencyMetadata {
+            move_type: native_coin_tag_lower().to_string(),
+        }),
+    }
+}
+
+pub fn native_coin_tag() -> TypeTag {
+    TypeTag::Struct(StructTag {
+        address: AccountAddress::ONE,
+        module: aptos_coin_identifier(),
+        name: aptos_coin_identifier(),
+        type_params: vec![],
+    })
+}
+
+pub fn native_coin_tag_lower() -> TypeTag {
+    TypeTag::Struct(StructTag {
+        address: AccountAddress::ONE,
+        module: aptos_coin_identifier_lower(),
+        name: aptos_coin_identifier(),
+        type_params: vec![],
+    })
+}
+
+pub fn is_native_coin(currency: &Currency) -> ApiResult<()> {
+    if currency == &native_coin() {
+        Ok(())
+    } else {
+        Err(ApiError::UnsupportedCurrency(Some(currency.symbol.clone())))
+    }
+}
+
+/// Determines which block to pull for the request
+pub async fn get_block_index_from_request(
+    server_context: &RosettaContext,
+    partial_block_identifier: Option<PartialBlockIdentifier>,
+) -> ApiResult<u64> {
+    Ok(match partial_block_identifier {
+        Some(PartialBlockIdentifier {
+            index: Some(_),
+            hash: Some(_),
+        }) => {
+            return Err(ApiError::BlockParameterConflict);
+        }
+        // Lookup by block index
+        Some(PartialBlockIdentifier {
+            index: Some(block_index),
+            hash: None,
+        }) => block_index,
+        // Lookup by block hash
+        Some(PartialBlockIdentifier {
+            index: None,
+            hash: Some(hash),
+        }) => {
+            server_context
+                .block_cache()?
+                .get_block_index_by_hash(&aptos_rest_client::aptos_api_types::HashValue::from_str(
+                    &hash,
+                )?)
+                .await?
+        }
+        // Lookup latest version
+        _ => {
+            let response = server_context
+                .rest_client()?
+                .get_ledger_information()
+                .await?;
+            let state = response.state();
+
+            server_context
+                .block_cache()?
+                .get_block_info_by_version(state.version)
+                .await?
+                .block_height
+        }
+    })
+}
+
+pub fn to_hex_lower<T: LowerHex>(obj: &T) -> String {
+    format!("{:x}", obj)
 }

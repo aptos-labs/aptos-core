@@ -13,7 +13,7 @@ use aptos_types::{
     move_resource::MoveStorage, transaction::TransactionListWithProof,
 };
 use event_notifications::{EventNotificationSender, EventSubscriptionService};
-use executor_types::{in_memory_state_calculator::IntoLedgerView, ChunkExecutorTrait};
+use executor_types::ChunkExecutorTrait;
 use std::sync::Arc;
 use storage_interface::DbReader;
 
@@ -85,19 +85,9 @@ impl<C: ChunkExecutorTrait> ExecutorProxyTrait for ExecutorProxy<C> {
         let current_epoch_state = storage_info.get_epoch_state().clone();
         let latest_ledger_info = storage_info.latest_ledger_info.clone();
 
-        let synced_trees = storage_info
-            .into_latest_tree_state()
-            .into_ledger_view(&self.storage)
-            .map_err(|error| {
-                Error::UnexpectedError(format!(
-                    "Failed to construct latest ledger view from storage: {}",
-                    error
-                ))
-            })?;
-
         Ok(SyncState::new(
             latest_ledger_info,
-            synced_trees,
+            storage_info.into_latest_executed_trees(),
             current_epoch_state,
         ))
     }
@@ -754,7 +744,7 @@ mod tests {
             sequence_number,
             genesis_key.clone(),
             genesis_key.public_key(),
-            Some(aptos_stdlib::encode_test_coin_transfer(
+            Some(aptos_stdlib::encode_aptos_coin_transfer(
                 validator_account,
                 1_000_000,
             )),
@@ -791,7 +781,7 @@ mod tests {
     }
 
     fn create_random_event_key() -> EventKey {
-        EventKey::new_from_address(&AccountAddress::random(), 0)
+        EventKey::new(0, AccountAddress::random())
     }
 
     /// Defines a new on-chain config for test purposes.
@@ -801,6 +791,7 @@ mod tests {
     }
 
     impl OnChainConfig for TestOnChainConfig {
-        const IDENTIFIER: &'static str = "TestOnChainConfig";
+        const MODULE_IDENTIFIER: &'static str = "test_on_chain_config";
+        const TYPE_IDENTIFIER: &'static str = "TestOnChainConfig";
     }
 }

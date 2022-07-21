@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    configurable_validator_signer::ConfigurableValidatorSigner,
     consensus_state::ConsensusState,
     counters,
     error::Error,
@@ -10,16 +9,13 @@ use crate::{
     persistent_safety_storage::PersistentSafetyStorage,
     t_safety_rules::TSafetyRules,
 };
-use aptos_crypto::{
-    ed25519::{Ed25519PublicKey, Ed25519Signature},
-    hash::CryptoHash,
-    traits::Signature,
-};
+use aptos_crypto::{bls12381, hash::CryptoHash};
 use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    validator_signer::ValidatorSigner,
     waypoint::Waypoint,
 };
 use consensus_types::{
@@ -30,7 +26,7 @@ use consensus_types::{
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_data::VoteData,
-    vote_proposal::MaybeSignedVoteProposal,
+    vote_proposal::VoteProposal,
 };
 use serde::Serialize;
 use std::cmp::Ordering;
@@ -42,33 +38,16 @@ pub(crate) fn next_round(round: Round) -> Result<Round, Error> {
 /// @TODO consider a cache of verified QCs to cut down on verification costs
 pub struct SafetyRules {
     pub(crate) persistent_storage: PersistentSafetyStorage,
-    pub(crate) execution_public_key: Option<Ed25519PublicKey>,
-    pub(crate) export_consensus_key: bool,
-    pub(crate) validator_signer: Option<ConfigurableValidatorSigner>,
+    pub(crate) validator_signer: Option<ValidatorSigner>,
     pub(crate) epoch_state: Option<EpochState>,
 }
 
 impl SafetyRules {
     /// Constructs a new instance of SafetyRules with the given persistent storage and the
     /// consensus private keys
-    pub fn new(
-        persistent_storage: PersistentSafetyStorage,
-        verify_vote_proposal_signature: bool,
-        export_consensus_key: bool,
-    ) -> Self {
-        let execution_public_key = if verify_vote_proposal_signature {
-            Some(
-                persistent_storage
-                    .execution_public_key()
-                    .expect("Unable to retrieve execution public key"),
-            )
-        } else {
-            None
-        };
+    pub fn new(persistent_storage: PersistentSafetyStorage) -> Self {
         Self {
             persistent_storage,
-            execution_public_key,
-            export_consensus_key,
             validator_signer: None,
             epoch_state: None,
         }
@@ -77,18 +56,8 @@ impl SafetyRules {
     /// Validity checks
     pub(crate) fn verify_proposal(
         &mut self,
-        maybe_signed_vote_proposal: &MaybeSignedVoteProposal,
+        vote_proposal: &VoteProposal,
     ) -> Result<VoteData, Error> {
-        let vote_proposal = &maybe_signed_vote_proposal.vote_proposal;
-        let execution_signature = maybe_signed_vote_proposal.signature.as_ref();
-
-        if let Some(public_key) = self.execution_public_key.as_ref() {
-            execution_signature
-                .ok_or(Error::VoteProposalSignatureNotFound)?
-                .verify(vote_proposal, public_key)
-                .map_err(|error| Error::InternalError(error.to_string()))?;
-        }
-
         let proposed_block = vote_proposal.block();
         let safety_data = self.persistent_storage.safety_data()?;
 
@@ -110,12 +79,12 @@ impl SafetyRules {
     pub(crate) fn sign<T: Serialize + CryptoHash>(
         &self,
         message: &T,
-    ) -> Result<Ed25519Signature, Error> {
+    ) -> Result<bls12381::Signature, Error> {
         let signer = self.signer()?;
-        signer.sign(message, &self.persistent_storage)
+        Ok(signer.sign(message))
     }
 
-    pub(crate) fn signer(&self) -> Result<&ConfigurableValidatorSigner, Error> {
+    pub(crate) fn signer(&self) -> Result<&ValidatorSigner, Error> {
         self.validator_signer
             .as_ref()
             .ok_or_else(|| Error::NotInitialized("validator_signer".into()))
@@ -299,17 +268,15 @@ impl SafetyRules {
                         "in set",
                     );
                     Ok(())
-                } else if self.export_consensus_key {
+                } else {
                     // Try to export the consensus key directly from storage.
                     match self
                         .persistent_storage
                         .consensus_key_for_version(expected_key)
                     {
                         Ok(consensus_key) => {
-                            self.validator_signer = Some(ConfigurableValidatorSigner::new_signer(
-                                author,
-                                consensus_key,
-                            ));
+                            self.validator_signer =
+                                Some(ValidatorSigner::new(author, consensus_key));
                             Ok(())
                         }
                         Err(Error::SecureStorageMissingDataError(error)) => {
@@ -317,16 +284,6 @@ impl SafetyRules {
                         }
                         Err(error) => Err(error),
                     }
-                } else {
-                    // Try to generate a signature over a test message to ensure the expected key
-                    // is actually held in storage.
-                    self.validator_signer = Some(ConfigurableValidatorSigner::new_handle(
-                        author,
-                        expected_key,
-                    ));
-                    self.sign(ledger_info)
-                        .map(|_signature| ())
-                        .map_err(|error| Error::ValidatorKeyNotFound(error.to_string()))
                 }
             }
         };
@@ -339,7 +296,10 @@ impl SafetyRules {
         })
     }
 
-    fn guarded_sign_proposal(&mut self, block_data: &BlockData) -> Result<Ed25519Signature, Error> {
+    fn guarded_sign_proposal(
+        &mut self,
+        block_data: &BlockData,
+    ) -> Result<bls12381::Signature, Error> {
         self.signer()?;
         self.verify_author(block_data.author())?;
 
@@ -366,7 +326,7 @@ impl SafetyRules {
         &mut self,
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
-    ) -> Result<Ed25519Signature, Error> {
+    ) -> Result<bls12381::Signature, Error> {
         self.signer()?;
 
         let old_ledger_info = ledger_info.ledger_info();
@@ -410,7 +370,7 @@ impl TSafetyRules for SafetyRules {
         run_and_log(cb, |log| log, LogEntry::Initialize)
     }
 
-    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<Ed25519Signature, Error> {
+    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<bls12381::Signature, Error> {
         let round = block_data.round();
         let cb = || self.guarded_sign_proposal(block_data);
         run_and_log(cb, |log| log.round(round), LogEntry::SignProposal)
@@ -420,7 +380,7 @@ impl TSafetyRules for SafetyRules {
         &mut self,
         timeout: &TwoChainTimeout,
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
-    ) -> Result<Ed25519Signature, Error> {
+    ) -> Result<bls12381::Signature, Error> {
         let cb = || self.guarded_sign_timeout_with_qc(timeout, timeout_cert);
         run_and_log(
             cb,
@@ -431,13 +391,11 @@ impl TSafetyRules for SafetyRules {
 
     fn construct_and_sign_vote_two_chain(
         &mut self,
-        maybe_signed_vote_proposal: &MaybeSignedVoteProposal,
+        vote_proposal: &VoteProposal,
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
     ) -> Result<Vote, Error> {
-        let round = maybe_signed_vote_proposal.vote_proposal.block().round();
-        let cb = || {
-            self.guarded_construct_and_sign_vote_two_chain(maybe_signed_vote_proposal, timeout_cert)
-        };
+        let round = vote_proposal.block().round();
+        let cb = || self.guarded_construct_and_sign_vote_two_chain(vote_proposal, timeout_cert);
         run_and_log(
             cb,
             |log| log.round(round),
@@ -449,7 +407,7 @@ impl TSafetyRules for SafetyRules {
         &mut self,
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
-    ) -> Result<Ed25519Signature, Error> {
+    ) -> Result<bls12381::Signature, Error> {
         let cb = || self.guarded_sign_commit_vote(ledger_info, new_ledger_info);
         run_and_log(cb, |log| log, LogEntry::SignCommitVote)
     }

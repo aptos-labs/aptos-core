@@ -3,6 +3,7 @@
 
 use crate::{Factory, GenesisConfig, Result, Swarm, Version};
 use anyhow::bail;
+use aptos_logger::info;
 use rand::rngs::StdRng;
 use std::{convert::TryInto, num::NonZeroUsize};
 
@@ -18,9 +19,12 @@ use aptos_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
 
 pub struct K8sFactory {
     root_key: [u8; ED25519_PRIVATE_KEY_LENGTH],
-    helm_repo: String,
     image_tag: String,
     base_image_tag: String,
+    kube_namespace: String,
+    use_port_forward: bool,
+    keep: bool,
+    enable_haproxy: bool,
 }
 
 // These are test keys for forge ephemeral networks. Do not use these elsewhere!
@@ -30,15 +34,40 @@ const DEFAULT_ROOT_PRIV_KEY: &str =
     "E25708D90C72A53B400B27FC7602C4D546C7B7469FA6E12544F0EBFB2F16AE19";
 
 impl K8sFactory {
-    pub fn new(helm_repo: String, image_tag: String, base_image_tag: String) -> Result<K8sFactory> {
+    pub fn new(
+        kube_namespace: String,
+        image_tag: String,
+        base_image_tag: String,
+        use_port_forward: bool,
+        keep: bool,
+        enable_haproxy: bool,
+    ) -> Result<K8sFactory> {
         let root_key: [u8; ED25519_PRIVATE_KEY_LENGTH] =
             hex::decode(DEFAULT_ROOT_PRIV_KEY)?.try_into().unwrap();
 
+        match kube_namespace.as_str() {
+            "default" => {
+                info!("Using the default kubernetes namespace");
+            }
+            s if s.starts_with("forge") => {
+                info!("Using forge namespace: {}", s);
+            }
+            _ => {
+                bail!(
+                    "Invalid kubernetes namespace provided: {}. Use forge-*",
+                    kube_namespace
+                );
+            }
+        }
+
         Ok(Self {
             root_key,
-            helm_repo,
             image_tag,
             base_image_tag,
+            kube_namespace,
+            use_port_forward,
+            keep,
+            enable_haproxy,
         })
     }
 }
@@ -71,24 +100,36 @@ impl Factory for K8sFactory {
             None => None,
         };
 
-        uninstall_testnet_resources().await?;
-        let era = reinstall_testnet_resources(
-            self.helm_repo.clone(),
+        // create the forge-management configmap before installing anything
+        create_management_configmap(self.kube_namespace.clone(), self.keep).await?;
+
+        // try installing testnet resources, but clean up if it fails
+        let (_era, validators, fullnodes) = match install_testnet_resources(
+            self.kube_namespace.clone(),
             node_num.get(),
             format!("{}", init_version),
             format!("{}", genesis_version),
-            false,
             genesis_modules_path,
+            self.use_port_forward,
+            self.enable_haproxy,
         )
-        .await?;
+        .await
+        {
+            Ok(res) => res,
+            Err(e) => {
+                uninstall_testnet_resources(self.kube_namespace.clone()).await?;
+                bail!(e);
+            }
+        };
 
         let swarm = K8sSwarm::new(
             &self.root_key,
-            &self.helm_repo,
             &self.image_tag,
             &self.base_image_tag,
-            format!("{}", init_version).as_str(),
-            &era,
+            &self.kube_namespace,
+            validators,
+            fullnodes,
+            self.keep,
         )
         .await
         .unwrap();

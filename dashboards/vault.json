@@ -364,37 +364,37 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "vault_dynamodb_get{chain_name=~\"$chain_name\", quantile=\"0.99\"}",
+          "expr": "vault_dynamodb_get{chain_name=~\"$chain_name\", namespace=~\"$namespace\", quantile=\"0.99\"}",
           "interval": "",
           "legendFormat": "get",
           "refId": "A"
         },
         {
-          "expr": "vault_dynamodb_put{chain_name=~\"$chain_name\", quantile=\"0.99\"}",
+          "expr": "vault_dynamodb_put{chain_name=~\"$chain_name\", namespace=~\"$namespace\", quantile=\"0.99\"}",
           "interval": "",
           "legendFormat": "put",
           "refId": "B"
         },
         {
-          "expr": "vault_spanner_list{chain_name=~\"$chain_name\", quantile=\"0.99\"}",
+          "expr": "vault_spanner_list{chain_name=~\"$chain_name\", namespace=~\"$namespace\", quantile=\"0.99\"}",
           "interval": "",
           "legendFormat": "list",
           "refId": "C"
         },
         {
-          "expr": "vault_spanner_put{chain_name=~\"$chain_name\", quantile=\"0.99\"}",
+          "expr": "vault_spanner_put{chain_name=~\"$chain_name\", namespace=~\"$namespace\", quantile=\"0.99\"}",
           "interval": "",
           "legendFormat": "put",
           "refId": "D"
         },
         {
-          "expr": "vault_azure_get{chain_name=~\"$chain_name\", quantile=\"0.99\"}",
+          "expr": "vault_azure_get{chain_name=~\"$chain_name\", namespace=~\"$namespace\", quantile=\"0.99\"}",
           "interval": "",
           "legendFormat": "get",
           "refId": "E"
         },
         {
-          "expr": "vault_azure_put{chain_name=~\"$chain_name\", quantile=\"0.99\"}",
+          "expr": "vault_azure_put{chain_name=~\"$chain_name\", namespace=~\"$namespace\", quantile=\"0.99\"}",
           "interval": "",
           "legendFormat": "put",
           "refId": "F"
@@ -449,6 +449,40 @@
         "regex": "",
         "skipUrlSync": false,
         "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(namespace)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "query": "label_values(namespace)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
       },
       {
         "current": {

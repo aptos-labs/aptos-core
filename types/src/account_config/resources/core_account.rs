@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::account_config::constants::CORE_ACCOUNT_MODULE_IDENTIFIER;
 use move_deps::move_core_types::{
     account_address::AccountAddress,
+    ident_str,
     identifier::IdentStr,
     move_resource::{MoveResource, MoveStructType},
 };
@@ -51,8 +51,8 @@ impl AccountResource {
 }
 
 impl MoveStructType for AccountResource {
-    const MODULE_NAME: &'static IdentStr = CORE_ACCOUNT_MODULE_IDENTIFIER;
-    const STRUCT_NAME: &'static IdentStr = CORE_ACCOUNT_MODULE_IDENTIFIER;
+    const MODULE_NAME: &'static IdentStr = ident_str!("account");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("Account");
 }
 
 impl MoveResource for AccountResource {}

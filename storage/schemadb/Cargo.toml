@@ -16,7 +16,6 @@ proptest = { version = "1.0.0", optional = true }
 
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 
 [dependencies.rocksdb]
 version = "0.17.0"

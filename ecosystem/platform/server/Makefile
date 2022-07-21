@@ -96,12 +96,15 @@ db-rollback:
 
 
 lint-ruby:
-	bundle exec rubocop -a
+	bundle exec rubocop -A
 
 lint-security:
 	bundle exec brakeman
 
-lint: lint-ruby lint-security
+lint-erb:
+	bundle exec erblint --lint-all
+
+lint: lint-ruby lint-security lint-erb
 
 
 run-console:

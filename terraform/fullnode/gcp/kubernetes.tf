@@ -29,10 +29,14 @@ provider "helm" {
   }
 }
 
+locals {
+  fullnode_helm_chart_path = "${path.module}/../../helm/fullnode"
+}
+
 resource "helm_release" "fullnode" {
   count            = var.num_fullnodes
   name             = "${terraform.workspace}${count.index}"
-  chart            = "${path.module}/../../helm/fullnode"
+  chart            = local.fullnode_helm_chart_path
   max_history      = 100
   wait             = false
   namespace        = var.k8s_namespace
@@ -41,7 +45,7 @@ resource "helm_release" "fullnode" {
   values = [
     jsonencode({
       chain = {
-        era  = var.era
+        era = var.era
       }
       image = {
         tag = var.image_tag
@@ -60,9 +64,10 @@ resource "helm_release" "fullnode" {
     jsonencode(var.fullnode_helm_values_list == {} ? {} : var.fullnode_helm_values_list[count.index]),
   ]
 
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
-    name  = "timestamp"
-    value = var.helm_force_update ? timestamp() : ""
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.fullnode_helm_chart_path, "**") : filesha1("${local.fullnode_helm_chart_path}/${f}")]))
   }
 }
 

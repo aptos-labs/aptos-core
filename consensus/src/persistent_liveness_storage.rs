@@ -12,7 +12,6 @@ use aptos_types::{
 use consensus_types::{
     block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
 };
-use executor_types::in_memory_state_calculator::IntoLedgerView;
 use std::{cmp::max, collections::HashSet, sync::Arc};
 use storage_interface::DbReader;
 
@@ -53,12 +52,7 @@ pub trait PersistentLivenessStorage: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct RootInfo(
-    pub Block,
-    pub QuorumCert,
-    pub QuorumCert,
-    pub LedgerInfoWithSignatures,
-);
+pub struct RootInfo(pub Block, pub QuorumCert, pub QuorumCert, pub QuorumCert);
 
 /// LedgerRecoveryData is a subset of RecoveryData that we can get solely from ledger info.
 #[derive(Clone)]
@@ -75,7 +69,7 @@ impl LedgerRecoveryData {
     /// and the ledger info for the root block, return an error if it can not be found.
     ///
     /// We guarantee that the block corresponding to the storage's latest ledger info always exists.
-    fn find_root(
+    pub fn find_root(
         &self,
         blocks: &mut Vec<Block>,
         quorum_certs: &mut Vec<QuorumCert>,
@@ -127,11 +121,15 @@ impl LedgerRecoveryData {
 
         info!("Consensus root block is {}", root_block);
 
+        let root_commit_cert = root_ordered_cert
+            .create_merged_with_executed_state(latest_ledger_info_sig)
+            .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
+
         Ok(RootInfo(
             root_block,
             root_quorum_cert,
             root_ordered_cert,
-            latest_ledger_info_sig,
+            root_commit_cert,
         ))
     }
 }
@@ -364,14 +362,8 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             .expect("unable to read ledger info from storage")
             .expect("startup info is None");
         let ledger_recovery_data = LedgerRecoveryData::new(startup_info.latest_ledger_info.clone());
-        let frozen_root_hashes = startup_info
-            .committed_tree_state
-            .ledger_frozen_subtree_hashes
-            .clone();
-        let root_executed_trees = startup_info
-            .committed_tree_state
-            .into_ledger_view(&self.aptos_db)
-            .expect("Failed to construct committed ledger view.");
+        let root_executed_trees = startup_info.committed_trees;
+
         match RecoveryData::new(
             last_vote,
             ledger_recovery_data.clone(),
@@ -379,7 +371,10 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             RootMetadata::new(
                 root_executed_trees.txn_accumulator().num_leaves(),
                 root_executed_trees.state_id(),
-                frozen_root_hashes,
+                root_executed_trees
+                    .txn_accumulator()
+                    .frozen_subtree_roots()
+                    .clone(),
             ),
             quorum_certs,
             highest_2chain_timeout_cert,

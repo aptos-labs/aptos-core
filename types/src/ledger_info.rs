@@ -9,7 +9,7 @@ use crate::{
     transaction::Version,
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
-use aptos_crypto::{ed25519::Ed25519Signature, hash::HashValue};
+use aptos_crypto::{bls12381, hash::HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -148,11 +148,11 @@ impl Display for LedgerInfoWithSignatures {
     }
 }
 
-// proxy to create LedgerInfoWithEd25519
+// proxy to create LedgerInfoWithbls12381::
 impl LedgerInfoWithSignatures {
     pub fn new(
         ledger_info: LedgerInfo,
-        signatures: BTreeMap<AccountAddress, Ed25519Signature>,
+        signatures: BTreeMap<AccountAddress, bls12381::Signature>,
     ) -> Self {
         LedgerInfoWithSignatures::V0(LedgerInfoWithV0::new(ledger_info, signatures))
     }
@@ -195,7 +195,7 @@ pub struct LedgerInfoWithV0 {
     ledger_info: LedgerInfo,
     /// The validator is identified by its account address: in order to verify a signature
     /// one needs to retrieve the public key of the validator for the given epoch.
-    signatures: BTreeMap<AccountAddress, Ed25519Signature>,
+    signatures: BTreeMap<AccountAddress, bls12381::Signature>,
 }
 
 impl Display for LedgerInfoWithV0 {
@@ -207,7 +207,7 @@ impl Display for LedgerInfoWithV0 {
 impl LedgerInfoWithV0 {
     pub fn new(
         ledger_info: LedgerInfo,
-        signatures: BTreeMap<AccountAddress, Ed25519Signature>,
+        signatures: BTreeMap<AccountAddress, bls12381::Signature>,
     ) -> Self {
         LedgerInfoWithV0 {
             ledger_info,
@@ -215,12 +215,12 @@ impl LedgerInfoWithV0 {
         }
     }
 
-    /// Create a new `LedgerInfoWithEd25519` at genesis with the given genesis
+    /// Create a new `LedgerInfoWithSignatures` at genesis with the given genesis
     /// state and initial validator set.
     ///
-    /// Note that the genesis `LedgerInfoWithEd25519` is unsigned. Validators
+    /// Note that the genesis `LedgerInfoWithSignatures` is unsigned. Validators
     /// and FullNodes are configured with the same genesis transaction and generate
-    /// an identical genesis `LedgerInfoWithEd25519` independently. In contrast,
+    /// an identical genesis `LedgerInfoWithSignatures` independently. In contrast,
     /// Clients will likely use a waypoint generated from the genesis `LedgerInfo`.
     pub fn genesis(genesis_state_root_hash: HashValue, validator_set: ValidatorSet) -> Self {
         Self::new(
@@ -237,7 +237,7 @@ impl LedgerInfoWithV0 {
         self.ledger_info.commit_info()
     }
 
-    pub fn add_signature(&mut self, validator: AccountAddress, signature: Ed25519Signature) {
+    pub fn add_signature(&mut self, validator: AccountAddress, signature: bls12381::Signature) {
         self.signatures.entry(validator).or_insert(signature);
     }
 
@@ -245,7 +245,7 @@ impl LedgerInfoWithV0 {
         self.signatures.remove(&validator);
     }
 
-    pub fn signatures(&self) -> &BTreeMap<AccountAddress, Ed25519Signature> {
+    pub fn signatures(&self) -> &BTreeMap<AccountAddress, bls12381::Signature> {
         &self.signatures
     }
 
@@ -277,7 +277,7 @@ impl Arbitrary for LedgerInfoWithV0 {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        let dummy_signature = Ed25519Signature::dummy_signature();
+        let dummy_signature = bls12381::Signature::dummy_signature();
         (
             proptest::arbitrary::any::<LedgerInfo>(),
             proptest::collection::vec(proptest::arbitrary::any::<AccountAddress>(), 0..100),

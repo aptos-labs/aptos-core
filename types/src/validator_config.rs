@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_address::NetworkAddress;
-use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_crypto::bls12381;
 use move_deps::move_core_types::{
     ident_str,
     identifier::IdentStr,
@@ -13,7 +13,7 @@ use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 
 impl MoveStructType for ValidatorConfig {
-    const MODULE_NAME: &'static IdentStr = ident_str!("Stake");
+    const MODULE_NAME: &'static IdentStr = ident_str!("stake");
     const STRUCT_NAME: &'static IdentStr = ident_str!("ValidatorConfig");
 }
 
@@ -25,7 +25,7 @@ pub struct ValidatorOperatorConfigResource {
 }
 
 impl MoveStructType for ValidatorOperatorConfigResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("ValidatorOperatorConfig");
+    const MODULE_NAME: &'static IdentStr = ident_str!("validator_operator_config");
     const STRUCT_NAME: &'static IdentStr = ident_str!("ValidatorOperatorConfig");
 }
 
@@ -34,7 +34,7 @@ impl MoveResource for ValidatorOperatorConfigResource {}
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ValidatorConfig {
-    pub consensus_public_key: Ed25519PublicKey,
+    pub consensus_public_key: bls12381::PublicKey,
     /// This is an bcs serialized Vec<NetworkAddress>
     pub validator_network_addresses: Vec<u8>,
     /// This is an bcs serialized Vec<NetworkAddress>
@@ -44,7 +44,7 @@ pub struct ValidatorConfig {
 
 impl ValidatorConfig {
     pub fn new(
-        consensus_public_key: Ed25519PublicKey,
+        consensus_public_key: bls12381::PublicKey,
         validator_network_addresses: Vec<u8>,
         fullnode_network_addresses: Vec<u8>,
         validator_index: u64,

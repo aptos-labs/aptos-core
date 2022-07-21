@@ -13,8 +13,8 @@ class ButtonComponent < ViewComponent::Base
 
   SIZE_CLASSES = {
     large: 'px-8 py-4 text-lg rounded-lg gap-4',
-    medium: 'px-8 py-2 text-lg rounded gap-2',
-    small: 'py-1 text-sm rounded gap-1'
+    medium: 'px-8 py-2 text-lg rounded-lg gap-2',
+    small: 'px-4 py-1 text-sm rounded-lg gap-1'
   }.freeze
 
   def initialize(scheme: :primary,

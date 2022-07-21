@@ -53,13 +53,13 @@ pub enum StorageServiceMessage {
 /// A storage service request.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum StorageServiceRequest {
-    GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest), // Fetches a list of account states with a proof
     GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest), // Fetches a list of epoch ending ledger infos
     GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest), // Subscribes to new transaction outputs
     GetNewTransactionsWithProof(NewTransactionsWithProofRequest), // Subscribes to new transactions with a proof
-    GetNumberOfAccountsAtVersion(Version), // Fetches the number of accounts at the specified version
-    GetServerProtocolVersion,              // Fetches the protocol version run by the server
-    GetStorageServerSummary,               // Fetches a summary of the storage server state
+    GetNumberOfStatesAtVersion(Version), // Fetches the number of states at the specified version
+    GetServerProtocolVersion,            // Fetches the protocol version run by the server
+    GetStateValuesWithProof(StateValuesWithProofRequest), // Fetches a list of states with a proof
+    GetStorageServerSummary,             // Fetches a summary of the storage server state
     GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest), // Fetches a list of transaction outputs with a proof
     GetTransactionsWithProof(TransactionsWithProofRequest), // Fetches a list of transactions with a proof
 }
@@ -68,12 +68,12 @@ impl StorageServiceRequest {
     /// Returns a summary label for the request
     pub fn get_label(&self) -> &'static str {
         match self {
-            Self::GetAccountStatesChunkWithProof(_) => "get_account_states_chunk_with_proof",
             Self::GetEpochEndingLedgerInfos(_) => "get_epoch_ending_ledger_infos",
             Self::GetNewTransactionOutputsWithProof(_) => "get_new_transaction_outputs_with_proof",
             Self::GetNewTransactionsWithProof(_) => "get_new_transactions_with_proof",
-            Self::GetNumberOfAccountsAtVersion(_) => "get_number_of_accounts_at_version",
+            Self::GetNumberOfStatesAtVersion(_) => "get_number_of_states_at_version",
             Self::GetServerProtocolVersion => "get_server_protocol_version",
+            Self::GetStateValuesWithProof(_) => "get_state_values_with_proof",
             Self::GetStorageServerSummary => "get_storage_server_summary",
             Self::GetTransactionOutputsWithProof(_) => "get_transaction_outputs_with_proof",
             Self::GetTransactionsWithProof(_) => "get_transactions_with_proof",
@@ -94,12 +94,12 @@ impl StorageServiceRequest {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum StorageServiceResponse {
-    AccountStatesChunkWithProof(StateValueChunkWithProof),
     EpochEndingLedgerInfos(EpochChangeProof),
     NewTransactionOutputsWithProof((TransactionOutputListWithProof, LedgerInfoWithSignatures)),
     NewTransactionsWithProof((TransactionListWithProof, LedgerInfoWithSignatures)),
-    NumberOfAccountsAtVersion(u64),
+    NumberOfStatesAtVersion(u64),
     ServerProtocolVersion(ServerProtocolVersion),
+    StateValueChunkWithProof(StateValueChunkWithProof),
     StorageServerSummary(StorageServerSummary),
     TransactionOutputsWithProof(TransactionOutputListWithProof),
     TransactionsWithProof(TransactionListWithProof),
@@ -110,12 +110,12 @@ impl StorageServiceResponse {
     /// Returns a summary label for the response
     pub fn get_label(&self) -> &'static str {
         match self {
-            Self::AccountStatesChunkWithProof(_) => "account_states_chunk_with_proof",
             Self::EpochEndingLedgerInfos(_) => "epoch_ending_ledger_infos",
             Self::NewTransactionOutputsWithProof(_) => "new_transaction_outputs_with_proof",
             Self::NewTransactionsWithProof(_) => "new_transactions_with_proof",
-            Self::NumberOfAccountsAtVersion(_) => "number_of_accounts_at_version",
+            Self::NumberOfStatesAtVersion(_) => "number_of_states_at_version",
             Self::ServerProtocolVersion(_) => "server_protocol_version",
+            Self::StateValueChunkWithProof(_) => "state_value_chunk_with_proof",
             Self::StorageServerSummary(_) => "storage_server_summary",
             Self::TransactionOutputsWithProof(_) => "transaction_outputs_with_proof",
             Self::TransactionsWithProof(_) => "transactions_with_proof",
@@ -152,9 +152,9 @@ impl TryFrom<StorageServiceResponse> for StateValueChunkWithProof {
     type Error = UnexpectedResponseError;
     fn try_from(response: StorageServiceResponse) -> Result<Self, Self::Error> {
         match response {
-            StorageServiceResponse::AccountStatesChunkWithProof(inner) => Ok(inner),
+            StorageServiceResponse::StateValueChunkWithProof(inner) => Ok(inner),
             _ => Err(UnexpectedResponseError(format!(
-                "expected account_states_chunk_with_proof, found {}",
+                "expected state_value_chunk_with_proof, found {}",
                 response.get_label()
             ))),
         }
@@ -206,9 +206,9 @@ impl TryFrom<StorageServiceResponse> for u64 {
     type Error = UnexpectedResponseError;
     fn try_from(response: StorageServiceResponse) -> Result<Self, Self::Error> {
         match response {
-            StorageServiceResponse::NumberOfAccountsAtVersion(inner) => Ok(inner),
+            StorageServiceResponse::NumberOfStatesAtVersion(inner) => Ok(inner),
             _ => Err(UnexpectedResponseError(format!(
-                "expected number_of_accounts_at_version, found {}",
+                "expected number_of_states_at_version, found {}",
                 response.get_label()
             ))),
         }
@@ -267,13 +267,13 @@ impl TryFrom<StorageServiceResponse> for TransactionListWithProof {
     }
 }
 
-/// A storage service request for fetching a list of account states at a
-/// specified version.
+/// A storage service request for fetching a list of state
+/// values at a specified version.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub struct AccountStatesChunkWithProofRequest {
-    pub version: u64,             // The version to fetch the account states at
-    pub start_account_index: u64, // The account index to start fetching account states
-    pub end_account_index: u64,   // The account index to stop fetching account states (inclusive)
+pub struct StateValuesWithProofRequest {
+    pub version: u64,     // The version to fetch the state values at
+    pub start_index: u64, // The index to start fetching state values (inclusive)
+    pub end_index: u64,   // The index to stop fetching state values (inclusive)
 }
 
 /// A storage service request for fetching a new transaction output list
@@ -346,9 +346,9 @@ impl StorageServerSummary {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ProtocolMetadata {
     pub max_epoch_chunk_size: u64, // The max number of epochs the server can return in a single chunk
+    pub max_state_chunk_size: u64, // The max number of states the server can return in a single chunk
     pub max_transaction_chunk_size: u64, // The max number of transactions the server can return in a single chunk
     pub max_transaction_output_chunk_size: u64, // The max number of transaction outputs the server can return in a single chunk
-    pub max_account_states_chunk_size: u64, // The max number of account states the server can return in a single chunk
 }
 
 impl ProtocolMetadata {
@@ -358,17 +358,18 @@ impl ProtocolMetadata {
         match request {
             GetNewTransactionsWithProof(_)
             | GetNewTransactionOutputsWithProof(_)
-            | GetNumberOfAccountsAtVersion(_)
+            | GetNumberOfStatesAtVersion(_)
             | GetServerProtocolVersion
             | GetStorageServerSummary => true,
-            GetAccountStatesChunkWithProof(request) => {
-                CompleteDataRange::new(request.start_account_index, request.end_account_index)
-                    .map_or(false, |range| {
-                        range.len().map_or(false, |chunk_size| {
-                            self.max_account_states_chunk_size >= chunk_size
-                        })
-                    })
-            }
+            GetStateValuesWithProof(request) => CompleteDataRange::new(
+                request.start_index,
+                request.end_index,
+            )
+            .map_or(false, |range| {
+                range
+                    .len()
+                    .map_or(false, |chunk_size| self.max_state_chunk_size >= chunk_size)
+            }),
             GetEpochEndingLedgerInfos(request) => CompleteDataRange::new(
                 request.start_epoch,
                 request.expected_end_epoch,
@@ -407,7 +408,7 @@ impl Default for ProtocolMetadata {
             max_epoch_chunk_size: config.max_epoch_chunk_size,
             max_transaction_chunk_size: config.max_transaction_chunk_size,
             max_transaction_output_chunk_size: config.max_transaction_output_chunk_size,
-            max_account_states_chunk_size: config.max_account_states_chunk_sizes,
+            max_state_chunk_size: config.max_state_chunk_size,
         }
     }
 }
@@ -422,6 +423,10 @@ pub struct DataSummary {
     /// is [(X,Y)], it means all epoch ending ledger infos for epochs X->Y
     /// (inclusive) are held.
     pub epoch_ending_ledger_infos: Option<CompleteDataRange<Epoch>>,
+    /// The range of states held in storage, e.g., if the range is
+    /// [(X,Y)], it means all states are held for every version X->Y
+    /// (inclusive).
+    pub states: Option<CompleteDataRange<Version>>,
     /// The range of transactions held in storage, e.g., if the range is
     /// [(X,Y)], it means all transactions for versions X->Y (inclusive) are held.
     pub transactions: Option<CompleteDataRange<Version>>,
@@ -429,10 +434,6 @@ pub struct DataSummary {
     /// is [(X,Y)], it means all transaction outputs for versions X->Y
     /// (inclusive) are held.
     pub transaction_outputs: Option<CompleteDataRange<Version>>,
-    /// The range of account states held in storage, e.g., if the range is
-    /// [(X,Y)], it means all account states are held for every version X->Y
-    /// (inclusive).
-    pub account_states: Option<CompleteDataRange<Version>>,
 }
 
 impl DataSummary {
@@ -444,22 +445,6 @@ impl DataSummary {
             | GetNewTransactionOutputsWithProof(_)
             | GetServerProtocolVersion
             | GetStorageServerSummary => true,
-            GetAccountStatesChunkWithProof(request) => {
-                let proof_version = request.version;
-
-                let can_serve_accounts = self
-                    .account_states
-                    .map(|range| range.contains(request.version))
-                    .unwrap_or(false);
-
-                let can_create_proof = self
-                    .synced_ledger_info
-                    .as_ref()
-                    .map(|li| li.ledger_info().version() >= proof_version)
-                    .unwrap_or(false);
-
-                can_serve_accounts && can_create_proof
-            }
             GetEpochEndingLedgerInfos(request) => {
                 let desired_range =
                     match CompleteDataRange::new(request.start_epoch, request.expected_end_epoch) {
@@ -470,10 +455,26 @@ impl DataSummary {
                     .map(|range| range.superset_of(&desired_range))
                     .unwrap_or(false)
             }
-            GetNumberOfAccountsAtVersion(version) => self
-                .account_states
+            GetNumberOfStatesAtVersion(version) => self
+                .states
                 .map(|range| range.contains(*version))
                 .unwrap_or(false),
+            GetStateValuesWithProof(request) => {
+                let proof_version = request.version;
+
+                let can_serve_states = self
+                    .states
+                    .map(|range| range.contains(request.version))
+                    .unwrap_or(false);
+
+                let can_create_proof = self
+                    .synced_ledger_info
+                    .as_ref()
+                    .map(|li| li.ledger_info().version() >= proof_version)
+                    .unwrap_or(false);
+
+                can_serve_states && can_create_proof
+            }
             GetTransactionOutputsWithProof(request) => {
                 let desired_range =
                     match CompleteDataRange::new(request.start_version, request.end_version) {
@@ -696,20 +697,20 @@ mod tests {
         })
     }
 
-    fn get_account_state_chunks_request(
+    fn get_state_values_request(
         version: Version,
-        start_account_index: u64,
-        end_account_index: u64,
+        start_index: u64,
+        end_index: u64,
     ) -> StorageServiceRequest {
-        StorageServiceRequest::GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest {
+        StorageServiceRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
             version,
-            start_account_index,
-            end_account_index,
+            start_index,
+            end_index,
         })
     }
 
-    fn get_account_states_request(version: Version) -> StorageServiceRequest {
-        get_account_state_chunks_request(version, 0, 1000)
+    fn get_states_request(version: Version) -> StorageServiceRequest {
+        get_state_values_request(version, 0, 1000)
     }
 
     #[test]
@@ -829,25 +830,25 @@ mod tests {
     }
 
     #[test]
-    fn test_data_summary_can_service_account_states_chunk_request() {
+    fn test_data_summary_can_service_state_chunk_request() {
         let summary = DataSummary {
             synced_ledger_info: Some(mock_ledger_info(250)),
-            account_states: Some(range(100, 300)),
+            states: Some(range(100, 300)),
             ..Default::default()
         };
 
         // in range and can provide proof => can service
-        assert!(summary.can_service(&get_account_states_request(100)));
-        assert!(summary.can_service(&get_account_states_request(200)));
-        assert!(summary.can_service(&get_account_states_request(250)));
+        assert!(summary.can_service(&get_states_request(100)));
+        assert!(summary.can_service(&get_states_request(200)));
+        assert!(summary.can_service(&get_states_request(250)));
 
         // in range, but cannot provide proof => cannot service
-        assert!(!summary.can_service(&get_account_states_request(251)));
-        assert!(!summary.can_service(&get_account_states_request(300)));
+        assert!(!summary.can_service(&get_states_request(251)));
+        assert!(!summary.can_service(&get_states_request(300)));
 
         // can provide proof, but out of range ==> cannot service
-        assert!(!summary.can_service(&get_account_states_request(50)));
-        assert!(!summary.can_service(&get_account_states_request(99)));
+        assert!(!summary.can_service(&get_states_request(50)));
+        assert!(!summary.can_service(&get_states_request(99)));
     }
 
     #[test]
@@ -856,7 +857,7 @@ mod tests {
             max_transaction_chunk_size: 100,
             max_epoch_chunk_size: 100,
             max_transaction_output_chunk_size: 100,
-            max_account_states_chunk_size: 100,
+            max_state_chunk_size: 100,
         };
 
         assert!(metadata.can_service(&get_txns_request(200, 100, 199)));
@@ -868,8 +869,8 @@ mod tests {
         assert!(metadata.can_service(&get_txn_outputs_request(200, 100, 199)));
         assert!(!metadata.can_service(&get_txn_outputs_request(200, 100, 200)));
 
-        assert!(metadata.can_service(&get_account_state_chunks_request(200, 100, 199)));
-        assert!(!metadata.can_service(&get_account_state_chunks_request(200, 100, 200)));
+        assert!(metadata.can_service(&get_state_values_request(200, 100, 199)));
+        assert!(!metadata.can_service(&get_state_values_request(200, 100, 200)));
     }
 
     proptest! {

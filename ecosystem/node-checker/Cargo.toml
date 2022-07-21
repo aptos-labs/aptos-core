@@ -13,6 +13,7 @@ publish = false
 anyhow = "1.0.57"
 async-trait = "0.1.53"
 clap = { version = "3.1.17", features = ["derive"] }
+const_format = "0.2.26"
 env_logger = "0.8.4"
 futures = "0.3.21"
 log = "0.4"
@@ -34,7 +35,7 @@ aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 transaction-emitter-lib = { path = "../../crates/transaction-emitter-lib" }
 
 [[bin]]

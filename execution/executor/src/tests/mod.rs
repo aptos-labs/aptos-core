@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use std::ops::Deref;
 use std::{collections::BTreeMap, iter::once};
 
 use proptest::prelude::*;
@@ -23,10 +24,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptosdb::AptosDB;
-use executor_types::{
-    in_memory_state_calculator::IntoLedgerView, BlockExecutorTrait, ChunkExecutorTrait,
-    TransactionReplayer,
-};
+use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
 use storage_interface::{DbReaderWriter, ExecutedTrees};
 
 use crate::{
@@ -288,7 +286,7 @@ fn create_transaction_chunks(
         let txn = encode_mint_transaction(gen_address(i), 100);
         txns.push(txn);
     }
-    txns.push(Transaction::StateCheckpoint);
+    txns.push(Transaction::StateCheckpoint(HashValue::random()));
     let id = gen_block_id(1);
 
     let output = executor
@@ -363,12 +361,7 @@ fn apply_transaction_by_writeset(
     db: &DbReaderWriter,
     transactions_and_writesets: Vec<(Transaction, WriteSet)>,
 ) {
-    let ledger_view: ExecutedTrees = db
-        .reader
-        .get_latest_tree_state()
-        .unwrap()
-        .into_ledger_view(&db.reader)
-        .unwrap();
+    let ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
 
     let transactions_and_outputs = transactions_and_writesets
         .iter()
@@ -384,7 +377,7 @@ fn apply_transaction_by_writeset(
             )
         })
         .chain(once((
-            Transaction::StateCheckpoint,
+            Transaction::StateCheckpoint(HashValue::random()),
             TransactionOutput::new(
                 WriteSet::default(),
                 Vec::new(),
@@ -395,7 +388,7 @@ fn apply_transaction_by_writeset(
         .collect();
 
     let state_view = ledger_view
-        .verified_state_view(StateViewId::Miscellaneous, db.reader.clone())
+        .verified_state_view(StateViewId::Miscellaneous, db.reader.deref())
         .unwrap();
 
     let chunk_output =
@@ -407,8 +400,9 @@ fn apply_transaction_by_writeset(
         .save_transactions(
             &executed.transactions_to_commit().unwrap(),
             ledger_view.txn_accumulator().num_leaves(),
-            ledger_view.state().checkpoint_version,
+            ledger_view.state().base_version,
             None,
+            executed.result_view.state().clone(),
         )
         .unwrap();
 }
@@ -527,18 +521,13 @@ impl TestBlock {
 fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
     let executor = TestExecutor::new();
     let db = &executor.db;
-    let mut ledger_view: ExecutedTrees = db
-        .reader
-        .get_latest_tree_state()
-        .unwrap()
-        .into_ledger_view(&db.reader)
-        .unwrap();
+    let mut ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
 
     for txn in transactions {
         let out = ChunkOutput::by_transaction_execution::<MockVM>(
             vec![txn],
             ledger_view
-                .verified_state_view(StateViewId::Miscellaneous, db.reader.clone())
+                .verified_state_view(StateViewId::Miscellaneous, db.reader.deref())
                 .unwrap(),
         )
         .unwrap();
@@ -547,8 +536,9 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
             .save_transactions(
                 &executed.transactions_to_commit().unwrap(),
                 ledger_view.txn_accumulator().num_leaves(),
-                ledger_view.state().checkpoint_version,
+                ledger_view.state().base_version,
                 None,
+                executed.result_view.state().clone(),
             )
             .unwrap();
         ledger_view = executed.result_view;

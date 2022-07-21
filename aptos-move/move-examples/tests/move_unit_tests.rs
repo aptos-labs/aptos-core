@@ -3,7 +3,8 @@
 
 use aptos_types::account_address::AccountAddress;
 use aptos_vm::natives::aptos_natives;
-use move_deps::{move_cli::package::cli, move_unit_test::UnitTestingConfig};
+use move_deps::move_cli::base::test::run_move_unit_tests;
+use move_deps::move_unit_test::UnitTestingConfig;
 use std::{collections::BTreeMap, path::PathBuf};
 use tempfile::tempdir;
 
@@ -21,7 +22,7 @@ pub fn run_tests_for_pkg(
     named_addr: BTreeMap<String, AccountAddress>,
 ) {
     let pkg_path = path_in_crate(path_to_pkg);
-    cli::run_move_unit_tests(
+    run_move_unit_tests(
         &pkg_path,
         move_deps::move_package::BuildConfig {
             test_mode: true,
@@ -32,6 +33,7 @@ pub fn run_tests_for_pkg(
         UnitTestingConfig::default_with_bound(Some(100_000)),
         aptos_natives(),
         /* compute_coverage */ false,
+        &mut std::io::stdout(),
     )
     .unwrap();
 }
@@ -46,10 +48,10 @@ fn test_hello_blockchain() {
 }
 
 #[test]
-fn test_message_board() {
+fn test_shared_account() {
     let named_address = BTreeMap::from([(
-        String::from("MessageBoard"),
+        String::from("shared_account"),
         AccountAddress::from_hex_literal("0x1").unwrap(),
     )]);
-    run_tests_for_pkg("messageboard", named_address);
+    run_tests_for_pkg("shared_account", named_address);
 }

@@ -16,6 +16,10 @@ forge:
   tolerations: []
   affinity: {}
 
+continuous_test:
+  enabled: false
+  intervalMins: 15
+
 serviceAccount:
   # Specifies whether a service account should be created
   create: true
@@ -23,4 +27,3 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name:
   annotations: {}
-

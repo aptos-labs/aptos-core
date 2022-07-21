@@ -50,7 +50,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveResource {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Copy)]
+#[derive(Clone, Debug, Eq, PartialEq, Copy)]
 pub struct U64(pub u64);
 
 impl U64 {
@@ -238,7 +238,7 @@ impl From<HexEncodedBytes> for move_core_types::value::MoveValue {
 impl TryFrom<HexEncodedBytes> for EventKey {
     type Error = anyhow::Error;
     fn try_from(bytes: HexEncodedBytes) -> anyhow::Result<Self> {
-        Ok(EventKey::from_bytes(bytes.0)?)
+        Ok(bcs::from_bytes(&bytes.0)?)
     }
 }
 
@@ -249,7 +249,7 @@ impl HexEncodedBytes {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct MoveStructValue(BTreeMap<Identifier, serde_json::Value>);
+pub struct MoveStructValue(pub BTreeMap<Identifier, serde_json::Value>);
 
 impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
     type Error = anyhow::Error;
@@ -280,17 +280,17 @@ impl MoveValue {
         Ok(serde_json::to_value(self)?)
     }
 
-    pub fn is_ascii_string(st: &StructTag) -> bool {
+    pub fn is_utf8_string(st: &StructTag) -> bool {
         st.address == CORE_CODE_ADDRESS
             && st.name.to_string() == "String"
-            && st.module.to_string() == "ASCII"
+            && st.module.to_string() == "string"
     }
 
-    pub fn convert_ascii_string(v: AnnotatedMoveStruct) -> anyhow::Result<MoveValue> {
+    pub fn convert_utf8_string(v: AnnotatedMoveStruct) -> anyhow::Result<MoveValue> {
         if let Some((_, AnnotatedMoveValue::Bytes(bytes))) = v.value.into_iter().next() {
             Ok(MoveValue::String(String::from_utf8(bytes)?))
         } else {
-            bail!("expect ASCII::String, but failed to decode struct value");
+            bail!("expect string::String, but failed to decode struct value");
         }
     }
 }
@@ -312,8 +312,8 @@ impl TryFrom<AnnotatedMoveValue> for MoveValue {
             ),
             AnnotatedMoveValue::Bytes(v) => MoveValue::Bytes(HexEncodedBytes(v)),
             AnnotatedMoveValue::Struct(v) => {
-                if MoveValue::is_ascii_string(&v.type_) {
-                    MoveValue::convert_ascii_string(v)?
+                if MoveValue::is_utf8_string(&v.type_) {
+                    MoveValue::convert_utf8_string(v)?
                 } else {
                     MoveValue::Struct(v.try_into()?)
                 }
@@ -607,7 +607,7 @@ impl From<CompiledModule> for MoveModule {
                 .function_defs
                 .iter()
                 .filter(|def| match def.visibility {
-                    Visibility::Public | Visibility::Friend | Visibility::Script => true,
+                    Visibility::Public | Visibility::Friend => true,
                     Visibility::Private => false,
                 })
                 .map(|def| m.new_move_function(def))
@@ -780,6 +780,7 @@ pub struct MoveStructField {
 pub struct MoveFunction {
     pub name: Identifier,
     pub visibility: MoveFunctionVisibility,
+    pub is_entry: bool,
     pub generic_type_params: Vec<MoveFunctionGenericTypeParam>,
     pub params: Vec<MoveType>,
     #[serde(rename = "return")]
@@ -790,7 +791,8 @@ impl From<&CompiledScript> for MoveFunction {
     fn from(script: &CompiledScript) -> Self {
         Self {
             name: Identifier::new("main").unwrap(),
-            visibility: MoveFunctionVisibility::Script,
+            visibility: MoveFunctionVisibility::Public,
+            is_entry: true,
             generic_type_params: script
                 .type_parameters
                 .iter()
@@ -812,7 +814,6 @@ impl From<&CompiledScript> for MoveFunction {
 pub enum MoveFunctionVisibility {
     Private,
     Public,
-    Script,
     Friend,
 }
 
@@ -821,7 +822,6 @@ impl From<Visibility> for MoveFunctionVisibility {
         match &v {
             Visibility::Private => Self::Private,
             Visibility::Public => Self::Public,
-            Visibility::Script => Self::Script,
             Visibility::Friend => Self::Friend,
         }
     }
@@ -832,7 +832,6 @@ impl From<MoveFunctionVisibility> for Visibility {
         match &v {
             MoveFunctionVisibility::Private => Self::Private,
             MoveFunctionVisibility::Public => Self::Public,
-            MoveFunctionVisibility::Script => Self::Script,
             MoveFunctionVisibility::Friend => Self::Friend,
         }
     }
@@ -1003,7 +1002,7 @@ mod tests {
 
         assert_serialize(
             Struct(create_nested_struct()),
-            json!("0x1::Home::ABC<address, 0x1::Account::Base<u128, vector<u64>, vector<0x1::Type::String>, 0x1::Type::String>>"),
+            json!("0x1::Home::ABC<address, 0x1::account::Base<u128, vector<u64>, vector<0x1::type::String>, 0x1::type::String>>"),
         );
     }
 
@@ -1050,7 +1049,7 @@ mod tests {
         assert_json(
             value,
             json!({
-                "type": "0x1::Type::Values",
+                "type": "0x1::type::Values",
                 "data": {
                     "field_u8": 7,
                     "field_u64": "7",
@@ -1081,7 +1080,7 @@ mod tests {
         assert_json(
             value,
             json!({
-                "type": "0x1::Type::Values",
+                "type": "0x1::type::Values",
                 "data": {
                     "address_0x0": "0x0",
                 }
@@ -1250,7 +1249,7 @@ mod tests {
     fn create_generic_type_struct() -> StructTag {
         StructTag {
             address: address("0x1"),
-            module: identifier("Account"),
+            module: identifier("account"),
             name: identifier("Base"),
             type_params: vec![
                 TypeTag::U128,
@@ -1264,7 +1263,7 @@ mod tests {
     fn type_struct(t: &str) -> StructTag {
         StructTag {
             address: address("0x1"),
-            module: identifier("Type"),
+            module: identifier("type"),
             name: identifier(t),
             type_params: vec![],
         }

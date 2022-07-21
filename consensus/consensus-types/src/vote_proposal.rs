@@ -2,20 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{block::Block, vote_data::VoteData};
-use aptos_crypto::{
-    ed25519::Ed25519Signature,
-    hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
-};
+use aptos_crypto::hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     epoch_state::EpochState,
     proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof},
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt::{Display, Formatter},
-    ops::Deref,
-};
+use std::fmt::{Display, Formatter};
 
 /// This structure contains all the information needed by safety rules to
 /// evaluate a proposal / block for correctness / safety and to produce a Vote.
@@ -110,24 +104,5 @@ impl VoteProposal {
 impl Display for VoteProposal {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "VoteProposal[block: {}]", self.block,)
-    }
-}
-
-/// Wraps a vote_proposal and its signature.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct MaybeSignedVoteProposal {
-    /// The vote proposal to be signed.
-    pub vote_proposal: VoteProposal,
-
-    /// The signature of this proposal's hash from the Execution Correctness service. It is
-    /// an `Option` because the LEC can be configured to not sign the vote hash.
-    pub signature: Option<Ed25519Signature>,
-}
-
-impl Deref for MaybeSignedVoteProposal {
-    type Target = VoteProposal;
-
-    fn deref(&self) -> &VoteProposal {
-        &self.vote_proposal
     }
 }

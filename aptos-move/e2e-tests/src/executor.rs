@@ -21,8 +21,8 @@ use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{AccountResource, CoinStoreResource, CORE_CODE_ADDRESS},
-    block_metadata::{new_block_event_key, BlockMetadata, NewBlockEvent},
+    account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
+    block_metadata::{new_block_event_key, BlockMetadata},
     on_chain_config::{OnChainConfig, VMPublishingOption, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{
@@ -321,8 +321,9 @@ impl FakeExecutor {
         match output.status() {
             TransactionStatus::Keep(status) => {
                 self.apply_write_set(output.write_set());
-                assert!(
-                    status == &ExecutionStatus::Success,
+                assert_eq!(
+                    status,
+                    &ExecutionStatus::Success,
                     "transaction failed with {:?}",
                     status
                 );

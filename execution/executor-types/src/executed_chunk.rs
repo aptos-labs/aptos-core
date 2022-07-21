@@ -51,7 +51,6 @@ impl ExecutedChunk {
                     txn.clone(),
                     txn_data.txn_info.clone(),
                     txn_data.state_updates().clone(),
-                    Some(txn_data.jf_node_hashes().clone()),
                     txn_data.write_set().clone(),
                     txn_data.events().to_vec(),
                 ))
@@ -127,7 +126,7 @@ impl ExecutedChunk {
                 || self
                     .to_commit
                     .last()
-                    .map_or(true, |(t, _)| matches!(t, Transaction::StateCheckpoint)),
+                    .map_or(true, |(t, _)| matches!(t, Transaction::StateCheckpoint(_))),
             "Chunk not ending with a state checkpoint.",
         );
         Ok(())

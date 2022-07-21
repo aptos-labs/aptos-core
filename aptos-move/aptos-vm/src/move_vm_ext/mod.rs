@@ -5,10 +5,14 @@
 ///! taken care of after session finish.
 mod resolver;
 mod session;
+mod transaction_context;
 mod vm;
 
 pub use crate::move_vm_ext::{
     resolver::MoveResolverExt,
     session::{SessionExt, SessionId, SessionOutput},
+    transaction_context::{
+        test_transaction_context_natives, transaction_context_natives, NativeTransactionContext,
+    },
     vm::MoveVmExt,
 };

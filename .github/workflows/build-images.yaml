@@ -90,9 +90,6 @@ jobs:
   rust-images:
     # trigger only for push events (on protected branches as defined above) OR on PR events with the "CICD:build-images" label.
     needs: [permission-check, determine-last-green-commit]
-    strategy:
-      matrix:
-        IMAGE_TARGET: [release, test]
 
     runs-on: high-perf-docker
     steps:
@@ -117,16 +114,16 @@ jobs:
       - name: Build and Push Rust images
         run: docker/docker-bake-rust-all.sh
         env:
-          IMAGE_TARGET: ${{ matrix.IMAGE_TARGET }}
           LAST_GREEN_COMMIT: ${{ needs.determine-last-green-commit.outputs.lastGreenCommit }}
 
   sdk-integration-test:
     needs: rust-images
     if: |
+      !contains(github.event.pull_request.labels.*.name, 'CICD:skip-sdk-integration-test') && (
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
       contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-      github.event.pull_request.auto_merge != null
+      github.event.pull_request.auto_merge != null)
     uses: ./.github/workflows/sdk-integration-test.yaml
     secrets: inherit
     with:
@@ -135,15 +132,20 @@ jobs:
   forge-e2e-test:
     needs: rust-images
     if: |
+      !contains(github.event.pull_request.labels.*.name, 'CICD:skip-forge-e2e-test') && (
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
       contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-      github.event.pull_request.auto_merge != null
+      github.event.pull_request.auto_merge != null)
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       merge_or_canary: ${{ github.event.pull_request.auto_merge != null && 'merge' || 'canary' }}
+      # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge
+      # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
+      # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
+      FORGE_NAMESPACE: forge-${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
 
   community-platform:
     needs: [permission-check]

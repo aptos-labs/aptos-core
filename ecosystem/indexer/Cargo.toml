@@ -29,7 +29,6 @@ url = "2.2.2"
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 
 [[bin]]
 name = "aptos-indexer"

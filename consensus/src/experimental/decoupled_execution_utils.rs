@@ -6,7 +6,7 @@ use crate::{
         buffer_manager::{create_channel, BufferManager, OrderedBlocks, ResetRequest},
         execution_phase::{ExecutionPhase, ExecutionRequest, ExecutionResponse},
         persisting_phase::{PersistingPhase, PersistingRequest},
-        pipeline_phase::PipelinePhase,
+        pipeline_phase::{CountedRequest, PipelinePhase},
         signing_phase::{SigningPhase, SigningRequest, SigningResponse},
     },
     metrics_safety_rules::MetricsSafetyRules,
@@ -40,7 +40,7 @@ pub fn prepare_phases_and_buffer_manager(
 ) {
     // Execution Phase
     let (execution_phase_request_tx, execution_phase_request_rx) =
-        create_channel::<ExecutionRequest>();
+        create_channel::<CountedRequest<ExecutionRequest>>();
     let (execution_phase_response_tx, execution_phase_response_rx) =
         create_channel::<ExecutionResponse>();
 
@@ -51,11 +51,11 @@ pub fn prepare_phases_and_buffer_manager(
         execution_phase_request_rx,
         Some(execution_phase_response_tx),
         Box::new(execution_phase_processor),
-        ongoing_tasks.clone(),
     );
 
     // Signing Phase
-    let (signing_phase_request_tx, signing_phase_request_rx) = create_channel::<SigningRequest>();
+    let (signing_phase_request_tx, signing_phase_request_rx) =
+        create_channel::<CountedRequest<SigningRequest>>();
     let (signing_phase_response_tx, signing_phase_response_rx) =
         create_channel::<SigningResponse>();
 
@@ -64,19 +64,17 @@ pub fn prepare_phases_and_buffer_manager(
         signing_phase_request_rx,
         Some(signing_phase_response_tx),
         Box::new(signing_phase_processor),
-        ongoing_tasks.clone(),
     );
 
     // Persisting Phase
     let (persisting_phase_request_tx, persisting_phase_request_rx) =
-        create_channel::<PersistingRequest>();
+        create_channel::<CountedRequest<PersistingRequest>>();
 
     let persisting_phase_processor = PersistingPhase::new(persisting_proxy);
     let persisting_phase = PipelinePhase::new(
         persisting_phase_request_rx,
         None,
         Box::new(persisting_phase_processor),
-        ongoing_tasks.clone(),
     );
 
     (

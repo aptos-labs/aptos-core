@@ -65,6 +65,12 @@ resource "kubernetes_role_binding" "psp-kube-system" {
 
 locals {
   kubeconfig = "/tmp/kube.config.${md5(timestamp())}"
+
+  # helm chart paths
+  vector_daemonset_helm_chart_path = "${path.module}/../../helm/vector-daemonset"
+  monitoring_helm_chart_path       = "${path.module}/../../helm/monitoring"
+  logger_helm_chart_path           = "${path.module}/../../helm/logger"
+  aptos_node_helm_chart_path       = var.helm_chart != "" ? var.helm_chart : "${path.module}/../../helm/aptos-node"
 }
 
 resource "null_resource" "delete-psp-authenticated" {
@@ -95,8 +101,9 @@ resource "helm_release" "calico" {
 
 locals {
   helm_values = jsonencode({
-    numValidators = var.num_validators
-    imageTag      = var.image_tag
+    numValidators     = var.num_validators
+    numFullnodeGroups = var.num_fullnode_groups
+    imageTag          = var.image_tag
     chain = {
       era        = var.era
       chain_id   = var.chain_id
@@ -115,7 +122,7 @@ locals {
         value  = "validators"
         effect = "NoExecute"
       }]
-      remoteLogAddress = var.enable_logger ? "${local.workspace_name}-log-aptos-logger:5044" : null
+      remoteLogAddress = var.enable_logger ? "${helm_release.logger[0].name}-aptos-logger.${helm_release.logger[0].namespace}.svc:5044" : null
     }
     fullnode = {
       storage = {
@@ -147,7 +154,7 @@ locals {
 resource "helm_release" "validator" {
   count       = var.helm_enable_validator ? 1 : 0
   name        = local.helm_release_name
-  chart       = var.helm_chart != "" ? var.helm_chart : "${path.module}/../../helm/aptos-node"
+  chart       = local.aptos_node_helm_chart_path
   max_history = 5
   wait        = false
 
@@ -157,16 +164,17 @@ resource "helm_release" "validator" {
     jsonencode(var.helm_values),
   ]
 
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
-    name  = "timestamp"
-    value = var.helm_force_update ? timestamp() : ""
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.aptos_node_helm_chart_path, "**") : filesha1("${local.aptos_node_helm_chart_path}/${f}")]))
   }
 }
 
 resource "helm_release" "logger" {
   count       = var.enable_logger ? 1 : 0
   name        = "${local.helm_release_name}-log"
-  chart       = "${path.module}/../../helm/logger"
+  chart       = local.logger_helm_chart_path
   max_history = 5
   wait        = false
 
@@ -181,22 +189,41 @@ resource "helm_release" "logger" {
       serviceAccount = {
         create = false
         # this name must match the serviceaccount created by the aptos-node helm chart
-        name = "${local.helm_release_name}-aptos-node-validator"
+        name = local.helm_release_name == "aptos-node" ? "aptos-node-validator" : "${local.helm_release_name}-aptos-node-validator"
       }
     }),
     jsonencode(var.logger_helm_values),
   ]
 
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
-    name  = "timestamp"
-    value = timestamp()
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.logger_helm_chart_path, "**") : filesha1("${local.logger_helm_chart_path}/${f}")]))
+  }
+}
+
+resource "helm_release" "vector_daemonset" {
+  count            = var.enable_vector_daemonset_logger ? 1 : 0
+  name             = "${local.helm_release_name}-vector-daemonset"
+  chart            = local.vector_daemonset_helm_chart_path
+  max_history      = 5
+  namespace        = "vector"
+  create_namespace = true
+  wait             = false
+
+  values = var.vector_daemonset_helm_values
+
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
+  set {
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.vector_daemonset_helm_chart_path, "**") : filesha1("${local.vector_daemonset_helm_chart_path}/${f}")]))
   }
 }
 
 resource "helm_release" "monitoring" {
   count       = var.enable_monitoring ? 1 : 0
   name        = "${local.helm_release_name}-mon"
-  chart       = "${path.module}/../../helm/monitoring"
+  chart       = local.monitoring_helm_chart_path
   max_history = 5
   wait        = false
 
@@ -209,7 +236,7 @@ resource "helm_release" "monitoring" {
         name = var.validator_name
       }
       service = {
-        domain   = local.domain
+        domain = local.domain
       }
       monitoring = {
         prometheus = {
@@ -222,9 +249,10 @@ resource "helm_release" "monitoring" {
     jsonencode(var.monitoring_helm_values),
   ]
 
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
-    name  = "timestamp"
-    value = timestamp()
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.monitoring_helm_chart_path, "**") : filesha1("${local.monitoring_helm_chart_path}/${f}")]))
   }
 }
 

@@ -20,7 +20,7 @@ use crate::{
         ChangeSet, ExecutionStatus, Module, ModuleBundle, RawTransaction, Script,
         SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
         TransactionInfo, TransactionListWithProof, TransactionPayload, TransactionStatus,
-        TransactionToCommit, Version, WriteSetPayload,
+        TransactionToCommit, VecBytes, Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -28,7 +28,8 @@ use crate::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptos_crypto::{
-    ed25519::{self, Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
+    bls12381::{self, bls12381_keys},
+    ed25519::{self, Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
     traits::*,
     HashValue,
@@ -44,7 +45,7 @@ use proptest_derive::Arbitrary;
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
-    convert::{TryFrom, TryInto},
+    convert::TryFrom,
     iter::Iterator,
 };
 
@@ -130,15 +131,23 @@ impl Arbitrary for ChangeSet {
     type Strategy = BoxedStrategy<Self>;
 }
 
+impl EventKey {
+    pub fn strategy_impl(
+        account_address_strategy: impl Strategy<Value = AccountAddress>,
+    ) -> impl Strategy<Value = Self> {
+        // We only generate small counters so that it won't overflow.
+        (account_address_strategy, 0..std::u64::MAX / 2)
+            .prop_map(|(account_address, counter)| EventKey::new(counter, account_address))
+    }
+}
+
 impl Arbitrary for EventKey {
     type Parameters = ();
-    fn arbitrary_with(_args: ()) -> Self::Strategy {
-        vec(any::<u8>(), EventKey::LENGTH)
-            .prop_map(|e| EventKey::new(e.try_into().unwrap()))
-            .boxed()
-    }
-
     type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        EventKey::strategy_impl(any::<AccountAddress>()).boxed()
+    }
 }
 
 #[derive(Debug)]
@@ -146,21 +155,27 @@ struct AccountInfo {
     address: AccountAddress,
     private_key: Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
+    consensus_private_key: bls12381::PrivateKey,
     sequence_number: u64,
     sent_event_handle: EventHandle,
     received_event_handle: EventHandle,
 }
 
 impl AccountInfo {
-    pub fn new(private_key: Ed25519PrivateKey, public_key: Ed25519PublicKey) -> Self {
+    pub fn new(
+        private_key: Ed25519PrivateKey,
+        consensus_private_key: bls12381::PrivateKey,
+    ) -> Self {
+        let public_key = private_key.public_key();
         let address = account_address::from_public_key(&public_key);
         Self {
             address,
             private_key,
             public_key,
+            consensus_private_key,
             sequence_number: 0,
-            sent_event_handle: EventHandle::new_from_address(&address, 0),
-            received_event_handle: EventHandle::new_from_address(&address, 1),
+            sent_event_handle: EventHandle::new(EventKey::new(0, address), 0),
+            received_event_handle: EventHandle::new(EventKey::new(1, address), 0),
         }
     }
 }
@@ -176,15 +191,19 @@ pub struct AccountInfoUniverse {
 
 impl AccountInfoUniverse {
     fn new(
-        keypairs: Vec<(Ed25519PrivateKey, Ed25519PublicKey)>,
+        account_private_keys: Vec<Ed25519PrivateKey>,
+        consensus_private_keys: Vec<bls12381::PrivateKey>,
         epoch: u64,
         round: Round,
         next_version: Version,
     ) -> Self {
-        let mut accounts = keypairs
+        let mut accounts: Vec<_> = account_private_keys
             .into_iter()
-            .map(|(private_key, public_key)| AccountInfo::new(private_key, public_key))
-            .collect::<Vec<_>>();
+            .zip(consensus_private_keys.into_iter())
+            .map(|(private_key, consensus_private_key)| {
+                AccountInfo::new(private_key, consensus_private_key)
+            })
+            .collect();
         accounts.sort_by(|a, b| a.address.cmp(&b.address));
         let validator_set_by_epoch = vec![(0, Vec::new())].into_iter().collect();
 
@@ -248,17 +267,29 @@ impl AccountInfoUniverse {
 impl Arbitrary for AccountInfoUniverse {
     type Parameters = usize;
     fn arbitrary_with(num_accounts: Self::Parameters) -> Self::Strategy {
-        vec(ed25519::keypair_strategy(), num_accounts)
-            .prop_map(|kps| {
-                let kps: Vec<_> = kps
-                    .into_iter()
-                    .map(|k| (k.private_key, k.public_key))
-                    .collect();
-                AccountInfoUniverse::new(
-                    kps, /* epoch = */ 0, /* round = */ 0, /* next_version = */ 0,
-                )
-            })
-            .boxed()
+        vec(
+            (
+                ed25519::keypair_strategy(),
+                bls12381_keys::keypair_strategy(),
+            ),
+            num_accounts,
+        )
+        .prop_map(|kps| {
+            let mut account_private_keys = vec![];
+            let mut consensus_private_keys = vec![];
+            for (kp1, kp2) in kps {
+                account_private_keys.push(kp1.private_key);
+                consensus_private_keys.push(kp2.private_key);
+            }
+            AccountInfoUniverse::new(
+                account_private_keys,
+                consensus_private_keys,
+                /* epoch = */ 0,
+                /* round = */ 0,
+                /* next_version = */ 0,
+            )
+        })
+        .boxed()
     }
 
     fn arbitrary() -> Self::Strategy {
@@ -584,10 +615,11 @@ impl Arbitrary for Module {
 prop_compose! {
     fn arb_validator_signature_for_ledger_info(ledger_info: LedgerInfo)(
         ledger_info in Just(ledger_info),
-        keypair in ed25519::keypair_strategy(),
-    ) -> (AccountAddress, Ed25519Signature) {
-        let signature = keypair.private_key.sign(&ledger_info);
-        (account_address::from_public_key(&keypair.public_key), signature)
+        account_keypair in ed25519::keypair_strategy(),
+        consensus_keypair in bls12381_keys::keypair_strategy(),
+    ) -> (AccountAddress, bls12381::Signature) {
+        let signature = consensus_keypair.private_key.sign(&ledger_info);
+        (account_address::from_public_key(&account_keypair.public_key), signature)
     }
 }
 
@@ -665,11 +697,7 @@ pub struct CoinStoreResourceGen {
 
 impl CoinStoreResourceGen {
     pub fn materialize(self) -> CoinStoreResource {
-        CoinStoreResource::new(
-            self.coin,
-            EventHandle::random_handle(0),
-            EventHandle::random_handle(0),
-        )
+        CoinStoreResource::new(self.coin, EventHandle::random(0), EventHandle::random(0))
     }
 }
 
@@ -763,8 +791,6 @@ pub struct TransactionToCommitGen {
     /// N.B. the transaction sender and event owners must be updated to reflect information such as
     /// sequence numbers so that test data generated through this is more realistic and logical.
     account_state_gens: Vec<(Index, AccountStateGen)>,
-    /// Write set
-    write_set: WriteSet,
     /// Gas used.
     gas_used: u64,
     /// Transaction status
@@ -783,13 +809,28 @@ impl TransactionToCommitGen {
             .map(|(index, event_gen)| event_gen.materialize(index, universe))
             .collect();
 
+        let (state_updates, write_set): (HashMap<_, _>, Vec<_>) = self
+            .account_state_gens
+            .into_iter()
+            .flat_map(|(index, account_gen)| {
+                let address = universe.get_account_info(index).address;
+                account_gen
+                    .materialize(index, universe)
+                    .into_resource_iter()
+                    .map(move |(key, value)| {
+                        let state_key = StateKey::AccessPath(AccessPath::new(address, key));
+                        (
+                            (state_key.clone(), StateValue::from(value.clone())),
+                            (state_key, WriteOp::Value(value)),
+                        )
+                    })
+            })
+            .unzip();
         TransactionToCommit::new(
             Transaction::UserTransaction(transaction),
-            TransactionInfo::new_placeholder(self.gas_used, self.status),
-            // state updates will be dealt with in BlockGen at a state checkpoint
-            HashMap::new(), /* state updates */
-            None,
-            self.write_set,
+            TransactionInfo::new_placeholder(self.gas_used, None, self.status),
+            state_updates,
+            WriteSetMut::new(write_set).freeze().expect("Cannot fail"),
             events,
         )
     }
@@ -820,12 +861,11 @@ impl Arbitrary for TransactionToCommitGen {
                 0..=2,
             ),
             vec((any::<Index>(), any::<AccountStateGen>()), 0..=1),
-            any::<WriteSet>(),
             any::<u64>(),
             any::<ExecutionStatus>(),
         )
             .prop_map(
-                |(sender, event_emitters, mut touched_accounts, write_set, gas_used, status)| {
+                |(sender, event_emitters, mut touched_accounts, gas_used, status)| {
                     // To reflect change of account/event sequence numbers, txn sender account and
                     // event emitter accounts must be updated.
                     let (sender_index, sender_blob_gen, txn_gen) = sender;
@@ -841,7 +881,6 @@ impl Arbitrary for TransactionToCommitGen {
                         transaction_gen: (sender_index, txn_gen),
                         event_gens,
                         account_state_gens: touched_accounts,
-                        write_set,
                         gas_used,
                         status,
                     }
@@ -949,7 +988,9 @@ impl ValidatorSetGen {
         universe
             .get_account_infos_dedup(&self.validators)
             .iter()
-            .map(|account| ValidatorSigner::new(account.address, account.private_key.clone()))
+            .map(|account| {
+                ValidatorSigner::new(account.address, account.consensus_private_key.clone())
+            })
             .collect()
     }
 }
@@ -1089,33 +1130,18 @@ impl BlockGen {
         let mut txns_to_commit = Vec::new();
 
         // materialize user transactions
-        let mut account_gens = Vec::new();
-        for mut txn_gen in self.txn_gens {
-            account_gens.extend(txn_gen.take_account_gens().into_iter());
+        for txn_gen in self.txn_gens {
             txns_to_commit.push(txn_gen.materialize(universe));
         }
 
-        // add state checkpoint transaction
-        let state_updates = account_gens
-            .into_iter()
-            .flat_map(|(index, account_gen)| {
-                let address = universe.get_account_info(index).address;
-                account_gen
-                    .materialize(index, universe)
-                    .into_resource_iter()
-                    .map(move |(key, value)| {
-                        (
-                            StateKey::AccessPath(AccessPath::new(address, key)),
-                            StateValue::from(value),
-                        )
-                    })
-            })
-            .collect();
         txns_to_commit.push(TransactionToCommit::new(
-            Transaction::StateCheckpoint,
-            TransactionInfo::new_placeholder(0, ExecutionStatus::Success),
-            state_updates,
-            None,
+            Transaction::StateCheckpoint(HashValue::random()),
+            TransactionInfo::new_placeholder(
+                0,
+                Some(HashValue::random()),
+                ExecutionStatus::Success,
+            ),
+            HashMap::new(),
             WriteSet::default(),
             Vec::new(),
         ));
@@ -1183,4 +1209,16 @@ pub fn arb_json_value() -> impl Strategy<Value = Value> {
             ]
         },
     )
+}
+
+// this function generate arbitrary vec<vec<u8>> value
+impl Arbitrary for VecBytes {
+    type Parameters = ();
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        prop::collection::vec(any::<[u8; 32]>().prop_map(|e| e.to_vec()), 1..32)
+            .prop_map(VecBytes::from)
+            .boxed()
+    }
+
+    type Strategy = BoxedStrategy<Self>;
 }

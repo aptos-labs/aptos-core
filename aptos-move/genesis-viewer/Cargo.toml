@@ -15,7 +15,7 @@ structopt = "0.3.21"
 aptos-resource-viewer = { path = "../aptos-resource-viewer" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 cached-framework-packages =  { path = "../framework/cached-packages" }
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "table-extension"] }
 vm-genesis = { path = "../vm-genesis" }

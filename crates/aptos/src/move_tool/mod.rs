@@ -3,6 +3,7 @@
 
 mod aptos_debug_natives;
 
+use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current};
 use crate::{
     common::{
         types::{
@@ -18,12 +19,11 @@ use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
+use move_deps::move_cli::base::test::UnitTestResult;
 use move_deps::{
     move_cli,
-    move_cli::package::cli::UnitTestResult,
     move_command_line_common::env::get_bytecode_version_from_env,
     move_core_types::{
-        account_address::AccountAddress,
         identifier::Identifier,
         language_storage::{ModuleId, TypeTag},
     },
@@ -31,16 +31,17 @@ use move_deps::{
         compilation::compiled_package::CompiledPackage,
         source_package::layout::SourcePackageLayout, BuildConfig,
     },
+    move_prover,
     move_unit_test::UnitTestingConfig,
 };
 use std::{
     collections::BTreeMap,
     convert::TryFrom,
-    fs::create_dir_all,
     io::Write,
     path::{Path, PathBuf},
     str::FromStr,
 };
+use tokio::task;
 
 /// CLI tool for performing Move tasks
 ///
@@ -51,6 +52,7 @@ pub enum MoveTool {
     Publish(PublishPackage),
     Run(RunFunction),
     Test(TestPackage),
+    Prove(ProvePackage),
 }
 
 impl MoveTool {
@@ -61,6 +63,7 @@ impl MoveTool {
             MoveTool::Publish(tool) => tool.execute_serialized().await,
             MoveTool::Run(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
+            MoveTool::Prove(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -72,8 +75,8 @@ pub struct InitPackage {
     #[clap(long)]
     name: String,
     /// Path to create the new move package
-    #[clap(long, parse(from_os_str), default_value_os_t = crate::common::utils::current_dir())]
-    package_dir: PathBuf,
+    #[clap(long, parse(from_os_str))]
+    package_dir: Option<PathBuf>,
     /// Named addresses for the move binary
     ///
     /// Example: alice=0x1234, bob=0x5678
@@ -92,23 +95,18 @@ impl CliCommand<()> for InitPackage {
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        let move_toml = self.package_dir.join(SourcePackageLayout::Manifest.path());
+        let package_dir = dir_default_to_current(self.package_dir.clone())?;
+        let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
         check_if_file_exists(move_toml.as_path(), self.prompt_options)?;
-        create_dir_all(self.package_dir.join(SourcePackageLayout::Sources.path())).map_err(
-            |err| {
-                CliError::IO(
-                    format!(
-                        "Failed to create {} move package directories",
-                        self.package_dir.display()
-                    ),
-                    err,
-                )
-            },
+        create_dir_if_not_exist(
+            package_dir
+                .join(SourcePackageLayout::Sources.path())
+                .as_path(),
         )?;
         let mut w = std::fs::File::create(move_toml.as_path()).map_err(|err| {
             CliError::UnexpectedError(format!(
                 "Failed to create {}: {}",
-                self.package_dir.join(Path::new("Move.toml")).display(),
+                package_dir.join(Path::new("Move.toml")).display(),
                 err
             ))
         })?;
@@ -128,7 +126,7 @@ name = \"{}\"
 version = \"0.0.0\"
 
 [dependencies]
-AptosFramework = {{ git = \"https://github.com/aptos-labs/aptos-core.git\", subdir = \"aptos-move/framework/aptos-framework/\", rev = \"main\" }}
+AptosFramework = {{ git = \"https://github.com/aptos-labs/aptos-core.git\", subdir = \"aptos-move/framework/aptos-framework/\", rev = \"devnet\" }}
 
 [addresses]
 {}
@@ -139,7 +137,7 @@ AptosFramework = {{ git = \"https://github.com/aptos-labs/aptos-core.git\", subd
         .map_err(|err| {
             CliError::UnexpectedError(format!(
                 "Failed to write {:?}: {}",
-                self.package_dir.join(Path::new("Move.toml")),
+                package_dir.join(Path::new("Move.toml")),
                 err
             ))
         })
@@ -167,7 +165,8 @@ impl CliCommand<Vec<String>> for CompilePackage {
             install_dir: self.move_options.output_dir.clone(),
             ..Default::default()
         };
-        let compiled_package = compile_move(build_config, self.move_options.package_dir.as_path())?;
+        let compiled_package =
+            compile_move(build_config, self.move_options.get_package_dir()?.as_path())?;
         let mut ids = Vec::new();
         for &module in compiled_package.root_modules_map().iter_modules().iter() {
             verify_module_init_function(module)
@@ -202,8 +201,8 @@ impl CliCommand<&'static str> for TestPackage {
             install_dir: self.move_options.output_dir.clone(),
             ..Default::default()
         };
-        let result = move_cli::package::cli::run_move_unit_tests(
-            self.move_options.package_dir.as_path(),
+        let result = move_cli::base::test::run_move_unit_tests(
+            self.move_options.get_package_dir()?.as_path(),
             config,
             UnitTestingConfig {
                 filter: self.filter,
@@ -211,13 +210,57 @@ impl CliCommand<&'static str> for TestPackage {
             },
             aptos_debug_natives::aptos_debug_natives(),
             false,
+            &mut std::io::stdout(),
         )
-        .map_err(|err| CliError::MoveTestError(err.to_string()))?;
+        .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
 
         // TODO: commit back up to the move repo
         match result {
             UnitTestResult::Success => Ok("Success"),
-            UnitTestResult::Failure => Ok("Failure"),
+            UnitTestResult::Failure => Err(CliError::MoveTestError),
+        }
+    }
+}
+
+/// Prove the Move package at the package path
+#[derive(Parser)]
+pub struct ProvePackage {
+    #[clap(flatten)]
+    move_options: MovePackageDir,
+
+    /// A filter string to determine which unit tests to run
+    #[clap(long)]
+    pub filter: Option<String>,
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for ProvePackage {
+    fn command_name(&self) -> &'static str {
+        "ProvePackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let config = BuildConfig {
+            additional_named_addresses: self.move_options.named_addresses(),
+            test_mode: true,
+            install_dir: self.move_options.output_dir.clone(),
+            ..Default::default()
+        };
+        let result = task::spawn_blocking(move || {
+            move_cli::base::prove::run_move_prover(
+                config,
+                self.move_options.get_package_dir()?.as_path(),
+                &self.filter,
+                true,
+                move_prover::cli::Options::default(),
+            )
+        })
+        .await
+        .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+
+        match result {
+            Ok(_) => Ok("Success"),
+            Err(_) => Err(CliError::MoveProverError),
         }
     }
 }
@@ -253,7 +296,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
             install_dir: self.move_options.output_dir.clone(),
             ..Default::default()
         };
-        let package = compile_move(build_config, self.move_options.package_dir.as_path())?;
+        let package = compile_move(build_config, self.move_options.get_package_dir()?.as_path())?;
         let compiled_units: Vec<Vec<u8>> = package
             .root_compiled_units
             .iter()
@@ -281,7 +324,7 @@ pub struct RunFunction {
     txn_options: TransactionOptions,
     /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
     ///
-    /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::Message::set_message`
+    /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
     #[clap(long, parse(try_from_str = parse_function_name))]
     function_id: FunctionId,
     /// Hex encoded arguments separated by spaces.
@@ -344,7 +387,7 @@ impl FunctionArgType {
     fn parse_arg(&self, arg: &str) -> CliTypedResult<Vec<u8>> {
         match self {
             FunctionArgType::Address => bcs::to_bytes(
-                &AccountAddress::from_str(arg)
+                &load_account_arg(arg)
                     .map_err(|err| CliError::UnableToParse("address", err.to_string()))?,
             ),
             FunctionArgType::Bool => bcs::to_bytes(

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::HashValue;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
 pub use block_store::{sync_manager::BlockRetriever, BlockStore};
 use consensus_types::{
     executed_block::ExecutedBlock, quorum_cert::QuorumCert, sync_info::SyncInfo,
@@ -52,8 +51,8 @@ pub trait BlockReader: Send + Sync {
     /// Return the highest timeout certificate if available.
     fn highest_2chain_timeout_cert(&self) -> Option<Arc<TwoChainTimeoutCertificate>>;
 
-    /// Return the highest commit decision ledger info.
-    fn highest_ledger_info(&self) -> LedgerInfoWithSignatures;
+    /// Return the highest commit decision quorum certificate.
+    fn highest_commit_cert(&self) -> Arc<QuorumCert>;
 
     /// Return the combination of highest quorum cert, timeout cert and commit cert.
     fn sync_info(&self) -> SyncInfo;

@@ -1,21 +1,42 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+//! Objects of the Rosetta spec
+//!
+//! [Spec](https://www.rosetta-api.org/docs/api_objects.html)
+
+use crate::common::{native_coin_tag, native_coin_tag_lower};
+use crate::types::{
+    account_identifier_lower, aptos_coin_identifier, aptos_coin_identifier_lower,
+    coin_identifier_lower, create_account_identifier, transfer_identifier,
+};
 use crate::{
+    common::{is_native_coin, native_coin},
     error::ApiResult,
     types::{
-        AccountIdentifier, BlockIdentifier, Error, NetworkIdentifier, OperationIdentifier,
-        OperationStatus, OperationType, TransactionIdentifier,
+        account_identifier, coin_identifier, coin_store_identifier, deposit_events_identifier,
+        sequence_number_identifier, withdraw_events_identifier, AccountIdentifier, BlockIdentifier,
+        Error, NetworkIdentifier, OperationIdentifier, OperationStatus, OperationStatusType,
+        OperationType, TransactionIdentifier,
     },
     ApiError,
 };
-use aptos_rest_client::{aptos::Balance, aptos_api_types::TransactionInfo};
-use aptos_types::account_address::AccountAddress;
-use itertools::Itertools;
-use serde::{Deserialize, Serialize};
+use anyhow::anyhow;
+use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
+use aptos_rest_client::aptos_api_types::{
+    Address, Event, MoveStructTag, MoveType, TransactionPayload,
+};
+use aptos_rest_client::{
+    aptos::Balance,
+    aptos_api_types::{WriteSetChange, U64},
+};
+use aptos_types::{account_address::AccountAddress, event::EventKey};
+use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
+    fmt::{Display, Formatter},
+    hash::Hash,
     str::FromStr,
 };
 
@@ -36,7 +57,6 @@ pub struct Allow {
     /// If the server is allowed to lookup historical transactions
     pub historical_balance_lookup: bool,
     /// All times after this are valid timestamps
-    /// TODO: Determine if we even need to bother with this
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp_start_index: Option<u64>,
     /// All call methods supported
@@ -71,7 +91,7 @@ impl From<Balance> for Amount {
         Amount {
             value: balance.coin.value.to_string(),
             // TODO: Support other currencies
-            currency: SupportedCurrencies::NativeCoin.into(),
+            currency: native_coin(),
         }
     }
 }
@@ -159,48 +179,19 @@ pub enum Case {
 /// Currency represented as atomic units including decimals
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/Currency.html)
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Currency {
     /// Symbol of currency
     pub symbol: String,
     /// Number of decimals to be considered in the currency
     pub decimals: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<CurrencyMetadata>,
 }
 
-pub const APTOS: &str = "aptos";
-pub const APTOS_DECIMALS: u64 = 6;
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum SupportedCurrencies {
-    NativeCoin,
-}
-
-impl From<SupportedCurrencies> for Currency {
-    fn from(currency: SupportedCurrencies) -> Self {
-        match currency {
-            SupportedCurrencies::NativeCoin => Currency {
-                symbol: APTOS.to_string(),
-                decimals: APTOS_DECIMALS,
-            },
-        }
-    }
-}
-
-impl TryFrom<&Currency> for SupportedCurrencies {
-    type Error = ApiError;
-
-    fn try_from(value: &Currency) -> Result<Self, Self::Error> {
-        match value.symbol.as_str() {
-            APTOS => {
-                if value.decimals != APTOS_DECIMALS {
-                    Err(ApiError::BadCoin)
-                } else {
-                    Ok(Self::NativeCoin)
-                }
-            }
-            _ => Err(ApiError::BadCoin),
-        }
-    }
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct CurrencyMetadata {
+    pub move_type: String,
 }
 
 /// Various signing curves supported by Rosetta.  We only use [`CurveType::Edwards25519`]
@@ -228,7 +219,10 @@ pub enum Direction {
 }
 
 /// Tells how balances can change without a specific transaction on the account
-/// TODO: Determine if we need to set these for staking
+///
+/// Balance exemptions are not necessary, because staking rewards go to the staking
+/// pool and not to the account.  When they are removed from the pool, normal events
+/// for transfer will occur.
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/ExemptionType.html)
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -264,9 +258,89 @@ pub struct Operation {
     pub account: Option<AccountIdentifier>,
     /// Amount in the operation
     ///
-    /// TODO: Determine if this is required
     #[serde(skip_serializing_if = "Option::is_none")]
     pub amount: Option<Amount>,
+    /// Operation specific metadata for any operation that's missing information it needs
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<OperationSpecificMetadata>,
+}
+
+impl Operation {
+    pub fn create_account(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        address: AccountAddress,
+        sender: AccountAddress,
+    ) -> Operation {
+        Operation {
+            operation_identifier: OperationIdentifier {
+                index: operation_index,
+                network_index: None,
+            },
+            related_operations: None,
+            operation_type: OperationType::CreateAccount.to_string(),
+            status: status.map(|inner| inner.to_string()),
+            account: Some(address.into()),
+            amount: None,
+            metadata: Some(OperationSpecificMetadata {
+                sender: sender.into(),
+            }),
+        }
+    }
+
+    pub fn deposit(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        address: AccountAddress,
+        currency: Currency,
+        amount: u64,
+    ) -> Operation {
+        Operation {
+            operation_identifier: OperationIdentifier {
+                index: operation_index,
+                network_index: None,
+            },
+            related_operations: None,
+            operation_type: OperationType::Deposit.to_string(),
+            status: status.map(|inner| inner.to_string()),
+            account: Some(address.into()),
+            amount: Some(Amount {
+                value: amount.to_string(),
+                currency,
+            }),
+            metadata: None,
+        }
+    }
+
+    pub fn withdraw(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        address: AccountAddress,
+        currency: Currency,
+        amount: u64,
+    ) -> Operation {
+        Operation {
+            operation_identifier: OperationIdentifier {
+                index: operation_index,
+                network_index: None,
+            },
+            related_operations: None,
+            operation_type: OperationType::Withdraw.to_string(),
+            status: status.map(|inner| inner.to_string()),
+            account: Some(address.into()),
+            amount: Some(Amount {
+                value: format!("-{}", amount),
+                currency,
+            }),
+            metadata: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct OperationSpecificMetadata {
+    /// Sender for operations that affect accounts other than the sender
+    pub sender: AccountIdentifier,
 }
 
 /// Used for query operations to apply conditions.  Defaults to [`Operator::And`] if no value is
@@ -296,6 +370,31 @@ pub struct PublicKey {
     pub hex_bytes: String,
     /// Curve type associated with the key
     pub curve_type: CurveType,
+}
+
+impl TryFrom<Ed25519PublicKey> for PublicKey {
+    type Error = anyhow::Error;
+
+    fn try_from(public_key: Ed25519PublicKey) -> Result<Self, Self::Error> {
+        Ok(PublicKey {
+            hex_bytes: public_key.to_encoded_string()?,
+            curve_type: CurveType::Edwards25519,
+        })
+    }
+}
+
+impl TryFrom<PublicKey> for Ed25519PublicKey {
+    type Error = anyhow::Error;
+
+    fn try_from(public_key: PublicKey) -> Result<Self, Self::Error> {
+        if public_key.curve_type != CurveType::Edwards25519 {
+            return Err(anyhow!("Invalid curve type"));
+        }
+
+        Ok(Ed25519PublicKey::from_encoded_string(
+            &public_key.hex_bytes,
+        )?)
+    }
 }
 
 /// Related Transaction allows for connecting related transactions across shards, networks or
@@ -373,35 +472,365 @@ pub struct Transaction {
     /// Related transactions
     #[serde(skip_serializing_if = "Option::is_none")]
     pub related_transactions: Option<Vec<RelatedTransaction>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<TransactionMetadata>,
 }
 
-impl From<&TransactionInfo> for Transaction {
-    fn from(txn: &TransactionInfo) -> Self {
-        Transaction {
-            transaction_identifier: txn.into(),
-            operations: vec![],
-            related_transactions: None,
-        }
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct TransactionMetadata {
+    pub transaction_type: TransactionType,
+    pub version: U64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum TransactionType {
+    User,
+    Genesis,
+    BlockMetadata,
+    StateCheckpoint,
+}
+
+impl Display for TransactionType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use TransactionType::*;
+        f.write_str(match self {
+            User => "User",
+            Genesis => "Genesis",
+            BlockMetadata => "BlockMetadata",
+            StateCheckpoint => "StateCheckpoint",
+        })
     }
 }
 
+impl Transaction {
+    pub async fn from_transaction(txn: aptos_rest_client::Transaction) -> ApiResult<Transaction> {
+        use aptos_rest_client::Transaction::*;
+        let (txn_type, maybe_sender, txn_info, events, maybe_payload) = match txn {
+            // Pending transactions aren't supported by Rosetta (for now)
+            PendingTransaction(_) => return Err(ApiError::TransactionIsPending),
+            UserTransaction(txn) => (
+                TransactionType::User,
+                Some(txn.request.sender),
+                txn.info,
+                txn.events,
+                Some(txn.request.payload),
+            ),
+            GenesisTransaction(txn) => (TransactionType::Genesis, None, txn.info, txn.events, None),
+            BlockMetadataTransaction(txn) => (
+                TransactionType::BlockMetadata,
+                None,
+                txn.info,
+                txn.events,
+                None,
+            ),
+            StateCheckpointTransaction(txn) => (
+                TransactionType::StateCheckpoint,
+                None,
+                txn.info,
+                vec![],
+                None,
+            ),
+        };
+
+        // Operations must be sequential and operation index must always be in the same order
+        // with no gaps
+        let mut operations = vec![];
+        let mut operation_index: u64 = 0;
+        if txn_info.success {
+            // Parse all operations from the writeset changes in a success
+            for change in &txn_info.changes {
+                let mut ops = parse_operations_from_write_set(
+                    change,
+                    &events,
+                    &maybe_sender,
+                    operation_index,
+                );
+                operation_index += ops.len() as u64;
+                operations.append(&mut ops);
+            }
+        } else {
+            // Parse all failed operations from the payload
+            if let Some(sender) = maybe_sender {
+                if let Some(payload) = maybe_payload {
+                    let mut ops = parse_operations_from_txn_payload(
+                        operation_index,
+                        *sender.inner(),
+                        payload,
+                    );
+                    operation_index += ops.len() as u64;
+                    operations.append(&mut ops);
+                }
+            }
+        };
+
+        // Everything committed costs gas
+        if let Some(sender) = maybe_sender {
+            operations.push(Operation::withdraw(
+                operation_index,
+                // Gas charging is always successful if it's been committed
+                Some(OperationStatusType::Success),
+                *sender.inner(),
+                native_coin(),
+                txn_info.gas_used.0,
+            ));
+        }
+
+        Ok(Transaction {
+            transaction_identifier: (&txn_info).into(),
+            operations,
+            related_transactions: None,
+            metadata: Some(TransactionMetadata {
+                transaction_type: txn_type,
+                version: txn_info.version,
+            }),
+        })
+    }
+}
+
+/// Parses operations from the transaction payload
+///
+/// This case only occurs if the transaction failed, and that's because it's less accurate
+/// than just following the state changes
+fn parse_operations_from_txn_payload(
+    operation_index: u64,
+    sender: AccountAddress,
+    payload: TransactionPayload,
+) -> Vec<Operation> {
+    let mut operations = vec![];
+    if let TransactionPayload::ScriptFunctionPayload(inner) = payload {
+        if AccountAddress::ONE == *inner.function.module.address.inner()
+            && (coin_identifier() == inner.function.module.name
+                || coin_identifier_lower() == inner.function.module.name)
+            && transfer_identifier() == inner.function.name
+        {
+            if let Some(MoveType::Struct(MoveStructTag {
+                address,
+                module,
+                name,
+                ..
+            })) = inner.type_arguments.first()
+            {
+                if *address.inner() == AccountAddress::ONE
+                    && (*module == aptos_coin_identifier()
+                        || *module == aptos_coin_identifier_lower())
+                    && *name == aptos_coin_identifier()
+                {
+                    let receiver =
+                        serde_json::from_value::<Address>(inner.arguments.get(0).cloned().unwrap())
+                            .unwrap();
+                    let amount =
+                        serde_json::from_value::<U64>(inner.arguments.get(1).cloned().unwrap())
+                            .unwrap()
+                            .0;
+                    operations.push(Operation::withdraw(
+                        operation_index,
+                        Some(OperationStatusType::Failure),
+                        sender,
+                        native_coin(),
+                        amount,
+                    ));
+                    operations.push(Operation::deposit(
+                        operation_index + 1,
+                        Some(OperationStatusType::Failure),
+                        receiver.into(),
+                        native_coin(),
+                        amount,
+                    ));
+                }
+            }
+        } else if AccountAddress::ONE == *inner.function.module.address.inner()
+            && (account_identifier() == inner.function.module.name
+                || account_identifier_lower() == inner.function.module.name)
+            && create_account_identifier() == inner.function.name
+        {
+            let address =
+                serde_json::from_value::<Address>(inner.arguments.get(0).cloned().unwrap())
+                    .unwrap();
+            operations.push(Operation::create_account(
+                operation_index,
+                Some(OperationStatusType::Failure),
+                address.into(),
+                sender,
+            ));
+        }
+    }
+    operations
+}
+
+/// Parses operations from the write set
+///
+/// This can only be done during a successful transaction because there are actual state changes.
+/// It is more accurate because untracked scripts are included in balance operations
+fn parse_operations_from_write_set(
+    change: &WriteSetChange,
+    events: &[Event],
+    maybe_sender: &Option<Address>,
+    mut operation_index: u64,
+) -> Vec<Operation> {
+    let mut operations = vec![];
+    if let WriteSetChange::WriteResource { address, data, .. } = change {
+        // Determine operation
+        let address = *address.inner();
+        let account_tag = MoveStructTag::new(
+            AccountAddress::ONE.into(),
+            account_identifier(),
+            account_identifier(),
+            vec![],
+        );
+        let account_tag_lower = MoveStructTag::new(
+            AccountAddress::ONE.into(),
+            account_identifier_lower(),
+            account_identifier(),
+            vec![],
+        );
+        let coin_store_tag = MoveStructTag::new(
+            AccountAddress::ONE.into(),
+            coin_identifier(),
+            coin_store_identifier(),
+            vec![native_coin_tag().into()],
+        );
+        let coin_store_tag_lower = MoveStructTag::new(
+            AccountAddress::ONE.into(),
+            coin_identifier_lower(),
+            coin_store_identifier(),
+            vec![native_coin_tag_lower().into()],
+        );
+
+        if data.typ == account_tag || data.typ == account_tag_lower {
+            // Account sequence number increase (possibly creation)
+            // Find out if it's the 0th sequence number (creation)
+            for (id, value) in data.data.0.iter() {
+                if id == &sequence_number_identifier() {
+                    if let Ok(U64(0)) = serde_json::from_value::<U64>(value.clone()) {
+                        operations.push(Operation::create_account(
+                            operation_index,
+                            Some(OperationStatusType::Success),
+                            address,
+                            maybe_sender
+                                .map(|inner| *inner.inner())
+                                .unwrap_or(AccountAddress::ONE),
+                        ));
+                        operation_index += 1;
+                    }
+                }
+            }
+        } else if data.typ == coin_store_tag || data.typ == coin_store_tag_lower {
+            // Account balance change
+            for (id, value) in data.data.0.iter() {
+                if id == &withdraw_events_identifier() {
+                    serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
+                    if let Ok(event) = serde_json::from_value::<CoinEventId>(value.clone()) {
+                        let withdraw_event =
+                            EventKey::new(event.guid.id.creation_num.0, event.guid.id.addr);
+                        if let Some(amount) = get_amount_from_event(events, withdraw_event) {
+                            operations.push(Operation::withdraw(
+                                operation_index,
+                                Some(OperationStatusType::Success),
+                                address,
+                                native_coin(),
+                                amount,
+                            ));
+                            operation_index += 1;
+                        }
+                    }
+                } else if id == &deposit_events_identifier() {
+                    serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
+                    if let Ok(event) = serde_json::from_value::<CoinEventId>(value.clone()) {
+                        let withdraw_event =
+                            EventKey::new(event.guid.id.creation_num.0, event.guid.id.addr);
+                        if let Some(amount) = get_amount_from_event(events, withdraw_event) {
+                            operations.push(Operation::deposit(
+                                operation_index,
+                                Some(OperationStatusType::Success),
+                                address,
+                                native_coin(),
+                                amount,
+                            ));
+                            operation_index += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    operations
+}
+
+/// Pulls the balance change from a withdraw or deposit event
+fn get_amount_from_event(events: &[Event], event_key: EventKey) -> Option<u64> {
+    if let Some(event) = events
+        .iter()
+        .find(|event| EventKey::from(event.key) == event_key)
+    {
+        if let Ok(CoinEvent { amount }) = serde_json::from_value::<CoinEvent>(event.data.clone()) {
+            return Some(amount.0);
+        }
+    }
+
+    None
+}
+
+/// An enum for processing which operation is in a transaction
+pub enum OperationDetails {
+    CreateAccount,
+    TransferCoin {
+        currency: Currency,
+        withdraw_event_key: Option<EventKey>,
+        deposit_event_key: Option<EventKey>,
+    },
+}
+
+/// A holder for all information related to a specific transaction
+/// built from [`Operation`]s
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum InternalOperation {
+    CreateAccount(CreateAccount),
     Transfer(Transfer),
 }
 
 impl InternalOperation {
-    pub fn extract_transfer(operations: &Vec<Operation>) -> ApiResult<InternalOperation> {
-        Ok(Self::Transfer(Transfer::extract_transfer(operations)?))
+    /// Pulls the [`InternalOperation`] from the set of [`Operation`]
+    pub fn extract(operations: &Vec<Operation>) -> ApiResult<InternalOperation> {
+        match operations.len() {
+            1 => {
+                if let Some(operation) = operations.first() {
+                    if operation.operation_type == OperationType::CreateAccount.to_string() {
+                        if let (Some(OperationSpecificMetadata { sender }), Some(account)) =
+                            (&operation.metadata, &operation.account)
+                        {
+                            return Ok(Self::CreateAccount(CreateAccount {
+                                sender: sender.account_address()?,
+                                new_account: account.account_address()?,
+                            }));
+                        }
+                    }
+                }
+
+                Err(ApiError::InvalidOperations)
+            }
+            2 => Ok(Self::Transfer(Transfer::extract_transfer(operations)?)),
+            _ => Err(ApiError::InvalidOperations),
+        }
     }
 
+    /// The sender of the transaction
     pub fn sender(&self) -> AccountAddress {
         match self {
-            Self::Transfer(transfer) => transfer.sender,
+            Self::CreateAccount(inner) => inner.sender,
+            Self::Transfer(inner) => inner.sender,
         }
     }
 }
 
+/// Operation to create an account
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct CreateAccount {
+    pub sender: AccountAddress,
+    pub new_account: AccountAddress,
+}
+
+/// Operation to transfer coins between accounts
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Transfer {
     pub sender: AccountAddress,
@@ -414,18 +843,10 @@ impl Transfer {
     pub fn extract_transfer(operations: &Vec<Operation>) -> ApiResult<Transfer> {
         // Only support 1:1 P2P transfer
         // This is composed of a Deposit and a Withdraw operation
-        if operations.len() != 2
-            && (!operations.iter().any(|op| {
-                OperationType::from_str(&op.operation_type).unwrap_or(OperationType::Withdraw)
-                    == OperationType::Deposit
-            }) || !operations.iter().any(|op| {
-                OperationType::from_str(&op.operation_type).unwrap_or(OperationType::Deposit)
-                    == OperationType::Withdraw
-            }))
-        {
-            return Err(ApiError::BadTransferOperations(
-                "Must have exactly 1 withdraw and 1 deposit".to_string(),
-            ));
+        if operations.len() != 2 {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Must have exactly 2 operations a withdraw and a deposit",
+            )));
         }
 
         let mut op_map = HashMap::new();
@@ -433,11 +854,16 @@ impl Transfer {
             let op_type = OperationType::from_str(&op.operation_type)?;
             op_map.insert(op_type, op);
         }
-        let mut keys = op_map.keys();
-        if !keys.contains(&OperationType::Withdraw) || !keys.contains(&OperationType::Deposit) {
-            return Err(ApiError::BadTransferOperations(
-                "Must have exactly 1 withdraw and 1 deposit".to_string(),
-            ));
+        if !op_map.contains_key(&OperationType::Withdraw) {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Must have a withdraw",
+            )));
+        }
+
+        if !op_map.contains_key(&OperationType::Deposit) {
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Must have a deposit",
+            )));
         }
 
         // Verify accounts and amounts
@@ -445,14 +871,18 @@ impl Transfer {
         let sender = if let Some(ref account) = withdraw.account {
             account.try_into()?
         } else {
-            return Err(ApiError::AccountNotFound);
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Invalid withdraw account provided",
+            )));
         };
 
         let deposit = op_map.get(&OperationType::Deposit).unwrap();
         let receiver = if let Some(ref account) = deposit.account {
             account.try_into()?
         } else {
-            return Err(ApiError::AccountNotFound);
+            return Err(ApiError::InvalidTransferOperations(Some(
+                "Invalid deposit account provided",
+            )));
         };
 
         let (amount, currency): (u64, Currency) =
@@ -461,26 +891,34 @@ impl Transfer {
             {
                 // Currencies have to be the same
                 if withdraw_amount.currency != deposit_amount.currency {
-                    return Err(ApiError::BadCoin);
+                    return Err(ApiError::InvalidTransferOperations(Some(
+                        "Currency mismatch between withdraw and deposit",
+                    )));
                 }
 
                 // Check that the currency is supported
                 // TODO: in future use currency, since there's more than just 1
-                let _ = SupportedCurrencies::try_from(&withdraw_amount.currency)?;
+                let _ = is_native_coin(&withdraw_amount.currency)?;
 
-                let withdraw_value = i64::from_str(&withdraw_amount.value)
-                    .map_err(|_| ApiError::BadTransactionPayload)?;
-                let deposit_value = i64::from_str(&deposit_amount.value)
-                    .map_err(|_| ApiError::BadTransactionPayload)?;
+                let withdraw_value = i64::from_str(&withdraw_amount.value).map_err(|_| {
+                    ApiError::InvalidTransferOperations(Some("Withdraw amount is invalid"))
+                })?;
+                let deposit_value = i64::from_str(&deposit_amount.value).map_err(|_| {
+                    ApiError::InvalidTransferOperations(Some("Deposit amount is invalid"))
+                })?;
 
                 // We can't create or destroy coins, they must be negatives of each other
                 if -withdraw_value != deposit_value {
-                    return Err(ApiError::BadTransactionPayload);
+                    return Err(ApiError::InvalidTransferOperations(Some(
+                        "Withdraw amount must be equal to negative of deposit amount",
+                    )));
                 }
 
                 (deposit_value as u64, deposit_amount.currency.clone())
             } else {
-                return Err(ApiError::BadTransactionPayload);
+                return Err(ApiError::InvalidTransferOperations(Some(
+                    "Must have exactly 1 withdraw and 1 deposit with amounts",
+                )));
             };
 
         Ok(Transfer {
@@ -489,5 +927,49 @@ impl Transfer {
             amount,
             currency,
         })
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct CoinEvent {
+    amount: U64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct CoinEventId {
+    guid: Id,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Id {
+    id: EventId,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct EventId {
+    #[serde(deserialize_with = "deserialize_account_address")]
+    addr: AccountAddress,
+    creation_num: U64,
+}
+
+fn deserialize_account_address<'de, D>(
+    deserializer: D,
+) -> std::result::Result<AccountAddress, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    if deserializer.is_human_readable() {
+        let s = <String>::deserialize(deserializer)?;
+        AccountAddress::from_hex_literal(&s).map_err(D::Error::custom)
+    } else {
+        // In order to preserve the Serde data model and help analysis tools,
+        // make sure to wrap our value in a container with the same name
+        // as the original type.
+        #[derive(::serde::Deserialize)]
+        #[serde(rename = "AccountAddress")]
+        struct Value([u8; AccountAddress::LENGTH]);
+
+        let value = Value::deserialize(deserializer)?;
+        Ok(AccountAddress::new(value.0))
     }
 }

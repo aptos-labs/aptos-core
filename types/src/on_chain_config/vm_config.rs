@@ -37,7 +37,8 @@ impl CostTableInner {
 }
 
 impl OnChainConfig for VMConfig {
-    const IDENTIFIER: &'static str = "VMConfig";
+    const MODULE_IDENTIFIER: &'static str = "vm_config";
+    const TYPE_IDENTIFIER: &'static str = "VMConfig";
 
     fn deserialize_into_config(bytes: &[u8]) -> Result<Self> {
         let raw_vm_config = bcs::from_bytes::<VMConfigInner>(bytes).map_err(|e| {

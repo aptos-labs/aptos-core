@@ -120,6 +120,7 @@ pub mod natives;
 pub mod parallel_executor;
 pub mod read_write_set_analysis;
 pub mod system_module_names;
+mod transaction_arg_validation;
 pub mod transaction_metadata;
 
 pub use crate::aptos_vm::AptosVM;

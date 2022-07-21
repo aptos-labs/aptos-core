@@ -155,6 +155,9 @@ impl LocalSwarmBuilder {
             .with_num_validators(self.number_of_validators)
             .with_template(self.template)
             .with_min_price_per_gas_unit(self.min_price_per_gas_unit)
+            .with_min_lockup_duration_secs(0)
+            .with_max_lockup_duration_secs(86400)
+            .with_initial_lockup_timestamp(0)
             .build(rng)?;
 
         // Get the initial version to start the nodes with, either the one provided or fallback to

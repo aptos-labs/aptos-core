@@ -1,7 +1,13 @@
+locals {
+  metrics_server_helm_chart_path = "${path.module}/../helm/k8s-metrics"
+  chaos_mesh_helm_chart_path     = "${path.module}/../helm/chaos"
+  testnet_addons_helm_chart_path = "${path.module}/../helm/testnet-addons"
+}
+
 resource "helm_release" "metrics-server" {
   name        = "metrics-server"
   namespace   = "kube-system"
-  chart       = "${path.module}/../helm/k8s-metrics"
+  chart       = local.metrics_server_helm_chart_path
   max_history = 5
   wait        = false
 
@@ -26,9 +32,10 @@ resource "helm_release" "metrics-server" {
     })
   ]
 
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
-    name  = "timestamp"
-    value = timestamp()
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.metrics_server_helm_chart_path, "**") : filesha1("${local.metrics_server_helm_chart_path}/${f}")]))
   }
 }
 
@@ -115,7 +122,7 @@ resource "helm_release" "chaos-mesh" {
   name      = "chaos-mesh"
   namespace = kubernetes_namespace.chaos-mesh.metadata[0].name
 
-  chart       = "${path.module}/../helm/chaos"
+  chart       = local.chaos_mesh_helm_chart_path
   max_history = 5
   wait        = false
 
@@ -143,15 +150,16 @@ resource "helm_release" "chaos-mesh" {
     })
   ]
 
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
-    name  = "timestamp"
-    value = timestamp()
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.chaos_mesh_helm_chart_path, "**") : filesha1("${local.chaos_mesh_helm_chart_path}/${f}")]))
   }
 }
 
 resource "helm_release" "testnet-addons" {
   name        = "testnet-addons"
-  chart       = "${path.module}/../helm/testnet-addons"
+  chart       = local.testnet_addons_helm_chart_path
   max_history = 5
   wait        = false
 
@@ -167,6 +175,8 @@ resource "helm_release" "testnet-addons" {
       genesis = {
         era             = var.era
         username_prefix = local.aptos_node_helm_prefix
+        chain_id        = var.chain_id
+        numValidators   = var.num_validators
       }
       service = {
         domain   = local.domain
@@ -176,12 +186,22 @@ resource "helm_release" "testnet-addons" {
         acm_certificate          = length(aws_acm_certificate.ingress) > 0 ? aws_acm_certificate.ingress[0].arn : null
         loadBalancerSourceRanges = var.client_sources_ipv4
       }
+      load_test = {
+        fullnodeGroups = try(var.aptos_node_helm_values.fullnode.groups, [])
+        config = {
+          numFullnodeGroups = var.num_fullnode_groups
+        }
+        image = {
+          tag = var.image_tag
+        }
+      }
     }),
     jsonencode(var.testnet_addons_helm_values)
   ]
 
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
-    name  = "timestamp"
-    value = timestamp()
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.testnet_addons_helm_chart_path, "**") : filesha1("${local.testnet_addons_helm_chart_path}/${f}")]))
   }
 }

@@ -97,8 +97,8 @@ pub static OPTIMAL_CHUNK_SIZES: Lazy<IntGaugeVec> = Lazy::new(|| {
 /// An enum representing the various types of data that can be
 /// fetched via the data client.
 pub enum DataType {
-    AccountStates,
     LedgerInfos,
+    States,
     TransactionOutputs,
     Transactions,
 }
@@ -106,8 +106,8 @@ pub enum DataType {
 impl DataType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            DataType::AccountStates => "account_states",
             DataType::LedgerInfos => "ledger_infos",
+            DataType::States => "states",
             DataType::TransactionOutputs => "transaction_outputs",
             DataType::Transactions => "transactions",
         }
@@ -115,8 +115,8 @@ impl DataType {
 
     pub fn get_all_types() -> Vec<DataType> {
         vec![
-            DataType::AccountStates,
             DataType::LedgerInfos,
+            DataType::States,
             DataType::TransactionOutputs,
             DataType::Transactions,
         ]

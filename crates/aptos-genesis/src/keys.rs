@@ -3,7 +3,7 @@
 
 use crate::config::{HostAndPort, ValidatorConfiguration};
 use aptos_config::{config::IdentityBlob, keys::ConfigKey};
-use aptos_crypto::{ed25519::Ed25519PrivateKey, x25519, PrivateKey};
+use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey};
 use aptos_keygen::KeyGen;
 use aptos_types::{account_address::AccountAddress, transaction::authenticator::AuthenticationKey};
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 pub struct PrivateIdentity {
     pub account_address: AccountAddress,
     pub account_private_key: Ed25519PrivateKey,
-    pub consensus_private_key: Ed25519PrivateKey,
+    pub consensus_private_key: bls12381::PrivateKey,
     pub full_node_network_private_key: x25519::PrivateKey,
     pub validator_network_private_key: x25519::PrivateKey,
 }
@@ -28,6 +28,8 @@ pub fn build_validator_configuration(
     let account_address = private_identity.account_address;
     let account_public_key = private_identity.account_private_key.public_key();
     let consensus_public_key = private_identity.consensus_private_key.public_key();
+    let proof_of_possession =
+        bls12381::ProofOfPossession::create(&private_identity.consensus_private_key);
     let validator_network_public_key = private_identity.validator_network_private_key.public_key();
 
     let full_node_network_public_key = if full_node_host.is_some() {
@@ -39,6 +41,7 @@ pub fn build_validator_configuration(
     Ok(ValidatorConfiguration {
         account_address,
         consensus_public_key,
+        proof_of_possession,
         account_public_key,
         validator_network_public_key,
         validator_host,
@@ -53,7 +56,7 @@ pub fn generate_key_objects(
     keygen: &mut KeyGen,
 ) -> anyhow::Result<(IdentityBlob, IdentityBlob, PrivateIdentity)> {
     let account_key = ConfigKey::new(keygen.generate_ed25519_private_key());
-    let consensus_key = ConfigKey::new(keygen.generate_ed25519_private_key());
+    let consensus_key = ConfigKey::new(keygen.generate_bls12381_private_key());
     let validator_network_key = ConfigKey::new(keygen.generate_x25519_private_key()?);
     let full_node_network_key = ConfigKey::new(keygen.generate_x25519_private_key()?);
 

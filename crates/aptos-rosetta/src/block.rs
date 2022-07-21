@@ -2,29 +2,32 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::{check_network, handle_request, strip_hex_prefix, with_context},
+    common::{
+        check_network, get_block_index_from_request, get_timestamp, handle_request, with_context,
+    },
     error::{ApiError, ApiResult},
-    types::{Block, BlockIdentifier, BlockRequest, BlockResponse},
+    types::{Block, BlockIdentifier, BlockRequest, BlockResponse, Transaction},
     RosettaContext,
 };
-use aptos_crypto::HashValue;
 use aptos_logger::{debug, trace};
-use aptos_rest_client::Transaction;
-use std::str::FromStr;
+use aptos_rest_client::aptos_api_types::{BlockInfo, HashValue};
+use std::{
+    cmp::Ordering,
+    collections::BTreeMap,
+    sync::{Arc, RwLock},
+};
 use warp::Filter;
 
-const Y2K_SECS: u64 = 946713600000;
-
-pub fn routes(
+pub fn block_route(
     server_context: RosettaContext,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::post().and(
-        warp::path!("block")
-            .and(warp::body::json())
-            .and(with_context(server_context))
-            .and_then(handle_request(block)),
-    )
+    warp::path!("block")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_context(server_context))
+        .and_then(handle_request(block))
 }
+
 /// Retrieves a block (in this case a single transaction) given it's identifier.
 ///
 /// Our implementation allows for by `index`, which is the ledger `version` or by
@@ -44,119 +47,269 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
     let rest_client = server_context.rest_client()?;
 
     // Retrieve by block or by hash, both or neither is not allowed
-    let (parent_transaction, transactions): (Transaction, Vec<Transaction>) = match (
-        &request.block_identifier.index,
-        &request.block_identifier.hash,
-    ) {
-        (Some(block_index), None) => {
-            get_block_by_index(rest_client, server_context.block_size, *block_index).await?
-        }
-        (None, Some(hash)) => {
-            // Allow 0x in front of hash
-            let hash = HashValue::from_str(strip_hex_prefix(hash))
-                .map_err(|err| ApiError::AptosError(err.to_string()))?;
-            let response = rest_client.get_transaction(hash).await?;
-            let txn = response.into_inner();
-            let version = txn.version().unwrap();
-            let block_index = version_to_block_index(server_context.block_size, version);
+    let block_index =
+        get_block_index_from_request(&server_context, request.block_identifier).await?;
 
-            get_block_by_index(rest_client, server_context.block_size, block_index).await?
-        }
-        (None, None) => {
-            // Get current version
-            let response = rest_client.get_ledger_information().await?;
-            let version = response.state().version;
-            let block_index = version_to_block_index(server_context.block_size, version) - 1;
+    let (parent_transaction, block_info, transactions) = get_block_by_index(
+        server_context.block_cache()?.as_ref(),
+        &rest_client,
+        block_index,
+    )
+    .await?;
 
-            get_block_by_index(rest_client, server_context.block_size, block_index).await?
-        }
-        (_, _) => return Err(ApiError::BadBlockRequest),
-    };
+    let block = build_block(parent_transaction, block_info, transactions).await?;
 
-    // Build up the transaction, which should contain the `operations` as the change set
-    let (block_identifier, timestamp) = if let Some(first) = transactions.first() {
-        // note: timestamps are in microseconds, so we convert to milliseconds
-        let mut timestamp = first.timestamp() / 1000;
-
-        // Rosetta doesn't like timestamps before 2000
-        if timestamp < Y2K_SECS {
-            timestamp = Y2K_SECS;
-        }
-        (
-            BlockIdentifier::from_transaction(server_context.block_size, first)?,
-            timestamp,
-        )
-    } else {
-        return Err(ApiError::BlockIncomplete);
-    };
-    let transactions: Vec<_> = transactions
-        .into_iter()
-        .map(|txn| txn.transaction_info().unwrap().into())
-        .collect();
-
-    let block = Block {
-        block_identifier,
-        parent_block_identifier: BlockIdentifier::from_transaction(
-            server_context.block_size,
-            &parent_transaction,
-        )?,
-        timestamp,
-        transactions,
-    };
-
-    let response = BlockResponse {
+    Ok(BlockResponse {
         block: Some(block),
         other_transactions: None,
-    };
-
-    Ok(response)
+    })
 }
 
-async fn get_block_by_index(
-    rest_client: &aptos_rest_client::Client,
-    block_size: u64,
-    block_index: u64,
-) -> ApiResult<(Transaction, Vec<Transaction>)> {
-    let version = block_index_to_version(block_size, block_index);
+/// Build up the transaction, which should contain the `operations` as the change set
+async fn build_block(
+    parent_block_identifier: BlockIdentifier,
+    block_info: BlockInfo,
+    transactions: Vec<aptos_rest_client::Transaction>,
+) -> ApiResult<Block> {
+    // note: timestamps are in microseconds, so we convert to milliseconds
+    let timestamp = get_timestamp(block_info);
+    let block_identifier = BlockIdentifier::from_block_info(block_info);
 
+    // Convert the transactions and build the block
+    let mut txns: Vec<Transaction> = Vec::new();
+    for txn in transactions {
+        txns.push(Transaction::from_transaction(txn).await?)
+    }
+
+    Ok(Block {
+        block_identifier,
+        parent_block_identifier,
+        timestamp,
+        transactions: txns,
+    })
+}
+
+/// Retrieves a block by its index
+async fn get_block_by_index(
+    block_cache: &BlockCache,
+    rest_client: &aptos_rest_client::Client,
+    block_index: u64,
+) -> ApiResult<(
+    BlockIdentifier,
+    BlockInfo,
+    Vec<aptos_rest_client::Transaction>,
+)> {
     // For the genesis block, we populate parent_block_identifier with the
     // same genesis block. Refer to
     // https://www.rosetta-api.org/docs/common_mistakes.html#malformed-genesis-block
-    if version == 0 {
-        let response = rest_client.get_transaction_by_version(version).await?;
-        let txn = response.into_inner();
-        Ok((txn.clone(), vec![txn]))
-    } else {
-        let previous_version = block_index_to_version(block_size, block_index - 1);
-        let parent_txn = rest_client
-            .get_transaction_by_version(previous_version)
-            .await?
-            .into_inner();
-        let txns = rest_client
-            .get_transactions(Some(version), Some(block_size))
-            .await?
-            .into_inner();
-
-        // We can't give an incomplete block, it'll have to be retried
-        if txns.len() != block_size as usize {
-            return Err(ApiError::BadBlockRequest);
-        }
-        Ok((parent_txn, txns))
-    }
-}
-
-pub fn block_index_to_version(block_size: u64, block_index: u64) -> u64 {
     if block_index == 0 {
-        0
+        let block_info = block_cache.get_block_info(block_index).await?;
+        let response = rest_client.get_transaction_by_version(0).await?;
+        let txn = response.into_inner();
+        Ok((
+            BlockIdentifier::from_block_info(block_info),
+            block_info,
+            vec![txn],
+        ))
     } else {
-        ((block_index - 1) * block_size) + 1
+        // Retrieve the previous block's identifier
+        let prev_block_info = block_cache.get_block_info(block_index - 1).await?;
+        let prev_block = BlockIdentifier::from_block_info(prev_block_info);
+
+        // Retrieve the current block
+        let block_info = block_cache.get_block_info(block_index).await?;
+        let txns = rest_client
+            .get_transactions(
+                Some(block_info.start_version),
+                Some(block_info.num_transactions),
+            )
+            .await?
+            .into_inner();
+        Ok((prev_block, block_info, txns))
     }
 }
 
-pub fn version_to_block_index(block_size: u64, version: u64) -> u64 {
-    if version == 0 {
-        0
-    } else {
-        ((version - 1) / block_size) + 1
+/// A cache of [`BlockInfo`] to allow us to keep track of the block boundaries
+#[derive(Debug)]
+pub struct BlockCache {
+    blocks: RwLock<BTreeMap<u64, BlockInfo>>,
+    hashes: RwLock<BTreeMap<HashValue, u64>>,
+    versions: RwLock<BTreeMap<u64, u64>>,
+    rest_client: Arc<aptos_rest_client::Client>,
+}
+
+impl BlockCache {
+    pub async fn new(rest_client: Arc<aptos_rest_client::Client>) -> ApiResult<Self> {
+        let mut blocks = BTreeMap::new();
+        let mut hashes = BTreeMap::new();
+        let mut versions = BTreeMap::new();
+        // Genesis is always index 0
+        let genesis_block_info = BlockInfo {
+            block_height: 0,
+            block_hash: aptos_crypto::HashValue::zero().into(),
+            block_timestamp: 0,
+            start_version: 0,
+            end_version: 0,
+            num_transactions: 1,
+        };
+        blocks.insert(0, genesis_block_info);
+        hashes.insert(genesis_block_info.block_hash, 0);
+        versions.insert(0, 0);
+
+        // Now insert the first and last blocks
+        let state = rest_client.get_ledger_information().await?.into_inner();
+        let block_cache = BlockCache {
+            blocks: RwLock::new(blocks),
+            hashes: RwLock::new(hashes),
+            versions: RwLock::new(versions),
+            rest_client,
+        };
+        if let Some(oldest_ledger_version) = state.oldest_ledger_version {
+            block_cache.add_block(oldest_ledger_version).await?;
+        }
+        block_cache.add_block(state.version).await?;
+
+        Ok(block_cache)
+    }
+
+    /// Retrieve the block info for the index
+    pub async fn get_block_info(&self, block_index: u64) -> ApiResult<BlockInfo> {
+        // If we already have the block info, let's roll with it
+        let (start_version, range, traverse_right) = {
+            let map = self.blocks.read().unwrap();
+            if let Some(block_info) = map.get(&block_index) {
+                return Ok(*block_info);
+            }
+
+            // Find the closest, left or right, and build up blocks from there
+            // Search from right to left because we're less likely to search far into the past
+            let mut search_left = None;
+            let mut search_right = None;
+            for (i, info) in map.iter().rev() {
+                let i = *i;
+                match i.cmp(&block_index) {
+                    Ordering::Less => {
+                        let start_version = info.end_version.saturating_add(1);
+                        let block_range = i.saturating_add(1)..=block_index;
+                        let distance = block_index.saturating_sub(i);
+                        search_left = Some((start_version, block_range, distance));
+                        // We've passed our block_index so we can stop now
+                        break;
+                    }
+                    Ordering::Greater => {
+                        let start_version = info.start_version.saturating_sub(1);
+                        let block_range = block_index..=(i.saturating_sub(1));
+                        let distance = i.saturating_sub(block_index);
+                        search_right = Some((start_version, block_range, distance));
+                    }
+                    Ordering::Equal => {}
+                }
+            }
+
+            // Choose the shortest distance and search in that direction
+            match (search_left, search_right) {
+                (Some((left_version, left_range, _)), None) => (left_version, left_range, true),
+                (None, Some((right_version, right_range, _))) => {
+                    (right_version, right_range, false)
+                }
+                (
+                    Some((left_version, left_range, left_distance)),
+                    Some((right_version, right_range, right_distance)),
+                ) => {
+                    if left_distance < right_distance {
+                        (left_version, left_range, true)
+                    } else {
+                        (right_version, right_range, false)
+                    }
+                }
+                // This shouldn't happen as the first thing we do when we initialize the cache
+                // is put the first and last blocks into it
+                _ => unreachable!("There should always be a block in the cache!"),
+            }
+        };
+
+        // Go through the blocks, and add them into the cache
+        let mut running_version = start_version;
+        for _ in range {
+            let info = self.add_block(running_version).await?;
+
+            // Increment to the next block
+            if traverse_right {
+                running_version = info.end_version.saturating_add(1);
+            } else {
+                running_version = info.start_version.saturating_sub(1);
+            }
+        }
+
+        if let Some(info) = self.blocks.read().unwrap().get(&block_index) {
+            Ok(*info)
+        } else {
+            // If for some reason the block doesn't get found, retry with block incomplete
+            Err(ApiError::BlockIncomplete)
+        }
+    }
+
+    /// Retrieve block info, and add it to the index
+    async fn add_block(&self, block_version: u64) -> ApiResult<BlockInfo> {
+        let info_response = self.rest_client.get_block_info(block_version).await?;
+        let info = info_response.into_inner();
+
+        // Add into the cache (keeping the write lock short)
+        let info = {
+            let mut map = self.blocks.write().unwrap();
+            map.insert(info.block_height, info);
+            info
+        };
+
+        // Write hash to index mapping
+        {
+            let mut map = self.hashes.write().unwrap();
+            map.insert(info.block_hash, info.block_height);
+        }
+
+        // Write version to index mapping
+        {
+            let mut map = self.versions.write().unwrap();
+            // The only versions that will be used are the start and end versions of a block
+            // As those are the only versions that will be returned by ledger info
+            map.insert(info.start_version, info.block_height);
+            map.insert(info.end_version, info.block_height);
+        }
+        Ok(info)
+    }
+
+    /// Retrieve the block index for the version
+    /// TODO: We can search through the versions to find the closest version
+    pub async fn get_block_info_by_version(&self, version: u64) -> ApiResult<BlockInfo> {
+        // If we already have the version, let's roll with it
+        let maybe_index = { self.versions.read().unwrap().get(&version).copied() };
+
+        if let Some(index) = maybe_index {
+            if let Some(info) = self.blocks.read().unwrap().get(&index) {
+                return Ok(*info);
+            }
+        }
+
+        // Lookup block info by version
+        self.add_block(version).await
+    }
+
+    /// Retrieve the block info for the hash
+    ///
+    /// This is particularly bad, since there's no index on this value.  It can only be derived
+    /// from the cache, otherwise it needs to fail immediately.  This cache will need to be saved
+    /// somewhere for these purposes.
+    ///
+    /// We could use the BlockMetadata transaction's hash rather than the block hash as a hack,
+    /// and that is always indexed
+    ///
+    /// TODO: Improve reliability
+    pub async fn get_block_index_by_hash(&self, hash: &HashValue) -> ApiResult<u64> {
+        if let Some(version) = self.hashes.read().unwrap().get(hash) {
+            Ok(*version)
+        } else {
+            // If for some reason the block doesn't get found, retry with block incomplete
+            Err(ApiError::BlockIncomplete)
+        }
     }
 }

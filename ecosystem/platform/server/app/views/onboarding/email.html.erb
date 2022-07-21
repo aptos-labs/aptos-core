@@ -18,7 +18,7 @@
   <% end %>
 
   <%= form_with(model: current_user, url: onboarding_email_path, method: :post, data: { turbo: !@show_recaptcha_v2, controller: 'recaptcha', action: 'recaptcha#validate' }, builder: AptosFormBuilder) do |f| %>
-    <% if !current_user.email %>
+    <% if !current_user.email_confirmed? %>
       <div class="mb-6">
         <%= f.label :email, class: 'font-mono uppercase block mb-2' %>
         <%= f.email_field :email, placeholder: 'ENTER YOUR EMAIL ADDRESS', autofocus: true, autocomplete: 'email', spellcheck: false, required: true, value: current_user.unconfirmed_email || @oauth_email, class: 'md:w-96' %>

@@ -10,12 +10,14 @@ use anyhow::ensure;
 use aptos_config::{
     config::{
         DiscoveryMethod, Identity, IdentityBlob, InitialSafetyRulesConfig, NetworkConfig,
-        NodeConfig, PeerRole, RoleType, SafetyRulesService, WaypointConfig,
+        NodeConfig, OnDiskStorageConfig, PeerRole, RoleType, SafetyRulesService, SecureBackend,
+        WaypointConfig,
     },
     generator::build_seed_for_network,
     network_id::NetworkId,
 };
 use aptos_crypto::{
+    bls12381,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey,
 };
@@ -160,6 +162,9 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
         Ok(ValidatorConfiguration {
             account_address: private_identity.account_address,
             consensus_public_key: private_identity.consensus_private_key.public_key(),
+            proof_of_possession: bls12381::ProofOfPossession::create(
+                &private_identity.consensus_private_key,
+            ),
             account_public_key: private_identity.account_private_key.public_key(),
             validator_network_public_key: private_identity
                 .validator_network_private_key
@@ -539,6 +544,10 @@ impl Builder {
 
         // Ensure safety rules runs in a thread
         config.consensus.safety_rules.service = SafetyRulesService::Thread;
+        let mut storage = OnDiskStorageConfig::default();
+        storage.set_data_dir(validator.dir.clone());
+
+        config.consensus.safety_rules.backend = SecureBackend::OnDiskStorage(storage);
 
         if index > 0 || self.randomize_first_validator_ports {
             config.randomize_ports();

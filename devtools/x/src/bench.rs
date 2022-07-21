@@ -31,7 +31,6 @@ pub fn run(mut args: Args, xctx: XContext) -> Result<()> {
     };
 
     let cmd = CargoCommand::Bench {
-        cargo_config: xctx.config().cargo_config(),
         direct_args: direct_args.as_slice(),
         args: &args.args,
         env: &[],

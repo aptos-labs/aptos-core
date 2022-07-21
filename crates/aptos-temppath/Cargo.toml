@@ -13,4 +13,4 @@ edition = "2018"
 hex = "0.4.3"
 rand = "0.7.3"
 
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }
+

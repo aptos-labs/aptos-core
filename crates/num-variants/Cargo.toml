@@ -16,5 +16,3 @@ proc-macro = true
 proc-macro2 = "1.0.38"
 quote = "1.0.18"
 syn = "1.0.92"
-
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }

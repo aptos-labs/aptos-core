@@ -3,7 +3,7 @@
 
 use crate::common::{Author, Round};
 use anyhow::Context;
-use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_crypto::bls12381;
 use aptos_types::{
     block_info::BlockInfo, ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -16,7 +16,7 @@ use std::fmt::{Debug, Display, Formatter};
 pub struct CommitVote {
     author: Author,
     ledger_info: LedgerInfo,
-    signature: Ed25519Signature,
+    signature: bls12381::Signature,
 }
 
 // this is required by structured log
@@ -52,7 +52,7 @@ impl CommitVote {
     pub fn new_with_signature(
         author: Author,
         ledger_info: LedgerInfo,
-        signature: Ed25519Signature,
+        signature: bls12381::Signature,
     ) -> Self {
         Self {
             author,
@@ -72,7 +72,7 @@ impl CommitVote {
     }
 
     /// Return the signature of the vote
-    pub fn signature(&self) -> &Ed25519Signature {
+    pub fn signature(&self) -> &bls12381::Signature {
         &self.signature
     }
 

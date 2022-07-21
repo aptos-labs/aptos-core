@@ -24,12 +24,14 @@ use event_notifications::EventSubscriptionService;
 use futures::StreamExt;
 use mempool_notifications::MempoolNotificationSender;
 use std::{sync::Arc, time::Duration};
-use storage_interface::{DbReader, StartupInfo};
+use storage_interface::DbReader;
 use tokio::time::timeout;
 
 // TODO(joshlind): make these configurable!
 const MAX_NUM_DATA_STREAM_TIMEOUTS: u64 = 3;
 pub const PENDING_DATA_LOG_FREQ_SECS: u64 = 3;
+
+// TODO(joshlind): add unit tests to the speculative stream state.
 
 /// The speculative state that tracks a data stream of transactions or outputs.
 /// This assumes all data is valid and allows the driver to speculatively verify
@@ -75,8 +77,20 @@ impl SpeculativeStreamState {
         self.synced_version = synced_version;
     }
 
-    /// Verifies the given ledger info with signatures against the current epoch
-    /// state and updates the state if the validator set has changed.
+    /// Updates the epoch state if we've hit the specified target ledger
+    /// info version and the ledger info has a new epoch state.
+    pub fn maybe_update_epoch_state(
+        &mut self,
+        ledger_info_with_signatures: LedgerInfoWithSignatures,
+    ) {
+        if let Some(epoch_state) = ledger_info_with_signatures.ledger_info().next_epoch_state() {
+            if ledger_info_with_signatures.ledger_info().version() == self.synced_version {
+                self.epoch_state = epoch_state.clone();
+            }
+        }
+    }
+
+    /// Verifies the given ledger info with signatures against the current epoch state
     pub fn verify_ledger_info_with_signatures(
         &mut self,
         ledger_info_with_signatures: &LedgerInfoWithSignatures,
@@ -85,11 +99,7 @@ impl SpeculativeStreamState {
             .verify(ledger_info_with_signatures)
             .map_err(|error| {
                 Error::VerificationError(format!("Ledger info failed verification: {:?}", error))
-            })?;
-        if let Some(epoch_state) = ledger_info_with_signatures.ledger_info().next_epoch_state() {
-            self.epoch_state = epoch_state.clone();
-        }
-        Ok(())
+            })
     }
 }
 
@@ -176,16 +186,24 @@ pub async fn handle_end_of_stream_or_invalid_payload<
 
 /// Fetches the latest epoch state from the specified storage
 pub fn fetch_latest_epoch_state(storage: Arc<dyn DbReader>) -> Result<EpochState, Error> {
-    let startup_info = fetch_startup_info(storage)?;
-    Ok(startup_info.get_epoch_state().clone())
+    storage.get_latest_epoch_state().map_err(|error| {
+        Error::StorageError(format!(
+            "Failed to get the latest epoch state from storage: {:?}",
+            error
+        ))
+    })
 }
 
 /// Fetches the latest synced ledger info from the specified storage
 pub fn fetch_latest_synced_ledger_info(
     storage: Arc<dyn DbReader>,
 ) -> Result<LedgerInfoWithSignatures, Error> {
-    let startup_info = fetch_startup_info(storage)?;
-    Ok(startup_info.latest_ledger_info)
+    storage.get_latest_ledger_info().map_err(|error| {
+        Error::StorageError(format!(
+            "Failed to get the latest ledger info from storage: {:?}",
+            error
+        ))
+    })
 }
 
 /// Fetches the latest synced version from the specified storage
@@ -204,19 +222,8 @@ pub fn fetch_latest_synced_version(storage: Arc<dyn DbReader>) -> Result<Version
         .map(|(latest_synced_version, _)| latest_synced_version)
 }
 
-/// Fetches the startup info from the specified storage
-fn fetch_startup_info(storage: Arc<dyn DbReader>) -> Result<StartupInfo, Error> {
-    let startup_info = storage.get_startup_info().map_err(|error| {
-        Error::StorageError(format!(
-            "Failed to get startup info from storage: {:?}",
-            error
-        ))
-    })?;
-    startup_info.ok_or_else(|| Error::StorageError("Missing startup info from storage".into()))
-}
-
 /// Initializes all relevant metric gauges (e.g., after a reboot
-/// or after an account state snapshot has been restored).
+/// or after a state snapshot has been restored).
 pub fn initialize_sync_gauges(storage: Arc<dyn DbReader>) -> Result<(), Error> {
     // Update the latest synced versions
     let highest_synced_version = fetch_latest_synced_version(storage.clone())?;
@@ -286,5 +293,42 @@ pub async fn handle_committed_transactions<M: MempoolNotificationSender>(
         error!(LogSchema::new(LogEntry::SynchronizerNotification)
             .error(&error)
             .message("Failed to handle a transaction commit notification!"));
+    }
+}
+
+/// Updates the metrics to handle an epoch change event
+pub fn update_new_epoch_metrics(storage: Arc<dyn DbReader>) {
+    // Increment the epoch
+    metrics::increment_gauge(
+        &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+        metrics::StorageSynchronizerOperations::SyncedEpoch.get_label(),
+        1,
+    );
+
+    // Update the validator set accounts in the epoch
+    match fetch_latest_epoch_state(storage) {
+        Ok(latest_epoch_state) => {
+            let epoch = metrics::read_gauge(
+                &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+                metrics::StorageSynchronizerOperations::SyncedEpoch.get_label(),
+            );
+            let validator_verifier = latest_epoch_state.verifier;
+            for validator_address in validator_verifier.get_ordered_account_addresses_iter() {
+                let validator_weight = validator_verifier
+                    .get_voting_power(&validator_address)
+                    .unwrap_or(0);
+                metrics::set_epoch_state_gauge(
+                    &epoch.to_string(),
+                    &validator_address.to_string(),
+                    &validator_weight.to_string(),
+                );
+            }
+        }
+        Err(error) => {
+            error!(LogSchema::new(LogEntry::Driver).message(&format!(
+                "Failed to get the latest epoch state from storage! Error: {:?}",
+                error
+            )));
+        }
     }
 }

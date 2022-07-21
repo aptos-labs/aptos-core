@@ -14,13 +14,13 @@ class OnboardingController < ApplicationController
   layout 'it2'
 
   def email
-    redirect_to it2_path if current_user.email_confirmed? && !current_user.username.nil?
+    redirect_to it2_path if current_user.registration_completed?
   end
 
   def email_success; end
 
   def email_update
-    return redirect_to it2_path if current_user.email_confirmed? && !current_user.username.nil?
+    return redirect_to it2_path if current_user.registration_completed?
 
     recaptcha_v3_success = verify_recaptcha(action: 'onboarding/email', minimum_score: 0.5,
                                             secret_key: ENV.fetch('RECAPTCHA_V3_SECRET_KEY', nil), model: current_user)
@@ -103,6 +103,6 @@ class OnboardingController < ApplicationController
   end
 
   def ensure_it2_registration_open!
-    redirect_to root_url if Flipper.enabled?(:it2_registration_closed, current_user)
+    redirect_to leaderboard_it2_path if Flipper.enabled?(:it2_registration_closed, current_user)
   end
 end

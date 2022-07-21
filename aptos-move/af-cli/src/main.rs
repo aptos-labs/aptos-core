@@ -28,12 +28,12 @@ pub enum AfCommands {
 fn main() -> Result<()> {
     let error_descriptions: ErrorMapping = bcs::from_bytes(cached_framework_packages::error_map())?;
     let args = AfCli::parse();
-    match &args.cmd {
+    match args.cmd {
         AfCommands::Command(cmd) => move_deps::move_cli::run_cli(
             aptos_vm::natives::aptos_natives(),
             &INITIAL_COST_SCHEDULE,
             &error_descriptions,
-            &args.move_args,
+            args.move_args,
             cmd,
         ),
     }

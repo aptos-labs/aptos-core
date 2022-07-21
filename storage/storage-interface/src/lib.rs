@@ -2,14 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, format_err, Result};
-use aptos_crypto::{
-    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
-    HashValue,
-};
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::aptos_root_address,
+    account_config::CORE_CODE_ADDRESS,
     contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
@@ -19,8 +16,8 @@ use aptos_types::{
     nibble::nibble_path::NibblePath,
     on_chain_config::{access_path_for_config, ConfigID},
     proof::{
-        definition::LeafCount, AccumulatorConsistencyProof, SparseMerkleProof,
-        SparseMerkleRangeProof, TransactionAccumulatorSummary,
+        AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleRangeProof,
+        TransactionAccumulatorSummary,
     },
     state_proof::StateProof,
     state_store::{
@@ -38,41 +35,43 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
+pub mod async_proof_fetcher;
 pub mod cached_state_view;
 mod executed_trees;
-pub mod in_memory_state;
-#[cfg(any(feature = "testing", feature = "fuzzing"))]
 pub mod mock;
 pub mod no_proof_fetcher;
 pub mod proof_fetcher;
+pub mod state_delta;
 pub mod state_view;
 pub mod sync_proof_fetcher;
 
+use crate::state_delta::StateDelta;
 pub use executed_trees::ExecutedTrees;
+use scratchpad::SparseMerkleTree;
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct StartupInfo {
     /// The latest ledger info.
     pub latest_ledger_info: LedgerInfoWithSignatures,
     /// If the above ledger info doesn't carry a validator set, the latest validator set. Otherwise
     /// `None`.
     pub latest_epoch_state: Option<EpochState>,
-    pub committed_tree_state: TreeState,
-    pub synced_tree_state: Option<TreeState>,
+    pub committed_trees: ExecutedTrees,
+    pub synced_trees: Option<ExecutedTrees>,
 }
 
 impl StartupInfo {
     pub fn new(
         latest_ledger_info: LedgerInfoWithSignatures,
         latest_epoch_state: Option<EpochState>,
-        committed_tree_state: TreeState,
-        synced_tree_state: Option<TreeState>,
+        committed_trees: ExecutedTrees,
+        synced_trees: Option<ExecutedTrees>,
     ) -> Self {
         Self {
             latest_ledger_info,
             latest_epoch_state,
-            committed_tree_state,
-            synced_tree_state,
+            committed_trees,
+            synced_trees,
         }
     }
 
@@ -83,19 +82,14 @@ impl StartupInfo {
         let latest_ledger_info =
             LedgerInfoWithSignatures::genesis(HashValue::zero(), ValidatorSet::empty());
         let latest_epoch_state = None;
-        let committed_tree_state = TreeState {
-            num_transactions: 0,
-            ledger_frozen_subtree_hashes: Vec::new(),
-            state_checkpoint_hash: *SPARSE_MERKLE_PLACEHOLDER_HASH,
-            state_checkpoint_version: None,
-        };
-        let synced_tree_state = None;
+        let committed_trees = ExecutedTrees::new_empty();
+        let synced_trees = None;
 
         Self {
             latest_ledger_info,
             latest_epoch_state,
-            committed_tree_state,
-            synced_tree_state,
+            committed_trees,
+            synced_trees,
         }
     }
 
@@ -110,60 +104,8 @@ impl StartupInfo {
             })
     }
 
-    pub fn into_latest_tree_state(self) -> TreeState {
-        self.synced_tree_state.unwrap_or(self.committed_tree_state)
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct TreeState {
-    pub num_transactions: LeafCount,
-    pub ledger_frozen_subtree_hashes: Vec<HashValue>,
-    /// Root hash of the state checkpoint (global sparse merkle tree).
-    pub state_checkpoint_hash: HashValue,
-    pub state_checkpoint_version: Option<Version>,
-}
-
-impl TreeState {
-    pub fn new(
-        num_transactions: LeafCount,
-        ledger_frozen_subtree_hashes: Vec<HashValue>,
-        state_checkpoint_hash: HashValue,
-        state_checkpoint_version: Option<Version>,
-    ) -> Self {
-        Self {
-            num_transactions,
-            ledger_frozen_subtree_hashes,
-            state_checkpoint_hash,
-            state_checkpoint_version,
-        }
-    }
-
-    pub fn new_at_state_checkpoint(
-        num_transactions: LeafCount,
-        ledger_frozen_subtree_hashes: Vec<HashValue>,
-        state_root_hash: HashValue,
-    ) -> Self {
-        Self {
-            num_transactions,
-            ledger_frozen_subtree_hashes,
-            state_checkpoint_hash: state_root_hash,
-            state_checkpoint_version: num_transactions.checked_sub(1),
-        }
-    }
-
-    pub fn new_empty() -> Self {
-        Self::new_at_state_checkpoint(0, Vec::new(), *SPARSE_MERKLE_PLACEHOLDER_HASH)
-    }
-
-    pub fn describe(&self) -> &'static str {
-        if self.num_transactions != 0 {
-            "DB has been bootstrapped."
-        } else if self.state_checkpoint_hash != *SPARSE_MERKLE_PLACEHOLDER_HASH {
-            "DB has no transaction, but a non-empty pre-genesis state."
-        } else {
-            "DB is empty, has no transaction or state."
-        }
+    pub fn into_latest_executed_trees(self) -> ExecutedTrees {
+        self.synced_trees.unwrap_or(self.committed_trees)
     }
 }
 
@@ -321,6 +263,14 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
+    /// See [AptosDB::get_block_boundaries].
+    ///
+    /// [AptosDB::get_block_boundaries]:
+    /// ../aptosdb/struct.AptosDB.html#method.get_block_boundaries
+    fn get_block_boundaries(&self, version: u64, latest_ledger_version: u64) -> Result<(u64, u64)> {
+        unimplemented!()
+    }
+
     /// Gets the version of the last transaction committed before timestamp,
     /// a committed block at or after the required timestamp must exist (otherwise it's possible
     /// the next block committed as a timestamp smaller than the one in the request).
@@ -337,6 +287,11 @@ pub trait DbReader: Send + Sync {
     /// [AptosDB::get_latest_account_state]:
     /// ../aptosdb/struct.AptosDB.html#method.get_latest_account_state
     fn get_latest_state_value(&self, state_key: StateKey) -> Result<Option<StateValue>> {
+        unimplemented!()
+    }
+
+    /// Gets the latest epoch state currently held in storage.
+    fn get_latest_epoch_state(&self) -> Result<EpochState> {
         unimplemented!()
     }
 
@@ -375,7 +330,7 @@ pub trait DbReader: Send + Sync {
     }
 
     /// Returns the latest state checkpoint version if any.
-    fn get_latest_state_checkpoint(&self) -> Result<Option<(Version, HashValue)>> {
+    fn get_latest_state_snapshot(&self) -> Result<Option<(Version, HashValue)>> {
         unimplemented!()
     }
 
@@ -458,6 +413,15 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
+    /// Returns the proof of the given state key and version.
+    fn get_state_proof_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<SparseMerkleProof> {
+        unimplemented!()
+    }
+
     /// Gets a state value by state key along with the proof, out of the ledger state indicated by the state
     /// Merkle tree root with a sparse merkle proof proving state tree root.
     /// See [AptosDB::get_account_state_with_proof_by_version].
@@ -474,9 +438,9 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// Gets the latest TreeState no matter if db has been bootstrapped.
+    /// Gets the latest ExecutedTrees no matter if db has been bootstrapped.
     /// Used by the Db-bootstrapper.
-    fn get_latest_tree_state(&self) -> Result<TreeState> {
+    fn get_latest_executed_trees(&self) -> Result<ExecutedTrees> {
         unimplemented!()
     }
 
@@ -585,7 +549,7 @@ impl MoveStorage for &dyn DbReader {
         let config_value_option = self
             .get_state_value_with_proof_by_version(
                 &StateKey::AccessPath(AccessPath::new(
-                    aptos_root_address(),
+                    CORE_CODE_ADDRESS,
                     access_path_for_config(config_id).path,
                 )),
                 version,
@@ -610,7 +574,7 @@ impl MoveStorage for &dyn DbReader {
     }
 
     fn fetch_latest_state_checkpoint_version(&self) -> Result<Version> {
-        self.get_latest_state_checkpoint()?
+        self.get_latest_state_snapshot()?
             .ok_or_else(|| format_err!("[MoveStorage] Latest state checkpoint not found."))
             .map(|(v, _)| v)
     }
@@ -664,6 +628,7 @@ pub trait DbWriter: Send + Sync {
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         save_state_snapshots: bool,
+        latest_in_memory_state: StateDelta,
     ) -> Result<()> {
         unimplemented!()
     }
@@ -674,6 +639,7 @@ pub trait DbWriter: Send + Sync {
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        latest_in_memory_state: StateDelta,
     ) -> Result<()> {
         self.save_transactions_ext(
             txns_to_commit,
@@ -681,20 +647,26 @@ pub trait DbWriter: Send + Sync {
             base_state_version,
             ledger_info_with_sigs,
             true, /* save_state_snapshots */
+            latest_in_memory_state,
         )
+    }
+
+    fn save_state_snapshot_for_bench(
+        &self,
+        jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
+        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
+        version: Version,
+        base_version: Option<Version>,
+        state_tree_at_snapshot: SparseMerkleTree<StateValue>,
+    ) -> Result<()> {
+        unimplemented!()
     }
 
     /// Persists merklized states as authenticated state checkpoint.
     /// See [`AptosDB::save_state_snapshot`].
     ///
     /// [`AptosDB::save_state_snapshot`]: ../aptosdb/struct.AptosDB.html#method.save_state_snapshot
-    fn save_state_snapshot(
-        &self,
-        jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
-        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
-        version: Version,
-        base_version: Option<Version>,
-    ) -> Result<()> {
+    fn save_state_snapshot(&self) -> Result<()> {
         unimplemented!()
     }
 
@@ -785,7 +757,7 @@ pub fn jmt_updates(
 ) -> Vec<(HashValue, (HashValue, StateKey))> {
     state_updates
         .iter()
-        .map(|(k, v)| (k.hash(), (v.hash(), k.clone())))
+        .map(|(k, v)| (k.hash(), (v.hash(), (*k).clone())))
         .collect()
 }
 

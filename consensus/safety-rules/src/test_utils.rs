@@ -5,12 +5,7 @@ use crate::{
     persistent_safety_storage::PersistentSafetyStorage, serializer::SerializerService, SafetyRules,
     TSafetyRules,
 };
-use aptos_crypto::{
-    ed25519::Ed25519PrivateKey,
-    hash::{CryptoHash, TransactionAccumulatorHasher},
-    traits::SigningKey,
-    Uniform,
-};
+use aptos_crypto::hash::{CryptoHash, TransactionAccumulatorHasher};
 use aptos_secure_storage::{InMemoryStorage, Storage};
 use aptos_types::{
     block_info::BlockInfo,
@@ -30,7 +25,7 @@ use consensus_types::{
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_data::VoteData,
-    vote_proposal::{MaybeSignedVoteProposal, VoteProposal},
+    vote_proposal::VoteProposal,
 };
 use std::collections::BTreeMap;
 
@@ -58,9 +53,8 @@ pub fn make_proposal_with_qc_and_proof(
     proof: Proof,
     qc: QuorumCert,
     validator_signer: &ValidatorSigner,
-    exec_key: Option<&Ed25519PrivateKey>,
-) -> MaybeSignedVoteProposal {
-    let vote_proposal = VoteProposal::new(
+) -> VoteProposal {
+    VoteProposal::new(
         proof,
         Block::new_proposal(
             payload,
@@ -72,40 +66,32 @@ pub fn make_proposal_with_qc_and_proof(
         ),
         None,
         false,
-    );
-    let signature = exec_key.map(|key| key.sign(&vote_proposal));
-    MaybeSignedVoteProposal {
-        vote_proposal,
-        signature,
-    }
+    )
 }
 
 pub fn make_proposal_with_qc(
     round: Round,
     qc: QuorumCert,
     validator_signer: &ValidatorSigner,
-    exec_key: Option<&Ed25519PrivateKey>,
-) -> MaybeSignedVoteProposal {
+) -> VoteProposal {
     make_proposal_with_qc_and_proof(
         Payload::new_empty(),
         round,
         empty_proof(),
         qc,
         validator_signer,
-        exec_key,
     )
 }
 
 pub fn make_proposal_with_parent_and_overrides(
     payload: Payload,
     round: Round,
-    parent: &MaybeSignedVoteProposal,
-    committed: Option<&MaybeSignedVoteProposal>,
+    parent: &VoteProposal,
+    committed: Option<&VoteProposal>,
     validator_signer: &ValidatorSigner,
     epoch: Option<u64>,
     next_epoch_state: Option<EpochState>,
-    exec_key: Option<&Ed25519PrivateKey>,
-) -> MaybeSignedVoteProposal {
+) -> VoteProposal {
     let block_epoch = match epoch {
         Some(e) => e,
         _ => parent.block().epoch(),
@@ -183,17 +169,16 @@ pub fn make_proposal_with_parent_and_overrides(
 
     let qc = QuorumCert::new(vote_data, ledger_info_with_signatures);
 
-    make_proposal_with_qc_and_proof(payload, round, proof, qc, validator_signer, exec_key)
+    make_proposal_with_qc_and_proof(payload, round, proof, qc, validator_signer)
 }
 
 pub fn make_proposal_with_parent(
     payload: Payload,
     round: Round,
-    parent: &MaybeSignedVoteProposal,
-    committed: Option<&MaybeSignedVoteProposal>,
+    parent: &VoteProposal,
+    committed: Option<&VoteProposal>,
     validator_signer: &ValidatorSigner,
-    exec_key: Option<&Ed25519PrivateKey>,
-) -> MaybeSignedVoteProposal {
+) -> VoteProposal {
     make_proposal_with_parent_and_overrides(
         payload,
         round,
@@ -202,7 +187,6 @@ pub fn make_proposal_with_parent(
         validator_signer,
         None,
         None,
-        exec_key,
     )
 }
 
@@ -238,7 +222,6 @@ pub fn test_storage(signer: &ValidatorSigner) -> PersistentSafetyStorage {
         storage,
         signer.author(),
         signer.private_key().clone(),
-        Ed25519PrivateKey::generate_for_testing(),
         waypoint,
         true,
     )
@@ -250,7 +233,7 @@ pub fn test_safety_rules() -> SafetyRules {
     let storage = test_storage(&signer);
     let (epoch_change_proof, _) = make_genesis(&signer);
 
-    let mut safety_rules = SafetyRules::new(storage, true, false);
+    let mut safety_rules = SafetyRules::new(storage);
     safety_rules.initialize(&epoch_change_proof).unwrap();
     safety_rules
 }
@@ -259,7 +242,7 @@ pub fn test_safety_rules() -> SafetyRules {
 pub fn test_safety_rules_uninitialized() -> SafetyRules {
     let signer = ValidatorSigner::from_int(0);
     let storage = test_storage(&signer);
-    SafetyRules::new(storage, true, false)
+    SafetyRules::new(storage)
 }
 
 /// Returns a simple serializer for testing purposes.

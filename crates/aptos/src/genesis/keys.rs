@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current};
 use crate::{
     common::{
         types::{CliError, CliTypedResult, PromptOptions, RngArgs},
@@ -9,7 +10,7 @@ use crate::{
     genesis::git::{from_yaml, to_yaml, GitOptions},
     CliCommand,
 };
-use aptos_crypto::PrivateKey;
+use aptos_crypto::{bls12381, PrivateKey};
 use aptos_genesis::{
     config::{HostAndPort, ValidatorConfiguration},
     keys::{generate_key_objects, PrivateIdentity},
@@ -30,8 +31,8 @@ pub struct GenerateKeys {
     #[clap(flatten)]
     pub rng_args: RngArgs,
     /// Output path for the three keys
-    #[clap(long, parse(from_os_str), default_value = ".")]
-    pub(crate) output_dir: PathBuf,
+    #[clap(long, parse(from_os_str))]
+    pub(crate) output_dir: Option<PathBuf>,
 }
 
 #[async_trait]
@@ -41,9 +42,11 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
     }
 
     async fn execute(self) -> CliTypedResult<Vec<PathBuf>> {
-        let keys_file = self.output_dir.join(PRIVATE_KEYS_FILE);
-        let validator_file = self.output_dir.join(VALIDATOR_FILE);
-        let vfn_file = self.output_dir.join(VFN_FILE);
+        let output_dir = dir_default_to_current(self.output_dir.clone())?;
+
+        let keys_file = output_dir.join(PRIVATE_KEYS_FILE);
+        let validator_file = output_dir.join(VALIDATOR_FILE);
+        let vfn_file = output_dir.join(VFN_FILE);
         check_if_file_exists(keys_file.as_path(), self.prompt_options)?;
         check_if_file_exists(validator_file.as_path(), self.prompt_options)?;
         check_if_file_exists(vfn_file.as_path(), self.prompt_options)?;
@@ -53,10 +56,7 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
             generate_key_objects(&mut key_generator)?;
 
         // Create the directory if it doesn't exist
-        if !self.output_dir.exists() || !self.output_dir.is_dir() {
-            std::fs::create_dir(&self.output_dir)
-                .map_err(|e| CliError::IO(self.output_dir.to_str().unwrap().to_string(), e))?
-        };
+        create_dir_if_not_exist(output_dir.as_path())?;
 
         write_to_user_only_file(
             keys_file.as_path(),
@@ -82,8 +82,8 @@ pub struct SetValidatorConfiguration {
     #[clap(flatten)]
     pub(crate) git_options: GitOptions,
     /// Path to folder with account.key, consensus.key, and network.key
-    #[clap(long, parse(from_os_str), default_value = ".")]
-    pub(crate) keys_dir: PathBuf,
+    #[clap(long, parse(from_os_str))]
+    pub(crate) keys_dir: Option<PathBuf>,
     /// Host and port pair for the validator e.g. 127.0.0.1:6180
     #[clap(long)]
     pub(crate) validator_host: HostAndPort,
@@ -102,13 +102,16 @@ impl CliCommand<()> for SetValidatorConfiguration {
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        let private_keys_path = self.keys_dir.join(PRIVATE_KEYS_FILE);
+        let keys_dir = dir_default_to_current(self.keys_dir.clone())?;
+        let private_keys_path = keys_dir.join(PRIVATE_KEYS_FILE);
         let bytes = read_from_file(private_keys_path.as_path())?;
         let key_files: PrivateIdentity =
             from_yaml(&String::from_utf8(bytes).map_err(CliError::from)?)?;
         let account_address = key_files.account_address;
         let account_key = key_files.account_private_key.public_key();
         let consensus_key = key_files.consensus_private_key.public_key();
+        let proof_of_possession =
+            bls12381::ProofOfPossession::create(&key_files.consensus_private_key);
         let validator_network_key = key_files.validator_network_private_key.public_key();
 
         let full_node_network_key = if self.full_node_host.is_some() {
@@ -120,6 +123,7 @@ impl CliCommand<()> for SetValidatorConfiguration {
         let credentials = ValidatorConfiguration {
             account_address,
             consensus_public_key: consensus_key,
+            proof_of_possession,
             account_public_key: account_key,
             validator_network_public_key: validator_network_key,
             validator_host: self.validator_host,

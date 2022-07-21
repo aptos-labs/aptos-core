@@ -10,13 +10,11 @@ use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{aptos_root_address, CoinStoreResource},
+    account_config::{aptos_root_address, CoinStoreResource, CORE_CODE_ADDRESS},
     account_view::AccountView,
     contract_event::ContractEvent,
     event::EventHandle,
-    on_chain_config::{
-        access_path_for_config, config_address, ConfigurationResource, OnChainConfig, ValidatorSet,
-    },
+    on_chain_config::{access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet},
     state_store::state_key::StateKey,
     test_helpers::transaction_test_helpers::block,
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
@@ -117,7 +115,7 @@ fn get_demo_accounts() -> (
     (account1, privkey1, account2, privkey2)
 }
 
-fn get_test_coin_mint_transaction(
+fn get_aptos_coin_mint_transaction(
     aptos_root_key: &Ed25519PrivateKey,
     aptos_root_seq_num: u64,
     account: &AccountAddress,
@@ -128,7 +126,7 @@ fn get_test_coin_mint_transaction(
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(aptos_stdlib::encode_test_coin_mint(*account, amount)),
+        Some(aptos_stdlib::encode_aptos_coin_mint(*account, amount)),
     )
 }
 
@@ -147,7 +145,7 @@ fn get_account_transaction(
     )
 }
 
-fn get_test_coin_transfer_transaction(
+fn get_aptos_coin_transfer_transaction(
     sender: AccountAddress,
     sender_seq_number: u64,
     sender_key: &Ed25519PrivateKey,
@@ -159,7 +157,7 @@ fn get_test_coin_transfer_transaction(
         sender_seq_number,
         sender_key.clone(),
         sender_key.public_key(),
-        Some(aptos_stdlib::encode_test_coin_transfer(recipient, amount)),
+        Some(aptos_stdlib::encode_aptos_coin_transfer(recipient, amount)),
     )
 }
 
@@ -175,9 +173,9 @@ fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
 
 fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
     let db_state_view = db.reader.latest_state_checkpoint_view().unwrap();
-    let config_address = config_address();
-    let config_account_state_view = db_state_view.as_account_with_state_view(&config_address);
-    config_account_state_view
+    let aptos_framework_account_state_view =
+        db_state_view.as_account_with_state_view(&CORE_CODE_ADDRESS);
+    aptos_framework_account_state_view
         .get_configuration_resource()
         .unwrap()
         .unwrap()
@@ -192,14 +190,17 @@ fn test_new_genesis() {
     let tmp_dir = TempPath::new();
     let db = DbReaderWriter::new(AptosDB::new_for_test(&tmp_dir));
     let waypoint = bootstrap_genesis::<AptosVM>(&db, &genesis_txn).unwrap();
-    let signer = ValidatorSigner::new(genesis.1[0].data.address, genesis.1[0].key.clone());
+    let signer = ValidatorSigner::new(
+        genesis.1[0].data.address,
+        genesis.1[0].consensus_key.clone(),
+    );
 
     // Mint for 2 demo accounts.
     let (account1, account1_key, account2, account2_key) = get_demo_accounts();
     let txn1 = get_account_transaction(genesis_key, 0, &account1, &account1_key);
     let txn2 = get_account_transaction(genesis_key, 1, &account2, &account2_key);
-    let txn3 = get_test_coin_mint_transaction(genesis_key, 2, &account1, 2_000_000);
-    let txn4 = get_test_coin_mint_transaction(genesis_key, 3, &account2, 2_000_000);
+    let txn3 = get_aptos_coin_mint_transaction(genesis_key, 2, &account1, 2_000_000);
+    let txn4 = get_aptos_coin_mint_transaction(genesis_key, 3, &account2, 2_000_000);
     execute_and_commit(block(vec![txn1, txn2, txn3, txn4]), &db, &signer);
     assert_eq!(get_balance(&account1, &db), 2_000_000);
     assert_eq!(get_balance(&account2, &db), 2_000_000);
@@ -219,7 +220,7 @@ fn test_new_genesis() {
             ),
             (
                 StateKey::AccessPath(AccessPath::new(
-                    config_address(),
+                    CORE_CODE_ADDRESS,
                     ConfigurationResource::resource_path(),
                 )),
                 WriteOp::Value(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),
@@ -232,8 +233,8 @@ fn test_new_genesis() {
                 WriteOp::Value(
                     bcs::to_bytes(&CoinStoreResource::new(
                         1_000_000,
-                        EventHandle::random_handle(0),
-                        EventHandle::random_handle(0),
+                        EventHandle::random(0),
+                        EventHandle::random(0),
                     ))
                     .unwrap(),
                 ),
@@ -268,7 +269,7 @@ fn test_new_genesis() {
     assert_eq!(get_balance(&account2, &db), 2_000_000);
 
     // Transfer some money.
-    let txn = get_test_coin_transfer_transaction(account1, 0, &account1_key, account2, 500_000);
+    let txn = get_aptos_coin_transfer_transaction(account1, 0, &account1_key, account2, 500_000);
     execute_and_commit(block(vec![txn]), &db, &signer);
 
     // And verify.

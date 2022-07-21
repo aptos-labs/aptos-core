@@ -23,9 +23,7 @@ use crate::{
         RandomComputeResultStateComputer,
     },
 };
-use aptos_crypto::{
-    ed25519::Ed25519PrivateKey, hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue, Uniform,
-};
+use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::Mutex;
 use aptos_secure_storage::Storage;
 use aptos_types::{
@@ -38,7 +36,7 @@ use aptos_types::{
 use channel::{aptos_channel, message_queues::QueueStyle};
 use consensus_types::{
     block::block_test_utils::certificate_for_genesis, executed_block::ExecutedBlock,
-    vote_proposal::MaybeSignedVoteProposal,
+    vote_proposal::VoteProposal,
 };
 use futures::{channel::oneshot, FutureExt, SinkExt, StreamExt};
 use itertools::enumerate;
@@ -47,7 +45,7 @@ use network::{
     protocols::network::{Event, NewNetworkSender},
 };
 use safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
-use std::{sync::Arc, thread::sleep, time::Duration};
+use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 pub fn prepare_buffer_manager() -> (
@@ -79,13 +77,12 @@ pub fn prepare_buffer_manager() -> (
         Storage::from(aptos_secure_storage::InMemoryStorage::new()),
         signer.author(),
         signer.private_key().clone(),
-        Ed25519PrivateKey::generate_for_testing(),
         waypoint,
         true,
     );
     let (_, storage) = MockStorage::start_for_testing((&validators).into());
 
-    let safety_rules_manager = SafetyRulesManager::new_local(safety_storage, false, false);
+    let safety_rules_manager = SafetyRulesManager::new_local(safety_storage);
 
     let mut safety_rules = MetricsSafetyRules::new(safety_rules_manager.client(), storage);
     safety_rules.perform_initialize().unwrap();
@@ -251,7 +248,7 @@ fn buffer_manager_happy_path_test() {
 
     let mut batches = vec![];
     let mut proofs = vec![];
-    let mut last_proposal: Option<MaybeSignedVoteProposal> = None;
+    let mut last_proposal: Option<VoteProposal> = None;
 
     for _ in 0..num_batches {
         let (vecblocks, li_sig, proposal) = prepare_executed_blocks_with_ledger_info(
@@ -306,13 +303,13 @@ fn buffer_manager_sync_test() {
     ) = launch_buffer_manager();
 
     let genesis_qc = certificate_for_genesis();
-    let num_batches = 5;
+    let num_batches = 100;
     let blocks_per_batch = 5;
     let mut init_round = 0;
 
     let mut batches = vec![];
     let mut proofs = vec![];
-    let mut last_proposal: Option<MaybeSignedVoteProposal> = None;
+    let mut last_proposal: Option<VoteProposal> = None;
 
     for _ in 0..num_batches {
         let (vecblocks, li_sig, proposal) = prepare_executed_blocks_with_ledger_info(
@@ -330,15 +327,10 @@ fn buffer_manager_sync_test() {
         last_proposal = Some(proposal.last().unwrap().clone());
     }
 
-    // message proxy
-    runtime.spawn(async move {
-        loop {
-            loopback_commit_vote(&mut self_loop_rx, &msg_tx, &verifier).await;
-        }
-    });
+    let dropped_batches = 42;
 
     timed_block_on(&mut runtime, async move {
-        for i in 0..2 {
+        for i in 0..dropped_batches {
             block_tx
                 .send(OrderedBlocks {
                     ordered_blocks: batches[i].clone(),
@@ -348,9 +340,6 @@ fn buffer_manager_sync_test() {
                 .await
                 .ok();
         }
-
-        // make sure the messages are processed
-        sleep(Duration::from_millis(100));
 
         // reset
         let (tx, rx) = oneshot::channel::<ResetAck>();
@@ -358,7 +347,14 @@ fn buffer_manager_sync_test() {
         reset_tx.send(ResetRequest { tx, stop: false }).await.ok();
         rx.await.ok();
 
-        for i in 2..num_batches {
+        // start sending back commit vote after reset, to avoid [0..dropped_batches] being sent to result_rx
+        tokio::spawn(async move {
+            loop {
+                loopback_commit_vote(&mut self_loop_rx, &msg_tx, &verifier).await;
+            }
+        });
+
+        for i in dropped_batches..num_batches {
             block_tx
                 .send(OrderedBlocks {
                     ordered_blocks: batches[i].clone(),
@@ -369,8 +365,8 @@ fn buffer_manager_sync_test() {
                 .ok();
         }
 
-        // we should only see batches[0..num_batches]
-        assert_results(batches.drain(..2).collect(), &mut result_rx).await;
+        // we should only see batches[dropped_batches..num_batches]
+        assert_results(batches.drain(dropped_batches..).collect(), &mut result_rx).await;
 
         assert!(matches!(result_rx.next().now_or_never(), None));
     });

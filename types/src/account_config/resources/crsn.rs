@@ -49,7 +49,7 @@ impl CRSNResource {
 }
 
 impl MoveStructType for CRSNResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("CRSN");
+    const MODULE_NAME: &'static IdentStr = ident_str!("crsn");
     const STRUCT_NAME: &'static IdentStr = ident_str!("CRSN");
 }
 

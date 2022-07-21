@@ -3,27 +3,20 @@
 
 //! This file defines state store APIs that are related account state Merkle tree.
 
-#[cfg(test)]
-mod state_store_test;
-
-use crate::{
-    change_set::ChangeSet,
-    schema::{
-        jellyfish_merkle_node::JellyfishMerkleNodeSchema, stale_node_index::StaleNodeIndexSchema,
-        state_value::StateValueSchema,
-    },
-    state_merkle_db::{add_node_batch, StateMerkleDb},
-    AptosDbError, OTHER_TIMERS_SECONDS,
-};
 use anyhow::{anyhow, ensure, format_err, Result};
-use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_jellyfish_merkle::{
-    iterator::JellyfishMerkleIterator, node_type::NodeKey, restore::StateSnapshotRestore,
-    StateValueWriter,
+use aptos_crypto::{
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    HashValue,
 };
+use aptos_infallible::Mutex;
+use aptos_jellyfish_merkle::{
+    iterator::JellyfishMerkleIterator, restore::StateSnapshotRestore, StateValueWriter,
+};
+use aptos_logger::{debug, info};
+use aptos_state_view::StateViewId;
 use aptos_types::{
     nibble::nibble_path::NibblePath,
-    proof::{SparseMerkleProof, SparseMerkleRangeProof},
+    proof::{definition::LeafCount, SparseMerkleProof, SparseMerkleRangeProof},
     state_store::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
@@ -31,18 +24,37 @@ use aptos_types::{
     },
     transaction::Version,
 };
+use executor_types::in_memory_state_calculator::InMemoryStateCalculator;
 use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::{collections::HashMap, sync::Arc};
-use storage_interface::{DbReader, StateSnapshotReceiver};
+use storage_interface::{
+    cached_state_view::CachedStateView, state_delta::StateDelta,
+    sync_proof_fetcher::SyncProofFetcher, DbReader, StateSnapshotReceiver,
+};
+
+use crate::{
+    change_set::ChangeSet,
+    schema::{stale_node_index::StaleNodeIndexSchema, state_value::StateValueSchema},
+    state_merkle_db::{add_node_batch, StateMerkleDb},
+    AptosDbError, LedgerStore, TransactionStore, OTHER_TIMERS_SECONDS,
+};
+
+#[cfg(test)]
+mod state_store_test;
 
 type StateValueBatch = aptos_jellyfish_merkle::StateValueBatch<StateKey, StateValue>;
 
 pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
+const MAX_WRITE_SETS_AFTER_CHECKPOINT: LeafCount = 200_000;
 
 #[derive(Debug)]
 pub(crate) struct StateStore {
     ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
+    // The `checkpoint` of buffered_state is the latest snapshot in state_merkle_db while `current`
+    // is the latest state sparse merkle tree that is replayed from that snapshot until the latest
+    // write set stored in ledger_db.
+    buffered_state: Mutex<StateDelta>,
 }
 
 // "using an Arc<dyn DbReader> as an Arc<dyn StateReader>" is not allowed in stable Rust. Actually we
@@ -55,7 +67,8 @@ impl DbReader for StateStore {
         &self,
         next_version: Version,
     ) -> Result<Option<(Version, HashValue)>> {
-        self.get_state_snapshot_version_before(next_version)?
+        self.state_merkle_db
+            .get_state_snapshot_version_before(next_version)?
             .map(|ver| Ok((ver, self.get_root_hash(ver)?)))
             .transpose()
     }
@@ -79,6 +92,16 @@ impl DbReader for StateStore {
             .transpose()
     }
 
+    /// Returns the proof of the given state key and version.
+    fn get_state_proof_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<SparseMerkleProof> {
+        let (_, proof) = self.state_merkle_db.get_with_proof(state_key, version)?;
+        Ok(proof)
+    }
+
     /// Get the state value with proof given the state key and version
     fn get_state_value_with_proof_by_version(
         &self,
@@ -97,28 +120,108 @@ impl DbReader for StateStore {
 }
 
 impl StateStore {
-    pub fn new(ledger_db: Arc<DB>, state_merkle_db: Arc<DB>) -> Self {
-        Self {
+    pub fn new(ledger_db: Arc<DB>, state_merkle_db: Arc<DB>, hack_for_tests: bool) -> Self {
+        let state_merkle_db = Arc::new(StateMerkleDb::new(state_merkle_db));
+        let store = Self {
             ledger_db,
-            state_merkle_db: Arc::new(StateMerkleDb::new(state_merkle_db)),
+            state_merkle_db,
+            buffered_state: Mutex::new(StateDelta::new_empty()),
+        };
+        store
+            .initialize(hack_for_tests)
+            .expect("StateStore initialization failed.");
+        store
+    }
+
+    pub fn maybe_reset(&self, latest_snapshot_version: Option<Version>) {
+        if self.buffered_state.lock().base_version < latest_snapshot_version {
+            self.initialize(false)
+                .expect("StateStore initialization failed.")
         }
     }
 
-    fn get_state_snapshot_version_before(&self, next_version: Version) -> Result<Option<Version>> {
-        if next_version > 0 {
-            let max_possible_version = next_version - 1;
-            let mut iter = self
-                .state_merkle_db
-                .rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
-            iter.seek_for_prev(&NodeKey::new_empty_path(max_possible_version))?;
-            if let Some((key, _node)) = iter.next().transpose()? {
-                // TODO: If we break up a single update batch to multiple commits, we would need to
-                // deal with a partial version, which hasn't got the root committed.
-                return Ok(Some(key.version()));
-            }
+    fn initialize(&self, hack_for_tests: bool) -> Result<()> {
+        let num_transactions = LedgerStore::new(Arc::clone(&self.ledger_db))
+            .get_latest_transaction_info_option()?
+            .map(|(version, _)| version + 1)
+            .unwrap_or(0);
+
+        let latest_snapshot_version = self
+            .state_merkle_db
+            .get_state_snapshot_version_before(num_transactions)
+            .expect("Failed to query latest node on initialization.");
+        let latest_snapshot_root_hash = if let Some(version) = latest_snapshot_version {
+            self.state_merkle_db
+                .get_root_hash(version)
+                .expect("Failed to query latest checkpoint root hash on initialization.")
+        } else {
+            *SPARSE_MERKLE_PLACEHOLDER_HASH
+        };
+
+        // Make sure the committed transactions is ahead of the latest snapshot.
+        let snapshot_next_version = latest_snapshot_version.map_or(0, |v| v + 1);
+        // Initialize the state store before replaying write sets.
+        *self.buffered_state.lock() =
+            StateDelta::new_at_checkpoint(latest_snapshot_root_hash, latest_snapshot_version);
+
+        // If we , we don't ensure the consistency.
+        if hack_for_tests {
+            return Ok(());
         }
-        // No version before genesis.
-        Ok(None)
+
+        // For non-restore cases, always snapshot_next_version <= num_transactions.
+        if snapshot_next_version > num_transactions {
+            info!(
+                snapshot_next_version = snapshot_next_version,
+                num_transactions = num_transactions,
+                "snapshot is after latest transaction version. It should only happen in restore mode",
+            );
+        }
+
+        // Replaying the committed write sets after the latest snapshot.
+        if snapshot_next_version < num_transactions {
+            ensure!(
+                num_transactions - snapshot_next_version <= MAX_WRITE_SETS_AFTER_CHECKPOINT,
+                "Too many versions after state snapshot. snapshot_next_version: {}, num_transactions: {}",
+                snapshot_next_version,
+                num_transactions,
+            );
+            let mut buffered_state = self.buffered_state.lock();
+            let latest_snapshot_state_view = CachedStateView::new(
+                StateViewId::Miscellaneous,
+                self,
+                num_transactions,
+                buffered_state.current.clone(),
+                SyncProofFetcher::new(self),
+            )?;
+            let write_sets = TransactionStore::new(Arc::clone(&self.ledger_db))
+                .get_write_sets(snapshot_next_version, num_transactions)?;
+            latest_snapshot_state_view.prime_cache_by_write_set(&write_sets)?;
+            let calculator = InMemoryStateCalculator::new(
+                &buffered_state,
+                latest_snapshot_state_view.into_state_cache(),
+            );
+            *buffered_state = calculator.calculate_for_write_sets_after_checkpoint(&write_sets)?;
+        }
+
+        let (latest_version, root_hash) = {
+            let buffered_state = self.buffered_state.lock();
+            (
+                buffered_state.current_version,
+                buffered_state.current.root_hash(),
+            )
+        };
+        debug!(
+            latest_version = latest_version,
+            root_hash = root_hash,
+            "StateStore initialization finished.",
+        );
+
+        Ok(())
+    }
+
+    pub fn buffered_state(&self) -> &Mutex<StateDelta> {
+        &self.buffered_state
     }
 
     /// Returns the key, value pairs for a particular state key prefix at at desired version. This
@@ -263,8 +366,10 @@ impl StateStore {
         }
 
         // commit jellyfish merkle nodes
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_jellyfish_merkle_nodes"])
+            .start_timer();
         self.state_merkle_db.write_schemas(batch)?;
-
         Ok(new_root_hash)
     }
 

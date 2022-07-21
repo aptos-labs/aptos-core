@@ -15,7 +15,7 @@ use crate::{
     waypoint::Waypoint,
 };
 use aptos_crypto::{
-    ed25519::Ed25519Signature,
+    bls12381,
     hash::{CryptoHash, CryptoHasher, HashValue},
 };
 use bcs::test_helpers::assert_canonical_encode_decode;
@@ -80,7 +80,7 @@ fn into_epoch_state(epoch: u64, signers: &[ValidatorSigner]) -> EpochState {
 fn sign_ledger_info(
     signers: &[ValidatorSigner],
     ledger_info: &LedgerInfo,
-) -> BTreeMap<AccountAddress, Ed25519Signature> {
+) -> BTreeMap<AccountAddress, bls12381::Signature> {
     signers
         .iter()
         .map(|s| (s.author(), s.sign(ledger_info)))
@@ -489,7 +489,7 @@ proptest! {
         let bad_li_5 = LedgerInfoWithSignatures::new(good_li.clone(), BTreeMap::new());
 
         let mut bad_sigs = sigs.clone();
-        *bad_sigs.values_mut().next().unwrap() = Ed25519Signature::dummy_signature();
+        *bad_sigs.values_mut().next().unwrap() = bls12381::Signature::dummy_signature();
         let bad_li_6 = LedgerInfoWithSignatures::new(good_li.clone(), bad_sigs);
 
         trusted_state.verify_and_ratchet_inner(&bad_li_1, &change_proof).unwrap_err();

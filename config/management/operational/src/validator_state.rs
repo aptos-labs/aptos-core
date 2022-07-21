@@ -88,7 +88,7 @@ impl VerifyValidatorState {
             .validator_config(owner_account)
             .await
             .and_then(|vc| DecodedValidatorConfig::from_validator_config_resource(&vc))?;
-        let storage_key = storage.ed25519_public_from_private(CONSENSUS_KEY)?;
+        let storage_key = storage.bls12381_public_from_private(CONSENSUS_KEY)?;
         result.consensus_key_match = Some(storage_key == validator_config.consensus_public_key);
 
         // Check if the consensus key is unique

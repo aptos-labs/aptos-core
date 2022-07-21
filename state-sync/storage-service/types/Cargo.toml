@@ -17,7 +17,6 @@ thiserror = "1.0.31"
 aptos-config = { path = "../../../config" }
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
 aptos-types = { path = "../../../types" }
-aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
 claim = "0.5.0"

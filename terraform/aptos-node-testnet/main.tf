@@ -12,40 +12,12 @@ locals {
   workspace  = var.workspace_name_override != "" ? var.workspace_name_override : terraform.workspace
   aws_tags   = "Terraform=testnet,Workspace=${local.workspace}"
   chain_name = var.chain_name != "" ? var.chain_name : "${local.workspace}net"
-
-  # Forge assumes the chain_id is 4
-  chain_id = var.enable_forge ? 4 : var.chain_id
-
-  # use this map to programatically set helm values
-  aptos_node_helm_values_computed = {
-    service = {
-      validator = {
-        external = {
-          type = var.enable_forge ? "NodePort" : null
-        }
-        enableRestApi     = var.enable_forge
-        enableMetricsPort = var.enable_forge
-      }
-      fullnode = {
-        external = {
-          type = var.enable_forge ? "NodePort" : null
-        }
-        enableRestApi     = var.enable_forge
-        enableMetricsPort = var.enable_forge
-      }
-    }
-  }
 }
 
-# merge the operator-provided helm values via TF var
-# with the computed helm values
-module "aptos-node-helm-values-deepmerge" {
-  # https://registry.terraform.io/modules/Invicton-Labs/deepmerge/null/0.1.5
-  source = "Invicton-Labs/deepmerge/null"
-  maps = [
-    local.aptos_node_helm_values_computed,
-    var.aptos_node_helm_values,
-  ]
+# Forge testing overrides
+locals {
+  # Forge assumes the chain_id is 4
+  chain_id = var.enable_forge ? 4 : var.chain_id
 }
 
 module "validator" {
@@ -75,8 +47,9 @@ module "validator" {
   image_tag      = var.image_tag
   validator_name = "aptos-node"
 
-  num_validators = var.num_validators
-  helm_values    = module.aptos-node-helm-values-deepmerge.merged
+  num_validators      = var.num_validators
+  num_fullnode_groups = var.num_fullnode_groups
+  helm_values         = var.aptos_node_helm_values
 
   # allow all nodegroups to surge to 2x their size, in case of total nodes replacement
   validator_instance_num = var.num_validator_instance > 0 ? 2 * var.num_validator_instance : var.num_validators
@@ -87,10 +60,12 @@ module "validator" {
   validator_instance_type = var.validator_instance_type
 
   # addons
-  enable_monitoring      = true
-  enable_logger          = true
-  monitoring_helm_values = var.monitoring_helm_values
-  logger_helm_values     = var.logger_helm_values
+  enable_monitoring              = true
+  enable_logger                  = true
+  monitoring_helm_values         = var.monitoring_helm_values
+  logger_helm_values             = var.logger_helm_values
+  enable_vector_daemonset_logger = var.enable_vector_daemonset_logger
+  vector_daemonset_helm_values   = var.vector_daemonset_helm_values
 }
 
 locals {

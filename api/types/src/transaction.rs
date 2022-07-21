@@ -10,7 +10,6 @@ use anyhow::bail;
 use aptos_crypto::{
     ed25519::{self, Ed25519PublicKey},
     multi_ed25519::{self, MultiEd25519PublicKey},
-    validatable::Validatable,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -261,6 +260,7 @@ impl From<(&BlockMetadata, TransactionInfo, Vec<Event>)> for Transaction {
             events,
             previous_block_votes: txn.previous_block_votes().clone(),
             proposer: txn.proposer().into(),
+            failed_proposer_indices: txn.failed_proposer_indices().clone(),
             timestamp: txn.timestamp_usecs().into(),
         })
     }
@@ -355,6 +355,7 @@ pub struct BlockMetadataTransaction {
     pub events: Vec<Event>,
     pub previous_block_votes: Vec<bool>,
     pub proposer: Address,
+    pub failed_proposer_indices: Vec<u32>,
     pub timestamp: U64,
 }
 
@@ -671,15 +672,6 @@ impl TryFrom<MultiAgentSignature> for TransactionAuthenticator {
                 .map(|s| s.try_into())
                 .collect::<anyhow::Result<_>>()?,
         ))
-    }
-}
-
-impl From<(&Validatable<Ed25519PublicKey>, &ed25519::Ed25519Signature)> for Ed25519Signature {
-    fn from((pk, sig): (&Validatable<Ed25519PublicKey>, &ed25519::Ed25519Signature)) -> Self {
-        Self {
-            public_key: pk.unvalidated().to_bytes().to_vec().into(),
-            signature: sig.to_bytes().to_vec().into(),
-        }
     }
 }
 

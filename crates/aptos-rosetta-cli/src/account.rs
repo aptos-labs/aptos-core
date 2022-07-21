@@ -1,12 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{format_output, NetworkArgs, UrlArgs};
-use aptos_rosetta::types::{AccountBalanceRequest, AccountBalanceResponse};
+use crate::common::{format_output, BlockArgs, NetworkArgs, UrlArgs};
+use aptos_rosetta::{
+    common::native_coin,
+    types::{AccountBalanceRequest, AccountBalanceResponse},
+};
 use aptos_types::account_address::AccountAddress;
 use clap::{Parser, Subcommand};
 
 /// Account APIs
+///
+/// Used for pulling state of an account at a point in time
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/AccountApi.html)
 #[derive(Debug, Subcommand)]
@@ -29,22 +34,32 @@ impl AccountCommand {
 pub struct AccountBalanceCommand {
     #[clap(flatten)]
     network_args: NetworkArgs,
-    /// Account to list the balance
-    #[clap(long)]
-    account: AccountAddress,
     #[clap(flatten)]
     url_args: UrlArgs,
+    #[clap(flatten)]
+    block_args: BlockArgs,
+    /// Whether to filter the currency to the native coin
+    #[clap(long)]
+    filter_currency: bool,
+    /// Account to list the balance
+    #[clap(long, parse(try_from_str=aptos::common::types::load_account_arg))]
+    account: AccountAddress,
 }
 
 impl AccountBalanceCommand {
     pub async fn execute(self) -> anyhow::Result<AccountBalanceResponse> {
         let client = self.url_args.client();
-        let request = AccountBalanceRequest {
-            network_identifier: self.network_args.network_identifier(),
-            account_identifier: self.account.into(),
-            block_identifier: None,
-            currencies: None,
-        };
-        client.account_balance(&request).await
+        client
+            .account_balance(&AccountBalanceRequest {
+                network_identifier: self.network_args.network_identifier(),
+                account_identifier: self.account.into(),
+                block_identifier: self.block_args.into(),
+                currencies: if self.filter_currency {
+                    Some(vec![native_coin()])
+                } else {
+                    None
+                },
+            })
+            .await
     }
 }

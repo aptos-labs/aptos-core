@@ -347,14 +347,18 @@ impl EpochManager {
             "Received verified epoch change",
         );
 
+        // shutdown existing processor first to avoid race condition with state sync.
+        self.shutdown_current_processor().await;
         // make sure storage is on this ledger_info too, it should be no-op if it's already committed
+        // panic if this doesn't succeed since the current processors are already shutdown.
         self.commit_state_computer
             .sync_to(ledger_info.clone())
             .await
             .context(format!(
                 "[EpochManager] State sync to new epoch {}",
                 ledger_info
-            ))?;
+            ))
+            .expect("Failed to sync to new epoch");
 
         monitor!("reconfig", self.await_reconfig_notification().await);
         Ok(())
@@ -566,7 +570,6 @@ impl EpochManager {
             epoch: payload.epoch(),
             verifier: (&validator_set).into(),
         };
-        self.shutdown_current_processor().await;
 
         let onchain_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         if let Err(error) = &onchain_config {

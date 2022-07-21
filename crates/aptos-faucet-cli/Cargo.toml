@@ -32,7 +32,6 @@ aptos-faucet = { path = "../aptos-faucet" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }
 
 [dev-dependencies]
 serde_json = "1.0.81"

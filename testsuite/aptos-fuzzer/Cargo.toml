@@ -29,7 +29,7 @@ aptos-mempool = { path = "../../mempool" }
 aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers" }
 aptos-types = { path = "../../types", features = ["fuzzing"] }
 aptos-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 aptosdb = { path = "../../storage/aptosdb", features = ["fuzzing"] }
 consensus = { path = "../../consensus", features = ["fuzzing"] }
 consensus-types = { path = "../../consensus/consensus-types", features = ["fuzzing"] }

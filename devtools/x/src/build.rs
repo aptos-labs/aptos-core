@@ -43,11 +43,9 @@ pub fn run(args: Box<Args>, xctx: XContext) -> Result<()> {
     let direct_args = convert_args(&args);
 
     let cmd = CargoCommand::Build {
-        cargo_config: xctx.config().cargo_config(),
         direct_args: direct_args.as_slice(),
         args: &[],
         env: &[],
-        skip_sccache: false,
     };
 
     let packages = args.package_args.to_selected_packages(&xctx)?;

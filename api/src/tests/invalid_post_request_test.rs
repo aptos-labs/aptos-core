@@ -55,7 +55,7 @@ async fn test_missing_script_function_arguments() {
 #[tokio::test]
 async fn test_invalid_script_function_function_name() {
     let mut req = signing_message_request();
-    req["payload"]["function"] = json!("0x1::Account::invalid");
+    req["payload"]["function"] = json!("0x1::account::invalid");
 
     response_error_msg(req, current_function_name!()).await;
 }
@@ -63,7 +63,7 @@ async fn test_invalid_script_function_function_name() {
 #[tokio::test]
 async fn test_invalid_script_function_module_name() {
     let mut req = signing_message_request();
-    req["payload"]["function"] = json!("0x1::Invalid::invalid");
+    req["payload"]["function"] = json!("0x1::invalid::invalid");
 
     response_error_msg(req, current_function_name!()).await;
 }
@@ -131,7 +131,7 @@ fn signing_message_request() -> Value {
         "expiration_timestamp_secs": "9991638487317",
         "payload": {
             "type": "script_function_payload",
-            "function": "0x1::Account::create_account",
+            "function": "0x1::account::create_account",
             "type_arguments": [
             ],
             "arguments": [

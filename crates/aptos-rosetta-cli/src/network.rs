@@ -7,6 +7,8 @@ use clap::{Parser, Subcommand};
 
 /// Network APIs
 ///
+/// Used to get status of the current network and what is supported on the API
+///
 /// [API Spec](https://www.rosetta-api.org/docs/NetworkApi.html)
 #[derive(Debug, Subcommand)]
 pub enum NetworkCommand {

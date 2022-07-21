@@ -332,6 +332,7 @@ pub struct BlockMetadataTransaction {
     pub inserted_at: chrono::NaiveDateTime,
     pub epoch: i64,
     pub previous_block_votes_bitmap: serde_json::Value,
+    pub failed_proposer_indices: serde_json::Value,
 }
 
 impl BlockMetadataTransaction {
@@ -348,6 +349,7 @@ impl BlockMetadataTransaction {
             inserted_at: chrono::Utc::now().naive_utc(),
             epoch: *tx.epoch.inner() as i64,
             previous_block_votes_bitmap: serde_json::to_value(&tx.previous_block_votes).unwrap(),
+            failed_proposer_indices: serde_json::to_value(&tx.failed_proposer_indices).unwrap(),
         }
     }
 }

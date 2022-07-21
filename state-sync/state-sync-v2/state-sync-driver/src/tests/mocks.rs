@@ -1,12 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::tests::utils::{create_empty_epoch_state, create_epoch_ending_ledger_info};
 use crate::{
-    storage_synchronizer::StorageSynchronizerInterface,
-    tests::utils::{create_startup_info, create_transaction_info},
+    storage_synchronizer::StorageSynchronizerInterface, tests::utils::create_transaction_info,
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_types::epoch_state::EpochState;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::EventWithVersion,
@@ -37,7 +38,8 @@ use executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use mockall::mock;
 use std::sync::Arc;
 use storage_interface::{
-    DbReader, DbReaderWriter, DbWriter, Order, StartupInfo, StateSnapshotReceiver, TreeState,
+    state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order, StartupInfo,
+    StateSnapshotReceiver,
 };
 use tokio::task::JoinHandle;
 
@@ -69,8 +71,11 @@ pub fn create_mock_reader_writer(
         .expect_get_latest_transaction_info_option()
         .returning(|| Ok(Some((0, create_transaction_info()))));
     reader
-        .expect_get_startup_info()
-        .returning(|| Ok(Some(create_startup_info())));
+        .expect_get_latest_epoch_state()
+        .returning(|| Ok(create_empty_epoch_state()));
+    reader
+        .expect_get_latest_ledger_info()
+        .returning(|| Ok(create_epoch_ending_ledger_info()));
 
     let writer = writer.unwrap_or_else(create_mock_db_writer);
     DbReaderWriter {
@@ -205,6 +210,8 @@ mock! {
 
         fn get_latest_state_value(&self, state_key: StateKey) -> Result<Option<StateValue>>;
 
+        fn get_latest_epoch_state(&self) -> Result<EpochState>;
+
         fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>>;
 
         fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures>;
@@ -248,7 +255,7 @@ mock! {
             version: Version,
         ) -> Result<(Option<StateValue>, SparseMerkleProof)>;
 
-        fn get_latest_tree_state(&self) -> Result<TreeState>;
+        fn get_latest_executed_trees(&self) -> Result<ExecutedTrees>;
 
         fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures>;
 
@@ -304,6 +311,7 @@ mock! {
             first_version: Version,
             base_state_version: Option<Version>,
             ledger_info_with_sigs: Option<&'a LedgerInfoWithSignatures>,
+            in_memory_state: StateDelta,
         ) -> Result<()>;
 
         fn delete_genesis(&self) -> Result<()>;
@@ -327,7 +335,7 @@ mock! {
     pub StreamingClient {}
     #[async_trait]
     impl DataStreamingClient for StreamingClient {
-        async fn get_all_accounts(
+        async fn get_all_state_values(
             &self,
             version: Version,
             start_index: Option<u64>,
@@ -399,7 +407,7 @@ mock! {
             end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
         ) -> Result<(), crate::error::Error>;
 
-        fn initialize_account_synchronizer(
+        fn initialize_state_synchronizer(
             &mut self,
             epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
             target_ledger_info: LedgerInfoWithSignatures,
@@ -408,10 +416,10 @@ mock! {
 
         fn pending_storage_data(&self) -> bool;
 
-        fn save_account_states(
+        fn save_state_values(
             &mut self,
             notification_id: NotificationId,
-            account_states_with_proof: StateValueChunkWithProof,
+            state_value_chunk_with_proof: StateValueChunkWithProof,
         ) -> Result<(), crate::error::Error>;
 
         fn reset_chunk_executor(&mut self) -> Result<(), crate::error::Error>;

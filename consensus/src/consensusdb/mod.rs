@@ -21,6 +21,9 @@ use schema::{BLOCK_CF_NAME, QC_CF_NAME, SINGLE_ENTRY_CF_NAME};
 use schemadb::{Options, ReadOptions, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME};
 use std::{collections::HashMap, iter::Iterator, path::Path, time::Instant};
 
+/// The name of the consensus db file
+pub const CONSENSUS_DB_NAME: &str = "consensus_db";
+
 pub struct ConsensusDB {
     db: DB,
 }
@@ -34,7 +37,7 @@ impl ConsensusDB {
             SINGLE_ENTRY_CF_NAME,
         ];
 
-        let path = db_root_path.as_ref().join("consensusdb");
+        let path = db_root_path.as_ref().join(CONSENSUS_DB_NAME);
         let instant = Instant::now();
         let mut opts = Options::default();
         opts.create_if_missing(true);

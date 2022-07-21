@@ -6,6 +6,7 @@ use move_deps::move_core_types::identifier::Identifier;
 use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Deserializer};
 
+use aptos_types::state_store::table::TableHandle;
 use std::{convert::Infallible, str::FromStr};
 
 pub type AddressParam = Param<Address>;
@@ -13,7 +14,7 @@ pub type EventKeyParam = Param<EventKey>;
 pub type LedgerVersionParam = Param<u64>;
 pub type MoveStructTagParam = Param<MoveStructTag>;
 pub type MoveIdentifierParam = Param<Identifier>;
-pub type TableHandleParam = Param<u128>;
+pub type TableHandleParam = Param<TableHandle>;
 pub type TransactionIdParam = Param<TransactionId>;
 pub type TransactionVersionParam = Param<u64>;
 

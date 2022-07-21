@@ -24,6 +24,7 @@ use executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeRe
 use fail::fail_point;
 use futures::{SinkExt, StreamExt};
 use std::{boxed::Box, sync::Arc};
+use tokio::sync::Mutex as AsyncMutex;
 
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
@@ -36,17 +37,18 @@ type CommitType = (u64, Round);
 /// Basic communication with the Execution module;
 /// implements StateComputer traits.
 pub struct ExecutionProxy {
-    executor: Box<dyn BlockExecutorTrait>,
+    executor: Arc<dyn BlockExecutorTrait>,
     txn_notifier: Arc<dyn TxnNotifier>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     async_state_sync_notifier: channel::Sender<NotificationType>,
     async_commit_notifier: channel::Sender<CommitType>,
     validators: Mutex<Vec<AccountAddress>>,
+    write_mutex: AsyncMutex<()>,
 }
 
 impl ExecutionProxy {
     pub fn new(
-        executor: Box<dyn BlockExecutorTrait>,
+        executor: Arc<dyn BlockExecutorTrait>,
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         commit_notifier: Arc<dyn CommitNotifier>,
@@ -86,6 +88,7 @@ impl ExecutionProxy {
             async_state_sync_notifier: tx,
             async_commit_notifier: commit_tx,
             validators: Mutex::new(vec![]),
+            write_mutex: AsyncMutex::new(()),
         }
     }
 }
@@ -104,23 +107,24 @@ impl StateComputer for ExecutionProxy {
                 error: "Injected error in compute".into(),
             })
         });
+        let block_id = block.id();
         debug!(
-            block_id = block.id(),
-            parent_id = block.parent_id(),
+            block = %block,
+            parent_id = parent_block_id,
             "Executing block",
         );
 
         // TODO: figure out error handling for the prologue txn
+        let executor = self.executor.clone();
+        let transactions_to_execute = block.transactions_to_execute(&self.validators.lock());
         let compute_result = monitor!(
             "execute_block",
-            self.executor.execute_block(
-                (
-                    block.id(),
-                    block.transactions_to_execute(&self.validators.lock())
-                ),
-                parent_block_id
-            )
-        )?;
+            tokio::task::spawn_blocking(move || {
+                executor.execute_block((block_id, transactions_to_execute), parent_block_id)
+            })
+            .await
+        )
+        .expect("spawn_blocking failed")?;
         observe_block(block.timestamp_usecs(), BlockStage::EXECUTED);
 
         // notify mempool about failed transaction
@@ -143,6 +147,8 @@ impl StateComputer for ExecutionProxy {
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> Result<(), ExecutionError> {
+        let _guard = self.write_mutex.lock().await;
+
         let mut block_ids = Vec::new();
         let mut txns = Vec::new();
         let mut reconfig_events = Vec::new();
@@ -163,11 +169,18 @@ impl StateComputer for ExecutionProxy {
             }
         }
 
+        let executor = self.executor.clone();
+        let proof = finality_proof.clone();
         monitor!(
             "commit_block",
-            self.executor
-                .commit_blocks(block_ids, finality_proof.clone())
-        )?;
+            tokio::task::spawn_blocking(move || {
+                executor
+                    .commit_blocks(block_ids, proof)
+                    .expect("Failed to commit blocks");
+            })
+            .await
+        )
+        .expect("spawn_blocking failed");
 
         let blocks = blocks.to_vec();
         let wrapped_callback = move || {
@@ -194,6 +207,7 @@ impl StateComputer for ExecutionProxy {
 
     /// Synchronize to a commit that not present locally.
     async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+        let _guard = self.write_mutex.lock().await;
         fail_point!("consensus::sync_to", |_| {
             Err(anyhow::anyhow!("Injected error in sync_to").into())
         });
@@ -206,7 +220,7 @@ impl StateComputer for ExecutionProxy {
             "sync_to",
             self.state_sync_notifier.sync_to_target(target).await
         );
-        // Similarily, after the state synchronization, we have to reset the cache
+        // Similarly, after the state synchronization, we have to reset the cache
         // of BlockExecutor to guarantee the latest committed state is up to date.
         self.executor.reset()?;
 

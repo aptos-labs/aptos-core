@@ -7,7 +7,6 @@ use crate::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     ledger_info::LedgerInfo,
-    nibble::nibble_path::NibblePath,
     proof::{
         accumulator::InMemoryAccumulator, TransactionInfoListWithProof, TransactionInfoWithProof,
     },
@@ -980,12 +979,16 @@ impl TransactionInfo {
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
-    pub fn new_placeholder(gas_used: u64, status: ExecutionStatus) -> Self {
+    pub fn new_placeholder(
+        gas_used: u64,
+        state_checkpoint_hash: Option<HashValue>,
+        status: ExecutionStatus,
+    ) -> Self {
         Self::new(
             HashValue::default(),
             HashValue::default(),
             HashValue::default(),
-            Some(HashValue::default()),
+            state_checkpoint_hash,
             gas_used,
             status,
         )
@@ -1093,7 +1096,6 @@ pub struct TransactionToCommit {
     transaction: Transaction,
     transaction_info: TransactionInfo,
     state_updates: HashMap<StateKey, StateValue>,
-    jf_node_hashes: Option<HashMap<NibblePath, HashValue>>,
     write_set: WriteSet,
     events: Vec<ContractEvent>,
 }
@@ -1103,7 +1105,6 @@ impl TransactionToCommit {
         transaction: Transaction,
         transaction_info: TransactionInfo,
         state_updates: HashMap<StateKey, StateValue>,
-        jf_node_hashes: Option<HashMap<NibblePath, HashValue>>,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
     ) -> Self {
@@ -1111,7 +1112,6 @@ impl TransactionToCommit {
             transaction,
             transaction_info,
             state_updates,
-            jf_node_hashes,
             write_set,
             events,
         }
@@ -1125,6 +1125,10 @@ impl TransactionToCommit {
         &self.transaction_info
     }
 
+    pub fn is_state_checkpoint(&self) -> bool {
+        self.transaction_info().state_checkpoint_hash.is_some()
+    }
+
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn set_transaction_info(&mut self, txn_info: TransactionInfo) {
         self.transaction_info = txn_info
@@ -1132,10 +1136,6 @@ impl TransactionToCommit {
 
     pub fn state_updates(&self) -> &HashMap<StateKey, StateValue> {
         &self.state_updates
-    }
-
-    pub fn jf_node_hashes(&self) -> Option<&HashMap<NibblePath, HashValue>> {
-        self.jf_node_hashes.as_ref()
     }
 
     pub fn write_set(&self) -> &WriteSet {
@@ -1492,7 +1492,8 @@ pub enum Transaction {
 
     /// Transaction to let the executor update the global state tree and record the root hash
     /// in the TransactionInfo
-    StateCheckpoint,
+    /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
+    StateCheckpoint(HashValue),
 }
 
 impl Transaction {
@@ -1513,7 +1514,7 @@ impl Transaction {
             // TODO: display proper information for client
             Transaction::BlockMetadata(_block_metadata) => String::from("block_metadata"),
             // TODO: display proper information for client
-            Transaction::StateCheckpoint => String::from("state_checkpoint"),
+            Transaction::StateCheckpoint(_) => String::from("state_checkpoint"),
         }
     }
 }

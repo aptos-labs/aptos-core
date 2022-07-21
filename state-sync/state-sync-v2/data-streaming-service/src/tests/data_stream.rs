@@ -7,15 +7,15 @@ use crate::{
     },
     data_stream::{DataStream, DataStreamListener},
     streaming_client::{
-        GetAllAccountsRequest, GetAllEpochEndingLedgerInfosRequest, GetAllTransactionsRequest,
+        GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, GetAllTransactionsRequest,
         NotificationFeedback, StreamRequest,
     },
     tests::utils::{
         create_data_client_response, create_ledger_info, create_random_u64,
         create_transaction_list_with_proof, get_data_notification, initialize_logger,
-        MockAptosDataClient, NoopResponseCallback, MAX_ADVERTISED_ACCOUNTS,
-        MAX_ADVERTISED_EPOCH_END, MAX_ADVERTISED_TRANSACTION_OUTPUT, MAX_NOTIFICATION_TIMEOUT_SECS,
-        MIN_ADVERTISED_ACCOUNTS, MIN_ADVERTISED_EPOCH_END, MIN_ADVERTISED_TRANSACTION_OUTPUT,
+        MockAptosDataClient, NoopResponseCallback, MAX_ADVERTISED_EPOCH_END, MAX_ADVERTISED_STATES,
+        MAX_ADVERTISED_TRANSACTION_OUTPUT, MAX_NOTIFICATION_TIMEOUT_SECS, MIN_ADVERTISED_EPOCH_END,
+        MIN_ADVERTISED_STATES, MIN_ADVERTISED_TRANSACTION_OUTPUT,
     },
 };
 use aptos_config::config::DataStreamingServiceConfig;
@@ -34,10 +34,10 @@ use tokio::time::timeout;
 
 #[tokio::test]
 async fn test_stream_blocked() {
-    // Create an account stream
+    // Create a state value stream
     let streaming_service_config = DataStreamingServiceConfig::default();
     let (mut data_stream, mut stream_listener) =
-        create_account_stream(streaming_service_config, MIN_ADVERTISED_ACCOUNTS);
+        create_state_value_stream(streaming_service_config, MIN_ADVERTISED_STATES);
 
     // Initialize the data stream
     let global_data_summary = create_global_data_summary(100);
@@ -61,7 +61,7 @@ async fn test_stream_blocked() {
             client_request: client_request.clone(),
             client_response: Some(Ok(Response {
                 context,
-                payload: ResponsePayload::NumberOfAccountStates(10),
+                payload: ResponsePayload::NumberOfStates(10),
             })),
         };
         insert_response_into_pending_queue(&mut data_stream, pending_response);
@@ -224,7 +224,7 @@ async fn test_stream_invalid_response() {
         id: 0,
         response_callback: Box::new(NoopResponseCallback),
     };
-    let client_response = Response::new(context, ResponsePayload::NumberOfAccountStates(10));
+    let client_response = Response::new(context, ResponsePayload::NumberOfStates(10));
     let pending_response = PendingClientResponse {
         client_request: client_request.clone(),
         client_response: Some(Ok(client_response)),
@@ -374,13 +374,13 @@ async fn test_stream_listener_dropped() {
     assert_eq!(sent_notifications.len(), 2);
 }
 
-/// Creates an account stream for the given `version`.
-fn create_account_stream(
+/// Creates a state value stream for the given `version`.
+fn create_state_value_stream(
     streaming_service_config: DataStreamingServiceConfig,
     version: Version,
 ) -> (DataStream<MockAptosDataClient>, DataStreamListener) {
-    // Create an account stream request
-    let stream_request = StreamRequest::GetAllAccounts(GetAllAccountsRequest {
+    // Create a state value stream request
+    let stream_request = StreamRequest::GetAllStates(GetAllStatesRequest {
         version,
         start_index: 0,
     });
@@ -424,11 +424,7 @@ fn create_data_stream(
 
     // Create an advertised data
     let advertised_data = AdvertisedData {
-        account_states: vec![CompleteDataRange::new(
-            MIN_ADVERTISED_ACCOUNTS,
-            MAX_ADVERTISED_ACCOUNTS,
-        )
-        .unwrap()],
+        states: vec![CompleteDataRange::new(MIN_ADVERTISED_STATES, MAX_ADVERTISED_STATES).unwrap()],
         epoch_ending_ledger_infos: vec![CompleteDataRange::new(
             MIN_ADVERTISED_EPOCH_END,
             MAX_ADVERTISED_EPOCH_END,
@@ -467,7 +463,7 @@ fn create_global_data_summary(chunk_sizes: u64) -> GlobalDataSummary {
 
 fn create_optimal_chunk_sizes(chunk_sizes: u64) -> OptimalChunkSizes {
     OptimalChunkSizes {
-        account_states_chunk_size: chunk_sizes,
+        state_chunk_size: chunk_sizes,
         epoch_chunk_size: chunk_sizes,
         transaction_chunk_size: chunk_sizes,
         transaction_output_chunk_size: chunk_sizes,

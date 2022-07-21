@@ -28,10 +28,10 @@ use crate::{
         buffer_item::BufferItem,
         execution_phase::{ExecutionRequest, ExecutionResponse},
         persisting_phase::PersistingRequest,
+        pipeline_phase::CountedRequest,
         signing_phase::{SigningRequest, SigningResponse},
     },
     network::NetworkSender,
-    network_interface::ConsensusMsg,
     round_manager::VerifiedEvent,
     state_replication::StateComputerCommitCallBackType,
 };
@@ -75,18 +75,18 @@ pub struct BufferManager {
     // the roots point to the first *unprocessed* item.
     // None means no items ready to be processed (either all processed or no item finishes previous stage)
     execution_root: BufferItemRootType,
-    execution_phase_tx: Sender<ExecutionRequest>,
+    execution_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
     execution_phase_rx: Receiver<ExecutionResponse>,
 
     signing_root: BufferItemRootType,
-    signing_phase_tx: Sender<SigningRequest>,
+    signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
     signing_phase_rx: Receiver<SigningResponse>,
 
     commit_msg_tx: NetworkSender,
     commit_msg_rx: channel::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
 
     // we don't hear back from the persisting phase
-    persisting_phase_tx: Sender<PersistingRequest>,
+    persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
 
     block_rx: UnboundedReceiver<OrderedBlocks>,
     reset_rx: UnboundedReceiver<ResetRequest>,
@@ -100,13 +100,13 @@ pub struct BufferManager {
 impl BufferManager {
     pub fn new(
         author: Author,
-        execution_phase_tx: Sender<ExecutionRequest>,
+        execution_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
         execution_phase_rx: Receiver<ExecutionResponse>,
-        signing_phase_tx: Sender<SigningRequest>,
+        signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
         signing_phase_rx: Receiver<SigningResponse>,
         commit_msg_tx: NetworkSender,
         commit_msg_rx: channel::aptos_channel::Receiver<AccountAddress, VerifiedEvent>,
-        persisting_phase_tx: Sender<PersistingRequest>,
+        persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
         verifier: ValidatorVerifier,
@@ -141,6 +141,24 @@ impl BufferManager {
         }
     }
 
+    fn create_new_request<Request>(&self, req: Request) -> CountedRequest<Request> {
+        CountedRequest::new(req, self.ongoing_tasks.clone())
+    }
+
+    fn spawn_retry_request<T: Send + 'static>(
+        mut sender: Sender<T>,
+        request: T,
+        duration: Duration,
+    ) {
+        tokio::spawn(async move {
+            tokio::time::sleep(duration).await;
+            sender
+                .send(request)
+                .await
+                .expect("Failed to send retry request");
+        });
+    }
+
     /// process incoming ordered blocks
     /// push them into the buffer and update the roots if they are none.
     fn process_ordered_blocks(&mut self, ordered_blocks: OrderedBlocks) {
@@ -166,10 +184,16 @@ impl BufferManager {
         );
         if self.execution_root.is_some() {
             let ordered_blocks = self.buffer.get(&self.execution_root).get_blocks().clone();
-            self.execution_phase_tx
-                .send(ExecutionRequest { ordered_blocks })
-                .await
-                .expect("Failed to send execution request")
+            let request = self.create_new_request(ExecutionRequest { ordered_blocks });
+            if cursor == self.execution_root {
+                let sender = self.execution_phase_tx.clone();
+                Self::spawn_retry_request(sender, request, Duration::from_millis(100));
+            } else {
+                self.execution_phase_tx
+                    .send(request)
+                    .await
+                    .expect("Failed to send execution request")
+            }
         }
     }
 
@@ -187,13 +211,19 @@ impl BufferManager {
         if self.signing_root.is_some() {
             let item = self.buffer.get(&self.signing_root);
             let executed_item = item.unwrap_executed_ref();
-            self.signing_phase_tx
-                .send(SigningRequest {
-                    ordered_ledger_info: executed_item.ordered_proof.clone(),
-                    commit_ledger_info: executed_item.commit_proof.ledger_info().clone(),
-                })
-                .await
-                .expect("Failed to send signing request");
+            let request = self.create_new_request(SigningRequest {
+                ordered_ledger_info: executed_item.ordered_proof.clone(),
+                commit_ledger_info: executed_item.commit_proof.ledger_info().clone(),
+            });
+            if cursor == self.signing_root {
+                let sender = self.signing_phase_tx.clone();
+                Self::spawn_retry_request(sender, request, Duration::from_millis(100));
+            } else {
+                self.signing_phase_tx
+                    .send(request)
+                    .await
+                    .expect("Failed to send signing request");
+            }
         }
     }
 
@@ -224,9 +254,12 @@ impl BufferManager {
                             false,
                         ))
                         .await;
+                    // the epoch ends, reset to avoid executing more blocks, execute after
+                    // this persisting request will result in BlockNotFound
+                    self.reset().await;
                 }
                 self.persisting_phase_tx
-                    .send(PersistingRequest {
+                    .send(self.create_new_request(PersistingRequest {
                         blocks: blocks_to_persist,
                         commit_ledger_info: aggregated_item.commit_proof,
                         // we use the last callback
@@ -236,7 +269,7 @@ impl BufferManager {
                         // the block_tree and storage are the same for all the callbacks in the current epoch
                         // the commit root is used in logging only.
                         callback: aggregated_item.callback,
-                    })
+                    }))
                     .await
                     .expect("Failed to send persist request");
                 debug!("Advance head to {:?}", self.buffer.head_cursor());
@@ -246,20 +279,28 @@ impl BufferManager {
         unreachable!("Aggregated item not found in the list");
     }
 
+    /// Reset any request in buffer manager, this is important to avoid race condition with state sync.
+    /// Internal requests are managed with ongoing_tasks.
+    /// Incoming ordered blocks are pulled, it should only have existing blocks but no new blocks until reset finishes.
+    async fn reset(&mut self) {
+        self.buffer = Buffer::new();
+        self.execution_root = None;
+        self.signing_root = None;
+        // purge the incoming blocks queue
+        while let Ok(Some(_)) = self.block_rx.try_next() {}
+        // Wait for ongoing tasks to finish before sending back ack.
+        while self.ongoing_tasks.load(Ordering::SeqCst) > 0 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }
+
     /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
     async fn process_reset_request(&mut self, request: ResetRequest) {
         let ResetRequest { tx, stop } = request;
         debug!("Receive reset");
 
         self.stop = stop;
-        self.buffer = Buffer::new();
-        self.execution_root = None;
-        self.signing_root = None;
-        // Wait for ongoing tasks to finish before sending back ack.
-        while self.ongoing_tasks.load(Ordering::SeqCst) > 0 {
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-
+        self.reset().await;
         tx.send(sync_ack_new()).unwrap();
     }
 
@@ -279,12 +320,6 @@ impl BufferManager {
                 return;
             }
         };
-        // if this batch of blocks are all suffix blocks (reconfiguration block is in one of previous batch)
-        // we pause the execution from here and wait for the reconfiguration to be committed.
-        if executed_blocks.first().unwrap().is_reconfiguration_suffix() {
-            debug!("Ignore reconfiguration suffix execution, waiting for epoch to be committed");
-            return;
-        }
         debug!(
             "Receive executed response {}",
             executed_blocks.last().unwrap().block_info()
@@ -330,9 +365,7 @@ impl BufferManager {
 
                 self.buffer.set(&current_cursor, signed_item);
 
-                self.commit_msg_tx
-                    .broadcast(ConsensusMsg::CommitVoteMsg(Box::new(commit_vote)))
-                    .await;
+                self.commit_msg_tx.broadcast_commit_vote(commit_vote).await;
             } else {
                 self.buffer.set(&current_cursor, item);
             }
@@ -406,9 +439,7 @@ impl BufferManager {
                 }
                 let signed_item = item.unwrap_signed_ref();
                 self.commit_msg_tx
-                    .broadcast(ConsensusMsg::CommitVoteMsg(Box::new(
-                        signed_item.commit_vote.clone(),
-                    )))
+                    .broadcast_commit_vote(signed_item.commit_vote.clone())
                     .await;
             }
             cursor = self.buffer.get_next(&cursor);

@@ -5,7 +5,7 @@ use crate::{
     common::Author, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeout, vote_data::VoteData,
 };
 use anyhow::{ensure, Context};
-use aptos_crypto::{ed25519::Ed25519Signature, hash::CryptoHash};
+use aptos_crypto::{bls12381, hash::CryptoHash};
 use aptos_types::{
     ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -27,9 +27,9 @@ pub struct Vote {
     /// LedgerInfo of a block that is going to be committed in case this vote gathers QC.
     ledger_info: LedgerInfo,
     /// Signature of the LedgerInfo
-    signature: Ed25519Signature,
+    signature: bls12381::Signature,
     /// The 2-chain timeout and corresponding signature.
-    two_chain_timeout: Option<(TwoChainTimeout, Ed25519Signature)>,
+    two_chain_timeout: Option<(TwoChainTimeout, bls12381::Signature)>,
 }
 
 // this is required by structured log
@@ -71,7 +71,7 @@ impl Vote {
         vote_data: VoteData,
         author: Author,
         ledger_info: LedgerInfo,
-        signature: Ed25519Signature,
+        signature: bls12381::Signature,
     ) -> Self {
         Self {
             vote_data,
@@ -83,7 +83,7 @@ impl Vote {
     }
 
     /// Add the 2-chain timeout and signature in the vote.
-    pub fn add_2chain_timeout(&mut self, timeout: TwoChainTimeout, signature: Ed25519Signature) {
+    pub fn add_2chain_timeout(&mut self, timeout: TwoChainTimeout, signature: bls12381::Signature) {
         self.two_chain_timeout = Some((timeout, signature));
     }
 
@@ -102,7 +102,7 @@ impl Vote {
     }
 
     /// Return the signature of the vote
-    pub fn signature(&self) -> &Ed25519Signature {
+    pub fn signature(&self) -> &bls12381::Signature {
         &self.signature
     }
 
@@ -121,7 +121,7 @@ impl Vote {
     }
 
     /// Return the two chain timeout vote and signature.
-    pub fn two_chain_timeout(&self) -> Option<&(TwoChainTimeout, Ed25519Signature)> {
+    pub fn two_chain_timeout(&self) -> Option<&(TwoChainTimeout, bls12381::Signature)> {
         self.two_chain_timeout.as_ref()
     }
 

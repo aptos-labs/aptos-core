@@ -16,7 +16,6 @@ proptest = { version = "1.0.0", optional = true }
 
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
 proptest = "1.0.0"

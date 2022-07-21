@@ -7,7 +7,6 @@ experience, and prevent confusion between the different use cases.
 ### The Tools
 ```
 aptos-management
-|-> aptos-genesis-tool = A tool for performing the genesis ceremony for the Aptos blockchain.
 |-> aptos-operational-tool = A tool for performing management operations on the Aptos blockchain.
 ```
 

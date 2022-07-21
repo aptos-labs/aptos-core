@@ -6,10 +6,8 @@
 //!
 //! Note that the ~13 KiB error descriptions will be inlined into the final binary.
 
-use move_deps::move_core_types::{
-    errmap::{ErrorContext, ErrorMapping},
-    language_storage::ModuleId,
-};
+use move_deps::move_core_types::errmap::ErrorDescription;
+use move_deps::move_core_types::{errmap::ErrorMapping, language_storage::ModuleId};
 use once_cell::sync::Lazy;
 
 static RELEASE_ERRMAP: Lazy<ErrorMapping> = Lazy::new(|| {
@@ -19,7 +17,7 @@ static RELEASE_ERRMAP: Lazy<ErrorMapping> = Lazy::new(|| {
 
 /// Given the module ID and the abort code raised from that module, returns the
 /// human-readable explanation of that abort if possible.
-pub fn get_explanation(module_id: &ModuleId, abort_code: u64) -> Option<ErrorContext> {
+pub fn get_explanation(module_id: &ModuleId, abort_code: u64) -> Option<ErrorDescription> {
     let errmap = &*RELEASE_ERRMAP;
     errmap.get_explanation(module_id, abort_code)
 }

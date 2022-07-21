@@ -19,11 +19,8 @@ tempfile = "3.3.0"
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive" }
 aptos-state-view = { path = "../../storage/state-view" }
-aptos-transaction-replay = { path = "../transaction-replay" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../aptos-vm" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
-aptosdb = { path = "../../storage/aptosdb" }
-cached-framework-packages =  { path = "../framework/cached-packages" }
+
 framework =  { path = "../framework" }
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "table-extension"] }

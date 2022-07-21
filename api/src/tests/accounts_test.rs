@@ -44,7 +44,7 @@ async fn test_get_account_resources_by_invalid_address_missing_0x_prefix() {
 #[tokio::test]
 async fn test_get_account_resources_by_valid_account_address() {
     let context = new_test_context(current_function_name!());
-    let addresses = vec!["0xA550C18", "0x0000000000000000000000000A550C18"];
+    let addresses = vec!["0x1", "0x00000000000000000000000000000001"];
     for address in &addresses {
         context.get(&account_resources(address)).await;
     }
@@ -55,7 +55,7 @@ async fn test_get_account_resources_by_valid_account_address() {
 #[tokio::test]
 async fn test_account_resources_response() {
     let mut context = new_test_context(current_function_name!());
-    let address = "0xA550C18";
+    let address = "0x1";
 
     let resp = context.get(&account_resources(address)).await;
     context.check_golden_output(resp);
@@ -118,7 +118,7 @@ async fn test_get_account_resources_by_ledger_version() {
         ))
         .await;
     let root_account = find_value(&ledger_version_1_resources, |f| {
-        f["type"] == "0x1::Account::Account"
+        f["type"] == "0x1::account::Account"
     });
     assert_eq!(root_account["data"]["sequence_number"], "1");
 
@@ -129,7 +129,7 @@ async fn test_get_account_resources_by_ledger_version() {
         ))
         .await;
     let root_account = find_value(&ledger_version_0_resources, |f| {
-        f["type"] == "0x1::Account::Account"
+        f["type"] == "0x1::account::Account"
     });
     assert_eq!(root_account["data"]["sequence_number"], "0");
 }
@@ -193,7 +193,7 @@ async fn test_get_account_modules_by_ledger_version() {
 #[tokio::test]
 async fn test_get_core_account_data() {
     let mut context = new_test_context(current_function_name!());
-    let resp = context.get("/accounts/0xA550C18").await;
+    let resp = context.get("/accounts/0x1").await;
     context.check_golden_output(resp);
 }
 

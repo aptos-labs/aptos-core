@@ -10,6 +10,7 @@ use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::LocalAccount;
 use aptos_types::{account_address::AccountAddress, PeerId};
+use aptosdb::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
 use std::{
     fs,
@@ -27,7 +28,7 @@ async fn test_full_node_bootstrap_accounts() {
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
     vfn_config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
     vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
-        BootstrappingMode::DownloadLatestAccountStates;
+        BootstrappingMode::DownloadLatestStates;
 
     // Create (and stop) the fullnode
     let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
@@ -36,10 +37,7 @@ async fn test_full_node_bootstrap_accounts() {
     // Set at most 2 accounts per storage request for the validator
     let validator = swarm.validators_mut().next().unwrap();
     let mut config = validator.config().clone();
-    config
-        .state_sync
-        .storage_service
-        .max_account_states_chunk_sizes = 2;
+    config.state_sync.storage_service.max_state_chunk_size = 2;
     config.save(validator.config_path()).unwrap();
     validator.restart().await.unwrap();
     validator
@@ -292,7 +290,7 @@ async fn test_validator_failure_bootstrap_outputs() {
         let mut config = validator.config().clone();
         config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
         config.state_sync.state_sync_driver.bootstrapping_mode =
-            BootstrappingMode::DownloadLatestAccountStates;
+            BootstrappingMode::DownloadLatestStates;
         config.state_sync.state_sync_driver.continuous_syncing_mode =
             ContinuousSyncingMode::ApplyTransactionOutputs;
         config.save(validator.config_path()).unwrap();
@@ -312,7 +310,7 @@ async fn test_validator_failure_bootstrap_execution() {
         let mut config = validator.config().clone();
         config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
         config.state_sync.state_sync_driver.bootstrapping_mode =
-            BootstrappingMode::DownloadLatestAccountStates;
+            BootstrappingMode::DownloadLatestStates;
         config.state_sync.state_sync_driver.continuous_syncing_mode =
             ContinuousSyncingMode::ExecuteTransactions;
         config.save(validator.config_path()).unwrap();
@@ -492,12 +490,15 @@ fn stop_validator_and_delete_storage(swarm: &mut LocalSwarm, validator: AccountA
 
     // Delete the validator storage
     let node_config = swarm.validator_mut(validator).unwrap().config().clone();
-    let state_db_path = node_config.storage.dir();
+    let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
+    let state_db_path = node_config.storage.dir().join(STATE_MERKLE_DB_NAME);
     info!(
-        "Deleting state db path {:?} for validator {:?}",
+        "Deleting ledger and state db paths ({:?}, {:?}) for validator {:?}",
+        ledger_db_path.as_path(),
         state_db_path.as_path(),
         validator
     );
-    assert!(state_db_path.as_path().exists());
+    assert!(ledger_db_path.as_path().exists() && state_db_path.as_path().exists());
+    fs::remove_dir_all(ledger_db_path).unwrap();
     fs::remove_dir_all(state_db_path).unwrap();
 }

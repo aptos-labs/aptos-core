@@ -1,26 +1,23 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-mod account_minter;
+pub mod account_minter;
 pub mod stats;
 pub mod submission_worker;
 
 use ::aptos_logger::*;
 use again::RetryPolicy;
-use anyhow::{format_err, Result};
+use anyhow::{anyhow, format_err, Result};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::TransactionFactory,
-    types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
+    types::{transaction::SignedTransaction, LocalAccount},
 };
 use futures::future::{try_join_all, FutureExt};
 use itertools::zip;
 use once_cell::sync::Lazy;
-use rand::{
-    distributions::{Distribution, Standard},
-    Rng, RngCore,
-};
+use rand::prelude::SliceRandom;
 use rand_core::SeedableRng;
 use std::{
     cmp::{max, min},
@@ -34,7 +31,14 @@ use std::{
 };
 use tokio::{runtime::Handle, task::JoinHandle, time};
 
-use crate::emitter::{account_minter::AccountMinter, submission_worker::SubmissionWorker};
+use crate::{
+    args::TransactionType,
+    emitter::{account_minter::AccountMinter, submission_worker::SubmissionWorker},
+    transaction_generator::{
+        account_generator::AccountGeneratorCreator, nft_mint::NFTMintGeneratorCreator,
+        p2p_transaction_generator::P2PTransactionGeneratorCreator, TransactionGeneratorCreator,
+    },
+};
 use aptos_sdk::transaction_builder::aptos_stdlib;
 use rand::rngs::StdRng;
 use stats::{StatsAccumulator, TxnStats};
@@ -85,6 +89,7 @@ pub struct EmitJobRequest {
     gas_price: u64,
     invalid_transaction_ratio: usize,
     vasp: bool,
+    transaction_type: TransactionType,
 }
 
 impl Default for EmitJobRequest {
@@ -97,6 +102,7 @@ impl Default for EmitJobRequest {
             gas_price: 0,
             invalid_transaction_ratio: 0,
             vasp: false,
+            transaction_type: TransactionType::P2P,
         }
     }
 }
@@ -133,6 +139,11 @@ impl EmitJobRequest {
 
     pub fn invalid_transaction_ratio(mut self, invalid_transaction_ratio: usize) -> Self {
         self.invalid_transaction_ratio = invalid_transaction_ratio;
+        self
+    }
+
+    pub fn transaction_type(mut self, transaction_type: TransactionType) -> Self {
+        self.transaction_type = transaction_type;
         self
     }
 
@@ -230,12 +241,12 @@ impl<'t> TxnEmitter<'t> {
         let workers_per_endpoint = match req.workers_per_endpoint {
             Some(x) => x,
             None => {
-                let target_threads = 300;
+                let target_threads = 1200;
                 // Trying to create somewhere between target_threads/2..target_threads threads
                 // We want to have equal numbers of threads for each endpoint, so that they are equally loaded
                 // Otherwise things like flamegrap/perf going to show different numbers depending on which endpoint is chosen
                 // Also limiting number of threads as max 10 per endpoint for use cases with very small number of nodes or use --peers
-                min(10, max(1, target_threads / req.rest_clients.len()))
+                min(60, max(1, target_threads / req.rest_clients.len()))
             }
         };
         let num_clients = req.rest_clients.len() * workers_per_endpoint;
@@ -263,6 +274,27 @@ impl<'t> TxnEmitter<'t> {
         let stop = Arc::new(AtomicBool::new(false));
         let stats = Arc::new(StatsAccumulator::default());
         let tokio_handle = Handle::current();
+        let txn_generator_creator: Box<dyn TransactionGeneratorCreator> = match req.transaction_type
+        {
+            TransactionType::P2P => Box::new(P2PTransactionGeneratorCreator::new(
+                self.from_rng(),
+                self.txn_factory.clone(),
+                SEND_AMOUNT,
+            )),
+            TransactionType::AccountGeneration => Box::new(AccountGeneratorCreator::new(
+                self.from_rng(),
+                self.txn_factory.clone(),
+            )),
+            TransactionType::NftMint => Box::new(
+                NFTMintGeneratorCreator::new(
+                    self.from_rng(),
+                    self.txn_factory.clone(),
+                    self.root_account,
+                    req.rest_clients[0].clone(),
+                )
+                .await,
+            ),
+        };
         for client in req.rest_clients {
             for _ in 0..workers_per_endpoint {
                 let accounts = (&mut all_accounts).take(req.accounts_per_client).collect();
@@ -270,6 +302,7 @@ impl<'t> TxnEmitter<'t> {
                 let stop = stop.clone();
                 let params = req.thread_params.clone();
                 let stats = Arc::clone(&stats);
+
                 let worker = SubmissionWorker::new(
                     accounts,
                     client.clone(),
@@ -277,7 +310,7 @@ impl<'t> TxnEmitter<'t> {
                     stop,
                     params,
                     stats,
-                    self.txn_factory.clone(),
+                    txn_generator_creator.create_transaction_generator(),
                     req.invalid_transaction_ratio,
                     self.from_rng(),
                 );
@@ -372,6 +405,36 @@ impl<'t> TxnEmitter<'t> {
     }
 }
 
+/// Waits for a single account to catch up to the expected sequence number
+async fn wait_for_single_account_sequence(
+    client: &RestClient,
+    account: &LocalAccount,
+    wait_timeout: Duration,
+) -> Result<()> {
+    let deadline = Instant::now() + wait_timeout;
+    while Instant::now() <= deadline {
+        time::sleep(Duration::from_millis(500)).await;
+        match query_sequence_numbers(client, &[account.address()]).await {
+            Ok(sequence_numbers) => {
+                if sequence_numbers[0] >= account.sequence_number() {
+                    return Ok(());
+                }
+            }
+            Err(e) => {
+                info!(
+                    "Failed to query sequence number for account {:?} for instance {:?} : {:?}",
+                    account, client, e
+                );
+            }
+        }
+    }
+    Err(anyhow!(
+        "Timed out waiting for single account {:?} sequence number for instance {:?}",
+        account,
+        client
+    ))
+}
+
 /// This function waits for the submitted transactions to be committed, up to
 /// a deadline. If some accounts still have uncommitted transactions when we
 /// hit the deadline, we return a map of account to the info about the number
@@ -388,10 +451,22 @@ async fn wait_for_accounts_sequence(
     client: &RestClient,
     accounts: &mut [LocalAccount],
     wait_timeout: Duration,
+    rng: &mut StdRng,
 ) -> Result<(), HashSet<AccountAddress>> {
     let deadline = Instant::now() + wait_timeout;
     let addresses: Vec<_> = accounts.iter().map(|d| d.address()).collect();
     let mut uncommitted = addresses.clone().into_iter().collect::<HashSet<_>>();
+
+    // Choose a random account and wait for its sequence number to be up to date. After that, we can
+    // query the all the accounts. This will help us ensure we don't hammer the REST API with too many
+    // query for all the accounts.
+    let account = accounts.choose(rng).expect("accounts can't be empty");
+    if wait_for_single_account_sequence(client, account, wait_timeout)
+        .await
+        .is_err()
+    {
+        return Err(uncommitted);
+    }
 
     while Instant::now() <= deadline {
         match query_sequence_numbers(client, &addresses).await {
@@ -413,8 +488,7 @@ async fn wait_for_accounts_sequence(
                 );
             }
         }
-
-        time::sleep(Duration::from_millis(250)).await;
+        time::sleep(Duration::from_millis(500)).await;
     }
 
     Err(uncommitted)
@@ -445,79 +519,9 @@ pub fn gen_transfer_txn_request(
 ) -> SignedTransaction {
     sender.sign_with_transaction_builder(
         txn_factory
-            .payload(aptos_stdlib::encode_test_coin_transfer(
+            .payload(aptos_stdlib::encode_aptos_coin_transfer(
                 *receiver, num_coins,
             ))
             .gas_unit_price(gas_price),
     )
-}
-
-fn generate_invalid_transaction<R>(
-    sender: &mut LocalAccount,
-    receiver: &AccountAddress,
-    num_coins: u64,
-    transaction_factory: &TransactionFactory,
-    gas_price: u64,
-    reqs: &[SignedTransaction],
-    rng: &mut R,
-) -> SignedTransaction
-where
-    R: ::rand_core::RngCore + ::rand_core::CryptoRng,
-{
-    let mut invalid_account = LocalAccount::generate(rng);
-    let invalid_address = invalid_account.address();
-    match Standard.sample(rng) {
-        InvalidTransactionType::ChainId => {
-            let txn_factory = transaction_factory.clone().with_chain_id(ChainId::new(255));
-            gen_transfer_txn_request(sender, receiver, num_coins, &txn_factory, gas_price)
-        }
-        InvalidTransactionType::Sender => gen_transfer_txn_request(
-            &mut invalid_account,
-            receiver,
-            num_coins,
-            transaction_factory,
-            gas_price,
-        ),
-        InvalidTransactionType::Receiver => gen_transfer_txn_request(
-            sender,
-            &invalid_address,
-            num_coins,
-            transaction_factory,
-            gas_price,
-        ),
-        InvalidTransactionType::Duplication => {
-            // if this is the first tx, default to generate invalid tx with wrong chain id
-            // otherwise, make a duplication of an exist valid tx
-            if reqs.is_empty() {
-                let txn_factory = transaction_factory.clone().with_chain_id(ChainId::new(255));
-                gen_transfer_txn_request(sender, receiver, num_coins, &txn_factory, gas_price)
-            } else {
-                let random_index = rng.gen_range(0, reqs.len());
-                reqs[random_index].clone()
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-enum InvalidTransactionType {
-    /// invalid tx with wrong chain id
-    ChainId,
-    /// invalid tx with sender not on chain
-    Sender,
-    /// invalid tx with receiver not on chain
-    Receiver,
-    /// duplicate an exist tx
-    Duplication,
-}
-
-impl Distribution<InvalidTransactionType> for Standard {
-    fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> InvalidTransactionType {
-        match rng.gen_range(0, 4) {
-            0 => InvalidTransactionType::ChainId,
-            1 => InvalidTransactionType::Sender,
-            2 => InvalidTransactionType::Receiver,
-            _ => InvalidTransactionType::Duplication,
-        }
-    }
 }

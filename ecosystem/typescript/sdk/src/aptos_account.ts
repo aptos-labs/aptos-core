@@ -1,10 +1,10 @@
-import * as Nacl from 'tweetnacl';
-import * as SHA3 from 'js-sha3';
-import bip39 from 'bip39-light';
-import { Buffer } from 'buffer/'; // the trailing slash is important!
-import { derivePath } from 'ed25519-hd-key';
-import { HexString, MaybeHexString } from './hex_string';
-import { Types } from './types';
+import * as Nacl from "tweetnacl";
+import * as SHA3 from "js-sha3";
+import * as bip39 from "@scure/bip39";
+import { Buffer } from "buffer/"; // the trailing slash is important!
+import { derivePath } from "ed25519-hd-key";
+import { HexString, MaybeHexString } from "./hex_string";
+import { Types } from "./types";
 
 export interface AptosAccountObject {
   address?: string;
@@ -35,32 +35,27 @@ export class AptosAccount {
   static isValidPath = (path: string): boolean => {
     if (
       // eslint-disable-next-line prefer-regex-literals
-      !new RegExp('^m\\/44+\'\\/637+\'\\/[0-9]+\'\\/[0-9]+\'\\/[0-9]+\'+$').test(
+      !new RegExp("^m\\/44'\\/637'\\/[0-9]+'\\/[0-9]+'\\/[0-9]+'+$").test(
         path,
       )
     ) {
       return false;
     }
-    return !path
-      .split('/')
-      .slice(1)
-      .map((val: string): string => val.replace('\'', ''))
-      // eslint-disable-next-line no-restricted-globals
-      .some(isNaN as any);
+    return true;
   };
 
   static fromDerivePath(path: string, mnemonics: string): AptosAccount {
     if (!AptosAccount.isValidPath(path)) {
-      throw new Error('Invalid derivation path');
+      throw new Error("Invalid derivation path");
     }
 
     const normalizeMnemonics = mnemonics
       .trim()
       .split(/\s+/)
       .map((part) => part.toLowerCase())
-      .join(' ');
+      .join(" ");
 
-    const { key } = derivePath(path, bip39.mnemonicToSeedHex(normalizeMnemonics));
+    const { key } = derivePath(path, Buffer.from(bip39.mnemonicToSeedSync(normalizeMnemonics)).toString("hex"));
 
     return new AptosAccount(new Uint8Array(key));
   }
@@ -102,7 +97,7 @@ export class AptosAccount {
     if (!this.authKeyCached) {
       const hash = SHA3.sha3_256.create();
       hash.update(Buffer.from(this.signingKey.publicKey));
-      hash.update('\x00');
+      hash.update("\x00");
       this.authKeyCached = new HexString(hash.hex());
     }
     return this.authKeyCached;
@@ -114,7 +109,7 @@ export class AptosAccount {
    * @returns The public key for the associated account
    */
   pubKey(): HexString {
-    return HexString.ensure(Buffer.from(this.signingKey.publicKey).toString('hex'));
+    return HexString.ensure(Buffer.from(this.signingKey.publicKey).toString("hex"));
   }
 
   /**
@@ -124,7 +119,7 @@ export class AptosAccount {
    */
   signBuffer(buffer: Buffer): HexString {
     const signature = Nacl.sign(buffer, this.signingKey.secretKey);
-    return HexString.ensure(Buffer.from(signature).toString('hex').slice(0, 128));
+    return HexString.ensure(Buffer.from(signature).toString("hex").slice(0, 128));
   }
 
   /**

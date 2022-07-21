@@ -15,7 +15,6 @@ futures = "0.3.21"
 once_cell = "1.10.0"
 
 aptos-infallible = { path = "../../crates/aptos-infallible" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 
 [features]
 default = []
