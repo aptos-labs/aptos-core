@@ -10,6 +10,7 @@ use aptos_logger::prelude::*;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     access_path::AccessPath,
+    delta_set::{deserialize, serialize},
     on_chain_config::ConfigStorage,
     state_store::state_key::StateKey,
     vm_status::StatusCode,
@@ -37,7 +38,7 @@ use std::{
 ///
 /// The cache is responsible to track all changes to the `StateView` that are the result
 /// of transaction execution. Those side effects are published at the end of a transaction
-/// execution via `StateViewCache::push_write_set`.
+/// execution via `StateViewCache::try_push_write_set`.
 ///
 /// `StateViewCache` is responsible to give an up to date view over the data store,
 /// so that changes executed but not yet committed are visible to subsequent transactions.
@@ -62,7 +63,7 @@ impl<'a, S: StateView> StateViewCache<'a, S> {
     // Publishes a `WriteSet` computed at the end of a transaction.
     // The effect is to build a layer in front of the `StateView` which keeps
     // track of the data as if the changes were applied immediately.
-    pub(crate) fn push_write_set(&mut self, write_set: &WriteSet) {
+    pub(crate) fn try_push_write_set(&mut self, write_set: &WriteSet) -> PartialVMResult<()> {
         for (ref ap, ref write_op) in write_set.iter() {
             match write_op {
                 WriteOp::Value(blob) => {
@@ -72,11 +73,33 @@ impl<'a, S: StateView> StateViewCache<'a, S> {
                     self.data_map.remove(ap);
                     self.data_map.insert(ap.clone(), None);
                 }
-                WriteOp::Delta(..) => {
-                    unimplemented!("sequential execution is not supported for deltas")
+                WriteOp::Delta(op) => {
+                    // Convert delta to a true value: first, fetch the base from
+                    // the cache/storage.
+                    let blob = self
+                        .get_state_value(ap)
+                        .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))?
+                        .expect("base value for delta application should always exist");
+
+                    // Deserialize the base value to which we apply delta.
+                    let base = deserialize(&blob);
+                    match op.apply_to(base) {
+                        None => {
+                            // Delta aplication failed!
+                            // TODO: ideally, we want to propagate the error code with the error.
+                            // One way to do this is to specify error codes (and errors in general)
+                            // within delta op?
+                            return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
+                        }
+                        Some(result) => {
+                            // Delta applied successfully, update the value in cache.
+                            self.data_map.insert(ap.clone(), Some(serialize(&result)));
+                        }
+                    }
                 }
             }
         }
+        Ok(())
     }
 }
 

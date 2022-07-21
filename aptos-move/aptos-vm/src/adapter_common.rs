@@ -8,6 +8,7 @@ use aptos_types::{
     transaction::{SignatureCheckedTransaction, SignedTransaction, VMValidatorResult},
     vm_status::{StatusCode, VMStatus},
 };
+use move_deps::move_binary_format::errors::Location;
 
 use crate::{
     data_cache::AsMoveResolver,
@@ -199,13 +200,19 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
             debug!(log_context, "Retry after reconfiguration");
             continue;
         };
-        let (vm_status, output, sender) = adapter.execute_single_transaction(
+        let (mut vm_status, output, sender) = adapter.execute_single_transaction(
             &txn,
             &data_cache.as_move_resolver(),
             &log_context,
         )?;
         if !output.status().is_discarded() {
-            data_cache.push_write_set(output.write_set());
+            if let Err(e) = data_cache.try_push_write_set(output.write_set()) {
+                if vm_status == VMStatus::Executed {
+                    // If delta application failed, but otherwise transaction executed
+                    // sucessfully, update the vm status
+                    vm_status = e.finish(Location::Undefined).into_vm_status();
+                }
+            }
         } else {
             match sender {
                 Some(s) => trace!(

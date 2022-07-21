@@ -35,7 +35,7 @@ impl<'a, S: StateView> StateView for VersionedView<'a, S> {
             Some(v) => Ok(match v.as_ref() {
                 WriteOp::Value(w) => Some(w.clone()),
                 WriteOp::Deletion => None,
-                WriteOp::Delta(..) => {
+                WriteOp::Delta(_) => {
                     unimplemented!("parallel execution is not supported for deltas")
                 }
             }),
