@@ -3,7 +3,7 @@
 
 use forge::{forge_main, ForgeConfig, LocalFactory, Options, Result};
 use smoke_test::{
-    aptos::{AccountCreation, ErrorReport, GasCheck, MintTransfer},
+    aptos::{AccountCreation, ErrorReport, GasCheck, MintTransfer, StringArgs},
     transaction::ExternalTransactionSigner,
 };
 
@@ -15,6 +15,7 @@ fn main() -> Result<()> {
             &ErrorReport,
             &GasCheck,
             &MintTransfer,
+            &StringArgs,
             &smoke_test::nft_transaction::NFTTransaction,
             // re-enable after delegation is enabled
             // &Staking,
