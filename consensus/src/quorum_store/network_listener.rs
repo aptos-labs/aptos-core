@@ -3,7 +3,7 @@
 
 use crate::{
     quorum_store::{
-        batch_aggregator::{AggregationMode, BatchAggregator},
+        batch_aggregator::BatchAggregator,
         batch_reader::BatchReaderCommand,
         batch_store::{BatchStoreCommand, PersistRequest},
         proof_builder::ProofBuilderCommand,
@@ -19,10 +19,9 @@ use std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
 
 pub(crate) struct NetworkListener {
+    // TODO: reconsider which fields are needed.
     epoch: u64,
-    //not sure if needed
     network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
-    //not sure if needed, depends who verifies.
     batch_aggregators: HashMap<PeerId, BatchAggregator>,
     batch_store_tx: Sender<BatchStoreCommand>,
     batch_reader_tx: Sender<BatchReaderCommand>,
@@ -55,36 +54,40 @@ impl NetworkListener {
         let entry = self
             .batch_aggregators
             .entry(source)
-            .or_insert(BatchAggregator::new(
-                self.max_batch_size,
-                AggregationMode::IgnoreWrongOrder,
-            ));
+            .or_insert(BatchAggregator::new(self.max_batch_size));
         if let Some(expiration) = fragment.fragment_info.maybe_expiration() {
-            //end batch message
-            debug!("QS: got end batch message");
+            // end batch message
+            debug!("QS: got end batch message from {:?}", source);
             if expiration.epoch() == self.epoch {
-                if let Some((num_bytes, payload, digest)) = entry.end_batch(
+                match entry.end_batch(
                     fragment.batch_id(),
                     fragment.fragment_id(),
                     fragment.take_transactions(),
                 ) {
-                    let persist_cmd = BatchStoreCommand::Persist(
-                        PersistRequest::new(source, payload, digest, num_bytes, expiration),
-                        None,
-                    );
-                    self.batch_store_tx
-                        .send(persist_cmd)
-                        .await
-                        .expect("BatchStore receiver not available");
+                    Ok((num_bytes, payload, digest)) => {
+                        let persist_cmd = BatchStoreCommand::Persist(
+                            PersistRequest::new(source, payload, digest, num_bytes, expiration),
+                            None,
+                        );
+                        self.batch_store_tx
+                            .send(persist_cmd)
+                            .await
+                            .expect("BatchStore receiver not available");
+                    }
+                    Err(e) => {
+                        debug!("Could not append batch from {:?}, error {:?}", source, e);
+                    }
                 }
             } // Malformed request with an inconsistent expiry epoch.
         } else {
-            debug!("QS: got append_batch message");
-            entry.append_transactions(
+            debug!("QS: got append_batch message from {:?}", source);
+            if let Err(e) = entry.append_transactions(
                 fragment.batch_id(),
                 fragment.fragment_id(),
                 fragment.take_transactions(),
-            );
+            ) {
+                debug!("Could not append batch from {:?}, error {:?}", source, e);
+            }
         }
     }
 
