@@ -7,8 +7,8 @@ module aptos_framework::block {
 
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
-    use aptos_framework::reconfiguration;
-    use aptos_framework::stake;
+    // use aptos_framework::reconfiguration;
+    // use aptos_framework::stake;
 
     /// Should be in-sync with BlockResource rust struct in new_block.rs
     struct BlockResource has key {
@@ -86,10 +86,10 @@ module aptos_framework::block {
         system_addresses::assert_vm(&vm);
 
         // Authorization
-        assert!(
-            proposer == @vm_reserved || stake::is_current_epoch_validator(proposer),
-        error::permission_denied(EVM_OR_VALIDATOR)
-        );
+        // assert!(
+        //     proposer == @vm_reserved || stake::is_current_epoch_validator(proposer),
+        // error::permission_denied(EVM_OR_VALIDATOR)
+        // );
 
         let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
         block_metadata_ref.height = event::counter(&block_metadata_ref.new_block_events);
@@ -107,11 +107,11 @@ module aptos_framework::block {
 
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
-        stake::update_performance_statistics(proposer_index_optional, failed_proposer_indices);
+        // stake::update_performance_statistics(proposer_index_optional, failed_proposer_indices);
 
-        if (timestamp - reconfiguration::last_reconfiguration_time() > block_metadata_ref.epoch_interval) {
-            reconfiguration::reconfigure();
-        };
+        // if (timestamp - reconfiguration::last_reconfiguration_time() > block_metadata_ref.epoch_interval) {
+        //     reconfiguration::reconfigure();
+        // };
     }
 
     /// Get the current block height

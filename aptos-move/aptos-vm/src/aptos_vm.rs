@@ -695,6 +695,7 @@ impl AptosVM {
 
         let output =
             get_transaction_output(&mut (), session, 0, &txn_data, ExecutionStatus::Success)?;
+        println!("Igor {:?}", output);
         Ok((VMStatus::Executed, output))
     }
 

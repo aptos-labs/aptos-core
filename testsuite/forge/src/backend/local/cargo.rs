@@ -157,7 +157,12 @@ where
     let output = Command::new("cargo")
         .current_dir(directory)
         .env("CARGO_TARGET_DIR", target_directory)
-        .args(&["build", "--bin=aptos-node", "--features=failpoints"])
+        .args(&[
+            "build",
+            "--bin=aptos-node",
+            "--features=failpoints",
+            // "--release",
+        ])
         .output()
         .context("Failed to build aptos-node")?;
 

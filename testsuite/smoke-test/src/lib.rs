@@ -10,6 +10,8 @@ mod aptos_cli;
 #[cfg(test)]
 mod client;
 #[cfg(test)]
+mod consensus;
+#[cfg(test)]
 mod full_nodes;
 #[cfg(test)]
 mod fullnode;
