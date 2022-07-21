@@ -10,23 +10,23 @@ The Aptos Blockchain uses the [Move][move_url] virtual machine (VM) for executin
 This guide (in concert with the [Move module tutorial][your-first-move-module]) will unlock the minimal amount of information required to start building rich applications on top of the Aptos Blockchain. Note: the Aptos Framework is under heavy development and this document may not be up to date. The most recent framework can be found in the source code, [here][aptos_framework].
 
 The core functions provided to users within the Aptos Framework include:
-* Sending and receiving the network coin `Coin<TestCoin>`
+* Sending and receiving the network coin `Coin<AptosCoin>`
 * Creating a new account
 * Publishing a new Move module
 
 Note: this document assumes readers are already familiar with submitting transactions, as described in the [Your first transaction tutorial][your-first-transaction].
 
-## Sending and Receiving the network coin `Coin<TestCoin>`
+## Sending and Receiving the network coin `Coin<AptosCoin>`
 
-`Coin<TestCoin>` is required for paying gas fees when submitting and executing transactions. `Coin<TestCoin>` can be obtained by calling the Devnet Faucet. See the [Your first transaction tutorial][your-first-transaction] for an example.
+`Coin<AptosCoin>` is required for paying gas fees when submitting and executing transactions. `Coin<AptosCoin>` can be obtained by calling the Devnet Faucet. See the [Your first transaction tutorial][your-first-transaction] for an example.
 
 The payload for instructing the blockchain to perform a transfer is:
 
 ```
 {
   "type": "script_function_payload",
-  "function": "0x1::coin::transfer",
-  "type_arguments": ["0x1::test_coin::TestCoin"],
+  "function": "0x1::Coin::transfer",
+  "type_arguments": ["0x1::aptos_coin::AptosCoin"],
   "arguments": [
     "0x737b36c96926043794ed3a0b3eaaceaf",
     "1000",
@@ -34,7 +34,7 @@ The payload for instructing the blockchain to perform a transfer is:
 }
 ```
 
-This instructs the VM to execute the `script` `0x1::coin::transfer` with a type argument of 0x1::test_coin::TestCoin. Type is required here as Coin is our standard module that can be used to create many types of Coins. See the [Your first coin tutorial][your-first-coin] for an example of creating a custom Coin. The first argument is the recipient address, `0x737b36c96926043794ed3a0b3eaaceaf`, and the second is the amount to transfer, `1000`. The sender address is the account address that sent the transaction querying this `script`.
+This instructs the VM to execute the `script` `0x1::Coin::transfer` with a type argument of 0x1::aptos_coin::AptosCoin. Type is required here as Coin is our standard module that can be used to create many types of Coins. See the [Your first coin tutorial][your-first-coin] for an example of creating a custom Coin. The first argument is the recipient address, `0x737b36c96926043794ed3a0b3eaaceaf`, and the second is the amount to transfer, `1000`. The sender address is the account address that sent the transaction querying this `script`.
 
 ## Creating a new account
 
