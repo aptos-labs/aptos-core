@@ -308,18 +308,17 @@ async fn construction_parse(
     // This is messy, but all we can do
     let operations = match unsigned_txn.into_payload() {
         TransactionPayload::ScriptFunction(inner) => {
-            let (module, script_name, type_args, args) = inner.into_inner();
+            let (module, function_name, type_args, args) = inner.into_inner();
 
             let module_name = Identifier::from(module.name());
             if AccountAddress::ONE == *module.address()
-                && (coin_identifier() == module_name || coin_identifier_lower() == module_name)
-                && transfer_identifier() == script_name
+                && coin_module_identifier() == module_name
+                && transfer_function_identifier() == function_name
             {
                 parse_transfer_operation(sender, &type_args, &args)?
             } else if AccountAddress::ONE == *module.address()
-                && (account_identifier() == module_name
-                    || account_identifier_lower() == module_name)
-                && create_account_identifier() == script_name
+                && account_module_identifier() == module_name
+                && create_account_function_identifier() == function_name
             {
                 parse_create_account_operation(sender, &type_args, &args)?
             } else {
@@ -385,8 +384,8 @@ fn parse_transfer_operation(
     {
         // Currency must be the native coin for now
         if *address != AccountAddress::ONE
-            || (*module != aptos_coin_identifier() && *module != aptos_coin_identifier_lower())
-            || *name != aptos_coin_identifier()
+            || *module != aptos_coin_module_identifier()
+            || *name != aptos_coin_resource_identifier()
             || !type_params.is_empty()
         {
             return Err(ApiError::TransactionParseError(Some(

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::aptos_cli::setup_cli_test;
+use anyhow::anyhow;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::HashValue;
@@ -22,6 +23,11 @@ use forge::{LocalSwarm, Node};
 use std::{future::Future, time::Duration};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
+
+const DEFAULT_MAX_WAIT_MS: u64 = 2000;
+const DEFAULT_INTERVAL_MS: u64 = 100;
+static DEFAULT_MAX_WAIT_DURATION: Duration = Duration::from_millis(DEFAULT_MAX_WAIT_MS);
+static DEFAULT_INTERVAL_DURATION: Duration = Duration::from_millis(DEFAULT_INTERVAL_MS);
 
 pub async fn setup_test(
     num_nodes: usize,
@@ -56,6 +62,11 @@ pub async fn setup_test(
     .await
     .unwrap();
 
+    // Ensure rosetta can take requests
+    try_until_ok_default(|| rosetta_client.network_list())
+        .await
+        .unwrap();
+
     // Create accounts
     for i in 0..num_accounts {
         cli.create_account_with_faucet(i).await.unwrap();
@@ -69,7 +80,9 @@ async fn test_network() {
     let chain_id = swarm.chain_id();
 
     // We only support one network, this network
-    let networks = rosetta_client.network_list().await.unwrap();
+    let networks = try_until_ok_default(|| rosetta_client.network_list())
+        .await
+        .unwrap();
     assert_eq!(1, networks.network_identifiers.len());
     let network_id = networks.network_identifiers.first().unwrap();
     assert_eq!(BLOCKCHAIN, network_id.blockchain);
@@ -111,7 +124,7 @@ async fn test_account_balance() {
     let chain_id = swarm.chain_id();
 
     // At time 0, there should be 0 balance
-    let response = get_balance(&rosetta_client, chain_id, account, 0)
+    let response = get_balance(&rosetta_client, chain_id, account, Some(0))
         .await
         .unwrap();
     assert_eq!(
@@ -122,22 +135,12 @@ async fn test_account_balance() {
         }
     );
 
-    // At some time before version 1000, the account should exist
-    let mut successful_version = None;
-    for i in 1..1000 {
-        let response = get_balance(&rosetta_client, chain_id, account, i)
-            .await
-            .unwrap();
-        let amount = response.balances.first().unwrap();
-        if amount.value == DEFAULT_FUNDED_COINS.to_string() {
-            successful_version = Some(i);
-            break;
-        }
-    }
-
-    if successful_version.is_none() {
-        panic!("Failed to find account balance increase")
-    }
+    // At some time the account should exist
+    try_until_ok(Duration::from_secs(5), DEFAULT_INTERVAL_DURATION, || {
+        account_created(&rosetta_client, chain_id, account)
+    })
+    .await
+    .unwrap();
 
     // TODO: Send money
     // TODO: Fail request due to bad transaction
@@ -145,22 +148,35 @@ async fn test_account_balance() {
     // TODO: Recieve money by faucet
 }
 
+async fn account_created(
+    rosetta_client: &RosettaClient,
+    chain_id: ChainId,
+    account: AccountAddress,
+) -> anyhow::Result<u64> {
+    let response = get_balance(rosetta_client, chain_id, account, None).await?;
+
+    if response.balances.iter().any(|amount| {
+        amount.currency == native_coin() && amount.value == DEFAULT_FUNDED_COINS.to_string()
+    }) {
+        Ok(response.block_identifier.index)
+    } else {
+        Err(anyhow!("Failed to find account, received {:?}", response))
+    }
+}
+
 async fn get_balance(
     rosetta_client: &RosettaClient,
     chain_id: ChainId,
     account: AccountAddress,
-    index: u64,
+    index: Option<u64>,
 ) -> anyhow::Result<AccountBalanceResponse> {
     let request = AccountBalanceRequest {
         network_identifier: chain_id.into(),
         account_identifier: account.into(),
-        block_identifier: Some(PartialBlockIdentifier {
-            index: Some(index),
-            hash: None,
-        }),
+        block_identifier: Some(PartialBlockIdentifier { index, hash: None }),
         currencies: Some(vec![native_coin()]),
     };
-    try_until_ok(|| rosetta_client.account_balance(&request)).await
+    try_until_ok_default(|| rosetta_client.account_balance(&request)).await
 }
 
 #[tokio::test]
@@ -170,7 +186,7 @@ async fn test_block() {
 
     // Genesis by version
     let request_genesis = BlockRequest::by_index(chain_id, 0);
-    let genesis_block = try_until_ok(|| rosetta_client.block(&request_genesis))
+    let genesis_block = try_until_ok_default(|| rosetta_client.block(&request_genesis))
         .await
         .unwrap()
         .block
@@ -342,7 +358,7 @@ fn assert_genesis_block(block: &Block) {
 async fn get_block(rosetta_client: &RosettaClient, chain_id: ChainId, index: u64) -> Block {
     let rosetta_client = (*rosetta_client).clone();
     let request = BlockRequest::by_index(chain_id, index);
-    try_until_ok(|| rosetta_client.block(&request))
+    try_until_ok_default(|| rosetta_client.block(&request))
         .await
         .unwrap()
         .block
@@ -350,18 +366,36 @@ async fn get_block(rosetta_client: &RosettaClient, chain_id: ChainId, index: u64
 }
 
 /// Try for 2 seconds to get a response.  This handles the fact that it's starting async
-async fn try_until_ok<F, Fut, T>(function: F) -> anyhow::Result<T>
+async fn try_until_ok_default<F, Fut, T>(function: F) -> anyhow::Result<T>
+where
+    F: Fn() -> Fut,
+    Fut: Future<Output = anyhow::Result<T>>,
+{
+    try_until_ok(
+        DEFAULT_MAX_WAIT_DURATION,
+        DEFAULT_INTERVAL_DURATION,
+        function,
+    )
+    .await
+}
+
+async fn try_until_ok<F, Fut, T>(
+    total_wait: Duration,
+    interval: Duration,
+    function: F,
+) -> anyhow::Result<T>
 where
     F: Fn() -> Fut,
     Fut: Future<Output = anyhow::Result<T>>,
 {
     let mut result = Err(anyhow::Error::msg("Failed to get response"));
-    for _ in 1..10 {
+    let start = Instant::now();
+    while start.elapsed() < total_wait {
         result = function().await;
         if result.is_ok() {
             break;
         }
-        tokio::time::sleep(Duration::from_millis(200)).await;
+        tokio::time::sleep(interval).await;
     }
 
     result

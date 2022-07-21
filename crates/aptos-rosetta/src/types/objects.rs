@@ -5,18 +5,19 @@
 //!
 //! [Spec](https://www.rosetta-api.org/docs/api_objects.html)
 
-use crate::common::{native_coin_tag, native_coin_tag_lower};
+use crate::common::native_coin_tag;
 use crate::types::{
-    account_identifier_lower, aptos_coin_identifier, aptos_coin_identifier_lower,
-    coin_identifier_lower, create_account_identifier, transfer_identifier,
+    account_module_identifier, aptos_coin_module_identifier, aptos_coin_resource_identifier,
+    coin_module_identifier, create_account_function_identifier, transfer_function_identifier,
 };
 use crate::{
     common::{is_native_coin, native_coin},
     error::ApiResult,
     types::{
-        account_identifier, coin_identifier, coin_store_identifier, deposit_events_identifier,
-        sequence_number_identifier, withdraw_events_identifier, AccountIdentifier, BlockIdentifier,
-        Error, NetworkIdentifier, OperationIdentifier, OperationStatus, OperationStatusType,
+        account_resource_identifier, coin_store_resource_identifier,
+        deposit_events_field_identifier, sequence_number_field_identifier,
+        withdraw_events_field_identifier, AccountIdentifier, BlockIdentifier, Error,
+        NetworkIdentifier, OperationIdentifier, OperationStatus, OperationStatusType,
         OperationType, TransactionIdentifier,
     },
     ApiError,
@@ -599,9 +600,8 @@ fn parse_operations_from_txn_payload(
     let mut operations = vec![];
     if let TransactionPayload::ScriptFunctionPayload(inner) = payload {
         if AccountAddress::ONE == *inner.function.module.address.inner()
-            && (coin_identifier() == inner.function.module.name
-                || coin_identifier_lower() == inner.function.module.name)
-            && transfer_identifier() == inner.function.name
+            && coin_module_identifier() == inner.function.module.name
+            && transfer_function_identifier() == inner.function.name
         {
             if let Some(MoveType::Struct(MoveStructTag {
                 address,
@@ -611,9 +611,8 @@ fn parse_operations_from_txn_payload(
             })) = inner.type_arguments.first()
             {
                 if *address.inner() == AccountAddress::ONE
-                    && (*module == aptos_coin_identifier()
-                        || *module == aptos_coin_identifier_lower())
-                    && *name == aptos_coin_identifier()
+                    && *module == aptos_coin_module_identifier()
+                    && *name == aptos_coin_resource_identifier()
                 {
                     let receiver =
                         serde_json::from_value::<Address>(inner.arguments.get(0).cloned().unwrap())
@@ -639,9 +638,8 @@ fn parse_operations_from_txn_payload(
                 }
             }
         } else if AccountAddress::ONE == *inner.function.module.address.inner()
-            && (account_identifier() == inner.function.module.name
-                || account_identifier_lower() == inner.function.module.name)
-            && create_account_identifier() == inner.function.name
+            && account_module_identifier() == inner.function.module.name
+            && create_account_function_identifier() == inner.function.name
         {
             let address =
                 serde_json::from_value::<Address>(inner.arguments.get(0).cloned().unwrap())
@@ -673,34 +671,22 @@ fn parse_operations_from_write_set(
         let address = *address.inner();
         let account_tag = MoveStructTag::new(
             AccountAddress::ONE.into(),
-            account_identifier(),
-            account_identifier(),
-            vec![],
-        );
-        let account_tag_lower = MoveStructTag::new(
-            AccountAddress::ONE.into(),
-            account_identifier_lower(),
-            account_identifier(),
+            account_module_identifier(),
+            account_resource_identifier(),
             vec![],
         );
         let coin_store_tag = MoveStructTag::new(
             AccountAddress::ONE.into(),
-            coin_identifier(),
-            coin_store_identifier(),
+            coin_module_identifier(),
+            coin_store_resource_identifier(),
             vec![native_coin_tag().into()],
         );
-        let coin_store_tag_lower = MoveStructTag::new(
-            AccountAddress::ONE.into(),
-            coin_identifier_lower(),
-            coin_store_identifier(),
-            vec![native_coin_tag_lower().into()],
-        );
 
-        if data.typ == account_tag || data.typ == account_tag_lower {
+        if data.typ == account_tag {
             // Account sequence number increase (possibly creation)
             // Find out if it's the 0th sequence number (creation)
             for (id, value) in data.data.0.iter() {
-                if id == &sequence_number_identifier() {
+                if id == &sequence_number_field_identifier() {
                     if let Ok(U64(0)) = serde_json::from_value::<U64>(value.clone()) {
                         operations.push(Operation::create_account(
                             operation_index,
@@ -714,10 +700,10 @@ fn parse_operations_from_write_set(
                     }
                 }
             }
-        } else if data.typ == coin_store_tag || data.typ == coin_store_tag_lower {
+        } else if data.typ == coin_store_tag {
             // Account balance change
             for (id, value) in data.data.0.iter() {
-                if id == &withdraw_events_identifier() {
+                if id == &withdraw_events_field_identifier() {
                     serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
                     if let Ok(event) = serde_json::from_value::<CoinEventId>(value.clone()) {
                         let withdraw_event =
@@ -733,7 +719,7 @@ fn parse_operations_from_write_set(
                             operation_index += 1;
                         }
                     }
-                } else if id == &deposit_events_identifier() {
+                } else if id == &deposit_events_field_identifier() {
                     serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
                     if let Ok(event) = serde_json::from_value::<CoinEventId>(value.clone()) {
                         let withdraw_event =
