@@ -51,7 +51,7 @@ pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
             signature::native_secp256k1_recover,
         ),
         ("type_info", "type_of", type_info::type_of),
-        ("type_info", "full_name", type_info::full_name),
+        ("type_info", "type_name", type_info::type_name),
         ("hash", "sip_hash", hash::native_sip_hash),
     ];
     NATIVES
