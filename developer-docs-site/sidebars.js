@@ -127,6 +127,8 @@ const sidebars = {
           label: "Typescript SDK",
           href: "https://aptos-labs.github.io/ts-sdk-doc/",
         },
+        "sdks/aptos-sdk-overview",
+        "sdks/transactions-with-ts-sdk",
       ],
     },
     {
