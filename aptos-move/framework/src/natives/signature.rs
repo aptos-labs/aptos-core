@@ -42,12 +42,9 @@ pub fn native_bls12381_public_key_validation(
         Err(_) => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
     };
 
-    let ret = if pop.verify(&public_key).is_ok() {
-        Value::bool(true)
-    } else {
-        Value::bool(false)
-    };
-    Ok(NativeResult::ok(cost, smallvec![ret]))
+    let valid = pop.verify(&public_key).is_ok();
+
+    Ok(NativeResult::ok(cost, smallvec![Value::bool(valid)]))
 }
 
 pub fn native_ed25519_publickey_validation(
@@ -184,5 +181,42 @@ pub fn native_secp256k1_recover(
             Value::vector_u8(pk.serialize()[1..].to_vec()),
             Value::bool(true)
         ],
+    ))
+}
+
+pub fn native_bls12381_verify_signature(
+    _context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    debug_assert!(_ty_args.is_empty());
+    debug_assert!(arguments.len() == 3);
+
+    // TODO: replace with proper gas cost
+    let cost = GasCost::new(super::cost::APTOS_LIB_TYPE_OF, 1).total();
+
+    let msg_bytes = pop_arg!(arguments, Vec<u8>);
+    let pk_bytes = pop_arg!(arguments, Vec<u8>);
+    let sig_bytes = pop_arg!(arguments, Vec<u8>);
+
+    let pk = match bls12381::PublicKey::try_from(&pk_bytes[..]) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
+        }
+    };
+
+    let sig = match bls12381::Signature::try_from(&sig_bytes[..]) {
+        Ok(sig) => sig,
+        Err(_) => {
+            return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
+        }
+    };
+
+    let verify_result = sig.verify_arbitrary_msg(&msg_bytes[..], &pk).is_ok();
+
+    Ok(NativeResult::ok(
+        cost,
+        smallvec![Value::bool(verify_result)],
     ))
 }
