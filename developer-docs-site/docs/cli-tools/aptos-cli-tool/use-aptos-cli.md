@@ -11,8 +11,7 @@ This document describes how to use the `aptos` CLI tool. To install the CLI, see
 ### Command Line Help
 Command line help is available.  Type `aptos help` or `aptos --help` to see the available command options.
 ```bash
-$ aptos help
-aptos 0.2.0
+$ aptos 0.2.1
 Aptos Labs <opensource@aptoslabs.com>
 CLI tool for interacting with the Aptos blockchain and nodes
 
@@ -28,15 +27,16 @@ SUBCOMMANDS:
     config     Tool for configuration of the CLI tool
     genesis    Tool for setting up and building the Genesis transaction
     help       Print this message or the help of the given subcommand(s)
+    info       Show information about the build of the CLI
     init       Tool to initialize current directory for the aptos tool
     key        CLI tool for generating, inspecting, and interacting with keys
     move       CLI tool for performing Move tasks
+    node       Tool for manipulating nodes
 ```
 
 Command specific help is also available.  For example, type `aptos move --help` to get command-specific help.
 ```bash
-$ aptos move --help
-aptos-move 0.2.0
+$ aptos-move 0.2.1
 CLI tool for performing Move tasks
 
 USAGE:
@@ -57,8 +57,7 @@ SUBCOMMANDS:
 
 Help for sub-commands is also available.  For example, type `aptos move compile --help` to get command-specific help.
 ```bash
-$ aptos move compile --help
-aptos-move-compile 0.2.0
+$ aptos-move-compile 0.2.1
 Compiles a package and returns the [`ModuleId`]s
 
 USAGE:
@@ -70,28 +69,79 @@ OPTIONS:
 
         --named-addresses <NAMED_ADDRESSES>
             Named addresses for the move binary
-
+            
             Example: alice=0x1234, bob=0x5678
-
+            
             Note: This will fail if there are duplicates in the Move.toml file remove those first.
-
+            
             [default: ]
 
         --output-dir <OUTPUT_DIR>
             Path to save the compiled move package
-
+            
             Defaults to `<package_dir>/build`
 
         --package-dir <PACKAGE_DIR>
             Path to a move package (the folder with a Move.toml file)
 
-            [default: .]
-
     -V, --version
             Print version information
 ```
 
-## Examples
+## CLI info
+
+To get CLI info for debugging purposes, you can run the `aptos info` command:
+
+```bash
+$ aptos info
+{
+  "Result": {
+    "build_branch": "main",
+    "build_cargo_version": "cargo 1.61.0 (a028ae42f 2022-04-29)",
+    "build_commit_hash": "9593a8d515b7c82886064812753b237d82075e35",
+    "build_os": "macos-aarch64",
+    "build_pkg_version": "0.2.1",
+    "build_rust_channel": "1.61.0-aarch64-apple-darwin",
+    "build_rust_version": "rustc 1.61.0 (fe5b13d68 2022-05-18)"
+  }
+}
+
+```
+
+## Config Examples
+
+### Set global configuration
+
+You can set global configuration options for the CLI accordingly with this command.  The global
+configuration is at `~/.aptos/global_config.yaml`.  For now the only field that is configurable is
+`--config-type` which allows you to set where the profile configuration is set.  By default it is
+`workspace`, which means the current directory (`./.aptos/config.yaml`) that the CLI is being run in, will contain the configuration.
+If set to `global`, it will use the global folder location (`~/.aptos/config.yaml`).
+```bash
+$ aptos config set-global-config --config-type global
+{
+  "Result": "Success"
+}
+```
+
+You can also show the global configuration with the `show-global-config` command.
+```bash
+$ aptos config show-global-config
+{
+  "Result": {
+    "config_type": "Global"
+  }
+}
+```
+
+### Setting up shell completion
+You can set up shell completions with the `generate-shell-completions` command.  Please lookup configuration for your
+specific shell.  The supported shells right now are `[bash, zsh, fish, powershell, elvish]`. An example is below for
+oh my zsh.
+
+```bash
+$ aptos config generate-shell-completions --shell zsh --output-file ~/.oh-my-zsh/completions/_aptos
+```
 
 ### Initialize local configuration and create an account
 
@@ -148,14 +198,33 @@ Aptos is now set up for account 18B61497FD290B02BB0751F44381CADA1657C2B3AA6194A0
 {
   "Result": "Success"
 }
-
 ```
+
+## Account Examples
+
+### Fund an account with the faucet
+
+You can fund an account with the faucet via the CLI with either an account or a profile:
+
+```bash
+$ aptos account fund --account B9BD2CFA58CA29BCE1D7ADD25FCE5C62220604CD0236FE3F90D9DE91ED9FB8CB
+{
+  "Result": "Added 10000 coins to account B9BD2CFA58CA29BCE1D7ADD25FCE5C62220604CD0236FE3F90D9DE91ED9FB8CB"
+}
+```
+
+```bash
+$ aptos account fund --account default
+{
+  "Result": "Added 10000 coins to account B9BD2CFA58CA29BCE1D7ADD25FCE5C62220604CD0236FE3F90D9DE91ED9FB8CB"
+}
+```
+
 ### View an account's balance and transfer events
 
 You can view the balance and transfer events (deposits and withdrawals) with:
 ```bash
-$ aptos account list --query balance --account 18B61497FD290B02BB0751F44381CADA1657C2B3AA6194A00D9BC9A85FAD3B04
-
+$ aptos account list --query balance --account 0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb
 ```
 
 The above command will generate the following information on your terminal:
@@ -165,30 +234,24 @@ The above command will generate the following information on your terminal:
   "Result": [
     {
       "coin": {
-        "value": "9999729"
+        "value": "10000"
       },
       "deposit_events": {
         "counter": "1",
         "guid": {
-          "guid": {
-            "id": {
-              "addr": "0x661a4ca2b5f7475e61d2209cd3818488b3725ddb5e483633317291f86d3a26d6",
-              "creation_num": "1"
-            }
-          },
-          "len_bytes": 40
+          "id": {
+            "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+            "creation_num": "1"
+          }
         }
       },
       "withdraw_events": {
-        "counter": "3",
+        "counter": "0",
         "guid": {
-          "guid": {
-            "id": {
-              "addr": "0x661a4ca2b5f7475e61d2209cd3818488b3725ddb5e483633317291f86d3a26d6",
-              "creation_num": "2"
-            }
-          },
-          "len_bytes": 40
+          "id": {
+            "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+            "creation_num": "2"
+          }
         }
       }
     }
@@ -200,7 +263,7 @@ The above command will generate the following information on your terminal:
 
 You can list the resources in an account from the command line. For example, see below for how to list the resources in the account you just created above:
 ```bash
-$ aptos account list --query resources --account 18B61497FD290B02BB0751F44381CADA1657C2B3AA6194A00D9BC9A85FAD3B04
+$ aptos account list --query resources --account 0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb
 
 ```
 
@@ -210,47 +273,49 @@ The above command will generate the following resource list information on your 
 {
   "Result": [
     {
-      "counter": "2"
-    },
-    {
-      "authentication_key": "0x18b61497fd290b02bb0751f44381cada1657c2b3aa6194a00d9bc9a85fad3b04",
-      "self_address": "0x18b61497fd290b02bb0751f44381cada1657c2b3aa6194a00d9bc9a85fad3b04",
-      "sequence_number": "0"
-    },
-    {
       "coin": {
         "value": "10000"
+      },
+      "deposit_events": {
+        "counter": "1",
+        "guid": {
+          "id": {
+            "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+            "creation_num": "1"
+          }
+        }
+      },
+      "withdraw_events": {
+        "counter": "0",
+        "guid": {
+          "id": {
+            "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+            "creation_num": "2"
+          }
+        }
       }
     },
     {
-      "received_events": {
-        "counter": "0",
+      "register_events": {
+        "counter": "1",
         "guid": {
-          "guid": {
-            "id": {
-              "addr": "0x18b61497fd290b02bb0751f44381cada1657c2b3aa6194a00d9bc9a85fad3b04",
-              "creation_num": "1"
-            }
-          },
-          "len_bytes": 40
-        }
-      },
-      "sent_events": {
-        "counter": "0",
-        "guid": {
-          "guid": {
-            "id": {
-              "addr": "0x18b61497fd290b02bb0751f44381cada1657c2b3aa6194a00d9bc9a85fad3b04",
-              "creation_num": "0"
-            }
-          },
-          "len_bytes": 40
+          "id": {
+            "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+            "creation_num": "0"
+          }
         }
       }
+    },
+    {
+      "counter": "3"
+    },
+    {
+      "authentication_key": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+      "self_address": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+      "sequence_number": "0"
     }
   ]
 }
-
 ```
 
 You can additionally list the default profile from configuration with no account specified.
@@ -259,43 +324,46 @@ $ aptos account list
 {
   "Result": [
     {
-      "counter": "2"
-    },
-    {
-      "authentication_key": "0x50a49d913aa6381c01579e3fc00784b49afa3a771f06389ebc65f8ff3a4e9a7d",
-      "self_address": "0x50a49d913aa6381c01579e3fc00784b49afa3a771f06389ebc65f8ff3a4e9a7d",
-      "sequence_number": "0"
-    },
-    {
       "coin": {
         "value": "10000"
+      },
+      "deposit_events": {
+        "counter": "1",
+        "guid": {
+          "id": {
+            "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+            "creation_num": "1"
+          }
+        }
+      },
+      "withdraw_events": {
+        "counter": "0",
+        "guid": {
+          "id": {
+            "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+            "creation_num": "2"
+          }
+        }
       }
     },
     {
-      "received_events": {
-        "counter": "0",
+      "register_events": {
+        "counter": "1",
         "guid": {
-          "guid": {
-            "id": {
-              "addr": "0x50a49d913aa6381c01579e3fc00784b49afa3a771f06389ebc65f8ff3a4e9a7d",
-              "creation_num": "1"
-            }
-          },
-          "len_bytes": 40
-        }
-      },
-      "sent_events": {
-        "counter": "0",
-        "guid": {
-          "guid": {
-            "id": {
-              "addr": "0x50a49d913aa6381c01579e3fc00784b49afa3a771f06389ebc65f8ff3a4e9a7d",
-              "creation_num": "0"
-            }
-          },
-          "len_bytes": 40
+          "id": {
+            "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+            "creation_num": "0"
+          }
         }
       }
+    },
+    {
+      "counter": "3"
+    },
+    {
+      "authentication_key": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+      "self_address": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+      "sequence_number": "0"
     }
   ]
 }
@@ -303,47 +371,50 @@ $ aptos account list
 
 Additionally, any place that takes an account can use the name of a profile:
 ```bash
-$ ./aptos account list --query resources --account superuser
+$ aptos account list --query resources --account superuser
 {
   "Result": [
     {
-      "counter": "2"
-    },
-    {
-      "authentication_key": "0x18b61497fd290b02bb0751f44381cada1657c2b3aa6194a00d9bc9a85fad3b04",
-      "self_address": "0x18b61497fd290b02bb0751f44381cada1657c2b3aa6194a00d9bc9a85fad3b04",
-      "sequence_number": "0"
-    },
-    {
       "coin": {
         "value": "10000"
+      },
+      "deposit_events": {
+        "counter": "1",
+        "guid": {
+          "id": {
+            "addr": "0x742854f7dca56ea6309b51e8cebb830b12623f9c9d76c72c3242e4cad353dedc",
+            "creation_num": "1"
+          }
+        }
+      },
+      "withdraw_events": {
+        "counter": "0",
+        "guid": {
+          "id": {
+            "addr": "0x742854f7dca56ea6309b51e8cebb830b12623f9c9d76c72c3242e4cad353dedc",
+            "creation_num": "2"
+          }
+        }
       }
     },
     {
-      "received_events": {
-        "counter": "0",
+      "register_events": {
+        "counter": "1",
         "guid": {
-          "guid": {
-            "id": {
-              "addr": "0x18b61497fd290b02bb0751f44381cada1657c2b3aa6194a00d9bc9a85fad3b04",
-              "creation_num": "1"
-            }
-          },
-          "len_bytes": 40
-        }
-      },
-      "sent_events": {
-        "counter": "0",
-        "guid": {
-          "guid": {
-            "id": {
-              "addr": "0x18b61497fd290b02bb0751f44381cada1657c2b3aa6194a00d9bc9a85fad3b04",
-              "creation_num": "0"
-            }
-          },
-          "len_bytes": 40
+          "id": {
+            "addr": "0x742854f7dca56ea6309b51e8cebb830b12623f9c9d76c72c3242e4cad353dedc",
+            "creation_num": "0"
+          }
         }
       }
+    },
+    {
+      "counter": "3"
+    },
+    {
+      "authentication_key": "0x742854f7dca56ea6309b51e8cebb830b12623f9c9d76c72c3242e4cad353dedc",
+      "self_address": "0x742854f7dca56ea6309b51e8cebb830b12623f9c9d76c72c3242e4cad353dedc",
+      "sequence_number": "0"
     }
   ]
 }
@@ -354,35 +425,36 @@ $ ./aptos account list --query resources --account superuser
 You can pass different types of queries to view different items under an account. Currently, 'resources' and
 'modules' are supported but more query types are coming. For example, to fetch modules:
 ```bash
-$ ./aptos account list --query modules --account superuser
-
+$ aptos account list --query modules                   
 {
   "Result": [
     {
-      "bytecode": "0xa11ceb0b050000000b01000a020a12031c2504410405452d0772e00108d202400692030a0a9c03150cb103650d96040400000101010201030104000506000006080001070700030e0401060100080001000009020300020f0404000110060100041107000003120709010603130a030106050806080105010802020c0a02000103040508020802070801010a0201060c010800010b0301090002070b030109000900074d657373616765054153434949064572726f7273054576656e74065369676e6572124d6573736167654368616e67654576656e740d4d657373616765486f6c64657206537472696e670b6765745f6d6573736167650b7365745f6d6573736167650c66726f6d5f6d6573736167650a746f5f6d657373616765076d657373616765156d6573736167655f6368616e67655f6576656e74730b4576656e7448616e646c650d6e6f745f7075626c697368656406737472696e670a616464726573735f6f66106e65775f6576656e745f68616e646c650a656d69745f6576656e747bd2d264eec4088a11c41a7acbcd8ab2d2c887fa4ea1a3ab0d0b4a405ddfb1560000000000000000000000000000000000000000000000000000000000000001030800000000000000000002020a08020b08020102020c08020d0b030108000001000101030b0a002901030607001102270b002b0110001402010200010105240b0111030c040e0011040c020a02290120030b05120e000b040e00380012012d0105230b022a010c050a051000140c030a050f010b030a04120038010b040b050f0015020100010100",
+      "bytecode": "0xa11ceb0b050000000b01000a020a12031c2504410405452d0772da0108cc0240068c030a0a9603150cab03650d90040400000101010201030104000506000006080004070700020e0401060100080001000009020300010f0404000410060100031107000002120709010602130a030106050806080105010802020c0a02000103040508020802070801010a0201060c010800010b0301090002070b030109000900074d657373616765056572726f72056576656e74067369676e657206737472696e67124d6573736167654368616e67654576656e740d4d657373616765486f6c64657206537472696e670b6765745f6d6573736167650b7365745f6d6573736167650c66726f6d5f6d6573736167650a746f5f6d657373616765076d657373616765156d6573736167655f6368616e67655f6576656e74730b4576656e7448616e646c65096e6f745f666f756e6404757466380a616464726573735f6f66106e65775f6576656e745f68616e646c650a656d69745f6576656e74b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb0000000000000000000000000000000000000000000000000000000000000001030800000000000000000002020a08020b08020102020c08020d0b030108000001000101030b0a002901030607001102270b002b0110001402010104010105240b0111030c040e0011040c020a02290120030b05120e000b040e00380012012d0105230b022a010c050a051000140c030a050f010b030a04120038010b040b050f0015020100010100",
       "abi": {
-        "address": "0x7bd2d264eec4088a11c41a7acbcd8ab2d2c887fa4ea1a3ab0d0b4a405ddfb156",
+        "address": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
         "name": "Message",
         "friends": [],
         "exposed_functions": [
           {
             "name": "get_message",
             "visibility": "public",
+            "is_entry": false,
             "generic_type_params": [],
             "params": [
               "address"
             ],
             "return": [
-              "0x1::ascii::String"
+              "0x1::string::String"
             ]
           },
           {
             "name": "set_message",
-            "visibility": "script",
+            "visibility": "public",
+            "is_entry": true,
             "generic_type_params": [],
             "params": [
               "signer",
-              "vector"
+              "vector<u8>"
             ],
             "return": []
           }
@@ -399,11 +471,11 @@ $ ./aptos account list --query modules --account superuser
             "fields": [
               {
                 "name": "from_message",
-                "type": "0x1::ascii::String"
+                "type": "0x1::string::String"
               },
               {
                 "name": "to_message",
-                "type": "0x1::ascii::String"
+                "type": "0x1::string::String"
               }
             ]
           },
@@ -417,11 +489,11 @@ $ ./aptos account list --query modules --account superuser
             "fields": [
               {
                 "name": "message",
-                "type": "0x1::ascii::String"
+                "type": "0x1::string::String"
               },
               {
                 "name": "message_change_events",
-                "type": "0x1::event::EventHandle<0x7bd2d264eec4088a11c41a7acbcd8ab2d2c887fa4ea1a3ab0d0b4a405ddfb156::Message::MessageChangeEvent>"
+                "type": "0x1::event::EventHandle<0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb::Message::MessageChangeEvent>"
               }
             ]
           }
@@ -436,26 +508,78 @@ $ ./aptos account list --query modules --account superuser
 
 The Aptos CLI is a simple wallet as well, and can transfer coins between accounts.
 ```bash
-$ ./aptos account transfer --account superuser --amount 100
+$ aptos account transfer --account superuser --amount 100
 {
   "Result": {
-    "gas_used": 86,
+    "gas_used": 73,
     "balance_changes": {
-      "18b61497fd290b02bb0751f44381cada1657c2b3aa6194a00d9bc9a85fad3b04": {
+      "742854f7dca56ea6309b51e8cebb830b12623f9c9d76c72c3242e4cad353dedc": {
         "coin": {
           "value": "10100"
+        },
+        "deposit_events": {
+          "counter": "2",
+          "guid": {
+            "id": {
+              "addr": "0x742854f7dca56ea6309b51e8cebb830b12623f9c9d76c72c3242e4cad353dedc",
+              "creation_num": "1"
+            }
+          }
+        },
+        "withdraw_events": {
+          "counter": "0",
+          "guid": {
+            "id": {
+              "addr": "0x742854f7dca56ea6309b51e8cebb830b12623f9c9d76c72c3242e4cad353dedc",
+              "creation_num": "2"
+            }
+          }
         }
       },
-      "50a49d913aa6381c01579e3fc00784b49afa3a771f06389ebc65f8ff3a4e9a7d": {
+      "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb": {
         "coin": {
-          "value": "9814"
+          "value": "9827"
+        },
+        "deposit_events": {
+          "counter": "1",
+          "guid": {
+            "id": {
+              "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+              "creation_num": "1"
+            }
+          }
+        },
+        "withdraw_events": {
+          "counter": "1",
+          "guid": {
+            "id": {
+              "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+              "creation_num": "2"
+            }
+          }
         }
       }
     },
-    "sender": "50a49d913aa6381c01579e3fc00784b49afa3a771f06389ebc65f8ff3a4e9a7d",
+    "sender": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
     "success": true,
-    "version": 270408,
+    "version": 1139,
     "vm_status": "Executed successfully"
+  }
+}
+```
+
+## Key Examples
+
+### Generating a key
+
+To allow generating private keys, you can use the `aptos key generate command`.  You can generate
+either `x25519` or `ed25519` keys.
+```bash
+$ aptos key generate --key-type ed25519 --output-file output.key
+{
+  "Result": {
+    "PrivateKey Path": "output.key",
+    "PublicKey Path": "output.key.pub"
   }
 }
 ```
@@ -472,44 +596,47 @@ The above command will generate the following output on the terminal:
 ```bash
 {
   "Result": {
-    "027eeddfbda3780b51e44731f0b214e53715cd17cdaecac99dc61590c1f2b76a": {
+    "8cfb85603080b13013b57e2e80887c695cfecd7ad8217d1cac22fa6f3b0b5752": {
       "addresses": [],
       "keys": [
-        "0x027eeddfbda3780b51e44731f0b214e53715cd17cdaecac99dc61590c1f2b76a"
+        "0x8cfb85603080b13013b57e2e80887c695cfecd7ad8217d1cac22fa6f3b0b5752"
       ],
       "role": "Upstream"
     }
   }
 }
-
 ```
 
 The `peer_config.yaml` file will be created in your current working directory, with the contents as shown in the below example:
 ```bash
 ---
-027eeddfbda3780b51e44731f0b214e53715cd17cdaecac99dc61590c1f2b76a:
+8cfb85603080b13013b57e2e80887c695cfecd7ad8217d1cac22fa6f3b0b5752:
   addresses: []
   keys:
-    - "0x027eeddfbda3780b51e44731f0b214e53715cd17cdaecac99dc61590c1f2b76a"
+    - "0x8cfb85603080b13013b57e2e80887c695cfecd7ad8217d1cac22fa6f3b0b5752"
   role: Upstream
 ```
 
 **Note:** In the addresses key, you should fill in your address.
+
+## Move examples
 
 ### Compiling Move
 
 The `aptos` CLI can be used to compile a Move package locally.
 The below example uses the `HelloBlockchain` in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
 
+The named addresses can be either an account address, or a profile name.
+
 ```bash
-aptos move compile --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71
+$ aptos move compile --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=superuser
 ```
 
 The above command will generate the below terminal output:
 ```bash
 {
   "Result": [
-    "8946741E5C907C43C9E042B3739993F32904723F8E2D1491564D38959B59AC71::Message"
+    "742854F7DCA56EA6309B51E8CEBB830B12623F9C9D76C72C3242E4CAD353DEDC::Message"
   ]
 }
 ```
@@ -520,16 +647,17 @@ The `aptos` CLI can also be used to compile and run unit tests locally.
 In this example, we'll use the `HelloBlockchain` in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
 
 ```bash
-aptos move test --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71
+$ aptos move test --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=superuser
 ```
 The above command will generate the following terminal output:
 ```bash
-BUILDING MoveStdlib
-BUILDING AptosFramework
+INCLUDING DEPENDENCY AptosFramework
+INCLUDING DEPENDENCY AptosStdlib
+INCLUDING DEPENDENCY MoveStdlib
 BUILDING Examples
 Running Move unit tests
-[ PASS    ] 0x8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71::Message::sender_can_set_message
-[ PASS    ] 0x8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71::MessageTests::sender_can_set_message
+[ PASS    ] 0x742854f7dca56ea6309b51e8cebb830b12623f9c9d76c72c3242e4cad353dedc::MessageTests::sender_can_set_message
+[ PASS    ] 0x742854f7dca56ea6309b51e8cebb830b12623f9c9d76c72c3242e4cad353dedc::Message::sender_can_set_message
 Test result: OK. Total tests: 2; passed: 2; failed: 0
 {
   "Result": "Success"
@@ -560,7 +688,7 @@ Now, you can use `Debug::print` and `Debug::print_stack_trace` in your [move fil
 
 You can run the following command:
 ```bash
-aptos move test --package-dir crates/aptos/debug-move-example
+$ aptos move test --package-dir crates/aptos/debug-move-example
 ```
 
 The command will generate the following output:
@@ -594,12 +722,12 @@ Publish the package with your account address set for `HelloBlockchain`.
 
 Here, you need to change 8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71 to your account address.
 ```bash
-aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71
+$ aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71
 ```
 
 You can additionally use named profiles for the addresses.  The first placeholder is `default`
 ```bash
-aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=default
+$ aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=default
 ```
 
 ### Running a Move Function
@@ -610,12 +738,198 @@ Arguments must be given a type with a colon to separate it.  In this example, we
 parsed as a string, so we put `string:Hello!`.
 
 ```bash
-aptos move run --function-id 0x8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71::Message::set_message --args string:hello!
+$ aptos move run --function-id 0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb::Message::set_message --args string:hello!
+{
+  "Result": {
+    "changes": [
+      {
+        "address": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+        "data": {
+          "authentication_key": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+          "self_address": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+          "sequence_number": "3"
+        },
+        "event": "write_resource",
+        "resource": "0x1::account::Account"
+      },
+      {
+        "address": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+        "data": {
+          "coin": {
+            "value": "9777"
+          },
+          "deposit_events": {
+            "counter": "1",
+            "guid": {
+              "id": {
+                "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+                "creation_num": "1"
+              }
+            }
+          },
+          "withdraw_events": {
+            "counter": "1",
+            "guid": {
+              "id": {
+                "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+                "creation_num": "2"
+              }
+            }
+          }
+        },
+        "event": "write_resource",
+        "resource": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
+      },
+      {
+        "address": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+        "data": {
+          "counter": "4"
+        },
+        "event": "write_resource",
+        "resource": "0x1::guid::Generator"
+      },
+      {
+        "address": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+        "data": {
+          "message": "hello!",
+          "message_change_events": {
+            "counter": "0",
+            "guid": {
+              "id": {
+                "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+                "creation_num": "3"
+              }
+            }
+          }
+        },
+        "event": "write_resource",
+        "resource": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb::Message::MessageHolder"
+      }
+    ],
+    "gas_used": 41,
+    "success": true,
+    "version": 3488,
+    "vm_status": "Executed successfully"
+  }
+} 
 ```
 
 Additionally, profiles can replace addresses in the function id.
 ```bash
-aptos move run --function-id default::Message::set_message --args string:hello!
+$ aptos move run --function-id default::Message::set_message --args string:hello!
+{
+  "Result": {
+    "changes": [
+      {
+        "address": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+        "data": {
+          "authentication_key": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+          "self_address": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+          "sequence_number": "3"
+        },
+        "event": "write_resource",
+        "resource": "0x1::account::Account"
+      },
+      {
+        "address": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+        "data": {
+          "coin": {
+            "value": "9777"
+          },
+          "deposit_events": {
+            "counter": "1",
+            "guid": {
+              "id": {
+                "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+                "creation_num": "1"
+              }
+            }
+          },
+          "withdraw_events": {
+            "counter": "1",
+            "guid": {
+              "id": {
+                "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+                "creation_num": "2"
+              }
+            }
+          }
+        },
+        "event": "write_resource",
+        "resource": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
+      },
+      {
+        "address": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+        "data": {
+          "counter": "4"
+        },
+        "event": "write_resource",
+        "resource": "0x1::guid::Generator"
+      },
+      {
+        "address": "b9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+        "data": {
+          "message": "hello!",
+          "message_change_events": {
+            "counter": "0",
+            "guid": {
+              "id": {
+                "addr": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb",
+                "creation_num": "3"
+              }
+            }
+          }
+        },
+        "event": "write_resource",
+        "resource": "0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb::Message::MessageHolder"
+      }
+    ],
+    "gas_used": 41,
+    "success": true,
+    "version": 3488,
+    "vm_status": "Executed successfully"
+  }
+}
+```
+
+## Node Command Examples
+
+### Running a local testnet
+
+You can run a local testnet from the aptos CLI, that will match the version it was built with.  Additionally, it can
+run a faucet side by side with the local single node testnet.
+
+```bash
+$ aptos node run-local-testnet --with-faucet
+Completed generating configuration:
+        Log file: "/Users/greg/.aptos/testnet/validator.log"
+        Test dir: "/Users/greg/.aptos/testnet"
+        Aptos root key path: "/Users/greg/.aptos/testnet/mint.key"
+        Waypoint: 0:d302c6b10e0fa68bfec9cdb383f24ef1189d8850d50b832365eea21ae52d8101
+        ChainId: TESTING
+        REST API endpoint: 0.0.0.0:8080
+        FullNode network: /ip4/0.0.0.0/tcp/6181
+
+Aptos is running, press ctrl-c to exit
+```
+
+This will have consistent state if the node is shutdown, it will start with the previous state.
+If you want to restart the chain from genesis, you can add the `--force-restart` flag.
+
+```bash
+$ aptos node run-local-testnet --with-faucet --force-restart
+Are you sure you want to delete the existing chain? [yes/no] >
+yes
+Completed generating configuration:
+        Log file: "/Users/greg/.aptos/testnet/validator.log"
+        Test dir: "/Users/greg/.aptos/testnet"
+        Aptos root key path: "/Users/greg/.aptos/testnet/mint.key"
+        Waypoint: 0:649efc34c813d0db8db6fa5b1ffc9cc62f726bb5168e7f4b8730bb155d6213ea
+        ChainId: TESTING
+        REST API endpoint: 0.0.0.0:8080
+        FullNode network: /ip4/0.0.0.0/tcp/6181
+
+Aptos is running, press ctrl-c to exit
 ```
 
 ## Genesis Ceremonies
