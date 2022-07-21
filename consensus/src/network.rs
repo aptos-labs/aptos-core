@@ -92,6 +92,9 @@ impl NetworkSender {
         from: Author,
         timeout: Duration,
     ) -> anyhow::Result<BlockRetrievalResponse> {
+        fail_point!("consensus::send::any", |_| {
+            Err(anyhow::anyhow!("Injected error in request_block"))
+        });
         fail_point!("consensus::send::block_retrieval", |_| {
             Err(anyhow::anyhow!("Injected error in request_block"))
         });
@@ -127,6 +130,7 @@ impl NetworkSender {
     /// out. It does not give indication about when the message is delivered to the recipients,
     /// as well as there is no indication about the network failures.
     async fn broadcast(&mut self, msg: ConsensusMsg) {
+        fail_point!("consensus::send::any", |_| ());
         // Directly send the message to ourself without going through network.
         let self_msg = Event::Message(self.author, msg.clone());
         if let Err(err) = self.self_sender.send(self_msg).await {
@@ -149,6 +153,7 @@ impl NetworkSender {
 
     /// Tries to send msg to given recipients.
     async fn send(&self, msg: ConsensusMsg, recipients: Vec<Author>) {
+        fail_point!("consensus::send::any", |_| ());
         let network_sender = self.network_sender.clone();
         let mut self_sender = self.self_sender.clone();
         for peer in recipients {
