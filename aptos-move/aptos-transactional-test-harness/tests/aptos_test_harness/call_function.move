@@ -2,11 +2,11 @@
 //#      --private-keys Alice=56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
 
 //# publish
-module Alice::HelloWorld {
-    use AptosFramework::signer;
-    use AptosFramework::Coin;
-    use AptosFramework::TestCoin::TestCoin;
-    use std::ascii::{Self, String};
+module Alice::hello_world {
+    use aptos_framework::signer;
+    use aptos_framework::coin;
+    use aptos_framework::test_coin::TestCoin;
+    use std::string::{Self, String};
 
     struct ModuleData has key, store {
         global_counter: u64,
@@ -16,12 +16,12 @@ module Alice::HelloWorld {
     fun init_module(sender: &signer) {
         move_to(
             sender,
-            ModuleData { global_counter: 0, state: ascii::string(b"init") }
+            ModuleData { global_counter: 0, state: string::utf8(b"init") }
         );
     }
 
     public fun foo(addr: address): u64 {
-        Coin::balance<TestCoin>(addr)
+        coin::balance<TestCoin>(addr)
     }
 
     public entry fun hi(sender: &signer, msg: String) acquires ModuleData {
@@ -30,6 +30,6 @@ module Alice::HelloWorld {
 }
 
 
-//# run --signers Alice --args x"68656C6C6F20776F726C64" --show-events -- Alice::HelloWorld::hi
+//# run --signers Alice --args x"68656C6C6F20776F726C64" --show-events -- Alice::hello_world::hi
 
-//# view --address Alice --resource Alice::HelloWorld::ModuleData
+//# view --address Alice --resource Alice::hello_world::ModuleData

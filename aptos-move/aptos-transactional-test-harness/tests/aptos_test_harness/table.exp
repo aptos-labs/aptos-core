@@ -1,0 +1,61 @@
+processed 4 tasks
+
+task 1 'run'. lines 6-6:
+Events:
+{
+    key:     0300000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
+    seq_num: 0
+    type:    0x1::token::CreateCollectionEvent
+    data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b73000000"
+}mutable inputs after call: local#0: 0
+return values: 0
+
+task 2 'view'. lines 8-8:
+key 0x1::token::Collections {
+    collections: store 0x1::table::Table<0x1::string::String, 0x1::token::Collection> {
+        handle: 5713946181763753045826830927579154558u128
+        length: 1
+    }
+    token_data: store 0x1::table::Table<0x1::token::TokenId, 0x1::token::TokenData> {
+        handle: 201565269216226451971031276281575418327u128
+        length: 0
+    }
+    burn_capabilities: store 0x1::table::Table<0x1::token::TokenId, 0x1::token::BurnCapability> {
+        handle: 287382435493071517965728229562421621568u128
+        length: 0
+    }
+    mint_capabilities: store 0x1::table::Table<0x1::token::TokenId, 0x1::token::MintCapability> {
+        handle: 324796155405202804299483011064140529667u128
+        length: 0
+    }
+    create_collection_events: store 0x1::event::EventHandle<0x1::token::CreateCollectionEvent> {
+        counter: 1
+        guid: drop store 0x1::guid::GUID {
+            id: copy drop store 0x1::guid::ID {
+                creation_num: 3
+                addr: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
+            }
+        }
+    }
+    create_token_events: store 0x1::event::EventHandle<0x1::token::CreateTokenEvent> {
+        counter: 0
+        guid: drop store 0x1::guid::GUID {
+            id: copy drop store 0x1::guid::ID {
+                creation_num: 4
+                addr: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
+            }
+        }
+    }
+    mint_token_events: store 0x1::event::EventHandle<0x1::token::MintTokenEvent> {
+        counter: 0
+        guid: drop store 0x1::guid::GUID {
+            id: copy drop store 0x1::guid::ID {
+                creation_num: 5
+                addr: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
+            }
+        }
+    }
+}
+
+task 3 'view_table'. lines 10-10:
+Struct(MoveStructValue({Identifier("count"): String("0"), Identifier("description"): String(""), Identifier("maximum"): Object({"vec": Array([])}), Identifier("name"): String("aptos_punks"), Identifier("uri"): String("")}))

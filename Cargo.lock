@@ -1169,6 +1169,7 @@ name = "aptos-transactional-test-harness"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-api-types",
  "aptos-crypto",
  "aptos-state-view",
  "aptos-transaction-builder",
@@ -1183,6 +1184,8 @@ dependencies = [
  "language-e2e-tests",
  "move-deps",
  "once_cell",
+ "serde 1.0.137",
+ "serde_json",
  "vm-genesis",
 ]
 
