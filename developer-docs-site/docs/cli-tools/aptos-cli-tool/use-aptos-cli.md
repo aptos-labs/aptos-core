@@ -499,7 +499,7 @@ The `peer_config.yaml` file will be created in your current working directory, w
 ### Compiling Move
 
 The `aptos` CLI can be used to compile a Move package locally.
-The below example uses the `HelloBlockchain` in [move-examples](../../aptos-move/move-examples/).
+The below example uses the `HelloBlockchain` in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
 
 ```bash
 aptos move compile --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71
@@ -517,7 +517,7 @@ The above command will generate the below terminal output:
 ### Compiling & Unit Testing Move
 
 The `aptos` CLI can also be used to compile and run unit tests locally.
-In this example, we'll use the `HelloBlockchain` in [move-examples](../../aptos-move/move-examples/).
+In this example, we'll use the `HelloBlockchain` in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
 
 ```bash
 aptos move test --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71
@@ -536,9 +536,23 @@ Test result: OK. Total tests: 2; passed: 2; failed: 0
 }
 ```
 
+### Proving Move
+
+The `aptos` CLI can be used to run [Move Prover](https://github.com/move-language/move/tree/main/language/move-prover) which is a formal verification tool for the Move language. The below example proves the `hello_prover` package in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
+```bash
+aptos move prove --package-dir aptos-move/move-examples/hello_prover/
+```
+The above command will generate the following terminal output:
+```bash
+SUCCESS proving 1 modules from package `hello_prover` in 1.649s
+{
+  "Result": "Success"
+}
+```
+
 ### Debug and Print Stacktrace
 
-In this example, we will use `DebugDemo` in [debug-move](./debug-move-example)
+In this example, we will use `DebugDemo` in [debug-move-example](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example)
 
 First, you need to include Move nursery in your Move.toml file [toml file](debug-move-example/Move.toml)
 
@@ -574,7 +588,7 @@ Operand Stack:
 
 ### Publishing a Move Package with a named address
 
-In this example, we'll use the `HelloBlockchain` in [move-examples](../../aptos-move/move-examples/).
+In this example, we'll use the `HelloBlockchain` in [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples).
 
 Publish the package with your account address set for `HelloBlockchain`.
 
