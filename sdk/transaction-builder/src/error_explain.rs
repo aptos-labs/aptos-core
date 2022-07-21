@@ -10,16 +10,21 @@ use move_deps::move_core_types::errmap::ErrorDescription;
 use move_deps::move_core_types::{errmap::ErrorMapping, language_storage::ModuleId};
 use once_cell::sync::Lazy;
 
-static RELEASE_ERRMAP: Lazy<ErrorMapping> = Lazy::new(|| {
+static RELEASE_ERRMAP: Lazy<Vec<ErrorMapping>> = Lazy::new(|| {
     let error_map = cached_framework_packages::error_map();
-    bcs::from_bytes(&*error_map).expect("Failed to deserialize static error descriptions")
+    error_map
+        .iter()
+        .map(|e| bcs::from_bytes(e).expect("Failed to deserialize static error descriptions"))
+        .collect()
 });
 
 /// Given the module ID and the abort code raised from that module, returns the
 /// human-readable explanation of that abort if possible.
 pub fn get_explanation(module_id: &ModuleId, abort_code: u64) -> Option<ErrorDescription> {
     let errmap = &*RELEASE_ERRMAP;
-    errmap.get_explanation(module_id, abort_code)
+    errmap
+        .iter()
+        .find_map(|e| e.get_explanation(module_id, abort_code))
 }
 
 #[cfg(test)]
