@@ -1,12 +1,12 @@
 /// This module provides the foundation for Tokens.
 module aptos_framework::token {
     use std::string;
-    use std::errors;
-    use std::event::{Self, EventHandle};
+    use std::error;
+    use aptos_std::event::{Self, EventHandle};
     use std::option::{Self, Option};
     use std::signer;
 
-    use aptos_framework::table::{Self, Table};
+    use aptos_std::table::{Self, Table};
     const ROYALTY_POINTS_DENOMINATOR: u64 = 1000000;
 
     const EALREADY_HAS_BALANCE: u64 = 0;
@@ -302,13 +302,13 @@ module aptos_framework::token {
     public fun direct_deposit_without_event(account_addr: address, token: Token) acquires TokenStore {
         assert!(
             exists<TokenStore>(account_addr),
-            errors::not_published(ETOKEN_STORE_NOT_PUBLISHED),
+            error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
         );
         let token_store = borrow_global_mut<TokenStore>(account_addr);
 
         assert!(
             table::contains(&token_store.tokens, token.id),
-            errors::not_published(EBALANCE_NOT_PUBLISHED),
+            error::not_found(EBALANCE_NOT_PUBLISHED),
         );
         let recipient_token = table::borrow_mut(&mut token_store.tokens, token.id);
 
@@ -329,13 +329,13 @@ module aptos_framework::token {
         let account_addr = signer::address_of(account);
         assert!(
             exists<TokenStore>(account_addr),
-            errors::not_published(ETOKEN_STORE_NOT_PUBLISHED),
+            error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
         );
         let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
 
         assert!(
             !table::contains(tokens, token_id),
-            errors::already_published(EALREADY_HAS_BALANCE),
+            error::already_exists(EALREADY_HAS_BALANCE),
         );
         table::add(tokens, token_id, Token { value : 0, id: token_id });
     }
@@ -354,7 +354,7 @@ module aptos_framework::token {
     }
 
     public fun merge(dst_token: &mut Token, source_token: Token) {
-        assert!(&dst_token.id == &source_token.id, errors::invalid_argument(EINVALID_TOKEN_MERGE));
+        assert!(&dst_token.id == &source_token.id, error::invalid_argument(EINVALID_TOKEN_MERGE));
         dst_token.value = dst_token.value + source_token.value;
         let Token { id: _, value: _ } = source_token;
     }
@@ -408,13 +408,13 @@ module aptos_framework::token {
     ): Token acquires TokenStore {
         assert!(
             exists<TokenStore>(account_addr),
-            errors::not_published(ETOKEN_STORE_NOT_PUBLISHED),
+            error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
         );
         let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
 
         assert!(
             table::contains(tokens, id),
-            errors::not_published(EBALANCE_NOT_PUBLISHED),
+            error::not_found(EBALANCE_NOT_PUBLISHED),
         );
         let balance = &mut table::borrow_mut(tokens, id).value;
         *balance = *balance - amount;
@@ -434,18 +434,18 @@ module aptos_framework::token {
         let account_addr = signer::address_of(account);
         assert!(
             exists<Collections>(account_addr),
-            errors::not_published(ECOLLECTIONS_NOT_PUBLISHED),
+            error::not_found(ECOLLECTIONS_NOT_PUBLISHED),
         );
         let collections = borrow_global_mut<Collections>(account_addr);
 
         assert!(
             table::contains(&collections.token_data, token.id),
-            errors::not_published(ETOKEN_NOT_PUBLISHED),
+            error::not_found(ETOKEN_NOT_PUBLISHED),
         );
 
         assert!(
             table::contains(&collections.burn_capabilities, token.id),
-            errors::requires_capability(ENO_BURN_CAPABILITY),
+            error::permission_denied(ENO_BURN_CAPABILITY),
         );
         let _cap = table::borrow(&collections.burn_capabilities, token.id);
 
@@ -487,7 +487,7 @@ module aptos_framework::token {
 
         assert!(
             !table::contains(collections, name),
-            errors::already_published(ECOLLECTION_ALREADY_EXISTS),
+            error::already_exists(ECOLLECTION_ALREADY_EXISTS),
         );
 
         let collection = Collection {
@@ -526,7 +526,7 @@ module aptos_framework::token {
         let account_addr = signer::address_of(account);
         assert!(
             exists<Collections>(account_addr),
-            errors::not_published(ECOLLECTIONS_NOT_PUBLISHED),
+            error::not_found(ECOLLECTIONS_NOT_PUBLISHED),
         );
         let collections = borrow_global_mut<Collections>(account_addr);
 
@@ -534,11 +534,11 @@ module aptos_framework::token {
 
         assert!(
             table::contains(&collections.collections, token_id.collection),
-            errors::already_published(ECOLLECTION_NOT_PUBLISHED),
+            error::already_exists(ECOLLECTION_NOT_PUBLISHED),
         );
         assert!(
             !table::contains(&collections.token_data, token_id),
-            errors::already_published(ETOKEN_ALREADY_EXISTS),
+            error::already_exists(ETOKEN_ALREADY_EXISTS),
         );
 
         let collection = table::borrow_mut(&mut collections.collections, token_id.collection);
@@ -624,25 +624,25 @@ module aptos_framework::token {
     ) acquires Collections, TokenStore {
         assert!(
             exists<Collections>(token_id.creator),
-            errors::not_published(ECOLLECTIONS_NOT_PUBLISHED),
+            error::not_found(ECOLLECTIONS_NOT_PUBLISHED),
         );
         let minter_collections = borrow_global_mut<Collections>(signer::address_of(account));
 
         assert!(
             table::contains(&minter_collections.mint_capabilities, token_id),
-            errors::requires_capability(ENO_MINT_CAPABILITY),
+            error::permission_denied(ENO_MINT_CAPABILITY),
         );
         let _cap = table::borrow(&minter_collections.mint_capabilities, token_id);
 
         assert!(
             exists<Collections>(token_id.creator),
-            errors::not_published(ECOLLECTIONS_NOT_PUBLISHED),
+            error::not_found(ECOLLECTIONS_NOT_PUBLISHED),
         );
         let creator_collections = borrow_global_mut<Collections>(token_id.creator);
 
         assert!(
             table::contains(&creator_collections.token_data, token_id),
-            errors::not_published(ETOKEN_NOT_PUBLISHED),
+            error::not_found(ETOKEN_NOT_PUBLISHED),
         );
         let token_data = table::borrow_mut(&mut creator_collections.token_data, token_id);
 

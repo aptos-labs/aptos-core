@@ -1,7 +1,7 @@
 // This module demonstrates a basic shared account that could be used for NFT royalties
 // Users can (1) create a shared account (2) disperse the coins to multiple creators
 module shared_account::SharedAccount {
-    use std::errors;
+    use std::error;
     use std::signer;
     use std::vector;
     use aptos_framework::account;
@@ -40,7 +40,7 @@ module shared_account::SharedAccount {
 
             // make sure that the account exists, so when we call disperse() it wouldn't fail
             // because one of the accounts does not exist
-            assert!(account::exists_at(addr), errors::invalid_argument(EACCOUNT_NOT_FOUND));
+            assert!(account::exists_at(addr), error::invalid_argument(EACCOUNT_NOT_FOUND));
 
             vector::push_back(&mut share_record, Share { share_holder: addr, num_shares: num_shares });
             total = total + num_shares;
@@ -65,10 +65,10 @@ module shared_account::SharedAccount {
 
     // Disperse all available balance to addresses in the shared account
     public entry fun disperse<CoinType>(resource_addr: address) acquires SharedAccount {
-        assert!(exists<SharedAccount>(resource_addr), errors::invalid_argument(ERESOURCE_DNE));
+        assert!(exists<SharedAccount>(resource_addr), error::invalid_argument(ERESOURCE_DNE));
 
         let total_balance = coin::balance<CoinType>(resource_addr);
-        assert!(total_balance > 0, errors::limit_exceeded(EINSUFFICIENT_BALANCE));
+        assert!(total_balance > 0, error::out_of_range(EINSUFFICIENT_BALANCE));
 
         let shared_account = borrow_global<SharedAccount>(resource_addr);
         let resource_signer = account::create_signer_with_capability(&shared_account.signer_capability);
@@ -103,7 +103,7 @@ module shared_account::SharedAccount {
 
         initialize(&user, seed, addresses, numerators);
 
-        assert!(exists<SharedAccountEvent>(user_addr), errors::not_published(EACCOUNT_NOT_FOUND));
+        assert!(exists<SharedAccountEvent>(user_addr), error::not_found(EACCOUNT_NOT_FOUND));
         *&borrow_global<SharedAccountEvent>(user_addr).resource_addr
     }
 

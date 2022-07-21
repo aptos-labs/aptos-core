@@ -1,7 +1,7 @@
 /// This module defines structs and methods to initialize VM configurations,
 /// including different costs of running the VM.
 module aptos_framework::vm_config {
-    use std::errors;
+    use std::error;
     use aptos_framework::reconfiguration;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
@@ -83,7 +83,7 @@ module aptos_framework::vm_config {
 
         assert!(
             !exists<VMConfig>(@aptos_framework),
-            errors::already_published(ECONFIG)
+            error::already_exists(ECONFIG)
         );
 
         let gas_constants = GasConstants {
@@ -131,14 +131,14 @@ module aptos_framework::vm_config {
 
         assert!(
             min_price_per_gas_unit <= max_price_per_gas_unit,
-            errors::invalid_argument(EGAS_CONSTANT_INCONSISTENCY)
+            error::invalid_argument(EGAS_CONSTANT_INCONSISTENCY)
         );
         assert!(
             min_transaction_gas_units <= maximum_number_of_gas_units,
-            errors::invalid_argument(EGAS_CONSTANT_INCONSISTENCY)
+            error::invalid_argument(EGAS_CONSTANT_INCONSISTENCY)
         );
 
-        assert!(exists<VMConfig>(@aptos_framework), errors::not_published(ECONFIG));
+        assert!(exists<VMConfig>(@aptos_framework), error::not_found(ECONFIG));
 
         let gas_constants = &mut borrow_global_mut<VMConfig>(@aptos_framework).gas_schedule.gas_constants;
 

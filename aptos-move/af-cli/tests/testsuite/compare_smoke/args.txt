@@ -1,2 +1,0 @@
-sandbox publish
-sandbox run scripts/set_script.move --dry-run

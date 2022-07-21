@@ -1,7 +1,7 @@
 /// This module provides the foundation for transferring of Tokens
 module aptos_framework::token_transfers {
     use std::signer;
-    use aptos_framework::table::{Self, Table};
+    use aptos_std::table::{Self, Table};
     use aptos_framework::token::{Self, Token, TokenId};
 
     struct TokenTransfers has key {
