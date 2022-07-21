@@ -27,7 +27,7 @@ use aptos_types::{
 pub use error::Error;
 pub use executed_chunk::ExecutedChunk;
 pub use parsed_transaction_output::ParsedTransactionOutput;
-use scratchpad::{ProofRead, SparseMerkleTree};
+use scratchpad::ProofRead;
 
 mod error;
 mod executed_chunk;
@@ -81,12 +81,6 @@ pub trait ChunkExecutorTrait: Send + Sync {
     fn finish(&self);
 }
 
-pub struct StateSnapshotDelta {
-    pub version: Version,
-    pub smt: SparseMerkleTree<StateValue>,
-    pub jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
-}
-
 pub trait BlockExecutorTrait: Send + Sync {
     /// Get the latest committed block id
     fn committed_block_id(&self) -> HashValue;
@@ -114,18 +108,18 @@ pub trait BlockExecutorTrait: Send + Sync {
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-        save_state_snapshots: bool,
-    ) -> Result<Option<StateSnapshotDelta>, Error>;
+        sync_commit: bool,
+    ) -> Result<()>;
 
     fn commit_blocks(
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-    ) -> Result<Option<StateSnapshotDelta>, Error> {
+    ) -> Result<()> {
         self.commit_blocks_ext(
             block_ids,
             ledger_info_with_sigs,
-            true, /* save_state_snapshots */
+            true, /* sync_commit */
         )
     }
 
