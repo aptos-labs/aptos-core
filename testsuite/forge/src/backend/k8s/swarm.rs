@@ -302,7 +302,6 @@ pub(crate) async fn get_validators(
 pub(crate) async fn get_fullnodes(
     client: K8sClient,
     image_tag: &str,
-    era: &str,
     kube_namespace: &str,
     use_port_forward: bool,
     enable_haproxy: bool,
@@ -328,8 +327,9 @@ pub(crate) async fn get_fullnodes(
                 ip = LOCALHOST.to_string();
             }
             let node_id = parse_node_id(&s.name).expect("error to parse node id");
-            // the base fullnode name is the same as that of the StatefulSet, and includes era
-            let fullnode_name = format!("{}-e{}", &s.name, era);
+            // the base fullnode name is the same as that of the StatefulSet
+            // TODO: get the era and fullnode group, for now ignore it
+            let fullnode_name = format!("aptos-node-{}-fullnode", node_id);
             let node = K8sNode {
                 name: fullnode_name.clone(),
                 sts_name: fullnode_name,

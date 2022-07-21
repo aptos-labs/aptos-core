@@ -93,6 +93,11 @@ struct K8sSwarm {
     port_forward: bool,
     #[structopt(
         long,
+        help = "If set, reuse the forge testnet active in the specified namespace"
+    )]
+    reuse: bool,
+    #[structopt(
+        long,
         help = "If set, keeps the forge testnet active in the specified namespace"
     )]
     keep: bool,
@@ -196,6 +201,7 @@ fn main() -> Result<()> {
                         k8s.image_tag,
                         k8s.base_image_tag,
                         k8s.port_forward,
+                        k8s.reuse,
                         k8s.keep,
                         k8s.enable_haproxy,
                     )
