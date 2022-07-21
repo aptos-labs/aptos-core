@@ -19,7 +19,6 @@ use kube::{
     client::Client as K8sClient,
     Config, Error as KubeError,
 };
-use rand::Rng;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::{
@@ -398,10 +397,10 @@ pub async fn install_testnet_resources(
     genesis_modules_path: Option<String>,
     use_port_forward: bool,
     enable_haproxy: bool,
-) -> Result<(String, HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
+) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     assert!(base_num_validators <= MAX_NUM_VALIDATORS);
 
-    let new_era = get_new_era().unwrap();
+    let new_era = "fg".to_string();
     let kube_client = create_k8s_client().await;
 
     // get deployment-specific helm values and cache it
@@ -485,6 +484,26 @@ pub async fn install_testnet_resources(
         kube_namespace.clone(),
     )?;
 
+    let (validators, fullnodes) = collect_running_nodes(
+        &kube_client,
+        kube_namespace,
+        base_validator_image_tag,
+        use_port_forward,
+        enable_haproxy,
+    )
+    .await?;
+
+    Ok((validators, fullnodes))
+}
+
+/// Collect the running nodes in the network into K8sNodes
+pub async fn collect_running_nodes(
+    kube_client: &K8sClient,
+    kube_namespace: String,
+    base_validator_image_tag: String,
+    use_port_forward: bool,
+    enable_haproxy: bool,
+) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     // get all validators
     let validators = get_validators(
         kube_client.clone(),
@@ -497,17 +516,16 @@ pub async fn install_testnet_resources(
     .unwrap();
 
     // wait for all validator STS to spin up
-    wait_node_stateful_set(&kube_client, &kube_namespace, &validators).await?;
+    wait_node_stateful_set(kube_client, &kube_namespace, &validators).await?;
 
     if enable_haproxy {
-        wait_node_haproxy(&kube_client, &kube_namespace, validators.len()).await?;
+        wait_node_haproxy(kube_client, &kube_namespace, validators.len()).await?;
     }
 
     // get all fullnodes
     let fullnodes = get_fullnodes(
         kube_client.clone(),
         &base_validator_image_tag,
-        &new_era,
         &kube_namespace,
         use_port_forward,
         enable_haproxy,
@@ -515,13 +533,14 @@ pub async fn install_testnet_resources(
     .await
     .unwrap();
 
-    wait_node_stateful_set(&kube_client, &kube_namespace, &fullnodes).await?;
+    wait_node_stateful_set(kube_client, &kube_namespace, &fullnodes).await?;
 
     let nodes = validators
         .values()
         // .chain(fullnodes.values())
         .collect::<Vec<&K8sNode>>();
 
+    // start port-forward for each of the validators
     if use_port_forward {
         for node in nodes.iter() {
             node.spawn_port_forward()?;
@@ -530,17 +549,7 @@ pub async fn install_testnet_resources(
     }
 
     nodes_healthcheck(nodes).await?;
-
-    // start port-forward for each of the validators
-    Ok((new_era, validators, fullnodes))
-}
-
-fn get_new_era() -> Result<String> {
-    // get a random new era to wipe the chain
-    let mut rng = rand::thread_rng();
-    let new_era: &str = &format!("fg{}", rng.gen::<u32>());
-    info!("new chain era: {}", new_era);
-    Ok(new_era.to_string())
+    Ok((validators, fullnodes))
 }
 
 pub async fn create_k8s_client() -> K8sClient {
@@ -593,7 +602,11 @@ fn get_helm_status(helm_release_name: &str) -> Result<Value> {
         .map_err(|e| format_err!("failed to deserialize helm values: {}", e))
 }
 
-fn dump_string_to_file(file_name: String, content: String, tmp_dir: &TempDir) -> Result<String> {
+pub fn dump_string_to_file(
+    file_name: String,
+    content: String,
+    tmp_dir: &TempDir,
+) -> Result<String> {
     let file_path = tmp_dir.path().join(file_name.clone());
     info!("Wrote content to: {:?}", &file_path);
     let mut file = File::create(file_path).expect("Could not create file in temp dir");
@@ -677,12 +690,25 @@ pub async fn create_management_configmap(kube_namespace: String, keep: bool) -> 
             ..ObjectMeta::default()
         },
     };
-    configmap.create(&PostParams::default(), &config).await?;
-
-    info!(
-        "Created configmap {} with data {:?}",
-        management_configmap_name, data
-    );
+    if let Err(KubeError::Api(api_err)) = configmap.create(&PostParams::default(), &config).await {
+        if api_err.code == 409 {
+            info!(
+                "Configmap {} already exists, continuing with it",
+                &management_configmap_name
+            );
+        } else {
+            bail!(
+                "Failed to use existing management configmap {}: {:?}",
+                &kube_namespace,
+                api_err
+            );
+        }
+    } else {
+        info!(
+            "Created configmap {} with data {:?}",
+            management_configmap_name, data
+        );
+    }
 
     Ok(())
 }

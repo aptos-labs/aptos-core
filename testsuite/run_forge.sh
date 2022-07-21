@@ -32,7 +32,9 @@ DEVINFRA_GRAFANA_BASE_URL="https://o11y.aptosdev.com/grafana/d/overview/overview
 # forge test runner customization
 FORGE_RUNNER_MODE=${FORGE_RUNNER_MODE:-k8s}
 FORGE_NAMESPACE_KEEP=${FORGE_NAMESPACE_KEEP:-false}
+FORGE_NAMESPACE_REUSE=${FORGE_NAMESPACE_REUSE:-false}
 FORGE_ENABLE_HAPROXY=${FORGE_ENABLE_HAPROXY:-false}
+FORGE_TEST_SUITE=${FORGE_TEST_SUITE:-land_blocking}
 
 # if this script is not triggered in GHA, use a default value
 [ -z "$GITHUB_RUN_ID" ] && GITHUB_RUN_ID=0
@@ -48,7 +50,7 @@ FORGE_NAMESPACE="${FORGE_NAMESPACE//[^[:alnum:]]/-}"
 # use the first 64 chars only for namespace, as it is the maximum for k8s resources
 FORGE_NAMESPACE=${FORGE_NAMESPACE:0:64}
 
-
+[ "$FORGE_NAMESPACE_REUSE" = "true" ] && REUSE_ARGS="--reuse"
 [ "$FORGE_NAMESPACE_KEEP" = "true" ] && KEEP_ARGS="--keep"
 [ "$FORGE_ENABLE_HAPROXY" = "true" ] && ENABLE_HAPROXY_ARGS="--enable-haproxy"
 
@@ -89,10 +91,10 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     # more file descriptors for heavy txn generation
     ulimit -n 1048576
 
-    cargo run -p forge-cli -- test k8s-swarm \
+    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE test k8s-swarm \
         --image-tag $IMAGE_TAG \
         --namespace $FORGE_NAMESPACE \
-        --port-forward $KEEP_ARGS $ENABLE_HAPROXY_ARGS | tee $FORGE_OUTPUT
+        --port-forward $REUSE_ARGS $KEEP_ARGS $ENABLE_HAPROXY_ARGS | tee $FORGE_OUTPUT
 
     FORGE_EXIT_CODE=$?
 
@@ -114,10 +116,12 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
     echo "Forge test-runner pod Spec : ${specfile}"
 
     sed -e "s/{FORGE_POD_NAME}/${FORGE_POD_NAME}/g" \
+        -e "s/{FORGE_TEST_SUITE}/${FORGE_TEST_SUITE}/g" \
         -e "s/{IMAGE_TAG}/${IMAGE_TAG}/g" \
         -e "s/{AWS_ACCOUNT_NUM}/${AWS_ACCOUNT_NUM}/g" \
         -e "s/{AWS_REGION}/${AWS_REGION}/g" \
         -e "s/{FORGE_NAMESPACE}/${FORGE_NAMESPACE}/g" \
+         -e "s/{REUSE_ARGS}/${REUSE_ARGS}/g" \
         -e "s/{KEEP_ARGS}/${KEEP_ARGS}/g" \
         -e "s/{ENABLE_HAPROXY_ARGS}/${ENABLE_HAPROXY_ARGS}/g" \
         testsuite/forge-test-runner-template.yaml > ${specfile}
