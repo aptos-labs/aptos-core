@@ -73,6 +73,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use fail::fail_point;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -595,6 +596,9 @@ impl EpochManager {
         peer_id: AccountAddress,
         consensus_msg: ConsensusMsg,
     ) -> anyhow::Result<()> {
+        fail_point!("consensus::process_any", |_| {
+            Err(anyhow::anyhow!("Injected error in process_message"))
+        });
         // we can't verify signatures from a different epoch
         let maybe_unverified_event = self.check_epoch(peer_id, consensus_msg).await?;
 
@@ -711,6 +715,9 @@ impl EpochManager {
         &self,
         request: IncomingBlockRetrievalRequest,
     ) -> anyhow::Result<()> {
+        fail_point!("consensus::process_any", |_| {
+            Err(anyhow::anyhow!("Injected error in process_block_retrieval"))
+        });
         if let Some(block_store) = &self.block_store {
             block_store.process_block_retrieval(request).await
         } else {

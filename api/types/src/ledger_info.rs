@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 pub struct LedgerInfo {
     pub chain_id: u8,
     pub epoch: u64,
+    pub round: u64,
     pub ledger_version: U64,
     pub oldest_ledger_version: U64,
     pub ledger_timestamp: U64,
@@ -26,6 +27,7 @@ impl LedgerInfo {
         Self {
             chain_id: chain_id.id(),
             epoch: ledger_info.epoch(),
+            round: ledger_info.round(),
             ledger_version: ledger_info.version().into(),
             oldest_ledger_version: oldest_ledger_version.into(),
             ledger_timestamp: ledger_info.timestamp_usecs().into(),

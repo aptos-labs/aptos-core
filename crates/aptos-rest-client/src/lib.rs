@@ -23,7 +23,7 @@ pub mod faucet;
 pub use faucet::FaucetClient;
 pub mod response;
 pub use response::Response;
-mod state;
+pub mod state;
 pub mod types;
 use crate::aptos::{AptosVersion, Balance};
 pub use types::{Account, Resource, RestError};
@@ -81,6 +81,7 @@ impl Client {
         struct Response {
             chain_id: u8,
             epoch: u64,
+            round: u64,
             #[serde(deserialize_with = "types::deserialize_from_string")]
             ledger_version: u64,
             #[serde(deserialize_with = "types::deserialize_from_string")]
@@ -95,6 +96,7 @@ impl Client {
             .map(|r| State {
                 chain_id: r.chain_id,
                 epoch: r.epoch,
+                round: r.round,
                 version: r.ledger_version,
                 timestamp_usecs: r.ledger_timestamp,
                 oldest_ledger_version: Some(r.oldest_ledger_version),
@@ -370,6 +372,26 @@ impl Client {
         let url = self.base_url.join(&format!("accounts/{}", address))?;
         let response = self.inner.get(url).send().await?;
         self.json(response).await
+    }
+
+    pub async fn set_failpoint(&self, name: String, actions: String) -> Result<String> {
+        let mut base = self.base_url.join("set_failpoint")?;
+        let url = base
+            .query_pairs_mut()
+            .append_pair("name", &name)
+            .append_pair("actions", &actions)
+            .finish();
+        let response = self.inner.get(url.clone()).send().await?;
+
+        if !response.status().is_success() {
+            let error_response = response.json::<RestError>().await?;
+            return Err(anyhow::anyhow!("Request failed: {:?}", error_response));
+        }
+
+        response
+            .text()
+            .await
+            .map_err(|e| anyhow::anyhow!("To text failed: {:?}", e))
     }
 
     async fn check_response(

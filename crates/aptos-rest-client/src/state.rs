@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_api_types::{
-    X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
+    X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_ROUND, X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
 };
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct State {
     pub chain_id: u8,
     pub epoch: u64,
+    pub round: u64,
     pub version: u64,
     pub timestamp_usecs: u64,
     pub oldest_ledger_version: Option<u64>,
@@ -32,18 +33,23 @@ impl State {
             .get(X_APTOS_EPOCH)
             .and_then(|h| h.to_str().ok())
             .and_then(|s| s.parse().ok());
+        let maybe_round = headers
+            .get(X_APTOS_ROUND)
+            .and_then(|h| h.to_str().ok())
+            .and_then(|s| s.parse().ok());
         // TODO: Why doesn't the constant work?
         let oldest_ledger_version = headers
             .get("X-Aptos-Ledger-Oldest-Version")
             .and_then(|h| h.to_str().ok())
             .and_then(|s| s.parse().ok());
 
-        let state = if let (Some(chain_id), Some(version), Some(timestamp_usecs), Some(epoch)) =
-            (maybe_chain_id, maybe_version, maybe_timestamp, maybe_epoch)
+        let state = if let (Some(chain_id), Some(version), Some(timestamp_usecs), Some(epoch), Some(round)) =
+            (maybe_chain_id, maybe_version, maybe_timestamp, maybe_epoch, maybe_round)
         {
             Self {
                 chain_id,
                 epoch,
+                round,
                 version,
                 timestamp_usecs,
                 oldest_ledger_version,
@@ -51,11 +57,12 @@ impl State {
         } else {
             anyhow::bail!(
                 "Failed to build State from headers due to missing values in response. \
-                Chain ID: {:?}, Version: {:?}, Timestamp: {:?}, Epoch: {:?}, Oldest Ledger Version: {:?}",
+                Chain ID: {:?}, Version: {:?}, Timestamp: {:?}, Epoch: {:?}, Round: {:?}, Oldest Ledger Version: {:?}",
                 maybe_chain_id,
                 maybe_version,
                 maybe_timestamp,
                 maybe_epoch,
+                maybe_round,
                 oldest_ledger_version,
             )
         };
