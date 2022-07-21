@@ -38,7 +38,7 @@ fn verify_signature() {
         executor.add_account_data(&sender);
         // Generate a new key pair to try and sign things with.
         let private_key = Ed25519PrivateKey::generate_for_testing();
-        let program = aptos_stdlib::encode_test_coin_transfer(
+        let program = aptos_stdlib::encode_aptos_coin_transfer(
             *sender.address(),
             100,
         );
@@ -170,7 +170,7 @@ fn verify_reserved_sender() {
         executor.add_account_data(&sender);
         // Generate a new key pair to try and sign things with.
         let private_key = Ed25519PrivateKey::generate_for_testing();
-        let program = aptos_stdlib::encode_test_coin_transfer(
+        let program = aptos_stdlib::encode_aptos_coin_transfer(
             *sender.address(),
             100,
         );
@@ -210,7 +210,7 @@ fn verify_simple_payment() {
         let txn = sender
             .account()
             .transaction()
-            .payload(aptos_stdlib::encode_test_coin_transfer(*receiver.address(), transfer_amount))
+            .payload(aptos_stdlib::encode_aptos_coin_transfer(*receiver.address(), transfer_amount))
             .sequence_number(10)
             .sign();
         assert_eq!(executor.verify_transaction(txn).status(), None);

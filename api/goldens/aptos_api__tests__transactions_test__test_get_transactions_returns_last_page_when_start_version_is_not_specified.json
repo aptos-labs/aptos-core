@@ -60,7 +60,7 @@
         "address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -124,8 +124,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }
@@ -291,7 +291,7 @@
         "address": "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -355,8 +355,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }
@@ -522,7 +522,7 @@
         "address": "0x95f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -586,8 +586,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }
@@ -753,7 +753,7 @@
         "address": "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -817,8 +817,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }
@@ -984,7 +984,7 @@
         "address": "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -1048,8 +1048,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }
@@ -1215,7 +1215,7 @@
         "address": "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -1279,8 +1279,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }
@@ -1446,7 +1446,7 @@
         "address": "0x99acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -1510,8 +1510,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }
@@ -1677,7 +1677,7 @@
         "address": "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -1741,8 +1741,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }
@@ -1908,7 +1908,7 @@
         "address": "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -1972,8 +1972,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }

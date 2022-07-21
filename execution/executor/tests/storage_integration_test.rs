@@ -112,7 +112,7 @@ fn test_reconfiguration() {
         /* sequence_number = */ 0,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(aptos_stdlib::encode_test_coin_mint(
+        Some(aptos_stdlib::encode_aptos_coin_mint(
             validator_account,
             1_000_000,
         )),

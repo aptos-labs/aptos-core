@@ -1,8 +1,8 @@
 /// Publishes configuration information for validators, and issues reconfiguration events
 /// to synchronize configuration changes for the validators.
 module aptos_framework::reconfiguration {
-    use std::errors;
-    use std::event;
+    use std::error;
+    use aptos_std::event;
     use std::signer;
     use std::guid;
     use aptos_framework::system_addresses;
@@ -57,9 +57,9 @@ module aptos_framework::reconfiguration {
         timestamp::assert_genesis();
         system_addresses::assert_aptos_framework(account);
 
-        assert!(!exists<Configuration>(@aptos_framework), errors::already_published(ECONFIGURATION));
+        assert!(!exists<Configuration>(@aptos_framework), error::already_exists(ECONFIGURATION));
         // assert it matches `new_epoch_event_key()`, otherwise the event can't be recognized
-        assert!(guid::get_next_creation_num(signer::address_of(account)) == 2, errors::invalid_state(EINVALID_GUID_FOR_EVENT));
+        assert!(guid::get_next_creation_num(signer::address_of(account)) == 2, error::invalid_state(EINVALID_GUID_FOR_EVENT));
         move_to<Configuration>(
             account,
             Configuration {
@@ -74,7 +74,7 @@ module aptos_framework::reconfiguration {
     /// This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
     fun disable_reconfiguration(account: &signer) {
         system_addresses::assert_aptos_framework(account);
-        assert!(reconfiguration_enabled(), errors::invalid_state(ECONFIGURATION));
+        assert!(reconfiguration_enabled(), error::invalid_state(ECONFIGURATION));
         move_to(account, DisableReconfiguration {} )
     }
 
@@ -83,7 +83,7 @@ module aptos_framework::reconfiguration {
     fun enable_reconfiguration(account: &signer) acquires DisableReconfiguration {
         system_addresses::assert_aptos_framework(account);
 
-        assert!(!reconfiguration_enabled(), errors::invalid_state(ECONFIGURATION));
+        assert!(!reconfiguration_enabled(), error::invalid_state(ECONFIGURATION));
         DisableReconfiguration {} = move_from<DisableReconfiguration>(signer::address_of(account));
     }
 
@@ -134,7 +134,7 @@ module aptos_framework::reconfiguration {
             return
         };
 
-        assert!(current_time > config_ref.last_reconfiguration_time, errors::invalid_state(EINVALID_BLOCK_TIME));
+        assert!(current_time > config_ref.last_reconfiguration_time, error::invalid_state(EINVALID_BLOCK_TIME));
         config_ref.last_reconfiguration_time = current_time;
         config_ref.epoch = config_ref.epoch + 1;
 
@@ -149,9 +149,9 @@ module aptos_framework::reconfiguration {
     /// Emit a `NewEpochEvent` event. This function will be invoked by genesis directly to generate the very first
     /// reconfiguration event.
     fun emit_genesis_reconfiguration_event() acquires Configuration {
-        assert!(exists<Configuration>(@aptos_framework), errors::not_published(ECONFIGURATION));
+        assert!(exists<Configuration>(@aptos_framework), error::not_found(ECONFIGURATION));
         let config_ref = borrow_global_mut<Configuration>(@aptos_framework);
-        assert!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, errors::invalid_state(ECONFIGURATION));
+        assert!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, error::invalid_state(ECONFIGURATION));
         config_ref.epoch = 1;
 
         event::emit_event<NewEpochEvent>(

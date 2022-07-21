@@ -32,12 +32,12 @@ pub fn create_account_identifier() -> Identifier {
     ident_str!("create_account").into()
 }
 
-pub fn test_coin_identifier() -> Identifier {
-    ident_str!("TestCoin").into()
+pub fn aptos_coin_identifier() -> Identifier {
+    ident_str!("AptosCoin").into()
 }
 
-pub fn test_coin_identifier_lower() -> Identifier {
-    ident_str!("testcoin").into()
+pub fn aptos_coin_identifier_lower() -> Identifier {
+    ident_str!("aptoscoin").into()
 }
 
 pub fn sequence_number_identifier() -> Identifier {

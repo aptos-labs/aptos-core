@@ -69,7 +69,7 @@ CREATE TABLE transactions
        "expiration_timestamp_secs":"1649713172",
        "payload":{
           "type":"script_function_payload",
-          "function":"0x1::test_coin::mint",
+          "function":"0x1::aptos_coin::mint",
           "type_arguments":[
 
           ],

@@ -1,7 +1,7 @@
 /// This module defines a struct storing the metadata of the block and new block events.
 module aptos_framework::block {
-    use std::errors;
-    use std::event;
+    use std::error;
+    use aptos_std::event;
 
     use aptos_framework::governance_proposal::GovernanceProposal;
     use aptos_framework::timestamp;
@@ -38,7 +38,7 @@ module aptos_framework::block {
         timestamp::assert_genesis();
         system_addresses::assert_aptos_framework(account);
 
-        assert!(!is_initialized(), errors::already_published(EBLOCK_METADATA));
+        assert!(!is_initialized(), error::already_exists(EBLOCK_METADATA));
         move_to<BlockMetadata>(
             account,
             BlockMetadata {
@@ -52,7 +52,7 @@ module aptos_framework::block {
     /// Update the epoch interval.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
     public fun update_epoch_interval(
-        _gov_proposal: GovernanceProposal,
+        _gov_proposal: &GovernanceProposal,
         new_epoch_interval: u64,
     ) acquires BlockMetadata {
         let block_metadata = borrow_global_mut<BlockMetadata>(@aptos_framework);
@@ -83,7 +83,7 @@ module aptos_framework::block {
         // Authorization
         assert!(
             proposer == @vm_reserved || stake::is_current_epoch_validator(proposer),
-        errors::requires_address(EVM_OR_VALIDATOR)
+        error::permission_denied(EVM_OR_VALIDATOR)
         );
 
         let block_metadata_ref = borrow_global_mut<BlockMetadata>(@aptos_framework);
@@ -112,7 +112,17 @@ module aptos_framework::block {
 
     /// Get the current block height
     public fun get_current_block_height(): u64 acquires BlockMetadata {
-        assert!(is_initialized(), errors::not_published(EBLOCK_METADATA));
+        assert!(is_initialized(), error::not_found(EBLOCK_METADATA));
         borrow_global<BlockMetadata>(@aptos_framework).height
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    public entry fun test_update_epoch_interval(aptos_framework: signer) acquires BlockMetadata {
+        use aptos_framework::governance_proposal;
+
+        initialize_block_metadata(&aptos_framework, 1);
+        assert!(borrow_global<BlockMetadata>(@aptos_framework).epoch_internal == 1, 0);
+        update_epoch_interval(&governance_proposal::create_test_proposal(), 2);
+        assert!(borrow_global<BlockMetadata>(@aptos_framework).epoch_internal == 2, 1);
     }
 }

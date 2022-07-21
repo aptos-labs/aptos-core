@@ -169,7 +169,7 @@ impl SessionOutput {
 
         for (handle, change) in table_change_set.changes {
             for (key, value_opt) in change.entries {
-                let state_key = StateKey::table_item(handle.0, key);
+                let state_key = StateKey::table_item(handle.into(), key);
                 if let Some(bytes) = value_opt {
                     write_set_mut.push((state_key, WriteOp::Value(bytes)))
                 } else {

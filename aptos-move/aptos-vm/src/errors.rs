@@ -30,13 +30,13 @@ pub const EBAD_TRANSACTION_FEE_CURRENCY: u64 = 1012;
 pub const ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1013;
 pub const ESEQ_NONCE_NONCE_INVALID: u64 = 1014;
 
-const INVALID_STATE: u8 = 1;
-const INVALID_ARGUMENT: u8 = 7;
-const LIMIT_EXCEEDED: u8 = 8;
+const INVALID_STATE: u8 = 3;
+const INVALID_ARGUMENT: u8 = 1;
+const LIMIT_EXCEEDED: u8 = 2;
 
 fn error_split(code: u64) -> (u8, u64) {
-    let category = code as u8;
-    let reason = code >> 8;
+    let reason = code & 0xffff;
+    let category = ((code >> 16) & 0xff) as u8;
     (category, reason)
 }
 

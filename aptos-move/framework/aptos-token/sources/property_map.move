@@ -3,7 +3,7 @@
 module aptos_token::property_map {
     use std::vector;
     use std::string::{Self, String};
-    use aptos_framework::simple_map::{Self, SimpleMap};
+    use aptos_std::simple_map::{Self, SimpleMap};
 
     const MAX_PROPERTY_MAP_SIZE: u64 = 1000;
     const EKEY_AREADY_EXIST_IN_PROPERTY_MAP: u64 = 1;

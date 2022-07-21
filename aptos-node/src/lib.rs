@@ -496,6 +496,9 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         info!("Genesis txn not provided, it's fine if you don't expect to apply it otherwise please double check config");
     }
     AptosVM::set_concurrency_level_once(node_config.execution.concurrency_level as usize);
+    AptosVM::set_num_proof_reading_threads_once(
+        node_config.execution.num_proof_reading_threads as usize,
+    );
 
     debug!(
         "Storage service started in {} ms",
