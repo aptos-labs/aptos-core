@@ -59,7 +59,7 @@ module aptos_framework::reconfiguration {
 
         assert!(!exists<Configuration>(@aptos_framework), error::already_exists(ECONFIGURATION));
         // assert it matches `new_epoch_event_key()`, otherwise the event can't be recognized
-        assert!(guid::get_next_creation_num(signer::address_of(account)) == 0, error::invalid_state(EINVALID_GUID_FOR_EVENT));
+        assert!(guid::get_next_creation_num(signer::address_of(account)) == 1, error::invalid_state(EINVALID_GUID_FOR_EVENT));
         move_to<Configuration>(
             account,
             Configuration {
