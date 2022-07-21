@@ -37,11 +37,11 @@ pub fn output(out: &mut dyn Write, abis: &[ScriptABI], local_types: bool) -> Res
     emitter.output_preamble()?;
     emitter.output_script_call_enum_with_imports(abis)?;
 
-    let tx_script_abis = common::transaction_script_abis(abis);
+    let txn_script_abis = common::transaction_script_abis(abis);
     let script_function_abis = common::script_function_abis(abis);
 
-    if !tx_script_abis.is_empty() {
-        emitter.output_transaction_script_impl(&tx_script_abis)?;
+    if !txn_script_abis.is_empty() {
+        emitter.output_transaction_script_impl(&txn_script_abis)?;
     }
     if !script_function_abis.is_empty() {
         emitter.output_script_function_impl(&script_function_abis)?;
@@ -51,19 +51,22 @@ pub fn output(out: &mut dyn Write, abis: &[ScriptABI], local_types: bool) -> Res
         emitter.output_script_encoder_function(abi)?;
     }
 
+    write!(emitter.out, "mod decoder {{")?;
     for abi in abis {
         emitter.output_script_decoder_function(abi)?;
     }
+    writeln!(emitter.out, "}}")?;
 
-    if !tx_script_abis.is_empty() {
-        emitter.output_transaction_script_decoder_map(&tx_script_abis)?;
+    if !txn_script_abis.is_empty() {
+        emitter.output_transaction_script_decoder_map(&txn_script_abis)?;
     }
     if !script_function_abis.is_empty() {
         emitter.output_script_function_decoder_map(&script_function_abis)?;
     }
+
     emitter.output_decoding_helpers(&common::filter_transaction_scripts(abis))?;
 
-    for abi in &tx_script_abis {
+    for abi in &txn_script_abis {
         emitter.output_code_constant(abi)?;
     }
     Ok(())
@@ -136,6 +139,7 @@ where
             .iter()
             .cloned()
             .partition(|abi| abi.is_transaction_script_abi());
+
         let has_script = !transaction_script_abis.is_empty();
         let mut script_registry: BTreeMap<_, _> = if has_script {
             vec![(
@@ -147,12 +151,14 @@ where
         } else {
             BTreeMap::new()
         };
+
         let mut script_function_registry: BTreeMap<_, _> = vec![(
             "ScriptFunctionCall".to_string(),
             common::make_namespaced_abi_enum_container(script_fun_abis.as_slice()),
         )]
         .into_iter()
         .collect();
+
         script_registry.append(&mut script_function_registry);
         let mut comments: BTreeMap<_, _> = abis
             .iter()
@@ -168,7 +174,11 @@ where
                         .to_string(),
                         match abi {
                             ScriptABI::ScriptFunction(sf) => {
-                                format!("{}{}", sf.module_name().name(), abi.name().to_camel_case())
+                                format!(
+                                    "{}{}",
+                                    sf.module_name().name().to_string().to_camel_case(),
+                                    abi.name().to_camel_case()
+                                )
                             }
                             _ => abi.name().to_camel_case(),
                         },
@@ -177,6 +187,7 @@ where
                 )
             })
             .collect();
+
         if has_script {
             comments.insert(
                 vec!["crate".to_string(), "ScriptCall".to_string()],
@@ -191,6 +202,7 @@ impl ScriptCall {
                 .into(),
             );
         }
+
         comments.insert(
             vec!["crate".to_string(), "ScriptFunctionCall".to_string()],
             r#"Structured representation of a call into a known Move script function.
@@ -203,6 +215,7 @@ impl ScriptFunctionCall {
 "#
             .into(),
         );
+
         let custom_derive_block = if self.local_types {
             Some(
                 r#"#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
@@ -212,11 +225,15 @@ impl ScriptFunctionCall {
         } else {
             None
         };
+
         // Deactivate serialization for local types to force `Bytes = Vec<u8>`.
         let config = CodeGeneratorConfig::new("crate".to_string())
             .with_comments(comments)
             .with_external_definitions(external_definitions)
             .with_serialization(!self.local_types);
+
+        // If you get an error here, you may need to add a new type to
+        // `get_external_definitions` below
         rust::CodeGenerator::new(&config)
             .with_derive_macros(vec![
                 "Clone".to_string(),
@@ -234,7 +251,7 @@ impl ScriptFunctionCall {
             vec![
                 (
                     "move_deps::move_core_types::language_storage",
-                    vec!["ModuleId"],
+                    vec!["ModuleId", "TypeTag"],
                 ),
                 ("move_deps::move_core_types", vec!["ident_str"]),
                 (
@@ -265,6 +282,7 @@ impl ScriptFunctionCall {
                 ],
             )]
         };
+
         definitions
             .into_iter()
             .map(|(module, defs)| {
@@ -325,13 +343,13 @@ pub fn encode(self) -> TransactionPayload {{"#
             .join(", ");
 
         let prefix = if let ScriptABI::ScriptFunction(sf) = abi {
-            sf.module_name().name().to_string()
+            sf.module_name().name().to_string().to_camel_case()
         } else {
             String::new()
         };
         writeln!(
             self.out,
-            "{5}{0}{{{2}}} => encode_{3}{4}{1}({2}),",
+            "{5}{0}{{{2}}} => {3}{4}{1}({2}),",
             abi.name().to_camel_case(),
             abi.name(),
             params,
@@ -428,7 +446,7 @@ pub fn name(&self) -> &'static str {{"#
     ) -> Result<()> {
         write!(
             self.out,
-            "pub fn encode_{}_script({}) -> Script {{",
+            "pub fn {}_script({}) -> Script {{",
             abi.name(),
             [
                 Self::quote_type_parameters(abi.ty_args()),
@@ -473,7 +491,7 @@ Script {{
     fn emit_script_function_encoder_function(&mut self, abi: &ScriptFunctionABI) -> Result<()> {
         write!(
             self.out,
-            "pub fn encode_{}_{}({}) -> TransactionPayload {{",
+            "pub fn {}_{}({}) -> TransactionPayload {{",
             abi.module_name().name().to_string().to_snake_case(),
             abi.name(),
             [
@@ -540,7 +558,7 @@ TransactionPayload::ScriptFunction(ScriptFunction {{
         //
         writeln!(
             self.out,
-            "\nfn decode_{}_{}(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {{",
+            "\nfn {}_{}(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {{",
             abi.module_name().name().to_string().to_snake_case(),
             abi.name(),
         )?;
@@ -559,7 +577,7 @@ TransactionPayload::ScriptFunction(ScriptFunction {{
         writeln!(
             self.out,
             "Some(ScriptFunctionCall::{}{} {{",
-            abi.module_name().name(),
+            abi.module_name().name().to_string().to_camel_case(),
             abi.name().to_camel_case(),
         )?;
         self.out.indent();
@@ -599,7 +617,7 @@ TransactionPayload::ScriptFunction(ScriptFunction {{
     ) -> Result<()> {
         writeln!(
             self.out,
-            "\nfn decode_{}_script({}script: &Script) -> Option<ScriptCall> {{",
+            "\nfn {}_script({}script: &Script) -> Option<ScriptCall> {{",
             abi.name(),
             // fix warning "unused variable"
             if abi.ty_args().is_empty() && abi.args().is_empty() {
@@ -627,7 +645,7 @@ TransactionPayload::ScriptFunction(ScriptFunction {{
         for (index, arg) in abi.args().iter().enumerate() {
             writeln!(
                 self.out,
-                "{} : decode_{}_argument(script.args{}.get({})?.clone())?,",
+                "{} : {}_argument(script.args{}.get({})?.clone())?,",
                 arg.name(),
                 common::mangle_type(arg.type_tag()),
                 if self.local_types { "()" } else { "" },
@@ -660,7 +678,7 @@ static TRANSACTION_SCRIPT_DECODER_MAP: once_cell::sync::Lazy<TransactionScriptDe
         for abi in abis {
             writeln!(
                 self.out,
-                "map.insert({}_CODE.to_vec(), Box::new(decode_{}_script));",
+                "map.insert({}_CODE.to_vec(), Box::new(decoder::{}_script));",
                 abi.name().to_shouty_snake_case(),
                 abi.name()
             )?;
@@ -686,7 +704,7 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         for abi in abis {
             writeln!(
                 self.out,
-                "map.insert(\"{}{}\".to_string(), Box::new(decode_{}_{}));",
+                "map.insert(\"{}_{}\".to_string(), Box::new(decoder::{}_{}));",
                 abi.module_name().name(),
                 abi.name(),
                 abi.module_name().name().to_string().to_snake_case(),

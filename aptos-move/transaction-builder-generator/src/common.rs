@@ -97,7 +97,11 @@ pub(crate) fn make_namespaced_abi_enum_container(abis: &[ScriptABI]) -> Containe
 
         let name = match abi {
             ScriptABI::ScriptFunction(sf) => {
-                format!("{}{}", sf.module_name().name(), abi.name().to_camel_case())
+                format!(
+                    "{}{}",
+                    sf.module_name().name().to_string().to_camel_case(),
+                    abi.name().to_camel_case()
+                )
             }
             _ => abi.name().to_camel_case(),
         };
