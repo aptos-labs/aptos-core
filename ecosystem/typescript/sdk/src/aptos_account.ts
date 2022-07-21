@@ -35,18 +35,13 @@ export class AptosAccount {
   static isValidPath = (path: string): boolean => {
     if (
       // eslint-disable-next-line prefer-regex-literals
-      !new RegExp("^m\\/44+'\\/637+'\\/[0-9]+'\\/[0-9]+'\\/[0-9]+'+$").test(
+      !new RegExp("^m\\/44'\\/637'\\/[0-9]+'\\/[0-9]+'\\/[0-9]+'+$").test(
         path,
       )
     ) {
       return false;
     }
-    return !path
-      .split("/")
-      .slice(1)
-      .map((val: string): string => val.replace("'", ""))
-      // eslint-disable-next-line no-restricted-globals
-      .some(isNaN as any);
+    return true;
   };
 
   static fromDerivePath(path: string, mnemonics: string): AptosAccount {
