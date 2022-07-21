@@ -27,13 +27,9 @@ test("generates derive path accounts", () => {
 });
 
 test("generates derive path accounts", () => {
-<<<<<<< HEAD
   expect(() => {
     AptosAccount.fromDerivePath("", mnemonic);
   }).toThrow(new Error("Invalid derivation path"));
-=======
-  expect(() => { AptosAccount.fromDerivePath("", mnemonic); }).toThrow(new Error("Invalid derivation path"));
->>>>>>> bf26ff4b51 (remove bip39-light)
 });
 
 test("accepts custom address", () => {
