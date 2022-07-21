@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! For each transaction the VM executes, the VM will output a `WriteSet` that contains each access
-//! path it updates. For each access path, the VM can either give its new value or delete it. If
-//! aggregator is used, a delta update is used.
+//! path it updates. For each access path, the VM can either give its new value or delete it. For
+//! aggregator, delta updates are used (note: this is a temporary solution and ideally we should
+//! modify `ChangeSet` and `TransactionOutput` to keep deltas internal to executor).
 
 use crate::state_store::state_key::StateKey;
 use anyhow::Result;
@@ -11,7 +12,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use serde::{Deserialize, Serialize};
 
 /// Specifies partial function such as +X or -X to use with `WriteOp::Delta`.
-#[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum DeltaOperation {
     Addition(u128),
     Subtraction(u128),
@@ -26,7 +27,7 @@ impl std::fmt::Debug for DeltaOperation {
     }
 }
 
-#[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct DeltaLimit(pub u128);
 
 impl std::fmt::Debug for DeltaLimit {
@@ -38,9 +39,9 @@ impl std::fmt::Debug for DeltaLimit {
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {
     Deletion,
+    Value(#[serde(with = "serde_bytes")] Vec<u8>),
     #[serde(skip)]
     Delta(DeltaOperation, DeltaLimit),
-    Value(#[serde(with = "serde_bytes")] Vec<u8>),
 }
 
 impl WriteOp {
