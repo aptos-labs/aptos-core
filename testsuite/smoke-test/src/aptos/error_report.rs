@@ -36,8 +36,7 @@ async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
         "expected = {}, err = {}",
         expected,
         err
-
-    );
+    )
 }
 
 #[async_trait::async_trait]
@@ -52,7 +51,7 @@ impl AptosTest for ErrorReport {
             |t| t.sender(address),
             "INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE",
         )
-        .await;
+            .await;
         // TODO(Gas): re-enable this
         /*submit_and_check_err(
             &local_account,
@@ -67,21 +66,21 @@ impl AptosTest for ErrorReport {
             |t| t.sender(address).chain_id(ChainId::new(100)),
             "BAD_CHAIN_ID",
         )
-        .await;
+            .await;
         submit_and_check_err(
             &local_account,
             ctx,
             |t| t.sender(AccountAddress::random()),
             "SENDING_ACCOUNT_DOES_NOT_EXIST",
         )
-        .await;
+            .await;
         submit_and_check_err(
             &local_account,
             ctx,
             |t| t.sender(aptos_root_address()),
             "SEQUENCE_NUMBER_TOO_OLD",
         )
-        .await;
+            .await;
         let root_account_sequence_number = ctx.root_account().sequence_number();
         submit_and_check_err(
             &local_account,
@@ -92,7 +91,7 @@ impl AptosTest for ErrorReport {
             },
             "INVALID_AUTH_KEY",
         )
-        .await;
+            .await;
         ctx.mint(address, 100000).await?;
         submit_and_check_err(
             &local_account,
@@ -100,7 +99,7 @@ impl AptosTest for ErrorReport {
             |t| t.sender(address).expiration_timestamp_secs(0),
             "TRANSACTION_EXPIRED",
         )
-        .await;
+            .await;
         Ok(())
     }
 }
