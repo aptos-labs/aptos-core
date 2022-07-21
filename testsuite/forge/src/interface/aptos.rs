@@ -164,7 +164,7 @@ impl<'t> AptosPublicInfo<'t> {
         Ok(())
     }
 
-    pub async fn transfer(
+    pub async fn transfer_non_blocking(
         &self,
         from_account: &mut LocalAccount,
         to_account: &LocalAccount,
@@ -174,6 +174,18 @@ impl<'t> AptosPublicInfo<'t> {
             aptos_stdlib::aptos_coin_transfer(to_account.address(), amount),
         ));
         let pending_txn = self.rest_client.submit(&tx).await?.into_inner();
+        Ok(pending_txn)
+    }
+
+    pub async fn transfer(
+        &self,
+        from_account: &mut LocalAccount,
+        to_account: &LocalAccount,
+        amount: u64,
+    ) -> Result<PendingTransaction> {
+        let pending_txn = self
+            .transfer_non_blocking(from_account, to_account, amount)
+            .await?;
         self.rest_client.wait_for_transaction(&pending_txn).await?;
         Ok(pending_txn)
     }
