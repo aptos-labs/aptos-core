@@ -7,42 +7,33 @@ module aptos_framework::governance_proposal {
     use std::string::{String, length, utf8};
     use std::error;
 
-    const ECODE_LOCATION_TOO_LONG: u64 = 1;
-    const ETITLE_TOO_LONG: u64 = 2;
-    const EDESCRIPTION_TOO_LONG: u64 = 3;
+    const ETOO_LONG: u64 = 1;
 
     struct GovernanceProposal has store, drop {
-        /// The location (e.g. url) where the proposal resolution script's code can be accessed.
-        /// Maximum length allowed is 256 chars.
-        code_location: String,
-        /// Title of the proposal.
-        /// Maximum length allowed is 256 chars.
-        title: String,
-        /// Description of the proposal.
-        /// Maximum length allowed is 256 chars.
-        description: String,
+        // Location where metadata such as the proposal's execution script content, description, etc. are hosted.
+        metadata_location: String,
+        // The hash of the metadata to allow easy verification when a user votes that the metadata hosted at a url is
+        // correct.
+        metadata_hash: String,
     }
 
     /// Create and return a GovernanceProposal resource. Can only be called by AptosGovernance
     public(friend) fun create_proposal(
-        code_location: String,
-        title: String,
-        description: String,
+        metadata_location: String,
+        metadata_hash: String,
     ): GovernanceProposal {
-        assert!(length(&code_location) <= 256, error::invalid_argument(ECODE_LOCATION_TOO_LONG));
-        assert!(length(&title) <= 256, error::invalid_argument(ETITLE_TOO_LONG));
-        assert!(length(&description) <= 256, error::invalid_argument(EDESCRIPTION_TOO_LONG));
+        assert!(length(&metadata_location) <= 256, error::invalid_argument(ETOO_LONG));
+        assert!(length(&metadata_hash) <= 256, error::invalid_argument(ETOO_LONG));
 
         GovernanceProposal {
-            code_location,
-            title,
-            description
+            metadata_location,
+            metadata_hash,
         }
     }
 
     /// Useful for AptosGovernance to create an empty proposal as proof.
     public(friend) fun create_empty_proposal(): GovernanceProposal {
-        create_proposal(utf8(b""), utf8(b""), utf8(b""))
+        create_proposal(utf8(b""), utf8(b""))
     }
 
     #[test_only]
@@ -52,29 +43,17 @@ module aptos_framework::governance_proposal {
 
     #[test]
     #[expected_failure(abort_code = 65537)]
-    public fun test_code_location_too_long(): GovernanceProposal {
+    public fun test_metadata_url_too_long(): GovernanceProposal {
         create_proposal(
-            utf8(b"123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789"),
-            utf8(b""),
-            utf8(b""),
-        )
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 65538)]
-    public fun test_title_too_long(): GovernanceProposal {
-        create_proposal(
-            utf8(b""),
             utf8(b"123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789"),
             utf8(b""),
         )
     }
 
     #[test]
-    #[expected_failure(abort_code = 65539)]
-    public fun test_description_too_long(): GovernanceProposal {
+    #[expected_failure(abort_code = 65537)]
+    public fun test_metadata_hash_too_long(): GovernanceProposal {
         create_proposal(
-            utf8(b""),
             utf8(b""),
             utf8(b"123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789"),
         )
