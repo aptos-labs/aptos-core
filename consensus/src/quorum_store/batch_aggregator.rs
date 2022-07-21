@@ -1,62 +1,83 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::types::{BatchId, Data};
+use crate::quorum_store::types::{BatchId, SerializedTransaction};
 use aptos_crypto::{hash::DefaultHasher, HashValue};
-use bcs::to_bytes;
+use aptos_types::transaction::SignedTransaction;
+use bcs::from_bytes;
+use std::result::Result;
 
-struct IncrementalBatchState {
-    txn_fragments: Vec<Data>,
+#[derive(Clone, Debug)]
+pub enum BatchAggregatorError {
+    DeserializationError,
+    SizeLimitExceeded,
+    OutdatedFragment,
+    MissedFragment,
+}
+
+pub(crate) struct IncrementalBatchState {
+    num_fragments: usize,
+    status: Result<(), BatchAggregatorError>,
+    txns: Vec<SignedTransaction>,
     hasher: DefaultHasher,
     num_bytes: usize,
     max_bytes: usize,
 }
 
 impl IncrementalBatchState {
-    pub fn new(max_bytes: usize) -> Self {
+    pub(crate) fn new(max_bytes: usize) -> Self {
         Self {
-            txn_fragments: Vec::new(),
+            num_fragments: 0,
+            status: Ok(()),
+            txns: Vec::new(),
             hasher: DefaultHasher::new(b"QuorumStoreBatch"),
             num_bytes: 0,
             max_bytes,
         }
     }
 
-    pub fn append_transactions(&mut self, transactions: Data) -> bool {
-        // Save computation when we overflow max size.
-        if self.num_bytes < self.max_bytes {
-            let serialized: Vec<u8> = transactions
-                .iter()
-                .map(|txn| to_bytes(txn).unwrap())
-                .flatten()
-                .collect();
-            self.num_bytes = self.num_bytes + serialized.len();
-            self.hasher.update(&serialized);
+    pub(crate) fn append_transactions(
+        &mut self,
+        serialized_txns: Vec<SerializedTransaction>,
+    ) -> Result<(), BatchAggregatorError> {
+        self.num_fragments = self.num_fragments + 1;
+
+        if self.status.is_ok() {
+            // Avoid useless work if batch already has an error.
+            for mut txn in serialized_txns {
+                self.num_bytes = self.num_bytes + txn.len();
+                // TODO: check that it's fine to hash individually (perf and incrementality).
+                self.hasher.update(&txn.bytes());
+
+                if self.num_bytes > self.max_bytes {
+                    self.status = Err(BatchAggregatorError::SizeLimitExceeded);
+                    break;
+                }
+
+                match from_bytes(&txn.take_bytes()) {
+                    Ok(signed_txn) => self.txns.push(signed_txn),
+                    Err(_) => {
+                        self.status = Err(BatchAggregatorError::DeserializationError);
+                        break;
+                    }
+                }
+            }
         }
-        self.txn_fragments.push(transactions);
-        self.num_bytes <= self.max_bytes
+
+        self.status.clone()
     }
 
-    pub fn num_fragments(&self) -> usize {
-        self.txn_fragments.len()
+    pub(crate) fn num_fragments(&self) -> usize {
+        self.num_fragments
     }
 
-    pub fn finalize_batch(self) -> (usize, Data, HashValue) {
-        (
-            self.num_bytes,
-            self.txn_fragments.into_iter().flatten().collect(),
-            self.hasher.finish(),
-        )
+    pub(crate) fn finalize_batch(
+        self,
+    ) -> Result<(usize, Vec<SignedTransaction>, HashValue), BatchAggregatorError> {
+        self.status
+            .clone()
+            .map(|_| (self.num_bytes, self.txns, self.hasher.finish()))
     }
-}
-
-// TODO: also apply this to num_bytes violating the maximum constraint (rename).
-/// Enum that determines how BatchAggregator handles missing fragments in the stream.
-/// For streams arriving on the network, it makes sense to be best effort, while for
-/// own stream, we assert that the fragments are in expected order.
-pub(crate) enum AggregationMode {
-    AssertWrongOrder,
-    IgnoreWrongOrder,
 }
 
 /// Aggregates batches and computes digest for a given validator.
@@ -64,16 +85,14 @@ pub(crate) struct BatchAggregator {
     batch_id: Option<BatchId>,
     batch_state: Option<IncrementalBatchState>,
     max_batch_bytes: usize,
-    mode: AggregationMode,
 }
 
 impl BatchAggregator {
-    pub(crate) fn new(max_batch_size: usize, mode: AggregationMode) -> Self {
+    pub(crate) fn new(max_batch_size: usize) -> Self {
         Self {
             batch_id: None,
             batch_state: None,
             max_batch_bytes: max_batch_size,
-            mode,
         }
     }
 
@@ -113,52 +132,46 @@ impl BatchAggregator {
     }
 
     /// Appends transactions from a batch fragment, ensuring that the fragment is
-    /// consistent with the state being aggregated, and handling missing fragments
-    /// according to the provided AggregationMode. Returns whether the fragment was
-    /// successfully appended (stale fragments are ignored).
+    /// consistent with the state being aggregated, and the maximum batch size is
+    /// being respected. Otherwise, a corresponding error is returned which should
+    /// be handled on the caller side (i.e. panic for self, log & ignore for peers).
     pub(crate) fn append_transactions(
         &mut self,
         batch_id: BatchId,
         fragment_id: usize,
-        transactions: Data,
-    ) -> bool {
+        transactions: Vec<SerializedTransaction>,
+    ) -> Result<(), BatchAggregatorError> {
         if self.outdated_fragment(batch_id, fragment_id) {
-            match self.mode {
-                // Replay or batch / fragment received out of order.
-                AggregationMode::AssertWrongOrder => panic!("Outdated batch / fragment ID"),
-                AggregationMode::IgnoreWrongOrder => {
-                    return false;
-                }
-            }
+            // Replay or batch / fragment received out of order.
+            return Err(BatchAggregatorError::OutdatedFragment);
         }
 
         let missed_fragment = self.missed_fragment(batch_id, fragment_id);
-        match self.mode {
-            AggregationMode::AssertWrongOrder => {
-                assert!(!missed_fragment, "Wrong batch / fragment ID")
-            }
-            AggregationMode::IgnoreWrongOrder => {
-                if missed_fragment {
-                    // If we started receiving a new batch, allow aggregating it by
-                    // clearing the state. Otherwise, when some fragment is skipped
-                    // within a batch, this just stops aggregating it.
-                    self.batch_state = None;
-                }
-            }
+        if missed_fragment {
+            // If we started receiving a new batch, allow aggregating it by
+            // clearing the state. Otherwise, when some fragment is skipped
+            // within a batch, this just stops aggregating it.
+            self.batch_state = None;
         }
 
         if fragment_id == 0 {
-            debug_assert!(self.batch_state.is_none());
+            // Fragment wasn't outdated. If a fragment was missed, state should be cleared
+            // above, and otherwise, it must be cleared by end_batch.
+            debug_assert!(self.batch_state.is_none(), "Batch state not cleared");
             self.batch_state = Some(IncrementalBatchState::new(self.max_batch_bytes));
             self.batch_id = Some(batch_id);
         }
+
         if self.batch_state.is_some() {
             self.batch_state
                 .as_mut()
                 .unwrap()
-                .append_transactions(transactions)
+                .append_transactions(transactions)?
+        }
+        if missed_fragment {
+            Err(BatchAggregatorError::MissedFragment)
         } else {
-            false
+            Ok(())
         }
     }
 
@@ -166,12 +179,12 @@ impl BatchAggregator {
         &mut self,
         batch_id: BatchId,
         fragment_id: usize,
-        transactions: Data,
-    ) -> Option<(usize, Data, HashValue)> {
-        if self.append_transactions(batch_id, fragment_id, transactions) {
-            Some(self.batch_state.take().unwrap().finalize_batch())
-        } else {
-            None
-        }
+        transactions: Vec<SerializedTransaction>,
+    ) -> Result<(usize, Vec<SignedTransaction>, HashValue), BatchAggregatorError> {
+        self.append_transactions(batch_id, fragment_id, transactions)?;
+        self.batch_state
+            .take()
+            .expect("Batch state must exist")
+            .finalize_batch()
     }
 }

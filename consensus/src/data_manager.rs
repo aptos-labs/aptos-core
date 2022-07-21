@@ -1,25 +1,23 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::ops::Deref;
-use crate::quorum_store::batch_reader::BatchReader;
+use crate::quorum_store::{batch_reader::BatchReader, utils::RoundExpirations};
 use aptos_crypto::HashValue;
+use aptos_infallible::Mutex;
 use aptos_logger::debug;
 use aptos_types::transaction::SignedTransaction;
 use arc_swap::ArcSwapOption;
 use consensus_types::{
-    common::Payload, proof_of_store::LogicalTime, request_response::WrapperCommand,
+    block::Block,
+    common::Payload,
+    proof_of_store::{LogicalTime, ProofOfStore},
+    request_response::WrapperCommand,
 };
-use executor_types::Error;
-use futures::channel::mpsc::Sender;
-use std::sync::Arc;
 use dashmap::DashMap;
+use executor_types::*;
+use futures::channel::mpsc::Sender;
+use std::{ops::Deref, sync::Arc};
 use tokio::sync::oneshot;
-use aptos_infallible::Mutex;
-use consensus_types::block::Block;
-use consensus_types::proof_of_store::ProofOfStore;
-use crate::quorum_store::types::Data;
-use crate::quorum_store::utils::RoundExpirations;
 
 /// Notification of execution committed logical time for QuorumStore to clean.
 #[async_trait::async_trait]
@@ -35,10 +33,7 @@ pub trait DataManager: Send + Sync {
 
     async fn update_payload(&self, block: &Block);
 
-    async fn get_data(
-        &self,
-        block: &Block,
-    ) -> Result<Vec<SignedTransaction>, Error>;
+    async fn get_data(&self, block: &Block) -> Result<Vec<SignedTransaction>, Error>;
 }
 
 enum DataStatus {
@@ -68,11 +63,20 @@ impl QuorumStoreDataManager {
 }
 
 impl QuorumStoreDataManager {
-    async fn request_data(&self, poss: Vec<ProofOfStore>, logical_time: LogicalTime) -> Vec<oneshot::Receiver<Result<Data, Error>>> {
+    async fn request_data(
+        &self,
+        poss: Vec<ProofOfStore>,
+        logical_time: LogicalTime,
+    ) -> Vec<oneshot::Receiver<Result<Vec<SignedTransaction>, executor_types::Error>>> {
         let mut receivers = Vec::new();
         for pos in poss {
-            debug!("QSE: requesting pos {:?}, digest {}", pos, pos.digest());
-            if logical_time < pos.expiration() {
+            debug!(
+                "QSE: requesting pos {:?}, digest {}, time = {:?}",
+                pos,
+                pos.digest(),
+                logical_time
+            );
+            if logical_time <= pos.expiration() {
                 receivers.push(
                     self.data_reader
                         .load()
@@ -81,7 +85,9 @@ impl QuorumStoreDataManager {
                         .get_batch(pos)
                         .await,
                 );
-            } else { debug!("QS: skipped expired pos"); }
+            } else {
+                debug!("QS: skipped expired pos");
+            }
         }
         receivers
     }
@@ -128,21 +134,28 @@ impl DataManager for QuorumStoreDataManager {
         if block.payload().is_some() {
             match block.payload().unwrap() {
                 Payload::InQuorumStore(proofs) => {
-                    let receivers = self.request_data(proofs.clone(), LogicalTime::new(block.epoch(), block.round())).await;
+                    let receivers = self
+                        .request_data(
+                            proofs.clone(),
+                            LogicalTime::new(block.epoch(), block.round()),
+                        )
+                        .await;
                     assert!(!self.digest_status.contains_key(&block.id()));
-                    self.digest_status.insert(block.id(), DataStatus::Requested(receivers));
-                    self.expiration_status.lock().add_item(block.id(), block.round());
+                    self.digest_status
+                        .insert(block.id(), DataStatus::Requested(receivers));
+                    self.expiration_status
+                        .lock()
+                        .add_item(block.id(), block.round());
                 }
                 Payload::Empty => {}
-                Payload::DirectMempool(_) => { unreachable!() }
+                Payload::DirectMempool(_) => {
+                    unreachable!()
+                }
             }
         }
     }
 
-    async fn get_data(
-        &self,
-        block: &Block,
-    ) -> Result<Vec<SignedTransaction>, Error> {
+    async fn get_data(&self, block: &Block) -> Result<Vec<SignedTransaction>, Error> {
         if block.payload().is_none() {
             return Ok(Vec::new());
         }
@@ -154,7 +167,9 @@ impl DataManager for QuorumStoreDataManager {
             Payload::DirectMempool(_) => unreachable!("Direct mempool should not be used."),
             Payload::InQuorumStore(proofs) => {
                 match self.digest_status.get(&block.id()) {
-                    None => { unreachable!() }
+                    None => {
+                        unreachable!()
+                    }
                     Some(data_status) => {
                         if let DataStatus::Cached(data) = data_status.deref() {
                             return Ok(data.clone());
@@ -165,12 +180,19 @@ impl DataManager for QuorumStoreDataManager {
                 let receivers = if let DataStatus::Requested(rec) = data_status {
                     rec
                 } else {
-                    self.request_data(proofs.clone(), LogicalTime::new(block.epoch(), block.round())).await
+                    self.request_data(
+                        proofs.clone(),
+                        LogicalTime::new(block.epoch(), block.round()),
+                    )
+                    .await
                 };
                 let mut vec_ret = Vec::new();
                 debug!("QSE: waiting for data on {} receivers", receivers.len());
                 for rx in receivers {
-                    match rx.await.expect("Oneshot channel to get a batch was dropped") {
+                    match rx
+                        .await
+                        .expect("Oneshot channel to get a batch was dropped")
+                    {
                         Ok(data) => {
                             debug!("QSE: got data, len {}", data.len());
                             vec_ret.push(data);
@@ -182,7 +204,8 @@ impl DataManager for QuorumStoreDataManager {
                     }
                 }
                 let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
-                self.digest_status.insert(block.id(), DataStatus::Cached(ret.clone()));
+                self.digest_status
+                    .insert(block.id(), DataStatus::Cached(ret.clone()));
                 Ok(ret)
             }
         }
@@ -198,7 +221,6 @@ impl DataManager for QuorumStoreDataManager {
             .swap(Some(Arc::from(quorum_store_wrapper_tx)));
     }
 }
-
 
 pub struct DummyDataManager {}
 
@@ -216,10 +238,7 @@ impl DataManager for DummyDataManager {
 
     async fn update_payload(&self, _: &Block) {}
 
-    async fn get_data(
-        &self,
-        block: &Block,
-    ) -> Result<Vec<SignedTransaction>, Error> {
+    async fn get_data(&self, block: &Block) -> Result<Vec<SignedTransaction>, Error> {
         if block.payload().is_none() {
             Ok(Vec::new())
         } else {

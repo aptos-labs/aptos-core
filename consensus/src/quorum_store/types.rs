@@ -2,31 +2,44 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
-use aptos_crypto::hash::DefaultHasher;
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::DefaultHasher, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::transaction::SignedTransaction;
-use aptos_types::PeerId;
+use aptos_types::{transaction::SignedTransaction, PeerId};
 use bcs::to_bytes;
 use consensus_types::proof_of_store::LogicalTime;
 use serde::{Deserialize, Serialize};
+use std::mem;
 
 pub(crate) type BatchId = u64;
 
-// TODO: deserialize before execution
-// TODO: better name for Data
-pub(crate) type Data = Vec<SignedTransaction>;
-// pub(crate) type Data = Vec<TxnData>;
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SerializedTransaction {
+    bytes: Vec<u8>,
+}
 
-#[allow(dead_code)]
-pub(crate) struct TxnData {
-    pub(crate) txn_bytes: Vec<u8>,
-    pub(crate) hash: HashValue,
+impl SerializedTransaction {
+    pub fn from_signed_txn(txn: &SignedTransaction) -> Self {
+        Self {
+            bytes: to_bytes(&txn).unwrap(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.bytes.len()
+    }
+
+    pub fn bytes(&self) -> &Vec<u8> {
+        &self.bytes
+    }
+
+    pub fn take_bytes(&mut self) -> Vec<u8> {
+        mem::take(&mut self.bytes)
+    }
 }
 
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
 pub(crate) struct PersistedValue {
-    pub(crate) maybe_payload: Option<Data>,
+    pub(crate) maybe_payload: Option<Vec<SignedTransaction>>,
     pub(crate) expiration: LogicalTime,
     pub(crate) author: PeerId,
     pub(crate) num_bytes: usize,
@@ -34,7 +47,7 @@ pub(crate) struct PersistedValue {
 
 impl PersistedValue {
     pub(crate) fn new(
-        maybe_payload: Option<Data>,
+        maybe_payload: Option<Vec<SignedTransaction>>,
         expiration: LogicalTime,
         author: PeerId,
         num_bytes: usize,
@@ -57,7 +70,7 @@ pub struct FragmentInfo {
     epoch: u64,
     batch_id: u64,
     fragment_id: usize,
-    payload: Data,
+    payload: Vec<SerializedTransaction>,
     maybe_expiration: Option<LogicalTime>,
 }
 
@@ -66,7 +79,7 @@ impl FragmentInfo {
         epoch: u64,
         batch_id: u64,
         fragment_id: usize,
-        fragment_payload: Data,
+        fragment_payload: Vec<SerializedTransaction>,
         maybe_expiration: Option<LogicalTime>,
     ) -> Self {
         Self {
@@ -78,7 +91,7 @@ impl FragmentInfo {
         }
     }
 
-    pub(crate) fn take_transactions(self) -> Data {
+    pub(crate) fn take_transactions(self) -> Vec<SerializedTransaction> {
         self.payload
     }
 
@@ -107,7 +120,7 @@ impl Fragment {
         epoch: u64,
         batch_id: u64,
         fragment_id: usize,
-        fragment_payload: Data,
+        fragment_payload: Vec<SerializedTransaction>,
         maybe_expiration: Option<LogicalTime>,
         peer_id: PeerId,
         // validator_signer: Arc<ValidatorSigner>,
@@ -145,7 +158,7 @@ impl Fragment {
         self.fragment_info.epoch
     }
 
-    pub(crate) fn take_transactions(self) -> Data {
+    pub(crate) fn take_transactions(self) -> Vec<SerializedTransaction> {
         self.fragment_info.take_transactions()
     }
 
@@ -172,9 +185,8 @@ pub struct BatchInfo {
 pub struct Batch {
     pub(crate) source: PeerId,
     // None is a request, Some(payload) is a response.
-    pub(crate) maybe_payload: Option<Data>,
+    pub(crate) maybe_payload: Option<Vec<SignedTransaction>>,
     pub(crate) batch_info: BatchInfo,
-    // pub(crate) maybe_signature: Option<Ed25519Signature>,
 }
 
 // TODO: make epoch, source, signature fields treatment consistent across structs.
@@ -183,7 +195,7 @@ impl Batch {
         epoch: u64,
         source: PeerId,
         digest_hash: HashValue,
-        maybe_payload: Option<Data>,
+        maybe_payload: Option<Vec<SignedTransaction>>,
     ) -> Self {
         let batch_info = BatchInfo {
             epoch,
@@ -200,8 +212,7 @@ impl Batch {
         self.batch_info.epoch
     }
 
-    //TODO: maybe we should verify signature anyway.
-    //TODO: maybe we dont need to verify signatures at all - network should check the sender
+    // TODO: do we need to check signatures
     pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
         if self.maybe_payload.is_some() {
             let mut hasher = DefaultHasher::new(b"QuorumStoreBatch");
@@ -228,8 +239,7 @@ impl Batch {
         }
     }
 
-    pub fn get_payload(self) -> Data {
-        assert!(self.maybe_payload.is_some());
-        self.maybe_payload.unwrap()
+    pub fn get_payload(self) -> Vec<SignedTransaction> {
+        self.maybe_payload.expect("Batch contains no payload")
     }
 }
