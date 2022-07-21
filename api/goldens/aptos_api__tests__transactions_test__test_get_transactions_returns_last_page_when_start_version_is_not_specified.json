@@ -164,13 +164,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "13",
+            "height": "14",
             "new_block_events": {
-              "counter": "13",
+              "counter": "14",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -208,8 +208,8 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "12",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "13",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
@@ -395,13 +395,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "14",
+            "height": "15",
             "new_block_events": {
-              "counter": "14",
+              "counter": "15",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -439,8 +439,8 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "13",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "14",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
@@ -626,13 +626,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "15",
+            "height": "16",
             "new_block_events": {
-              "counter": "15",
+              "counter": "16",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -670,8 +670,8 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "14",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "15",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
@@ -857,13 +857,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "16",
+            "height": "17",
             "new_block_events": {
-              "counter": "16",
+              "counter": "17",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -901,8 +901,8 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "15",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "16",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
@@ -1088,13 +1088,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "17",
+            "height": "18",
             "new_block_events": {
-              "counter": "17",
+              "counter": "18",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -1132,8 +1132,8 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "16",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "17",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
@@ -1319,13 +1319,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "18",
+            "height": "19",
             "new_block_events": {
-              "counter": "18",
+              "counter": "19",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -1363,8 +1363,8 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "17",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "18",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
@@ -1550,13 +1550,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "19",
+            "height": "20",
             "new_block_events": {
-              "counter": "19",
+              "counter": "20",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -1594,8 +1594,8 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "18",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "19",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
@@ -1781,13 +1781,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "20",
+            "height": "21",
             "new_block_events": {
-              "counter": "20",
+              "counter": "21",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -1825,8 +1825,8 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "19",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "20",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
