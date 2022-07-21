@@ -6,7 +6,6 @@ import {
   PinInput, PinInputField, useColorMode, VStack,
 } from '@chakra-ui/react';
 import { AptosBlackLogo, AptosWhiteLogo } from 'core/components/AptosLogo';
-import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import { secondaryBgColor } from 'core/colors';
 import React, { useCallback, useState } from 'react';
 
@@ -58,4 +57,4 @@ function Password() {
   );
 }
 
-export default withSimulatedExtensionContainer({ Component: Password });
+export default Password;

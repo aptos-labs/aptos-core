@@ -15,7 +15,6 @@ import React from 'react';
 import SquareBox from 'core/components/SquareBox';
 import CreateNFTDrawer from 'core/components/CreateNFTDrawer';
 import GalleryItem from 'core/components/GalleryItem';
-import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import WalletLayout from 'core/layouts/WalletLayout';
 import { useGalleryItems } from 'core/queries/collectibles';
 import AuthLayout from 'core/layouts/AuthLayout';
@@ -68,4 +67,4 @@ function Gallery() {
   );
 }
 
-export default withSimulatedExtensionContainer({ Component: Gallery });
+export default Gallery;

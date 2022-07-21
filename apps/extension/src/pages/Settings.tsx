@@ -22,7 +22,6 @@ import SettingsListItem from 'core/components/SettingsListItem';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
 import { secondaryTextColor } from 'core/colors';
-import withSimulatedExtensionContainer from '../core/components/WithSimulatedExtensionContainer';
 import { CredentialHeaderAndBodyProps } from './CreateWallet';
 
 export function CredentialRow({
@@ -93,4 +92,4 @@ function Account() {
   );
 }
 
-export default withSimulatedExtensionContainer({ Component: Account });
+export default Account;

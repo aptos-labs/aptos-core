@@ -14,6 +14,7 @@ import { WalletStateProvider } from 'core/hooks/useWalletState';
 import ReactGA from 'react-ga4';
 import { getLocalStorageNetworkState } from 'core/utils/network';
 import { createStandaloneToast } from '@chakra-ui/toast';
+import SimulatedExtensionContainer from 'core/layouts/SimulatedExtensionContainer';
 
 const { ToastContainer } = createStandaloneToast();
 
@@ -47,15 +48,17 @@ root.render(
     <QueryClientProvider client={queryClient}>
       <ChakraProvider theme={theme}>
         <WalletStateProvider>
-          <MemoryRouter>
-            <Routes>
-              {
-                Object.values(PageRoutes).map(({ element, routePath }) => (
-                  <Route key={routePath} path={routePath} element={element} />
-                ))
-              }
-            </Routes>
-          </MemoryRouter>
+          <SimulatedExtensionContainer>
+            <MemoryRouter>
+              <Routes>
+                {
+                  Object.values(PageRoutes).map(({ element, routePath }) => (
+                    <Route key={routePath} path={routePath} element={element} />
+                  ))
+                }
+              </Routes>
+            </MemoryRouter>
+          </SimulatedExtensionContainer>
         </WalletStateProvider>
       </ChakraProvider>
     </QueryClientProvider>

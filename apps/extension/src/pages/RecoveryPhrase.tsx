@@ -7,7 +7,6 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import WalletLayout from 'core/layouts/WalletLayout';
-import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
 import RecoveryPhraseBox from 'core/components/RecoveryPhraseBox';
@@ -25,4 +24,4 @@ function RecoveryPhrase() {
   );
 }
 
-export default withSimulatedExtensionContainer({ Component: RecoveryPhrase });
+export default RecoveryPhrase;

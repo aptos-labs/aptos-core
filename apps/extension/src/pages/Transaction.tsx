@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import AuthLayout from 'core/layouts/AuthLayout';
 import WalletLayout from 'core/layouts/WalletLayout';
 import React, { Suspense } from 'react';
@@ -20,4 +19,4 @@ function Transaction() {
   );
 }
 
-export default withSimulatedExtensionContainer({ Component: Transaction });
+export default Transaction;

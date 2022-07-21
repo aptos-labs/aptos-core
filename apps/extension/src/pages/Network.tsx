@@ -7,7 +7,6 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import WalletLayout from 'core/layouts/WalletLayout';
-import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import NetworkBody from 'core/components/NetworkBody';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
@@ -26,4 +25,4 @@ function Network() {
   );
 }
 
-export default withSimulatedExtensionContainer({ Component: Network });
+export default Network;

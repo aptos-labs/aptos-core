@@ -10,7 +10,6 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import React from 'react';
-import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import WalletLayout from 'core/layouts/WalletLayout';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { secondaryBorderColor } from 'core/colors';
@@ -51,4 +50,4 @@ function Activity() {
   );
 }
 
-export default withSimulatedExtensionContainer({ Component: Activity });
+export default Activity;

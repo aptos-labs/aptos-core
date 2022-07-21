@@ -8,7 +8,6 @@ import {
 } from '@chakra-ui/react';
 import WalletLayout from 'core/layouts/WalletLayout';
 import CredentialsBody from 'core/components/CredentialsBody';
-import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
 
@@ -27,4 +26,4 @@ function Credentials() {
   );
 }
 
-export default withSimulatedExtensionContainer({ Component: Credentials });
+export default Credentials;

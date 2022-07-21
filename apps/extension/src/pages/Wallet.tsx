@@ -6,7 +6,6 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import React from 'react';
-import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import WalletLayout from 'core/layouts/WalletLayout';
 import WalletAccountBalance from 'core/components/WalletAccountBalance';
 import TransferDrawer from 'core/components/TransferDrawer';
@@ -31,4 +30,4 @@ function Wallet() {
   );
 }
 
-export default withSimulatedExtensionContainer({ Component: Wallet });
+export default Wallet;

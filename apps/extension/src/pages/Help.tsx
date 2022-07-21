@@ -4,10 +4,9 @@
 import { useColorMode, VStack } from '@chakra-ui/react';
 import React from 'react';
 import HelpHeader from 'core/components/HelpHeader';
-import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
-import { secondaryBgColor } from '../core/colors';
+import { secondaryBgColor } from 'core/colors';
 
 /**
  * TODO fill out Help page
@@ -28,4 +27,4 @@ function Help() {
   );
 }
 
-export default withSimulatedExtensionContainer({ Component: Help });
+export default Help;

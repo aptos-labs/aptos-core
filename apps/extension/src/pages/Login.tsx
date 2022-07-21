@@ -24,7 +24,6 @@ import { SubmitHandler, useForm } from 'react-hook-form';
 import ChakraLink from 'core/components/ChakraLink';
 import useWalletState from 'core/hooks/useWalletState';
 import { AptosWhiteLogo, AptosBlackLogo } from 'core/components/AptosLogo';
-import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
 import { secondaryBgColor, secondaryErrorMessageColor, secondaryTextColor } from 'core/colors';
 import { getAccountResources } from 'core/queries/account';
 import AuthLayout from 'core/layouts/AuthLayout';
@@ -158,6 +157,4 @@ function Login() {
   );
 }
 
-export default withSimulatedExtensionContainer({
-  Component: Login,
-});
+export default Login;
