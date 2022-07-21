@@ -19,18 +19,7 @@ fn get_abi_paths(dir: &Path) -> std::io::Result<Vec<String>> {
             if path.is_dir() {
                 abi_paths.append(&mut get_abi_paths(&path)?);
             } else if let Some("abi") = path.extension().and_then(OsStr::to_str) {
-                // not read Genesis abi (script builder doesn't work with the script function there)
-                if !path
-                    .to_str()
-                    .map(|s| {
-                        s.contains("/Genesis/")
-                            || s.contains("/Coin/")
-                            || s.contains("/ManagedCoin/")
-                    })
-                    .unwrap()
-                {
-                    abi_paths.push(path.to_str().unwrap().to_string());
-                }
+                abi_paths.push(path.to_str().unwrap().to_string());
             }
         }
     }
@@ -48,19 +37,19 @@ pub fn read_abis(dir_paths: &[impl AsRef<Path>]) -> anyhow::Result<Vec<ScriptABI
             abis.push(bcs::from_bytes(&buffer)?);
         }
     }
-    // Sort scripts by alphabetical order.
+
+    // Sort functions by (module, function) lexicographical order
     #[allow(clippy::unnecessary_sort_by)]
     abis.sort_by(|a, b| {
-        let a0 = if let ScriptABI::ScriptFunction(sf) = a {
-            sf.module_name().name().to_string()
-        } else {
-            "".to_owned()
+        let a0 = match a {
+            ScriptABI::ScriptFunction(sf) => sf.module_name().to_string(),
+            _ => "".to_owned(),
         };
-        let b0 = if let ScriptABI::ScriptFunction(sf) = b {
-            sf.module_name().name().to_string()
-        } else {
-            "".to_owned()
+        let b0 = match b {
+            ScriptABI::ScriptFunction(sf) => sf.module_name().to_string(),
+            _ => "".to_owned(),
         };
+
         (a0, a.name()).cmp(&(b0, b.name()))
     });
     Ok(abis)
