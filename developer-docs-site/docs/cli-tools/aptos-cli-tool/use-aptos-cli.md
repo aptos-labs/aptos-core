@@ -536,6 +536,20 @@ Test result: OK. Total tests: 2; passed: 2; failed: 0
 }
 ```
 
+### Proving Move
+
+The `aptos` CLI can be used to run [Move Prover](https://github.com/move-language/move/tree/main/language/move-prover) which is a formal verification tool for the Move language. The below example proves the `hello_prover` package in [move-examples](../../aptos-move/move-examples/).
+```bash
+aptos move prove --package-dir aptos-move/move-examples/hello_prover/
+```
+The above command will generate the following terminal output:
+```bash
+SUCCESS proving 1 modules from package `hello_prover` in 1.649s
+{
+  "Result": "Success"
+}
+```
+
 ### Debug and Print Stacktrace
 
 In this example, we will use `DebugDemo` in [debug-move](./debug-move-example)
