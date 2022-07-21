@@ -88,6 +88,7 @@ impl DbWriter for FakeDb {
         _first_version: Version,
         _base_state_version: Option<Version>,
         _ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        _sync_commit: bool,
         _in_memory_state: StateDelta,
     ) -> Result<()> {
         Ok(())
