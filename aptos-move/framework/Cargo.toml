@@ -26,10 +26,9 @@ structopt = "0.3.21"
 tempfile = "3.3.0"
 
 aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-sdk-builder = { path = "../aptos-sdk-builder" }
 aptos-types = { path = "../../types" }
-
 move-deps = { path = "../move-deps", features = ["address32"] }
-transaction-builder-generator = { path = "../transaction-builder-generator" }
 
 [dev-dependencies]
 aptos-vm = { path = "../../aptos-move/aptos-vm" }

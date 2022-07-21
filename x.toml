@@ -213,12 +213,6 @@ mark-changed = []
 globs = ["*.md"]
 mark-changed = []
 
-[[determinator.path-rule]]
-# Required by get_stdlib_script_abis in transaction-builder-generator.
-globs = ["aptos-move/framework/DPN/releases/artifacts/current/**/*"]
-mark-changed = ["transaction-builder-generator"]
-post-rule = "skip-rules"
-
 [[determinator.package-rule]]
 # x controls the build process, so if it changes, build everything.
 on-affected = ["x"]

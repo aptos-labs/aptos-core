@@ -8,7 +8,7 @@ use serde_generate::SourceInstaller as _;
 use serde_reflection::Registry;
 use std::{io::Write, process::Command};
 use tempfile::tempdir;
-use transaction_builder_generator as buildgen;
+use aptos_sdk_builder as buildgen;
 
 fn get_aptos_registry() -> Registry {
     let path = "../../testsuite/generate-format/tests/staged/aptos.yaml";

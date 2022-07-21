@@ -1,10 +1,10 @@
 ---
-id: transaction-builder-generator
-title: Transaction Builder Generator
-custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/language/transaction-builder-generator/README.md
+id: aptos-sdk-builder
+title: Aptos SDK Builder
+custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/language/aptos-sdk-builder/README.md
 ---
 
-# Transaction Builder Generator
+# Aptos SDK Builder
 
 A *transaction builder* is a helper function that converts its arguments into the payload of an Aptos transaction calling a particular Move script.
 
