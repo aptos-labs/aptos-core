@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::move_vm_ext::code_natives;
 use crate::move_vm_ext::transaction_context_natives;
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use move_deps::{
@@ -15,5 +16,6 @@ pub fn aptos_natives() -> NativeFunctionTable {
             move_table_extension::table_natives(CORE_CODE_ADDRESS),
         ))
         .chain(transaction_context_natives(CORE_CODE_ADDRESS))
+        .chain(code_natives(CORE_CODE_ADDRESS))
         .collect()
 }

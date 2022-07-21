@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::account_config::CORE_CODE_ADDRESS;
-use aptos_vm::move_vm_ext::test_transaction_context_natives;
+use aptos_vm::move_vm_ext::{code_natives, test_transaction_context_natives};
 use framework::path_in_crate;
 use move_deps::move_cli::base::test::run_move_unit_tests;
 use move_deps::{
@@ -37,6 +37,7 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
             move_table_extension::table_natives(CORE_CODE_ADDRESS),
         ))
         .chain(test_transaction_context_natives(CORE_CODE_ADDRESS))
+        .chain(code_natives(CORE_CODE_ADDRESS))
         .collect()
 }
 

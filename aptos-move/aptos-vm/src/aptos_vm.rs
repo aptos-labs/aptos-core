@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::move_vm_ext::NativeCodeContext;
 use crate::{
     adapter_common,
     adapter_common::{
@@ -296,7 +297,9 @@ impl AptosVM {
             }
             .map_err(|e| e.into_vm_status())?;
 
-            charge_global_write_gas_usage(gas_status, &session, &txn_data.sender())?;
+            let sender = &txn_data.sender();
+            charge_global_write_gas_usage(gas_status, &session, sender)?;
+            NativeCodeContext::resolve_pending_requests(&mut session, sender, gas_status)?;
 
             self.success_transaction_cleanup(session, gas_status, txn_data, log_context)
         }
