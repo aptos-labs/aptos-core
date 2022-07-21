@@ -6,23 +6,19 @@ use anyhow::anyhow;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::HashValue;
-use aptos_rosetta::common::{BLOCKCHAIN, Y2K_MS};
-use aptos_rosetta::types::{
-    AccountBalanceResponse, Block, BlockIdentifier, NetworkIdentifier, NetworkRequest,
-    PartialBlockIdentifier,
-};
 use aptos_rosetta::{
     client::RosettaClient,
-    common::native_coin,
-    types::{AccountBalanceRequest, BlockRequest},
+    common::{native_coin, BLOCKCHAIN, Y2K_MS},
+    types::{
+        AccountBalanceRequest, AccountBalanceResponse, Block, BlockIdentifier, BlockRequest,
+        NetworkIdentifier, NetworkRequest, PartialBlockIdentifier,
+    },
     ROSETTA_VERSION,
 };
-use aptos_types::account_address::AccountAddress;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use forge::{LocalSwarm, Node};
 use std::{future::Future, time::Duration};
-use tokio::task::JoinHandle;
-use tokio::time::Instant;
+use tokio::{task::JoinHandle, time::Instant};
 
 const DEFAULT_MAX_WAIT_MS: u64 = 5000;
 const DEFAULT_INTERVAL_MS: u64 = 100;
@@ -217,6 +213,7 @@ async fn get_balance(
     try_until_ok_default(|| rosetta_client.account_balance(&request)).await
 }
 
+#[ignore]
 #[tokio::test]
 async fn test_block() {
     let (swarm, _cli, _faucet, rosetta_client) = setup_test(1, 0).await;

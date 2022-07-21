@@ -27,8 +27,8 @@ use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
-    block_metadata::BlockMetadata,
-    on_chain_config::{VMConfig, VMPublishingOption, Version},
+    block_metadata::{new_block_event_key, BlockMetadata},
+    on_chain_config::{new_epoch_event_key, VMConfig, VMPublishingOption, Version},
     transaction::{
         ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
         Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
@@ -553,10 +553,34 @@ impl AptosVM {
         Ok(())
     }
 
+    fn validate_waypoint_change_set(
+        change_set: &ChangeSet,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(), VMStatus> {
+        let has_new_block_event = change_set
+            .events()
+            .iter()
+            .any(|e| *e.key() == new_block_event_key());
+        let has_new_epoch_event = change_set
+            .events()
+            .iter()
+            .any(|e| *e.key() == new_epoch_event_key());
+        if has_new_block_event && has_new_epoch_event {
+            Ok(())
+        } else {
+            error!(
+                *log_context,
+                "[aptos_vm] waypoint txn needs to emit new epoch and block"
+            );
+            Err(VMStatus::Error(StatusCode::INVALID_WRITE_SET))
+        }
+    }
+
     pub(crate) fn process_waypoint_change_set<S: MoveResolverExt + StateView>(
         &self,
         storage: &S,
         writeset_payload: WriteSetPayload,
+        log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
         // TODO: user specified genesis id to distinguish different genesis write sets
         let genesis_id = HashValue::zero();
@@ -569,6 +593,7 @@ impl AptosVM {
             Ok(cs) => cs,
             Err(e) => return e,
         };
+        Self::validate_waypoint_change_set(&change_set, log_context)?;
         let (write_set, events) = change_set.into_inner();
         self.read_writeset(storage, &write_set)?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
@@ -956,8 +981,11 @@ impl VMAdapter for AptosVM {
                 (vm_status, output, Some("block_prologue".to_string()))
             }
             PreprocessedTransaction::WaypointWriteSet(write_set_payload) => {
-                let (vm_status, output) =
-                    self.process_waypoint_change_set(data_cache, write_set_payload.clone())?;
+                let (vm_status, output) = self.process_waypoint_change_set(
+                    data_cache,
+                    write_set_payload.clone(),
+                    log_context,
+                )?;
                 (vm_status, output, Some("waypoint_write_set".to_string()))
             }
             PreprocessedTransaction::UserTransaction(txn) => {

@@ -129,7 +129,7 @@ pub fn encode_genesis_change_set(
     initialize_on_chain_governance(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
-    reconfigure(&mut session);
+    emit_new_block_and_epoch_event(&mut session);
 
     let mut session1_out = session.finish().unwrap();
 
@@ -350,7 +350,16 @@ fn publish_stdlib(session: &mut SessionExt<impl MoveResolver>, stdlib: Modules) 
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
-fn reconfigure(session: &mut SessionExt<impl MoveResolver>) {
+fn emit_new_block_and_epoch_event(session: &mut SessionExt<impl MoveResolver>) {
+    exec_function(
+        session,
+        "block",
+        "emit_genesis_block_event",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(
+            account_config::reserved_vm_address(),
+        )]),
+    );
     exec_function(
         session,
         "reconfiguration",
