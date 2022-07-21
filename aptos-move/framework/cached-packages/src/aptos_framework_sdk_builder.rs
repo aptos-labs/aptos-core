@@ -83,6 +83,13 @@ pub enum ScriptFunctionCall {
         should_pass: bool,
     },
 
+    /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
+    /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
+    CodePublishPackageTxn {
+        pack_serialized: Bytes,
+        code: Vec<Bytes>,
+    },
+
     /// Script function to register to receive a specific `CoinType`. An account that wants to hold a coin type
     /// has to explicitly registers to do so. The register creates a special `CoinStore`
     /// to hold the specified `CoinType`.
@@ -387,6 +394,10 @@ impl ScriptFunctionCall {
                 proposal_id,
                 should_pass,
             } => aptos_governance_vote(stake_pool, proposal_id, should_pass),
+            CodePublishPackageTxn {
+                pack_serialized,
+                code,
+            } => code_publish_package_txn(pack_serialized, code),
             CoinRegister { coin_type } => coin_register(coin_type),
             CoinTransfer {
                 coin_type,
@@ -804,6 +815,29 @@ pub fn aptos_governance_vote(
             bcs::to_bytes(&stake_pool).unwrap(),
             bcs::to_bytes(&proposal_id).unwrap(),
             bcs::to_bytes(&should_pass).unwrap(),
+        ],
+    ))
+}
+
+/// Same as `publish_package` but as an entry function which can be called as a transaction. Because
+/// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
+pub fn code_publish_package_txn(
+    pack_serialized: Vec<u8>,
+    code: Vec<Vec<u8>>,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("code").to_owned(),
+        ),
+        ident_str!("publish_package_txn").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pack_serialized).unwrap(),
+            bcs::to_bytes(&code).unwrap(),
         ],
     ))
 }
@@ -1791,6 +1825,17 @@ mod decoder {
         }
     }
 
+    pub fn code_publish_package_txn(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::CodePublishPackageTxn {
+                pack_serialized: bcs::from_bytes(script.args().get(0)?).ok()?,
+                code: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn coin_register(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::CoinRegister {
@@ -2364,6 +2409,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "aptos_governance_vote".to_string(),
             Box::new(decoder::aptos_governance_vote),
+        );
+        map.insert(
+            "code_publish_package_txn".to_string(),
+            Box::new(decoder::code_publish_package_txn),
         );
         map.insert(
             "coin_register".to_string(),
