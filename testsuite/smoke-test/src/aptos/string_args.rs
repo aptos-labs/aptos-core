@@ -22,7 +22,7 @@ impl AptosTest for StringArgs {
     async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
         let base_path =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/aptos/move_modules/");
-        let txn_factory = move_test_helpers::publish_code(ctx, base_path).await?;
+        let txn_factory = move_test_helpers::publish_code(ctx, base_path.clone()).await?;
 
         // After publish, expect state == "init"
         assert_eq!(
@@ -39,6 +39,12 @@ impl AptosTest for StringArgs {
             &format!("{:?}", rsc.data.get("state").unwrap()),
             "String(\"hi there\")"
         );
+
+        // republish should fail
+        move_test_helpers::publish_code(ctx, base_path.clone())
+            .await
+            .unwrap_err();
+
         Ok(())
     }
 }
