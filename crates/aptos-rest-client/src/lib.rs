@@ -23,7 +23,7 @@ pub mod faucet;
 pub use faucet::FaucetClient;
 pub mod response;
 pub use response::Response;
-mod state;
+pub mod state;
 pub mod types;
 use crate::aptos::{AptosVersion, Balance};
 pub use types::{Account, Resource, RestError};
@@ -81,6 +81,7 @@ impl Client {
         struct Response {
             chain_id: u8,
             epoch: u64,
+            round: u64,
             #[serde(deserialize_with = "types::deserialize_from_string")]
             ledger_version: u64,
             #[serde(deserialize_with = "types::deserialize_from_string")]
@@ -95,6 +96,7 @@ impl Client {
             .map(|r| State {
                 chain_id: r.chain_id,
                 epoch: r.epoch,
+                round: r.round,
                 version: r.ledger_version,
                 timestamp_usecs: r.ledger_timestamp,
                 oldest_ledger_version: Some(r.oldest_ledger_version),

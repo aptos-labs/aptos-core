@@ -33,7 +33,7 @@ pub use move_types::{
     U128, U64,
 };
 pub use response::{
-    Response, X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
+    Response, X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_ROUND, X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
 };
 pub use table::TableItemRequest;
 pub use transaction::{
