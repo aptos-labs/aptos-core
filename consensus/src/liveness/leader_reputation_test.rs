@@ -456,6 +456,10 @@ impl MockDbReader {
     pub fn add_event(&self, epoch: u64, round: Round) {
         let mut idx = self.idx.lock();
         *idx += 1;
+
+        let mut votes = BitVec::with_num_bits(1);
+        votes.set(0);
+
         self.events.lock().push(EventWithVersion::new(
             *idx,
             ContractEvent::new(
@@ -466,7 +470,7 @@ impl MockDbReader {
                     epoch,
                     round,
                     round,
-                    vec![],
+                    votes.into(),
                     self.random_address,
                     vec![],
                     *self.last_timestamp.lock(),
