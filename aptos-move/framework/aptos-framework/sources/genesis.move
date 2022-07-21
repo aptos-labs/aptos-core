@@ -18,6 +18,7 @@ module aptos_framework::genesis {
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
     use aptos_framework::vm_config;
+    use aptos_std::table;
 
     /// Invalid epoch duration.
     const EINVALID_EPOCH_DURATION: u64 = 1;
@@ -96,6 +97,9 @@ module aptos_framework::genesis {
         // to use this account.
         let (aptos_framework_account, framework_signer_cap) = account::create_core_framework_account();
 
+        // Initialize table in case it is used in other initializations below.
+        table::initialize(&aptos_framework_account);
+
         // Initialize account configs on aptos framework account.
         account::initialize(
             &aptos_framework_account,
@@ -150,7 +154,6 @@ module aptos_framework::genesis {
         // Pad the event counter for the Root account to match DPN. This
         // _MUST_ match the new epoch event counter otherwise all manner of
         // things start to break.
-        event::destroy_handle(event::new_event_handle<u64>(&aptos_framework_account));
         event::destroy_handle(event::new_event_handle<u64>(&aptos_framework_account));
 
         // This needs to be called at the very end.

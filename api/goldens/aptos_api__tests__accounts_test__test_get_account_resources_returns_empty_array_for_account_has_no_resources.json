@@ -82,6 +82,20 @@
     }
   },
   {
+    "type": "0x1::table::TableMetadata",
+    "data": {
+      "new_table_events": {
+        "counter": "2",
+        "guid": {
+          "id": {
+            "addr": "0x1",
+            "creation_num": "0"
+          }
+        }
+      }
+    }
+  },
+  {
     "type": "0x1::voting::VotingForum<0x1::governance_proposal::GovernanceProposal>",
     "data": {
       "events": {
