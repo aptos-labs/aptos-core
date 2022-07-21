@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_transaction_builder::aptos_stdlib;
+use aptos_transaction_builder::aptos_token_stdlib;
+use aptos_types::transaction::VecBytes;
+use cached_framework_packages::aptos_stdlib;
 use forge::{AptosContext, AptosTest, Result, Test};
 
 pub struct NFTTransaction;
@@ -16,7 +18,6 @@ impl Test for NFTTransaction {
 impl AptosTest for NFTTransaction {
     async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
         let client = ctx.client();
-
         let mut creator = ctx.random_account();
         ctx.create_user_account(creator.public_key()).await?;
         ctx.mint(creator.address(), 10_000_000).await?;
@@ -29,11 +30,12 @@ impl AptosTest for NFTTransaction {
         let token_name = "token name".to_owned().into_bytes();
 
         let collection_builder = ctx.transaction_factory().payload(
-            aptos_stdlib::token_create_unlimited_collection_script(
-                collection_name.clone(),
-                "description".to_owned().into_bytes(),
-                "uri".to_owned().into_bytes(),
-            ),
+        aptos_token_stdlib::encode_token_create_collection_script(
+            collection_name.clone(),
+            "description".to_owned().into_bytes(),
+            "uri".to_owned().into_bytes(),
+            20_000_000,
+            vec![false, false, false],
         );
 
         let collection_txn = creator.sign_with_transaction_builder(collection_builder);
@@ -41,6 +43,7 @@ impl AptosTest for NFTTransaction {
 
         println!("collection created.");
 
+<<<<<<< HEAD
         let token_builder =
             ctx.transaction_factory()
                 .payload(aptos_stdlib::token_create_unlimited_token_script(
@@ -52,6 +55,25 @@ impl AptosTest for NFTTransaction {
                     "uri".to_owned().into_bytes(),
                     0,
                 ));
+=======
+        let token_builder = ctx.transaction_factory().payload(
+            aptos_token_stdlib::encode_token_create_token_script(
+                collection_name.clone(),
+                token_name.clone(),
+                "collection description".to_owned().into_bytes(),
+                3,
+                4,
+                "uri".to_owned().into_bytes(),
+                creator.address(),
+                0,
+                0,
+                vec![false, false, false, false, false],
+                VecBytes::from(vec![Vec::new()]),
+                VecBytes::from(vec![Vec::new()]),
+                VecBytes::from(vec![Vec::new()]),
+            ),
+        );
+>>>>>>> 5b7510137a ([Token] replace token.move with tokenv1)
 
         let token_txn = creator.sign_with_transaction_builder(token_builder);
         client.submit_and_wait(&token_txn).await?;

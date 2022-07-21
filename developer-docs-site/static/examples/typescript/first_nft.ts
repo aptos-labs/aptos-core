@@ -6,6 +6,8 @@ import assert from "assert";
 import { Account, RestClient, TESTNET_URL, FAUCET_URL, FaucetClient } from "./first_transaction";
 import fetch from "cross-fetch";
 
+let U64_MAX = 1844674407370955161;
+
 export class TokenClient {
   restClient: RestClient;
 
@@ -23,14 +25,17 @@ export class TokenClient {
   //:!:>section_1
   /** Creates a new collection within the specified account */
   async createCollection(account: Account, name: string, description: string, uri: string) {
-    const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
+    // @ts-ignore
+    const payload: { function: string; arguments: any[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: "0x1::token::create_unlimited_collection_script",
+      function: "0x1::token::create_collection_script",
       type_arguments: [],
       arguments: [
         Buffer.from(name).toString("hex"),
         Buffer.from(description).toString("hex"),
         Buffer.from(uri).toString("hex"),
+        U64_MAX.toString(),
+        [false, false, false],
       ],
     };
     await this.submitTransactionHelper(account, payload);
@@ -48,16 +53,22 @@ export class TokenClient {
   ) {
     const payload: { function: string; arguments: any[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: "0x1::token::create_unlimited_token_script",
+      function: "0x1::token::create_token_script",
       type_arguments: [],
       arguments: [
         Buffer.from(collection_name).toString("hex"),
         Buffer.from(name).toString("hex"),
         Buffer.from(description).toString("hex"),
-        true,
         supply.toString(),
+        U64_MAX.toString(),
         Buffer.from(uri).toString("hex"),
+        account.address(),
         "0",
+        "0",
+        [false, false, false, false, false],
+        [],
+        [],
+        []
       ],
     };
     await this.submitTransactionHelper(account, payload);
@@ -75,7 +86,7 @@ export class TokenClient {
   ) {
     const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: "0x1::tokenTransfers::offer_script",
+      function: "0x1::token_transfers::offer_script",
       type_arguments: [],
       arguments: [
         receiver,
@@ -83,6 +94,7 @@ export class TokenClient {
         Buffer.from(collection_name).toString("hex"),
         Buffer.from(token_name).toString("hex"),
         amount.toString(),
+        "0"
       ],
     };
     await this.submitTransactionHelper(account, payload);
@@ -93,13 +105,14 @@ export class TokenClient {
   async claimToken(account: Account, sender: string, creator: string, collection_name: string, token_name: string) {
     const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: "0x1::tokenTransfers::claim_script",
+      function: "0x1::token_transfers::claim_script",
       type_arguments: [],
       arguments: [
         sender,
         creator,
         Buffer.from(collection_name).toString("hex"),
         Buffer.from(token_name).toString("hex"),
+        "0"
       ],
     };
     await this.submitTransactionHelper(account, payload);
@@ -109,7 +122,7 @@ export class TokenClient {
   async cancelTokenOffer(account: Account, receiver: string, creator: string, token_creation_num: number) {
     const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: "0x1::tokenTransfers::cancel_offer_script",
+      function: "0x1::token_transfers::cancel_offer_script",
       type_arguments: [],
       arguments: [receiver, creator, token_creation_num.toString()],
     };
@@ -141,9 +154,12 @@ export class TokenClient {
     const token_store = await this.restClient.accountResource(creator, "0x1::token::TokenStore");
 
     const token_id = {
-      creator: creator,
-      collection: collection_name,
-      name: token_name,
+      token_data_id : {
+        creator: creator,
+        collection: collection_name,
+        name: token_name,
+      },
+      serial_number: "0"
     };
 
     const token = await this.tableItem(
@@ -158,7 +174,7 @@ export class TokenClient {
   async getTokenData(creator: string, collection_name: string, token_name: string): Promise<any> {
     const collections = await this.restClient.accountResource(creator, "0x1::token::Collections");
 
-    const token_id = {
+    const token_data_id = {
       creator: creator,
       collection: collection_name,
       name: token_name,
@@ -166,9 +182,9 @@ export class TokenClient {
 
     return await this.tableItem(
       collections["data"]["token_data"]["handle"],
-      "0x1::token::TokenId",
+      "0x1::token::TokenDataId",
       "0x1::token::TokenData",
-      token_id,
+        token_data_id,
     );
   }
   //<:!:section_3

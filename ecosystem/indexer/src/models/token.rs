@@ -110,6 +110,7 @@ pub struct DepositEventType {
 pub struct CreationEventType {
     pub id: TokenId,
     pub token_data: TokenData,
+    pub initial_balance: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
