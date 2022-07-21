@@ -32,16 +32,6 @@
     "Aptos Labs",
     "Move"
   ],
-  "dependencies": {
-    "axios": "^0.27.2",
-    "bip39-light": "^1.0.7",
-    "ed25519-hd-key": "^1.2.0",
-    "buffer": "^6.0.3",
-    "js-sha3": "^0.8.0",
-    "tweetnacl": "^1.0.3",
-    "typescript-memoize": "^1.1.0",
-    "yarn": "^1.22.19"
-  },
   "devDependencies": {
     "@types/jest": "^27.4.1",
     "@types/node": "^18.6.2",
