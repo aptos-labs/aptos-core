@@ -125,6 +125,8 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
 
     /// Processes a request for terminating the stream that sent a specific
     /// notification ID.
+    /// TODO(joshlind): once this is exposed to the wild, we'll need automatic
+    /// garbage collection for misbehaving clients.
     fn process_terminate_stream_request(
         &mut self,
         terminate_request: &TerminateStreamRequest,

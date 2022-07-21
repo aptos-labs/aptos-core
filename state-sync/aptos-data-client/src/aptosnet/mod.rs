@@ -54,7 +54,7 @@ mod tests;
 // and little separation between components.
 
 // Useful constants for the Aptos Data Client
-const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 5;
+const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 10;
 const GLOBAL_DATA_METRIC_FREQ_SECS: u64 = 1;
 const IN_FLIGHT_METRICS_SAMPLE_FREQ: u64 = 5;
 const PEER_LOG_FREQ_SECS: u64 = 10;
@@ -284,8 +284,8 @@ impl AptosNetDataClient {
                 (LogSchema::new(LogEntry::PeerStates)
                     .event(LogEvent::PriorityAndRegularPeers)
                     .message(&format!(
-                        "Current priority peers: {:?} and regular peers: {:?}",
-                        priority_peers, regular_peers,
+                        "Number of priority peers: {:?}. Number of regular peers: {:?}",
+                        priority_peers.len(), regular_peers.len(),
                     )))
             );
         );
@@ -760,7 +760,7 @@ pub(crate) fn poll_peer(
                 (LogSchema::new(LogEntry::PeerStates)
                     .event(LogEvent::AggregateSummary)
                     .message(&format!(
-                        "Global data summary: {:?}",
+                        "Global data summary: {}",
                         data_client.get_global_data_summary()
                     )))
             );

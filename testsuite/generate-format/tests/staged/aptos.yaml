@@ -139,7 +139,8 @@ StateKey:
     1:
       TableItem:
         STRUCT:
-          - handle: U128
+          - handle:
+              TYPENAME: TableHandle
           - key: BYTES
     2:
       Raw:
@@ -155,6 +156,8 @@ StructTag:
     - type_args:
         SEQ:
           TYPENAME: TypeTag
+TableHandle:
+  NEWTYPESTRUCT: U128
 Transaction:
   ENUM:
     0:

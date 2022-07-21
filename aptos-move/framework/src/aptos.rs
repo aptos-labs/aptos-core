@@ -14,15 +14,15 @@ use move_deps::{
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;
 
-const APTOS_MODULES_DIR: &str = "aptos-framework/sources";
-const MOVE_NURSERY_DIR: &str = "move-stdlib/nursery/sources";
+const APTOS_FRAMEWORK_DIR: &str = "aptos-framework/sources";
+const APTOS_STDLIB_DIR: &str = "aptos-stdlib/sources";
 const MOVE_STDLIB_DIR: &str = "move-stdlib/sources";
 static APTOS_PKG: Lazy<CompiledPackage> = Lazy::new(|| super::package("aptos-framework"));
 
 pub fn files() -> Vec<String> {
     let mut files = super::move_files_in_path(MOVE_STDLIB_DIR);
-    files.extend(super::move_files_in_path(MOVE_NURSERY_DIR));
-    files.extend(super::move_files_in_path(APTOS_MODULES_DIR));
+    files.extend(super::move_files_in_path(APTOS_STDLIB_DIR));
+    files.extend(super::move_files_in_path(APTOS_FRAMEWORK_DIR));
     files
 }
 
