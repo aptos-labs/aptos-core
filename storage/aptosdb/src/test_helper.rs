@@ -223,6 +223,7 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
             cur_ver,                /* first_version */
             cur_ver.checked_sub(1), /* base_state_version */
             Some(ledger_info_with_sigs),
+            true, /* sync_commit */
             in_memory_state.clone(),
         )
         .unwrap();
@@ -672,6 +673,7 @@ pub fn test_sync_transactions_impl(
                 cur_ver, /* first_version */
                 base_state_version,
                 None,
+                true, /* sync_commit */
                 in_memory_state.clone(),
             )
             .unwrap();
@@ -682,6 +684,7 @@ pub fn test_sync_transactions_impl(
             cur_ver + batch1_len as u64, /* first_version */
             base_state_version,
             Some(ledger_info_with_sigs),
+            true, /* sync_commit */
             in_memory_state.clone(),
         )
         .unwrap();

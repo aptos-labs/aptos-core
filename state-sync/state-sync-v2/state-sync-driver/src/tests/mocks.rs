@@ -316,6 +316,7 @@ mock! {
             first_version: Version,
             base_state_version: Option<Version>,
             ledger_info_with_sigs: Option<&'a LedgerInfoWithSignatures>,
+            sync_commit: bool,
             in_memory_state: StateDelta,
         ) -> Result<()>;
 

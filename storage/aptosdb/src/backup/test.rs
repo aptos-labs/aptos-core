@@ -23,7 +23,7 @@ proptest! {
         let mut cur_ver: Version = 0;
         for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
             update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
-            db.save_transactions(txns_to_commit, cur_ver, cur_ver.checked_sub(1), Some(ledger_info_with_sigs), in_memory_state.clone())
+            db.save_transactions(txns_to_commit, cur_ver, cur_ver.checked_sub(1), Some(ledger_info_with_sigs), true, in_memory_state.clone())
                 .unwrap();
             cur_ver += txns_to_commit.len() as u64;
         }

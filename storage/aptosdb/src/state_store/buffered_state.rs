@@ -61,29 +61,23 @@ impl BufferedState {
     }
 
     fn maybe_commit(&mut self, sync_commit: bool) {
-        let to_commit = if self.state_until_checkpoint.is_some()
-            && (sync_commit
-                || self
-                    .state_until_checkpoint
-                    .as_ref()
-                    .expect("Must exist")
-                    .updates_since_base
-                    .len()
-                    >= SNAPSHOT_SIZE_THRESHOLD)
-        {
-            Some(Arc::from(
-                self.state_until_checkpoint.take().expect("Must exist"),
-            ))
-        } else {
-            None
-        };
         if sync_commit {
+            let to_commit = self.state_until_checkpoint.take().map(Arc::from);
             let (commit_sync_sender, commit_sync_receiver) = mpsc::channel();
             self.state_commit_sender
                 .send((to_commit, Some(commit_sync_sender)))
                 .unwrap();
             commit_sync_receiver.recv().unwrap();
-        } else {
+        } else if self.state_until_checkpoint.is_some()
+            && self
+                .state_until_checkpoint
+                .as_ref()
+                .expect("Must exist")
+                .updates_since_base
+                .len()
+                >= SNAPSHOT_SIZE_THRESHOLD
+        {
+            let to_commit = self.state_until_checkpoint.take().map(Arc::from);
             self.state_commit_sender.send((to_commit, None)).unwrap();
         }
     }

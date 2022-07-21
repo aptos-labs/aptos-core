@@ -1401,13 +1401,13 @@ impl DbWriter for AptosDB {
     /// it carries is generated after the `txns_to_commit` are applied.
     /// Note that even if `txns_to_commit` is empty, `frist_version` is checked to be
     /// `ledger_info_with_sigs.ledger_info.version + 1` if `ledger_info_with_sigs` is not `None`.
-    fn save_transactions_ext(
+    fn save_transactions(
         &self,
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        save_state_snapshots: bool,
+        sync_commit: bool,
         latest_in_memory_state: StateDelta,
     ) -> Result<()> {
         gauged_api("save_transactions", || {
@@ -1507,7 +1507,7 @@ impl DbWriter for AptosDB {
                 buffered_state.update(
                     updates_until_latest_checkpoint_since_current,
                     latest_in_memory_state,
-                    save_state_snapshots,
+                    sync_commit,
                 )?;
             }
 

@@ -405,6 +405,7 @@ fn apply_transaction_by_writeset(
             ledger_view.txn_accumulator().num_leaves(),
             ledger_view.state().base_version,
             None,
+            true, /* sync_commit */
             executed.result_view.state().clone(),
         )
         .unwrap();
@@ -545,6 +546,7 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
                 ledger_view.txn_accumulator().num_leaves(),
                 ledger_view.state().base_version,
                 None,
+                true, /* sync_commit */
                 executed.result_view.state().clone(),
             )
             .unwrap();

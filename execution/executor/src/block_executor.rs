@@ -14,7 +14,7 @@ use aptos_types::{
     transaction::Transaction,
 };
 use aptos_vm::VMExecutor;
-use executor_types::{BlockExecutorTrait, Error, StateComputeResult, StateSnapshotDelta};
+use executor_types::{BlockExecutorTrait, Error, StateComputeResult};
 use fail::fail_point;
 use scratchpad::SparseMerkleTree;
 use std::{marker::PhantomData, sync::Arc};
@@ -28,7 +28,7 @@ use crate::{
         APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
-use storage_interface::{jmt_updates, DbReaderWriter};
+use storage_interface::DbReaderWriter;
 
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
@@ -96,7 +96,7 @@ where
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
         save_state_snapshots: bool,
-    ) -> Result<Option<StateSnapshotDelta>, Error> {
+    ) -> Result<()> {
         self.inner
             .read()
             .as_ref()
@@ -218,15 +218,15 @@ where
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-        save_state_snapshots: bool,
-    ) -> Result<Option<StateSnapshotDelta>, Error> {
+        sync_commit: bool,
+    ) -> Result<()> {
         let _timer = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
         let committed_block = self.block_tree.root_block();
         if committed_block.num_persisted_transactions()
             == ledger_info_with_sigs.ledger_info().version() + 1
         {
             // a retry
-            return Ok(None);
+            return Ok(());
         }
 
         let block_id_to_commit = ledger_info_with_sigs.ledger_info().consensus_block_id();
@@ -255,43 +255,35 @@ where
                 first_version,
                 to_commit,
                 target_version,
-            });
+            }
+            .into());
         }
 
-        let committed_smt = {
-            let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
-            APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
+        let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
+        APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
 
-            fail_point!("executor::commit_blocks", |_| {
-                Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
-            });
-            let result_in_memory_state = self
-                .block_tree
-                .get_block(block_id_to_commit)?
-                .output
-                .result_view
-                .state()
-                .clone();
-            self.db.writer.save_transactions_ext(
-                &txns_to_commit,
-                first_version,
-                committed_block.output.result_view.state().base_version,
-                Some(&ledger_info_with_sigs),
-                save_state_snapshots,
-                result_in_memory_state,
-            )?;
-            self.block_tree
-                .prune(ledger_info_with_sigs.ledger_info())
-                .expect("Failure pruning block tree.")
-        };
-        let jmt_updates = txns_to_commit
-            .iter()
-            .flat_map(|t| jmt_updates(t.state_updates()))
-            .collect();
-        Ok(Some(StateSnapshotDelta {
-            version: ledger_info_with_sigs.ledger_info().version(),
-            smt: committed_smt,
-            jmt_updates,
-        }))
+        fail_point!("executor::commit_blocks", |_| {
+            Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
+        });
+        let result_in_memory_state = self
+            .block_tree
+            .get_block(block_id_to_commit)?
+            .output
+            .result_view
+            .state()
+            .clone();
+        self.db.writer.save_transactions(
+            &txns_to_commit,
+            first_version,
+            committed_block.output.result_view.state().base_version,
+            Some(&ledger_info_with_sigs),
+            sync_commit,
+            result_in_memory_state,
+        )?;
+        self.block_tree
+            .prune(ledger_info_with_sigs.ledger_info())
+            .expect("Failure pruning block tree.");
+
+        Ok(())
     }
 }
