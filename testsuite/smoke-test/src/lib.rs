@@ -19,6 +19,8 @@ mod client;
 #[cfg(test)]
 mod full_nodes;
 #[cfg(test)]
+mod leader_election;
+#[cfg(test)]
 mod network;
 #[cfg(test)]
 mod rosetta;
