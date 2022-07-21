@@ -66,3 +66,37 @@ pub fn serialize(value: &u128) -> Vec<u8> {
 pub fn deserialize(value_bytes: &Vec<u8>) -> u128 {
     bcs::from_bytes(value_bytes).expect("unexpected deserialization error")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use claim::{assert_matches, assert_some_eq};
+
+    fn addition(value: u128, limit: u128) -> DeltaOperation {
+        DeltaOperation::Addition { value, limit }
+    }
+
+    fn subtraction(value: u128) -> DeltaOperation {
+        DeltaOperation::Subtraction { value }
+    }
+
+    #[test]
+    fn test_delta_addition() {
+        let add5 = addition(5, 100);
+        assert_some_eq!(add5.apply_to(0), 5);
+        assert_some_eq!(add5.apply_to(5), 10);
+        assert_some_eq!(add5.apply_to(95), 100);
+
+        assert_matches!(add5.apply_to(96), None);
+    }
+
+    #[test]
+    fn test_delta_subtraction() {
+        let sub5 = subtraction(5);
+        assert_matches!(sub5.apply_to(0), None);
+        assert_matches!(sub5.apply_to(1), None);
+
+        assert_some_eq!(sub5.apply_to(5), 0);
+        assert_some_eq!(sub5.apply_to(100), 95);
+    }
+}

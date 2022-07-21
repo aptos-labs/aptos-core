@@ -1158,6 +1158,7 @@ dependencies = [
  "aptos-crypto-derive",
  "bcs",
  "chrono",
+ "claim",
  "hex",
  "itertools",
  "mirai-annotations",
