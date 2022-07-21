@@ -3,6 +3,7 @@ import { AptosClient } from "./aptos_client";
 import { Types } from "./types";
 import { HexString, MaybeHexString } from "./hex_string";
 
+let u64_max = 184467440737095516;
 /**
  * Class for creating, minting and managing minting NFT collections and tokens
  */
@@ -83,14 +84,14 @@ export class TokenClient {
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
       type: "script_function_payload",
-      function: "0x1::token::create_unlimited_token_script",
+      function: "0x1::token::create_token_script",
       type_arguments: [],
       arguments: [
         Buffer.from(collectionName).toString("hex"),
         Buffer.from(name).toString("hex"),
         Buffer.from(description).toString("hex"),
-        true,
         supply.toString(),
+        u64_max.toString(),
         Buffer.from(uri).toString("hex"),
         royalty_points_per_million.toString(),
       ],

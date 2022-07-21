@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_transaction_builder::aptos_stdlib;
+use aptos_transaction_builder::aptos_token_stdlib;
+use aptos_types::transaction::VecBytes;
+use cached_framework_packages::aptos_stdlib;
 use forge::{AptosContext, AptosTest, Result, Test};
 
 pub struct NFTTransaction;
@@ -16,7 +18,6 @@ impl Test for NFTTransaction {
 impl AptosTest for NFTTransaction {
     async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
         let client = ctx.client();
-
         let mut creator = ctx.random_account();
         ctx.create_user_account(creator.public_key()).await?;
         ctx.mint(creator.address(), 10_000_000).await?;
@@ -29,10 +30,12 @@ impl AptosTest for NFTTransaction {
         let token_name = "token name".to_owned().into_bytes();
 
         let collection_builder = ctx.transaction_factory().payload(
-            aptos_stdlib::encode_token_create_unlimited_collection_script(
+            aptos_token_stdlib::encode_token_create_collection_script(
                 collection_name.clone(),
                 "description".to_owned().into_bytes(),
                 "uri".to_owned().into_bytes(),
+                20_000_000,
+                vec![false, false, false],
             ),
         );
 
@@ -42,14 +45,20 @@ impl AptosTest for NFTTransaction {
         println!("collection created.");
 
         let token_builder = ctx.transaction_factory().payload(
-            aptos_stdlib::encode_token_create_unlimited_token_script(
+            aptos_token_stdlib::encode_token_create_token_script(
                 collection_name.clone(),
                 token_name.clone(),
                 "collection description".to_owned().into_bytes(),
-                true,
-                1,
+                3,
+                4,
                 "uri".to_owned().into_bytes(),
+                creator.address(),
                 0,
+                0,
+                vec![false, false, false, false, false],
+                VecBytes::from(vec![Vec::new()]),
+                VecBytes::from(vec![Vec::new()]),
+                VecBytes::from(vec![Vec::new()]),
             ),
         );
 

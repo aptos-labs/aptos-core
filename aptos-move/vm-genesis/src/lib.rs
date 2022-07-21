@@ -318,6 +318,22 @@ fn create_and_initialize_validators(
     );
 }
 
+/// Collect compiledModule based on account address, dedup modules for each address
+fn construct_module_map(
+    modules: Vec<CompiledModule>,
+) -> HashMap<AccountAddress, Vec<CompiledModule>> {
+    let mut module_ids = HashSet::new();
+    let mut map = HashMap::new();
+    for m in modules {
+        if module_ids.insert(m.self_id()) {
+            map.entry(*m.address())
+                .or_insert_with(Vec::new)
+                .push(m.clone());
+        }
+    }
+    map
+}
+
 /// Publish all modules that should be available after genesis.
 fn publish_stdlib(session: &mut SessionExt<impl MoveResolver>, stdlib: Vec<CompiledModule>) {
     let map = construct_module_map(stdlib);
