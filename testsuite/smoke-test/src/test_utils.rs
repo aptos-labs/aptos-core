@@ -51,6 +51,21 @@ pub async fn transfer_coins(
     txn
 }
 
+pub async fn reconfig(
+    client: &RestClient,
+    transaction_factory: &TransactionFactory,
+    root_account: &mut LocalAccount,
+) {
+    let aptos_version = client.get_aptos_version().await.unwrap();
+    let current_version = *aptos_version.into_inner().major.inner();
+    let txn = root_account.sign_with_transaction_builder(transaction_factory.payload(
+        aptos_stdlib::encode_version_set_version(current_version + 1),
+    ));
+    client.submit_and_wait(&txn).await.unwrap();
+
+    println!("Changing aptos version to {}", current_version + 1,);
+}
+
 pub async fn transfer_and_reconfig(
     client: &RestClient,
     transaction_factory: &TransactionFactory,
@@ -62,14 +77,7 @@ pub async fn transfer_and_reconfig(
     for _ in 0..num_transfers {
         // Reconfigurations have a 20% chance of being executed
         if random::<u16>() % 5 == 0 {
-            let aptos_version = client.get_aptos_version().await.unwrap();
-            let current_version = *aptos_version.into_inner().major.inner();
-            let txn = root_account.sign_with_transaction_builder(transaction_factory.payload(
-                aptos_stdlib::encode_version_set_version(current_version + 1),
-            ));
-            client.submit_and_wait(&txn).await.unwrap();
-
-            println!("Changing aptos version to {}", current_version + 1,);
+            reconfig(client, transaction_factory, root_account).await;
         }
 
         transfer_coins(client, transaction_factory, sender, receiver, 1).await;

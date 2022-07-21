@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
-use aptos_genesis::builder::FullnodeNodeConfig;
+use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{
@@ -76,6 +76,7 @@ pub struct LocalSwarmBuilder {
     versions: Arc<HashMap<Version, LocalVersion>>,
     initial_version: Option<Version>,
     template: NodeConfig,
+    init_config: Option<InitConfigFn>,
     number_of_validators: NonZeroUsize,
     dir: Option<PathBuf>,
     genesis_modules: Option<Vec<Vec<u8>>>,
@@ -88,6 +89,7 @@ impl LocalSwarmBuilder {
             versions,
             initial_version: None,
             template: NodeConfig::default_for_validator(),
+            init_config: None,
             number_of_validators: NonZeroUsize::new(1).unwrap(),
             dir: None,
             genesis_modules: None,
@@ -102,6 +104,11 @@ impl LocalSwarmBuilder {
 
     pub fn template(mut self, template: NodeConfig) -> Self {
         self.template = template;
+        self
+    }
+
+    pub fn with_init_config(mut self, init_config: Option<InitConfigFn>) -> Self {
+        self.init_config = init_config;
         self
     }
 
@@ -129,6 +136,7 @@ impl LocalSwarmBuilder {
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
+        println!("Building a new swarm");
         let dir = if let Some(dir) = self.dir {
             if dir.exists() {
                 fs::remove_dir_all(&dir)?;
@@ -154,6 +162,7 @@ impl LocalSwarmBuilder {
             )?
             .with_num_validators(self.number_of_validators)
             .with_template(self.template)
+            .with_init_config(self.init_config)
             .with_min_price_per_gas_unit(self.min_price_per_gas_unit)
             .with_min_lockup_duration_secs(0)
             .with_max_lockup_duration_secs(86400)
@@ -198,6 +207,7 @@ impl LocalSwarmBuilder {
             root_account,
             chain_id: ChainId::test(),
             root_key,
+            launched: false,
         })
     }
 }
@@ -214,6 +224,8 @@ pub struct LocalSwarm {
     root_account: LocalAccount,
     chain_id: ChainId,
     root_key: ConfigKey<Ed25519PrivateKey>,
+
+    launched: bool,
 }
 
 impl LocalSwarm {
@@ -222,18 +234,28 @@ impl LocalSwarm {
     }
 
     pub async fn launch(&mut self) -> Result<()> {
+        if self.launched {
+            return Err(anyhow!("Swarm already launched"));
+        }
+        self.launched = true;
+
         // Start all the validators
         for validator in self.validators.values_mut() {
             validator.start()?;
         }
 
+        self.wait_all_alive(Duration::from_secs(60)).await?;
+        println!("Swarm launched successfully.");
+        Ok(())
+    }
+
+    pub async fn wait_all_alive(&mut self, timeout: Duration) -> Result<()> {
         // Wait for all of them to startup
-        let deadline = Instant::now() + Duration::from_secs(60);
+        let deadline = Instant::now() + timeout;
         self.wait_for_startup().await?;
         self.wait_for_connectivity(deadline).await?;
         self.liveness_check(deadline).await?;
-
-        println!("Swarm launched successfully.");
+        println!("Swarm alive.");
         Ok(())
     }
 
