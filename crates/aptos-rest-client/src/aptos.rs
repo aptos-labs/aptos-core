@@ -5,13 +5,13 @@ use aptos_api_types::U64;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AptosCoin {
+pub struct TestCoin {
     pub value: U64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Balance {
-    pub coin: AptosCoin,
+    pub coin: TestCoin,
 }
 
 impl Balance {

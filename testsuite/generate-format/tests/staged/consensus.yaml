@@ -335,8 +335,7 @@ StateKey:
     1:
       TableItem:
         STRUCT:
-          - handle:
-              TYPENAME: TableHandle
+          - handle: U128
           - key: BYTES
     2:
       Raw:
@@ -364,8 +363,6 @@ SyncInfo:
     - highest_2chain_timeout_cert:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
-TableHandle:
-  NEWTYPESTRUCT: U128
 Transaction:
   ENUM:
     0:

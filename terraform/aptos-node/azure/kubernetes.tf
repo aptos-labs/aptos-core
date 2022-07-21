@@ -14,16 +14,9 @@ provider "helm" {
   }
 }
 
-locals {
-  # helm chart paths
-  monitoring_helm_chart_path = "${path.module}/../../helm/monitoring"
-  logger_helm_chart_path     = "${path.module}/../../helm/logger"
-  aptos_node_helm_chart_path = var.helm_chart != "" ? var.helm_chart : "${path.module}/../../helm/aptos-node"
-}
-
 resource "helm_release" "validator" {
   name        = terraform.workspace
-  chart       = local.aptos_node_helm_chart_path
+  chart       = var.helm_chart != "" ? var.helm_chart : "${path.module}/../../helm/aptos-node"
   max_history = 5
   wait        = false
 
@@ -67,17 +60,16 @@ resource "helm_release" "validator" {
     jsonencode(var.helm_values),
   ]
 
-  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
-    name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.aptos_node_helm_chart_path, "**") : filesha1("${local.aptos_node_helm_chart_path}/${f}")]))
+    name  = "timestamp"
+    value = var.helm_force_update ? timestamp() : ""
   }
 }
 
 resource "helm_release" "logger" {
   count       = var.enable_logger ? 1 : 0
   name        = "${terraform.workspace}-log"
-  chart       = local.logger_helm_chart_path
+  chart       = "${path.module}/../../helm/logger"
   max_history = 10
   wait        = false
 
@@ -91,23 +83,22 @@ resource "helm_release" "logger" {
       }
       serviceAccount = {
         create = false
-        name   = "${terraform.workspace}-aptos-node-validator"
+        name = "${terraform.workspace}-aptos-node-validator"
       }
     }),
     jsonencode(var.logger_helm_values),
   ]
 
-  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
-    name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.logger_helm_chart_path, "**") : filesha1("${local.logger_helm_chart_path}/${f}")]))
+    name  = "timestamp"
+    value = timestamp()
   }
 }
 
 resource "helm_release" "monitoring" {
   count       = var.enable_monitoring ? 1 : 0
   name        = "${terraform.workspace}-mon"
-  chart       = local.monitoring_helm_chart_path
+  chart       = "${path.module}/../../helm/monitoring"
   max_history = 10
   wait        = false
 
@@ -130,9 +121,8 @@ resource "helm_release" "monitoring" {
     jsonencode(var.monitoring_helm_values),
   ]
 
-  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
-    name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.monitoring_helm_chart_path, "**") : filesha1("${local.monitoring_helm_chart_path}/${f}")]))
+    name  = "timestamp"
+    value = timestamp()
   }
 }

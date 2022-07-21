@@ -45,7 +45,7 @@ class RestClient:
     def account_balance(self, account_address: str) -> int:
         """Returns the test coin balance associated with the account"""
         return self.account_resource(
-            account_address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
+            account_address, "0x1::coin::CoinStore<0x1::test_coin::TestCoin>"
         )["data"]["coin"]["value"]
 
     def account_sequence_number(self, account_address: AccountAddress) -> int:
@@ -229,7 +229,7 @@ class RestClient:
         payload = {
             "type": "script_function_payload",
             "function": "0x1::coin::transfer",
-            "type_arguments": ["0x1::aptos_coin::AptosCoin"],
+            "type_arguments": ["0x1::test_coin::TestCoin"],
             "arguments": [
                 f"{recipient}",
                 str(amount),
@@ -248,7 +248,7 @@ class RestClient:
         payload = ScriptFunction.natural(
             "0x1::coin",
             "transfer",
-            [TypeTag(StructTag.from_str("0x1::aptos_coin::AptosCoin"))],
+            [TypeTag(StructTag.from_str("0x1::test_coin::TestCoin"))],
             transaction_arguments,
         )
 

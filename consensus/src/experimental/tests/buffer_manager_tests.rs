@@ -45,7 +45,7 @@ use network::{
     protocols::network::{Event, NewNetworkSender},
 };
 use safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
-use std::sync::Arc;
+use std::{sync::Arc, thread::sleep, time::Duration};
 use tokio::runtime::Runtime;
 
 pub fn prepare_buffer_manager() -> (
@@ -303,7 +303,7 @@ fn buffer_manager_sync_test() {
     ) = launch_buffer_manager();
 
     let genesis_qc = certificate_for_genesis();
-    let num_batches = 100;
+    let num_batches = 5;
     let blocks_per_batch = 5;
     let mut init_round = 0;
 
@@ -327,10 +327,15 @@ fn buffer_manager_sync_test() {
         last_proposal = Some(proposal.last().unwrap().clone());
     }
 
-    let dropped_batches = 42;
+    // message proxy
+    runtime.spawn(async move {
+        loop {
+            loopback_commit_vote(&mut self_loop_rx, &msg_tx, &verifier).await;
+        }
+    });
 
     timed_block_on(&mut runtime, async move {
-        for i in 0..dropped_batches {
+        for i in 0..2 {
             block_tx
                 .send(OrderedBlocks {
                     ordered_blocks: batches[i].clone(),
@@ -340,6 +345,9 @@ fn buffer_manager_sync_test() {
                 .await
                 .ok();
         }
+
+        // make sure the messages are processed
+        sleep(Duration::from_millis(100));
 
         // reset
         let (tx, rx) = oneshot::channel::<ResetAck>();
@@ -347,14 +355,7 @@ fn buffer_manager_sync_test() {
         reset_tx.send(ResetRequest { tx, stop: false }).await.ok();
         rx.await.ok();
 
-        // start sending back commit vote after reset, to avoid [0..dropped_batches] being sent to result_rx
-        tokio::spawn(async move {
-            loop {
-                loopback_commit_vote(&mut self_loop_rx, &msg_tx, &verifier).await;
-            }
-        });
-
-        for i in dropped_batches..num_batches {
+        for i in 2..num_batches {
             block_tx
                 .send(OrderedBlocks {
                     ordered_blocks: batches[i].clone(),
@@ -365,8 +366,8 @@ fn buffer_manager_sync_test() {
                 .ok();
         }
 
-        // we should only see batches[dropped_batches..num_batches]
-        assert_results(batches.drain(dropped_batches..).collect(), &mut result_rx).await;
+        // we should only see batches[0..num_batches]
+        assert_results(batches.drain(..2).collect(), &mut result_rx).await;
 
         assert!(matches!(result_rx.next().now_or_never(), None));
     });

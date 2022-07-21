@@ -48,10 +48,10 @@ fn test_hello_blockchain() {
 }
 
 #[test]
-fn test_shared_account() {
+fn test_message_board() {
     let named_address = BTreeMap::from([(
-        String::from("shared_account"),
+        String::from("MessageBoard"),
         AccountAddress::from_hex_literal("0x1").unwrap(),
     )]);
-    run_tests_for_pkg("shared_account", named_address);
+    run_tests_for_pkg("messageboard", named_address);
 }

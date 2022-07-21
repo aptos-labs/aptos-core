@@ -58,26 +58,20 @@ provider "kubernetes" {
   token                  = data.aws_eks_cluster_auth.aptos.token
 }
 
-locals {
-  pfn_helm_chart_path        = "${path.module}/fullnode"
-  pfn_logger_helm_chart_path = "${path.module}/../../helm/logger"
-  fullnode_helm_chart_path   = "${path.module}/../../helm/fullnode"
-}
-
 resource "helm_release" "pfn" {
   name        = "aptos"
-  chart       = local.pfn_helm_chart_path
+  chart       = "${path.module}/fullnode"
   max_history = 10
   wait        = false
 
   values = [
     jsonencode({
-      imageTag = local.image_tag
+      imageTag          = local.image_tag
       service = {
         domain   = local.domain
         aws_tags = local.aws_tags
         fullnode = {
-          numFullnodes             = var.num_fullnodes
+          numFullnodes = var.num_fullnodes
           loadBalancerSourceRanges = var.client_sources_ipv4
         }
         monitoring = {
@@ -106,24 +100,23 @@ resource "helm_release" "pfn" {
     jsonencode(var.pfn_helm_values),
   ]
 
-  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
-    name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.pfn_helm_chart_path, "**") : filesha1("${local.pfn_helm_chart_path}/${f}")]))
+    name  = "timestamp"
+    value = timestamp()
   }
 }
 
 resource "helm_release" "fullnode" {
   count       = var.num_fullnodes
   name        = "pfn${count.index}"
-  chart       = local.fullnode_helm_chart_path
+  chart       = "${path.module}/../../helm/fullnode"
   max_history = 10
   wait        = false
 
   values = [
     jsonencode({
       chain = {
-        era = var.era
+        era  = var.era
       }
       image = {
         tag = local.image_tag
@@ -142,10 +135,9 @@ resource "helm_release" "fullnode" {
     jsonencode(var.fullnode_helm_values_list == {} ? {} : var.fullnode_helm_values_list[count.index]),
   ]
 
-  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
-    name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.fullnode_helm_chart_path, "**") : filesha1("${local.fullnode_helm_chart_path}/${f}")]))
+    name  = "timestamp"
+    value = timestamp()
   }
 }
 
@@ -153,7 +145,7 @@ resource "helm_release" "fullnode" {
 resource "helm_release" "pfn-logger" {
   count       = var.enable_pfn_logger ? 1 : 0
   name        = "pfn-logger"
-  chart       = local.pfn_logger_helm_chart_path
+  chart       = "${path.module}/../../helm/logger"
   max_history = 10
   wait        = false
 
@@ -169,9 +161,8 @@ resource "helm_release" "pfn-logger" {
     jsonencode(var.pfn_logger_helm_values),
   ]
 
-  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
   set {
-    name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.pfn_logger_helm_chart_path, "**") : filesha1("${local.pfn_logger_helm_chart_path}/${f}")]))
+    name  = "timestamp"
+    value = timestamp()
   }
 }

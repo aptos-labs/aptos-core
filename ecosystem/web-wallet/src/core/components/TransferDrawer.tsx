@@ -30,10 +30,10 @@ import useWalletState from 'core/hooks/useWalletState';
 import {
   getAccountExists,
   getAccountResources,
-  getAptosCoinTokenBalanceFromAccountResources,
+  getTestCoinTokenBalanceFromAccountResources,
   getToAddressAccountExists,
 } from 'core/queries/account';
-import { submitAptosCoinTransferTransaction } from 'core/mutations/transaction';
+import { submitTestCoinTransferTransaction } from 'core/mutations/transaction';
 import { useMutation, useQuery, useQueryClient } from 'react-query';
 import { getUserTransaction } from 'core/queries/transaction';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
@@ -62,7 +62,7 @@ function TransferDrawer() {
   const {
     isLoading: isTransferLoading,
     mutateAsync: submitSendTransaction,
-  } = useMutation(submitAptosCoinTransferTransaction, {
+  } = useMutation(submitTestCoinTransferTransaction, {
     onSettled: async (txnHash) => {
       if (!txnHash) {
         return;
@@ -110,7 +110,7 @@ function TransferDrawer() {
         address: aptosAccount.address().hex(),
         nodeUrl: aptosNetwork,
       });
-      const tokenBalance = getAptosCoinTokenBalanceFromAccountResources({
+      const tokenBalance = getTestCoinTokenBalanceFromAccountResources({
         accountResources: fromAccountResources,
       });
       if (Number(transferAmount) >= Number(tokenBalance) - STATIC_GAS_AMOUNT) {

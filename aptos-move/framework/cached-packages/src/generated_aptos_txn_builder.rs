@@ -137,15 +137,15 @@ pub enum ScriptFunctionCall {
     StakeWithdraw {},
 
     /// Claim the delegated mint capability and destroy the delegated token.
-    AptosCoinClaimMintCapability {},
+    TestCoinClaimMintCapability {},
 
     /// Create delegated token for the address so the account could claim MintCapability later.
-    AptosCoinDelegateMintCapability {
+    TestCoinDelegateMintCapability {
         to: AccountAddress,
     },
 
     /// Create new test coins and deposit them into dst_addr's account.
-    AptosCoinMint {
+    TestCoinMint {
         dst_addr: AccountAddress,
         amount: u64,
     },
@@ -351,11 +351,9 @@ impl ScriptFunctionCall {
                 new_fullnode_addresses,
             ),
             StakeWithdraw {} => encode_stake_withdraw(),
-            AptosCoinClaimMintCapability {} => encode_aptos_coin_claim_mint_capability(),
-            AptosCoinDelegateMintCapability { to } => {
-                encode_aptos_coin_delegate_mint_capability(to)
-            }
-            AptosCoinMint { dst_addr, amount } => encode_aptos_coin_mint(dst_addr, amount),
+            TestCoinClaimMintCapability {} => encode_test_coin_claim_mint_capability(),
+            TestCoinDelegateMintCapability { to } => encode_test_coin_delegate_mint_capability(to),
+            TestCoinMint { dst_addr, amount } => encode_test_coin_mint(dst_addr, amount),
             TokenCreateLimitedCollectionScript {
                 name,
                 description,
@@ -880,14 +878,14 @@ pub fn encode_stake_withdraw() -> TransactionPayload {
 }
 
 /// Claim the delegated mint capability and destroy the delegated token.
-pub fn encode_aptos_coin_claim_mint_capability() -> TransactionPayload {
+pub fn encode_test_coin_claim_mint_capability() -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 1,
             ]),
-            ident_str!("aptos_coin").to_owned(),
+            ident_str!("test_coin").to_owned(),
         ),
         ident_str!("claim_mint_capability").to_owned(),
         vec![],
@@ -896,14 +894,14 @@ pub fn encode_aptos_coin_claim_mint_capability() -> TransactionPayload {
 }
 
 /// Create delegated token for the address so the account could claim MintCapability later.
-pub fn encode_aptos_coin_delegate_mint_capability(to: AccountAddress) -> TransactionPayload {
+pub fn encode_test_coin_delegate_mint_capability(to: AccountAddress) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 1,
             ]),
-            ident_str!("aptos_coin").to_owned(),
+            ident_str!("test_coin").to_owned(),
         ),
         ident_str!("delegate_mint_capability").to_owned(),
         vec![],
@@ -912,14 +910,14 @@ pub fn encode_aptos_coin_delegate_mint_capability(to: AccountAddress) -> Transac
 }
 
 /// Create new test coins and deposit them into dst_addr's account.
-pub fn encode_aptos_coin_mint(dst_addr: AccountAddress, amount: u64) -> TransactionPayload {
+pub fn encode_test_coin_mint(dst_addr: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 1,
             ]),
-            ident_str!("aptos_coin").to_owned(),
+            ident_str!("test_coin").to_owned(),
         ),
         ident_str!("mint").to_owned(),
         vec![],
@@ -1603,21 +1601,21 @@ fn decode_stake_withdraw(payload: &TransactionPayload) -> Option<ScriptFunctionC
     }
 }
 
-fn decode_aptos_coin_claim_mint_capability(
+fn decode_test_coin_claim_mint_capability(
     payload: &TransactionPayload,
 ) -> Option<ScriptFunctionCall> {
     if let TransactionPayload::ScriptFunction(_script) = payload {
-        Some(ScriptFunctionCall::AptosCoinClaimMintCapability {})
+        Some(ScriptFunctionCall::TestCoinClaimMintCapability {})
     } else {
         None
     }
 }
 
-fn decode_aptos_coin_delegate_mint_capability(
+fn decode_test_coin_delegate_mint_capability(
     payload: &TransactionPayload,
 ) -> Option<ScriptFunctionCall> {
     if let TransactionPayload::ScriptFunction(script) = payload {
-        Some(ScriptFunctionCall::AptosCoinDelegateMintCapability {
+        Some(ScriptFunctionCall::TestCoinDelegateMintCapability {
             to: bcs::from_bytes(script.args().get(0)?).ok()?,
         })
     } else {
@@ -1625,9 +1623,9 @@ fn decode_aptos_coin_delegate_mint_capability(
     }
 }
 
-fn decode_aptos_coin_mint(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+fn decode_test_coin_mint(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
     if let TransactionPayload::ScriptFunction(script) = payload {
-        Some(ScriptFunctionCall::AptosCoinMint {
+        Some(ScriptFunctionCall::TestCoinMint {
             dst_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
             amount: bcs::from_bytes(script.args().get(1)?).ok()?,
         })
@@ -2005,17 +2003,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         );
         map.insert("stakewithdraw".to_string(), Box::new(decode_stake_withdraw));
         map.insert(
-            "aptos_coinclaim_mint_capability".to_string(),
-            Box::new(decode_aptos_coin_claim_mint_capability),
+            "test_coinclaim_mint_capability".to_string(),
+            Box::new(decode_test_coin_claim_mint_capability),
         );
         map.insert(
-            "aptos_coindelegate_mint_capability".to_string(),
-            Box::new(decode_aptos_coin_delegate_mint_capability),
+            "test_coindelegate_mint_capability".to_string(),
+            Box::new(decode_test_coin_delegate_mint_capability),
         );
-        map.insert(
-            "aptos_coinmint".to_string(),
-            Box::new(decode_aptos_coin_mint),
-        );
+        map.insert("test_coinmint".to_string(), Box::new(decode_test_coin_mint));
         map.insert(
             "tokencreate_limited_collection_script".to_string(),
             Box::new(decode_token_create_limited_collection_script),

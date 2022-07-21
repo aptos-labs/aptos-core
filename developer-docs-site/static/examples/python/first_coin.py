@@ -16,7 +16,7 @@ class FirstCoin(RestClient):
         """ Initialize a new coin with the given coin type. """
         payload = {
             "type": "script_function_payload",
-            "function": "0x1::managed_coin::initialize",
+            "function": "0x1::ManagedCoin::initialize",
             "type_arguments": [f"0x{account_from.address()}::MoonCoin::MoonCoin"],
             "arguments": [
                 "Moon Coin".encode("utf-8").hex(),
@@ -54,7 +54,7 @@ class FirstCoin(RestClient):
 
         payload = {
             "type": "script_function_payload",
-            "function": "0x1::managed_coin::mint",
+            "function": "0x1::ManagedCoin::mint",
             "type_arguments": [f"0x{account_coin_owner.address()}::MoonCoin::MoonCoin"],
             "arguments": [
                 receiver_address,
@@ -73,8 +73,7 @@ class FirstCoin(RestClient):
     ) -> str:
         """ Returns the coin balance of the given account """
 
-        balance = self.account_resource(account_address, f"0x1::coin::CoinStore<0x{coin_type_address}::MoonCoin::MoonCoin>")
-        return balance["data"]["coin"]["value"]
+        return self.account_resource(account_address, f"0x1::coin::CoinStore<0x{coin_type_address}::MoonCoin::MoonCoin>")
 #<:!:section_4
 
 if __name__ == "__main__":

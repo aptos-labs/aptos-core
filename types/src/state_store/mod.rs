@@ -4,4 +4,3 @@
 pub mod state_key;
 pub mod state_key_prefix;
 pub mod state_value;
-pub mod table;

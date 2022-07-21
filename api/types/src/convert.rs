@@ -11,7 +11,6 @@ use crate::{
 use anyhow::{bail, ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_transaction_builder::error_explain;
-use aptos_types::state_store::table::TableHandle;
 use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
@@ -264,11 +263,11 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     pub fn try_table_item_into_write_set_change(
         &self,
         state_key_hash: String,
-        handle: TableHandle,
+        handle: u128,
         key: Vec<u8>,
         op: WriteOp,
     ) -> Result<WriteSetChange> {
-        let handle = handle.0.to_be_bytes().to_vec().into();
+        let handle = handle.to_be_bytes().to_vec().into();
         let key = key.into();
         let ret = match op {
             WriteOp::Deletion => WriteSetChange::DeleteTableItem {

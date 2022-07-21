@@ -1,6 +1,6 @@
 /// This module defines a struct storing the publishing policies for the VM.
 module aptos_framework::transaction_publishing_option {
-    use std::error;
+    use std::errors;
     use std::vector;
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
@@ -28,7 +28,7 @@ module aptos_framework::transaction_publishing_option {
     ) {
         timestamp::assert_genesis();
         system_addresses::assert_aptos_framework(account);
-        assert!(!exists<TransactionPublishingOption>(@aptos_framework), error::already_exists(ECONFIG));
+        assert!(!exists<TransactionPublishingOption>(@aptos_framework), errors::already_published(ECONFIG));
 
         move_to(
             account,

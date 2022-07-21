@@ -21,16 +21,15 @@
  * the resolution process.
  */
 module aptos_framework::voting {
-    use std::error;
-    use aptos_std::event::{Self, EventHandle};
+    use std::errors;
+    use std::event::{Self, EventHandle};
     use std::option::{Self, Option};
     use std::signer;
 
-    use aptos_std::table::{Self, Table};
-    use aptos_std::type_info::{Self, TypeInfo};
-
+    use aptos_framework::table::{Self, Table};
     use aptos_framework::timestamp;
     use aptos_framework::transaction_context;
+    use aptos_framework::type_info::{Self, TypeInfo};
 
     /// Error codes.
     const EPROPOSAL_EXECUTION_HASH_NOT_MATCHING: u64 = 1;
@@ -231,18 +230,18 @@ module aptos_framework::voting {
         proposal_id: u64,
     ): ProposalType acquires VotingForum {
         let proposal_state = get_proposal_state<ProposalType>(voting_forum_address, proposal_id);
-        assert!(proposal_state == PROPOSAL_STATE_SUCCEEDED, error::invalid_argument(EPROPOSAL_CANNOT_BE_RESOLVED));
+        assert!(proposal_state == PROPOSAL_STATE_SUCCEEDED, errors::invalid_argument(EPROPOSAL_CANNOT_BE_RESOLVED));
 
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
-        assert!(!proposal.is_resolved, error::invalid_argument(EPROPOSAL_ALREADY_RESOLVED));
+        assert!(!proposal.is_resolved, errors::invalid_argument(EPROPOSAL_ALREADY_RESOLVED));
 
         let resolved_early = can_be_resolved_early(proposal);
         proposal.is_resolved = true;
 
         assert!(
             transaction_context::get_script_hash() == proposal.execution_hash,
-            error::invalid_argument(EPROPOSAL_EXECUTION_HASH_NOT_MATCHING),
+            errors::invalid_argument(EPROPOSAL_EXECUTION_HASH_NOT_MATCHING),
         );
 
         event::emit_event<ResolveProposal>(
@@ -371,7 +370,7 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x10003)]
+    #[expected_failure(abort_code = 775)]
     public entry fun test_cannot_resolve_twice(aptos_framework: signer, governance: signer) acquires VotingForum {
         timestamp::set_time_has_started_for_testing(&aptos_framework);
 
@@ -419,7 +418,7 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x10002)]
+    #[expected_failure(abort_code = 519)]
     public entry fun test_voting_failed(aptos_framework: signer, governance: signer) acquires VotingForum {
         timestamp::set_time_has_started_for_testing(&aptos_framework);
 
@@ -441,7 +440,7 @@ module aptos_framework::voting {
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
-    #[expected_failure(abort_code = 0x10002)]
+    #[expected_failure(abort_code = 519)]
     public entry fun test_voting_failed_early(aptos_framework: signer, governance: signer) acquires VotingForum {
         timestamp::set_time_has_started_for_testing(&aptos_framework);
 

@@ -20,7 +20,7 @@ fn test_timestamp_time_has_started() {
         vec![],
         serialize_values(&vec![MoveValue::Signer(account_address)]),
     );
-    assert_eq!(output.unwrap_err().move_abort_code(), Some(327682));
+    assert_eq!(output.unwrap_err().move_abort_code(), Some(514));
 
     executor.exec(
         "timestamp",
@@ -36,7 +36,7 @@ fn test_timestamp_time_has_started() {
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
     );
 
-    assert_eq!(output.unwrap_err().move_abort_code(), Some(196608));
+    assert_eq!(output.unwrap_err().move_abort_code(), Some(1));
 }
 
 #[test]
@@ -63,5 +63,5 @@ fn test_block_double_init() {
         ]),
     );
 
-    assert_eq!(output.unwrap_err().move_abort_code(), Some(524288));
+    assert_eq!(output.unwrap_err().move_abort_code(), Some(6));
 }

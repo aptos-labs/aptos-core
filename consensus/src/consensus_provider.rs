@@ -51,7 +51,7 @@ pub fn start_consensus(
     ));
 
     let state_computer = Arc::new(ExecutionProxy::new(
-        Arc::new(BlockExecutor::<AptosVM>::new(aptos_db)),
+        Box::new(BlockExecutor::<AptosVM>::new(aptos_db)),
         txn_notifier,
         state_sync_notifier,
         commit_notifier.clone(),

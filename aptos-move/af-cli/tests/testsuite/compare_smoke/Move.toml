@@ -1,0 +1,7 @@
+[package]
+name = "compare_smoke"
+version = "0.0.0"
+
+[dependencies]
+AptosFramework = { local = "../../../../framework/aptos-framework" }
+MoveNursery = { local = "../../../../framework/move-stdlib/nursery" }

@@ -3,7 +3,7 @@
 /// By utilizing this current module, a developer can create his own coin and care less about mint and burn capabilities,
 module aptos_framework::managed_coin {
     use std::string;
-    use std::error;
+    use std::errors;
     use std::signer;
 
     use aptos_framework::coin::{Self, BurnCapability, MintCapability};
@@ -39,7 +39,7 @@ module aptos_framework::managed_coin {
 
         assert!(
             exists<Capabilities<CoinType>>(account_addr),
-            error::not_found(ENO_CAPABILITIES),
+            errors::not_published(ENO_CAPABILITIES),
         );
 
         let capabilities = borrow_global<Capabilities<CoinType>>(account_addr);
@@ -81,7 +81,7 @@ module aptos_framework::managed_coin {
 
         assert!(
             exists<Capabilities<CoinType>>(account_addr),
-            error::not_found(ENO_CAPABILITIES),
+            errors::not_published(ENO_CAPABILITIES),
         );
 
         let capabilities = borrow_global<Capabilities<CoinType>>(account_addr);
@@ -147,7 +147,7 @@ module aptos_framework::managed_coin {
     }
 
     #[test(source = @0x1, destination = @0x2)]
-    #[expected_failure(abort_code = 0x60000)]
+    #[expected_failure(abort_code = 5)]
     public entry fun fail_mint(
         source: signer,
         destination: signer,
@@ -162,7 +162,7 @@ module aptos_framework::managed_coin {
     }
 
     #[test(source = @0x1, destination = @0x2)]
-    #[expected_failure(abort_code = 0x60000)]
+    #[expected_failure(abort_code = 5)]
     public entry fun fail_burn(
         source: signer,
         destination: signer,
