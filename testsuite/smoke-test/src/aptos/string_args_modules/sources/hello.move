@@ -1,4 +1,4 @@
-module 0xA550C18::HelloWorld {
+module 0xA550C18::HelloWorldForStringArgs {
     use std::string::{Self, String};
     use std::signer;
     use aptos_framework::coin;
