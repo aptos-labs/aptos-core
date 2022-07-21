@@ -14,6 +14,7 @@ use move_deps::{
 pub mod cost {
     pub const APTOS_CREATE_ADDRESS: u64 = 5;
     pub const APTOS_LIB_TYPE_OF: u64 = 10;
+    pub const APTOS_LIB_TYPE_NAME: u64 = 10;
     pub const APTOS_SIP_HASH: u64 = 10;
     pub const APTOS_SECP256K1_RECOVER: u64 = 71;
 }
@@ -50,6 +51,7 @@ pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
             signature::native_secp256k1_recover,
         ),
         ("type_info", "type_of", type_info::type_of),
+        ("type_info", "type_name", type_info::type_name),
         ("hash", "sip_hash", hash::native_sip_hash),
     ];
     NATIVES
