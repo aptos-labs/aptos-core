@@ -99,7 +99,7 @@ impl BlockMetadata {
 }
 
 pub fn new_block_event_key() -> EventKey {
-    EventKey::new(3, CORE_CODE_ADDRESS)
+    EventKey::new(1, CORE_CODE_ADDRESS)
 }
 
 /// The path to the new block event handle under a Block::BlockMetadata resource.
@@ -113,6 +113,7 @@ pub static NEW_BLOCK_EVENT_PATH: Lazy<Vec<u8>> = Lazy::new(|| {
 #[derive(Deserialize, Serialize)]
 pub struct BlockResource {
     height: u64,
+    epoch_interval: u64,
     new_block_events: EventHandle,
 }
 

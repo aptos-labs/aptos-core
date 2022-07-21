@@ -18,13 +18,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "1",
+            "height": "2",
             "new_block_events": {
-              "counter": "1",
+              "counter": "2",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -62,12 +62,13 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "0",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "1",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
           "failed_proposer_indices": [],
+          "height": "1",
           "previous_block_votes": [
             false
           ],

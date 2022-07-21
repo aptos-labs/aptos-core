@@ -1,7 +1,6 @@
 module aptos_framework::genesis {
     use std::signer;
     use std::error;
-    use aptos_std::event;
     use std::vector;
 
     use aptos_framework::account;
@@ -146,12 +145,6 @@ module aptos_framework::genesis {
 
         // Give TransactionFee BurnCapability<AptosCoin> so it can burn gas.
         transaction_fee::store_aptos_coin_burn_cap(&aptos_framework_account, burn_cap);
-
-        // Pad the event counter for the Root account to match DPN. This
-        // _MUST_ match the new epoch event counter otherwise all manner of
-        // things start to break.
-        event::destroy_handle(event::new_event_handle<u64>(&aptos_framework_account));
-        event::destroy_handle(event::new_event_handle<u64>(&aptos_framework_account));
 
         // This needs to be called at the very end.
         chain_id::initialize(&aptos_framework_account, chain_id);
