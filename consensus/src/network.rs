@@ -92,7 +92,7 @@ impl NetworkSender {
         from: Author,
         timeout: Duration,
     ) -> anyhow::Result<BlockRetrievalResponse> {
-        fail_point!("consensus::send_block_retrieval", |_| {
+        fail_point!("consensus::request_block", |_| {
             Err(anyhow::anyhow!("Injected error in request_block"))
         });
 
@@ -169,31 +169,31 @@ impl NetworkSender {
     }
 
     pub async fn broadcast_proposal(&mut self, proposal_msg: ProposalMsg) {
-        fail_point!("consensus::send_proposal", |_| ());
+        fail_point!("consensus::broadcast_proposal", |_| ());
         let msg = ConsensusMsg::ProposalMsg(Box::new(proposal_msg));
         self.broadcast(msg).await
     }
 
     pub async fn broadcast_sync_info(&mut self, sync_info_msg: SyncInfo) {
-        fail_point!("consensus::send_sync_info", |_| ());
+        fail_point!("consensus::broadcast_sync_info", |_| ());
         let msg = ConsensusMsg::SyncInfo(Box::new(sync_info_msg));
         self.broadcast(msg).await
     }
 
     pub async fn broadcast_timeout_vote(&mut self, timeout_vote_msg: VoteMsg) {
-        fail_point!("consensus::send_vote", |_| ());
+        fail_point!("consensus::broadcast_timeout_vote", |_| ());
         let msg = ConsensusMsg::VoteMsg(Box::new(timeout_vote_msg));
         self.broadcast(msg).await
     }
 
     pub async fn broadcast_epoch_change(&mut self, epoch_chnage_proof: EpochChangeProof) {
-        fail_point!("consensus::send_epoch_change", |_| ());
+        fail_point!("consensus::broadcast_epoch_change", |_| ());
         let msg = ConsensusMsg::EpochChangeProof(Box::new(epoch_chnage_proof));
         self.broadcast(msg).await
     }
 
     pub async fn broadcast_commit_vote(&mut self, commit_vote: CommitVote) {
-        fail_point!("consensus::send_commit_vote", |_| ());
+        fail_point!("consensus::broadcast_commit_vote", |_| ());
         let msg = ConsensusMsg::CommitVoteMsg(Box::new(commit_vote));
         self.broadcast(msg).await
     }
@@ -218,14 +218,14 @@ impl NetworkSender {
         self.send(msg, recipients).await
     }
 
-    pub async fn notify_epoch_change(&mut self, proof: EpochChangeProof) {
+    pub async fn send_epoch_change(&mut self, proof: EpochChangeProof) {
         fail_point!("consensus::send_epoch_change", |_| ());
         let msg = ConsensusMsg::EpochChangeProof(Box::new(proof));
         self.send(msg, vec![self.author]).await
     }
 
     /// Sends the ledger info to self buffer manager
-    pub async fn notify_commit_proof(&self, ledger_info: LedgerInfoWithSignatures) {
+    pub async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures) {
         fail_point!("consensus::send_commit_proof", |_| ());
 
         // this requires re-verification of the ledger info we can probably optimize it later

@@ -249,7 +249,7 @@ impl BufferManager {
                 let aggregated_item = item.unwrap_aggregated();
                 if aggregated_item.commit_proof.ledger_info().ends_epoch() {
                     self.commit_msg_tx
-                        .notify_epoch_change(EpochChangeProof::new(
+                        .send_epoch_change(EpochChangeProof::new(
                             vec![aggregated_item.commit_proof.clone()],
                             false,
                         ))
