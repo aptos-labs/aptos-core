@@ -970,6 +970,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-sdk-builder"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-types",
+ "bcs",
+ "cached-framework-packages",
+ "heck 0.3.3",
+ "move-deps",
+ "regex",
+ "serde-generate",
+ "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection?rev=9ba2437dc079515f5a1797b8536b0ea7685678d0)",
+ "serde_yaml",
+ "structopt",
+ "tempfile",
+ "textwrap 0.15.0",
+ "which",
+]
+
+[[package]]
 name = "aptos-secure-net"
 version = "0.1.0"
 dependencies = [
@@ -3132,6 +3152,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-sdk-builder",
  "aptos-types",
  "aptos-vm",
  "bcs",
@@ -3148,7 +3169,6 @@ dependencies = [
  "smallvec",
  "structopt",
  "tempfile",
- "transaction-builder-generator",
 ]
 
 [[package]]
@@ -8328,26 +8348,6 @@ dependencies = [
  "thread_local",
  "tracing-core",
  "tracing-log",
-]
-
-[[package]]
-name = "transaction-builder-generator"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-types",
- "bcs",
- "cached-framework-packages",
- "heck 0.3.3",
- "move-deps",
- "regex",
- "serde-generate",
- "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection?rev=9ba2437dc079515f5a1797b8536b0ea7685678d0)",
- "serde_yaml",
- "structopt",
- "tempfile",
- "textwrap 0.15.0",
- "which",
 ]
 
 [[package]]

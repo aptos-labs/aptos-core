@@ -1,5 +1,5 @@
 [package]
-name = "transaction-builder-generator"
+name = "aptos-sdk-builder"
 version = "0.1.0"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos transaction-builder"

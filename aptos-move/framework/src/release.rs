@@ -171,7 +171,7 @@ fn generate_script_builder(output_path: impl AsRef<Path>, abi_paths: &[&Path]) {
     let abis: Vec<_> = abi_paths
         .iter()
         .flat_map(|path| {
-            transaction_builder_generator::read_abis(&[path])
+            aptos_sdk_builder::read_abis(&[path])
                 .unwrap_or_else(|_| panic!("Failed to read ABIs at {}", path.to_string_lossy()))
         })
         .collect();
@@ -179,7 +179,7 @@ fn generate_script_builder(output_path: impl AsRef<Path>, abi_paths: &[&Path]) {
     {
         let mut file = std::fs::File::create(output_path)
             .expect("Failed to open file for Rust script build generation");
-        transaction_builder_generator::rust::output(&mut file, &abis, /* local types */ true)
+        aptos_sdk_builder::rust::output(&mut file, &abis, /* local types */ true)
             .expect("Failed to generate Rust builders");
     }
 
