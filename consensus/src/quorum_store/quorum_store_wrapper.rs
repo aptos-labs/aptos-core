@@ -3,11 +3,11 @@
 
 use crate::network::NetworkSender;
 use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::quorum_store_db::BatchIdDB;
 use crate::quorum_store::{
     counters,
     quorum_store::{QuorumStoreCommand, QuorumStoreError},
-    types::{BatchId, Data},
+    quorum_store_db::BatchIdDB,
+    types::BatchId,
     utils::{BatchBuilder, MempoolProxy, RoundExpirations},
 };
 use crate::round_manager::VerifiedEvent;
@@ -17,8 +17,7 @@ use aptos_mempool::QuorumStoreRequest;
 use aptos_types::PeerId;
 use channel::aptos_channel;
 use consensus_types::{
-    common::TransactionSummary,
-    common::{Payload, PayloadFilter},
+    common::{Payload, PayloadFilter, Round, TransactionSummary},
     proof_of_store::{LogicalTime, ProofOfStore},
     request_response::{ConsensusResponse, WrapperCommand},
 };
@@ -31,10 +30,9 @@ use futures::{
     stream::FuturesUnordered,
     StreamExt,
 };
-use std::collections::HashMap;
-use std::sync::Arc;
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
+    sync::Arc,
     time::{Duration, Instant},
 };
 use tokio::{sync::mpsc::Sender as TokioSender, time};
@@ -53,7 +51,9 @@ pub struct QuorumStoreWrapper {
     proofs_for_consensus: HashMap<HashValue, ProofOfStore>,
     mempool_txn_pull_max_count: u64,
     // For ensuring that batch size does not exceed QuorumStore limit.
-    quorum_store_max_batch_bytes: u64,
+    max_batch_bytes: u64,
+    max_batch_expiry_round_gap: Round,
+    end_batch_ms: u128,
     last_end_batch_time: Instant,
     db: Arc<dyn BatchIdDB>,
 }
@@ -66,7 +66,9 @@ impl QuorumStoreWrapper {
         quorum_store_sender: TokioSender<QuorumStoreCommand>,
         mempool_txn_pull_timeout_ms: u64,
         mempool_txn_pull_max_count: u64,
-        quorum_store_max_batch_bytes: u64,
+        max_batch_bytes: u64,
+        max_batch_expiry_round_gap: Round,
+        end_batch_ms: u128,
     ) -> Self {
         let batch_id = if let Some(id) = db
             .clean_and_get_batch_id(epoch)
@@ -84,11 +86,13 @@ impl QuorumStoreWrapper {
             quorum_store_sender,
             batches_in_progress: HashMap::new(),
             batch_expirations: RoundExpirations::new(),
-            batch_builder: BatchBuilder::new(batch_id, quorum_store_max_batch_bytes as usize),
+            batch_builder: BatchBuilder::new(batch_id, max_batch_bytes as usize),
             latest_logical_time: LogicalTime::new(epoch, 0),
             proofs_for_consensus: HashMap::new(),
             mempool_txn_pull_max_count,
-            quorum_store_max_batch_bytes,
+            max_batch_bytes,
+            max_batch_expiry_round_gap,
+            end_batch_ms,
             last_end_batch_time: Instant::now(),
             db,
         }
@@ -101,7 +105,7 @@ impl QuorumStoreWrapper {
             .flatten()
             .cloned()
             .collect();
-        exclude_txns.extend(self.batch_builder.cloned_summaries());
+        exclude_txns.extend(self.batch_builder.summaries().clone());
 
         // TODO: size and unwrap or not?
         let pulled_txns = self
@@ -112,31 +116,24 @@ impl QuorumStoreWrapper {
 
         let mut end_batch = false;
 
-        // TODO: pass TxnData to QuorumStore to save extra serialization.
-        // TODO: clean up this disgusting code below.
-        let mut pulled_txns_cloned = pulled_txns.clone();
-        let mut num_pulled = 0;
         for txn in pulled_txns {
             if !self.batch_builder.append_transaction(&txn) {
                 end_batch = true;
                 break;
-            } else {
-                num_pulled = num_pulled + 1;
             }
         }
-        let txns: Data = pulled_txns_cloned.drain(0..num_pulled).collect();
+        let serialized_txns = self.batch_builder.take_serialized_txns();
 
-        // TODO: config param for timeout
-        if self.last_end_batch_time.elapsed().as_millis() > 500 {
+        if self.last_end_batch_time.elapsed().as_millis() > self.end_batch_ms {
             end_batch = true;
             self.last_end_batch_time = Instant::now();
         }
 
         let batch_id = self.batch_builder.batch_id();
         if !end_batch {
-            if !txns.is_empty() {
+            if !serialized_txns.is_empty() {
                 self.quorum_store_sender
-                    .send(QuorumStoreCommand::AppendToBatch(txns, batch_id))
+                    .send(QuorumStoreCommand::AppendToBatch(serialized_txns, batch_id))
                     .await
                     .expect("could not send to QuorumStore");
             }
@@ -154,12 +151,12 @@ impl QuorumStoreWrapper {
                 .expect("Could not save to db");
 
             let (proof_tx, proof_rx) = oneshot::channel();
-            let expiry_round = self.latest_logical_time.round() + 20; // TODO: take from quorum store config
+            let expiry_round = self.latest_logical_time.round() + self.max_batch_expiry_round_gap;
             let logical_time = LogicalTime::new(self.latest_logical_time.epoch(), expiry_round);
 
             self.quorum_store_sender
                 .send(QuorumStoreCommand::EndBatch(
-                    txns,
+                    serialized_txns,
                     batch_id,
                     logical_time.clone(),
                     proof_tx,
@@ -168,7 +165,7 @@ impl QuorumStoreWrapper {
                 .expect("could not send to QuorumStore");
 
             self.batches_in_progress
-                .insert(batch_id, self.batch_builder.take_batch().0);
+                .insert(batch_id, self.batch_builder.take_summaries());
             self.batch_expirations.add_item(batch_id, expiry_round);
 
             Some(proof_rx)
@@ -240,6 +237,7 @@ impl QuorumStoreWrapper {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
+                // TODO: optimization: exclude proofs if corresponding batches aren't present locally.
                 let mut proof_block = Vec::new();
                 let mut expired = Vec::new();
                 for proof in self.proofs_for_consensus.values() {

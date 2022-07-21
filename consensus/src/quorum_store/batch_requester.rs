@@ -1,26 +1,28 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::network::NetworkSender;
-use crate::network_interface::ConsensusMsg;
-use crate::quorum_store::{
-    types::{Batch, Data},
-    utils::DigestTimeouts,
-};
+use crate::quorum_store::{types::Batch, utils::DigestTimeouts};
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
-use aptos_types::PeerId;
-use executor_types::Error;
+use aptos_types::{transaction::SignedTransaction, PeerId};
+use executor_types::*;
 use std::collections::HashMap;
 use tokio::sync::oneshot;
 
 struct BatchRequesterState {
     signers: Vec<PeerId>,
     next_index: usize,
-    ret_tx: oneshot::Sender<Result<Data, Error>>,
+    ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, executor_types::Error>>,
     num_retries: usize,
     max_num_retry: usize,
 }
 
 impl BatchRequesterState {
-    fn new(signers: Vec<PeerId>, ret_tx: oneshot::Sender<Result<Data, Error>>) -> Self {
+    fn new(
+        signers: Vec<PeerId>,
+        ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, executor_types::Error>>,
+    ) -> Self {
         Self {
             signers,
             next_index: 0,
@@ -49,7 +51,7 @@ impl BatchRequesterState {
     }
 
     // TODO: if None, then return an error to the caller
-    fn serve_request(self, digest: HashValue, maybe_payload: Option<Data>) {
+    fn serve_request(self, digest: HashValue, maybe_payload: Option<Vec<SignedTransaction>>) {
         if let Some(payload) = maybe_payload {
             debug!(
                 "QS: batch to oneshot, digest {}, tx {:?}",
@@ -109,7 +111,7 @@ impl BatchRequester {
         &mut self,
         digest: HashValue,
         signers: Vec<PeerId>,
-        ret_tx: oneshot::Sender<Result<Data, Error>>,
+        ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, executor_types::Error>>,
     ) {
         let mut request_state = BatchRequesterState::new(signers, ret_tx);
         let request_peers = request_state
@@ -138,7 +140,7 @@ impl BatchRequester {
         }
     }
 
-    pub(crate) fn serve_request(&mut self, digest: HashValue, payload: Data) {
+    pub(crate) fn serve_request(&mut self, digest: HashValue, payload: Vec<SignedTransaction>) {
         if self.digest_to_state.contains_key(&digest) {
             debug!("QS: serving batch digest = {}", digest);
             let state = self.digest_to_state.remove(&digest).unwrap();
