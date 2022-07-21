@@ -5,11 +5,11 @@ mutable inputs after call: local#0: 0
 return values: 0
 
 task 2 'view'. lines 15-15:
-key 0x1::Coin::CoinStore<0x1::TestCoin::TestCoin> {
-    coin: store 0x1::Coin::Coin<0x1::TestCoin::TestCoin> {
+key 0x1::coin::CoinStore<0x1::test_coin::TestCoin> {
+    coin: store 0x1::coin::Coin<0x1::test_coin::TestCoin> {
         value: 10100
     }
-    deposit_events: store 0x1::event::EventHandle<0x1::Coin::DepositEvent> {
+    deposit_events: store 0x1::event::EventHandle<0x1::coin::DepositEvent> {
         counter: 2
         guid: drop store 0x1::guid::GUID {
             id: copy drop store 0x1::guid::ID {
@@ -18,7 +18,7 @@ key 0x1::Coin::CoinStore<0x1::TestCoin::TestCoin> {
             }
         }
     }
-    withdraw_events: store 0x1::event::EventHandle<0x1::Coin::WithdrawEvent> {
+    withdraw_events: store 0x1::event::EventHandle<0x1::coin::WithdrawEvent> {
         counter: 0
         guid: drop store 0x1::guid::GUID {
             id: copy drop store 0x1::guid::ID {
