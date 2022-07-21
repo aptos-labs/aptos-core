@@ -69,17 +69,16 @@ const cleanupMetadata = async (tokenId: string) => {
 
 const createRandomOwnership = async () => {
   const token_name = `Ape${Math.random() * 10000000}`;
-  const token_id = `${creator_address}::${collection_name}::${token_name}`
-  const ownership_id = `${token_id}::${creator_address}`
-
+  const token_id = `${creator_address}::${collection_name}::${token_name}`;
+  const ownership_id = `${token_id}::${creator_address}`;
   const ownership = await prisma.ownerships.create({
     data: {
       amount: 1,
       inserted_at: new Date(),
       owner: creator_address,
-      token_id: token_id,
-      updated_at: new Date(),
       ownership_id,
+      token_id,
+      updated_at: new Date(),
     },
   });
   return ownership;
@@ -87,43 +86,42 @@ const createRandomOwnership = async () => {
 
 const createRandomEmptyOwnership = async () => {
   const token_name = `Ape${Math.random() * 10000000}`;
-  const token_id = `${creator_address}::${collection_name}::${token_name}`
-  const ownership_id = `${token_id}::${creator_address}`
-
+  const token_id = `${creator_address}::${collection_name}::${token_name}`;
+  const ownership_id = `${token_id}::${creator_address}`;
   const ownership = await prisma.ownerships.create({
     data: {
       amount: 0,
       inserted_at: new Date(),
       owner: creator_address,
-      token_id: token_id,
-      updated_at: new Date(),
       ownership_id,
+      token_id,
+      updated_at: new Date(),
     },
   });
   return ownership;
 };
 
 const cleanupOwnership = async (owner: string, token_id: string) => {
-  const ownership_id = `${token_id}::${owner}`
-  await prisma.ownerships.delete({
+  await prisma.ownerships.deleteMany({
     where: {
-      ownership_id,
+      owner,
+      token_id,
     },
   });
 };
 
 const createRandomCollection = async () => {
-  const name = collection_name + (Math.random() * 10000000)
-  const collection_id = `${creator_address}::${name}`
+  const name = collection_name + (Math.random() * 10000000);
+  const collection_id = `${creator_address}::${name}`;
   const collection = await prisma.collections.create({
     data: {
+      collection_id,
       created_at: new Date(),
       creator: creator_address,
       description,
       inserted_at: new Date(),
       name,
       uri,
-      collection_id,
     },
   });
   return collection;
@@ -133,9 +131,11 @@ const cleanupCollection = async (
   creatorAddress: string,
   collectionName: string,
 ) => {
-  const collection_id = `${creatorAddress}::${collectionName}`
-  await prisma.collections.delete({
-    where: { collection_id },
+  await prisma.collections.deleteMany({
+    where: {
+      creator: creatorAddress,
+      name: collectionName,
+    },
   });
 };
 
@@ -234,11 +234,11 @@ test('/ownerships/byId', async () => {
     owner,
     token_id,
   } = ownership;
-  const ownership_id = `${token_id}::${owner}`
+  const ownership_id = `${token_id}::${owner}`;
   const fetchedOwnership = await axios.get<ownerships>(`http://localhost:${URL_PORT}/${version}/ownerships/byId`, {
     params: {
       ownershipId: ownership_id,
-    }
+    },
   });
   expect(fetchedOwnership.data.owner).toBe(owner);
   await cleanupOwnership(owner!, token_id!);
@@ -263,9 +263,9 @@ test('/ownerships/byOwner', async () => {
   const fetchedOwnerships = await axios.get<ownerships[]>(`http://localhost:${URL_PORT}/${version}/ownerships/byOwner`, {
     params: {
       ownerAddress: owner,
-    }
+    },
   });
-  const token_ids = fetchedOwnerships.data.map((value) => value.token_id)
+  const token_ids = fetchedOwnerships.data.map((value) => value.token_id);
   expect(token_ids).toEqual(expect.arrayContaining([token_id, token_id1]));
   expect(token_ids).not.toContain(token_id2);
   await cleanupOwnership(owner!, token_id!);

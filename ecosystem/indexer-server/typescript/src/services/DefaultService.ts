@@ -225,10 +225,10 @@ const getOwnershipsByOwner = ({
     try {
       const data = await prisma.ownerships.findMany({
         where: {
-          owner: ownerAddress,
           amount: {
-            gt: 0
-          }
+            gt: 0,
+          },
+          owner: ownerAddress,
         },
       });
       resolve(Service.successResponse(data));
