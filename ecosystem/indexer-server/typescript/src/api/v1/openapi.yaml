@@ -452,19 +452,76 @@ paths:
           description: |
             Server internal error, caused by unexpected issues.
       x-eov-operation-handler: controllers/DefaultController
-  /ownerships/{ownershipId}:
+  /ownerships/byId:
     get:
       description: Returns ownership by ownershipId
       operationId: getOwnershipById
       parameters:
       - description: Ownership Id has the format of "${tokenID}::${ownerAddress}"
-        explode: false
-        in: path
+        explode: true
+        in: query
         name: ownershipId
         required: true
         schema:
           $ref: '#/components/schemas/OwnershipId'
-        style: simple
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ownership'
+          description: OK
+        "404":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/AptosError'
+                example:
+                  code: 404
+                  message: resource not found
+                  aptos_ledger_version: "37829327"
+          description: |
+            Resource or data not found.
+            Client may retry the request if it is waiting for transaction execution or ledger synchronization.
+        "400":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/AptosError'
+                example:
+                  code: 400
+                  message: invalid parameter
+          description: |
+            Bad request due to a client error: invalid request headers, parameters or body.
+            Client should not retry the request without modification.
+        "500":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/AptosError'
+                example:
+                  code: 500
+                  message: unexpected internal error
+          description: |
+            Server internal error, caused by unexpected issues.
+      x-eov-operation-handler: controllers/DefaultController
+  /ownerships/byOwner:
+    get:
+      description: Returns ownership by owner address
+      operationId: getOwnershipsByOwner
+      parameters:
+      - description: Address of owner in string format
+        explode: true
+        in: query
+        name: ownerAddress
+        required: true
+        schema:
+          $ref: '#/components/schemas/Address'
+        style: form
       responses:
         "200":
           content:

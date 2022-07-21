@@ -232,17 +232,41 @@ paths:
           $ref: "#/components/responses/400"
         '500':
           $ref: "#/components/responses/500"
-  /ownerships/{ownershipId}:
+  /ownerships/byId:
     get:
       description: "Returns ownership by ownershipId"
       operationId: getOwnershipById
       parameters:
         - name: "ownershipId"
-          in: path
+          in: query
           required: true
           description: Ownership Id has the format of "${tokenID}::${ownerAddress}"
           schema:
             $ref: "#/components/schemas/OwnershipId"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ownership"
+        '404':
+          $ref: "#/components/responses/404"
+        '400':
+          $ref: "#/components/responses/400"
+        '500':
+          $ref: "#/components/responses/500"
+  /ownerships/byOwner:
+    get:
+      description: "Returns ownership by owner address"
+      operationId: getOwnershipsByOwner
+      parameters:
+        - name: "ownerAddress"
+          in: query
+          required: true
+          description: Address of owner in string format
+          schema:
+            $ref: "#/components/schemas/Address"
       responses:
         "200":
           description: "OK"
