@@ -7,12 +7,19 @@
 
 module aptos_std::table {
     use std::error;
+    use std::string::String;
+    use std::signer::address_of;
+    use aptos_std::event::{EventHandle, new_event_handle, emit_event};
+    use aptos_std::type_info::type_name;
 
     // native code raises this with error::invalid_arguments()
     const EALREADY_EXISTS: u64 = 100;
     // native code raises this with error::invalid_arguments()
     const ENOT_FOUND: u64 = 101;
     const ENOT_EMPTY: u64 = 102;
+
+    const ENOT_STD_ACCOUNT: u64 = 103;
+    const ETABLE_METADATA_ALREADY_EXISTS: u64 = 104;
 
     /// Type of tables
     struct Table<phantom K: copy + drop, phantom V> has store {
@@ -21,9 +28,12 @@ module aptos_std::table {
     }
 
     /// Create a new Table.
-    public fun new<K: copy + drop, V: store>(): Table<K, V> {
-        Table{
-            handle: new_table_handle<K, V>(),
+    public fun new<K: copy + drop, V: store>(): Table<K, V> acquires TableMetadata {
+        let handle = new_table_handle<K, V>();
+        maybe_emit_create_table_event<K, V>(handle);
+
+        Table {
+            handle,
             length: 0,
         }
     }
@@ -95,6 +105,39 @@ module aptos_std::table {
 
     // ======================================================================================================
     // Internal API
+
+    struct NewTableEvent has drop, store {
+        handle: u128,
+        key_type: String,
+        value_type: String,
+    }
+
+    struct TableMetadata has key, store {
+        new_table_events: EventHandle<NewTableEvent>,
+    }
+
+    public fun initialize(account: &signer) {
+        assert!(address_of(account) == @aptos_std, error::permission_denied(ENOT_STD_ACCOUNT));
+
+        assert!(!exists<TableMetadata>(@aptos_std), error::already_exists(ETABLE_METADATA_ALREADY_EXISTS));
+        move_to(account, TableMetadata {
+            new_table_events: new_event_handle<NewTableEvent>(account)
+        });
+    }
+
+    fun maybe_emit_create_table_event<K: copy + drop, V>(handle: u128) acquires TableMetadata {
+        if (exists<TableMetadata>(@aptos_std)) {
+            let key_type = type_name<K>();
+            let value_type = type_name<V>();
+
+            let table_metadata = borrow_global_mut<TableMetadata>(@aptos_std);
+            emit_event(&mut table_metadata.new_table_events, NewTableEvent {
+                key_type,
+                value_type,
+                handle,
+            })
+        }
+    }
 
     /// Wrapper for values. Required for making values appear as resources in the implementation.
     struct Box<V> has key, drop, store {

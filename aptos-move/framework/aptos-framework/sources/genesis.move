@@ -18,6 +18,7 @@ module aptos_framework::genesis {
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
     use aptos_framework::vm_config;
+    use aptos_std::table;
 
     /// Invalid epoch duration.
     const EINVALID_EPOCH_DURATION: u64 = 1;
@@ -158,6 +159,7 @@ module aptos_framework::genesis {
         reconfiguration::initialize(&aptos_framework_account);
         block::initialize_block_metadata(&aptos_framework_account, epoch_interval);
         timestamp::set_time_has_started(&aptos_framework_account);
+        table::initialize(&aptos_framework_account);
     }
 
     /// Sets up the initial validator set for the network.
