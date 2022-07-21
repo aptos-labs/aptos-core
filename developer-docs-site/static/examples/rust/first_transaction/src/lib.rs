@@ -8,7 +8,7 @@ use std::{
 
 use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
 use hex::ToHex;
-use rand::{rngs::OsRng, Rng, SeedableRng, RngCore};
+use rand::{rngs::OsRng, Rng, RngCore, SeedableRng};
 use reqwest;
 use tiny_keccak::{Hasher, Sha3};
 
@@ -30,7 +30,7 @@ impl Account {
                 let mut bytes = [0; 32];
                 rng.fill_bytes(&mut bytes);
                 SecretKey::from_bytes(&bytes).unwrap()
-            },
+            }
         };
 
         Account { signing_key }
@@ -265,8 +265,11 @@ impl RestClient {
     //:!:>section_5
     /// Returns the test coin balance associated with the account
     pub fn account_balance(&self, account_address: &str) -> Option<u64> {
-        self.account_resource(account_address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>")
-            .unwrap()["data"]["coin"]["value"]
+        self.account_resource(
+            account_address,
+            "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+        )
+        .unwrap()["data"]["coin"]["value"]
             .as_str()
             .and_then(|s| s.parse::<u64>().ok())
     }
