@@ -1,12 +1,22 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod error;
+pub mod faucet;
+pub use faucet::FaucetClient;
+pub mod response;
+pub use response::Response;
+pub mod aptos;
+pub mod state;
+pub mod types;
+
+use crate::aptos::{AptosVersion, Balance};
 use anyhow::{anyhow, Result};
 pub use aptos_api_types::{
     self, IndexResponse, MoveModuleBytecode, PendingTransaction, Transaction,
 };
 use aptos_api_types::{
-    mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, Block, BlockInfo, Event,
+    mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, Block, BlockInfo, VersionedEvent,
     HexEncodedBytes,
 };
 use aptos_crypto::HashValue;
@@ -20,19 +30,11 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 pub use state::State;
 use std::time::Duration;
-use url::Url;
-
-pub mod error;
-pub mod faucet;
-pub use faucet::FaucetClient;
-pub mod response;
-pub use response::Response;
-pub mod state;
-pub mod types;
 use crate::aptos::{AptosVersion, Balance};
-pub use types::{Account, Resource};
+pub use types::{Account, Resource, RestError};
 pub mod aptos;
 use types::{deserialize_from_prefixed_hex_string, deserialize_from_string};
+use url::Url;
 
 pub const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
 pub const DEFAULT_VERSION_PATH_BASE: &str = "v1/";
@@ -369,8 +371,8 @@ impl Client {
         struct_tag: &str,
         field_name: &str,
         start: Option<u64>,
-        limit: Option<u64>,
-    ) -> Result<Response<Vec<Event>>> {
+        limit: Option<u16>,
+    ) -> Result<Response<Vec<VersionedEvent>>> {
         let url = self.build_path(&format!(
             "accounts/{}/events/{}/{}",
             address.to_hex_literal(),
@@ -393,8 +395,8 @@ impl Client {
     pub async fn get_new_block_events(
         &self,
         start: Option<u64>,
-        limit: Option<u64>,
-    ) -> Result<Response<Vec<NewBlockEvent>>> {
+        limit: Option<u16>,
+    ) -> Result<Response<Vec<VersionedNewBlockEvent>>> {
         #[derive(Clone, Debug, Serialize, Deserialize)]
         pub struct NewBlockEventResponse {
             #[serde(deserialize_with = "deserialize_from_string")]
@@ -425,22 +427,28 @@ impl Client {
             let new_events: Result<Vec<_>> = events
                 .into_iter()
                 .map(|event| {
+                    let version = event.version.into();
+                    let sequence_number = event.sequence_number.into();
                     serde_json::from_value::<NewBlockEventResponse>(event.data)
                         .map_err(|e| anyhow!(e))
                         .and_then(|e| {
-                            Ok(NewBlockEvent::new(
-                                e.epoch,
-                                e.round,
-                                e.height,
-                                e.previous_block_votes_bitvec.0,
-                                AccountAddress::from_hex_literal(&e.proposer)
-                                    .map_err(|e| anyhow!(e))?,
-                                e.failed_proposer_indices
-                                    .iter()
-                                    .map(|v| v.parse())
-                                    .collect::<Result<Vec<_>, _>>()?,
-                                e.time_microseconds,
-                            ))
+                            Ok(VersionedNewBlockEvent {
+                                event: NewBlockEvent::new(
+                                    e.epoch,
+                                    e.round,
+                                    e.height,
+                                    e.previous_block_votes_bitvec.0,
+                                    AccountAddress::from_hex_literal(&e.proposer)
+                                        .map_err(|e| anyhow!(e))?,
+                                    e.failed_proposer_indices
+                                        .iter()
+                                        .map(|v| v.parse())
+                                        .collect::<Result<Vec<_>, _>>()?,
+                                    e.time_microseconds,
+                                ),
+                                version,
+                                sequence_number,
+                            })
                         })
                 })
                 .collect();
@@ -543,4 +551,14 @@ impl From<(ReqwestClient, Url)> for Client {
             version_path_base: DEFAULT_VERSION_PATH_BASE.to_string(),
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct VersionedNewBlockEvent {
+    /// event
+    pub event: NewBlockEvent,
+    /// version
+    pub version: u64,
+    /// sequence number
+    pub sequence_number: u64,
 }

@@ -277,6 +277,39 @@ async fn test_join_and_leave_validator() {
     .await;
 }
 
+#[tokio::test]
+async fn test_analyze_validators() {
+    let (mut swarm, cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_i, _conf, genesis_stake_amount| {
+            *genesis_stake_amount = 100000;
+        }))
+        .build_with_cli(0)
+        .await;
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    let rest_client = swarm.validators().next().unwrap().rest_client();
+
+    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    reconfig(
+        &rest_client,
+        &transaction_factory,
+        swarm.chain_info().root_account(),
+    )
+    .await;
+
+    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    reconfig(
+        &rest_client,
+        &transaction_factory,
+        swarm.chain_info().root_account(),
+    )
+    .await;
+
+    cli.analyze_validator_performance(None, None).await.unwrap();
+}
+
 fn dns_name(addr: &str) -> DnsName {
     DnsName::try_from(addr.to_string()).unwrap()
 }

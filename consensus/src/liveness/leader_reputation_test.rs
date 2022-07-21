@@ -466,7 +466,7 @@ impl MockDbReader {
                     epoch,
                     round,
                     round,
-                    vec![],
+                    vec![true],
                     self.random_address,
                     vec![],
                     *self.last_timestamp.lock(),
