@@ -6,6 +6,7 @@
 //! See: [Account API Spec](https://www.rosetta-api.org/docs/AccountApi.html)
 //!
 
+use crate::types::coin_module_identifier;
 use crate::{
     common::{
         check_network, get_block_index_from_request, handle_request, native_coin, native_coin_tag,
@@ -13,8 +14,8 @@ use crate::{
     },
     error::{ApiError, ApiResult},
     types::{
-        coin_identifier_lower, coin_store_identifier, AccountBalanceRequest,
-        AccountBalanceResponse, Amount, BlockIdentifier, Currency, CurrencyMetadata,
+        coin_store_resource_identifier, AccountBalanceRequest, AccountBalanceResponse, Amount,
+        BlockIdentifier, Currency, CurrencyMetadata,
     },
     RosettaContext,
 };
@@ -164,8 +165,8 @@ async fn get_balances(
             .iter()
             .filter(|resource| {
                 resource.resource_type.address == AccountAddress::ONE
-                    && resource.resource_type.module == coin_identifier_lower()
-                    && resource.resource_type.name == coin_store_identifier()
+                    && resource.resource_type.module == coin_module_identifier()
+                    && resource.resource_type.name == coin_store_resource_identifier()
             })
             .filter_map(|resource| {
                 // Currency must have a type
@@ -289,7 +290,7 @@ impl CoinCache {
                 symbol: coin_info.symbol,
                 decimals: coin_info.decimals.0,
                 metadata: Some(CurrencyMetadata {
-                    move_type: resource_tag.to_string(),
+                    move_type: struct_tag.to_string(),
                 }),
             }))
         } else {

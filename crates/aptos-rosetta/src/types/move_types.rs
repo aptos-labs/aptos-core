@@ -5,61 +5,62 @@
 
 use aptos_sdk::move_types::{ident_str, identifier::Identifier};
 
-pub fn account_identifier() -> Identifier {
-    ident_str!("Account").into()
+// Module identifiers
+pub fn aptos_coin_module_identifier() -> Identifier {
+    ident_str!("aptos_coin").into()
 }
 
-pub fn account_identifier_lower() -> Identifier {
+pub fn account_module_identifier() -> Identifier {
     ident_str!("account").into()
 }
 
-pub fn coin_identifier() -> Identifier {
-    ident_str!("Coin").into()
-}
-
-pub fn coin_identifier_lower() -> Identifier {
+pub fn coin_module_identifier() -> Identifier {
     ident_str!("coin").into()
 }
-pub fn coin_info_identifier() -> Identifier {
+
+// Resource Identifiers
+pub fn account_resource_identifier() -> Identifier {
+    ident_str!("Account").into()
+}
+
+pub fn coin_info_resource_identifier() -> Identifier {
     ident_str!("CoinInfo").into()
 }
 
-pub fn coin_store_identifier() -> Identifier {
+pub fn coin_store_resource_identifier() -> Identifier {
     ident_str!("CoinStore").into()
 }
 
-pub fn create_account_identifier() -> Identifier {
-    ident_str!("create_account").into()
-}
-
-pub fn aptos_coin_identifier() -> Identifier {
+pub fn aptos_coin_resource_identifier() -> Identifier {
     ident_str!("AptosCoin").into()
 }
 
-pub fn aptos_coin_identifier_lower() -> Identifier {
-    ident_str!("aptoscoin").into()
+// Function identifiers
+pub fn create_account_function_identifier() -> Identifier {
+    ident_str!("create_account").into()
 }
 
-pub fn sequence_number_identifier() -> Identifier {
-    ident_str!("sequence_number").into()
-}
-
-pub fn deposit_events_identifier() -> Identifier {
-    ident_str!("deposit_events").into()
-}
-
-pub fn withdraw_events_identifier() -> Identifier {
-    ident_str!("withdraw_events").into()
-}
-
-pub fn transfer_identifier() -> Identifier {
+pub fn transfer_function_identifier() -> Identifier {
     ident_str!("transfer").into()
 }
 
-pub fn decimals_identifier() -> Identifier {
+// Field identifiers
+pub fn decimals_field_identifier() -> Identifier {
     ident_str!("decimals").into()
 }
 
-pub fn symbol_identifier() -> Identifier {
+pub fn deposit_events_field_identifier() -> Identifier {
+    ident_str!("deposit_events").into()
+}
+
+pub fn withdraw_events_field_identifier() -> Identifier {
+    ident_str!("withdraw_events").into()
+}
+
+pub fn sequence_number_field_identifier() -> Identifier {
+    ident_str!("sequence_number").into()
+}
+
+pub fn symbol_field_identifier() -> Identifier {
     ident_str!("symbol").into()
 }

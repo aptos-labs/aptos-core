@@ -1,12 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::aptos_coin_identifier_lower;
+use crate::types::{aptos_coin_module_identifier, aptos_coin_resource_identifier};
 use crate::{
     error::{ApiError, ApiResult},
     types::{
-        aptos_coin_identifier, Currency, CurrencyMetadata, MetadataRequest, NetworkIdentifier,
-        PartialBlockIdentifier,
+        Currency, CurrencyMetadata, MetadataRequest, NetworkIdentifier, PartialBlockIdentifier,
     },
     RosettaContext,
 };
@@ -145,7 +144,7 @@ pub fn native_coin() -> Currency {
         symbol: DEFAULT_COIN.to_string(),
         decimals: DEFAULT_DECIMALS,
         metadata: Some(CurrencyMetadata {
-            move_type: native_coin_tag_lower().to_string(),
+            move_type: native_coin_tag().to_string(),
         }),
     }
 }
@@ -153,17 +152,8 @@ pub fn native_coin() -> Currency {
 pub fn native_coin_tag() -> TypeTag {
     TypeTag::Struct(StructTag {
         address: AccountAddress::ONE,
-        module: aptos_coin_identifier(),
-        name: aptos_coin_identifier(),
-        type_params: vec![],
-    })
-}
-
-pub fn native_coin_tag_lower() -> TypeTag {
-    TypeTag::Struct(StructTag {
-        address: AccountAddress::ONE,
-        module: aptos_coin_identifier_lower(),
-        name: aptos_coin_identifier(),
+        module: aptos_coin_module_identifier(),
+        name: aptos_coin_resource_identifier(),
         type_params: vec![],
     })
 }
