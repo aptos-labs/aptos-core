@@ -1,5 +1,5 @@
 /// This module provides the foundation for Tokens.
-module aptos_token::token_v1 {
+module aptos_token::token {
     use std::string::{String, Self};
     use std::error;
     use aptos_std::event::{Self, EventHandle};
