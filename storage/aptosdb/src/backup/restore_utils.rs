@@ -50,7 +50,7 @@ pub fn confirm_or_save_frozen_subtrees(
     num_leaves: LeafCount,
     frozen_subtrees: &[HashValue],
 ) -> Result<()> {
-    let mut cs = ChangeSet::new();
+    let cs = ChangeSet::new();
     let positions: Vec<_> = FrozenSubTreeIterator::new(num_leaves).collect();
 
     ensure!(
