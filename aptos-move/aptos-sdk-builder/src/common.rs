@@ -34,7 +34,7 @@ fn quote_type_as_format(type_tag: &TypeTag) -> Format {
             U8 => Format::Bytes,
             Vector(type_tag) => {
                 if type_tag.as_ref() == &U8 {
-                    Format::TypeName("VecBytes".into())
+                    Format::Seq(Box::new(Format::Bytes))
                 } else {
                     type_not_allowed(type_tag)
                 }

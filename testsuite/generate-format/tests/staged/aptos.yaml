@@ -264,9 +264,6 @@ TypeTag:
       struct:
         NEWTYPE:
           TYPENAME: StructTag
-VecBytes:
-  NEWTYPESTRUCT:
-    SEQ: BYTES
 WriteOp:
   ENUM:
     0:
