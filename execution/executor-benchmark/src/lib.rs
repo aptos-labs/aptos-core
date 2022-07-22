@@ -14,6 +14,7 @@ use crate::{
 };
 use aptos_config::config::{
     NodeConfig, RocksdbConfigs, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG,
+    TARGET_SNAPSHOT_SIZE,
 };
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
@@ -35,6 +36,7 @@ pub fn init_db_and_executor(config: &NodeConfig) -> (DbReaderWriter, BlockExecut
             config.storage.storage_pruner_config,
             RocksdbConfigs::default(),
             false,
+            config.storage.target_snapshot_size,
         )
         .expect("DB should open."),
     );
@@ -57,6 +59,7 @@ fn create_checkpoint(source_dir: impl AsRef<Path>, checkpoint_dir: impl AsRef<Pa
         NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
         RocksdbConfigs::default(),
         false,
+        TARGET_SNAPSHOT_SIZE,
     )
     .expect("db open failure.")
     .create_checkpoint(checkpoint_dir.as_ref())

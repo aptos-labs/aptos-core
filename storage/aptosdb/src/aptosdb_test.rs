@@ -27,13 +27,13 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
     #[test]
-    fn test_save_blocks(input in arb_blocks_to_commit()) {
-        test_save_blocks_impl(input);
+    fn test_save_blocks(input in arb_blocks_to_commit(), threshold in 10..20usize) {
+        test_save_blocks_impl(input, threshold);
     }
 
     #[test]
-    fn test_sync_transactions(input in arb_blocks_to_commit()) {
-        test_sync_transactions_impl(input);
+    fn test_sync_transactions(input in arb_blocks_to_commit(), threshold in 10..20usize) {
+        test_sync_transactions_impl(input, threshold);
     }
 }
 

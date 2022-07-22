@@ -63,6 +63,7 @@ pub(crate) struct StateStore {
     // is the latest state sparse merkle tree that is replayed from that snapshot until the latest
     // write set stored in ledger_db.
     buffered_state: Mutex<BufferedState>,
+    target_snapshot_size: usize,
 }
 
 impl Deref for StateStore {
@@ -195,24 +196,35 @@ impl StateDb {
 }
 
 impl StateStore {
-    pub fn new(ledger_db: Arc<DB>, state_merkle_db: Arc<DB>, hack_for_tests: bool) -> Self {
+    pub fn new(
+        ledger_db: Arc<DB>,
+        state_merkle_db: Arc<DB>,
+        target_snapshot_size: usize,
+        hack_for_tests: bool,
+    ) -> Self {
         let state_merkle_db = Arc::new(StateMerkleDb::new(state_merkle_db));
         let state_db = Arc::new(StateDb {
             ledger_db,
             state_merkle_db,
         });
         let buffered_state = Mutex::new(
-            Self::create_buffered_state_from_latest_snapshot(&state_db, hack_for_tests)
-                .expect("buffered state creation failed."),
+            Self::create_buffered_state_from_latest_snapshot(
+                &state_db,
+                target_snapshot_size,
+                hack_for_tests,
+            )
+            .expect("buffered state creation failed."),
         );
         Self {
             state_db,
             buffered_state,
+            target_snapshot_size,
         }
     }
 
     fn create_buffered_state_from_latest_snapshot(
         state_db: &Arc<StateDb>,
+        target_snapshot_size: usize,
         hack_for_tests: bool,
     ) -> Result<BufferedState> {
         let ledger_store = LedgerStore::new(Arc::clone(&state_db.ledger_db));
@@ -236,6 +248,7 @@ impl StateStore {
         let mut buffered_state = BufferedState::new(
             &state_db.state_merkle_db,
             StateDelta::new_at_checkpoint(latest_snapshot_root_hash, latest_snapshot_version),
+            target_snapshot_size,
         );
 
         // In some backup-restore tests we hope to open the db without consistency check.
@@ -307,9 +320,12 @@ impl StateStore {
     }
 
     pub fn reset(&self) {
-        *self.buffered_state.lock() =
-            Self::create_buffered_state_from_latest_snapshot(&self.state_db, false)
-                .expect("buffered state creation failed.");
+        *self.buffered_state.lock() = Self::create_buffered_state_from_latest_snapshot(
+            &self.state_db,
+            self.target_snapshot_size,
+            false,
+        )
+        .expect("buffered state creation failed.");
     }
 
     pub fn buffered_state(&self) -> &Mutex<BufferedState> {

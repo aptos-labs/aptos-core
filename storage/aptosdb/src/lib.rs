@@ -58,6 +58,7 @@ use crate::{
 use anyhow::{bail, ensure, Result};
 use aptos_config::config::{
     RocksdbConfig, RocksdbConfigs, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG,
+    TARGET_SNAPSHOT_SIZE,
 };
 use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
@@ -275,6 +276,7 @@ impl AptosDB {
         ledger_rocksdb: DB,
         state_merkle_rocksdb: DB,
         storage_pruner_config: StoragePrunerConfig,
+        target_snapshot_size: usize,
         hack_for_tests: bool,
     ) -> Self {
         let arc_ledger_rocksdb = Arc::new(ledger_rocksdb);
@@ -300,6 +302,7 @@ impl AptosDB {
             state_store: Arc::new(StateStore::new(
                 Arc::clone(&arc_ledger_rocksdb),
                 Arc::clone(&arc_state_merkle_rocksdb),
+                target_snapshot_size,
                 hack_for_tests,
             )),
             system_store: Arc::new(SystemStore::new(Arc::clone(&arc_ledger_rocksdb))),
@@ -321,6 +324,7 @@ impl AptosDB {
         storage_pruner_config: StoragePrunerConfig,
         rocksdb_configs: RocksdbConfigs,
         enable_indexer: bool,
+        target_snapshot_size: usize,
     ) -> Result<Self> {
         ensure!(
             storage_pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -363,8 +367,13 @@ impl AptosDB {
             )
         };
 
-        let mut myself =
-            Self::new_with_dbs(ledger_db, state_merkle_db, storage_pruner_config, readonly);
+        let mut myself = Self::new_with_dbs(
+            ledger_db,
+            state_merkle_db,
+            storage_pruner_config,
+            target_snapshot_size,
+            readonly,
+        );
 
         if !readonly && enable_indexer {
             myself.open_indexer(db_root_path, rocksdb_configs.index_db_config)?;
@@ -451,18 +460,24 @@ impl AptosDB {
                 state_merkle_db_column_families(),
             )?,
             NO_OP_STORAGE_PRUNER_CONFIG,
+            TARGET_SNAPSHOT_SIZE,
             true,
         ))
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
-    fn new_without_pruner<P: AsRef<Path> + Clone>(db_root_path: P, readonly: bool) -> Self {
+    fn new_without_pruner<P: AsRef<Path> + Clone>(
+        db_root_path: P,
+        readonly: bool,
+        target_snapshot_size: usize,
+    ) -> Self {
         Self::open(
             db_root_path,
             readonly,
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
             RocksdbConfigs::default(),
             false,
+            target_snapshot_size,
         )
         .expect("Unable to open AptosDB")
     }
@@ -470,13 +485,22 @@ impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_for_test<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, false)
+        Self::new_without_pruner(db_root_path, false, TARGET_SNAPSHOT_SIZE)
+    }
+
+    /// This opens db in non-readonly mode, without the pruner.
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_for_test_with_target_snapshot_size<P: AsRef<Path> + Clone>(
+        db_root_path: P,
+        target_snapshot_size: usize,
+    ) -> Self {
+        Self::new_without_pruner(db_root_path, false, target_snapshot_size)
     }
 
     /// This opens db in non-readonly mode, without the pruner.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_readonly_for_test<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, true)
+        Self::new_without_pruner(db_root_path, true, TARGET_SNAPSHOT_SIZE)
     }
 
     /// This gets the current buffered_state in StateStore.
@@ -1298,14 +1322,13 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_latest_state_snapshot(&self) -> Result<Option<(Version, HashValue)>> {
-        gauged_api("get_latest_state_snapshot", || {
-            let num_txns = self
-                .ledger_store
-                .get_latest_transaction_info_option()?
-                .map(|(version, _)| version + 1)
-                .unwrap_or(0);
-            self.state_store.get_state_snapshot_before(num_txns)
+    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
+        gauged_api("get_latest_state_checkpoint_version", || {
+            Ok(self
+                .state_store
+                .buffered_state()
+                .lock()
+                .current_checkpoint_version())
         })
     }
 
@@ -1475,10 +1498,12 @@ impl DbWriter for AptosDB {
                 let mut buffered_state = self.state_store.buffered_state().lock();
                 ensure!(
                     base_state_version == buffered_state.current_state().base_version,
-                    "base_state_version {:?} does not equal to the base_version {:?} in bufferd state ",
+                    "base_state_version {:?} does not equal to the base_version {:?} in buffered state{:?}",
                     base_state_version,
-                    buffered_state.current_state().base_version
+                    buffered_state.current_state().base_version,
+                    buffered_state.current_state().current_version,
                 );
+                let mut end_with_reconfig = false;
                 let updates_until_latest_checkpoint_since_current = if let Some(
                     latest_checkpoint_version,
                 ) =
@@ -1492,6 +1517,7 @@ impl DbWriter for AptosDB {
                             latest_checkpoint_version,
                             first_version + idx as u64
                     );
+                        end_with_reconfig = txns_to_commit[idx].is_reconfig();
                         Some(
                             txns_to_commit[..=idx]
                                 .iter()
@@ -1507,7 +1533,7 @@ impl DbWriter for AptosDB {
                 buffered_state.update(
                     updates_until_latest_checkpoint_since_current,
                     latest_in_memory_state,
-                    sync_commit,
+                    end_with_reconfig || sync_commit,
                 )?;
             }
 

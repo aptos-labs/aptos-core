@@ -202,9 +202,53 @@ fn verify_epochs(db: &AptosDB, ledger_infos_with_sigs: &[LedgerInfoWithSignature
     }
 }
 
-pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>) {
+fn gen_snapshot_version(
+    updates: &mut HashMap<StateKey, StateValue>,
+    txns_to_commit: &[TransactionToCommit],
+    cur_ver: Version,
+    threshold: usize,
+) -> Option<Version> {
+    let mut snapshot_version = None;
+    let last_checkpoint = txns_to_commit
+        .iter()
+        .enumerate()
+        .filter(|(_idx, x)| x.is_state_checkpoint())
+        .last()
+        .map(|(idx, _)| idx);
+    if let Some(idx) = last_checkpoint {
+        updates.extend(
+            txns_to_commit[0..=idx]
+                .iter()
+                .flat_map(|x| x.state_updates().clone())
+                .collect::<HashMap<_, _>>(),
+        );
+        if updates.len() >= threshold {
+            snapshot_version = Some(cur_ver + idx as u64);
+            updates.clear();
+        }
+        updates.extend(
+            txns_to_commit[idx + 1..]
+                .iter()
+                .flat_map(|x| x.state_updates().clone())
+                .collect::<HashMap<_, _>>(),
+        );
+    } else {
+        updates.extend(
+            txns_to_commit
+                .iter()
+                .flat_map(|x| x.state_updates().clone())
+                .collect::<HashMap<_, _>>(),
+        );
+    }
+    snapshot_version
+}
+
+pub fn test_save_blocks_impl(
+    input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
+    snapshot_size_threshold: usize,
+) {
     let tmp_dir = TempPath::new();
-    let db = AptosDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test_with_target_snapshot_size(&tmp_dir, snapshot_size_threshold);
 
     let mut in_memory_state = db
         .state_store
@@ -216,6 +260,8 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
     let num_batches = input.len();
     let mut cur_ver: Version = 0;
     let mut all_committed_txns = vec![];
+    let mut updates = HashMap::new();
+    let mut snapshot_versions = vec![];
     for (batch_idx, (txns_to_commit, ledger_info_with_sigs)) in input.iter().enumerate() {
         update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
         db.save_transactions(
@@ -223,10 +269,19 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
             cur_ver,                /* first_version */
             cur_ver.checked_sub(1), /* base_state_version */
             Some(ledger_info_with_sigs),
-            true, /* sync_commit */
+            false, /* sync_commit */
             in_memory_state.clone(),
         )
         .unwrap();
+
+        if let Some(v) = gen_snapshot_version(
+            &mut updates,
+            txns_to_commit,
+            cur_ver,
+            snapshot_size_threshold,
+        ) {
+            snapshot_versions.push(v);
+        }
 
         assert_eq!(
             db.ledger_store.get_latest_ledger_info().unwrap(),
@@ -246,6 +301,7 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
 
         cur_ver += txns_to_commit.len() as u64;
     }
+    db.state_store.buffered_state().lock().sync_commit();
 
     let first_batch = input.first().unwrap().0.clone();
     let first_batch_ledger_info = input.first().unwrap().1.clone();
@@ -268,6 +324,59 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
     );
     let (_, ledger_infos_with_sigs): (Vec<_>, Vec<_>) = input.iter().cloned().unzip();
     verify_epochs(&db, &ledger_infos_with_sigs);
+
+    // sync the commits and verify the states
+    db.state_store.buffered_state().lock().sync_commit();
+    verify_snapshots(
+        &db,
+        0, /* first_version */
+        snapshot_versions,
+        input
+            .iter()
+            .flat_map(|(txns_to_commit, _)| txns_to_commit.iter())
+            .collect(),
+    );
+}
+
+fn verify_snapshots(
+    db: &AptosDB,
+    start_version: Version,
+    snapshot_versions: Vec<Version>,
+    txns_to_commit: Vec<&TransactionToCommit>,
+) {
+    let mut cur_version = start_version;
+    let mut updates: HashMap<&StateKey, &StateValue> = HashMap::new();
+    for snapshot_version in snapshot_versions {
+        let start = (cur_version - start_version) as usize;
+        let end = (snapshot_version - start_version) as usize;
+        assert!(txns_to_commit[end].is_state_checkpoint());
+        let expected_root_hash = db
+            .ledger_store
+            .get_transaction_info(snapshot_version)
+            .unwrap()
+            .state_checkpoint_hash()
+            .unwrap();
+        updates.extend(
+            txns_to_commit[start..=end]
+                .iter()
+                .flat_map(|x| x.state_updates().iter())
+                .collect::<HashMap<&StateKey, &StateValue>>(),
+        );
+        for (state_key, state_value) in &updates {
+            let (state_value_in_db, proof) = db
+                .get_state_value_with_proof_by_version(state_key, snapshot_version)
+                .unwrap();
+            assert_eq!(state_value_in_db, Some((*state_value).clone()));
+            proof
+                .verify(
+                    expected_root_hash,
+                    state_key.hash(),
+                    state_value_in_db.as_ref(),
+                )
+                .unwrap();
+        }
+        cur_version = snapshot_version + 1;
+    }
 }
 
 fn get_events_by_event_key(
@@ -515,22 +624,7 @@ pub fn verify_committed_transactions(
             assert_eq!(state_value_in_db, Some(state_value.clone()));
         }
 
-        if txn_to_commit.is_state_checkpoint() {
-            for (state_key, state_value) in &updates {
-                let (state_value_in_db, proof) = db
-                    .get_state_value_with_proof_by_version(state_key, cur_ver)
-                    .unwrap();
-                assert_eq!(state_value_in_db, Some((*state_value).clone()));
-                proof
-                    .verify(
-                        txn_info.state_checkpoint_hash().unwrap(),
-                        state_key.hash(),
-                        state_value_in_db.as_ref(),
-                    )
-                    .unwrap();
-            }
-            updates.clear();
-        } else {
+        if !txn_to_commit.is_state_checkpoint() {
             // Fetch and verify transaction itself.
             let txn = txn_to_commit.transaction().as_signed_user_txn().unwrap();
             let txn_with_proof = db
@@ -596,7 +690,6 @@ pub fn verify_committed_transactions(
                 .unwrap();
             assert_eq!(txn_output_list_with_proof.transactions_and_outputs.len(), 1);
         }
-
         cur_ver += 1;
     }
 
@@ -649,9 +742,10 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
 
 pub fn test_sync_transactions_impl(
     input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
+    snapshot_size_threshold: usize,
 ) {
     let tmp_dir = TempPath::new();
-    let db = AptosDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test_with_target_snapshot_size(&tmp_dir, snapshot_size_threshold);
 
     let mut in_memory_state = db
         .state_store
@@ -662,6 +756,8 @@ pub fn test_sync_transactions_impl(
     let _ancester = in_memory_state.current.clone();
     let num_batches = input.len();
     let mut cur_ver: Version = 0;
+    let mut updates = HashMap::new();
+    let mut snapshot_versions = vec![];
     for (batch_idx, (txns_to_commit, ledger_info_with_sigs)) in input.iter().enumerate() {
         // if batch has more than 2 transactions, save them in two batches
         let batch1_len = txns_to_commit.len() / 2;
@@ -673,7 +769,7 @@ pub fn test_sync_transactions_impl(
                 cur_ver, /* first_version */
                 base_state_version,
                 None,
-                true, /* sync_commit */
+                false, /* sync_commit */
                 in_memory_state.clone(),
             )
             .unwrap();
@@ -684,10 +780,19 @@ pub fn test_sync_transactions_impl(
             cur_ver + batch1_len as u64, /* first_version */
             base_state_version,
             Some(ledger_info_with_sigs),
-            true, /* sync_commit */
+            false, /* sync_commit */
             in_memory_state.clone(),
         )
         .unwrap();
+
+        if let Some(v) = gen_snapshot_version(
+            &mut updates,
+            txns_to_commit,
+            cur_ver,
+            snapshot_size_threshold,
+        ) {
+            snapshot_versions.push(v);
+        }
 
         verify_committed_transactions(
             &db,
@@ -699,4 +804,16 @@ pub fn test_sync_transactions_impl(
 
         cur_ver += txns_to_commit.len() as u64;
     }
+
+    // sync the commits and verify the states
+    db.state_store.buffered_state().lock().sync_commit();
+    verify_snapshots(
+        &db,
+        0, /* first_version */
+        snapshot_versions,
+        input
+            .iter()
+            .flat_map(|(txns_to_commit, _)| txns_to_commit.iter())
+            .collect(),
+    );
 }
