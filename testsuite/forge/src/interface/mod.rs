@@ -13,6 +13,8 @@ mod factory;
 pub use factory::*;
 mod swarm;
 pub use swarm::*;
+mod chaos;
+pub use chaos::*;
 mod node;
 pub use node::*;
 mod chain_info;

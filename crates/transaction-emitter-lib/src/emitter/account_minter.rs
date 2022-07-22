@@ -96,7 +96,6 @@ impl<'t> AccountMinter<'t> {
             "Minting additional {} accounts with {} coins each",
             num_accounts, coins_per_account
         );
-        // tokio::time::sleep(Duration::from_secs(10)).await;
 
         let seed_rngs = gen_rng_for_reusable_account(actual_num_seed_accounts);
         // For each seed account, create a future and transfer coins from that seed account to new accounts

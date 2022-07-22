@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    backend::k8s::node::{K8sNode, REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT},
-    create_k8s_client, query_sequence_numbers, set_validator_image_tag,
-    uninstall_testnet_resources, ChainInfo, FullNode, Node, Result, Swarm, Validator, Version,
+    chaos, create_k8s_client,
+    node::{K8sNode, REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT},
+    query_sequence_numbers, set_validator_image_tag, uninstall_testnet_resources, ChainInfo,
+    FullNode, Node, Result, Swarm, SwarmChaos, Validator, Version,
 };
 use ::aptos_logger::*;
 use anyhow::{anyhow, bail, format_err};
@@ -20,7 +21,14 @@ use kube::{
     api::{Api, ListParams},
     client::Client as K8sClient,
 };
-use std::{collections::HashMap, convert::TryFrom, env, net::TcpListener, str, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryFrom,
+    env,
+    net::TcpListener,
+    str,
+    sync::Arc,
+};
 use tokio::{runtime::Runtime, time::Duration};
 
 pub const VALIDATOR_SERVICE_SUFFIX: &str = "validator";
@@ -38,6 +46,7 @@ pub struct K8sSwarm {
     pub chain_id: ChainId,
     kube_namespace: String,
     keep: bool,
+    chaoses: HashSet<SwarmChaos>,
 }
 
 impl K8sSwarm {
@@ -82,6 +91,7 @@ impl K8sSwarm {
             versions: Arc::new(versions),
             kube_namespace: kube_namespace.to_string(),
             keep,
+            chaoses: HashSet::new(),
         })
     }
 
@@ -200,6 +210,21 @@ impl Swarm for K8sSwarm {
     // and instructions to check the actual live logs location from fgi
     fn logs_location(&mut self) -> String {
         "See fgi output for more information.".to_string()
+    }
+
+    fn inject_chaos(&mut self, chaos: SwarmChaos) -> Result<()> {
+        chaos::inject_swarm_chaos(&self.kube_namespace, &chaos)?;
+        self.chaoses.insert(chaos);
+        Ok(())
+    }
+
+    fn remove_chaos(&mut self, chaos: SwarmChaos) -> Result<()> {
+        if self.chaoses.remove(&chaos) {
+            chaos::remove_swarm_chaos(&self.kube_namespace, &chaos)?;
+        } else {
+            bail!("Chaos {:?} not found", chaos);
+        }
+        Ok(())
     }
 }
 

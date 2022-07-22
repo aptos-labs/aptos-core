@@ -1,0 +1,25 @@
+kind: NetworkChaos
+apiVersion: chaos-mesh.org/v1alpha1
+metadata:
+  namespace: {namespace}
+  name: forge-namespace-{latency_ms}ms-latency
+spec:
+  selector:
+    namespaces:
+      - {namespace}
+    labelSelectors:
+      app.kubernetes.io/name: validator
+  mode: all
+  action: delay
+  delay:
+    latency: "{latency_ms}ms"
+    correlation: "{correlation_percentage}"
+    jitter: "{jitter_ms}ms"
+  direction: both
+  target:
+    selector:
+      namespaces:
+        - {namespace}
+      labelSelectors:
+        app.kubernetes.io/name: validator
+    mode: all

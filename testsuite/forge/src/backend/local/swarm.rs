@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ChainInfo, FullNode, HealthCheckError, LocalNode, LocalVersion, Node, NodeExt, Swarm, SwarmExt,
-    Validator, Version,
+    ChainInfo, FullNode, HealthCheckError, LocalNode, LocalVersion, Node, NodeExt, Swarm,
+    SwarmChaos, SwarmExt, Validator, Version,
 };
 use anyhow::{anyhow, bail, Result};
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
@@ -523,5 +523,13 @@ impl Swarm for LocalSwarm {
     fn logs_location(&mut self) -> String {
         self.dir.persist();
         self.dir.display().to_string()
+    }
+
+    fn inject_chaos(&mut self, _chaos: SwarmChaos) -> Result<()> {
+        todo!()
+    }
+
+    fn remove_chaos(&mut self, _chaos: SwarmChaos) -> Result<()> {
+        todo!()
     }
 }
