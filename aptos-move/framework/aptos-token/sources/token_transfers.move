@@ -1,8 +1,8 @@
 /// This module provides the foundation for transferring of Tokens
-module aptos_framework::token_transfers {
+module aptos_token::token_transfers {
     use std::signer;
     use aptos_std::table::{Self, Table};
-    use aptos_framework::token::{Self, Token, TokenId};
+    use aptos_token::token::{Self, Token, TokenId};
 
     struct TokenTransfers has key {
         pending_claims: Table<address, Table<TokenId, Token>>,
@@ -24,8 +24,9 @@ module aptos_framework::token_transfers {
         collection: vector<u8>,
         name: vector<u8>,
         amount: u64,
+        serial_number: u64,
     ) acquires TokenTransfers {
-        let token_id = token::create_token_id_raw(creator, collection, name);
+        let token_id = token::create_token_id_raw(creator, collection, name, serial_number);
         offer(&sender, receiver, token_id, amount);
     }
 
@@ -64,8 +65,9 @@ module aptos_framework::token_transfers {
         creator: address,
         collection: vector<u8>,
         name: vector<u8>,
+        serial_number: u64,
     ) acquires TokenTransfers {
-        let token_id = token::create_token_id_raw(creator, collection, name);
+        let token_id = token::create_token_id_raw(creator, collection, name, serial_number);
         claim(&receiver, sender, token_id);
     }
 
@@ -95,8 +97,9 @@ module aptos_framework::token_transfers {
         creator: address,
         collection: vector<u8>,
         name: vector<u8>,
+        serial_number: u64,
     ) acquires TokenTransfers {
-        let token_id = token::create_token_id_raw(creator, collection, name);
+        let token_id = token::create_token_id_raw(creator, collection, name, serial_number);
         cancel_offer(&sender, receiver, token_id);
     }
 
@@ -162,30 +165,42 @@ module aptos_framework::token_transfers {
         claim(&creator, owner1_addr, token_id);
     }
 
+    #[test_only]
     fun create_token(creator: &signer, amount: u64): TokenId {
-        use std::string;
-        use std::option;
+        use std::string::{Self, String};
 
         let collection_name = string::utf8(b"Hello, World");
+        let collection_mutation_setting = vector<bool>[false, false, false];
 
         token::create_collection(
             creator,
             *&collection_name,
             string::utf8(b"Collection: Hello, World"),
             string::utf8(b"https://aptos.dev"),
-            option::some(1),
+            1,
+            collection_mutation_setting,
         );
 
+        let token_mutation_setting = vector<bool>[false, false, false, false, true];
+        let default_keys = vector<String>[string::utf8(b"attack"), string::utf8(b"num_of_use")];
+        let default_vals = vector<vector<u8>>[b"10", b"5"];
+        let default_types = vector<String>[string::utf8(b"integer"), string::utf8(b"integer")];
         token::create_token(
             creator,
             *&collection_name,
+
             string::utf8(b"Token: Hello, Token"),
             string::utf8(b"Hello, Token"),
-            false,
             amount,
-            option::none(),
+            amount,
             string::utf8(b"https://aptos.dev"),
+            signer::address_of(creator),
+            100,
             0,
+            token_mutation_setting,
+            default_keys,
+            default_vals,
+            default_types,
         )
     }
 }

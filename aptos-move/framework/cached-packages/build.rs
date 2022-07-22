@@ -31,7 +31,7 @@ fn main() {
         no_check_layout_compatibility: false,
         no_build_docs: true,
         with_diagram: true,
-        no_script_builder: true,
+        no_script_builder: false,
         no_script_abis: false,
         no_errmap: false,
         package: PathBuf::from("aptos-token"),

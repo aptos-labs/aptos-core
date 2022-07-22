@@ -24,6 +24,7 @@ use aptos_vm::{
     data_cache::{IntoMoveResolver, StateViewCache},
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
+use move_deps::move_binary_format::access::ModuleAccess;
 use move_deps::{
     move_binary_format::CompiledModule,
     move_bytecode_utils::Modules,
@@ -38,6 +39,7 @@ use move_deps::{
 };
 use once_cell::sync::Lazy;
 use rand::prelude::*;
+use std::collections::{HashMap, HashSet};
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
@@ -141,8 +143,7 @@ pub fn encode_genesis_change_set(
     id2_arr[31] = 1;
     let id2 = HashValue::new(id2_arr);
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
-
-    publish_stdlib(&mut session, Modules::new(stdlib_modules.iter()));
+    publish_stdlib(&mut session, stdlib_modules);
     let session2_out = session.finish().unwrap();
 
     session1_out.squash(session2_out).unwrap();
@@ -317,9 +318,36 @@ fn create_and_initialize_validators(
     );
 }
 
-/// Publish the standard library.
-fn publish_stdlib(session: &mut SessionExt<impl MoveResolver>, stdlib: Modules) {
-    let dep_graph = stdlib.compute_dependency_graph();
+/// Collect compiledModule based on account address, dedup modules for each address
+fn construct_module_map(
+    modules: Vec<CompiledModule>,
+) -> HashMap<AccountAddress, Vec<CompiledModule>> {
+    let mut module_ids = HashSet::new();
+    let mut map = HashMap::new();
+    for m in modules {
+        if module_ids.insert(m.self_id()) {
+            map.entry(*m.address())
+                .or_insert_with(Vec::new)
+                .push(m.clone());
+        }
+    }
+    map
+}
+
+/// Publish all modules that should be available after genesis.
+fn publish_stdlib(session: &mut SessionExt<impl MoveResolver>, stdlib: Vec<CompiledModule>) {
+    let map = construct_module_map(stdlib);
+    let aptos_framework_address = AccountAddress::from_hex_literal("0x1").unwrap();
+
+    let framework_modules = map.get(&aptos_framework_address).unwrap();
+
+    // publish core-framework
+    publish_module_bundle(session, Modules::new(framework_modules));
+}
+
+/// publish the core-framework with stdlib
+fn publish_module_bundle(session: &mut SessionExt<impl MoveResolver>, lib: Modules) {
+    let dep_graph = lib.compute_dependency_graph();
     let mut addr_opt: Option<AccountAddress> = None;
     let modules = dep_graph
         .compute_topological_order()
@@ -327,13 +355,13 @@ fn publish_stdlib(session: &mut SessionExt<impl MoveResolver>, stdlib: Modules) 
         .map(|m| {
             let addr = *m.self_id().address();
             if let Some(a) = addr_opt {
-              assert_eq!(
-                  a,
-                  addr,
-                  "All genesis modules must be published under the same address, but found modules under both {} and {}",
-                  a.short_str_lossless(),
-                  addr.short_str_lossless()
-              );
+                assert_eq!(
+                    a,
+                    addr,
+                    "All modules must be published under the same address, but found modules under both {} and {}",
+                    a.short_str_lossless(),
+                    addr.short_str_lossless(),
+                );
             } else {
                 addr_opt = Some(addr)
             }
@@ -497,4 +525,22 @@ pub fn generate_test_genesis(
         },
     );
     (genesis, test_validators)
+}
+
+#[test]
+pub fn test_genesis_module_publishing() {
+    let mut stdlib_modules = Vec::new();
+    // create a data view for move_vm
+    let mut state_view = GenesisStateView::new();
+    for module_bytes in cached_framework_packages::module_blobs() {
+        let module = CompiledModule::deserialize(module_bytes).unwrap();
+        state_view.add_module(&module.self_id(), module_bytes);
+        stdlib_modules.push(module)
+    }
+    let data_cache = StateViewCache::new(&state_view).into_move_resolver();
+
+    let move_vm = MoveVmExt::new().unwrap();
+    let id1 = HashValue::zero();
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
+    publish_stdlib(&mut session, stdlib_modules);
 }

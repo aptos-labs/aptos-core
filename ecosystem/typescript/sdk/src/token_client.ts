@@ -2,7 +2,9 @@ import { AptosAccount } from "./aptos_account";
 import { AptosClient } from "./aptos_client";
 import { Types } from "./types";
 import { HexString, MaybeHexString } from "./hex_string";
+import {AccountAddress} from "./transaction_builder/aptos_types";
 
+let U64_MAX = 184467440737095516;
 /**
  * Class for creating, minting and managing minting NFT collections and tokens
  */
@@ -49,12 +51,14 @@ export class TokenClient {
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
       type: "script_function_payload",
-      function: "0x1::token::create_unlimited_collection_script",
+      function: "0x1::token::create_collection_script",
       type_arguments: [],
       arguments: [
         Buffer.from(name).toString("hex"),
         Buffer.from(description).toString("hex"),
         Buffer.from(uri).toString("hex"),
+        U64_MAX.toString(),
+        [false, false, false],
       ],
     };
     const transactionHash = await this.submitTransactionHelper(account, payload);
@@ -79,20 +83,31 @@ export class TokenClient {
     description: string,
     supply: number,
     uri: string,
-    royalty_points_per_million: number,
+    royalty_payee_address: MaybeHexString,
+    royalty_points_denominator: number,
+    royalty_points_nominator: number,
+    property_keys: Array<Array<number>>,
+    property_values: Array<Array<number>>,
+    property_types: Array<Array<number>>,
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
       type: "script_function_payload",
-      function: "0x1::token::create_unlimited_token_script",
+      function: "0x1::token::create_token_script",
       type_arguments: [],
       arguments: [
         Buffer.from(collectionName).toString("hex"),
         Buffer.from(name).toString("hex"),
         Buffer.from(description).toString("hex"),
-        true,
         supply.toString(),
+        U64_MAX.toString(),
         Buffer.from(uri).toString("hex"),
-        royalty_points_per_million.toString(),
+        royalty_payee_address,
+        royalty_points_denominator,
+        royalty_points_nominator,
+        [false, false, false, false, false],
+        property_keys,
+        property_types,
+        property_values,
       ],
     };
     const transactionHash = await this.submitTransactionHelper(account, payload);
@@ -116,6 +131,7 @@ export class TokenClient {
     collectionName: string,
     name: string,
     amount: number,
+    serial_number: number = 0
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
       type: "script_function_payload",
@@ -127,6 +143,7 @@ export class TokenClient {
         Buffer.from(collectionName).toString("hex"),
         Buffer.from(name).toString("hex"),
         amount.toString(),
+        serial_number.toString()
       ],
     };
     const transactionHash = await this.submitTransactionHelper(account, payload);
@@ -148,12 +165,15 @@ export class TokenClient {
     creator: MaybeHexString,
     collectionName: string,
     name: string,
+    serial_number: number = 0
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
       type: "script_function_payload",
       function: "0x1::token_transfers::claim_script",
       type_arguments: [],
-      arguments: [sender, creator, Buffer.from(collectionName).toString("hex"), Buffer.from(name).toString("hex")],
+      arguments: [
+          sender, creator, Buffer.from(collectionName).toString("hex"), Buffer.from(name).toString("hex"), serial_number.toString(),
+      ],
     };
     const transactionHash = await this.submitTransactionHelper(account, payload);
     return transactionHash;
@@ -174,12 +194,15 @@ export class TokenClient {
     creator: MaybeHexString,
     collectionName: string,
     name: string,
+    serial_number: number = 0
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
       type: "script_function_payload",
       function: "0x1::token_transfers::cancel_offer_script",
       type_arguments: [],
-      arguments: [receiver, creator, Buffer.from(collectionName).toString("hex"), Buffer.from(name).toString("hex")],
+      arguments: [
+          receiver, creator, Buffer.from(collectionName).toString("hex"), Buffer.from(name).toString("hex"), serial_number.toString()
+      ],
     };
     const transactionHash = await this.submitTransactionHelper(account, payload);
     return transactionHash;
@@ -248,16 +271,16 @@ export class TokenClient {
       "0x1::token::Collections",
     );
     const { handle } = collection.data.token_data;
-    const tokenId = {
+    const tokenDataId = {
       creator,
       collection: collectionName,
       name: tokenName,
     };
 
     const getTokenTableItemRequest: Types.TableItemRequest = {
-      key_type: "0x1::token::TokenId",
+      key_type: "0x1::token::TokenDataId",
       value_type: "0x1::token::TokenData",
-      key: tokenId,
+      key: tokenDataId,
     };
 
     const tableItem = await this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
