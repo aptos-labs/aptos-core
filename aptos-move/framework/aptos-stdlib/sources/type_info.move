@@ -19,6 +19,10 @@ module aptos_std::type_info {
 
     public native fun type_of<T>(): TypeInfo;
 
+    spec type_of { // TODO: temporary mockup.
+        pragma opaque;
+    }
+
     #[test]
     fun test() {
         let type_info = type_of<TypeInfo>();

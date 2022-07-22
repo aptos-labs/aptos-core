@@ -11,7 +11,6 @@
 /// which reflect that the system has been successfully initialized.
 module aptos_framework::timestamp {
     use aptos_framework::system_addresses;
-    use std::signer;
     use std::error;
 
     friend aptos_framework::genesis;
@@ -46,16 +45,13 @@ module aptos_framework::timestamp {
         /// and need to hold.
         pragma delegate_invariants_to_caller;
         include AbortsIfNotGenesis;
-        include system_addresses::AbortsIfNotaptos_framework{account: signer::address_of(account)};
+        include system_addresses::AbortsIfNotAptosFramework{account};
         ensures is_operating();
     }
 
     #[test_only]
     public fun set_time_has_started_for_testing(account: &signer) {
         set_time_has_started(account);
-    }
-    spec set_time_has_started_for_testing {
-        pragma verify = false;
     }
 
     /// Updates the wall clock time by consensus. Requires VM privilege and will be invoked during block prologue.
