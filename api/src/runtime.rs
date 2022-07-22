@@ -1,12 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{context::Context, index, poem_backend::attach_poem_to_runtime, indexer_extractor::Extractor};
+use crate::{
+    context::Context, index, indexer_extractor::Extractor, poem_backend::attach_poem_to_runtime,
+};
 use anyhow::Context as AnyhowContext;
 use aptos_config::config::{ApiConfig, NodeConfig};
 use aptos_mempool::MempoolClientSender;
 use aptos_types::chain_id::ChainId;
-use std::{convert::Infallible, net::SocketAddr, sync::Arc};
+use std::{convert::Infallible, net::SocketAddr, sync::Arc, thread};
 use storage_interface::DbReader;
 use tokio::runtime::{Builder, Runtime};
 use warp::{Filter, Reply};
@@ -37,9 +39,9 @@ pub fn bootstrap(
     let api = WebServer::from(config.api.clone());
 
     let context_copy = context.clone();
-    tokio::spawn(async move {
+    thread::spawn(move || {
         let mut extractor = Extractor::new(context_copy, 0, 0);
-        extractor.bootstrap().await;
+        extractor.bootstrap();
     });
     runtime.spawn(async move {
         // TODO: This proxy is temporary while we have both APIs running.
