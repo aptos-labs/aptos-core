@@ -224,6 +224,7 @@ dependencies = [
  "mime",
  "move-deps",
  "once_cell",
+ "paste",
  "percent-encoding",
  "poem",
  "poem-openapi",

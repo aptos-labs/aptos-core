@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{response::AptosInternalResult, AptosError, AptosErrorCode, AptosErrorResponse};
-use poem_openapi::payload::Json;
+use super::{AptosErrorCode, BadRequestError};
 use serde::Deserialize;
 
 const DEFAULT_PAGE_SIZE: u16 = 25;
@@ -18,43 +17,34 @@ impl Page {
     pub fn new(start: Option<u64>, limit: Option<u16>) -> Self {
         Self { start, limit }
     }
-}
 
-impl Page {
-    pub fn start(&self, default: u64, max: u64) -> AptosInternalResult<u64> {
+    pub fn start<E: BadRequestError>(&self, default: u64, max: u64) -> Result<u64, E> {
         let start = self.start.unwrap_or(default);
         if start > max {
-            return Err(AptosErrorResponse::BadRequest(Json(
-                AptosError::new(
-                    anyhow::format_err!(
-                        "Given start value ({}) is too large, it must be < {}",
-                        start,
-                        max
-                    )
-                    .to_string(),
-                )
-                .error_code(AptosErrorCode::InvalidBcsInStorageError),
-            )));
+            return Err(E::bad_request_str(&format!(
+                "Given start value ({}) is too large, it must be < {}",
+                start, max
+            ))
+            .error_code(AptosErrorCode::InvalidStartParam));
         }
         Ok(start)
     }
 
-    pub fn limit(&self) -> AptosInternalResult<u16> {
+    pub fn limit<E: BadRequestError>(&self) -> Result<u16, E> {
         let limit = self.limit.unwrap_or(DEFAULT_PAGE_SIZE);
         if limit == 0 {
-            return Err(AptosErrorResponse::BadRequest(Json(AptosError::new(
-                anyhow::format_err!("Given limit value ({}) must not be zero", limit,).to_string(),
-            ))));
+            return Err(E::bad_request_str(&format!(
+                "Given limit value ({}) must not be zero",
+                limit
+            ))
+            .error_code(AptosErrorCode::InvalidLimitParam));
         }
         if limit > MAX_PAGE_SIZE {
-            return Err(AptosErrorResponse::BadRequest(Json(AptosError::new(
-                anyhow::format_err!(
-                    "Given limit value ({}) is too large, it must be < {}",
-                    limit,
-                    MAX_PAGE_SIZE
-                )
-                .to_string(),
-            ))));
+            return Err(E::bad_request_str(&format!(
+                "Given limit value ({}) is too large, it must be < {}",
+                limit, MAX_PAGE_SIZE
+            ))
+            .error_code(AptosErrorCode::InvalidLimitParam));
         }
         Ok(limit)
     }
