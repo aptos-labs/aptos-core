@@ -14,7 +14,7 @@ pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory
 
 # for calculating regression
 TPS_THRESHOLD=5000
-P99_LATENCY_MS_THRESHOLD=8000
+P99_LATENCY_MS_THRESHOLD=1000
 
 FORGE_OUTPUT=${FORGE_OUTPUT:-forge_output.txt}
 FORGE_REPORT=${FORGE_REPORT:-forge_report.json}
@@ -175,7 +175,7 @@ if [ -n "$P99_LATENCY" ]; then
     echo "P99_LATENCY: ${P99_LATENCY}"
     echo "forge_job_p99_latency {FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\",GITHUB_RUN_ID=\"$GITHUB_RUN_ID\"} $P99_LATENCY" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
     if [[ "$P99_LATENCY" -gt "$P99_LATENCY_MS_THRESHOLD" ]]; then
-        echo "(\!) P99_LATENCY: ${P99_LATENCY} > ${P99_LATENCY_MS_THRESHOLD} ms"
+        echo "(\!) P99_LATENCY: ${P99_LATENCY} > ${P99_LATENCY_MS_THRESHOLD} ms" >> "${FORGE_REPORT}"
         FORGE_EXIT_CODE=1
     fi
 fi
