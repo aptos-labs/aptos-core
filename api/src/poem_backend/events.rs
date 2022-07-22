@@ -32,7 +32,7 @@ impl EventsApi {
         path = "/events/:event_key",
         method = "get",
         operation_id = "get_events_by_event_key",
-        tag = "ApiTags::General"
+        tag = "ApiTags::Events"
     )]
     async fn get_events_by_event_key(
         &self,
@@ -59,7 +59,7 @@ impl EventsApi {
         path = "/accounts/:address/events/:event_handle/:field_name",
         method = "get",
         operation_id = "get_events_by_event_handle",
-        tag = "ApiTags::General"
+        tag = "ApiTags::Events"
     )]
     async fn get_events_by_event_handle(
         &self,

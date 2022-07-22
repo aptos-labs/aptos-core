@@ -18,8 +18,17 @@ mod transactions;
 
 #[derive(Tags)]
 pub enum ApiTags {
+    /// Access to account resources and modules
+    Accounts,
+
+    /// Access to events
+    Events,
+
     /// General information.
     General,
+
+    /// Access to transactions
+    Transactions,
 }
 
 pub use accept_type::AcceptType;

@@ -45,7 +45,7 @@ impl AccountsApi {
         path = "/accounts/:address",
         method = "get",
         operation_id = "get_account",
-        tag = "ApiTags::General"
+        tag = "ApiTags::Accounts"
     )]
     async fn get_account(
         &self,
@@ -69,7 +69,7 @@ impl AccountsApi {
         path = "/accounts/:address/resources",
         method = "get",
         operation_id = "get_account_resources",
-        tag = "ApiTags::General"
+        tag = "ApiTags::Accounts"
     )]
     async fn get_account_resources(
         &self,
@@ -93,7 +93,7 @@ impl AccountsApi {
         path = "/accounts/:address/modules",
         method = "get",
         operation_id = "get_account_modules",
-        tag = "ApiTags::General"
+        tag = "ApiTags::Accounts"
     )]
     async fn get_account_modules(
         &self,
