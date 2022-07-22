@@ -16,6 +16,7 @@ pub(crate) mod ledger_counters;
 pub(crate) mod ledger_info;
 pub(crate) mod stale_node_index;
 pub(crate) mod state_value;
+pub(crate) mod table_info;
 pub(crate) mod transaction;
 pub(crate) mod transaction_accumulator;
 pub(crate) mod transaction_by_account;
@@ -36,6 +37,7 @@ pub const LEDGER_COUNTERS_CF_NAME: ColumnFamilyName = "ledger_counters";
 pub const LEDGER_INFO_CF_NAME: ColumnFamilyName = "ledger_info";
 pub const STALE_NODE_INDEX_CF_NAME: ColumnFamilyName = "stale_node_index";
 pub const STATE_VALUE_CF_NAME: ColumnFamilyName = "state_value";
+pub const TABLE_INFO_CF_NAME: ColumnFamilyName = "table_info";
 pub const TRANSACTION_CF_NAME: ColumnFamilyName = "transaction";
 pub const TRANSACTION_ACCUMULATOR_CF_NAME: ColumnFamilyName = "transaction_accumulator";
 pub const TRANSACTION_BY_ACCOUNT_CF_NAME: ColumnFamilyName = "transaction_by_account";
@@ -82,6 +84,7 @@ pub mod fuzzing {
             assert_no_panic_decoding::<super::ledger_info::LedgerInfoSchema>(data);
             assert_no_panic_decoding::<super::stale_node_index::StaleNodeIndexSchema>(data);
             assert_no_panic_decoding::<super::state_value::StateValueSchema>(data);
+            assert_no_panic_decoding::<super::table_info::TableInfoSchema>(data);
             assert_no_panic_decoding::<super::transaction::TransactionSchema>(data);
             assert_no_panic_decoding::<super::transaction_accumulator::TransactionAccumulatorSchema>(
                 data,
