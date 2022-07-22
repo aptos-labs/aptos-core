@@ -21,7 +21,7 @@ impl Test for StringArgs {
 impl AptosTest for StringArgs {
     async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
         let base_path =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/aptos/move_modules/");
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/aptos/string_args_modules/");
         let txn_factory = move_test_helpers::publish_code(ctx, base_path).await?;
 
         // After publish, expect state == "init"
@@ -48,7 +48,7 @@ async fn get_resource(ctx: &mut AptosContext<'_>) -> Result<Resource> {
         .client()
         .get_account_resource(
             ctx.root_account().address(),
-            "0xA550C18::HelloWorld::ModuleData",
+            "0xA550C18::HelloWorldForStringArgs::ModuleData",
         )
         .await?;
     Ok(resp.into_inner().unwrap())
@@ -59,7 +59,7 @@ fn encode_hello_world_hi(msg: &str) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::from_hex_literal("0xA550C18").unwrap(),
-            ident_str!("HelloWorld").to_owned(),
+            ident_str!("HelloWorldForStringArgs").to_owned(),
         ),
         ident_str!("hi").to_owned(),
         vec![],
