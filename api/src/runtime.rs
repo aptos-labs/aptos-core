@@ -1,13 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-<<<<<<< HEAD
-use crate::{context::Context, index, poem_backend::attach_poem_to_runtime};
+use crate::{context::Context, index, poem_backend::attach_poem_to_runtime, indexer_extractor::Extractor};
 use anyhow::Context as AnyhowContext;
-=======
-use crate::{context::Context, index, indexer_extractor::Extractor};
-
->>>>>>> 2f62c68fc0 (Play around)
 use aptos_config::config::{ApiConfig, NodeConfig};
 use aptos_mempool::MempoolClientSender;
 use aptos_types::chain_id::ChainId;
@@ -40,23 +35,19 @@ pub fn bootstrap(
         .context("Failed to attach poem to runtime")?;
 
     let api = WebServer::from(config.api.clone());
+
+    let context_copy = context.clone();
+    tokio::spawn(async move {
+        let mut extractor = Extractor::new(context_copy, 0, 0);
+        extractor.bootstrap().await;
+    });
     runtime.spawn(async move {
-<<<<<<< HEAD
         // TODO: This proxy is temporary while we have both APIs running.
         let proxy = warp::path!("v1" / ..).and(reverse_proxy_filter(
             "v1".to_string(),
             format!("http://{}", poem_address),
         ));
         let routes = proxy.or(index::routes(context));
-=======
-        let context = Context::new(chain_id, db, mp_sender, node_config);
-        let context_copy = context.clone();
-        tokio::spawn(async move {
-            let mut extractor = Extractor::new(context_copy, 0, 0);
-            extractor.bootstrap().await;
-        });
-        let routes = index::routes(context);
->>>>>>> 2f62c68fc0 (Play around)
         api.serve(routes).await;
     });
 
