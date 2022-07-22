@@ -35,6 +35,8 @@ pub fn output(out: &mut dyn Write, abis: &[ScriptABI], local_types: bool) -> Res
     };
 
     emitter.output_preamble()?;
+    writeln!(emitter.out, "#![allow(unused_imports)]")?;
+
     emitter.output_script_call_enum_with_imports(abis)?;
 
     let txn_script_abis = common::transaction_script_abis(abis);
@@ -257,12 +259,7 @@ impl ScriptFunctionCall {
                 ("move_deps::move_core_types", vec!["ident_str"]),
                 (
                     "aptos_types::transaction",
-                    vec![
-                        "Script",
-                        "TransactionArgument",
-                        "TransactionPayload",
-                        "ScriptFunction",
-                    ],
+                    vec!["TransactionPayload", "ScriptFunction"],
                 ),
                 ("aptos_types::account_address", vec!["AccountAddress"]),
             ]
