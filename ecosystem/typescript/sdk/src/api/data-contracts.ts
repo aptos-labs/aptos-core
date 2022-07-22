@@ -133,7 +133,7 @@ export interface Account {
 
 /**
  * Account resource is a Move struct value belongs to an account.
- * @example {"type":"0x1::Aptos0x1::reconfigurationBalance<0x1::XDX::XDX>","data":{"coin":{"value":"8000000000"}}}
+ * @example {"type":"0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>","data":{"coin":{"value":"8000000000"}}}
  */
 export interface AccountResource {
   /**
@@ -143,9 +143,8 @@ export interface AccountResource {
    *   1. `Move module address`, `module name` and `struct name` joined by `::`.
    *   2. `struct generic type parameters` joined by `, `.
    * Examples:
-   *   * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
-   *   * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
-   *   * `0x1::AptosAccount::AccountOperationsCapability`
+   *   * `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`
+   *   * `0x1::account::Account`
    * Note:
    *   1. Empty chars should be ignored when comparing 2 struct tag ids.
    *   2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
@@ -177,18 +176,17 @@ Values:
 Vector type value examples:
   * `vector<u8>`
   * `vector<vector<u64>>`
-  * `vector<0x1::AptosAccount::Balance<0x1::XDX::XDX>>`
+  * `vector<0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>>`
 
 Struct type value examples:
-  * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
-  * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
-  * `0x1::AptosAccount::AccountOperationsCapability`
+  * `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
+  * `0x1::account::Account`
 
 Note:
   1. Empty chars should be ignored when comparing 2 struct tag ids.
   2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
 * @pattern ^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+)$
-* @example 0x1::XUS::XUS
+* @example 0x1::aptos_coin::AptosCoin
 */
 export type MoveTypeTagId = string;
 
@@ -212,50 +210,18 @@ Values:
 Vector type value examples:
   * `vector<u8>`
   * `vector<vector<u64>>`
-  * `vector<0x1::AptosAccount::Balance<0x1::XDX::XDX>>`
+  * `vector<0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>>`
 
 Struct type value examples:
-  * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
-  * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
-  * `0x1::AptosAccount::AccountOperationsCapability`
+  * `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`
+  * `0x1::account::Account`
 
 Reference type value examples:
   * `&signer`
   * `&mut address`
   * `&mut vector<u8>`
-
-Generic type parameter value example, the following is `0x1::TransactionFee::TransactionFee` JSON representation:
-
-    {
-        "name": "TransactionFee",
-        "is_native": false,
-        "abilities": ["key"],
-        "generic_type_params": [
-            {"constraints": [], "is_phantom": true}
-        ],
-        "fields": [
-            { "name": "balance", "type": "0x1::Aptos::Aptos<T0>" },
-            { "name": "preburn", "type": "0x1::Aptos::Preburn<T0>" }
-        ]
-    }
-
-It's Move source code:
-
-    module AptosFramework::TransactionFee {
-        struct TransactionFee<phantom CoinType> has key {
-            balance: Aptos<CoinType>,
-            preburn: Preburn<CoinType>,
-        }
-    }
-
-The `T0` in the above JSON representation is the generic type place holder for
-the `CoinType` in the Move source code.
-
-Note:
-  1. Empty chars should be ignored when comparing 2 struct tag ids.
-  2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
 * @pattern ^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+|^&(mut )?.+$|T\d+)$
-* @example 0x1::AptosAccount::Balance<0x1::XUS::XUS>
+* @example 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
 */
 export type MoveTypeId = string;
 
@@ -267,9 +233,8 @@ It is a combination of:
   2. `struct generic type parameters` joined by `, `.
 
 Examples:
-  * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
-  * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
-  * `0x1::AptosAccount::AccountOperationsCapability`
+  * `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`
+  * `0x1::account::Account`
 
 Note:
   1. Empty chars should be ignored when comparing 2 struct tag ids.
@@ -278,7 +243,7 @@ Note:
 See [doc](https://diem.github.io/move/structs-and-resources.html) for more details.
 * @format move_type
 * @pattern ^0x[0-9a-zA-Z:_<>]+$
-* @example 0x1::AptosAccount::Balance<0x1::XUS::XUS>
+* @example 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
 */
 export type MoveStructTagId = string;
 
@@ -318,7 +283,7 @@ export interface MoveModuleABI {
 }
 
 /**
- * @example {"name":"Balance","is_native":false,"abilities":["key"],"generic_type_params":[{"constraints":[],"is_phantom":true}],"fields":[{"name":"coin","type":"0x1::Aptos::Aptos<T0>"}]}
+ * @example {"name":"Balance","is_native":false,"abilities":["key"],"generic_type_params":[{"constraints":[],"is_phantom":true}],"fields":[{"name":"coin","type":"0x1::aptos_coin::AptosCoin"}]}
  */
 export interface MoveStruct {
   name: string;
@@ -353,39 +318,14 @@ export interface MoveStructField {
    * Vector type value examples:
    *   * `vector<u8>`
    *   * `vector<vector<u64>>`
-   *   * `vector<0x1::AptosAccount::Balance<0x1::XDX::XDX>>`
+   *   * `vector<0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>>`
    * Struct type value examples:
-   *   * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
-   *   * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
-   *   * `0x1::AptosAccount::AccountOperationsCapability`
+   *   * `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`
+   *   * `0x1::account::Account`
    * Reference type value examples:
    *   * `&signer`
    *   * `&mut address`
    *   * `&mut vector<u8>`
-   * Generic type parameter value example, the following is `0x1::TransactionFee::TransactionFee` JSON representation:
-   *     {
-   *         "name": "TransactionFee",
-   *         "is_native": false,
-   *         "abilities": ["key"],
-   *         "generic_type_params": [
-   *             {"constraints": [], "is_phantom": true}
-   *         ],
-   *         "fields": [
-   *             { "name": "balance", "type": "0x1::Aptos::Aptos<T0>" },
-   *             { "name": "preburn", "type": "0x1::Aptos::Preburn<T0>" }
-   *         ]
-   *     }
-   * It's Move source code:
-   *     module AptosFramework::TransactionFee {
-   *         struct TransactionFee<phantom CoinType> has key {
-   *             balance: Aptos<CoinType>,
-   *             preburn: Preburn<CoinType>,
-   *         }
-   * The `T0` in the above JSON representation is the generic type place holder for
-   * the `CoinType` in the Move source code.
-   * Note:
-   *   1. Empty chars should be ignored when comparing 2 struct tag ids.
-   *   2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
    */
   type: MoveTypeId;
 }
@@ -396,7 +336,7 @@ export interface MoveStructField {
 export interface MoveFunction {
   /** Move function name */
   name: string;
-  visibility: 'public' | 'script' | 'friend';
+  visibility: "public" | "script" | "friend";
   generic_type_params: { constraints: MoveAbility[] }[];
   params: MoveTypeId[];
   return: MoveTypeId[];
@@ -409,10 +349,10 @@ See [doc](https://diem.github.io/move/abilities.html) for more details.
 * @example key
 */
 export enum MoveAbility {
-  Copy = 'copy',
-  Drop = 'drop',
-  Store = 'store',
-  Key = 'key',
+  Copy = "copy",
+  Drop = "drop",
+  Store = "store",
+  Key = "key",
 }
 
 /**
@@ -426,7 +366,7 @@ that is prefixed with `0x` and leading zeros are trimmed.
 Module name is case-sensitive.
 
 See [doc](https://diem.github.io/move/modules-and-scripts.html#modules) for more details.
-* @example 0x1::Aptos
+* @example 0x1::aptos
 */
 export type MoveModuleId = string;
 
@@ -560,7 +500,7 @@ export type StateCheckpointTransaction = { type: string; timestamp: TimestampUse
 export type TransactionPayload = ScriptFunctionPayload | ScriptPayload | ModuleBundlePayload | WriteSetPayload;
 
 /**
- * @example {"type":"script_function_payload","function":"0x1::PaymentScripts::peer_to_peer_with_metadata","type_arguments":["0x1::XDX::XDX"],"arguments":["0x1668f6be25668c1a17cd8caf6b8d2f25","2021000000","0x","0x"]}
+ * @example {"type":"script_function_payload","function":"0x1::payment_scripts::peer_to_peer_with_metadata","type_arguments":["0x1::xdx::XDX"],"arguments":["0x1668f6be25668c1a17cd8caf6b8d2f25","2021000000","0x","0x"]}
  */
 export interface ScriptFunctionPayload {
   type: string;
@@ -586,7 +526,7 @@ export interface ScriptFunctionPayload {
 Format: `{address}::{module name}::{function name}`
 
 Both `module name` and `function name` are case-sensitive.
-* @example 0x1::PaymentScripts::peer_to_peer_with_metadata
+* @example 0x1::payment_scripts::peer_to_peer_with_metadata
 */
 export type ScriptFunctionId = string;
 
@@ -703,9 +643,8 @@ export interface DeleteResource {
    *   1. `Move module address`, `module name` and `struct name` joined by `::`.
    *   2. `struct generic type parameters` joined by `, `.
    * Examples:
-   *   * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
-   *   * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
-   *   * `0x1::AptosAccount::AccountOperationsCapability`
+   *   * `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`
+   *   * `0x1::account::Account`
    * Note:
    *   1. Empty chars should be ignored when comparing 2 struct tag ids.
    *   2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
@@ -890,7 +829,7 @@ Event `sequence_number` starts from 0 for each event key.
 
 Event `type` is the type information of the event `data`, you can use the `type`
 to decode the `data` JSON.
-* @example {"key":"0x00000000000000000000000000000000000000000a550c18","sequence_number":"23","type":"0x1::AptosAccount::CreateAccountEvent","data":{"created":"0xa550c18","role_id":"0"}}
+* @example {"key":"0x00000000000000000000000000000000000000000a550c18","sequence_number":"23","type":"0x1::account::CreateAccountEvent","data":{"created":"0xa550c18","role_id":"0"}}
 */
 export interface Event {
   /**
@@ -928,11 +867,10 @@ export interface Event {
    * Vector type value examples:
    *   * `vector<u8>`
    *   * `vector<vector<u64>>`
-   *   * `vector<0x1::AptosAccount::Balance<0x1::XDX::XDX>>`
+   *   * `vector<0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>>`
    * Struct type value examples:
-   *   * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
-   *   * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
-   *   * `0x1::AptosAccount::AccountOperationsCapability`
+   *   * `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
+   *   * `0x1::account::Account`
    * Note:
    *   1. Empty chars should be ignored when comparing 2 struct tag ids.
    *   2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
@@ -1053,39 +991,14 @@ export interface TableItemRequest {
    * Vector type value examples:
    *   * `vector<u8>`
    *   * `vector<vector<u64>>`
-   *   * `vector<0x1::AptosAccount::Balance<0x1::XDX::XDX>>`
+   *   * `vector<0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>>`
    * Struct type value examples:
-   *   * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
-   *   * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
-   *   * `0x1::AptosAccount::AccountOperationsCapability`
+   *   * `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`
+   *   * `0x1::account::Account`
    * Reference type value examples:
    *   * `&signer`
    *   * `&mut address`
    *   * `&mut vector<u8>`
-   * Generic type parameter value example, the following is `0x1::TransactionFee::TransactionFee` JSON representation:
-   *     {
-   *         "name": "TransactionFee",
-   *         "is_native": false,
-   *         "abilities": ["key"],
-   *         "generic_type_params": [
-   *             {"constraints": [], "is_phantom": true}
-   *         ],
-   *         "fields": [
-   *             { "name": "balance", "type": "0x1::Aptos::Aptos<T0>" },
-   *             { "name": "preburn", "type": "0x1::Aptos::Preburn<T0>" }
-   *         ]
-   *     }
-   * It's Move source code:
-   *     module AptosFramework::TransactionFee {
-   *         struct TransactionFee<phantom CoinType> has key {
-   *             balance: Aptos<CoinType>,
-   *             preburn: Preburn<CoinType>,
-   *         }
-   * The `T0` in the above JSON representation is the generic type place holder for
-   * the `CoinType` in the Move source code.
-   * Note:
-   *   1. Empty chars should be ignored when comparing 2 struct tag ids.
-   *   2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
    */
   key_type: MoveTypeId;
 
@@ -1108,39 +1021,14 @@ export interface TableItemRequest {
    * Vector type value examples:
    *   * `vector<u8>`
    *   * `vector<vector<u64>>`
-   *   * `vector<0x1::AptosAccount::Balance<0x1::XDX::XDX>>`
+   *   * `vector<0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>>`
    * Struct type value examples:
-   *   * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
-   *   * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
-   *   * `0x1::AptosAccount::AccountOperationsCapability`
+   *   * `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`
+   *   * `0x1::account::Account`
    * Reference type value examples:
    *   * `&signer`
    *   * `&mut address`
    *   * `&mut vector<u8>`
-   * Generic type parameter value example, the following is `0x1::TransactionFee::TransactionFee` JSON representation:
-   *     {
-   *         "name": "TransactionFee",
-   *         "is_native": false,
-   *         "abilities": ["key"],
-   *         "generic_type_params": [
-   *             {"constraints": [], "is_phantom": true}
-   *         ],
-   *         "fields": [
-   *             { "name": "balance", "type": "0x1::Aptos::Aptos<T0>" },
-   *             { "name": "preburn", "type": "0x1::Aptos::Preburn<T0>" }
-   *         ]
-   *     }
-   * It's Move source code:
-   *     module AptosFramework::TransactionFee {
-   *         struct TransactionFee<phantom CoinType> has key {
-   *             balance: Aptos<CoinType>,
-   *             preburn: Preburn<CoinType>,
-   *         }
-   * The `T0` in the above JSON representation is the generic type place holder for
-   * the `CoinType` in the Move source code.
-   * Note:
-   *   1. Empty chars should be ignored when comparing 2 struct tag ids.
-   *   2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
    */
   value_type: MoveTypeId;
 

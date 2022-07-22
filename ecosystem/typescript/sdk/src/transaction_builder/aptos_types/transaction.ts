@@ -143,7 +143,7 @@ export class ScriptFunction {
 
   /**
    *
-   * @param module Fully qualified module name in format "AccountAddress::ModuleName" e.g. "0x1::coin"
+   * @param module Fully qualified module name in format "AccountAddress::module_name" e.g. "0x1::coin"
    * @param func Function name
    * @param ty_args Type arguments that move function requires.
    *
@@ -245,8 +245,8 @@ export class ModuleId {
 
   /**
    * Converts a string literal to a ModuleId
-   * @param moduleId String literal in format "AcountAddress::ModuleName",
-   *   e.g. "0x01::Coin"
+   * @param moduleId String literal in format "AccountAddress::module_name",
+   *   e.g. "0x1::coin"
    * @returns
    */
   static fromStr(moduleId: string): ModuleId {
