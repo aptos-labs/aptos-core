@@ -172,3 +172,28 @@ You can check the details about node liveness definition [here](https://aptos.de
     ```
 
     You should expect to see this number keep increasing.
+
+
+## Leaving Validator Set
+
+A node can choose to leave validator set at anytime, or it would happen automatically when there's not sufficient stake on the validator account. To leave validator set, you can perform the following steps:
+
+1. Leave validator set (will take effect in next epoch)
+
+    ```
+    aptos node leave-validator-set --profile ait2
+    ```
+
+2. Unlock the stake amount as you want. (will take effect in next epoch)
+
+    ```
+    aptos node unlock-stake --amount 100000000 --profile ait2
+    ```
+
+3. Withdraw stake back to your account. (This will withdraw all the unlocked stake from your validator staking pool)
+
+    ```
+    aptos node withdraw-stake --profile ait2
+    ```
+
+4. Once you're done withdrawing your fund, now you can safely shutdown the node, following the doc [here](https://aptos.dev/nodes/ait/additional-doc#shutdown-nodes-for-incentivized-testnet)
