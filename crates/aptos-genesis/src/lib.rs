@@ -11,7 +11,7 @@ pub mod keys;
 pub mod test_utils;
 
 use crate::config::ValidatorConfiguration;
-use aptos_config::config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG};
+use aptos_config::config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE};
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_temppath::TempPath;
 use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
@@ -126,6 +126,7 @@ impl GenesisInfo {
             NO_OP_STORAGE_PRUNER_CONFIG,
             RocksdbConfigs::default(),
             false,
+            TARGET_SNAPSHOT_SIZE,
         )?;
         let db_rw = DbReaderWriter::new(aptosdb);
         executor::db_bootstrapper::generate_waypoint::<AptosVM>(&db_rw, genesis)

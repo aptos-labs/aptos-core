@@ -11,7 +11,9 @@ pub(crate) mod stream;
 pub mod test_utils;
 
 use anyhow::{anyhow, Result};
-use aptos_config::config::{RocksdbConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG};
+use aptos_config::config::{
+    RocksdbConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
+};
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{
@@ -206,6 +208,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
                 opt.rocksdb_opt.into(),
                 false,
+                TARGET_SNAPSHOT_SIZE,
             )?)
             .get_restore_handler();
             RestoreRunMode::Restore { restore_handler }

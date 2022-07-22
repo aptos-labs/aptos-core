@@ -7,6 +7,7 @@ use aptos_config::{
     utils::get_genesis_txn,
 };
 
+use aptos_config::config::TARGET_SNAPSHOT_SIZE;
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};
@@ -59,6 +60,7 @@ fn bootstrap_with_genesis(db_dir: impl AsRef<Path>) {
             NO_OP_STORAGE_PRUNER_CONFIG,
             rocksdb_configs,
             false, /* indexer */
+            TARGET_SNAPSHOT_SIZE,
         )
         .expect("DB should open."),
     );

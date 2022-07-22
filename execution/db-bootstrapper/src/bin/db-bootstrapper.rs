@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{ensure, format_err, Context, Result};
-use aptos_config::config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG};
+use aptos_config::config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE};
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::AptosVM;
@@ -54,6 +54,7 @@ fn main() -> Result<()> {
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
             RocksdbConfigs::default(),
             false, /* indexer */
+            TARGET_SNAPSHOT_SIZE,
         )
     } else {
         // When not committing, we open the DB as secondary so the tool is usable along side a

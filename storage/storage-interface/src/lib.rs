@@ -332,7 +332,7 @@ pub trait DbReader: Send + Sync {
     }
 
     /// Returns the latest state checkpoint version if any.
-    fn get_latest_state_snapshot(&self) -> Result<Option<(Version, HashValue)>> {
+    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         unimplemented!()
     }
 
@@ -543,8 +543,8 @@ impl MoveStorage for &dyn DbReader {
         access_path: AccessPath,
         version: Version,
     ) -> Result<Vec<u8>> {
-        let (state_value, _) = self
-            .get_state_value_with_proof_by_version(&StateKey::AccessPath(access_path), version)?;
+        let state_value =
+            self.get_state_value_by_version(&StateKey::AccessPath(access_path), version)?;
 
         state_value
             .ok_or_else(|| format_err!("no value found in DB"))?
@@ -554,12 +554,12 @@ impl MoveStorage for &dyn DbReader {
 
     fn fetch_config_by_version(&self, config_id: ConfigID, version: Version) -> Result<Vec<u8>> {
         let config_value_option = self.get_state_value_by_version(
-                &StateKey::AccessPath(AccessPath::new(
-                    CORE_CODE_ADDRESS,
-                    access_path_for_config(config_id).path,
-                )),
-                version,
-            )?;
+            &StateKey::AccessPath(AccessPath::new(
+                CORE_CODE_ADDRESS,
+                access_path_for_config(config_id).path,
+            )),
+            version,
+        )?;
         config_value_option
             .and_then(|x| x.maybe_bytes)
             .ok_or_else(|| anyhow!("no config {} found in aptos root account state", config_id))
@@ -579,9 +579,8 @@ impl MoveStorage for &dyn DbReader {
     }
 
     fn fetch_latest_state_checkpoint_version(&self) -> Result<Version> {
-        self.get_latest_state_snapshot()?
+        self.get_latest_state_checkpoint_version()?
             .ok_or_else(|| format_err!("[MoveStorage] Latest state checkpoint not found."))
-            .map(|(v, _)| v)
     }
 }
 

@@ -96,7 +96,7 @@ where
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
         save_state_snapshots: bool,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         self.inner
             .read()
             .as_ref()
@@ -219,7 +219,7 @@ where
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
         sync_commit: bool,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         let _timer = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
         let committed_block = self.block_tree.root_block();
         if committed_block.num_persisted_transactions()
@@ -255,8 +255,7 @@ where
                 first_version,
                 to_commit,
                 target_version,
-            }
-            .into());
+            });
         }
 
         let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();

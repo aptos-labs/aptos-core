@@ -67,7 +67,7 @@ impl StateDelta {
     }
 
     pub fn follow(&self, other: &StateDelta) -> bool {
-        other.base_version == self.current_version && self.current.has_same_root_hash(&other.base)
+        self.base_version == other.current_version && other.current.has_same_root_hash(&self.base)
     }
 
     pub fn has_same_current_state(&self, other: &StateDelta) -> bool {
