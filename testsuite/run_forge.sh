@@ -91,7 +91,8 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     # more file descriptors for heavy txn generation
     ulimit -n 1048576
 
-    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE test k8s-swarm \
+    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --workers-per-ac 10 \
+	test k8s-swarm 
         --image-tag $IMAGE_TAG \
         --namespace $FORGE_NAMESPACE \
         --port-forward $REUSE_ARGS $KEEP_ARGS $ENABLE_HAPROXY_ARGS | tee $FORGE_OUTPUT
@@ -172,7 +173,9 @@ if [ -n "$AVG_TPS" ]; then
     echo "forge_job_avg_tps {FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\",GITHUB_RUN_ID=\"$GITHUB_RUN_ID\"} $AVG_TPS" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
     if [[ "$AVG_TPS" -lt "$TPS_THRESHOLD" ]]; then
         echo "(\!) AVG_TPS: ${avg_tps} < ${TPS_THRESHOLD} tps"
-        FORGE_EXIT_CODE=1
+	if [ "$FORGE_RUNNER_MODE" != "local" ]; then
+           FORGE_EXIT_CODE=1
+        fi
     fi
 fi
 if [ -n "$P99_LATENCY" ]; then
@@ -180,7 +183,9 @@ if [ -n "$P99_LATENCY" ]; then
     echo "forge_job_p99_latency {FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\",GITHUB_RUN_ID=\"$GITHUB_RUN_ID\"} $P99_LATENCY" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
     if [[ "$P99_LATENCY" -gt "$P99_LATENCY_MS_THRESHOLD" ]]; then
         echo "(\!) P99_LATENCY: ${P99_LATENCY} > ${P99_LATENCY_MS_THRESHOLD} ms"
-        FORGE_EXIT_CODE=1
+	if [ "$FORGE_RUNNER_MODE" != "local" ]; then
+            FORGE_EXIT_CODE=1
+        fi
     fi
 fi
 
