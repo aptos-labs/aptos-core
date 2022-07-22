@@ -40,9 +40,10 @@ impl AptosTest for BasicClient {
         let mut account1 = ctx.create_and_fund_user_account(10_000).await?;
         let account2 = ctx.create_and_fund_user_account(10_000).await?;
 
-        let tx = account1.sign_with_transaction_builder(ctx.transaction_factory().payload(
-            aptos_stdlib::encode_aptos_coin_transfer(account2.address(), 1),
-        ));
+        let tx = account1.sign_with_transaction_builder(
+            ctx.transaction_factory()
+                .payload(aptos_stdlib::aptos_coin_transfer(account2.address(), 1)),
+        );
         let pending_txn = client.submit(&tx).await.unwrap().into_inner();
 
         client.wait_for_transaction(&pending_txn).await.unwrap();

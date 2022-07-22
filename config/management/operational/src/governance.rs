@@ -82,7 +82,7 @@ impl CreateValidator {
     pub async fn execute(self) -> Result<(TransactionContext, AccountAddress), Error> {
         self.input
             .execute(
-                transaction_builder::encode_validator_set_script_create_validator_account,
+                transaction_builder::validator_set_script_create_validator_account,
                 "create-validator",
             )
             .await
@@ -99,7 +99,7 @@ impl CreateValidatorOperator {
     pub async fn execute(self) -> Result<(TransactionContext, AccountAddress), Error> {
         self.input
             .execute(
-                transaction_builder::encode_validator_set_script_create_validator_operator_account,
+                transaction_builder::validator_set_script_create_validator_operator_account,
                 "create-validator-operator",
             )
             .await
@@ -143,10 +143,9 @@ impl AddValidator {
         client.validator_config(self.input.account_address).await?;
 
         let seq_num = client.sequence_number(aptos_root_address()).await?;
-        let script = transaction_builder::encode_validator_set_script_add_validator(
-            self.input.account_address,
-        )
-        .into_script_function();
+        let script =
+            transaction_builder::validator_set_script_add_validator(self.input.account_address)
+                .into_script_function();
         let mut transaction_context =
             build_and_submit_aptos_root_transaction(&config, seq_num, script, "add-validator")
                 .await?;
@@ -179,10 +178,9 @@ impl RemoveValidator {
             .await?;
 
         let seq_num = client.sequence_number(aptos_root_address()).await?;
-        let script = transaction_builder::encode_validator_set_script_remove_validator(
-            self.input.account_address,
-        )
-        .into_script_function();
+        let script =
+            transaction_builder::validator_set_script_remove_validator(self.input.account_address)
+                .into_script_function();
 
         let mut transaction_context =
             build_and_submit_aptos_root_transaction(&config, seq_num, script, "remove-validator")

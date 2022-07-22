@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_sdk_builder as buildgen;
 use aptos_types::transaction::ScriptABI;
 use cached_framework_packages::abis;
 use serde_generate as serdegen;
@@ -8,7 +9,6 @@ use serde_generate::SourceInstaller as _;
 use serde_reflection::Registry;
 use std::{io::Write, process::Command};
 use tempfile::tempdir;
-use aptos_sdk_builder as buildgen;
 
 fn get_aptos_registry() -> Registry {
     let path = "../../testsuite/generate-format/tests/staged/aptos.yaml";

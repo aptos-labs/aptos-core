@@ -443,13 +443,13 @@ async fn construction_payloads(
     // Encode operation
     let (txn_payload, sender) = match operation {
         InternalOperation::CreateAccount(create_account) => (
-            aptos_stdlib::encode_account_create_account(create_account.new_account),
+            aptos_stdlib::account_create_account(create_account.new_account),
             create_account.sender,
         ),
         InternalOperation::Transfer(transfer) => {
             is_native_coin(&transfer.currency)?;
             (
-                aptos_stdlib::encode_aptos_coin_transfer(transfer.receiver, transfer.amount),
+                aptos_stdlib::aptos_coin_transfer(transfer.receiver, transfer.amount),
                 transfer.sender,
             )
         }

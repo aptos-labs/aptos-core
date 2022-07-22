@@ -22,10 +22,10 @@ impl AptosTest for GasCheck {
         let mut account2 = ctx.random_account();
         ctx.create_user_account(account2.public_key()).await?;
 
-        let transfer_txn =
-            account1.sign_with_transaction_builder(ctx.aptos_transaction_factory().payload(
-                aptos_stdlib::encode_aptos_coin_transfer(account2.address(), 100),
-            ));
+        let transfer_txn = account1.sign_with_transaction_builder(
+            ctx.aptos_transaction_factory()
+                .payload(aptos_stdlib::aptos_coin_transfer(account2.address(), 100)),
+        );
         // fail due to not enough gas
         let err = ctx
             .client()
@@ -37,10 +37,10 @@ impl AptosTest for GasCheck {
         ctx.mint(account1.address(), 1000).await?;
         ctx.mint(account2.address(), 1000).await?;
 
-        let transfer_too_much =
-            account2.sign_with_transaction_builder(ctx.aptos_transaction_factory().payload(
-                aptos_stdlib::encode_aptos_coin_transfer(account1.address(), 1000),
-            ));
+        let transfer_too_much = account2.sign_with_transaction_builder(
+            ctx.aptos_transaction_factory()
+                .payload(aptos_stdlib::aptos_coin_transfer(account1.address(), 1000)),
+        );
 
         let err = ctx
             .client()
@@ -59,7 +59,7 @@ impl AptosTest for GasCheck {
         let update_txn = ctx
             .root_account()
             .sign_with_transaction_builder(txn_factory.payload(
-                aptos_stdlib::encode_vm_config_set_gas_constants(
+                aptos_stdlib::vm_config_set_gas_constants(
                     gas_constant.global_memory_per_byte_cost.get(),
                     gas_constant.global_memory_per_byte_write_cost.get(),
                     gas_constant.min_transaction_gas_units.get(),
@@ -77,10 +77,7 @@ impl AptosTest for GasCheck {
 
         let zero_gas_txn = account1.sign_with_transaction_builder(
             ctx.aptos_transaction_factory()
-                .payload(aptos_stdlib::encode_aptos_coin_transfer(
-                    account2.address(),
-                    100,
-                ))
+                .payload(aptos_stdlib::aptos_coin_transfer(account2.address(), 100))
                 .gas_unit_price(0),
         );
         while ctx.client().get_ledger_information().await?.inner().epoch < 2 {

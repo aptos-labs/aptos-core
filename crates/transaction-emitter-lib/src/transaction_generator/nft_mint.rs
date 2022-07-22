@@ -102,7 +102,7 @@ pub fn create_nft_collection_request(
     txn_factory: &TransactionFactory,
 ) -> SignedTransaction {
     creation_account.sign_with_transaction_builder(txn_factory.payload(
-        aptos_stdlib::encode_token_create_unlimited_collection_script(
+        aptos_stdlib::token_create_unlimited_collection_script(
             collection_name.to_vec(),
             "description".to_owned().into_bytes(),
             "uri".to_owned().into_bytes(),
@@ -117,7 +117,7 @@ pub fn create_nft_token_request(
     txn_factory: &TransactionFactory,
 ) -> SignedTransaction {
     creation_account.sign_with_transaction_builder(txn_factory.payload(
-        aptos_stdlib::encode_token_create_unlimited_token_script(
+        aptos_stdlib::token_create_unlimited_token_script(
             collection_name.to_vec(),
             token_name.to_vec(),
             "collection description".to_owned().into_bytes(),
@@ -138,7 +138,7 @@ pub fn create_nft_transfer_request(
 ) -> SignedTransaction {
     owner_account.sign_multi_agent_with_transaction_builder(
         vec![creation_account],
-        txn_factory.payload(aptos_stdlib::encode_token_direct_transfer_script(
+        txn_factory.payload(aptos_stdlib::token_direct_transfer_script(
             creation_account.address(),
             collection_name.to_vec(),
             token_name.to_vec(),

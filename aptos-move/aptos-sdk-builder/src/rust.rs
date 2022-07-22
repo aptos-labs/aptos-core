@@ -52,6 +52,7 @@ pub fn output(out: &mut dyn Write, abis: &[ScriptABI], local_types: bool) -> Res
     }
 
     write!(emitter.out, "mod decoder {{")?;
+    write!(emitter.out, "    use super::*;")?;
     for abi in abis {
         emitter.output_script_decoder_function(abi)?;
     }
@@ -385,7 +386,7 @@ pub fn decode(script: &Script) -> Option<ScriptCall> {{
 /// Try to recognize an Aptos `TransactionPayload` and convert it into a structured object `ScriptFunctionCall`.
 pub fn decode(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {{
     if let TransactionPayload::ScriptFunction(script) = payload {{
-        match SCRIPT_FUNCTION_DECODER_MAP.get(&format!("{{}}{{}}", {}, {})) {{
+        match SCRIPT_FUNCTION_DECODER_MAP.get(&format!("{{}}_{{}}", {}, {})) {{
             Some(decoder) => decoder(payload),
             None => None,
         }}
@@ -558,7 +559,7 @@ TransactionPayload::ScriptFunction(ScriptFunction {{
         //
         writeln!(
             self.out,
-            "\nfn {}_{}(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {{",
+            "\npub fn {}_{}(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {{",
             abi.module_name().name().to_string().to_snake_case(),
             abi.name(),
         )?;
@@ -617,7 +618,7 @@ TransactionPayload::ScriptFunction(ScriptFunction {{
     ) -> Result<()> {
         writeln!(
             self.out,
-            "\nfn {}_script({}script: &Script) -> Option<ScriptCall> {{",
+            "\npub fn {}_script({}script: &Script) -> Option<ScriptCall> {{",
             abi.name(),
             // fix warning "unused variable"
             if abi.ty_args().is_empty() && abi.args().is_empty() {
