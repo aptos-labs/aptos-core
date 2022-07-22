@@ -172,7 +172,7 @@ export class AptosClient {
    * @example An example of an account resource
    * ```
    * {
-   *    type: "0x1::AptosAccount::Coin",
+   *    type: "0x1::account::Coin",
    *    data: { value: 6 }
    * }
    * ```
@@ -195,7 +195,7 @@ export class AptosClient {
    * @example An example of an account resource
    * ```
    * {
-   *    type: "0x1::AptosAccount::Coin",
+   *    type: "0x1::account::Coin",
    *    data: { value: 6 }
    * }
    * ```
@@ -330,7 +330,7 @@ export class AptosClient {
    * `event_handle_struct` and `field_name`, then returns events identified by the event key
    * @param address Hex-encoded 16 bytes Aptos account from which events are queried
    * @param eventHandleStruct String representation of an on-chain Move struct type.
-   * (e.g. `0x1::Coin::CoinStore<0x1::aptos_coin::AptosCoin>`)
+   * (e.g. `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`)
    * @param fieldName The field name of the EventHandle in the struct
    * @param query Optional query object
    * @param query.start The start sequence number in the EVENT STREAM, defaulting to the latest event.
@@ -461,7 +461,7 @@ export class AptosClient {
    *
    * To create a transaction hash:
    *
-   * 1. Create hash message bytes: "Aptos::Transaction" bytes + BCS bytes of Transaction.
+   * 1. Create hash message bytes: "APTOS::RawTransaction" bytes + BCS bytes of Transaction.
    * 2. Apply hash algorithm SHA3-256 to the hash message bytes.
    * 3. Hex-encode the hash bytes with 0x prefix.
    *
