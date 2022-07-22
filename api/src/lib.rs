@@ -7,6 +7,7 @@ pub mod context;
 mod events;
 mod health_check;
 mod index;
+mod indexer_extractor;
 pub mod log;
 pub mod metrics;
 mod page;
