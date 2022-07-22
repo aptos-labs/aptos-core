@@ -24,7 +24,6 @@ module aptos_framework::stake {
     use aptos_std::comparator;
     use aptos_std::event::{Self, EventHandle};
     use aptos_std::signature;
-    use aptos_framework::governance_proposal::{GovernanceProposal};
     use aptos_framework::coin::{Self, Coin, MintCapability};
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
@@ -314,10 +313,11 @@ module aptos_framework::stake {
     /// Update the min and max stake amounts.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
     public fun update_required_stake(
-        _gov_proposal: &GovernanceProposal,
+        aptos_framework: &signer,
         minimum_stake: u64,
         maximum_stake: u64,
     ) acquires ValidatorSetConfiguration {
+        system_addresses::assert_aptos_framework(aptos_framework);
         validate_required_stake(minimum_stake, maximum_stake);
 
         let validator_set_config = borrow_global_mut<ValidatorSetConfiguration>(@aptos_framework);
@@ -328,10 +328,11 @@ module aptos_framework::stake {
     /// Update the min and max lockup duration.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
     public fun update_required_lockup(
-        _gov_proposal: &GovernanceProposal,
+        aptos_framework: &signer,
         min_lockup_duration_secs: u64,
         max_lockup_duration_secs: u64,
     ) acquires ValidatorSetConfiguration {
+        system_addresses::assert_aptos_framework(aptos_framework);
         validate_required_lockup(min_lockup_duration_secs, max_lockup_duration_secs);
 
         let validator_set_config = borrow_global_mut<ValidatorSetConfiguration>(@aptos_framework);
@@ -342,10 +343,11 @@ module aptos_framework::stake {
     /// Update the rewards rate.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
     public fun update_rewards_rate(
-        _gov_proposal: &GovernanceProposal,
+        aptos_framework: &signer,
         new_rewards_rate: u64,
         new_rewards_rate_denominator: u64,
     ) acquires ValidatorSetConfiguration {
+        system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
             new_rewards_rate_denominator > 0,
             error::invalid_argument(EINVALID_REWARDS_RATE),
@@ -1101,9 +1103,6 @@ module aptos_framework::stake {
     use aptos_framework::aptos_coin;
 
     #[test_only]
-    use aptos_framework::governance_proposal;
-
-    #[test_only]
     const CONSENSUS_KEY_1: vector<u8> = x"8a54b92288d4ba5073d3a52e80cc00ae9fbbc1cc5b433b46089b7804c38a76f00fc64746c7685ee628fc2d0b929c2294";
     #[test_only]
     const CONSENSUS_POP_1: vector<u8> = x"a9d6c1f1270f2d1454c89a83a4099f813a56dc7db55591d46aa4e6ccae7898b234029ba7052f18755e6fa5e6b73e235f14efc4e2eb402ca2b8f56bad69f965fc11b7b25eb1c95a06f83ddfd023eac4559b6582696cfea97b227f4ce5bdfdfed0";
@@ -1552,13 +1551,11 @@ module aptos_framework::stake {
 
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_change_validator_set_configs(aptos_framework: signer) acquires ValidatorSetConfiguration {
-        use aptos_framework::governance_proposal;
-
         initialize_validator_set(&aptos_framework, 0, 1, 0, 1, false, 1, 1);
 
-        update_required_stake(&governance_proposal::create_test_proposal(), 100, 1000);
-        update_required_lockup(&governance_proposal::create_test_proposal(), 1000, 10000);
-        update_rewards_rate(&governance_proposal::create_test_proposal(), 10, 100);
+        update_required_stake(&aptos_framework, 100, 1000);
+        update_required_lockup(&aptos_framework, 1000, 10000);
+        update_rewards_rate(&aptos_framework, 10, 100);
         let config = borrow_global<ValidatorSetConfiguration>(@aptos_framework);
         assert!(config.minimum_stake == 100, 0);
         assert!(config.maximum_stake == 1000, 1);
@@ -1568,28 +1565,66 @@ module aptos_framework::stake {
         assert!(config.rewards_rate_denominator == 100, 4);
     }
 
-    #[test]
+    #[test(account = @0x123)]
+    #[expected_failure(abort_code = 0x50002)]
+    public entry fun test_update_required_stake_unauthorized_should_fail(
+        account: signer
+    ) acquires ValidatorSetConfiguration {
+        update_required_stake(&account, 1, 2);
+    }
+
+    #[test(account = @0x123)]
+    #[expected_failure(abort_code = 0x50002)]
+    public entry fun test_update_required_lockup_unauthorized_should_fail(
+        account: signer
+    ) acquires ValidatorSetConfiguration {
+        update_required_lockup(&account, 1, 2);
+    }
+
+    #[test(account = @0x123)]
+    #[expected_failure(abort_code = 0x50002)]
+    public entry fun test_update_rewards_unauthorized_should_fail(account: signer) acquires ValidatorSetConfiguration {
+        update_rewards_rate(&account, 1, 10);
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10011)]
-    public entry fun test_update_required_stake_invalid_range_should_fail() acquires ValidatorSetConfiguration {
-        update_required_stake(&governance_proposal::create_test_proposal(), 10, 5);
+    public entry fun test_update_required_stake_invalid_range_should_fail(
+        aptos_framework: signer
+    ) acquires ValidatorSetConfiguration {
+        update_required_stake(&aptos_framework, 10, 5);
     }
 
-    #[test]
+    #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10011)]
-    public entry fun test_update_required_stake_zero_max_stake_should_fail() acquires ValidatorSetConfiguration {
-        update_required_stake(&governance_proposal::create_test_proposal(), 0, 0);
+    public entry fun test_update_required_stake_zero_max_stake_should_fail(
+        aptos_framework: signer
+    ) acquires ValidatorSetConfiguration {
+        update_required_stake(&aptos_framework, 0, 0);
     }
 
-    #[test]
+    #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10012)]
-    public entry fun test_update_required_lockup_invalid_range_should_fail() acquires ValidatorSetConfiguration {
-        update_required_lockup(&governance_proposal::create_test_proposal(), 10, 5);
+    public entry fun test_update_required_lockup_invalid_range_should_fail(
+        aptos_framework: signer
+    ) acquires ValidatorSetConfiguration {
+        update_required_lockup(&aptos_framework, 10, 5);
     }
 
-    #[test]
+    #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10012)]
-    public entry fun test_update_required_lockup_zero_max_lockup_should_fail() acquires ValidatorSetConfiguration {
-        update_required_lockup(&governance_proposal::create_test_proposal(), 0, 0);
+    public entry fun test_update_required_lockup_zero_max_lockup_should_fail(
+        aptos_framework: signer
+    ) acquires ValidatorSetConfiguration {
+        update_required_lockup(&aptos_framework, 0, 0);
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    #[expected_failure(abort_code = 0x10013)]
+    public entry fun test_update_rewards_invalid_denominator_should_fail(
+        aptos_framework: signer
+    ) acquires ValidatorSetConfiguration {
+        update_rewards_rate(&aptos_framework, 1, 0);
     }
 
     #[test_only]
