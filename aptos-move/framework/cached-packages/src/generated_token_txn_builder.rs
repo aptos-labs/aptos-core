@@ -28,6 +28,7 @@ type Bytes = Vec<u8>;
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
+#[allow(non_camel_case_types)]
 pub enum ScriptFunctionCall {
     /// create a empty token collection with parameters
     tokenCreateCollectionScript {
@@ -62,10 +63,6 @@ pub enum ScriptFunctionCall {
         amount: u64,
         serial_number: u64,
     },
-
-    /// initialize capability store for storing all token capabilities
-    /// this function should be called by any account that plan to own tokens
-    tokenInitializeTokenAuthorityStoreScript {},
 
     tokenInitializeTokenScript {},
 
@@ -163,9 +160,6 @@ impl ScriptFunctionCall {
                 amount,
                 serial_number,
             ),
-            tokenInitializeTokenAuthorityStoreScript {} => {
-                encode_token_initialize_token_authority_store_script()
-            }
             tokenInitializeTokenScript {} => encode_token_initialize_token_script(),
             tokenMint {
                 token_data_address,
@@ -330,23 +324,6 @@ pub fn encode_token_direct_transfer_script(
             bcs::to_bytes(&amount).unwrap(),
             bcs::to_bytes(&serial_number).unwrap(),
         ],
-    ))
-}
-
-/// initialize capability store for storing all token capabilities
-/// this function should be called by any account that plan to own tokens
-pub fn encode_token_initialize_token_authority_store_script() -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("token").to_owned(),
-        ),
-        ident_str!("initialize_token_authority_store_script").to_owned(),
-        vec![],
-        vec![],
     ))
 }
 
@@ -526,16 +503,6 @@ fn decode_token_direct_transfer_script(payload: &TransactionPayload) -> Option<S
     }
 }
 
-fn decode_token_initialize_token_authority_store_script(
-    payload: &TransactionPayload,
-) -> Option<ScriptFunctionCall> {
-    if let TransactionPayload::ScriptFunction(_script) = payload {
-        Some(ScriptFunctionCall::tokenInitializeTokenAuthorityStoreScript {})
-    } else {
-        None
-    }
-}
-
 fn decode_token_initialize_token_script(
     payload: &TransactionPayload,
 ) -> Option<ScriptFunctionCall> {
@@ -608,8 +575,8 @@ type ScriptFunctionDecoderMap = std::collections::HashMap<
     String,
     Box<
         dyn Fn(&TransactionPayload) -> Option<ScriptFunctionCall>
-            + std::marker::Sync
-            + std::marker::Send,
+        + std::marker::Sync
+        + std::marker::Send,
     >,
 >;
 
@@ -627,10 +594,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "tokendirect_transfer_script".to_string(),
             Box::new(decode_token_direct_transfer_script),
-        );
-        map.insert(
-            "tokeninitialize_token_authority_store_script".to_string(),
-            Box::new(decode_token_initialize_token_authority_store_script),
         );
         map.insert(
             "tokeninitialize_token_script".to_string(),

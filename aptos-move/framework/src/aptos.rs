@@ -14,7 +14,6 @@ use move_deps::{
 use once_cell::sync::Lazy;
 use std::collections::{BTreeMap, HashSet};
 use std::hash::Hash;
-use aptos_types::transaction::Module;
 
 const APTOS_FRAMEWORK_DIR: &str = "aptos-framework/sources";
 const APTOS_STDLIB_DIR: &str = "aptos-stdlib/sources";
@@ -24,7 +23,7 @@ static APTOS_PKG: Lazy<CompiledPackage> = Lazy::new(|| super::package("aptos-fra
 static TOKEN_PKG: Lazy<CompiledPackage> = Lazy::new(|| super::package("aptos-token"));
 static APTOS_STDLIB_PKG: Lazy<CompiledPackage> = Lazy::new(|| super::package("aptos-stdlib"));
 
-pub fn dedup<T, K: Hash+Eq, F: Fn(&T) -> K>(lists: Vec<T>, f: F) -> Vec<T> {
+pub fn dedup<T, K: Hash + Eq, F: Fn(&T) -> K>(lists: Vec<T>, f: F) -> Vec<T> {
     let mut res = vec![];
     let mut keys = HashSet::new();
     for l in lists {
@@ -49,7 +48,9 @@ pub fn module_blobs() -> Vec<Vec<u8>> {
     let mut framework_blobs = super::module_blobs(&*APTOS_PKG);
     framework_blobs.extend(super::module_blobs(&*TOKEN_PKG));
     framework_blobs.extend(super::module_blobs(&*APTOS_STDLIB_PKG));
-    dedup(framework_blobs, |blob| CompiledModule::deserialize(blob).unwrap().self_id())
+    dedup(framework_blobs, |blob| {
+        CompiledModule::deserialize(blob).unwrap().self_id()
+    })
 }
 
 pub fn named_addresses() -> BTreeMap<String, NumericalAddress> {
