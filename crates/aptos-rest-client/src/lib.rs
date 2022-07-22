@@ -7,6 +7,7 @@ pub use aptos_api_types::{
 };
 use aptos_api_types::{mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, BlockInfo};
 use aptos_crypto::HashValue;
+use aptos_types::transaction::{TransactionListWithProof, TransactionOutputListWithProof};
 use aptos_types::{
     account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
     transaction::SignedTransaction,
@@ -21,6 +22,7 @@ use url::Url;
 pub mod error;
 pub mod faucet;
 pub use faucet::FaucetClient;
+use move_deps::move_core_types::language_storage::StructTag;
 pub mod response;
 pub use response::Response;
 mod state;
@@ -412,6 +414,100 @@ impl Client {
 
     async fn get<T: DeserializeOwned>(&self, url: Url) -> Result<Response<T>> {
         self.json(self.inner.get(url).send().await?).await
+    }
+
+    pub async fn get_raw_account(&self, address: AccountAddress) -> Result<Response<Account>> {
+        let url = self.base_url.join(&format!("/data/accounts/{}", address))?;
+
+        let response = self.inner.get(url).send().await?;
+        let (response, state) = self.check_response(response).await?;
+
+        let bytes = response.bytes().await?;
+
+        Ok(Response::new(bcs::from_bytes(bytes.as_ref())?, state))
+    }
+
+    pub async fn get_raw_account_resources(
+        &self,
+        address: AccountAddress,
+    ) -> Result<Response<Vec<(StructTag, Vec<u8>)>>> {
+        let url = self
+            .base_url
+            .join(&format!("/data/accounts/{}/resources", address))?;
+
+        let response = self.inner.get(url).send().await?;
+        let (response, state) = self.check_response(response).await?;
+
+        let bytes = response.bytes().await?;
+        let resources: Vec<_> = bcs::from_bytes(bytes.as_ref())?;
+
+        Ok(Response::new(resources, state))
+    }
+
+    pub async fn get_raw_account_modules(
+        &self,
+        address: AccountAddress,
+    ) -> Result<Response<Vec<(StructTag, Vec<u8>)>>> {
+        let url = self
+            .base_url
+            .join(&format!("/data/accounts/{}/modules", address))?;
+
+        let response = self.inner.get(url).send().await?;
+        let (response, state) = self.check_response(response).await?;
+
+        let bytes = response.bytes().await?;
+        let modules: Vec<_> = bcs::from_bytes(bytes.as_ref())?;
+
+        Ok(Response::new(modules, state))
+    }
+
+    pub async fn get_raw_account_transactions(
+        &self,
+        address: AccountAddress,
+        start: Option<u64>,
+        limit: Option<u64>,
+    ) -> Result<Response<TransactionListWithProof>> {
+        let url = self
+            .base_url
+            .join(&format!("/data/accounts/{}/transactions", address))?;
+
+        let mut request = self.inner.get(url);
+        if let Some(start) = start {
+            request = request.query(&[("start", start)])
+        }
+
+        if let Some(limit) = limit {
+            request = request.query(&[("limit", limit)])
+        }
+        let response = request.send().await?;
+        let (response, state) = self.check_response(response).await?;
+
+        let bytes = response.bytes().await?;
+
+        Ok(Response::new(bcs::from_bytes(bytes.as_ref())?, state))
+    }
+
+    pub async fn get_raw_transactions(
+        &self,
+        start: Option<u64>,
+        limit: Option<u64>,
+    ) -> Result<Response<TransactionOutputListWithProof>> {
+        let url = self.base_url.join("/data/transactions")?;
+
+        let mut request = self.inner.get(url);
+        if let Some(start) = start {
+            request = request.query(&[("start", start)])
+        }
+
+        if let Some(limit) = limit {
+            request = request.query(&[("limit", limit)])
+        }
+        let response = request.send().await?;
+        let (response, state) = self.check_response(response).await?;
+
+        let bytes = response.bytes().await?;
+
+        Ok(Response::new(bcs::from_bytes(bytes.as_ref())?, state))
     }
 }
 

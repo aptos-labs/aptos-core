@@ -20,6 +20,7 @@ use aptos_types::{
 };
 
 use anyhow::Result;
+use aptos_types::account_view::AccountView;
 use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
 use move_deps::move_core_types::{
     identifier::Identifier,
@@ -209,10 +210,32 @@ impl Account {
             .move_struct_fields(&typ, data)?)
     }
 
+    pub fn raw_account_resource(self) -> Result<impl Reply, Error> {
+        let state = self.account_state()?;
+        if let Some(account) = state.get_account_resource()? {
+            Response::new_bcs(self.latest_ledger_info, &account)
+        } else {
+            Err(self.account_not_found())
+        }
+    }
+
+    pub fn raw_resources(self) -> Result<impl Reply, Error> {
+        let state = self.account_state()?;
+        let resources: Vec<_> = state.get_resources().collect();
+        Response::new_bcs(self.latest_ledger_info, &resources)
+    }
+
+    pub fn raw_modules(self) -> Result<impl Reply, Error> {
+        let state = self.account_state()?;
+        let modules: Vec<_> = state.get_modules().collect();
+        Response::new_bcs(self.latest_ledger_info, &modules)
+    }
+
     fn account_state(&self) -> Result<AccountState, Error> {
         let state = self
             .context
-            .get_account_state(self.address.into(), self.ledger_version)?
+            .get_account_state(self.address.into(), self.ledger_version)
+            .unwrap()
             .ok_or_else(|| self.account_not_found())?;
         Ok(state)
     }

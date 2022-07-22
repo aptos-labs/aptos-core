@@ -259,13 +259,13 @@ async fn handle_create_signing_message(
     Ok(Transactions::new(context)?.signing_message(body)?)
 }
 
-struct Transactions {
+pub struct Transactions {
     ledger_info: LedgerInfo,
     context: Context,
 }
 
 impl Transactions {
-    fn new(context: Context) -> Result<Self, Error> {
+    pub fn new(context: Context) -> Result<Self, Error> {
         let ledger_info = context.get_latest_ledger_info()?;
         Ok(Self {
             ledger_info,
@@ -387,6 +387,24 @@ impl Transactions {
         self.render_transactions(data, accept_type)
     }
 
+    pub fn raw_list(self, page: Page) -> Result<impl Reply, Error> {
+        let ledger_version = self.ledger_info.version();
+        let limit = page.limit()?;
+        let last_page_start = if ledger_version > (limit as u64) {
+            ledger_version - (limit as u64)
+        } else {
+            0
+        };
+        let start_version = page.start(last_page_start, ledger_version)?;
+
+        let outputs =
+            self.context
+                .db
+                .get_transaction_outputs(start_version, limit as u64, ledger_version)?;
+
+        Response::new_bcs(self.ledger_info, &outputs)
+    }
+
     pub fn list_by_account(self, address: AddressParam, page: Page) -> Result<impl Reply, Error> {
         let data = self.context.get_account_transactions(
             address.parse("account address")?.into(),
@@ -395,6 +413,22 @@ impl Transactions {
             self.ledger_info.version(),
         )?;
         self.render_transactions(data, AcceptType::Json)
+    }
+
+    pub fn raw_list_by_account(
+        self,
+        address: AddressParam,
+        page: Page,
+    ) -> Result<impl Reply, Error> {
+        let data = self.context.db.get_account_transactions(
+            address.parse("account address")?.into(),
+            page.start(0, u64::MAX)?,
+            page.limit()? as u64,
+            true,
+            self.ledger_info.ledger_version.0,
+        )?;
+
+        Response::new_bcs(self.ledger_info, &data)
     }
 
     fn render_transactions(

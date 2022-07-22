@@ -7,6 +7,9 @@ use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::StateView;
+use aptos_types::transaction::{
+    AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
+};
 use aptos_types::{
     access_path::Path,
     account_address::AccountAddress,
@@ -414,6 +417,95 @@ impl Context {
 
     pub fn health_check_route(&self) -> BoxedFilter<(impl Reply,)> {
         super::health_check::health_check_route(self.db.clone())
+    }
+
+    pub fn raw_state_view(&self, version: u64) -> Result<DbStateView, Error> {
+        Ok(self.db.state_view_at_version(Some(version))?)
+    }
+
+    pub fn raw_ledger_info(&self) -> Result<LedgerInfoWithSignatures, Error> {
+        Ok(self.db.get_latest_ledger_info()?)
+    }
+
+    pub fn raw_transaction_by_version(
+        &self,
+        version: u64,
+        latest_ledger_version: u64,
+    ) -> Result<TransactionWithProof, Error> {
+        if version > latest_ledger_version {
+            Err(Error::not_found(
+                "transaction",
+                version,
+                latest_ledger_version,
+            ))
+        } else {
+            Ok(self
+                .db
+                .get_transaction_by_version(version, latest_ledger_version, true)?)
+        }
+    }
+
+    pub fn raw_transaction_by_hash(
+        &self,
+        hash: HashValue,
+        latest_ledger_version: u64,
+    ) -> Result<TransactionWithProof, Error> {
+        if let Some(txn) = self
+            .db
+            .get_transaction_by_hash(hash, latest_ledger_version, true)?
+        {
+            Ok(txn)
+        } else {
+            Err(Error::not_found("transaction", hash, latest_ledger_version))
+        }
+    }
+
+    pub fn raw_account_transactions(
+        &self,
+        account: AccountAddress,
+        start: u64,
+        limit: u64,
+        latest_ledger_version: u64,
+    ) -> Result<AccountTransactionsWithProof, Error> {
+        Ok(self
+            .db
+            .get_account_transactions(account, start, limit, true, latest_ledger_version)?)
+    }
+
+    pub fn raw_transactions(
+        &self,
+        start: u64,
+        limit: u64,
+        latest_ledger_version: u64,
+    ) -> Result<TransactionListWithProof, Error> {
+        Ok(self
+            .db
+            .get_transactions(start, limit, latest_ledger_version, true)?)
+    }
+
+    pub fn raw_transaction_outputs(
+        &self,
+        start: u64,
+        limit: u64,
+        latest_ledger_version: u64,
+    ) -> Result<TransactionOutputListWithProof, Error> {
+        Ok(self
+            .db
+            .get_transaction_outputs(start, limit, latest_ledger_version)?)
+    }
+
+    pub fn raw_account_state(
+        &self,
+        address: AccountAddress,
+        version: u64,
+    ) -> Result<AccountState, Error> {
+        if let Some(account_state) =
+            AccountState::from_access_paths_and_values(&self.get_state_values(address, version)?)?
+        {
+            Ok(account_state)
+        } else {
+            Err(Error::not_found("account", address, version))
+        }
     }
 }
 

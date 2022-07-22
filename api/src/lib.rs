@@ -18,6 +18,7 @@ mod transactions;
 pub(crate) mod version;
 
 mod blocks;
+mod data;
 mod failpoint;
 #[cfg(any(test))]
 pub(crate) mod tests;

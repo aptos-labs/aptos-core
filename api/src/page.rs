@@ -13,7 +13,7 @@ const DEFAULT_PAGE_SIZE: u16 = 25;
 const MAX_PAGE_SIZE: u16 = 1000;
 
 #[derive(Clone, Debug, Deserialize)]
-pub(crate) struct Page {
+pub struct Page {
     start: Option<TransactionVersionParam>,
     limit: Option<Param<NonZeroU16>>,
 }

@@ -4,7 +4,7 @@
 use crate::{
     accounts, blocks,
     context::Context,
-    events,
+    data, events,
     failpoint::fail_point,
     log,
     metrics::{metrics, status_metrics},
@@ -31,6 +31,11 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .or(accounts::get_account_resources(context.clone()))
         .or(accounts::get_account_modules(context.clone()))
         .or(blocks::get_block_info(context.clone()))
+        .or(data::data_get_account(context.clone()))
+        .or(data::data_get_account_resources(context.clone()))
+        .or(data::data_get_account_modules(context.clone()))
+        .or(data::data_get_account_transactions(context.clone()))
+        .or(data::data_get_transactions(context.clone()))
         .or(transactions::get_bcs_transaction(context.clone()))
         .or(transactions::get_json_transaction(context.clone()))
         .or(transactions::get_bcs_transactions(context.clone()))
