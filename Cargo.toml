@@ -65,9 +65,6 @@ members = [
     "crates/short-hex-str",
     "crates/transaction-emitter",
     "crates/transaction-emitter-lib",
-    "devtools/x",
-    "devtools/x-core",
-    "devtools/x-lint",
     "ecosystem/indexer",
     "ecosystem/node-checker",
     "execution/db-bootstrapper",
@@ -162,7 +159,3 @@ codegen-units = 1
 
 [profile.bench]
 debug = true
-
-# Build guppy in opt mode so that x commands are faster.
-[profile.dev.package.guppy]
-opt-level = 3
