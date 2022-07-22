@@ -34,7 +34,7 @@ impl TransactionsApi {
         path = "/transactions",
         method = "get",
         operation_id = "get_transactions",
-        tag = "ApiTags::General"
+        tag = "ApiTags::Transactions"
     )]
     async fn get_transactions(
         &self,
