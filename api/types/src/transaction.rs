@@ -21,6 +21,7 @@ use aptos_types::{
     },
 };
 
+use poem_openapi::{Object, Union};
 use serde::{Deserialize, Serialize};
 use std::{
     boxed::Box,
@@ -28,6 +29,8 @@ use std::{
     fmt,
     str::FromStr,
 };
+
+// TODO: Add read_only / write_only (and their all variants) where appropriate.
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum TransactionData {
@@ -126,7 +129,8 @@ impl
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
+#[oai(discriminator_name = "type")]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Transaction {
     PendingTransaction(PendingTransaction),
@@ -280,7 +284,7 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct TransactionInfo {
     pub version: U64,
     pub hash: HashValue,
@@ -293,31 +297,35 @@ pub struct TransactionInfo {
     pub changes: Vec<WriteSetChange>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct PendingTransaction {
     pub hash: HashValue,
     #[serde(flatten)]
+    #[oai(flatten)]
     pub request: UserTransactionRequest,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct UserTransaction {
     #[serde(flatten)]
+    #[oai(flatten)]
     pub info: TransactionInfo,
     #[serde(flatten)]
+    #[oai(flatten)]
     pub request: UserTransactionRequest,
     pub events: Vec<Event>,
     pub timestamp: U64,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct StateCheckpointTransaction {
     #[serde(flatten)]
+    #[oai(flatten)]
     pub info: TransactionInfo,
     pub timestamp: U64,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct UserTransactionRequest {
     pub sender: Address,
     pub sequence_number: U64,
@@ -329,25 +337,28 @@ pub struct UserTransactionRequest {
     pub signature: Option<TransactionSignature>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct UserCreateSigningMessageRequest {
     #[serde(flatten)]
+    #[oai(flatten)]
     pub transaction: UserTransactionRequest,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub secondary_signers: Option<Vec<Address>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct GenesisTransaction {
     #[serde(flatten)]
+    #[oai(flatten)]
     pub info: TransactionInfo,
     pub payload: GenesisPayload,
     pub events: Vec<Event>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct BlockMetadataTransaction {
     #[serde(flatten)]
+    #[oai(flatten)]
     pub info: TransactionInfo,
     pub id: HashValue,
     pub epoch: U64,
@@ -359,12 +370,14 @@ pub struct BlockMetadataTransaction {
     pub timestamp: U64,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct Event {
     pub key: EventKey,
     pub sequence_number: U64,
     #[serde(rename = "type")]
+    #[oai(rename = "type")]
     pub typ: MoveType,
+    // TODO: Use the real data here, not a JSON representation.
     pub data: serde_json::Value,
 }
 
@@ -381,13 +394,15 @@ impl From<(&ContractEvent, serde_json::Value)> for Event {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
+#[oai(discriminator_name = "type")]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum GenesisPayload {
     WriteSetPayload(WriteSetPayload),
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
+#[oai(discriminator_name = "type")]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TransactionPayload {
     ScriptFunctionPayload(ScriptFunctionPayload),
@@ -396,22 +411,24 @@ pub enum TransactionPayload {
     WriteSetPayload(WriteSetPayload),
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct ModuleBundlePayload {
     pub modules: Vec<MoveModuleBytecode>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct ScriptFunctionPayload {
     pub function: ScriptFunctionId,
     pub type_arguments: Vec<MoveType>,
+    // TODO: Use the real data here, not a JSON representation.
     pub arguments: Vec<serde_json::Value>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct ScriptPayload {
     pub code: MoveScriptBytecode,
     pub type_arguments: Vec<MoveType>,
+    // TODO: Use the real data here, not a JSON representation.
     pub arguments: Vec<serde_json::Value>,
 }
 
@@ -431,64 +448,84 @@ impl TryFrom<Script> for ScriptPayload {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct WriteSetPayload {
     pub write_set: WriteSet,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
+#[oai(discriminator_name = "type")]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum WriteSet {
     ScriptWriteSet(ScriptWriteSet),
     DirectWriteSet(DirectWriteSet),
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct ScriptWriteSet {
     pub execute_as: Address,
     pub script: ScriptPayload,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct DirectWriteSet {
     pub changes: Vec<WriteSetChange>,
     pub events: Vec<Event>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
+#[oai(discriminator_name = "type")]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum WriteSetChange {
-    DeleteModule {
-        address: Address,
-        state_key_hash: String,
-        module: MoveModuleId,
-    },
-    DeleteResource {
-        address: Address,
-        state_key_hash: String,
-        resource: MoveStructTag,
-    },
-    DeleteTableItem {
-        state_key_hash: String,
-        handle: HexEncodedBytes,
-        key: HexEncodedBytes,
-    },
-    WriteModule {
-        address: Address,
-        state_key_hash: String,
-        data: MoveModuleBytecode,
-    },
-    WriteResource {
-        address: Address,
-        state_key_hash: String,
-        data: MoveResource,
-    },
-    WriteTableItem {
-        state_key_hash: String,
-        handle: HexEncodedBytes,
-        key: HexEncodedBytes,
-        value: HexEncodedBytes,
-    },
+    DeleteModule(DeleteModule),
+    DeleteResource(DeleteResource),
+    DeleteTableItem(DeleteTableItem),
+    WriteModule(WriteModule),
+    WriteResource(WriteResource),
+    WriteTableItem(WriteTableItem),
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+pub struct DeleteModule {
+    pub address: Address,
+    pub state_key_hash: String,
+    pub module: MoveModuleId,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+pub struct DeleteResource {
+    pub address: Address,
+    pub state_key_hash: String,
+    pub resource: MoveStructTag,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+pub struct DeleteTableItem {
+    pub state_key_hash: String,
+    pub handle: HexEncodedBytes,
+    pub key: HexEncodedBytes,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+pub struct WriteModule {
+    pub address: Address,
+    pub state_key_hash: String,
+    pub data: MoveModuleBytecode,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+pub struct WriteResource {
+    pub address: Address,
+    pub state_key_hash: String,
+    pub data: MoveResource,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+pub struct WriteTableItem {
+    pub state_key_hash: String,
+    pub handle: HexEncodedBytes,
+    pub key: HexEncodedBytes,
+    pub value: HexEncodedBytes,
 }
 
 impl WriteSetChange {
@@ -504,7 +541,8 @@ impl WriteSetChange {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
+#[oai(discriminator_name = "type")]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TransactionSignature {
     Ed25519Signature(Ed25519Signature),
@@ -523,7 +561,7 @@ impl TryFrom<TransactionSignature> for TransactionAuthenticator {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct Ed25519Signature {
     public_key: HexEncodedBytes,
     signature: HexEncodedBytes,
@@ -559,7 +597,7 @@ impl TryFrom<Ed25519Signature> for AccountAuthenticator {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MultiEd25519Signature {
     public_keys: Vec<HexEncodedBytes>,
     signatures: Vec<HexEncodedBytes>,
@@ -627,7 +665,8 @@ impl TryFrom<MultiEd25519Signature> for AccountAuthenticator {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
+#[oai(discriminator_name = "type")]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AccountSignature {
     Ed25519Signature(Ed25519Signature),
@@ -645,7 +684,7 @@ impl TryFrom<AccountSignature> for AccountAuthenticator {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MultiAgentSignature {
     sender: AccountSignature,
     secondary_signer_addresses: Vec<Address>,
@@ -777,7 +816,8 @@ impl From<TransactionAuthenticator> for TransactionSignature {
 /// There are 2 types transaction ids from HTTP request inputs:
 /// 1. Transaction hash: hex-encoded string, e.g. "0x374eda71dce727c6cd2dd4a4fd47bfb85c16be2e3e95ab0df4948f39e1af9981"
 /// 2. Transaction version: u64 number string (as we encode u64 into string in JSON), e.g. "122"
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Union)]
+#[oai(discriminator_name = "type")]
 pub enum TransactionId {
     Hash(HashValue),
     Version(u64),
@@ -804,7 +844,7 @@ impl fmt::Display for TransactionId {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct TransactionSigningMessage {
     pub message: HexEncodedBytes,
 }

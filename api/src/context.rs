@@ -16,20 +16,23 @@ use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix},
+    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
     transaction::{SignedTransaction, TransactionWithProof, Version},
     write_set::WriteOp,
 };
 use aptos_vm::data_cache::{IntoMoveResolver, RemoteStorageOwned};
 use futures::{channel::oneshot, SinkExt};
 use move_deps::move_core_types::ident_str;
+use poem_openapi::payload::Json;
 use serde::{Deserialize, Serialize};
-use std::{convert::Infallible, sync::Arc};
+use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
     DbReader, Order,
 };
 use warp::{filters::BoxedFilter, Filter, Reply};
+
+use crate::poem_backend::{AptosError, AptosErrorCode, AptosErrorResponse, AptosInternalResult};
 
 // Context holds application scope context
 #[derive(Clone)]
@@ -59,6 +62,18 @@ impl Context {
         self.db
             .latest_state_checkpoint_view()
             .map(|state_view| state_view.into_move_resolver())
+    }
+
+    pub fn move_resolver_poem(&self) -> AptosInternalResult<RemoteStorageOwned<DbStateView>> {
+        self.move_resolver().map_err(|e| {
+            AptosErrorResponse::InternalServerError(Json(
+                AptosError::new(
+                    format_err!("Failed to read latest state checkpoint from DB: {}", e)
+                        .to_string(),
+                )
+                .error_code(AptosErrorCode::ReadFromStorageError),
+            ))
+        })
     }
 
     pub fn state_view_at_version(&self, version: Version) -> Result<DbStateView> {
@@ -103,6 +118,15 @@ impl Context {
         }
     }
 
+    pub fn get_latest_ledger_info_poem(&self) -> AptosInternalResult<LedgerInfo> {
+        self.get_latest_ledger_info().map_err(|e| {
+            AptosErrorResponse::InternalServerError(Json(
+                AptosError::new(format_err!("Failed to retrieve ledger info: {}", e).to_string())
+                    .error_code(AptosErrorCode::ReadFromStorageError),
+            ))
+        })
+    }
+
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {
         self.db.get_latest_ledger_info()
     }
@@ -113,16 +137,34 @@ impl Context {
             .get_state_value(state_key)
     }
 
+    pub fn get_state_value_poem(
+        &self,
+        state_key: &StateKey,
+        version: u64,
+    ) -> Result<Option<Vec<u8>>, AptosErrorResponse> {
+        self.get_state_value(state_key, version).map_err(|e| {
+            AptosErrorResponse::InternalServerError(Json(
+                AptosError::new(format_err!("Failed to retrieve state value: {}", e).to_string())
+                    .error_code(AptosErrorCode::ReadFromStorageError),
+            ))
+        })
+    }
+
+    pub fn get_state_values(
+        &self,
+        address: AccountAddress,
+        version: u64,
+    ) -> Result<HashMap<StateKey, StateValue>> {
+        self.db
+            .get_state_values_by_key_prefix(&StateKeyPrefix::from(address), version)
+    }
+
     pub fn get_account_state(
         &self,
         address: AccountAddress,
         version: u64,
     ) -> Result<Option<AccountState>> {
-        AccountState::from_access_paths_and_values(
-            &self
-                .db
-                .get_state_values_by_key_prefix(&StateKeyPrefix::from(address), version)?,
-        )
+        AccountState::from_access_paths_and_values(&self.get_state_values(address, version)?)
     }
 
     pub fn get_block_timestamp(&self, version: u64) -> Result<u64> {
@@ -198,7 +240,7 @@ impl Context {
                     if path.address == CORE_CODE_ADDRESS && typ == block_metadata_type {
                         if let WriteOp::Value(value) = op {
                             if let Ok(mut resource) = converter.try_into_resource(&typ, value) {
-                                if let Some(value) = resource.data.0.remove(height_id) {
+                                if let Some(value) = resource.data.0.remove(&height_id.into()) {
                                     if let Ok(height) = serde_json::from_value::<U64>(value) {
                                         return Some(height.0);
                                     }

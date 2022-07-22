@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Address, Bytecode};
-
+use crate::{Address, Bytecode, IdentifierWrapper};
 use anyhow::{bail, format_err};
+use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use aptos_types::{account_config::CORE_CODE_ADDRESS, event::EventKey, transaction::Module};
 use move_deps::{
     move_binary_format::{
@@ -23,6 +23,7 @@ use move_deps::{
     move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue},
 };
 
+use poem_openapi::{Enum, NewType, Object};
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
@@ -32,9 +33,10 @@ use std::{
     str::FromStr,
 };
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveResource {
     #[serde(rename = "type")]
+    #[oai(rename = "type")]
     pub typ: MoveStructTag,
     pub data: MoveStructValue,
 }
@@ -50,7 +52,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveResource {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Copy)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Copy, NewType)]
 pub struct U64(pub u64);
 
 impl U64 {
@@ -117,7 +119,7 @@ impl<'de> Deserialize<'de> for U64 {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Copy)]
+#[derive(Clone, Debug, Default, PartialEq, Copy)]
 pub struct U128(u128);
 
 impl U128 {
@@ -249,14 +251,14 @@ impl HexEncodedBytes {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct MoveStructValue(pub BTreeMap<Identifier, serde_json::Value>);
+pub struct MoveStructValue(pub BTreeMap<IdentifierWrapper, serde_json::Value>);
 
 impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
     type Error = anyhow::Error;
     fn try_from(s: AnnotatedMoveStruct) -> anyhow::Result<Self> {
         let mut map = BTreeMap::new();
         for (id, val) in s.value {
-            map.insert(id, MoveValue::try_from(val)?.json()?);
+            map.insert(id.into(), MoveValue::try_from(val)?.json()?);
         }
         Ok(Self(map))
     }
@@ -351,19 +353,19 @@ impl Serialize for MoveValue {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Object)]
 pub struct MoveStructTag {
     pub address: Address,
-    pub module: Identifier,
-    pub name: Identifier,
+    pub module: IdentifierWrapper,
+    pub name: IdentifierWrapper,
     pub generic_type_params: Vec<MoveType>,
 }
 
 impl MoveStructTag {
     pub fn new(
         address: Address,
-        module: Identifier,
-        name: Identifier,
+        module: IdentifierWrapper,
+        name: IdentifierWrapper,
         generic_type_params: Vec<MoveType>,
     ) -> Self {
         Self {
@@ -387,8 +389,8 @@ impl From<StructTag> for MoveStructTag {
     fn from(tag: StructTag) -> Self {
         Self {
             address: tag.address.into(),
-            module: tag.module,
-            name: tag.name,
+            module: tag.module.into(),
+            name: tag.name.into(),
             generic_type_params: tag.type_params.into_iter().map(MoveType::from).collect(),
         }
     }
@@ -430,8 +432,8 @@ impl TryFrom<MoveStructTag> for StructTag {
     fn try_from(tag: MoveStructTag) -> anyhow::Result<Self> {
         Ok(Self {
             address: tag.address.into(),
-            module: tag.module,
-            name: tag.name,
+            module: tag.module.into(),
+            name: tag.name.into(),
             type_params: tag
                 .generic_type_params
                 .into_iter()
@@ -583,10 +585,10 @@ impl TryFrom<MoveType> for TypeTag {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveModule {
     pub address: Address,
-    pub name: Identifier,
+    pub name: IdentifierWrapper,
     pub friends: Vec<MoveModuleId>,
     pub exposed_functions: Vec<MoveFunction>,
     pub structs: Vec<MoveStruct>,
@@ -597,7 +599,7 @@ impl From<CompiledModule> for MoveModule {
         let (address, name) = <(AccountAddress, Identifier)>::from(m.self_id());
         Self {
             address: address.into(),
-            name,
+            name: name.into(),
             friends: m
                 .immediate_friends()
                 .into_iter()
@@ -621,10 +623,10 @@ impl From<CompiledModule> for MoveModule {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Object)]
 pub struct MoveModuleId {
     pub address: Address,
-    pub name: Identifier,
+    pub name: IdentifierWrapper,
 }
 
 impl From<ModuleId> for MoveModuleId {
@@ -632,14 +634,14 @@ impl From<ModuleId> for MoveModuleId {
         let (address, name) = <(AccountAddress, Identifier)>::from(id);
         Self {
             address: address.into(),
-            name,
+            name: name.into(),
         }
     }
 }
 
 impl From<MoveModuleId> for ModuleId {
     fn from(id: MoveModuleId) -> Self {
-        ModuleId::new(id.address.into(), id.name)
+        ModuleId::new(id.address.into(), id.name.into())
     }
 }
 
@@ -684,15 +686,18 @@ impl<'de> Deserialize<'de> for MoveModuleId {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveStruct {
-    pub name: Identifier,
+    pub name: IdentifierWrapper,
     pub is_native: bool,
     pub abilities: Vec<MoveAbility>,
     pub generic_type_params: Vec<MoveStructGenericTypeParam>,
     pub fields: Vec<MoveStructField>,
 }
 
+// TODO: Consider finding a way to derive NewType here instead of using the
+// custom macro, since some of the enum type information (such as the
+// variants) is currently being lost.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MoveAbility(Ability);
 
@@ -750,7 +755,7 @@ impl<'de> Deserialize<'de> for MoveAbility {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveStructGenericTypeParam {
     pub constraints: Vec<MoveAbility>,
     pub is_phantom: bool,
@@ -769,28 +774,30 @@ impl From<&StructTypeParameter> for MoveStructGenericTypeParam {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveStructField {
-    pub name: Identifier,
+    pub name: IdentifierWrapper,
     #[serde(rename = "type")]
+    #[oai(rename = "type")]
     pub typ: MoveType,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveFunction {
-    pub name: Identifier,
+    pub name: IdentifierWrapper,
     pub visibility: MoveFunctionVisibility,
     pub is_entry: bool,
     pub generic_type_params: Vec<MoveFunctionGenericTypeParam>,
     pub params: Vec<MoveType>,
     #[serde(rename = "return")]
+    #[oai(rename = "return")]
     pub return_: Vec<MoveType>,
 }
 
 impl From<&CompiledScript> for MoveFunction {
     fn from(script: &CompiledScript) -> Self {
         Self {
-            name: Identifier::new("main").unwrap(),
+            name: Identifier::new("main").unwrap().into(),
             visibility: MoveFunctionVisibility::Public,
             is_entry: true,
             generic_type_params: script
@@ -809,7 +816,7 @@ impl From<&CompiledScript> for MoveFunction {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Enum)]
 #[serde(rename_all = "snake_case")]
 pub enum MoveFunctionVisibility {
     Private,
@@ -837,7 +844,7 @@ impl From<MoveFunctionVisibility> for Visibility {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveFunctionGenericTypeParam {
     pub constraints: Vec<MoveAbility>,
 }
@@ -850,7 +857,7 @@ impl From<&AbilitySet> for MoveFunctionGenericTypeParam {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveModuleBytecode {
     pub bytecode: HexEncodedBytes,
     // We don't need deserialize MoveModule as it should be serialized
@@ -886,7 +893,7 @@ impl From<Module> for MoveModuleBytecode {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveScriptBytecode {
     pub bytecode: HexEncodedBytes,
     // We don't need deserialize MoveModule as it should be serialized
@@ -916,10 +923,10 @@ impl MoveScriptBytecode {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Object)]
 pub struct ScriptFunctionId {
     pub module: MoveModuleId,
-    pub name: Identifier,
+    pub name: IdentifierWrapper,
 }
 
 impl FromStr for ScriptFunctionId {
@@ -1302,3 +1309,12 @@ mod tests {
         serde_json::to_string_pretty(val).unwrap()
     }
 }
+
+// This macro derives all the necessary traits to make it possible to use the
+// given types in a Poem API. This macro in many ways is a short cut compared
+// to deriving the traits properly (e.g. #[derive(Type)] on a struct), use it
+// with great caution, since it essentially rewrites the type to be a string
+// from the perspective of the OpenAPI spec, potentially losing some useful
+// type information that the client could use.
+impl_poem_type!(MoveAbility, MoveStructValue, MoveType, HexEncodedBytes);
+impl_poem_parameter!(HexEncodedBytes);
