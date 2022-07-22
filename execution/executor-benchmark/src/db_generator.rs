@@ -3,7 +3,7 @@
 
 use crate::add_accounts_impl;
 use aptos_config::{
-    config::{RocksdbConfigs, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG},
+    config::{AptosDbConfig, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG},
     utils::get_genesis_txn,
 };
 
@@ -50,7 +50,7 @@ pub fn run(
 fn bootstrap_with_genesis(db_dir: impl AsRef<Path>) {
     let (config, _genesis_key) = aptos_genesis::test_utils::test_config();
     // Create executor.
-    let mut rocksdb_configs = RocksdbConfigs::default();
+    let mut rocksdb_configs = AptosDbConfig::default();
     rocksdb_configs.state_merkle_db_config.max_open_files = -1;
     let (_db, db_rw) = DbReaderWriter::wrap(
         AptosDB::open(

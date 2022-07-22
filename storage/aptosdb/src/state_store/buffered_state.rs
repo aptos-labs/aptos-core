@@ -75,6 +75,10 @@ impl BufferedState {
         }
     }
 
+    pub(crate) fn sync_commit(&mut self) {
+        self.maybe_commit(true /* sync_commit */);
+    }
+
     pub fn update(
         &mut self,
         updates_until_next_checkpoint_since_current_option: Option<HashMap<StateKey, StateValue>>,
@@ -114,7 +118,7 @@ impl BufferedState {
 
 impl Drop for BufferedState {
     fn drop(&mut self) {
-        self.maybe_commit(true /* sync_commit */);
+        self.sync_commit();
         self.state_commit_sender.send((None, None)).unwrap();
         self.join_handle
             .take()

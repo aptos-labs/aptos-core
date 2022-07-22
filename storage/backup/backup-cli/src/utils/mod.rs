@@ -11,7 +11,7 @@ pub(crate) mod stream;
 pub mod test_utils;
 
 use anyhow::{anyhow, Result};
-use aptos_config::config::{RocksdbConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG};
+use aptos_config::config::{AptosDbConfig, RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{
@@ -58,7 +58,7 @@ pub struct RocksdbOpt {
     max_background_jobs: i32,
 }
 
-impl From<RocksdbOpt> for RocksdbConfigs {
+impl From<RocksdbOpt> for AptosDbConfig {
     fn from(opt: RocksdbOpt) -> Self {
         Self {
             ledger_db_config: RocksdbConfig {

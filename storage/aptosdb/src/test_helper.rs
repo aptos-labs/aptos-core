@@ -18,6 +18,7 @@ use aptos_types::{
 use executor_types::ProofReader;
 use proptest::{collection::vec, prelude::*};
 use scratchpad::SparseMerkleTree;
+use std::hash::Hash;
 
 pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[TransactionToCommit]) {
     let mut next_version = state.current_version.map_or(0, |v| v + 1);
@@ -223,7 +224,7 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
             cur_ver,                /* first_version */
             cur_ver.checked_sub(1), /* base_state_version */
             Some(ledger_info_with_sigs),
-            true, /* sync_commit */
+            false, /* sync_commit */
             in_memory_state.clone(),
         )
         .unwrap();
@@ -243,9 +244,9 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
         // check getting all events by version for all committed transactions
         // up to this point using the current ledger info
         all_committed_txns.extend_from_slice(txns_to_commit);
-
         cur_ver += txns_to_commit.len() as u64;
     }
+    db.state_store.buffered_state().lock().sync_commit();
 
     let first_batch = input.first().unwrap().0.clone();
     let first_batch_ledger_info = input.first().unwrap().1.clone();

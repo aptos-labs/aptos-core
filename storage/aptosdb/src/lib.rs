@@ -56,8 +56,13 @@ use crate::{
     transaction_store::TransactionStore,
 };
 use anyhow::{ensure, Result};
+<<<<<<< HEAD
 use aptos_config::config::{RocksdbConfigs, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_crypto::hash::HashValue;
+=======
+use aptos_config::config::{AptosDbConfig, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
+use aptos_crypto::hash::{HashValue, SPARSE_MERKLE_PLACEHOLDER_HASH};
+>>>>>>> c5d4040a18 ([storage] rename RocksdbConfigs to AptosDbConfig)
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -308,7 +313,7 @@ impl AptosDB {
         db_root_path: P,
         readonly: bool,
         storage_pruner_config: StoragePrunerConfig,
-        rocksdb_configs: RocksdbConfigs,
+        rocksdb_configs: AptosDbConfig,
     ) -> Result<Self> {
         ensure!(
             storage_pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -365,7 +370,7 @@ impl AptosDB {
         db_root_path: P,
         ledger_db_secondary_path: P,
         state_merkle_db_secondary_path: P,
-        mut rocksdb_configs: RocksdbConfigs,
+        mut rocksdb_configs: AptosDbConfig,
     ) -> Result<Self> {
         let ledger_db_primary_path = db_root_path.as_ref().join(LEDGER_DB_NAME);
         let ledger_db_secondary_path = ledger_db_secondary_path.as_ref().to_path_buf();
@@ -402,7 +407,7 @@ impl AptosDB {
             db_root_path,
             readonly,
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-            RocksdbConfigs::default(),
+            AptosDbConfig::default(),
         )
         .expect("Unable to open AptosDB")
     }
