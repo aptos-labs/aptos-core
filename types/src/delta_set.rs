@@ -63,7 +63,7 @@ pub fn serialize(value: &u128) -> Vec<u8> {
 }
 
 /// Deserializes value for delta application.
-pub fn deserialize(value_bytes: &Vec<u8>) -> u128 {
+pub fn deserialize(value_bytes: &[u8]) -> u128 {
     bcs::from_bytes(value_bytes).expect("unexpected deserialization error")
 }
 
