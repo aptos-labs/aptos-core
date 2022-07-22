@@ -78,5 +78,6 @@ fn test_native_get_script_hash(
     _args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     let cost = native_gas(context.cost_table(), NativeCostIndex::SHA3_256, 0);
-    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(vec![])]))
+    // TODO: Allow tests to configure the script hash value.
+    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(vec![1])]))
 }
