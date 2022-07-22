@@ -177,10 +177,12 @@ impl AptosDebugger {
                 access_path::Path::Resource(tag) => match op {
                     WriteOp::Deletion => state_view.delete_resource(addr, tag)?,
                     WriteOp::Value(bytes) => state_view.save_resource(addr, tag, bytes)?,
+                    WriteOp::Delta(..) => unreachable!("deltas are only used in executor"),
                 },
                 access_path::Path::Code(module_id) => match op {
                     WriteOp::Deletion => state_view.delete_module(&module_id)?,
                     WriteOp::Value(bytes) => state_view.save_module(&module_id, bytes)?,
+                    WriteOp::Delta(..) => unreachable!("deltas are only used in executor"),
                 },
             }
         }

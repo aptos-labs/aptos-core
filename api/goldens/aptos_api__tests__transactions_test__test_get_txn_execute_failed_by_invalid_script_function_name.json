@@ -32,7 +32,7 @@
     "type": "script_function_payload",
     "function": "0x1::Coin::transfer_invalid",
     "type_arguments": [
-      "0x1::test_coin::TestCoin"
+      "0x1::aptos_coin::AptosCoin"
     ],
     "arguments": [
       "0x00000000000000000000000000000000000000000000000000000000000000dd",
@@ -42,7 +42,7 @@
   "signature": {
     "type": "ed25519_signature",
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0x71341f63b6d8e5de757c15584dfc45d26d7520c611f9112f1bc2a5271ccde00dfb913a0e0fcf8c428d6fae07abcb74c302d6a4310a529b78f8a49452406e8500"
+    "signature": "0xa2483d6054aeb114308883f1581a705b240b78567e0780176a9f97a665e9a4b242153f22f75de34558903a50a81eb6c95968626bae95f207a25bbf6006d85600"
   },
   "events": [],
   "timestamp": "1"

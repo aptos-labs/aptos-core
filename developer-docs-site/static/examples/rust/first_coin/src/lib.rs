@@ -20,7 +20,7 @@ impl FirstCoinClient {
     pub fn initialize_coin(&self, account_from: &mut Account) -> String {
         let payload = serde_json::json!({
             "type": "script_function_payload",
-            "function": "0x1::ManagedCoin::initialize",
+            "function": "0x1::managed_coin::initialize",
             "type_arguments": [format!("0x{}::MoonCoin::MoonCoin", account_from.address())],
             "arguments": [
                 hex::encode("Moon Coin".as_bytes()),
@@ -58,7 +58,7 @@ impl FirstCoinClient {
     ) -> String {
         let payload = serde_json::json!({
             "type": "script_function_payload",
-            "function": "0x1::ManagedCoin::mint",
+            "function": "0x1::managed_coin::mint",
             "type_arguments": [format!("0x{}::MoonCoin::MoonCoin", account_owner.address())],
             "arguments": [
                 receiver_address,

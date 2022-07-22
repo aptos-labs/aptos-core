@@ -70,7 +70,7 @@ Now your basic Aptos development environment is ready.
 ## Aptos CLI
 
 - [Aptos CLI releases](https://github.com/aptos-labs/aptos-core/releases?q=cli&expanded=true).
-- [Aptos CLI README](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md).
+- [Aptos CLI Documentation](/cli-tools/aptos-cli-tool/aptos-cli-index).
 
 ## Aptos SDK
 

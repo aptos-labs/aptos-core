@@ -31,6 +31,7 @@ use move_deps::{
         compilation::compiled_package::CompiledPackage,
         source_package::layout::SourcePackageLayout, BuildConfig,
     },
+    move_prover,
     move_unit_test::UnitTestingConfig,
 };
 use std::{
@@ -40,6 +41,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
+use tokio::task;
 
 /// CLI tool for performing Move tasks
 ///
@@ -50,6 +52,7 @@ pub enum MoveTool {
     Publish(PublishPackage),
     Run(RunFunction),
     Test(TestPackage),
+    Prove(ProvePackage),
 }
 
 impl MoveTool {
@@ -60,6 +63,7 @@ impl MoveTool {
             MoveTool::Publish(tool) => tool.execute_serialized().await,
             MoveTool::Run(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
+            MoveTool::Prove(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -214,6 +218,49 @@ impl CliCommand<&'static str> for TestPackage {
         match result {
             UnitTestResult::Success => Ok("Success"),
             UnitTestResult::Failure => Err(CliError::MoveTestError),
+        }
+    }
+}
+
+/// Prove the Move package at the package path
+#[derive(Parser)]
+pub struct ProvePackage {
+    #[clap(flatten)]
+    move_options: MovePackageDir,
+
+    /// A filter string to determine which unit tests to run
+    #[clap(long)]
+    pub filter: Option<String>,
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for ProvePackage {
+    fn command_name(&self) -> &'static str {
+        "ProvePackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let config = BuildConfig {
+            additional_named_addresses: self.move_options.named_addresses(),
+            test_mode: true,
+            install_dir: self.move_options.output_dir.clone(),
+            ..Default::default()
+        };
+        let result = task::spawn_blocking(move || {
+            move_cli::base::prove::run_move_prover(
+                config,
+                self.move_options.get_package_dir()?.as_path(),
+                &self.filter,
+                true,
+                move_prover::cli::Options::default(),
+            )
+        })
+        .await
+        .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+
+        match result {
+            Ok(_) => Ok("Success"),
+            Err(_) => Err(CliError::MoveProverError),
         }
     }
 }

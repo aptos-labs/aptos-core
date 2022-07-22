@@ -41,8 +41,13 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
 }
 
 #[test]
-fn move_unit_tests() {
+fn move_framework_unit_tests() {
     run_tests_for_pkg("aptos-framework");
+}
+
+#[test]
+fn move_stdlib_unit_tests() {
+    run_tests_for_pkg("aptos-stdlib");
 }
 
 #[test]

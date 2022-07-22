@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::types::FaucetOptions;
 use crate::{
     account::{
         create::{CreateAccount, DEFAULT_FUNDED_COINS},
@@ -80,7 +81,7 @@ impl CliTestFramework {
             txn_options: Default::default(),
             account: Self::account_id(index),
             use_faucet: true,
-            faucet_options: Default::default(),
+            faucet_options: self.faucet_options(),
             initial_coins: 0,
         }
         .execute()
@@ -91,7 +92,7 @@ impl CliTestFramework {
         FundAccount {
             profile_options: profile(index),
             account: Self::account_id(index),
-            faucet_options: Default::default(),
+            faucet_options: self.faucet_options(),
             num_coins: DEFAULT_FUNDED_COINS,
         }
         .execute()
@@ -207,6 +208,10 @@ impl CliTestFramework {
 
     pub fn rest_options(&self) -> RestOptions {
         RestOptions::new(Some(self.endpoint.clone()))
+    }
+
+    pub fn faucet_options(&self) -> FaucetOptions {
+        FaucetOptions::new(Some(self.faucet_endpoint.clone()))
     }
 
     pub fn account_id(index: usize) -> AccountAddress {

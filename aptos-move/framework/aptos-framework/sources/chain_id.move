@@ -4,7 +4,7 @@
 module aptos_framework::chain_id {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
-    use std::errors;
+    use std::error;
     use std::signer;
 
     struct ChainId has key {
@@ -18,7 +18,7 @@ module aptos_framework::chain_id {
     public fun initialize(account: &signer, id: u8) {
         timestamp::assert_genesis();
         system_addresses::assert_aptos_framework(account);
-        assert!(!exists<ChainId>(signer::address_of(account)), errors::already_published(ECHAIN_ID));
+        assert!(!exists<ChainId>(signer::address_of(account)), error::already_exists(ECHAIN_ID));
         move_to(account, ChainId { id })
     }
 

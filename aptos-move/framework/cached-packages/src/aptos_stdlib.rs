@@ -3,10 +3,10 @@
 
 #![allow(unused_imports)]
 
-use aptos_types::utility_coin::TEST_COIN_TYPE;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{Script, ScriptFunction, TransactionArgument, TransactionPayload, VecBytes},
+    utility_coin::APTOS_COIN_TYPE,
 };
 use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
 use move_deps::move_core_types::{ident_str, language_storage::ModuleId};
@@ -21,11 +21,11 @@ include!(concat!(
 ));
  */
 
-pub fn encode_test_coin_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
+pub fn encode_aptos_coin_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(AccountAddress::ONE, ident_str!("coin").to_owned()),
         ident_str!("transfer").to_owned(),
-        vec![TEST_COIN_TYPE.clone()],
+        vec![APTOS_COIN_TYPE.clone()],
         vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
     ))
 }

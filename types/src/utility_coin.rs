@@ -8,11 +8,11 @@ use move_deps::move_core_types::{
 };
 use once_cell::sync::Lazy;
 
-pub static TEST_COIN_TYPE: Lazy<TypeTag> = Lazy::new(|| {
+pub static APTOS_COIN_TYPE: Lazy<TypeTag> = Lazy::new(|| {
     TypeTag::Struct(StructTag {
         address: AccountAddress::ONE,
-        module: ident_str!("test_coin").to_owned(),
-        name: ident_str!("TestCoin").to_owned(),
+        module: ident_str!("aptos_coin").to_owned(),
+        name: ident_str!("AptosCoin").to_owned(),
         type_params: vec![],
     })
 });

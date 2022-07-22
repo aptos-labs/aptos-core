@@ -71,7 +71,7 @@ This module enables users to create a `String` resource under their account and 
 ```rust
 module HelloBlockchain::Message {
     use std::string;
-    use std::errors;
+    use std::error;
     use std::signer;
 
     struct MessageHolder has key {

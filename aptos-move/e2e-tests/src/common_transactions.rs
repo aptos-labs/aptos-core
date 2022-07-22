@@ -64,7 +64,7 @@ pub fn peer_to_peer_txn(
     // get a SignedTransaction
     sender
         .transaction()
-        .payload(aptos_stdlib::encode_test_coin_transfer(
+        .payload(aptos_stdlib::encode_aptos_coin_transfer(
             *receiver.address(),
             transfer_amount,
         ))

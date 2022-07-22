@@ -1,7 +1,7 @@
 /// This module defines a struct storing the metadata of the block and new block events.
 module aptos_framework::block {
-    use std::errors;
-    use std::event;
+    use std::error;
+    use aptos_std::event;
 
     use aptos_framework::governance_proposal::GovernanceProposal;
     use aptos_framework::timestamp;
@@ -38,7 +38,7 @@ module aptos_framework::block {
         timestamp::assert_genesis();
         system_addresses::assert_aptos_framework(account);
 
-        assert!(!is_initialized(), errors::already_published(EBLOCK_METADATA));
+        assert!(!is_initialized(), error::already_exists(EBLOCK_METADATA));
         move_to<BlockMetadata>(
             account,
             BlockMetadata {
@@ -83,7 +83,7 @@ module aptos_framework::block {
         // Authorization
         assert!(
             proposer == @vm_reserved || stake::is_current_epoch_validator(proposer),
-        errors::requires_address(EVM_OR_VALIDATOR)
+        error::permission_denied(EVM_OR_VALIDATOR)
         );
 
         let block_metadata_ref = borrow_global_mut<BlockMetadata>(@aptos_framework);
@@ -112,7 +112,7 @@ module aptos_framework::block {
 
     /// Get the current block height
     public fun get_current_block_height(): u64 acquires BlockMetadata {
-        assert!(is_initialized(), errors::not_published(EBLOCK_METADATA));
+        assert!(is_initialized(), error::not_found(EBLOCK_METADATA));
         borrow_global<BlockMetadata>(@aptos_framework).height
     }
 

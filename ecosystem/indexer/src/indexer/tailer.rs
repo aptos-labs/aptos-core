@@ -604,7 +604,7 @@ mod test {
               "expiration_timestamp_secs": "1649713172",
               "payload": {
                 "type": "script_function_payload",
-                "function": "0x1::test_coin::mint",
+                "function": "0x1::aptos_coin::mint",
                 "type_arguments": [],
                 "arguments": [
                   "0x45b44793724a5ecc6ad85fa60949d0824cfc7f61d6bd74490b13598379313142",

@@ -1,7 +1,7 @@
 module HelloBlockchain::Message {
     use std::string;
-    use std::errors;
-    use std::event;
+    use std::error;
+    use aptos_std::event;
     use std::signer;
 
     struct MessageHolder has key {
@@ -18,7 +18,7 @@ module HelloBlockchain::Message {
     const ENO_MESSAGE: u64 = 0;
 
     public fun get_message(addr: address): string::String acquires MessageHolder {
-        assert!(exists<MessageHolder>(addr), errors::not_published(ENO_MESSAGE));
+        assert!(exists<MessageHolder>(addr), error::not_found(ENO_MESSAGE));
         *&borrow_global<MessageHolder>(addr).message
     }
 

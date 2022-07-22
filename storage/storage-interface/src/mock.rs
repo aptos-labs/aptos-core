@@ -10,6 +10,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
     account_state::AccountState,
+    proof::SparseMerkleProof,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
@@ -28,6 +29,7 @@ impl DbReader for MockDbReaderWriter {
                     .cloned()
                     .map(StateValue::from))
             }
+            StateKey::Raw(raw_key) => Ok(Some(StateValue::from(raw_key))),
             _ => Err(anyhow!("Not supported state key type {:?}", state_key)),
         }
     }
@@ -49,6 +51,14 @@ impl DbReader for MockDbReaderWriter {
     ) -> Result<Option<StateValue>> {
         // dummy proof which is not used
         Ok(self.get_latest_state_value(state_key.clone()).unwrap())
+    }
+
+    fn get_state_proof_by_version(
+        &self,
+        _state_key: &StateKey,
+        _version: Version,
+    ) -> Result<SparseMerkleProof> {
+        Ok(SparseMerkleProof::new(None, vec![]))
     }
 }
 

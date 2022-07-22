@@ -127,7 +127,17 @@ const sidebars = {
           label: "Typescript SDK",
           href: "https://aptos-labs.github.io/ts-sdk-doc/",
         },
+        "sdks/aptos-sdk-overview",
+        "sdks/transactions-with-ts-sdk",
       ],
+    },
+    {
+      type: "category",
+      label: "Aptos CLI",
+      collapsible: true,
+      collapsed: true,
+      link: { type: "doc", id: "cli-tools/aptos-cli-tool/index" },
+      items: ["cli-tools/aptos-cli-tool/install-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
     },
     {
       type: "category",

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::access_path::AccessPath;
+use crate::state_store::table::TableHandle;
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
@@ -20,7 +21,7 @@ use thiserror::Error;
 pub enum StateKey {
     AccessPath(AccessPath),
     TableItem {
-        handle: u128,
+        handle: TableHandle,
         #[serde(with = "serde_bytes")]
         key: Vec<u8>,
     },
@@ -47,7 +48,7 @@ impl StateKey {
                 (StateKeyTag::AccessPath, bcs::to_bytes(access_path)?)
             }
             StateKey::TableItem { handle, key } => {
-                let mut bytes = handle.to_be_bytes().to_vec();
+                let mut bytes = handle.0.to_be_bytes().to_vec();
                 bytes.extend(key);
                 (StateKeyTag::TableItem, bytes)
             }
@@ -82,13 +83,13 @@ impl StateKey {
                         .expect("Bytes too short."),
                 );
                 let key = val[1 + HANDLE_SIZE..].to_vec();
-                Ok(StateKey::table_item(handle, key))
+                Ok(StateKey::table_item(TableHandle(handle), key))
             }
             StateKeyTag::Raw => Ok(StateKey::Raw(val[1..].to_vec())),
         }
     }
 
-    pub fn table_item(handle: u128, key: Vec<u8>) -> Self {
+    pub fn table_item(handle: TableHandle, key: Vec<u8>) -> Self {
         StateKey::TableItem { handle, key }
     }
 }

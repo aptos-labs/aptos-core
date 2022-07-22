@@ -29,6 +29,7 @@ pub fn type_of(
     let cost = GasCost::new(super::cost::APTOS_LIB_TYPE_OF, 1).total();
 
     let type_tag = context.type_to_type_tag(&ty_args[0])?;
+
     if let TypeTag::Struct(struct_tag) = type_tag {
         Ok(NativeResult::ok(
             cost,
@@ -40,6 +41,27 @@ pub fn type_of(
             super::status::NFE_EXPECTED_STRUCT_TYPE_TAG,
         ))
     }
+}
+
+/// Returns a string representing the TypeTag of the parameter.
+pub fn type_name(
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    debug_assert!(ty_args.len() == 1);
+    debug_assert!(arguments.is_empty());
+
+    let cost = GasCost::new(super::cost::APTOS_LIB_TYPE_NAME, 1).total();
+    let type_tag = context.type_to_type_tag(&ty_args[0])?;
+    let type_name = type_tag.to_string();
+
+    Ok(NativeResult::ok(
+        cost,
+        smallvec![Value::struct_(Struct::pack(vec![Value::vector_u8(
+            type_name.as_bytes().to_vec()
+        )]))],
+    ))
 }
 
 fn type_of_internal(struct_tag: &StructTag) -> Result<SmallVec<[Value; 1]>, std::fmt::Error> {

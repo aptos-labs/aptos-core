@@ -17,7 +17,7 @@ class FirstCoinClient extends RestClient {
   async initializeCoin(accountFrom: Account, coinTypeAddress: string): Promise<string> {
     let payload: { function: string; arguments: any[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: `0x1::ManagedCoin::initialize`,
+      function: `0x1::managed_coin::initialize`,
       type_arguments: [`0x${coinTypeAddress}::MoonCoin::MoonCoin`],
       arguments: [
         Buffer.from("Moon Coin", "utf-8").toString("hex"),
@@ -55,7 +55,7 @@ class FirstCoinClient extends RestClient {
     let payload: { function: string; arguments: string[]; type: string; type_arguments: any[] };
     payload = {
       type: "script_function_payload",
-      function: `0x1::ManagedCoin::mint`,
+      function: `0x1::managed_coin::mint`,
       type_arguments: [`0x${coinTypeAddress}::MoonCoin::MoonCoin`],
       arguments: [receiverAddress, amount.toString()],
     };

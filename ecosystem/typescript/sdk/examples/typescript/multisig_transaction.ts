@@ -37,26 +37,26 @@ type SigningMessage = TxnBuilderTypes.SigningMessage;
   // See https://aptos.dev/basics/basics-accounts for more details.
   const authKey = TxnBuilderTypes.AuthenticationKey.fromMultiEd25519PublicKey(multiSigPublicKey);
 
-  // Derive the multisig account address and fund the address with 5000 TestCoin.
+  // Derive the multisig account address and fund the address with 5000 AptosCoin.
   const mutisigAccountAddress = authKey.derivedAddress();
   await faucetClient.fundAccount(mutisigAccountAddress, 5000);
 
   let resources = await client.getAccountResources(mutisigAccountAddress);
-  let accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::test_coin::TestCoin>");
+  let accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
   let balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 5000);
   console.log(`multisig account coins: ${balance}. Should be 5000!`);
 
   const account4 = new AptosAccount();
-  // Creates a receiver account and fund the account with 0 TestCoin
+  // Creates a receiver account and fund the account with 0 AptosCoin
   await faucetClient.fundAccount(account4.address(), 0);
   resources = await client.getAccountResources(account4.address());
-  accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::test_coin::TestCoin>");
+  accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 0);
   console.log(`multisig account coins: ${balance}. Should be 0!`);
 
-  const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::test_coin::TestCoin"));
+  const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
   // TS SDK support 3 types of transaction payloads: `ScriptFunction`, `Script` and `Module`.
   // See https://aptos-labs.github.io/ts-sdk-doc/ for the details.
@@ -121,7 +121,7 @@ type SigningMessage = TxnBuilderTypes.SigningMessage;
   await client.waitForTransaction(transactionRes.hash);
 
   resources = await client.getAccountResources(account4.address());
-  accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::test_coin::TestCoin>");
+  accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 123);
   console.log(`multisig account coins: ${balance}. Should be 123!`);

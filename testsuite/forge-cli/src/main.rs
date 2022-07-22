@@ -93,6 +93,11 @@ struct K8sSwarm {
     port_forward: bool,
     #[structopt(
         long,
+        help = "If set, reuse the forge testnet active in the specified namespace"
+    )]
+    reuse: bool,
+    #[structopt(
+        long,
         help = "If set, keeps the forge testnet active in the specified namespace"
     )]
     keep: bool,
@@ -196,6 +201,7 @@ fn main() -> Result<()> {
                         k8s.image_tag,
                         k8s.base_image_tag,
                         k8s.port_forward,
+                        k8s.reuse,
                         k8s.keep,
                         k8s.enable_haproxy,
                     )
@@ -469,10 +475,10 @@ impl AptosTest for TransferCoins {
         ctx.mint(payer.address(), 10000).await?;
         check_account_balance(&client, payer.address(), 10000).await?;
 
-        let transfer_txn = payer.sign_with_transaction_builder(
-            ctx.aptos_transaction_factory()
-                .payload(aptos_stdlib::encode_test_coin_transfer(payee.address(), 10)),
-        );
+        let transfer_txn =
+            payer.sign_with_transaction_builder(ctx.aptos_transaction_factory().payload(
+                aptos_stdlib::encode_aptos_coin_transfer(payee.address(), 10),
+            ));
         client.submit_and_wait(&transfer_txn).await?;
         check_account_balance(&client, payee.address(), 10).await?;
 

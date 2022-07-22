@@ -11,6 +11,7 @@ use crate::{
 use anyhow::{bail, ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_transaction_builder::error_explain;
+use aptos_types::state_store::table::TableHandle;
 use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
@@ -256,6 +257,8 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     data: self.try_into_resource(&typ, &val)?,
                 },
             },
+            // Deltas never use access paths.
+            WriteOp::Delta(..) => unreachable!("unexpected conversion"),
         };
         Ok(ret)
     }
@@ -263,11 +266,11 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     pub fn try_table_item_into_write_set_change(
         &self,
         state_key_hash: String,
-        handle: u128,
+        handle: TableHandle,
         key: Vec<u8>,
         op: WriteOp,
     ) -> Result<WriteSetChange> {
-        let handle = handle.to_be_bytes().to_vec().into();
+        let handle = handle.0.to_be_bytes().to_vec().into();
         let key = key.into();
         let ret = match op {
             WriteOp::Deletion => WriteSetChange::DeleteTableItem {
@@ -281,6 +284,8 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 key,
                 value: value.into(),
             },
+            // Deltas are materialized into WriteOP::Value(..) in executor.
+            WriteOp::Delta(..) => unreachable!("unexpected conversion"),
         };
         Ok(ret)
     }
