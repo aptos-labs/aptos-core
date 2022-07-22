@@ -40,8 +40,8 @@ fn main() {
     println!("cargo:rerun-if-changed=../aptos-token/sources");
     let token_release = framework::release::ReleaseOptions {
         no_check_layout_compatibility: false,
-        no_build_docs: true,
-        with_diagram: true,
+        no_build_docs: false,
+        with_diagram: false,
         no_script_builder: false,
         no_script_abis: false,
         no_errmap: false,

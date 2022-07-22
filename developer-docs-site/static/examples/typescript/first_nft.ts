@@ -6,7 +6,7 @@ import assert from "assert";
 import { Account, RestClient, TESTNET_URL, FAUCET_URL, FaucetClient } from "./first_transaction";
 import fetch from "cross-fetch";
 
-let U64_MAX = 1844674407370955161;
+const NUMBER_MAX: number = 9007199254740991;
 
 export class TokenClient {
   restClient: RestClient;
@@ -34,7 +34,7 @@ export class TokenClient {
         Buffer.from(name).toString("hex"),
         Buffer.from(description).toString("hex"),
         Buffer.from(uri).toString("hex"),
-        U64_MAX.toString(),
+        NUMBER_MAX.toString(),
         [false, false, false],
       ],
     };
@@ -60,7 +60,7 @@ export class TokenClient {
         Buffer.from(name).toString("hex"),
         Buffer.from(description).toString("hex"),
         supply.toString(),
-        U64_MAX.toString(),
+        NUMBER_MAX.toString(),
         Buffer.from(uri).toString("hex"),
         account.address(),
         "0",
@@ -68,7 +68,7 @@ export class TokenClient {
         [false, false, false, false, false],
         [],
         [],
-        []
+        [],
       ],
     };
     await this.submitTransactionHelper(account, payload);
@@ -94,7 +94,7 @@ export class TokenClient {
         Buffer.from(collection_name).toString("hex"),
         Buffer.from(token_name).toString("hex"),
         amount.toString(),
-        "0"
+        "0",
       ],
     };
     await this.submitTransactionHelper(account, payload);
@@ -112,7 +112,7 @@ export class TokenClient {
         creator,
         Buffer.from(collection_name).toString("hex"),
         Buffer.from(token_name).toString("hex"),
-        "0"
+        "0",
       ],
     };
     await this.submitTransactionHelper(account, payload);
@@ -154,12 +154,12 @@ export class TokenClient {
     const token_store = await this.restClient.accountResource(creator, "0x1::token::TokenStore");
 
     const token_id = {
-      token_data_id : {
+      token_data_id: {
         creator: creator,
         collection: collection_name,
         name: token_name,
       },
-      serial_number: "0"
+      serial_number: "0",
     };
 
     const token = await this.tableItem(
@@ -184,7 +184,7 @@ export class TokenClient {
       collections["data"]["token_data"]["handle"],
       "0x1::token::TokenDataId",
       "0x1::token::TokenData",
-        token_data_id,
+      token_data_id,
     );
   }
   //<:!:section_3

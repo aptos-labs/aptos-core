@@ -135,6 +135,7 @@ module aptos_token::token {
         deposit_events: EventHandle<DepositEvent>,
         withdraw_events: EventHandle<WithdrawEvent>,
         burn_events: EventHandle<BurnTokenEvent>,
+        mutate_token_property_events: EventHandle<MutateTokenPropertyMapEvent>,
     }
 
     /// This config specifies which fields in the Collection are mutable
@@ -187,13 +188,23 @@ module aptos_token::token {
 
     /// token creation event id of token created
     struct CreateTokenEvent has drop, store {
-        id: TokenId,
-        initial_balance: u64,
+        id: TokenDataId,
+        description: String,
+        maximum: u64,
+        uri: String,
+        royalty_payee_address: address,
+        royalty_points_denominator: u64,
+        royalty_points_nominator: u64,
+        name: String,
+        mutability_config: TokenMutabilityConfig,
+        property_keys: vector<String>,
+        property_values: vector<vector<u8>>,
+        property_types: vector<String>,
     }
 
     /// mint token event. This event triggered when creator adds more supply to existing token
     struct MintTokenEvent has drop, store {
-        id: TokenId,
+        id: TokenDataId,
         amount: u64,
     }
 
@@ -201,6 +212,15 @@ module aptos_token::token {
     struct BurnTokenEvent has drop, store {
         id: TokenId,
         amount: u64,
+    }
+
+    ///
+    struct MutateTokenPropertyMapEvent has drop, store {
+        old_id: TokenId,
+        new_id: TokenId,
+        keys: vector<String>,
+        values: vector<vector<u8>>,
+        types: vector<String>,
     }
 
     /// create collection event with creator address and collection name
@@ -288,7 +308,6 @@ module aptos_token::token {
             string::utf8(collection),
             string::utf8(name),
         );
-        // TODO: check based on mint_capability
         assert!(token_data_id.creator == signer::address_of(account), ENO_MINT_CAPABILITY);
         mint_token(
             account,
@@ -360,7 +379,6 @@ module aptos_token::token {
                 i = i + 1;
             };
             token_data.largest_serial_number = largest_serial_number + token.value;
-
             // burn the orignial serial 0 token after mutation
             let Token {id: _, value: _} = token;
 
@@ -383,7 +401,17 @@ module aptos_token::token {
         } else {
             let properties = property_map::new(keys, values, types);
             table::add(token_properties, token_id, properties);
-        }
+        };
+        event::emit_event<MutateTokenPropertyMapEvent>(
+            &mut borrow_global_mut<TokenStore>(token_owner).mutate_token_property_events,
+            MutateTokenPropertyMapEvent {
+                old_id: token_id,
+                new_id: token_id,
+                keys,
+                values,
+                types
+            },
+        );
     }
 
     /// Deposit the token balance into the owner's account and emit an event.
@@ -612,7 +640,6 @@ module aptos_token::token {
         collection: String,
         name: String,
         description: String,
-        amount: u64,
         maximum: u64,
         uri: String,
         royalty_payee_address: address,
@@ -648,17 +675,12 @@ module aptos_token::token {
             ECREATE_WOULD_EXCEED_MAXIMUM,
         );
 
-        let supply = amount;
-        assert!(
-            maximum >= supply,
-            ECREATE_WOULD_EXCEED_MAXIMUM,
-        );
 
         let token_data = TokenData {
             id: token_data_id,
             maximum,
             largest_serial_number: 0,
-            supply,
+            supply: 0,
             uri,
             royalty: Royalty{
                 royalty_points_denominator,
@@ -672,6 +694,25 @@ module aptos_token::token {
         };
 
         table::add(&mut collections.token_data, token_data_id, token_data);
+
+        event::emit_event<CreateTokenEvent>(
+            &mut collections.create_token_events,
+            CreateTokenEvent {
+                id: token_data_id,
+                description,
+                maximum,
+                uri,
+                royalty_payee_address,
+                royalty_points_denominator,
+                royalty_points_nominator,
+                name,
+                mutability_config: token_mutate_config,
+                property_keys,
+                property_values,
+                property_types,
+            },
+        );
+
         token_data_id
     }
 
@@ -717,7 +758,6 @@ module aptos_token::token {
             name,
             description,
             0, // haven't minted token yet
-            maximum,
             uri,
             royalty_payee_address,
             royalty_points_denominator,
@@ -789,6 +829,14 @@ module aptos_token::token {
                 value: amount
             }
         );
+        event::emit_event<MintTokenEvent>(
+            &mut borrow_global_mut<Collections>(creator_addr).mint_token_events,
+            MintTokenEvent {
+                id: token_data_id,
+                amount,
+            }
+        );
+
         token_id
     }
 
