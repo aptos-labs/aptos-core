@@ -126,7 +126,7 @@ fn get_aptos_coin_mint_transaction(
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(aptos_stdlib::encode_aptos_coin_mint(*account, amount)),
+        Some(aptos_stdlib::aptos_coin_mint(*account, amount)),
     )
 }
 
@@ -141,7 +141,7 @@ fn get_account_transaction(
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(aptos_stdlib::encode_account_create_account(*account)),
+        Some(aptos_stdlib::account_create_account(*account)),
     )
 }
 
@@ -157,7 +157,7 @@ fn get_aptos_coin_transfer_transaction(
         sender_seq_number,
         sender_key.clone(),
         sender_key.public_key(),
-        Some(aptos_stdlib::encode_aptos_coin_transfer(recipient, amount)),
+        Some(aptos_stdlib::aptos_coin_transfer(recipient, amount)),
     )
 }
 

@@ -29,7 +29,7 @@ pub async fn transfer_coins_non_blocking(
     amount: u64,
 ) -> SignedTransaction {
     let txn = sender.sign_with_transaction_builder(transaction_factory.payload(
-        aptos_stdlib::encode_aptos_coin_transfer(receiver.address(), amount),
+        aptos_stdlib::aptos_coin_transfer(receiver.address(), amount),
     ));
 
     client.submit(&txn).await.unwrap();
@@ -58,9 +58,9 @@ pub async fn reconfig(
 ) {
     let aptos_version = client.get_aptos_version().await.unwrap();
     let current_version = *aptos_version.into_inner().major.inner();
-    let txn = root_account.sign_with_transaction_builder(transaction_factory.payload(
-        aptos_stdlib::encode_version_set_version(current_version + 1),
-    ));
+    let txn = root_account.sign_with_transaction_builder(
+        transaction_factory.payload(aptos_stdlib::version_set_version(current_version + 1)),
+    );
     client.submit_and_wait(&txn).await.unwrap();
 
     println!("Changing aptos version to {}", current_version + 1,);

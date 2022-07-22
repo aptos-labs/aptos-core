@@ -25,7 +25,7 @@ fn initial_aptos_version() {
         println!("@@@@@@@@@@@@ account {:?}", account);
         let txn = account
             .transaction()
-            .payload(aptos_stdlib::encode_version_set_version(test_env.version_number + 1))
+            .payload(aptos_stdlib::version_set_version(test_env.version_number + 1))
             .sequence_number(test_env.dr_sequence_number)
             .sign();
         println!("@@@@@@@@@@@@ txn {:?}", txn);
@@ -56,7 +56,7 @@ fn drop_txn_after_reconfiguration() {
         let account = test_env.dr_account;
         let txn = account
             .transaction()
-            .payload(aptos_stdlib::encode_version_set_version(test_env.version_number + 1))
+            .payload(aptos_stdlib::version_set_version(test_env.version_number + 1))
             .sequence_number(test_env.dr_sequence_number)
             .sign();
         executor.new_block();

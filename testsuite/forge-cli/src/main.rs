@@ -475,10 +475,10 @@ impl AptosTest for TransferCoins {
         ctx.mint(payer.address(), 10000).await?;
         check_account_balance(&client, payer.address(), 10000).await?;
 
-        let transfer_txn =
-            payer.sign_with_transaction_builder(ctx.aptos_transaction_factory().payload(
-                aptos_stdlib::encode_aptos_coin_transfer(payee.address(), 10),
-            ));
+        let transfer_txn = payer.sign_with_transaction_builder(
+            ctx.aptos_transaction_factory()
+                .payload(aptos_stdlib::aptos_coin_transfer(payee.address(), 10)),
+        );
         client.submit_and_wait(&transfer_txn).await?;
         check_account_balance(&client, payee.address(), 10).await?;
 

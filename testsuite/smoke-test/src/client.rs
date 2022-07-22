@@ -97,9 +97,9 @@ async fn test_concurrent_transfers_single_node() {
     assert_balance(&client, &account_1, 10).await;
 
     for _ in 0..20 {
-        let txn = account_0.sign_with_transaction_builder(transaction_factory.payload(
-            aptos_stdlib::encode_aptos_coin_transfer(account_1.address(), 1),
-        ));
+        let txn = account_0.sign_with_transaction_builder(
+            transaction_factory.payload(aptos_stdlib::aptos_coin_transfer(account_1.address(), 1)),
+        );
         client.submit_and_wait(&txn).await.unwrap();
     }
     transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 1).await;
