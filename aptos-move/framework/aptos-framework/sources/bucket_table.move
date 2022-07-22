@@ -86,11 +86,19 @@ module aptos_framework::bucket_table {
         }
     }
 
+    fun xor(a: u64, b: u64): u64 {
+        a ^ b
+    }
+    spec xor { // TODO: temporary mockup until Prover supports the operator `^`.
+        pragma opaque;
+        pragma verify = false;
+    }
+
     /// Split the next bucket into two and re-insert existing items.
     fun split_one_bucket<K, V>(map: &mut BucketTable<K, V>) {
         let new_bucket_index = map.num_buckets;
         // the next bucket to split is num_bucket without the most significant bit.
-        let to_split = new_bucket_index ^ (1 << map.level);
+        let to_split = xor(new_bucket_index, (1 << map.level));
         let new_bucket = vector::empty();
         map.num_buckets = new_bucket_index + 1;
         // if the whole level is splitted once, bump the level.
@@ -278,7 +286,7 @@ module aptos_framework::bucket_table {
         while (i < 256) {
             let j = i & 15; // i % 16
             if (j >= map.num_buckets) {
-                j = j ^ 8; // i % 8
+                j = xor(j, 8); // i % 8
             };
             let index = bucket_index(map.level, map.num_buckets, i);
             assert!(index == j, 0);

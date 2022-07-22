@@ -81,6 +81,14 @@ module aptos_framework::account {
     native fun create_address(bytes: vector<u8>): address;
     native fun create_signer(addr: address): signer;
 
+    spec create_address { // TODO: temporary mockup.
+        pragma opaque;
+    }
+
+    spec create_signer { // TODO: temporary mockup.
+        pragma opaque;
+    }
+
     public fun initialize(account: &signer,
         module_addr: address,
         module_name: vector<u8>,
