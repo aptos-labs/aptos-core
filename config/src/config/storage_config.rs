@@ -8,6 +8,8 @@ use std::{
     path::PathBuf,
 };
 
+pub const SNAPSHOT_SIZE_THRESHOLD: usize = 100_000;
+
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
 /// for detailed explanations.
@@ -23,6 +25,7 @@ pub struct RocksdbConfig {
 pub struct AptosDbConfig {
     pub ledger_db_config: RocksdbConfig,
     pub state_merkle_db_config: RocksdbConfig,
+    pub snapshot_size_threshold: usize,
 }
 
 impl Default for AptosDbConfig {
@@ -48,6 +51,8 @@ impl Default for AptosDbConfig {
                 // threads to use internally.
                 max_background_jobs: 16,
             },
+            // The threshold that determine whether a snapshot should be committed to state merkle db.
+            snapshot_size_threshold: SNAPSHOT_SIZE_THRESHOLD,
         }
     }
 }

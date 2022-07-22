@@ -56,13 +56,8 @@ use crate::{
     transaction_store::TransactionStore,
 };
 use anyhow::{ensure, Result};
-<<<<<<< HEAD
-use aptos_config::config::{RocksdbConfigs, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
-use aptos_crypto::hash::HashValue;
-=======
 use aptos_config::config::{AptosDbConfig, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
-use aptos_crypto::hash::{HashValue, SPARSE_MERKLE_PLACEHOLDER_HASH};
->>>>>>> c5d4040a18 ([storage] rename RocksdbConfigs to AptosDbConfig)
+use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -271,6 +266,7 @@ impl AptosDB {
         ledger_rocksdb: DB,
         state_merkle_rocksdb: DB,
         storage_pruner_config: StoragePrunerConfig,
+        snapshot_size_threshold: usize,
         hack_for_tests: bool,
     ) -> Self {
         let arc_ledger_rocksdb = Arc::new(ledger_rocksdb);
@@ -295,6 +291,7 @@ impl AptosDB {
             state_store: Arc::new(StateStore::new(
                 Arc::clone(&arc_ledger_rocksdb),
                 Arc::clone(&arc_state_merkle_rocksdb),
+                snapshot_size_threshold,
                 hack_for_tests,
             )),
             system_store: Arc::new(SystemStore::new(Arc::clone(&arc_ledger_rocksdb))),
@@ -313,7 +310,7 @@ impl AptosDB {
         db_root_path: P,
         readonly: bool,
         storage_pruner_config: StoragePrunerConfig,
-        rocksdb_configs: AptosDbConfig,
+        aptosdb_config: AptosDbConfig,
     ) -> Result<Self> {
         ensure!(
             storage_pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -327,13 +324,13 @@ impl AptosDB {
         let (ledger_db, state_merkle_db) = if readonly {
             (
                 DB::open_cf_readonly(
-                    &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, true),
+                    &gen_rocksdb_options(&aptosdb_config.ledger_db_config, true),
                     ledger_db_path.clone(),
                     "ledger_db_ro",
                     ledger_db_column_families(),
                 )?,
                 DB::open_cf_readonly(
-                    &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, true),
+                    &gen_rocksdb_options(&aptosdb_config.state_merkle_db_config, true),
                     state_merkle_db_path.clone(),
                     "state_merkle_db_ro",
                     state_merkle_db_column_families(),
@@ -342,13 +339,13 @@ impl AptosDB {
         } else {
             (
                 DB::open_cf(
-                    &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, false),
+                    &gen_rocksdb_options(&aptosdb_config.ledger_db_config, false),
                     ledger_db_path.clone(),
                     "ledger_db",
                     gen_ledger_cfds(),
                 )?,
                 DB::open_cf(
-                    &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, false),
+                    &gen_rocksdb_options(&aptosdb_config.state_merkle_db_config, false),
                     state_merkle_db_path.clone(),
                     "state_merkle_db",
                     gen_state_merkle_cfds(),
@@ -356,7 +353,13 @@ impl AptosDB {
             )
         };
 
-        let ret = Self::new_with_dbs(ledger_db, state_merkle_db, storage_pruner_config, readonly);
+        let ret = Self::new_with_dbs(
+            ledger_db,
+            state_merkle_db,
+            storage_pruner_config,
+            aptosdb_config.snapshot_size_threshold,
+            readonly,
+        );
         info!(
             ledger_db_path = ledger_db_path,
             state_merkle_db_path = state_merkle_db_path,
@@ -370,7 +373,7 @@ impl AptosDB {
         db_root_path: P,
         ledger_db_secondary_path: P,
         state_merkle_db_secondary_path: P,
-        mut rocksdb_configs: AptosDbConfig,
+        mut aptosdb_config: AptosDbConfig,
     ) -> Result<Self> {
         let ledger_db_primary_path = db_root_path.as_ref().join(LEDGER_DB_NAME);
         let ledger_db_secondary_path = ledger_db_secondary_path.as_ref().to_path_buf();
@@ -378,36 +381,41 @@ impl AptosDB {
         let state_merkle_db_secondary_path = state_merkle_db_secondary_path.as_ref().to_path_buf();
 
         // Secondary needs `max_open_files = -1` per https://github.com/facebook/rocksdb/wiki/Secondary-instance
-        rocksdb_configs.ledger_db_config.max_open_files = -1;
-        rocksdb_configs.state_merkle_db_config.max_open_files = -1;
+        aptosdb_config.ledger_db_config.max_open_files = -1;
+        aptosdb_config.state_merkle_db_config.max_open_files = -1;
 
         Ok(Self::new_with_dbs(
             DB::open_cf_as_secondary(
-                &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, false),
+                &gen_rocksdb_options(&aptosdb_config.ledger_db_config, false),
                 ledger_db_primary_path,
                 ledger_db_secondary_path,
                 "ledgerdb_sec",
                 ledger_db_column_families(),
             )?,
             DB::open_cf_as_secondary(
-                &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, false),
+                &gen_rocksdb_options(&aptosdb_config.state_merkle_db_config, false),
                 state_merkle_db_primary_path,
                 state_merkle_db_secondary_path,
                 "state_merkle_db_sec",
                 state_merkle_db_column_families(),
             )?,
             NO_OP_STORAGE_PRUNER_CONFIG,
+            aptosdb_config.snapshot_size_threshold,
             true,
         ))
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
-    fn new_without_pruner<P: AsRef<Path> + Clone>(db_root_path: P, readonly: bool) -> Self {
+    fn new_without_pruner<P: AsRef<Path> + Clone>(
+        db_root_path: P,
+        readonly: bool,
+        db_config: AptosDbConfig,
+    ) -> Self {
         Self::open(
             db_root_path,
             readonly,
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-            AptosDbConfig::default(),
+            db_config,
         )
         .expect("Unable to open AptosDB")
     }
@@ -415,13 +423,22 @@ impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_for_test<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, false)
+        Self::new_without_pruner(db_root_path, false, AptosDbConfig::default())
+    }
+
+    /// This opens db in non-readonly mode, without the pruner.
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_for_test_with_db_config<P: AsRef<Path> + Clone>(
+        db_root_path: P,
+        db_config: AptosDbConfig,
+    ) -> Self {
+        Self::new_without_pruner(db_root_path, false, db_config)
     }
 
     /// This opens db in non-readonly mode, without the pruner.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_readonly_for_test<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, true)
+        Self::new_without_pruner(db_root_path, true, AptosDbConfig::default())
     }
 
     /// This gets the current buffered_state in StateStore.
@@ -1234,14 +1251,9 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_latest_state_snapshot(&self) -> Result<Option<(Version, HashValue)>> {
-        gauged_api("get_latest_state_snapshot_version", || {
-            let num_txns = self
-                .ledger_store
-                .get_latest_transaction_info_option()?
-                .map(|(version, _)| version + 1)
-                .unwrap_or(0);
-            self.state_store.get_state_snapshot_before(num_txns)
+    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
+        gauged_api("get_latest_state_checkpoint_version", || {
+            Ok(self.state_store.buffered_state().lock().current_checkpoint_version())
         })
     }
 
@@ -1404,11 +1416,13 @@ impl DbWriter for AptosDB {
                 let mut buffered_state = self.state_store.buffered_state().lock();
                 ensure!(
                     base_state_version == buffered_state.current_state().base_version,
-                    "base_state_version {:?} does not equal to the base_version {:?} in bufferd state ",
+                    "base_state_version {:?} does not equal to the base_version {:?} in buffered state{:?}",
                     base_state_version,
-                    buffered_state.current_state().base_version
+                    buffered_state.current_state().base_version,
+                    buffered_state.current_state().current_version,
                 );
 
+                let mut end_with_reconfig = false;
                 let latest_checkpoint_version = latest_in_memory_state.base_version;
                 let updates_until_latest_checkpoint_since_current = if latest_checkpoint_version
                     >= Some(first_version)
@@ -1422,6 +1436,7 @@ impl DbWriter for AptosDB {
                             latest_checkpoint_version,
                             first_version + idx as u64
                     );
+                    end_with_reconfig = txns_to_commit[idx].is_reconfig();
                     Some(
                         txns_to_commit[..=idx]
                             .iter()
@@ -1434,7 +1449,7 @@ impl DbWriter for AptosDB {
                 buffered_state.update(
                     updates_until_latest_checkpoint_since_current,
                     latest_in_memory_state,
-                    sync_commit,
+                    end_with_reconfig || sync_commit,
                 )?;
             }
 

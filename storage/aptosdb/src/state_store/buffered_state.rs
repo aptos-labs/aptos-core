@@ -9,14 +9,13 @@ use crate::{
 use anyhow::{ensure, Result};
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::state_store::state_value::StateValue;
+use aptos_types::transaction::Version;
 use std::collections::HashMap;
 use std::mem::swap;
 use std::sync::mpsc::{Sender, SyncSender};
 use std::sync::{mpsc, Arc};
 use std::thread::JoinHandle;
 use storage_interface::state_delta::StateDelta;
-
-const SNAPSHOT_SIZE_THRESHOLD: usize = 100_000;
 
 #[derive(Debug)]
 pub struct BufferedState {
@@ -25,11 +24,16 @@ pub struct BufferedState {
     // state after the latest checkpoint.
     state_after_checkpoint: StateDelta,
     state_commit_sender: SyncSender<(Option<Arc<StateDelta>>, Option<Sender<()>>)>,
+    snapshot_size_threshold: usize,
     join_handle: Option<JoinHandle<()>>,
 }
 
 impl BufferedState {
-    pub fn new(state_merkle_db: &Arc<StateMerkleDb>, state_after_checkpoint: StateDelta) -> Self {
+    pub fn new(
+        state_merkle_db: &Arc<StateMerkleDb>,
+        state_after_checkpoint: StateDelta,
+        snapshot_size_threshold: usize,
+    ) -> Self {
         let (state_commit_sender, state_commit_receiver) = mpsc::sync_channel(1 /* bound */);
         let arc_state_merkle_db = Arc::clone(state_merkle_db);
         let join_handle = std::thread::Builder::new()
@@ -44,6 +48,7 @@ impl BufferedState {
             state_until_checkpoint: None,
             state_after_checkpoint,
             state_commit_sender,
+            snapshot_size_threshold,
             // The join handle of the async state commit thread for graceful drop.
             join_handle: Some(join_handle),
         }
@@ -51,6 +56,10 @@ impl BufferedState {
 
     pub fn current_state(&self) -> &StateDelta {
         &self.state_after_checkpoint
+    }
+
+    pub fn current_checkpoint_version(&self) -> Option<Version> {
+        self.state_after_checkpoint.base_version
     }
 
     fn maybe_commit(&mut self, sync_commit: bool) {
@@ -68,7 +77,7 @@ impl BufferedState {
                 .expect("Must exist")
                 .updates_since_base
                 .len()
-                >= SNAPSHOT_SIZE_THRESHOLD
+                >= self.snapshot_size_threshold
         {
             let to_commit = self.state_until_checkpoint.take().map(Arc::from);
             self.state_commit_sender.send((to_commit, None)).unwrap();

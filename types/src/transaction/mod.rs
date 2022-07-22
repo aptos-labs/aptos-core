@@ -1102,6 +1102,7 @@ pub struct TransactionToCommit {
     state_updates: HashMap<StateKey, StateValue>,
     write_set: WriteSet,
     events: Vec<ContractEvent>,
+    is_reconfig: bool,
 }
 
 impl TransactionToCommit {
@@ -1111,6 +1112,7 @@ impl TransactionToCommit {
         state_updates: HashMap<StateKey, StateValue>,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
+        is_reconfig: bool,
     ) -> Self {
         TransactionToCommit {
             transaction,
@@ -1118,6 +1120,7 @@ impl TransactionToCommit {
             state_updates,
             write_set,
             events,
+            is_reconfig,
         }
     }
 
@@ -1156,6 +1159,10 @@ impl TransactionToCommit {
 
     pub fn status(&self) -> &ExecutionStatus {
         &self.transaction_info.status
+    }
+
+    pub fn is_reconfig(&self) -> bool {
+        self.is_reconfig
     }
 }
 

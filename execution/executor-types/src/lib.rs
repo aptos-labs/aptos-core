@@ -27,7 +27,7 @@ use aptos_types::{
 pub use error::Error;
 pub use executed_chunk::ExecutedChunk;
 pub use parsed_transaction_output::ParsedTransactionOutput;
-use scratchpad::ProofRead;
+use scratchpad::{ProofRead, SparseMerkleTree};
 
 mod error;
 mod executed_chunk;
@@ -81,6 +81,12 @@ pub trait ChunkExecutorTrait: Send + Sync {
     fn finish(&self);
 }
 
+pub struct StateSnapshotDelta {
+    pub version: Version,
+    pub smt: SparseMerkleTree<StateValue>,
+    pub jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
+}
+
 pub trait BlockExecutorTrait: Send + Sync {
     /// Get the latest committed block id
     fn committed_block_id(&self) -> HashValue;
@@ -108,18 +114,18 @@ pub trait BlockExecutorTrait: Send + Sync {
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-        sync_commit: bool,
-    ) -> Result<()>;
+        save_state_snapshots: bool,
+    ) -> Result<(), Error>;
 
     fn commit_blocks(
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         self.commit_blocks_ext(
             block_ids,
             ledger_info_with_sigs,
-            true, /* sync_commit */
+            true, /* save_state_snapshots */
         )
     }
 
@@ -394,5 +400,9 @@ impl TransactionData {
 
     pub fn txn_info_hash(&self) -> HashValue {
         self.txn_info_hash
+    }
+
+    pub fn is_reconfig(&self) -> bool {
+        !self.reconfig_events.is_empty()
     }
 }

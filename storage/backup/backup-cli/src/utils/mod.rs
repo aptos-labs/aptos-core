@@ -11,7 +11,9 @@ pub(crate) mod stream;
 pub mod test_utils;
 
 use anyhow::{anyhow, Result};
-use aptos_config::config::{AptosDbConfig, RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
+use aptos_config::config::{
+    AptosDbConfig, RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG, SNAPSHOT_SIZE_THRESHOLD,
+};
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{
@@ -71,6 +73,7 @@ impl From<RocksdbOpt> for AptosDbConfig {
                 max_total_wal_size: opt.state_merkle_db_max_total_wal_size,
                 max_background_jobs: opt.max_background_jobs,
             },
+            snapshot_size_threshold: SNAPSHOT_SIZE_THRESHOLD,
         }
     }
 }
