@@ -1,6 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+/// This macro helps implement necessary traits for a type to be used in
+/// a struct that is used in a poem-openapi server. Where possible, prefer
+/// to use the existing poem-openapi macros such as Object, NewType, etc.
+/// This macro erases the type information, instead returning the data as
+/// a string in its JSON representation. For newtypes wrapping strings,
+/// this is perfect, but otherwise this is a bit scary, so use it with caution.
 #[macro_export]
 macro_rules! impl_poem_type {
     ($($ty:ty),*) => {
@@ -55,6 +61,8 @@ macro_rules! impl_poem_type {
     };
 }
 
+// This macro implements the traits necessary for using a type as a parameter
+// in a poem-openapi endpoint handler, specifically as an argument like Path<T>.
 // A type must impl FromStr for this to work, hence why it is a seperate macro.
 #[macro_export]
 macro_rules! impl_poem_parameter {

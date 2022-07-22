@@ -686,7 +686,7 @@ fn parse_operations_from_write_set(
             // Account sequence number increase (possibly creation)
             // Find out if it's the 0th sequence number (creation)
             for (id, value) in data.data.0.iter() {
-                if id.0 == &sequence_number_field_identifier() {
+                if id.0 == sequence_number_field_identifier() {
                     if let Ok(U64(0)) = serde_json::from_value::<U64>(value.clone()) {
                         operations.push(Operation::create_account(
                             operation_index,
@@ -703,7 +703,7 @@ fn parse_operations_from_write_set(
         } else if data.typ == coin_store_tag {
             // Account balance change
             for (id, value) in data.data.0.iter() {
-                if id.0 == &withdraw_events_field_identifier() {
+                if id.0 == withdraw_events_field_identifier() {
                     serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
                     if let Ok(event) = serde_json::from_value::<CoinEventId>(value.clone()) {
                         let withdraw_event =
@@ -719,11 +719,7 @@ fn parse_operations_from_write_set(
                             operation_index += 1;
                         }
                     }
-<<<<<<< HEAD
-                } else if id == &deposit_events_field_identifier() {
-=======
-                } else if id.0 == deposit_events_identifier() {
->>>>>>> 1a050cedc6 ([API] Fix up Rosetta following adding IdentifierWrapper)
+                } else if id.0 == deposit_events_field_identifier() {
                     serde_json::from_value::<CoinEventId>(value.clone()).unwrap();
                     if let Ok(event) = serde_json::from_value::<CoinEventId>(value.clone()) {
                         let withdraw_event =

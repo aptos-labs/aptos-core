@@ -76,12 +76,6 @@ impl<'de> Deserialize<'de> for Address {
     }
 }
 
-impl Default for Address {
-    fn default() -> Self {
-        Self(AccountAddress::ONE)
-    }
-}
-
 impl_poem_type!(Address);
 impl_poem_parameter!(Address);
 
