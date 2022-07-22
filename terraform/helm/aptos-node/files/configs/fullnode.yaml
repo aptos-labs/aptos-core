@@ -15,7 +15,8 @@ storage:
   storage_pruner_config:
     ledger_prune_window: {{ int $.Values.validator.config.ledger_prune_window }}
     state_store_prune_window: {{ int $.Values.validator.config.state_store_prune_window }}
-    pruning_batch_size: {{ int $.Values.validator.config.pruning_batch_size }}
+    ledger_pruning_batch_size: {{ int $.Values.validator.config.ledger_pruning_batch_size }}
+    state_store_pruning_batch_size: {{ int $.Values.validator.config.state_store_pruning_batch_size }}
 
 full_node_networks:
 - network_id:
