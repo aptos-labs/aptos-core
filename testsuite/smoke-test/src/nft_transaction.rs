@@ -29,7 +29,7 @@ impl AptosTest for NFTTransaction {
         let token_name = "token name".to_owned().into_bytes();
 
         let collection_builder = ctx.transaction_factory().payload(
-            aptos_stdlib::encode_token_create_unlimited_collection_script(
+            aptos_stdlib::token_create_unlimited_collection_script(
                 collection_name.clone(),
                 "description".to_owned().into_bytes(),
                 "uri".to_owned().into_bytes(),
@@ -41,24 +41,24 @@ impl AptosTest for NFTTransaction {
 
         println!("collection created.");
 
-        let token_builder = ctx.transaction_factory().payload(
-            aptos_stdlib::encode_token_create_unlimited_token_script(
-                collection_name.clone(),
-                token_name.clone(),
-                "collection description".to_owned().into_bytes(),
-                true,
-                1,
-                "uri".to_owned().into_bytes(),
-                0,
-            ),
-        );
+        let token_builder =
+            ctx.transaction_factory()
+                .payload(aptos_stdlib::token_create_unlimited_token_script(
+                    collection_name.clone(),
+                    token_name.clone(),
+                    "collection description".to_owned().into_bytes(),
+                    true,
+                    1,
+                    "uri".to_owned().into_bytes(),
+                    0,
+                ));
 
         let token_txn = creator.sign_with_transaction_builder(token_builder);
         client.submit_and_wait(&token_txn).await?;
 
         let offer_builder =
             ctx.transaction_factory()
-                .payload(aptos_stdlib::encode_token_transfers_offer_script(
+                .payload(aptos_stdlib::token_transfers_offer_script(
                     owner.address(),
                     creator.address(),
                     collection_name.clone(),
@@ -70,7 +70,7 @@ impl AptosTest for NFTTransaction {
 
         let claim_builder =
             ctx.transaction_factory()
-                .payload(aptos_stdlib::encode_token_transfers_claim_script(
+                .payload(aptos_stdlib::token_transfers_claim_script(
                     creator.address(),
                     creator.address(),
                     collection_name.clone(),
@@ -82,7 +82,7 @@ impl AptosTest for NFTTransaction {
 
         let transfer_builder =
             ctx.transaction_factory()
-                .payload(aptos_stdlib::encode_token_direct_transfer_script(
+                .payload(aptos_stdlib::token_direct_transfer_script(
                     creator.address(),
                     collection_name.clone(),
                     token_name.clone(),

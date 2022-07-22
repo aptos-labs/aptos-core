@@ -123,10 +123,7 @@ impl ReleaseOptions {
         if !self.no_script_builder {
             println!("Generating script builders");
             let abi_paths: Vec<&Path> = vec![&output_path];
-            generate_script_builder(
-                &output_path.join("transaction_script_builder.rs"),
-                &abi_paths[..],
-            )
+            generate_script_builder(&output_path.join("aptos_sdk_builder.rs"), &abi_paths[..])
         }
     }
 }

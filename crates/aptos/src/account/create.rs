@@ -57,7 +57,7 @@ impl CliCommand<String> for CreateAccount {
 impl CreateAccount {
     async fn create_account_with_key(self, address: AccountAddress) -> CliTypedResult<()> {
         self.txn_options
-            .submit_transaction(aptos_stdlib::encode_account_create_account(address))
+            .submit_transaction(aptos_stdlib::account_create_account(address))
             .await?;
         Ok(())
     }

@@ -40,7 +40,7 @@ impl P2PTransactionGenerator {
     ) -> SignedTransaction {
         from.sign_with_transaction_builder(
             txn_factory
-                .payload(aptos_stdlib::encode_aptos_coin_transfer(*to, num_coins))
+                .payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins))
                 .gas_unit_price(gas_price),
         )
     }

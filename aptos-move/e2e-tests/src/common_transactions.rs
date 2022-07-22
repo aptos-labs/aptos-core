@@ -46,9 +46,7 @@ pub fn create_account_txn(
 ) -> SignedTransaction {
     sender
         .transaction()
-        .payload(aptos_stdlib::encode_account_create_account(
-            *new_account.address(),
-        ))
+        .payload(aptos_stdlib::account_create_account(*new_account.address()))
         .sequence_number(seq_num)
         .sign()
 }
@@ -64,7 +62,7 @@ pub fn peer_to_peer_txn(
     // get a SignedTransaction
     sender
         .transaction()
-        .payload(aptos_stdlib::encode_aptos_coin_transfer(
+        .payload(aptos_stdlib::aptos_coin_transfer(
             *receiver.address(),
             transfer_amount,
         ))
@@ -76,7 +74,7 @@ pub fn peer_to_peer_txn(
 pub fn rotate_key_txn(sender: &Account, new_key_hash: Vec<u8>, seq_num: u64) -> SignedTransaction {
     sender
         .transaction()
-        .payload(aptos_stdlib::encode_account_rotate_authentication_key(
+        .payload(aptos_stdlib::account_rotate_authentication_key(
             new_key_hash,
         ))
         .sequence_number(seq_num)
@@ -87,7 +85,7 @@ pub fn rotate_key_txn(sender: &Account, new_key_hash: Vec<u8>, seq_num: u64) -> 
 pub fn raw_rotate_key_txn(sender: &Account, new_key_hash: Vec<u8>, seq_num: u64) -> RawTransaction {
     sender
         .transaction()
-        .payload(aptos_stdlib::encode_account_rotate_authentication_key(
+        .payload(aptos_stdlib::account_rotate_authentication_key(
             new_key_hash,
         ))
         .sequence_number(seq_num)

@@ -14,7 +14,7 @@ fn main() {
         no_check_layout_compatibility: false,
         no_build_docs: false,
         with_diagram: false,
-        no_script_builder: true, // TODO: consider bringing this back
+        no_script_builder: false,
         no_script_abis: false,
         no_errmap: false,
         package: PathBuf::from("aptos-framework"),

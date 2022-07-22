@@ -51,7 +51,7 @@ pub fn template_path() -> PathBuf {
     path
 }
 
-pub fn encode_remove_validators_payload(validators: Vec<AccountAddress>) -> WriteSetPayload {
+pub fn remove_validators_payload(validators: Vec<AccountAddress>) -> WriteSetPayload {
     assert!(!validators.is_empty(), "Unexpected validator set length");
     let mut script = template_path();
     script.push("remove_validators.move");
@@ -74,7 +74,7 @@ pub fn encode_remove_validators_payload(validators: Vec<AccountAddress>) -> Writ
     }
 }
 
-pub fn encode_custom_script<T: Serialize>(
+pub fn custom_script<T: Serialize>(
     script_name_in_templates: &str,
     args: &T,
     execute_as: Option<AccountAddress>,
@@ -97,7 +97,7 @@ pub fn encode_custom_script<T: Serialize>(
     }
 }
 
-pub fn encode_halt_network_payload() -> WriteSetPayload {
+pub fn halt_network_payload() -> WriteSetPayload {
     let mut script = template_path();
     script.push("halt_transactions.move");
 
