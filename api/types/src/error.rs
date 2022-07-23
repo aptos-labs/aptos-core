@@ -14,7 +14,7 @@ use crate::U64;
 pub struct Error {
     pub code: u16,
     pub message: String,
-    /// Diem blockchain latest onchain ledger version.
+    /// Aptos blockchain latest onchain ledger version.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aptos_ledger_version: Option<U64>,
 }
