@@ -1607,9 +1607,14 @@ module aptos_framework::stake {
     }
 
     #[test_only]
+    public fun set_validator_perf_num_blocks(num_blocks: u64) acquires ValidatorPerformance {
+        borrow_global_mut<ValidatorPerformance>(@aptos_framework).num_blocks = num_blocks;
+    }
+
+    #[test_only]
     fun end_epoch() acquires StakePool, StakePoolEvents, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorSetConfiguration {
         // Set the number of blocks to 1 so reward distribution doesn't error out with division by zero.
-        borrow_global_mut<ValidatorPerformance>(@aptos_framework).num_blocks = 1;
+        set_validator_perf_num_blocks(1);
         on_new_epoch();
     }
 
