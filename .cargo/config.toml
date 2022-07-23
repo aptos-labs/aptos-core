@@ -2,6 +2,7 @@
 xclippy = [
   "clippy",
   "--workspace",
+  "--all-targets",
   "--",
   "-Dwarnings",
   "-Wclippy::all",

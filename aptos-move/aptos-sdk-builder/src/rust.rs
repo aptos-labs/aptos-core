@@ -157,7 +157,7 @@ where
 
         let mut script_function_registry: BTreeMap<_, _> = vec![(
             "ScriptFunctionCall".to_string(),
-            common::make_namespaced_abi_enum_container(script_fun_abis.as_slice()),
+            common::make_abi_enum_container(script_fun_abis.as_slice()),
         )]
         .into_iter()
         .collect();
