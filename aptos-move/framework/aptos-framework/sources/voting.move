@@ -22,10 +22,11 @@
  */
 module aptos_framework::voting {
     use std::error;
-    use aptos_std::event::{Self, EventHandle};
     use std::option::{Self, Option};
     use std::signer;
+    use std::vector;
 
+    use aptos_std::event::{Self, EventHandle};
     use aptos_std::table::{Self, Table};
     use aptos_std::type_info::{Self, TypeInfo};
 
@@ -36,6 +37,7 @@ module aptos_framework::voting {
     const EPROPOSAL_EXECUTION_HASH_NOT_MATCHING: u64 = 1;
     const EPROPOSAL_CANNOT_BE_RESOLVED: u64 = 2;
     const EPROPOSAL_ALREADY_RESOLVED: u64 = 3;
+    const EPROPOSAL_EMPTY_EXECUTION_HASH: u64 = 4;
 
     /// ProposalStateEnum representing proposal state.
     const PROPOSAL_STATE_PENDING: u64 = 0;
@@ -161,6 +163,9 @@ module aptos_framework::voting {
         expiration_secs: u64,
         early_resolution_vote_threshold: Option<u128>,
     ): u64 acquires VotingForum {
+        // Make sure the execution script's hash is not empty.
+        assert!(vector::length(&execution_hash) > 0, error::invalid_argument(EPROPOSAL_EMPTY_EXECUTION_HASH));
+
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
         let proposal_id = voting_forum.next_proposal_id;
         voting_forum.next_proposal_id = voting_forum.next_proposal_id + 1;
@@ -325,24 +330,52 @@ module aptos_framework::voting {
     }
 
     #[test_only]
-    public fun create_test_proposal(governance: &signer, early_resolution_threshold: Option<u128>): u64 acquires VotingForum {
+    public fun create_test_proposal(
+        governance: &signer,
+        early_resolution_threshold: Option<u128>,
+    ): u64 acquires VotingForum {
         // Register voting forum and create a proposal.
         register<TestProposal>(governance);
         let governance_address = signer::address_of(governance);
         let proposal = TestProposal {
             code_url: utf8(b"http://mycode.url"),
         };
+
+        // This works because our Move unit test extensions mock out the execution hash to be [1].
+        let execution_hash = vector::empty<u8>();
+        vector::push_back(&mut execution_hash, 1);
         let proposal_id = create_proposal<TestProposal>(
             governance_address,
             governance_address,
             proposal,
-            b"",
+            execution_hash,
             10,
             100000,
             early_resolution_threshold,
         );
 
         proposal_id
+    }
+
+    #[test(governance = @0x123)]
+    #[expected_failure(abort_code = 0x10004)]
+    public fun create_proposal_with_empty_execution_hash_should_fail(governance: &signer) acquires VotingForum {
+        register<TestProposal>(governance);
+        let governance_address = signer::address_of(governance);
+        let proposal = TestProposal {
+            code_url: utf8(b""),
+        };
+
+        // This should fail because execution hash is empty.
+        create_proposal<TestProposal>(
+            governance_address,
+            governance_address,
+            proposal,
+            b"",
+            10,
+            100000,
+            option::none<u128>(),
+        );
     }
 
     #[test(aptos_framework = @aptos_framework, governance = @0x123)]
