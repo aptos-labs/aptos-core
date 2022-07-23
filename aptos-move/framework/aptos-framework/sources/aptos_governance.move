@@ -306,7 +306,7 @@ module aptos_framework::aptos_governance {
         create_proposal(
             &proposer,
             signer::address_of(&proposer),
-            b"",
+            b"123",
             b"",
             b"",
         );
