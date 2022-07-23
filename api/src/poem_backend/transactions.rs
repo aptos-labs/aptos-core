@@ -19,7 +19,7 @@ use crate::failpoint::fail_point_poem;
 use crate::{generate_error_response, generate_success_response};
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    AsConverter, EncodeSubmissionRequest, HashValue, HexEncodedBytes, LedgerInfo,
+    Address, AsConverter, EncodeSubmissionRequest, HashValue, HexEncodedBytes, LedgerInfo,
     PendingTransaction, SubmitTransactionRequest, Transaction, TransactionData,
     TransactionOnChainData, U64,
 };
@@ -95,6 +95,9 @@ impl TransactionsApi {
         self.list(&accept_type, page)
     }
 
+    /// Get transaction by hash
+    ///
+    /// todo
     #[oai(
         path = "/transactions/by_hash/:txn_hash",
         method = "get",
@@ -107,12 +110,15 @@ impl TransactionsApi {
         txn_hash: Path<HashValue>,
         // TODO: Use a new request type that can't return 507.
     ) -> BasicResultWith404<Transaction> {
-        fail_point_poem("endpoint_encode_submission")?;
+        fail_point_poem("endpoint_transaction_by_hash")?;
         let accept_type = parse_accept(&accept)?;
         self.get_transaction_by_hash_inner(&accept_type, txn_hash.0)
             .await
     }
 
+    /// Get transaction by version
+    ///
+    /// todo
     #[oai(
         path = "/transactions/by_version/:txn_version",
         method = "get",
@@ -125,10 +131,34 @@ impl TransactionsApi {
         txn_version: Path<U64>,
         // TODO: Use a new request type that can't return 507.
     ) -> BasicResultWith404<Transaction> {
-        fail_point_poem("endpoint_encode_submission")?;
+        fail_point_poem("endpoint_transaction_by_version")?;
         let accept_type = parse_accept(&accept)?;
         self.get_transaction_by_version_inner(&accept_type, txn_version.0)
             .await
+    }
+
+    /// Get account transactions
+    ///
+    /// todo
+    /// todo, note that this currently returns [] even if the account doesn't
+    /// exist, when it should really return a 404.
+    #[oai(
+        path = "/accounts/:address/transactions",
+        method = "get",
+        operation_id = "get_account_transactions",
+        tag = "ApiTags::Transactions"
+    )]
+    async fn get_accounts_transactions(
+        &self,
+        accept: Accept,
+        address: Path<Address>,
+        start: Query<Option<u64>>,
+        limit: Query<Option<u16>>,
+    ) -> BasicResultWith404<Vec<Transaction>> {
+        fail_point_poem("endpoint_get_accounts_transactions")?;
+        let accept_type = parse_accept(&accept)?;
+        let page = Page::new(start.0, limit.0);
+        self.list_by_account(&accept_type, page, address.0)
     }
 
     // TODO: Add custom sizelimit middleware.
@@ -404,6 +434,28 @@ impl TransactionsApi {
                 .map(|t| t.into()),
             _ => from_db.map(|t| t.into()),
         })
+    }
+
+    fn list_by_account(
+        &self,
+        accept_type: &AcceptType,
+        page: Page,
+        address: Address,
+    ) -> BasicResultWith404<Vec<Transaction>> {
+        let latest_ledger_info = self.context.get_latest_ledger_info_poem()?;
+        // TODO: Return more specific errors from within this function.
+        let data = self
+            .context
+            .get_account_transactions(
+                address.into(),
+                page.start(0, u64::MAX)?,
+                page.limit()?,
+                latest_ledger_info.version(),
+            )
+            .context("Failed to get account transactions for the given account")
+            .map_err(BasicErrorWith404::internal)?;
+
+        self.render_transactions(data, accept_type, &latest_ledger_info)
     }
 
     fn get_signed_transaction(
