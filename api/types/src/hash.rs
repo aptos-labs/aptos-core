@@ -64,6 +64,12 @@ impl LowerHex for HashValue {
     }
 }
 
+impl HashValue {
+    pub fn zero() -> Self {
+        Self(aptos_crypto::hash::HashValue::zero())
+    }
+}
+
 impl_poem_type!(HashValue);
 impl_poem_parameter!(HashValue);
 
