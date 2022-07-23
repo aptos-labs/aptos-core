@@ -1205,7 +1205,6 @@ dependencies = [
  "num-derive",
  "num-traits 0.2.15",
  "once_cell",
- "poem-openapi",
  "proptest",
  "proptest-derive",
  "rand 0.7.3",

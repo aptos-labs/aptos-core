@@ -4,12 +4,14 @@
 use crate::{
     transaction::{
         DeleteModule, DeleteResource, DeleteTableItem, ModuleBundlePayload,
-        StateCheckpointTransaction, WriteModule, WriteResource, WriteTableItem,
+        StateCheckpointTransaction, UserTransactionRequestInner, WriteModule, WriteResource,
+        WriteTableItem,
     },
     Bytecode, DirectWriteSet, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode,
-    MoveResource, MoveScriptBytecode, MoveValue, ScriptFunctionId, ScriptFunctionPayload,
-    ScriptPayload, ScriptWriteSet, Transaction, TransactionInfo, TransactionOnChainData,
-    TransactionPayload, UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
+    MoveResource, MoveScriptBytecode, MoveValue, PendingTransaction, ScriptFunctionId,
+    ScriptFunctionPayload, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction,
+    TransactionInfo, TransactionOnChainData, TransactionPayload, UserTransactionRequest, WriteSet,
+    WriteSetChange, WriteSetPayload,
 };
 use anyhow::{bail, ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -76,6 +78,14 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     }
 
     pub fn try_into_pending_transaction(&self, txn: SignedTransaction) -> Result<Transaction> {
+        let payload = self.try_into_transaction_payload(txn.payload().clone())?;
+        Ok((txn, payload).into())
+    }
+
+    pub fn try_into_pending_transaction_poem(
+        &self,
+        txn: SignedTransaction,
+    ) -> Result<PendingTransaction> {
         let payload = self.try_into_transaction_payload(txn.payload().clone())?;
         Ok((txn, payload).into())
     }
@@ -319,6 +329,20 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         ))
     }
 
+    pub fn try_into_signed_transaction_poem(
+        &self,
+        submit_transaction_request: SubmitTransactionRequest,
+        chain_id: ChainId,
+    ) -> Result<SignedTransaction> {
+        Ok(SignedTransaction::new_with_authenticator(
+            self.try_into_raw_transaction_poem(
+                submit_transaction_request.user_transaction_request,
+                chain_id,
+            )?,
+            submit_transaction_request.signature.try_into()?,
+        ))
+    }
+
     pub fn try_into_raw_transaction(
         &self,
         txn: UserTransactionRequest,
@@ -333,6 +357,30 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             payload,
             signature: _,
         } = txn;
+        Ok(RawTransaction::new(
+            sender.into(),
+            sequence_number.into(),
+            self.try_into_aptos_core_transaction_payload(payload)?,
+            max_gas_amount.into(),
+            gas_unit_price.into(),
+            expiration_timestamp_secs.into(),
+            chain_id,
+        ))
+    }
+
+    pub fn try_into_raw_transaction_poem(
+        &self,
+        user_transaction_request: UserTransactionRequestInner,
+        chain_id: ChainId,
+    ) -> Result<RawTransaction> {
+        let UserTransactionRequestInner {
+            sender,
+            sequence_number,
+            max_gas_amount,
+            gas_unit_price,
+            expiration_timestamp_secs,
+            payload,
+        } = user_transaction_request;
         Ok(RawTransaction::new(
             sender.into(),
             sequence_number.into(),
