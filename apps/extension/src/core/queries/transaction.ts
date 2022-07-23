@@ -87,7 +87,7 @@ export function useCoinTransferTransactions() {
   const getCoinTransferTransactionsQuery = useCallback(
     async () => (aptosAccount ? getScriptFunctionTransactions({
       address: aptosAccount.address(),
-      functionName: '0x1::Coin::transfer',
+      functionName: '0x1::coin::transfer',
       nodeUrl: aptosNetwork,
     }) : null),
     [aptosAccount, aptosNetwork],

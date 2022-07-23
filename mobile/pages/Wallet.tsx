@@ -39,7 +39,7 @@ export default function Wallet({ route }: { route: RouteProp<{ params: WalletPar
     if (accountResources) {
       const accountResource = accountResources
         ? accountResources?.find(
-          (r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>',
+          (r) => r.type === '0x1::coin::CoinStore<0x1::test_coin::TestCoin>',
         )
         : undefined;
       const tokenBalance = accountResource

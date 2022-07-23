@@ -29,7 +29,7 @@ export default function Faucet() {
         params: {
           address: aptosAccount?.address().hex(),
           amount: 5000,
-          coinType: '0x1::TestCoin::TestCoin',
+          coinType: '0x1::test_coin::TestCoin',
           network: aptosNetwork,
         },
       });

@@ -40,7 +40,7 @@ export const getGalleryItems = async ({
 }: GetGalleryItemsProps) => {
   const createTokenTransactions = await getScriptFunctionTransactions({
     address,
-    functionName: '0x1::Token::create_unlimited_token_script',
+    functionName: '0x1::token::create_unlimited_token_script',
     nodeUrl,
   });
 
@@ -52,7 +52,7 @@ export const getGalleryItems = async ({
   // Initialize collection dict from `create_unlimited_collection` transactions
   // const createCollectionTransactions = await getScriptFunctionTransactions({
   //   address,
-  //   functionName: '0x1::Token::create_unlimited_collection_script',
+  //   functionName: '0x1::token::create_unlimited_collection_script',
   //   nodeUrl,
   // });
   //
