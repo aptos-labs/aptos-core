@@ -136,7 +136,7 @@ fn create_node_for_fuzzing() -> RoundManager {
 
     // TODO: remove
     let time_service = Arc::new(SimulatedTimeService::new());
-    time_service.sleep(Duration::from_millis(1));
+    block_on(time_service.sleep(Duration::from_millis(1)));
 
     // TODO: remove
     let proposal_generator = ProposalGenerator::new(
