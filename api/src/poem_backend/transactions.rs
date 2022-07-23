@@ -11,7 +11,7 @@ use super::bcs_payload::Bcs;
 use super::page::Page;
 use super::{
     ApiTags, AptosErrorResponse, BasicError, BasicErrorWith404, BasicResponse, BasicResponseStatus,
-    BasicResult, BasicResultWith404, InternalError,
+    BasicResult, BasicResultWith404, InternalError, NotFoundError,
 };
 use super::{AptosErrorCode, BadRequestError, InsufficientStorageError};
 use crate::context::Context;
@@ -19,14 +19,15 @@ use crate::failpoint::fail_point_poem;
 use crate::{generate_error_response, generate_success_response};
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    AsConverter, EncodeSubmissionRequest, HexEncodedBytes, LedgerInfo, PendingTransaction,
-    SubmitTransactionRequest, Transaction, TransactionOnChainData,
+    AsConverter, EncodeSubmissionRequest, HashValue, HexEncodedBytes, LedgerInfo,
+    PendingTransaction, SubmitTransactionRequest, Transaction, TransactionData,
+    TransactionOnChainData, U64,
 };
 use aptos_crypto::signing_message;
 use aptos_types::mempool_status::MempoolStatusCode;
 use aptos_types::transaction::{RawTransaction, RawTransactionWithData, SignedTransaction};
 use poem::web::Accept;
-use poem_openapi::param::Query;
+use poem_openapi::param::{Path, Query};
 use poem_openapi::payload::Json;
 use poem_openapi::{ApiRequest, OpenApi};
 
@@ -87,6 +88,42 @@ impl TransactionsApi {
         let accept_type = parse_accept(&accept)?;
         let page = Page::new(start.0, limit.0);
         self.list(&accept_type, page)
+    }
+
+    #[oai(
+        path = "/transactions/by_hash/:txn_hash",
+        method = "get",
+        operation_id = "get_transaction_by_hash",
+        tag = "ApiTags::Transactions"
+    )]
+    async fn get_transaction_by_hash(
+        &self,
+        accept: Accept,
+        txn_hash: Path<HashValue>,
+        // TODO: Use a new request type that can't return 507.
+    ) -> BasicResultWith404<Transaction> {
+        fail_point_poem("endpoint_encode_submission")?;
+        let accept_type = parse_accept(&accept)?;
+        self.get_transaction_by_hash_inner(&accept_type, txn_hash.0)
+            .await
+    }
+
+    #[oai(
+        path = "/transactions/by_version/:txn_version",
+        method = "get",
+        operation_id = "get_transaction_by_version",
+        tag = "ApiTags::Transactions"
+    )]
+    async fn get_transaction_by_version(
+        &self,
+        accept: Accept,
+        txn_version: Path<U64>,
+        // TODO: Use a new request type that can't return 507.
+    ) -> BasicResultWith404<Transaction> {
+        fail_point_poem("endpoint_encode_submission")?;
+        let accept_type = parse_accept(&accept)?;
+        self.get_transaction_by_version_inner(&accept_type, txn_version.0)
+            .await
     }
 
     // TODO: Add custom sizelimit middleware.
@@ -158,8 +195,8 @@ impl TransactionsApi {
     /// - Sign the bytes to create the signature.
     /// - Use that as the signature field in something like Ed25519Signature,
     ///   which you then use to build a TransactionSignature.
-    ///
-    /// TODO: Link an example of how to do this. Use externalDoc.
+    //
+    // TODO: Link an example of how to do this. Use externalDoc.
     #[oai(
         path = "/transactions/encode_submission",
         method = "post",
@@ -170,7 +207,7 @@ impl TransactionsApi {
         &self,
         accept: Accept,
         data: Json<EncodeSubmissionRequest>,
-        // TODO: Use a new request type that can't return 507.
+        // TODO: Use a new request type that can't return 507 but still returns all the other necessary errors.
     ) -> BasicResult<HexEncodedBytes> {
         fail_point_poem("endpoint_encode_submission")?;
         let accept_type = parse_accept(&accept)?;
@@ -183,6 +220,8 @@ impl TransactionsApi {
         let latest_ledger_info = self.context.get_latest_ledger_info_poem()?;
         let ledger_version = latest_ledger_info.version();
         let limit = page.limit()?;
+        // TODO: I think there is a bug at startup where limit 1 still returns
+        // every transaction.
         let last_page_start = if ledger_version > (limit as u64) {
             ledger_version - (limit as u64)
         } else {
@@ -236,6 +275,118 @@ impl TransactionsApi {
             BasicResponseStatus::Ok,
             accept_type,
         ))
+    }
+
+    async fn get_transaction_by_hash_inner(
+        &self,
+        accept_type: &AcceptType,
+        hash: HashValue,
+    ) -> BasicResultWith404<Transaction> {
+        let ledger_info = self.context.get_latest_ledger_info_poem()?;
+        let txn_data = self
+            .get_by_hash(hash.into(), &ledger_info)
+            .await
+            .context(format!("Failed to get transaction by hash {}", hash))
+            // TODO: Should this be a 500?
+            .map_err(BasicErrorWith404::not_found)?
+            .context(format!("Failed to find transaction with hash: {}", hash))
+            .map_err(BasicErrorWith404::not_found)?;
+
+        self.get_transaction_inner(accept_type, txn_data, &ledger_info)
+            .await
+    }
+
+    async fn get_transaction_by_version_inner(
+        &self,
+        accept_type: &AcceptType,
+        version: U64,
+    ) -> BasicResultWith404<Transaction> {
+        let ledger_info = self.context.get_latest_ledger_info_poem()?;
+        let txn_data = self
+            .get_by_version(version.0, &ledger_info)
+            .context(format!("Failed to get transaction by version {}", version))
+            // TODO: Should this be a 500?
+            .map_err(BasicErrorWith404::not_found)?
+            .context(format!(
+                "Failed to find transaction at version: {}",
+                version
+            ))
+            .map_err(BasicErrorWith404::not_found)?;
+
+        self.get_transaction_inner(accept_type, txn_data, &ledger_info)
+            .await
+    }
+
+    async fn get_transaction_inner(
+        &self,
+        accept_type: &AcceptType,
+        transaction_data: TransactionData,
+        ledger_info: &LedgerInfo,
+    ) -> BasicResultWith404<Transaction> {
+        let resolver = self.context.move_resolver_poem()?;
+        let transaction = match transaction_data {
+            TransactionData::OnChain(txn) => {
+                let timestamp = self
+                    .context
+                    .get_block_timestamp(txn.version)
+                    .context("Failed to get block timestamp from DB")
+                    .map_err(BasicErrorWith404::internal)?;
+                resolver
+                    .as_converter()
+                    .try_into_onchain_transaction(timestamp, txn)
+                    .context("Failed to convert on chain transaction to Transaction")
+                    .map_err(BasicErrorWith404::internal)?
+            }
+            TransactionData::Pending(txn) => resolver
+                .as_converter()
+                .try_into_pending_transaction(*txn)
+                .context("Failed to convert on pending transaction to Transaction")
+                .map_err(BasicErrorWith404::internal)?,
+        };
+
+        BasicResponse::try_from_rust_value((
+            transaction,
+            ledger_info,
+            BasicResponseStatus::Ok,
+            accept_type,
+        ))
+    }
+
+    fn get_by_version(
+        &self,
+        version: u64,
+        ledger_info: &LedgerInfo,
+    ) -> anyhow::Result<Option<TransactionData>> {
+        if version > ledger_info.version() {
+            return Ok(None);
+        }
+        Ok(Some(
+            self.context
+                .get_transaction_by_version(version, ledger_info.version())?
+                .into(),
+        ))
+    }
+
+    // This function looks for the transaction by hash in database and then mempool,
+    // because the period a transaction stay in the mempool is likely short.
+    // Although the mempool get transation is async, but looking up txn in database is a sync call,
+    // thus we keep it simple and call them in sequence.
+    async fn get_by_hash(
+        &self,
+        hash: aptos_crypto::HashValue,
+        ledger_info: &LedgerInfo,
+    ) -> anyhow::Result<Option<TransactionData>> {
+        let from_db = self
+            .context
+            .get_transaction_by_hash(hash, ledger_info.version())?;
+        Ok(match from_db {
+            None => self
+                .context
+                .get_pending_transaction_by_hash(hash)
+                .await?
+                .map(|t| t.into()),
+            _ => from_db.map(|t| t.into()),
+        })
     }
 
     async fn create_from_request(
