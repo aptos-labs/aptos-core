@@ -5,11 +5,14 @@ use crate::{
     current_function_name,
     tests::{new_test_context, TestContext},
 };
+use aptos_sdk::move_types::parser::parse_type_tag;
 use aptos_sdk::types::LocalAccount;
+use aptos_types::state_store::table::TableHandle;
 use move_deps::{move_core_types::account_address::AccountAddress, move_package::BuildConfig};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{convert::TryInto, path::PathBuf};
+use storage_interface::DbReader;
 
 #[tokio::test]
 async fn test_get_account_resource() {
@@ -167,7 +170,11 @@ async fn test_get_table_item() {
     .await;
     let nested_table = api_get_table_item(
         ctx,
-        &tt["table_table"],
+        tt["table_table"]["handle"]
+            .as_str()
+            .unwrap()
+            .parse()
+            .unwrap(),
         "u8",
         "0x1::table::Table<u8, u8>",
         1u8,
@@ -230,12 +237,11 @@ async fn build_test_module(account: AccountAddress) -> Vec<u8> {
 
 async fn api_get_table_item<T: Serialize>(
     ctx: &mut TestContext,
-    table: &Value,
+    handle: u128,
     key_type: &str,
     value_type: &str,
     key: T,
 ) -> Value {
-    let handle = table["handle"].as_str().unwrap().parse().unwrap();
     ctx.post(
         &get_table_item(handle),
         json!({
@@ -255,6 +261,11 @@ async fn assert_table_item<T: Serialize, U: Serialize>(
     key: T,
     value: U,
 ) {
-    let response = api_get_table_item(ctx, table, key_type, value_type, key).await;
+    let handle = TableHandle(table["handle"].as_str().unwrap().parse().unwrap());
+    let table_info = ctx.db.get_table_info(handle).unwrap();
+    assert_eq!(table_info.key_type, parse_type_tag(key_type).unwrap());
+    assert_eq!(table_info.value_type, parse_type_tag(value_type).unwrap());
+
+    let response = api_get_table_item(ctx, handle.0, key_type, value_type, key).await;
     assert_eq!(response, json!(value));
 }
