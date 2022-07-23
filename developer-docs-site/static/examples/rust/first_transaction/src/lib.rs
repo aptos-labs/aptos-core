@@ -280,7 +280,7 @@ impl RestClient {
         let payload = serde_json::json!({
             "type": "script_function_payload",
             "function": "0x1::coin::transfer",
-            "type_arguments": ["0x1::aptos_coin::AptosCoin"],
+            "type_arguments": ["0x1::test_coin::TestCoin"],
             "arguments": [format!("0x{}", recipient), amount.to_string()]
         });
         let txn_request = self.generate_transaction(&account_from.address(), payload);
