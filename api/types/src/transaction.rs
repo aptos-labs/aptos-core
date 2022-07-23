@@ -379,6 +379,15 @@ pub struct UserCreateSigningMessageRequest {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+pub struct EncodeSubmissionRequest {
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub transaction: UserTransactionRequestInner,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secondary_signers: Option<Vec<Address>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct GenesisTransaction {
     #[serde(flatten)]
     #[oai(flatten)]

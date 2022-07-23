@@ -20,6 +20,7 @@ pub fn parse_accept<E: BadRequestError>(accept: &Accept) -> Result<AcceptType, E
             "application/x-bcs" => return Ok(AcceptType::Bcs),
             "*/*" => {}
             wildcard => {
+                // TODO: Use 415 instead.
                 return Err(E::bad_request_str(&format!(
                     "Unsupported Accept type: {:?}",
                     wildcard

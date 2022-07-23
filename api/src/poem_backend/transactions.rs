@@ -10,8 +10,8 @@ use super::accept_type::{parse_accept, AcceptType};
 use super::bcs_payload::Bcs;
 use super::page::Page;
 use super::{
-    ApiTags, AptosErrorResponse, BasicErrorWith404, BasicResponse, BasicResponseStatus,
-    BasicResultWith404, InternalError,
+    ApiTags, AptosErrorResponse, BasicError, BasicErrorWith404, BasicResponse, BasicResponseStatus,
+    BasicResult, BasicResultWith404, InternalError,
 };
 use super::{AptosErrorCode, BadRequestError, InsufficientStorageError};
 use crate::context::Context;
@@ -19,11 +19,12 @@ use crate::failpoint::fail_point_poem;
 use crate::{generate_error_response, generate_success_response};
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    AsConverter, LedgerInfo, PendingTransaction, SubmitTransactionRequest, Transaction,
-    TransactionOnChainData,
+    AsConverter, EncodeSubmissionRequest, HexEncodedBytes, LedgerInfo, PendingTransaction,
+    SubmitTransactionRequest, Transaction, TransactionOnChainData,
 };
+use aptos_crypto::signing_message;
 use aptos_types::mempool_status::MempoolStatusCode;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::{RawTransaction, RawTransactionWithData, SignedTransaction};
 use poem::web::Accept;
 use poem_openapi::param::Query;
 use poem_openapi::payload::Json;
@@ -130,6 +131,50 @@ impl TransactionsApi {
                 self.create_from_request(&accept_type, data.0).await
             }
         }
+    }
+
+    // TODO: The previous language around this endpoint used "signing message".
+    // From what I can tell, all this endpoint is really doing is encoding the
+    // request as BCS. To your average user (read: not knowledgable about
+    // cryptography), "signing message" is needlessly confusing, hence the name
+    // change. Discuss this further with the team.
+
+    /// Encode submission
+    ///
+    /// This endpoint accepts an EncodeSubmissionRequest, which internally is a
+    /// UserTransactionRequestInner (and optionally secondary signers) encoded
+    /// as JSON, validates the request format, and then returns that request
+    /// encoded in BCS. The client can then use this to create a transaction
+    /// signature to be used in a SubmitTransactionRequest, which it then
+    /// passes to the /transactions POST endpoint.
+    ///
+    /// To be clear, this endpoint makes it possible to submit transaction
+    /// requests to the API from languages that do not have library support for
+    /// BCS. If you are using an SDK that has BCS support, such as the official
+    /// Rust, TypeScript, or Python SDKs, you do not need to use this endpoint.
+    ///
+    /// To sign a message using the response from this endpoint:
+    /// - Decode the hex encoded string in the response to bytes.
+    /// - Sign the bytes to create the signature.
+    /// - Use that as the signature field in something like Ed25519Signature,
+    ///   which you then use to build a TransactionSignature.
+    ///
+    /// TODO: Link an example of how to do this. Use externalDoc.
+    #[oai(
+        path = "/transactions/encode_submission",
+        method = "post",
+        operation_id = "encode_submission",
+        tag = "ApiTags::Transactions"
+    )]
+    async fn encode_submission(
+        &self,
+        accept: Accept,
+        data: Json<EncodeSubmissionRequest>,
+        // TODO: Use a new request type that can't return 507.
+    ) -> BasicResult<HexEncodedBytes> {
+        fail_point_poem("endpoint_encode_submission")?;
+        let accept_type = parse_accept(&accept)?;
+        self.get_signing_message(&accept_type, data.0)
     }
 }
 
@@ -249,5 +294,39 @@ impl TransactionsApi {
                 mempool_status,
             ))),
         }
+    }
+
+    pub fn get_signing_message(
+        &self,
+        accept_type: &AcceptType,
+        request: EncodeSubmissionRequest,
+    ) -> BasicResult<HexEncodedBytes> {
+        let resolver = self.context.move_resolver_poem()?;
+        let raw_txn: RawTransaction = resolver
+            .as_converter()
+            .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
+            .context("The given transaction is invalid")
+            .map_err(BasicError::bad_request)?;
+
+        let raw_message = match request.secondary_signers {
+            Some(secondary_signer_addresses) => {
+                signing_message(&RawTransactionWithData::new_multi_agent(
+                    raw_txn,
+                    secondary_signer_addresses
+                        .into_iter()
+                        .map(|v| v.into())
+                        .collect(),
+                ))
+            }
+            None => raw_txn.signing_message(),
+        };
+
+        BasicResponse::try_from_rust_value((
+            HexEncodedBytes::from(raw_message),
+            // TODO: Make a variant that doesn't require ledger info.
+            &self.context.get_latest_ledger_info_poem()?,
+            BasicResponseStatus::Ok,
+            accept_type,
+        ))
     }
 }
