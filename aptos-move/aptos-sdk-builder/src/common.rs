@@ -73,27 +73,6 @@ pub(crate) fn make_abi_enum_container(abis: &[ScriptABI]) -> ContainerFormat {
         for arg in abi.args() {
             fields.push(quote_parameter_as_field(arg));
         }
-        variants.insert(
-            index as u32,
-            Named {
-                name: abi.name().to_camel_case(),
-                value: VariantFormat::Struct(fields),
-            },
-        );
-    }
-    ContainerFormat::Enum(variants)
-}
-
-pub(crate) fn make_namespaced_abi_enum_container(abis: &[ScriptABI]) -> ContainerFormat {
-    let mut variants = BTreeMap::new();
-    for (index, abi) in abis.iter().enumerate() {
-        let mut fields = Vec::new();
-        for ty_arg in abi.ty_args() {
-            fields.push(quote_type_parameter_as_field(ty_arg));
-        }
-        for arg in abi.args() {
-            fields.push(quote_parameter_as_field(arg));
-        }
 
         let name = match abi {
             ScriptABI::ScriptFunction(sf) => {
@@ -134,10 +113,26 @@ pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
                     type_not_allowed(type_tag)
                 }
             }
-            _ => type_not_allowed(type_tag),
+            _ => format!("vec{}", mangle_type(type_tag)),
         },
         Struct(_) | Signer => type_not_allowed(type_tag),
     }
+}
+
+pub(crate) fn get_external_definitions(aptos_types: &str) -> serde_generate::ExternalDefinitions {
+    let definitions = vec![(
+        aptos_types,
+        vec!["AccountAddress", "TypeTag", "Script", "TransactionArgument"],
+    )];
+    definitions
+        .into_iter()
+        .map(|(module, defs)| {
+            (
+                module.to_string(),
+                defs.into_iter().map(String::from).collect(),
+            )
+        })
+        .collect()
 }
 
 pub(crate) fn get_required_helper_types(abis: &[ScriptABI]) -> BTreeSet<&TypeTag> {

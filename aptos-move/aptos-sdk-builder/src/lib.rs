@@ -4,7 +4,7 @@
 use aptos_types::transaction::ScriptABI;
 use std::{ffi::OsStr, fs, io::Read, path::Path};
 
-/// Support for code-generation in Rust.
+pub mod golang;
 pub mod rust;
 
 /// Internals shared between languages.

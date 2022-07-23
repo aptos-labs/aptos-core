@@ -981,7 +981,7 @@ dependencies = [
  "move-deps",
  "regex",
  "serde-generate",
- "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection?rev=9ba2437dc079515f5a1797b8536b0ea7685678d0)",
+ "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection?rev=839aed62a20ddccf043c08961cfe74875741ccba)",
  "serde_yaml",
  "structopt",
  "tempfile",
@@ -7025,7 +7025,7 @@ dependencies = [
 [[package]]
 name = "serde-generate"
 version = "0.20.6"
-source = "git+https://github.com/aptos-labs/serde-reflection?rev=9ba2437dc079515f5a1797b8536b0ea7685678d0#9ba2437dc079515f5a1797b8536b0ea7685678d0"
+source = "git+https://github.com/aptos-labs/serde-reflection?rev=839aed62a20ddccf043c08961cfe74875741ccba#839aed62a20ddccf043c08961cfe74875741ccba"
 dependencies = [
  "bcs",
  "bincode",
@@ -7033,7 +7033,7 @@ dependencies = [
  "include_dir 0.6.2",
  "maplit",
  "serde 1.0.137",
- "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection?rev=9ba2437dc079515f5a1797b8536b0ea7685678d0)",
+ "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection?rev=839aed62a20ddccf043c08961cfe74875741ccba)",
  "serde_bytes",
  "serde_yaml",
  "structopt",
@@ -7076,7 +7076,7 @@ dependencies = [
 [[package]]
 name = "serde-reflection"
 version = "0.3.5"
-source = "git+https://github.com/aptos-labs/serde-reflection?rev=9ba2437dc079515f5a1797b8536b0ea7685678d0#9ba2437dc079515f5a1797b8536b0ea7685678d0"
+source = "git+https://github.com/aptos-labs/serde-reflection?rev=839aed62a20ddccf043c08961cfe74875741ccba#839aed62a20ddccf043c08961cfe74875741ccba"
 dependencies = [
  "once_cell",
  "serde 1.0.137",
