@@ -267,7 +267,7 @@ impl RestClient {
     pub fn account_balance(&self, account_address: &str) -> Option<u64> {
         self.account_resource(
             account_address,
-            "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+            "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
         )
         .unwrap()["data"]["coin"]["value"]
             .as_str()
