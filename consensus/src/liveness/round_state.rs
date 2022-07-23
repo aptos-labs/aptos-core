@@ -218,7 +218,7 @@ impl RoundState {
         }
         warn!(round = round, "Local timeout");
         counters::TIMEOUT_COUNT.inc();
-        self.setup_timeout();
+        self.setup_timeout(1);
         true
     }
 
@@ -234,7 +234,7 @@ impl RoundState {
             self.current_round = new_round;
             self.pending_votes = PendingVotes::new();
             self.vote_sent = None;
-            let timeout = self.setup_timeout();
+            let timeout = self.setup_timeout(1);
             // The new round reason is QCReady in case both QC.round + 1 == new_round, otherwise
             // it's Timeout and TC.round + 1 == new_round.
             let new_round_reason = if sync_info.highest_certified_round() + 1 == new_round {
@@ -278,10 +278,15 @@ impl RoundState {
         self.vote_sent.clone()
     }
 
+    /// Setup a longer timeout task for leader because it enters the round earlier.
+    pub fn setup_leader_timeout(&mut self) {
+        self.setup_timeout(2);
+    }
+
     /// Setup the timeout task and return the duration of the current timeout
-    fn setup_timeout(&mut self) -> Duration {
+    fn setup_timeout(&mut self, multiplier: u32) -> Duration {
         let timeout_sender = self.timeout_sender.clone();
-        let timeout = self.setup_deadline();
+        let timeout = self.setup_deadline(multiplier);
         trace!(
             "Scheduling timeout of {} ms for round {}",
             timeout.as_millis(),
@@ -297,7 +302,7 @@ impl RoundState {
     }
 
     /// Setup the current round deadline and return the duration of the current round
-    fn setup_deadline(&mut self) -> Duration {
+    fn setup_deadline(&mut self, multiplier: u32) -> Duration {
         let round_index_after_committed_round = {
             if self.highest_committed_round == 0 {
                 // Genesis doesn't require the 3-chain rule for commit, hence start the index at
@@ -311,7 +316,8 @@ impl RoundState {
         } as usize;
         let timeout = self
             .time_interval
-            .get_round_duration(round_index_after_committed_round);
+            .get_round_duration(round_index_after_committed_round)
+            * multiplier;
         let now = self.time_service.get_current_timestamp();
         debug!(
             round = self.current_round,
