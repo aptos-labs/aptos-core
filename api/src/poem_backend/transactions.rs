@@ -25,7 +25,10 @@ use aptos_api_types::{
 };
 use aptos_crypto::signing_message;
 use aptos_types::mempool_status::MempoolStatusCode;
-use aptos_types::transaction::{RawTransaction, RawTransactionWithData, SignedTransaction};
+use aptos_types::transaction::{
+    ExecutionStatus, RawTransaction, RawTransactionWithData, SignedTransaction, TransactionStatus,
+};
+use aptos_vm::AptosVM;
 use poem::web::Accept;
 use poem_openapi::param::{Path, Query};
 use poem_openapi::payload::Json;
@@ -42,6 +45,8 @@ generate_error_response!(
 
 type SubmitTransactionResult<T> =
     poem::Result<SubmitTransactionResponse<T>, SubmitTransactionError>;
+
+type SimulateTransactionResult<T> = poem::Result<BasicResponse<T>, SubmitTransactionError>;
 
 // TODO: Consider making both content types accept either
 // SubmitTransactionRequest or SignedTransaction (using AptosPost), the way
@@ -155,19 +160,32 @@ impl TransactionsApi {
         accept: Accept,
         data: SubmitTransactionPost,
     ) -> SubmitTransactionResult<PendingTransaction> {
-        fail_point_poem("endppoint_submit_transaction")?;
+        fail_point_poem("endpoint_submit_transaction")?;
         let accept_type = parse_accept(&accept)?;
-        match data {
-            SubmitTransactionPost::Bcs(data) => {
-                let signed_transaction = bcs::from_bytes(&data)
-                    .context("Failed to deserialize input into SignedTransaction")
-                    .map_err(SubmitTransactionError::bad_request)?;
-                self.create(&accept_type, signed_transaction).await
-            }
-            SubmitTransactionPost::Json(data) => {
-                self.create_from_request(&accept_type, data.0).await
-            }
-        }
+        let signed_transaction = self.get_signed_transaction(data)?;
+        self.create(&accept_type, signed_transaction).await
+    }
+
+    /// Simulate transaction
+    ///
+    /// Simulate submitting a transaction. To use this, you must:
+    /// - Create a SignedTransaction with a zero-padded signature.
+    /// - Submit a SubmitTransactionRequest containing a UserTransactionRequest containing that signature.
+    #[oai(
+        path = "/transactions/simulate",
+        method = "post",
+        operation_id = "simulate_transaction",
+        tag = "ApiTags::Transactions"
+    )]
+    async fn simulate_transaction(
+        &self,
+        accept: Accept,
+        data: SubmitTransactionPost,
+    ) -> SimulateTransactionResult<Vec<Transaction>> {
+        fail_point_poem("endpoint_simulate_transaction")?;
+        let accept_type = parse_accept(&accept)?;
+        let signed_transaction = self.get_signed_transaction(data)?;
+        self.simulate(&accept_type, signed_transaction).await
     }
 
     // TODO: The previous language around this endpoint used "signing message".
@@ -193,8 +211,7 @@ impl TransactionsApi {
     /// To sign a message using the response from this endpoint:
     /// - Decode the hex encoded string in the response to bytes.
     /// - Sign the bytes to create the signature.
-    /// - Use that as the signature field in something like Ed25519Signature,
-    ///   which you then use to build a TransactionSignature.
+    /// - Use that as the signature field in something like Ed25519Signature, which you then use to build a TransactionSignature.
     //
     // TODO: Link an example of how to do this. Use externalDoc.
     #[oai(
@@ -239,12 +256,12 @@ impl TransactionsApi {
         self.render_transactions(data, accept_type, &latest_ledger_info)
     }
 
-    fn render_transactions(
+    fn render_transactions<E: InternalError>(
         &self,
         data: Vec<TransactionOnChainData>,
         accept_type: &AcceptType,
         latest_ledger_info: &LedgerInfo,
-    ) -> BasicResultWith404<Vec<Transaction>> {
+    ) -> Result<BasicResponse<Vec<Transaction>>, E> {
         if data.is_empty() {
             let data: Vec<Transaction> = vec![];
             return BasicResponse::try_from_rust_value((
@@ -267,7 +284,7 @@ impl TransactionsApi {
             })
             .collect::<Result<_, anyhow::Error>>()
             .context("Failed to convert transaction data from storage")
-            .map_err(BasicErrorWith404::internal)?;
+            .map_err(E::internal)?;
 
         BasicResponse::try_from_rust_value((
             txns,
@@ -389,19 +406,25 @@ impl TransactionsApi {
         })
     }
 
-    async fn create_from_request(
+    fn get_signed_transaction(
         &self,
-        accept_type: &AcceptType,
-        req: SubmitTransactionRequest,
-    ) -> SubmitTransactionResult<PendingTransaction> {
-        let txn = self
-            .context
-            .move_resolver_poem()?
-            .as_converter()
-            .try_into_signed_transaction_poem(req, self.context.chain_id())
-            .context("Failed to create SignedTransaction from SubmitTransactionRequest")
-            .map_err(SubmitTransactionError::bad_request)?;
-        self.create(accept_type, txn).await
+        data: SubmitTransactionPost,
+    ) -> Result<SignedTransaction, SubmitTransactionError> {
+        match data {
+            SubmitTransactionPost::Bcs(data) => {
+                let signed_transaction = bcs::from_bytes(&data)
+                    .context("Failed to deserialize input into SignedTransaction")
+                    .map_err(SubmitTransactionError::bad_request)?;
+                Ok(signed_transaction)
+            }
+            SubmitTransactionPost::Json(data) => self
+                .context
+                .move_resolver_poem()?
+                .as_converter()
+                .try_into_signed_transaction_poem(data.0, self.context.chain_id())
+                .context("Failed to create SignedTransaction from SubmitTransactionRequest")
+                .map_err(SubmitTransactionError::bad_request),
+        }
     }
 
     async fn create(
@@ -445,6 +468,52 @@ impl TransactionsApi {
                 mempool_status,
             ))),
         }
+    }
+
+    // TODO: This returns a Vec<Transaction>, but is it possible for a single
+    // transaction request to result in multiple executed transactions?
+    // TODO: Look at just returning (a) UserTransaction, since that's all users
+    // are allowed to submit in the first place.
+    // TODO: This function leverages a lot of types from aptos_types, use the
+    // local API types and just return those directly, instead of converting
+    // from these types in render_transactions.
+    pub async fn simulate(
+        &self,
+        accept_type: &AcceptType,
+        txn: SignedTransaction,
+    ) -> SimulateTransactionResult<Vec<Transaction>> {
+        if txn.clone().check_signature().is_ok() {
+            return Err(SubmitTransactionError::bad_request_str(
+                "Transaction simulation request has a valid signature, this is not allowed",
+            ));
+        }
+        let ledger_info = self.context.get_latest_ledger_info_poem()?;
+        let move_resolver = self.context.move_resolver_poem()?;
+        let (status, output) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
+        let version = ledger_info.version();
+        let exe_status = match status.into() {
+            TransactionStatus::Keep(exec_status) => exec_status,
+            _ => ExecutionStatus::MiscellaneousError(None),
+        };
+        let zero_hash = aptos_crypto::HashValue::zero();
+        let info = aptos_types::transaction::TransactionInfo::new(
+            zero_hash,
+            zero_hash,
+            zero_hash,
+            None,
+            output.gas_used(),
+            exe_status,
+        );
+        let simulated_txn = TransactionOnChainData {
+            version,
+            transaction: aptos_types::transaction::Transaction::UserTransaction(txn),
+            info,
+            events: output.events().to_vec(),
+            accumulator_root_hash: aptos_crypto::HashValue::default(),
+            changes: output.write_set().clone(),
+        };
+
+        self.render_transactions(vec![simulated_txn], accept_type, &ledger_info)
     }
 
     pub fn get_signing_message(
