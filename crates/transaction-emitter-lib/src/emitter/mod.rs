@@ -244,9 +244,10 @@ impl<'t> TxnEmitter<'t> {
                 let target_threads = 1200;
                 // Trying to create somewhere between target_threads/2..target_threads threads
                 // We want to have equal numbers of threads for each endpoint, so that they are equally loaded
-                // Otherwise things like flamegrap/perf going to show different numbers depending on which endpoint is chosen
+                // Otherwise things like flamegrap/perf go
+                // ing to show different numbers depending on which endpoint is chosen
                 // Also limiting number of threads as max 10 per endpoint for use cases with very small number of nodes or use --peers
-                min(60, max(1, target_threads / req.rest_clients.len()))
+                min(100, max(1, target_threads / req.rest_clients.len()))
             }
         };
         let num_clients = req.rest_clients.len() * workers_per_endpoint;
