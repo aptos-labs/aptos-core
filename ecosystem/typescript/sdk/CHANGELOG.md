@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.3.0 (2022-07-23)
+
+### Refactors
+
+- [move] [Aptos Framework] Rename TestCoin to AptosCoin ([d02c86ed74](https://github.com/aptos-labs/aptos-core/commit/d02c86ed746999ddd984535e494fb45fb5806ec5))
+- [move] Using new UTF8 strings instead of ASCII strings ([b189a79507](https://github.com/aptos-labs/aptos-core/commit/b189a795076cf78c799f4ecbc63c9527c2997170))
+- [move] Upgrade Move step #2 ([7343c6453f](https://github.com/aptos-labs/aptos-core/commit/7343c6453fe1ec843f3e1839804b5ed0515b145b))
+- [move] Upgrade to the newest state of the move-language repo ([28934df501](https://github.com/aptos-labs/aptos-core/commit/28934df501d4662d97bb6ef5486ace87c94b96b3))
+- [devtools] common prettier format for all JS/TS files ([e168e83d6e](https://github.com/aptos-labs/aptos-core/commit/e168e83d6ee9503aa39f3062413401e00ecb9109))
+
 ## 1.2.0 (2022-06-28)
 
 ### Features
