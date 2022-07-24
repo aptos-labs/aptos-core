@@ -90,6 +90,7 @@ members = [
     "secure/storage",
     "secure/storage/github",
     "secure/storage/vault",
+    "sf-stream",
     "state-sync/aptos-data-client",
     "state-sync/inter-component/consensus-notifications",
     "state-sync/inter-component/event-notifications",
