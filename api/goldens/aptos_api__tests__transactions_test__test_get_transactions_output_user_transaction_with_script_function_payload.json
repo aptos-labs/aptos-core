@@ -24,7 +24,7 @@
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "1"
+                  "creation_num": "2"
                 }
               }
             }
@@ -62,7 +62,7 @@
     "round": "1",
     "events": [
       {
-        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "key": "0x02000000000000000000000000000000000000000000000000000000000000000000000000000001",
         "sequence_number": "1",
         "type": "0x1::block::NewBlockEvent",
         "data": {
@@ -91,7 +91,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "137",
+    "gas_used": "133",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -104,6 +104,15 @@
           "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
+            "coin_register_events": {
+              "counter": "0",
+              "guid": {
+                "id": {
+                  "addr": "0xa550c18",
+                  "creation_num": "0"
+                }
+              }
+            },
             "self_address": "0xa550c18",
             "sequence_number": "1"
           }
@@ -117,19 +126,7 @@
           "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
-            "self_address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
-            "sequence_number": "0"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
-        "state_key_hash": "",
-        "data": {
-          "type": "0x1::coin::CoinEvents",
-          "data": {
-            "register_events": {
+            "coin_register_events": {
               "counter": "1",
               "guid": {
                 "id": {
@@ -137,7 +134,9 @@
                   "creation_num": "0"
                 }
               }
-            }
+            },
+            "self_address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+            "sequence_number": "0"
           }
         }
       },
@@ -206,7 +205,7 @@
       {
         "key": "0x000000000000000034bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
         "sequence_number": "0",
-        "type": "0x1::coin::RegisterEvent",
+        "type": "0x1::account::CoinRegisterEvent",
         "data": {
           "type_info": {
             "account_address": "0x1",

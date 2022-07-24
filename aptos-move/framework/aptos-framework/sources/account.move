@@ -4,14 +4,17 @@ module aptos_framework::account {
     use std::hash;
     use std::signer;
     use std::vector;
+    use aptos_std::event::{Self, EventHandle};
+    use aptos_std::type_info::{Self, TypeInfo};
+    use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::chain_id;
     use aptos_framework::coin;
-    use aptos_framework::aptos_coin::AptosCoin;
+    use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
     use aptos_framework::transaction_publishing_option;
-    use aptos_framework::system_addresses;
 
+    friend aptos_framework::coins;
     friend aptos_framework::genesis;
 
     /// Resource representing an account.
@@ -19,6 +22,11 @@ module aptos_framework::account {
         authentication_key: vector<u8>,
         sequence_number: u64,
         self_address: address,
+        coin_register_events: EventHandle<CoinRegisterEvent>,
+    }
+
+    struct CoinRegisterEvent has drop, store {
+        type_info: TypeInfo,
     }
 
     /// This holds information that will be picked up by the VM to call the
@@ -159,6 +167,7 @@ module aptos_framework::account {
                 authentication_key,
                 sequence_number: 0,
                 self_address: new_address,
+                coin_register_events: event::new_event_handle<CoinRegisterEvent>(&new_account),
             }
         );
 
@@ -366,9 +375,10 @@ module aptos_framework::account {
     /// Basic account creation methods.
     ///////////////////////////////////////////////////////////////////////////
 
-    public entry fun create_account(auth_key: address) {
+    public entry fun create_account(auth_key: address) acquires Account {
         let signer = create_account_internal(auth_key);
         coin::register<AptosCoin>(&signer);
+        register_coin<AptosCoin>(auth_key);
     }
 
     /// A resource account is used to manage resources independent of an account managed by a user.
@@ -391,6 +401,20 @@ module aptos_framework::account {
         let signer = create_account_unchecked(@aptos_framework);
         let signer_cap = SignerCapability { account: @aptos_framework };
         (signer, signer_cap)
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    /// Coin management methods.
+    ///////////////////////////////////////////////////////////////////////////
+
+    public(friend) fun register_coin<CoinType>(account_addr: address) acquires Account {
+        let account = borrow_global_mut<Account>(account_addr);
+        event::emit_event<CoinRegisterEvent>(
+            &mut account.coin_register_events,
+            CoinRegisterEvent {
+                type_info: type_info::type_of<CoinType>(),
+            },
+        );
     }
 
     ///////////////////////////////////////////////////////////////////////////
