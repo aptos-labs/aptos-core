@@ -10,13 +10,16 @@ use super::{BasicErrorWith404, BasicResultWith404};
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::{Address, AsConverter, MoveStructTag, MoveStructTagWrapper, TransactionId};
+use aptos_api_types::{
+    Address, AsConverter, IdentifierWrapper, MoveModuleBytecode, MoveStructTag,
+    MoveStructTagWrapper, TransactionId,
+};
 use aptos_api_types::{LedgerInfo, MoveResource};
 use aptos_state_view::StateView;
 use aptos_types::access_path::AccessPath;
 use aptos_types::state_store::state_key::StateKey;
 use aptos_vm::data_cache::AsMoveResolver;
-use move_deps::move_core_types::language_storage::{ResourceKey, StructTag};
+use move_deps::move_core_types::language_storage::{ModuleId, ResourceKey, StructTag};
 use poem::web::Accept;
 use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};
@@ -30,7 +33,7 @@ pub struct StateApi {
 
 #[OpenApi]
 impl StateApi {
-    /// Get account resource of specific type
+    /// Get specific account resource
     ///
     /// This endpoint returns the resource of a specific type residing at a given
     /// account at a specified ledger version (AKA transaction version). If the
@@ -40,7 +43,7 @@ impl StateApi {
     /// The Aptos nodes prune account state history, via a configurable time window (link).
     /// If the requested data has been pruned, the server responds with a 404.
     #[oai(
-        path = "/accounts/:address/resources/:resource_type",
+        path = "/accounts/:address/resource/:resource_type",
         method = "get",
         operation_id = "get_account_resource",
         tag = "ApiTags::Accounts"
@@ -55,6 +58,33 @@ impl StateApi {
         fail_point_poem("endpoint_get_account_resource")?;
         let accept_type = parse_accept(&accept)?;
         self.resource(&accept_type, address.0, resource_type.0, ledger_version.0)
+    }
+
+    /// Get specific account module
+    ///
+    /// This endpoint returns the module with a specific name residing at a given
+    /// account at a specified ledger version (AKA transaction version). If the
+    /// ledger version is not specified in the request, the latest ledger version
+    /// is used.
+    ///
+    /// The Aptos nodes prune account state history, via a configurable time window (link).
+    /// If the requested data has been pruned, the server responds with a 404.
+    #[oai(
+        path = "/accounts/:address/module/:module_name",
+        method = "get",
+        operation_id = "get_account_module",
+        tag = "ApiTags::Accounts"
+    )]
+    async fn get_account_module(
+        &self,
+        accept: Accept,
+        address: Path<Address>,
+        module_name: Path<IdentifierWrapper>,
+        ledger_version: Query<Option<u64>>,
+    ) -> BasicResultWith404<MoveModuleBytecode> {
+        fail_point_poem("endpoint_get_account_module")?;
+        let accept_type = parse_accept(&accept)?;
+        self.module(&accept_type, address.0, module_name.0, ledger_version.0)
     }
 }
 
@@ -113,6 +143,36 @@ impl StateApi {
 
         BasicResponse::try_from_rust_value((
             resource,
+            &ledger_info,
+            BasicResponseStatus::Ok,
+            accept_type,
+        ))
+    }
+
+    pub fn module(
+        &self,
+        accept_type: &AcceptType,
+        address: Address,
+        name: IdentifierWrapper,
+        ledger_version: Option<u64>,
+    ) -> BasicResultWith404<MoveModuleBytecode> {
+        let module_id = ModuleId::new(address.into(), name.into());
+        let access_path = AccessPath::code_access_path(module_id.clone());
+        let state_key = StateKey::AccessPath(access_path);
+        let (ledger_info, ledger_version, state_view) = self.preprocess_request(ledger_version)?;
+        let bytes = state_view
+            .get_state_value(&state_key)
+            .context(format!("Failed to query DB to check for {:?}", state_key))
+            .map_err(BasicErrorWith404::internal)?
+            .ok_or_else(|| build_not_found("Module", module_id, ledger_version))?;
+
+        let module = MoveModuleBytecode::new(bytes)
+            .try_parse_abi()
+            .context("Failed to parse move module ABI from bytes retrieved from storage")
+            .map_err(BasicErrorWith404::internal)?;
+
+        BasicResponse::try_from_rust_value((
+            module,
             &ledger_info,
             BasicResponseStatus::Ok,
             accept_type,
