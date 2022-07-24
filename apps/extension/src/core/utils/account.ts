@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosAccount, AptosAccountObject } from 'aptos';
+import { AptosAccount } from 'aptos';
 import { WALLET_STATE_LOCAL_STORAGE_KEY } from 'core/constants';
 import {
   AptosAccountState, LocalStorageState, Mnemonic, MnemonicState,
@@ -34,50 +34,37 @@ export function getLocalStorageState(): LocalStorageState | null {
   return null;
 }
 
-export function getCurrentAptosAccountAddress() {
-  const localStorage = getLocalStorageState();
-  if (localStorage) {
-    const { currAccountAddress } = localStorage;
-    return currAccountAddress;
+export function getAptosAccountState(localStorage: LocalStorageState): AptosAccountState {
+  const { accounts, currAccountAddress } = localStorage;
+  const currAccountAddressString = currAccountAddress?.toString();
+  if (!currAccountAddressString || !accounts) {
+    return undefined;
   }
-  return undefined;
+  const aptosAccountObject = accounts[currAccountAddressString].aptosAccount;
+  return aptosAccountObject ? AptosAccount.fromAptosAccountObject(aptosAccountObject) : undefined;
 }
 
-export function getAptosAccountState(): AptosAccountState {
-  const localStorage = getLocalStorageState();
-  if (localStorage) {
-    const { accounts, currAccountAddress } = localStorage;
-    const currAccountAddressString = currAccountAddress?.toString();
-    if (!currAccountAddressString || !accounts) {
-      return undefined;
-    }
-    const aptosAccountObject = accounts[currAccountAddressString].aptosAccount;
-    return aptosAccountObject ? AptosAccount.fromAptosAccountObject(aptosAccountObject) : undefined;
+export function getMnemonicState(localStorage: LocalStorageState): MnemonicState {
+  const { accounts, currAccountAddress } = localStorage;
+  const currAccountAddressString = currAccountAddress?.toString();
+  if (!currAccountAddressString || !accounts) {
+    return undefined;
   }
-  return undefined;
-}
-
-export function getMnemonicState(): MnemonicState {
-  const localStorage = getLocalStorageState();
-  if (localStorage) {
-    const { accounts, currAccountAddress } = localStorage;
-    const currAccountAddressString = currAccountAddress?.toString();
-    if (!currAccountAddressString || !accounts) {
-      return undefined;
-    }
-    const { mnemonic } = accounts[currAccountAddressString];
-    return mnemonic;
-  }
-  return undefined;
+  const { mnemonic } = accounts[currAccountAddressString];
+  return mnemonic;
 }
 
 export function getBackgroundAptosAccountState(): Promise<AptosAccountState> {
   return new Promise((resolve) => {
     Browser.storage()?.get([WALLET_STATE_LOCAL_STORAGE_KEY], (result: any) => {
-      const aptosAccountObject: AptosAccountObject = result[WALLET_STATE_LOCAL_STORAGE_KEY];
-      resolve(aptosAccountObject
-        ? AptosAccount.fromAptosAccountObject(aptosAccountObject)
-        : undefined);
+      const localStorage: LocalStorageState = JSON.parse(result[WALLET_STATE_LOCAL_STORAGE_KEY]);
+      if (localStorage) {
+        const aptosAccount = getAptosAccountState(localStorage);
+        console.log(aptosAccount);
+        resolve(aptosAccount);
+      } else {
+        resolve(undefined);
+      }
     });
   });
 }

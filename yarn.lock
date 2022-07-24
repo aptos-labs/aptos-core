@@ -3762,10 +3762,10 @@ anymatch@^3.0.3, anymatch@~3.1.2:
     normalize-path "^3.0.0"
     picomatch "^2.0.4"
 
-aptos@1.2.0:
-  version "1.2.0"
-  resolved "https://registry.yarnpkg.com/aptos/-/aptos-1.2.0.tgz#c555da3db90b66e7d623024e95ea6920cbf48403"
-  integrity sha512-4qyM8zShWPffmQoVN7hWJSKjAIWPgvZVN7oPKxnhuEetPEPV+LJyD2HtqYjUhTk/DuCANf8ziBatIKFE+vQY/A==
+aptos@1.2.1:
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/aptos/-/aptos-1.2.1.tgz#a806540907e68bdee8bc394bff62e4d753e0417c"
+  integrity sha512-XCX1B7Sj9TVLk30hP2aWgCH1yapzLwPle3elsWuoWqpjer1XACGReYkHCAL4p0G+afTR+Q9jFYJdxuSjsCJYSw==
   dependencies:
     axios "^0.26.1"
     buffer "^6.0.3"
