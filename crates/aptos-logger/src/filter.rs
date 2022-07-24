@@ -188,7 +188,7 @@ mod tests {
     use super::{Builder, Level, LevelFilter, Metadata};
 
     fn make_metadata(level: Level, target: &'static str) -> Metadata {
-        Metadata::new(level, target, target, "", 0, "")
+        Metadata::new(level, target, target, "")
     }
 
     #[test]
