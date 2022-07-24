@@ -5,7 +5,7 @@ module aptos_framework::genesis {
 
     use aptos_framework::account;
     use aptos_framework::aptos_governance;
-    use aptos_framework::coin;
+    use aptos_framework::coins;
     use aptos_framework::consensus_config;
     use aptos_framework::transaction_publishing_option;
     use aptos_framework::version;
@@ -202,7 +202,7 @@ module aptos_framework::genesis {
             let amount = *vector::borrow(&staking_distribution, i);
             // Transfer coins from the root account to the validator, so they can stake and have non-zero voting power
             // and can complete consensus on the genesis block.
-            coin::register<AptosCoin>(&owner_account);
+            coins::register<AptosCoin>(&owner_account);
             aptos_coin::mint(&aptos_framework_account, *owner, amount);
             stake::add_stake(&owner_account, amount);
             stake::join_validator_set_internal(&owner_account, *owner);

@@ -90,18 +90,18 @@ pub enum ScriptFunctionCall {
         code: Vec<Bytes>,
     },
 
-    /// Script function to register to receive a specific `CoinType`. An account that wants to hold a coin type
-    /// has to explicitly registers to do so. The register creates a special `CoinStore`
-    /// to hold the specified `CoinType`.
-    CoinRegister {
-        coin_type: TypeTag,
-    },
-
     /// Transfers `amount` of coins `CoinType` from `from` to `to`.
     CoinTransfer {
         coin_type: TypeTag,
         to: AccountAddress,
         amount: u64,
+    },
+
+    /// Script function to register to receive a specific `CoinType`. An account that wants to hold a coin type
+    /// has to explicitly registers to do so. The register creates a special `CoinStore`
+    /// to hold the specified `CoinType`.
+    CoinsRegister {
+        coin_type: TypeTag,
     },
 
     /// Sets up the initial validator set for the network.
@@ -227,7 +227,9 @@ pub enum ScriptFunctionCall {
     },
 
     /// Withdraw from `account`'s inactive stake.
-    StakeWithdraw {},
+    StakeWithdraw {
+        withdraw_amount: u64,
+    },
 
     TokenCreateLimitedCollectionScript {
         name: Bytes,
@@ -398,12 +400,12 @@ impl ScriptFunctionCall {
                 pack_serialized,
                 code,
             } => code_publish_package_txn(pack_serialized, code),
-            CoinRegister { coin_type } => coin_register(coin_type),
             CoinTransfer {
                 coin_type,
                 to,
                 amount,
             } => coin_transfer(coin_type, to, amount),
+            CoinsRegister { coin_type } => coins_register(coin_type),
             GenesisCreateInitializeValidators {
                 owners,
                 consensus_pubkeys,
@@ -478,7 +480,7 @@ impl ScriptFunctionCall {
                 new_network_addresses,
                 new_fullnode_addresses,
             ),
-            StakeWithdraw {} => stake_withdraw(),
+            StakeWithdraw { withdraw_amount } => stake_withdraw(withdraw_amount),
             TokenCreateLimitedCollectionScript {
                 name,
                 description,
@@ -842,24 +844,6 @@ pub fn code_publish_package_txn(
     ))
 }
 
-/// Script function to register to receive a specific `CoinType`. An account that wants to hold a coin type
-/// has to explicitly registers to do so. The register creates a special `CoinStore`
-/// to hold the specified `CoinType`.
-pub fn coin_register(coin_type: TypeTag) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("coin").to_owned(),
-        ),
-        ident_str!("register").to_owned(),
-        vec![coin_type],
-        vec![],
-    ))
-}
-
 /// Transfers `amount` of coins `CoinType` from `from` to `to`.
 pub fn coin_transfer(coin_type: TypeTag, to: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
@@ -873,6 +857,24 @@ pub fn coin_transfer(coin_type: TypeTag, to: AccountAddress, amount: u64) -> Tra
         ident_str!("transfer").to_owned(),
         vec![coin_type],
         vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
+    ))
+}
+
+/// Script function to register to receive a specific `CoinType`. An account that wants to hold a coin type
+/// has to explicitly registers to do so. The register creates a special `CoinStore`
+/// to hold the specified `CoinType`.
+pub fn coins_register(coin_type: TypeTag) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coins").to_owned(),
+        ),
+        ident_str!("register").to_owned(),
+        vec![coin_type],
+        vec![],
     ))
 }
 
@@ -1233,7 +1235,7 @@ pub fn stake_update_network_and_fullnode_addresses(
 }
 
 /// Withdraw from `account`'s inactive stake.
-pub fn stake_withdraw() -> TransactionPayload {
+pub fn stake_withdraw(withdraw_amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -1244,7 +1246,7 @@ pub fn stake_withdraw() -> TransactionPayload {
         ),
         ident_str!("withdraw").to_owned(),
         vec![],
-        vec![],
+        vec![bcs::to_bytes(&withdraw_amount).unwrap()],
     ))
 }
 
@@ -1836,22 +1838,22 @@ mod decoder {
         }
     }
 
-    pub fn coin_register(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::CoinRegister {
-                coin_type: script.ty_args().get(0)?.clone(),
-            })
-        } else {
-            None
-        }
-    }
-
     pub fn coin_transfer(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::CoinTransfer {
                 coin_type: script.ty_args().get(0)?.clone(),
                 to: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn coins_register(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::CoinsRegister {
+                coin_type: script.ty_args().get(0)?.clone(),
             })
         } else {
             None
@@ -2058,8 +2060,10 @@ mod decoder {
     }
 
     pub fn stake_withdraw(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(_script) = payload {
-            Some(ScriptFunctionCall::StakeWithdraw {})
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::StakeWithdraw {
+                withdraw_amount: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
         } else {
             None
         }
@@ -2415,12 +2419,12 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
             Box::new(decoder::code_publish_package_txn),
         );
         map.insert(
-            "coin_register".to_string(),
-            Box::new(decoder::coin_register),
-        );
-        map.insert(
             "coin_transfer".to_string(),
             Box::new(decoder::coin_transfer),
+        );
+        map.insert(
+            "coins_register".to_string(),
+            Box::new(decoder::coins_register),
         );
         map.insert(
             "genesis_create_initialize_validators".to_string(),
