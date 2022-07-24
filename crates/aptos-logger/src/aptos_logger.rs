@@ -17,44 +17,81 @@ use aptos_infallible::RwLock;
 use backtrace::Backtrace;
 use chrono::{SecondsFormat, Utc};
 use once_cell::sync::Lazy;
-use serde::Serialize;
+use serde::ser::SerializeStruct;
+use serde::{Serialize, Serializer};
 use std::{
     collections::BTreeMap,
     env, fmt,
     io::Write,
+    str::FromStr,
     sync::{
         mpsc::{self, Receiver, SyncSender},
         Arc,
     },
     thread,
 };
+use strum_macros::EnumString;
 
 const RUST_LOG: &str = "RUST_LOG";
 const RUST_LOG_REMOTE: &str = "RUST_LOG_REMOTE";
+const RUST_LOG_FORMAT: &str = "RUST_LOG_FORMAT";
 /// Default size of log write channel, if the channel is full, logs will be dropped
 pub const CHANNEL_SIZE: usize = 10000;
 const NUM_SEND_RETRIES: u8 = 1;
 
+#[derive(EnumString)]
+#[strum(serialize_all = "lowercase")]
+enum LogFormat {
+    Json,
+    Text,
+}
+
 /// A single log entry emitted by a logging macro with associated metadata
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct LogEntry {
-    #[serde(flatten)]
     metadata: Metadata,
-    #[serde(skip_serializing_if = "Option::is_none")]
     thread_name: Option<String>,
     /// The program backtrace taken when the event occurred. Backtraces
     /// are only supported for errors and must be configured.
-    #[serde(skip_serializing_if = "Option::is_none")]
     backtrace: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     hostname: Option<&'static str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     namespace: Option<&'static str>,
     timestamp: String,
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     data: BTreeMap<Key, serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<String>,
+}
+
+// implement custom serializer for LogEntry since we want to promote the `metadata.level` field into a top level field
+// and prefix the remaining metadata attributes as `source.<metadata_field>`.
+impl Serialize for LogEntry {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("LogEntry", 9)?;
+        state.serialize_field("level", &self.metadata.level())?;
+        state.serialize_field("source", &self.metadata)?;
+        if let Some(thread_name) = &self.thread_name {
+            state.serialize_field("thread_name", thread_name)?;
+        }
+        if let Some(hostname) = &self.hostname {
+            state.serialize_field("hostname", hostname)?;
+        }
+        if let Some(namespace) = &self.namespace {
+            state.serialize_field("namespace", namespace)?;
+        }
+        state.serialize_field("timestamp", &self.timestamp)?;
+        if let Some(message) = &self.message {
+            state.serialize_field("message", message)?;
+        }
+        if !&self.data.is_empty() {
+            state.serialize_field("data", &self.data)?;
+        }
+        if let Some(backtrace) = &self.backtrace {
+            state.serialize_field("backtrace", backtrace)?;
+        }
+        state.end()
+    }
 }
 
 impl LogEntry {
@@ -180,7 +217,7 @@ impl AptosDataBuilder {
             level: Level::Info,
             remote_level: Level::Info,
             address: None,
-            printer: Some(Box::new(StderrWriter)),
+            printer: Some(Box::new(StdoutWriter)),
             is_async: false,
             custom_format: None,
         }
@@ -277,6 +314,18 @@ impl AptosDataBuilder {
             }
         };
 
+        if let Ok(log_format) = env::var(RUST_LOG_FORMAT) {
+            let log_format = LogFormat::from_str(&log_format).unwrap();
+            match log_format {
+                LogFormat::Json => {
+                    self.custom_format = Some(json_format);
+                }
+                LogFormat::Text => {
+                    self.custom_format = Some(text_format);
+                }
+            }
+        }
+
         let logger = if self.is_async {
             let (sender, receiver) = mpsc::sync_channel(self.channel_size);
             let logger = Arc::new(AptosData {
@@ -284,7 +333,7 @@ impl AptosDataBuilder {
                 sender: Some(sender),
                 printer: None,
                 filter: RwLock::new(filter),
-                formatter: self.custom_format.take().unwrap_or(default_format),
+                formatter: self.custom_format.take().unwrap_or(text_format),
             });
             let service = LoggerService {
                 receiver,
@@ -301,7 +350,7 @@ impl AptosDataBuilder {
                 sender: None,
                 printer: self.printer.take(),
                 filter: RwLock::new(filter),
-                formatter: self.custom_format.take().unwrap_or(default_format),
+                formatter: self.custom_format.take().unwrap_or(text_format),
             })
         };
 
@@ -350,7 +399,7 @@ impl AptosData {
         Self::builder()
             .is_async(false)
             .enable_backtrace()
-            .printer(Box::new(StderrWriter))
+            .printer(Box::new(StdoutWriter))
             .build();
     }
 
@@ -512,13 +561,13 @@ pub trait Writer: Send + Sync {
     fn write(&self, log: String);
 }
 
-/// A struct for writing logs to stderr
-struct StderrWriter;
+/// A struct for writing logs to stdout
+struct StdoutWriter;
 
-impl Writer for StderrWriter {
-    /// Write log to stderr
+impl Writer for StdoutWriter {
+    /// Write log to stdout
     fn write(&self, log: String) {
-        eprintln!("{}", log);
+        println!("{}", log);
     }
 }
 
@@ -553,7 +602,7 @@ impl Writer for FileWriter {
 /// UNIX_TIMESTAMP LOG_LEVEL [thread_name] FILE:LINE MESSAGE JSON_DATA
 /// Example:
 /// 2020-03-07 05:03:03 INFO [thread_name] common/aptos-logger/src/lib.rs:261 Hello { "world": true }
-fn default_format(entry: &LogEntry) -> Result<String, fmt::Error> {
+fn text_format(entry: &LogEntry) -> Result<String, fmt::Error> {
     use std::fmt::Write;
 
     let mut w = String::new();
@@ -567,7 +616,7 @@ fn default_format(entry: &LogEntry) -> Result<String, fmt::Error> {
         w,
         " {} {}",
         entry.metadata.level(),
-        entry.metadata.location()
+        entry.metadata.source_path()
     )?;
 
     if let Some(message) = &entry.message {
@@ -581,14 +630,28 @@ fn default_format(entry: &LogEntry) -> Result<String, fmt::Error> {
     Ok(w)
 }
 
+// converts a record into json format
+fn json_format(entry: &LogEntry) -> Result<String, fmt::Error> {
+    match serde_json::to_string(&entry) {
+        Ok(s) => Ok(s),
+        Err(_) => {
+            // TODO: Improve the error handling here. Currently we're just increasing some misleadingly-named metric and dropping any context on why this could not be deserialized.
+            STRUCT_LOG_PARSE_ERROR_COUNT.inc();
+            Err(fmt::Error)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::LogEntry;
     use crate::{
-        debug, error, info, logger::Logger, trace, warn, Event, Key, KeyValue, Level, Metadata,
-        Schema, Value, Visitor,
+        aptos_logger::json_format, debug, error, info, logger::Logger, trace, warn, Event, Key,
+        KeyValue, Level, Metadata, Schema, Value, Visitor,
     };
     use chrono::{DateTime, Utc};
+    #[cfg(test)]
+    use pretty_assertions::assert_eq;
     use serde_json::Value as JsonValue;
     use std::{
         sync::{
@@ -676,7 +739,7 @@ mod tests {
         );
         let after = Utc::now();
 
-        let entry = receiver.recv().unwrap();
+        let mut entry = receiver.recv().unwrap();
 
         // Ensure standard fields are filled
         assert_eq!(entry.metadata.level(), Level::Info);
@@ -684,10 +747,17 @@ mod tests {
             entry.metadata.target(),
             module_path!().split("::").next().unwrap()
         );
-        assert_eq!(entry.metadata.module_path(), module_path!());
-        assert_eq!(entry.metadata.file(), file!());
         assert_eq!(entry.message.as_deref(), Some("This is a log"));
         assert!(entry.backtrace.is_none());
+
+        // Ensure json formatter works
+        // hardcoding a timestamp and hostname to make the tests deterministic and not depend on environment
+        let original_timestamp = entry.timestamp;
+        entry.timestamp = String::from("2022-07-24T23:42:29.540278Z");
+        entry.hostname = Some("test-host");
+        let expected = r#"{"level":"INFO","source":{"package":"aptos_logger","file":"crates/aptos-logger/src/aptos_logger.rs:730"},"thread_name":"aptos_logger::tests::basic","hostname":"test-host","timestamp":"2022-07-24T23:42:29.540278Z","message":"This is a log","data":{"bar":"foo_bar","category":"name","display":"12345","foo":5,"test":true}}"#;
+        assert_eq!(json_format(&entry).unwrap(), expected);
+        entry.timestamp = original_timestamp;
 
         // Log time should be the time the structured log entry was created
         let timestamp = DateTime::parse_from_rfc3339(&entry.timestamp).unwrap();
