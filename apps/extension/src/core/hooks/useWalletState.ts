@@ -78,12 +78,12 @@ export default function useWalletState() {
     try {
       await faucetClient.fundAccount(account.address(), 0);
       setLocalStorageState(localStorageStateCopy);
-      const json = JSON.stringify(localStorageStateCopy);
+      const localStorageStateString = JSON.stringify(localStorageStateCopy);
       window.localStorage.setItem(
         WALLET_STATE_LOCAL_STORAGE_KEY,
-        json,
+        localStorageStateString,
       );
-      Browser.storage()?.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: json });
+      Browser.storage()?.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: localStorageStateString });
       toast({
         description: 'Successfully created new account',
         duration: 5000,
@@ -119,12 +119,12 @@ export default function useWalletState() {
     };
     try {
       setLocalStorageState(localStorageStateCopy);
-      const json = JSON.stringify(localStorageStateCopy);
+      const localStorageStateString = JSON.stringify(localStorageStateCopy);
       window.localStorage.setItem(
         WALLET_STATE_LOCAL_STORAGE_KEY,
-        json,
+        localStorageStateString,
       );
-      Browser.storage()?.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: json });
+      Browser.storage()?.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: localStorageStateString });
       toast({
         description: `Successfully switched account to ${accountAddress.substring(0, 6)}...`,
         duration: 5000,

@@ -60,7 +60,6 @@ export function getBackgroundAptosAccountState(): Promise<AptosAccountState> {
       const localStorage: LocalStorageState = JSON.parse(result[WALLET_STATE_LOCAL_STORAGE_KEY]);
       if (localStorage) {
         const aptosAccount = getAptosAccountState(localStorage);
-        console.log(aptosAccount);
         resolve(aptosAccount);
       } else {
         resolve(undefined);
