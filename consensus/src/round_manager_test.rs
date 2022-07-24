@@ -275,23 +275,6 @@ impl NodeSetup {
             _ => panic!("Unexpected Network Event"),
         }
     }
-
-    pub async fn next_sync_info(&mut self) -> SyncInfo {
-        match self.all_events.next().await.unwrap() {
-            Event::Message(_, msg) => match msg {
-                ConsensusMsg::SyncInfo(s) => *s,
-                msg => panic!("Unexpected Consensus Message: {:?}", msg),
-            },
-            _ => panic!("Unexpected Network Event"),
-        }
-    }
-
-    pub async fn next_message(&mut self) -> ConsensusMsg {
-        match self.all_events.next().await.unwrap() {
-            Event::Message(_, msg) => msg,
-            _ => panic!("Unexpected Network Event"),
-        }
-    }
 }
 
 #[test]
@@ -933,68 +916,6 @@ fn vote_resent_on_timeout() {
 }
 
 #[test]
-fn sync_info_sent_on_stale_sync_info() {
-    let mut runtime = consensus_runtime();
-    let mut playground = NetworkPlayground::new(runtime.handle().clone());
-    let mut nodes = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 2);
-    runtime.spawn(playground.start());
-    let genesis_qc = certificate_for_genesis();
-    let block_0 = Block::new_proposal(
-        Payload::new_empty(),
-        1,
-        1,
-        genesis_qc,
-        &nodes[0].signer,
-        Vec::new(),
-    );
-    let parent_block_info = block_0.quorum_cert().certified_block();
-    let block_0_quorum_cert = gen_test_certificate(
-        vec![&nodes[0].signer, &nodes[1].signer],
-        // Follow MockStateComputer implementation
-        block_0.gen_block_info(
-            parent_block_info.executed_state_id(),
-            parent_block_info.version(),
-            parent_block_info.next_epoch_state().cloned(),
-        ),
-        parent_block_info.clone(),
-        None,
-    );
-    let mut behind_node = nodes.pop().unwrap();
-    let mut ahead_node = nodes.pop().unwrap();
-    // ahead node has one more block
-    runtime
-        .block_on(ahead_node.block_store.execute_and_insert_block(block_0))
-        .unwrap();
-    ahead_node
-        .block_store
-        .insert_single_quorum_cert(block_0_quorum_cert.clone())
-        .unwrap();
-
-    timed_block_on(&mut runtime, async {
-        ahead_node.next_proposal().await;
-        behind_node.next_proposal().await;
-        // broadcast timeout
-        behind_node
-            .round_manager
-            .process_local_timeout(1)
-            .await
-            .unwrap_err();
-        let timeout_vote_msg = behind_node.next_vote().await;
-        assert!(timeout_vote_msg.vote().is_timeout());
-
-        // process the stale sync info carried in the vote
-        ahead_node
-            .round_manager
-            .process_vote_msg(timeout_vote_msg)
-            .await
-            .unwrap();
-        let sync_info = behind_node.next_sync_info().await;
-
-        assert_eq!(*sync_info.highest_quorum_cert(), block_0_quorum_cert);
-    });
-}
-
-#[test]
 fn sync_on_partial_newer_sync_info() {
     let mut runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
@@ -1038,18 +959,11 @@ fn sync_on_partial_newer_sync_info() {
                 sync_info.highest_round() + 1,
                 &sync_info,
                 node.signer.author(),
-                true,
             )
             .await
             .unwrap();
         // QuorumCert added
         assert_eq!(*node.block_store.highest_quorum_cert(), block_4_qc);
-        // Help remote message sent
-        // Due to the asynchronous channel, the order of the sync info and next proposal is not fixed.
-        // We assert one of them is the sync info we expect.
-        let m1 = node.next_message().await;
-        let m2 = node.next_message().await;
-        assert!(matches!(m1, ConsensusMsg::SyncInfo(_)) || matches!(m2, ConsensusMsg::SyncInfo(_)));
     });
 }
 

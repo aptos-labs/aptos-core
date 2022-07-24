@@ -65,11 +65,12 @@ Now your basic Aptos development environment is ready.
 
 - [Syntax hightlighting for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=damirka.move-syntax).
 - [Move analyzer for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=move.move-analyzer) - supports advanced code navigation and syntax highlighting.
+- [Move language plugin for Jetbrains IDEs](https://plugins.jetbrains.com/plugin/14721-move-language) - supports syntax highlighting, code navigation, renames, formatting, type checks and code generation.
 
 ## Aptos CLI
 
 - [Aptos CLI releases](https://github.com/aptos-labs/aptos-core/releases?q=cli&expanded=true).
-- [Aptos CLI README](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md).
+- [Aptos CLI Documentation](/cli-tools/aptos-cli-tool/aptos-cli-index).
 
 ## Aptos SDK
 

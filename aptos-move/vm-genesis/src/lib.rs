@@ -42,8 +42,8 @@ use rand::prelude::*;
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
 
-const GENESIS_MODULE_NAME: &str = "Genesis";
-const GOVERNANCE_MODULE_NAME: &str = "AptosGovernance";
+const GENESIS_MODULE_NAME: &str = "genesis";
+const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
@@ -129,7 +129,7 @@ pub fn encode_genesis_change_set(
     initialize_on_chain_governance(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
-    reconfigure(&mut session);
+    emit_new_block_and_epoch_event(&mut session);
 
     let mut session1_out = session.finish().unwrap();
 
@@ -350,10 +350,19 @@ fn publish_stdlib(session: &mut SessionExt<impl MoveResolver>, stdlib: Modules) 
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
-fn reconfigure(session: &mut SessionExt<impl MoveResolver>) {
+fn emit_new_block_and_epoch_event(session: &mut SessionExt<impl MoveResolver>) {
     exec_function(
         session,
-        "Reconfiguration",
+        "block",
+        "emit_genesis_block_event",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(
+            account_config::reserved_vm_address(),
+        )]),
+    );
+    exec_function(
+        session,
+        "reconfiguration",
         "emit_genesis_reconfiguration_event",
         vec![],
         vec![],

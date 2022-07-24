@@ -15,15 +15,15 @@ impl Test for ModulePublish {
 #[async_trait::async_trait]
 impl AptosTest for ModulePublish {
     async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
-        let base_path =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/aptos/move_modules/");
+        let base_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/aptos/module_publish_modules/");
 
         // module publish should call init_module by default to create the resource
         move_test_helpers::publish_code(ctx, base_path.clone()).await?;
         ctx.client()
             .get_account_resource(
                 ctx.root_account().address(),
-                "0xA550C18::HelloWorld::ModuleData",
+                "0xA550C18::HelloWorldForModulePublish::ModuleData",
             )
             .await
             .unwrap();

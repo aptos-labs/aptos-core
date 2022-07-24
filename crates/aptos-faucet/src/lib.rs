@@ -134,6 +134,8 @@ impl FaucetArgs {
                 .await
         };
 
+        println!("Faucet is running.  Faucet endpoint: {}", address);
+
         info!(
             "[faucet]: running on: {}. Minting from {}",
             address,
@@ -294,9 +296,7 @@ pub async fn delegate_mint_account(
             .client
             .submit_and_wait(&faucet_account.sign_with_transaction_builder(
                 service.transaction_factory.payload(
-                    aptos_stdlib::encode_test_coin_delegate_mint_capability(
-                        delegated_account.address(),
-                    ),
+                    aptos_stdlib::aptos_coin_delegate_mint_capability(delegated_account.address()),
                 ),
             ))
             .await
@@ -310,7 +310,7 @@ pub async fn delegate_mint_account(
             &delegated_account.sign_with_transaction_builder(
                 service
                     .transaction_factory
-                    .payload(aptos_stdlib::encode_test_coin_claim_mint_capability()),
+                    .payload(aptos_stdlib::aptos_coin_claim_mint_capability()),
             ),
         )
         .await

@@ -41,9 +41,13 @@ export interface paths {
     /** Returns all ownerships */
     get: operations["getAllOwnerships"];
   };
-  "/ownerships/{ownershipId}": {
+  "/ownerships/byId": {
     /** Returns ownership by ownershipId */
     get: operations["getOwnershipById"];
+  };
+  "/ownerships/byOwner": {
+    /** Returns ownership by owner address */
+    get: operations["getOwnershipsByOwner"];
   };
   "/ownerships/byToken": {
     /** Returns ownerships by token */
@@ -722,7 +726,7 @@ export interface components {
      *
      * **Special serialization for Move stdlib types:**
      *
-     * * [0x1::ascii::String](https://github.com/aptos-labs/aptos-core/blob/main/language/move-stdlib/docs/ascii.md) is serialized into `string`. For example, struct value `0x1::ascii::String{bytes: b"hello world"}` is serialized as `"hello world"` in JSON.
+     * * [0x1::string::String](https://github.com/aptos-labs/aptos-core/blob/main/language/move-stdlib/docs/ascii.md) is serialized into `string`. For example, struct value `0x1::string::String{bytes: b"hello world"}` is serialized as `"hello world"` in JSON.
      *
      * @example 3344000000
      */
@@ -1207,9 +1211,29 @@ export interface operations {
   /** Returns ownership by ownershipId */
   getOwnershipById: {
     parameters: {
-      path: {
+      query: {
         /** Ownership Id has the format of "${tokenID}::${ownerAddress}" */
         ownershipId: components["schemas"]["OwnershipId"];
+      };
+    };
+    responses: {
+      /** OK */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Ownership"];
+        };
+      };
+      400: components["responses"]["400"];
+      404: components["responses"]["404"];
+      500: components["responses"]["500"];
+    };
+  };
+  /** Returns ownership by owner address */
+  getOwnershipsByOwner: {
+    parameters: {
+      query: {
+        /** Address of owner in string format */
+        ownerAddress: components["schemas"]["Address"];
       };
     };
     responses: {

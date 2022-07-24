@@ -13,8 +13,8 @@
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
 
 # for calculating regression
-TPS_THRESHOLD=4000
-P99_LATENCY_MS_THRESHOLD=5000
+TPS_THRESHOLD=5000
+P99_LATENCY_MS_THRESHOLD=8000
 
 FORGE_OUTPUT=${FORGE_OUTPUT:-forge_output.txt}
 FORGE_REPORT=${FORGE_REPORT:-forge_report.json}
@@ -32,7 +32,9 @@ DEVINFRA_GRAFANA_BASE_URL="https://o11y.aptosdev.com/grafana/d/overview/overview
 # forge test runner customization
 FORGE_RUNNER_MODE=${FORGE_RUNNER_MODE:-k8s}
 FORGE_NAMESPACE_KEEP=${FORGE_NAMESPACE_KEEP:-false}
+FORGE_NAMESPACE_REUSE=${FORGE_NAMESPACE_REUSE:-false}
 FORGE_ENABLE_HAPROXY=${FORGE_ENABLE_HAPROXY:-false}
+FORGE_TEST_SUITE=${FORGE_TEST_SUITE:-land_blocking}
 
 # if this script is not triggered in GHA, use a default value
 [ -z "$GITHUB_RUN_ID" ] && GITHUB_RUN_ID=0
@@ -48,19 +50,21 @@ FORGE_NAMESPACE="${FORGE_NAMESPACE//[^[:alnum:]]/-}"
 # use the first 64 chars only for namespace, as it is the maximum for k8s resources
 FORGE_NAMESPACE=${FORGE_NAMESPACE:0:64}
 
-
+[ "$FORGE_NAMESPACE_REUSE" = "true" ] && REUSE_ARGS="--reuse"
 [ "$FORGE_NAMESPACE_KEEP" = "true" ] && KEEP_ARGS="--keep"
 [ "$FORGE_ENABLE_HAPROXY" = "true" ] && ENABLE_HAPROXY_ARGS="--enable-haproxy"
 
 if [ -z "$IMAGE_TAG" ]; then
-    echo "IMAGE_TAG not set"
-    exit 1
+    IMAGE_TAG_DEFAULT=$(git rev-parse HEAD)
+    echo "IMAGE_TAG not set, defaulting to current HEAD commit as tag: ${IMAGE_TAG_DEFAULT}"
+    IMAGE_TAG=${IMAGE_TAG_DEFAULT}
 fi
 
 echo "Ensure image exists"
 img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG)
 if [ $? != 0 ]; then
-    echo "IMAGE_TAG does not exist: ${IMAGE_TAG}"
+    echo "IMAGE_TAG does not exist in ECR: ${IMAGE_TAG}. Make sure your commit has been pushed to GitHub previously."
+    echo "If you're trying to run the code from your PR, apply the label 'CICD:build-images' and wait for the builds to finish."
     exit 1
 fi
 
@@ -87,10 +91,11 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     # more file descriptors for heavy txn generation
     ulimit -n 1048576
 
-    cargo run -p forge-cli -- test k8s-swarm \
+    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --workers-per-ac 10 \
+	test k8s-swarm 
         --image-tag $IMAGE_TAG \
         --namespace $FORGE_NAMESPACE \
-        --port-forward $KEEP_ARGS $ENABLE_HAPROXY_ARGS | tee $FORGE_OUTPUT
+        --port-forward $REUSE_ARGS $KEEP_ARGS $ENABLE_HAPROXY_ARGS | tee $FORGE_OUTPUT
 
     FORGE_EXIT_CODE=$?
 
@@ -105,31 +110,33 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
     # this will pre-empt the existing forge test in the same namespace and ensures
     # we do not have any dangling test runners
     FORGE_POD_NAME=$FORGE_NAMESPACE
-    kubectl delete pod $FORGE_POD_NAME || true
-    kubectl wait --for=delete "pod/${FORGE_POD_NAME}" || true
+    kubectl delete pod -n default $FORGE_POD_NAME || true
+    kubectl wait -n default --for=delete "pod/${FORGE_POD_NAME}" || true
 
     specfile=$(mktemp)
     echo "Forge test-runner pod Spec : ${specfile}"
 
     sed -e "s/{FORGE_POD_NAME}/${FORGE_POD_NAME}/g" \
+        -e "s/{FORGE_TEST_SUITE}/${FORGE_TEST_SUITE}/g" \
         -e "s/{IMAGE_TAG}/${IMAGE_TAG}/g" \
         -e "s/{AWS_ACCOUNT_NUM}/${AWS_ACCOUNT_NUM}/g" \
         -e "s/{AWS_REGION}/${AWS_REGION}/g" \
         -e "s/{FORGE_NAMESPACE}/${FORGE_NAMESPACE}/g" \
+         -e "s/{REUSE_ARGS}/${REUSE_ARGS}/g" \
         -e "s/{KEEP_ARGS}/${KEEP_ARGS}/g" \
         -e "s/{ENABLE_HAPROXY_ARGS}/${ENABLE_HAPROXY_ARGS}/g" \
         testsuite/forge-test-runner-template.yaml > ${specfile}
     
-    kubectl apply -f $specfile
+    kubectl apply -n default -f $specfile
 
     # wait for enough time for the pod to start and potentially new nodes to come online
-    kubectl wait --timeout=5m --for=condition=Ready "pod/${FORGE_POD_NAME}"
+    kubectl wait -n default --timeout=5m --for=condition=Ready "pod/${FORGE_POD_NAME}"
 
     # tail the logs and tee them for further parsing
-    kubectl logs -f $FORGE_POD_NAME | tee $FORGE_OUTPUT
+    kubectl logs -n default -f $FORGE_POD_NAME | tee $FORGE_OUTPUT
 
     # parse the pod status: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
-    forge_pod_status=$(kubectl get pod $FORGE_POD_NAME -o jsonpath="{.status.phase}")
+    forge_pod_status=$(kubectl get pod -n default $FORGE_POD_NAME -o jsonpath="{.status.phase}")
     echo "Forge pod status: ${forge_pod_status}"
     if [ "$forge_pod_status" = "Succeeded" ]; then
         FORGE_EXIT_CODE=0
@@ -164,8 +171,11 @@ P99_LATENCY=$(cat $FORGE_REPORT | grep -oE '[0-9]+ ms p99 latency' | awk '{print
 if [ -n "$AVG_TPS" ]; then
     echo "AVG_TPS: ${AVG_TPS}"
     echo "forge_job_avg_tps {FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\",GITHUB_RUN_ID=\"$GITHUB_RUN_ID\"} $AVG_TPS" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
-    if [[ "$AVG_TPS" -lt "$AVG_TPS_MS_THRESHOLD" ]]; then
+    if [[ "$AVG_TPS" -lt "$TPS_THRESHOLD" ]]; then
         echo "(\!) AVG_TPS: ${avg_tps} < ${TPS_THRESHOLD} tps"
+	if [ "$FORGE_RUNNER_MODE" != "local" ]; then
+           FORGE_EXIT_CODE=1
+        fi
     fi
 fi
 if [ -n "$P99_LATENCY" ]; then
@@ -173,6 +183,9 @@ if [ -n "$P99_LATENCY" ]; then
     echo "forge_job_p99_latency {FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\",GITHUB_RUN_ID=\"$GITHUB_RUN_ID\"} $P99_LATENCY" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
     if [[ "$P99_LATENCY" -gt "$P99_LATENCY_MS_THRESHOLD" ]]; then
         echo "(\!) P99_LATENCY: ${P99_LATENCY} > ${P99_LATENCY_MS_THRESHOLD} ms"
+	if [ "$FORGE_RUNNER_MODE" != "local" ]; then
+            FORGE_EXIT_CODE=1
+        fi
     fi
 fi
 
@@ -191,7 +204,10 @@ fi
 
 # remove the "aptos-" prefix and add "net" suffix to get the chain name
 # as used by the deployment setup and as reported to o11y systems
-FORGE_CHAIN_NAME=${FORGE_CLUSTER_NAME#"aptos-"}net
+FORGE_CHAIN_NAME=${FORGE_CLUSTER_NAME#"aptos-"}
+if echo $FORGE_CLUSTER_NAME | grep -qv "forge"; then
+    FORGE_CHAIN_NAME="${FORGE_CHAIN_NAME}net"
+fi
 FORGE_DASHBOARD_LINK="${GRAFANA_BASE_URL}&var-namespace=${FORGE_NAMESPACE}&var-chain_name=${FORGE_CHAIN_NAME}&from=${FORGE_START_TIME_MS}&to=${FORGE_END_TIME_MS}"
 
 # build the logs link in a readable way...

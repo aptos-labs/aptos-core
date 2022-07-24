@@ -33,14 +33,21 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
     move_stdlib::natives::all_natives(CORE_CODE_ADDRESS)
         .into_iter()
         .chain(framework::natives::all_natives(CORE_CODE_ADDRESS))
-        .chain(move_table_extension::table_natives(CORE_CODE_ADDRESS))
+        .chain(framework::natives::patch_table_module(
+            move_table_extension::table_natives(CORE_CODE_ADDRESS),
+        ))
         .chain(test_transaction_context_natives(CORE_CODE_ADDRESS))
         .collect()
 }
 
 #[test]
-fn move_unit_tests() {
+fn move_framework_unit_tests() {
     run_tests_for_pkg("aptos-framework");
+}
+
+#[test]
+fn move_stdlib_unit_tests() {
+    run_tests_for_pkg("aptos-stdlib");
 }
 
 #[test]

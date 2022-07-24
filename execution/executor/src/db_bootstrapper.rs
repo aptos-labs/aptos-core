@@ -22,7 +22,9 @@ use aptos_types::{
 use aptos_vm::VMExecutor;
 use executor_types::ExecutedChunk;
 use move_deps::move_core_types::move_resource::MoveResource;
+use std::ops::Deref;
 use std::{collections::btree_map::BTreeMap, sync::Arc};
+use storage_interface::sync_proof_fetcher::SyncProofFetcher;
 use storage_interface::{
     cached_state_view::CachedStateView, DbReaderWriter, DbWriter, ExecutedTrees,
 };
@@ -121,7 +123,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     // second use case said above.
     let genesis_version = executed_trees.version().map_or(0, |v| v + 1);
     let base_state_view =
-        executed_trees.verified_state_view(StateViewId::Miscellaneous, db.reader.clone())?;
+        executed_trees.verified_state_view(StateViewId::Miscellaneous, db.reader.deref())?;
 
     let epoch = if genesis_version == 0 {
         GENESIS_EPOCH
@@ -143,7 +145,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     } else {
         let state_view = output
             .result_view
-            .verified_state_view(StateViewId::Miscellaneous, db.reader.clone())?;
+            .verified_state_view(StateViewId::Miscellaneous, db.reader.deref())?;
         let next_epoch = epoch
             .checked_add(1)
             .ok_or_else(|| format_err!("integer overflow occurred"))?;
@@ -187,7 +189,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     Ok(committer)
 }
 
-fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {
+fn get_state_timestamp(state_view: &CachedStateView<SyncProofFetcher>) -> Result<u64> {
     let rsrc_bytes = &state_view
         .get_state_value(&StateKey::AccessPath(AccessPath::new(
             CORE_CODE_ADDRESS,
@@ -198,7 +200,7 @@ fn get_state_timestamp(state_view: &CachedStateView) -> Result<u64> {
     Ok(rsrc.timestamp.microseconds)
 }
 
-fn get_state_epoch(state_view: &CachedStateView) -> Result<u64> {
+fn get_state_epoch(state_view: &CachedStateView<SyncProofFetcher>) -> Result<u64> {
     let rsrc_bytes = &state_view
         .get_state_value(&StateKey::AccessPath(AccessPath::new(
             CORE_CODE_ADDRESS,

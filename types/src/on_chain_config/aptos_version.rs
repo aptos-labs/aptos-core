@@ -11,7 +11,8 @@ pub struct Version {
 }
 
 impl OnChainConfig for Version {
-    const IDENTIFIER: &'static str = "Version";
+    const MODULE_IDENTIFIER: &'static str = "version";
+    const TYPE_IDENTIFIER: &'static str = "Version";
 }
 
 // NOTE: version number for release 1.2 Aptos

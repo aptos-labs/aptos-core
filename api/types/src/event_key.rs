@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 
@@ -50,6 +51,9 @@ impl fmt::Display for EventKey {
         write!(f, "{:#x}", self.0)
     }
 }
+
+impl_poem_type!(EventKey);
+impl_poem_parameter!(EventKey);
 
 #[cfg(test)]
 mod tests {

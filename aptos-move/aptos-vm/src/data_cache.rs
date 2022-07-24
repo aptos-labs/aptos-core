@@ -72,6 +72,9 @@ impl<'a, S: StateView> StateViewCache<'a, S> {
                     self.data_map.remove(ap);
                     self.data_map.insert(ap.clone(), None);
                 }
+                WriteOp::Delta(..) => {
+                    unimplemented!("sequential execution is not supported for deltas")
+                }
             }
         }
     }
@@ -160,7 +163,7 @@ impl<'a, S: StateView> TableResolver for RemoteStorage<'a, S> {
         handle: &TableHandle,
         key: &[u8],
     ) -> Result<Option<Vec<u8>>, Error> {
-        self.get_state_value(&StateKey::table_item(handle.0, key.to_vec()))
+        self.get_state_value(&StateKey::table_item((*handle).into(), key.to_vec()))
     }
 
     fn operation_cost(

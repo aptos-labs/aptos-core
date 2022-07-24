@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 pub struct NewBlockEvent {
     epoch: u64,
     round: u64,
+    height: u64,
     previous_block_votes: Vec<bool>,
     proposer: AccountAddress,
     failed_proposer_indices: Vec<u64>,
@@ -53,6 +54,7 @@ impl NewBlockEvent {
     pub fn new(
         epoch: u64,
         round: u64,
+        height: u64,
         previous_block_votes: Vec<bool>,
         proposer: AccountAddress,
         failed_proposer_indices: Vec<u64>,
@@ -61,6 +63,7 @@ impl NewBlockEvent {
         Self {
             epoch,
             round,
+            height,
             previous_block_votes,
             proposer,
             failed_proposer_indices,
@@ -70,6 +73,6 @@ impl NewBlockEvent {
 }
 
 impl MoveStructType for NewBlockEvent {
-    const MODULE_NAME: &'static IdentStr = ident_str!("Block");
+    const MODULE_NAME: &'static IdentStr = ident_str!("block");
     const STRUCT_NAME: &'static IdentStr = ident_str!("NewBlockEvent");
 }

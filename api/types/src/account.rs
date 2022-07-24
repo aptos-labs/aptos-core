@@ -4,9 +4,10 @@
 use crate::{HexEncodedBytes, U64};
 
 use aptos_types::account_config::AccountResource;
+use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct AccountData {
     pub sequence_number: U64,
     pub authentication_key: HexEncodedBytes,
@@ -14,9 +15,10 @@ pub struct AccountData {
 
 impl From<AccountResource> for AccountData {
     fn from(ar: AccountResource) -> Self {
+        let authentication_key: HexEncodedBytes = ar.authentication_key().to_vec().into();
         Self {
             sequence_number: ar.sequence_number().into(),
-            authentication_key: ar.authentication_key().to_vec().into(),
+            authentication_key,
         }
     }
 }

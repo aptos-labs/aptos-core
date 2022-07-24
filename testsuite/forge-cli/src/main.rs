@@ -93,6 +93,11 @@ struct K8sSwarm {
     port_forward: bool,
     #[structopt(
         long,
+        help = "If set, reuse the forge testnet active in the specified namespace"
+    )]
+    reuse: bool,
+    #[structopt(
+        long,
         help = "If set, keeps the forge testnet active in the specified namespace"
     )]
     keep: bool,
@@ -143,9 +148,9 @@ struct Resize {
     move_modules_dir: Option<String>,
     #[structopt(
         long,
-        help = "If set, uses kubectl port-forward instead of assuming k8s DNS access"
+        help = "If set, dont use kubectl port forward to access the cluster"
     )]
-    port_forward: bool,
+    connect_directly: bool,
     #[structopt(long, help = "If set, enables HAProxy for each of the validators")]
     enable_haproxy: bool,
 }
@@ -196,6 +201,7 @@ fn main() -> Result<()> {
                         k8s.image_tag,
                         k8s.base_image_tag,
                         k8s.port_forward,
+                        k8s.reuse,
                         k8s.keep,
                         k8s.enable_haproxy,
                     )
@@ -229,7 +235,7 @@ fn main() -> Result<()> {
                     resize.validator_image_tag,
                     resize.testnet_image_tag,
                     resize.move_modules_dir,
-                    resize.port_forward,
+                    !resize.connect_directly,
                     resize.enable_haproxy,
                 ))?;
                 Ok(())
@@ -471,7 +477,7 @@ impl AptosTest for TransferCoins {
 
         let transfer_txn = payer.sign_with_transaction_builder(
             ctx.aptos_transaction_factory()
-                .payload(aptos_stdlib::encode_test_coin_transfer(payee.address(), 10)),
+                .payload(aptos_stdlib::aptos_coin_transfer(payee.address(), 10)),
         );
         client.submit_and_wait(&transfer_txn).await?;
         check_account_balance(&client, payee.address(), 10).await?;

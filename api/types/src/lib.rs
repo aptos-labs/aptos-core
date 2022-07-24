@@ -16,12 +16,13 @@ mod move_types;
 mod response;
 mod table;
 mod transaction;
+mod wrappers;
 
 pub use account::AccountData;
 pub use address::Address;
 pub use block::BlockInfo;
 pub use bytecode::Bytecode;
-pub use convert::{new_vm_ascii_string, AsConverter, MoveConverter};
+pub use convert::{new_vm_utf8_string, AsConverter, MoveConverter};
 pub use error::Error;
 pub use event_key::EventKey;
 pub use hash::HashValue;
@@ -37,9 +38,11 @@ pub use response::{
 };
 pub use table::TableItemRequest;
 pub use transaction::{
-    BlockMetadataTransaction, DirectWriteSet, Event, GenesisTransaction, PendingTransaction,
-    ScriptFunctionPayload, ScriptPayload, ScriptWriteSet, Transaction, TransactionData,
-    TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
-    TransactionSigningMessage, UserCreateSigningMessageRequest, UserTransaction,
-    UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
+    BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem, DirectWriteSet, Event,
+    GenesisTransaction, PendingTransaction, ScriptFunctionPayload, ScriptPayload, ScriptWriteSet,
+    Transaction, TransactionData, TransactionId, TransactionInfo, TransactionOnChainData,
+    TransactionPayload, TransactionSigningMessage, UserCreateSigningMessageRequest,
+    UserTransaction, UserTransactionRequest, WriteModule, WriteResource, WriteSet, WriteSetChange,
+    WriteSetPayload, WriteTableItem,
 };
+pub use wrappers::{IdentifierWrapper, MoveStructTagWrapper};

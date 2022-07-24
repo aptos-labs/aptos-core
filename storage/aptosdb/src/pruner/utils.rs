@@ -13,7 +13,7 @@ use crate::{
 use aptos_config::config::StoragePrunerConfig;
 use aptos_infallible::Mutex;
 use schemadb::DB;
-use std::{sync::Arc, time::Instant};
+use std::sync::Arc;
 
 /// A useful utility function to instantiate all db pruners.
 pub fn create_db_pruners(
@@ -23,11 +23,9 @@ pub fn create_db_pruners(
 ) -> Vec<Option<Mutex<Arc<dyn DBPruner + Send + Sync>>>> {
     vec![
         if storage_pruner_config.state_store_prune_window.is_some() {
-            Some(Mutex::new(Arc::new(StateStorePruner::new(
-                Arc::clone(&state_merkle_db),
-                0,
-                Instant::now(),
-            ))))
+            Some(Mutex::new(Arc::new(StateStorePruner::new(Arc::clone(
+                &state_merkle_db,
+            )))))
         } else {
             None
         },

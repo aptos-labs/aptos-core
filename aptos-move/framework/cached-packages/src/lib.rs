@@ -8,8 +8,9 @@ use move_deps::{
 };
 use once_cell::sync::Lazy;
 
+pub mod aptos_framework_sdk_builder;
 pub mod aptos_stdlib;
-pub mod aptos_token_stdlib;
+pub mod aptos_token_sdk_builder;
 
 static PACKAGE: Dir<'static> = include_dir!("$OUT_DIR/framework");
 
@@ -91,20 +92,24 @@ pub fn module_blobs() -> &'static [Vec<u8>] {
 fn verify_load_framework() {
     module_blobs();
     error_map();
+    /*
     std::fs::read(concat!(
         env!("OUT_DIR"),
         "/framework/transaction_script_builder.rs"
     ))
     .unwrap();
+     */
 }
 
 #[test]
 fn verify_load_token() {
     module_blobs();
     error_map();
+    /*
     std::fs::read(concat!(
         env!("OUT_DIR"),
         "/token/transaction_script_builder.rs"
     ))
     .unwrap();
+     */
 }

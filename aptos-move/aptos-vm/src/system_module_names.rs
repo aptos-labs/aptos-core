@@ -11,7 +11,7 @@ use once_cell::sync::Lazy;
 pub static BLOCK_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(
         account_config::CORE_CODE_ADDRESS,
-        ident_str!("Block").to_owned(),
+        ident_str!("block").to_owned(),
     )
 });
 

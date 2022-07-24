@@ -17,6 +17,7 @@ use executor_types::{BlockExecutorTrait, Error, StateComputeResult, StateSnapsho
 use fail::fail_point;
 use scratchpad::SparseMerkleTree;
 use std::marker::PhantomData;
+use std::ops::Deref;
 
 use crate::{
     components::{block_tree::BlockTree, chunk_output::ChunkOutput},
@@ -108,7 +109,7 @@ where
             let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
             let state_view = parent_view.verified_state_view(
                 StateViewId::BlockExecution { block_id },
-                self.db.reader.clone(),
+                self.db.reader.deref(),
             )?;
 
             let chunk_output = {

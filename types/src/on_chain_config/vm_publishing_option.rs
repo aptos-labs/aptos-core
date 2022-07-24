@@ -49,5 +49,6 @@ impl VMPublishingOption {
 }
 
 impl OnChainConfig for VMPublishingOption {
-    const IDENTIFIER: &'static str = "TransactionPublishingOption";
+    const MODULE_IDENTIFIER: &'static str = "transaction_publishing_option";
+    const TYPE_IDENTIFIER: &'static str = "TransactionPublishingOption";
 }

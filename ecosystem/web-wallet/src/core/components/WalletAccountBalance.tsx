@@ -6,7 +6,7 @@ import {
 } from '@chakra-ui/react';
 import React from 'react';
 import { seconaryAddressFontColor } from 'core/components/WalletHeader';
-import { getAccountResources, getTestCoinTokenBalanceFromAccountResources } from 'core/queries/account';
+import { getAccountResources, getAptosCoinTokenBalanceFromAccountResources } from 'core/queries/account';
 import { useQuery } from 'react-query';
 import useWalletState from 'core/hooks/useWalletState';
 import numeral from 'numeral';
@@ -25,7 +25,7 @@ function WalletAccountBalance() {
     { refetchInterval: 2000 },
   );
 
-  const tokenBalance = getTestCoinTokenBalanceFromAccountResources({ accountResources });
+  const tokenBalance = getAptosCoinTokenBalanceFromAccountResources({ accountResources });
   const tokenBalanceString = numeral(tokenBalance).format('0,0.0000');
 
   return (

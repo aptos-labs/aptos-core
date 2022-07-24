@@ -24,14 +24,19 @@ async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
 ) {
     let payload = ctx
         .aptos_transaction_factory()
-        .payload(aptos_stdlib::encode_test_coin_claim_mint_capability())
+        .payload(aptos_stdlib::aptos_coin_claim_mint_capability())
         .sequence_number(0);
     let txn = local_account.sign_transaction(f(payload).build());
     let err = format!(
         "{:?}",
         ctx.client().submit_and_wait(&txn).await.unwrap_err()
     );
-    assert!(err.contains(expected), "{}", err);
+    assert!(
+        err.contains(expected),
+        "expected = {}, err = {}",
+        expected,
+        err
+    )
 }
 
 #[async_trait::async_trait]
@@ -75,10 +80,14 @@ impl AptosTest for ErrorReport {
             "SEQUENCE_NUMBER_TOO_OLD",
         )
         .await;
+        let root_account_sequence_number = ctx.root_account().sequence_number();
         submit_and_check_err(
             &local_account,
             ctx,
-            |t| t.sender(aptos_root_address()).sequence_number(1),
+            |t| {
+                t.sender(aptos_root_address())
+                    .sequence_number(root_account_sequence_number)
+            },
             "INVALID_AUTH_KEY",
         )
         .await;

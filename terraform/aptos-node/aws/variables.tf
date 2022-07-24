@@ -79,11 +79,6 @@ variable "helm_values_file" {
   default     = ""
 }
 
-variable "helm_force_update" {
-  description = "Force Terraform to update the Helm deployment"
-  default     = true
-}
-
 variable "k8s_admins" {
   description = "List of AWS usernames to configure as Kubernetes administrators"
   type        = list(string)
@@ -194,6 +189,17 @@ variable "logger_helm_values" {
   description = "Map of values to pass to logger Helm"
   type        = any
   default     = {}
+}
+
+variable "enable_vector_daemonset_logger" {
+  description = "Enable vector daemonset logger helm chart"
+  default     = false
+}
+
+variable "vector_daemonset_helm_values" {
+  description = "Map of helm values to pass to vector-daemonset chart"
+  type        = list(string)
+  default     = []
 }
 
 variable "enable_monitoring" {

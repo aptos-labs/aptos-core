@@ -21,7 +21,7 @@ impl ChainIdResource {
 }
 
 impl MoveStructType for ChainIdResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("ChainId");
+    const MODULE_NAME: &'static IdentStr = ident_str!("chain_id");
     const STRUCT_NAME: &'static IdentStr = ident_str!("ChainId");
 }
 

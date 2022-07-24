@@ -38,7 +38,7 @@ impl AccountGenerator {
         let auth_key = AuthenticationKey::from_preimage(&preimage);
         from.sign_with_transaction_builder(
             txn_factory
-                .payload(aptos_stdlib::encode_account_create_account(
+                .payload(aptos_stdlib::account_create_account(
                     auth_key.derived_address(),
                 ))
                 .gas_unit_price(gas_price),

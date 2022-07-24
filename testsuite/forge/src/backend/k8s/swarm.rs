@@ -205,7 +205,7 @@ impl Swarm for K8sSwarm {
 
 /// Amount of time to wait for genesis to complete
 pub fn k8s_wait_genesis_strategy() -> impl Iterator<Item = Duration> {
-    ExponentWithLimitDelay::new(1000, 10 * 1000, 3 * 60 * 1000)
+    ExponentWithLimitDelay::new(1000, 10 * 1000, 10 * 60 * 1000)
 }
 
 /// Amount of time to wait for nodes to respond on the REST API
@@ -302,7 +302,6 @@ pub(crate) async fn get_validators(
 pub(crate) async fn get_fullnodes(
     client: K8sClient,
     image_tag: &str,
-    era: &str,
     kube_namespace: &str,
     use_port_forward: bool,
     enable_haproxy: bool,
@@ -328,8 +327,9 @@ pub(crate) async fn get_fullnodes(
                 ip = LOCALHOST.to_string();
             }
             let node_id = parse_node_id(&s.name).expect("error to parse node id");
-            // the base fullnode name is the same as that of the StatefulSet, and includes era
-            let fullnode_name = format!("{}-e{}", &s.name, era);
+            // the base fullnode name is the same as that of the StatefulSet
+            // TODO: get the era and fullnode group, for now ignore it
+            let fullnode_name = format!("aptos-node-{}-fullnode", node_id);
             let node = K8sNode {
                 name: fullnode_name.clone(),
                 sts_name: fullnode_name,

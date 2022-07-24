@@ -85,7 +85,7 @@ use aptos_types::{
 };
 use itertools::zip_eq;
 use once_cell::sync::Lazy;
-use schemadb::{SchemaBatch, DB};
+use schemadb::DB;
 use scratchpad::SparseMerkleTree;
 use std::{
     collections::HashMap,
@@ -287,11 +287,11 @@ impl AptosDB {
             state_merkle_db: Arc::clone(&arc_state_merkle_rocksdb),
             event_store: Arc::new(EventStore::new(Arc::clone(&arc_ledger_rocksdb))),
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&arc_ledger_rocksdb))),
-            state_store: StateStore::new(
+            state_store: Arc::new(StateStore::new(
                 Arc::clone(&arc_ledger_rocksdb),
                 Arc::clone(&arc_state_merkle_rocksdb),
                 hack_for_tests,
-            ),
+            )),
             system_store: Arc::new(SystemStore::new(Arc::clone(&arc_ledger_rocksdb))),
             transaction_store: Arc::new(TransactionStore::new(Arc::clone(&arc_ledger_rocksdb))),
             pruner_config,
@@ -1636,12 +1636,11 @@ impl DbWriter for AptosDB {
             // Execute each pruner to clean up the genesis state
             let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive).
             let max_version = 1; // We should only really be pruning at a single version.
-            let mut db_batch = SchemaBatch::new();
             for db_pruner in db_pruners.into_iter().flatten() {
                 db_pruner.lock().set_target_version(target_version);
-                db_pruner.lock().prune(&mut db_batch, max_version)?;
+                db_pruner.lock().prune(max_version)?;
             }
-            self.ledger_db.write_schemas(db_batch)
+            Ok(())
         })
     }
 }

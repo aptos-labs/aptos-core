@@ -35,7 +35,7 @@ The Aptos Token is defined as:
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | `id` | `GUID:ID` | A globally unique identifier for this token also useful for identifying the creator |
-| `name` | `ascii::String` | The name of this token, must be unique within the collection |
+| `name` | `string::String` | The name of this token, must be unique within the collection |
 | `collection` | `GUID:ID` | A globally unique identifier for the collection that contains this token |
 | `balance` | `u64` | The current stored amount of this token in relation to the supply, `1 <= balance <= supply` |
 
@@ -44,10 +44,10 @@ The Aptos TokenData is defined as:
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | `id` | `GUID:ID` | A globally unique identifier for this token also useful for identifying the creator |
-| `description` | `ascii::String` | Describes this token |
-| `name` | `ascii::String` | The name of this token, must be unique within the collection |
+| `description` | `string::String` | Describes this token |
+| `name` | `string::String` | The name of this token, must be unique within the collection |
 | `supply` | `u64` | Total number of editions of this Token |
-| `uri` | `ascii::String` | URL for additional information / media |
+| `uri` | `string::String` | URL for additional information / media |
 | `metadata` | `TokenType` | A generic, a optional user defined struct to contain additional information about this token on-chain |
 
 Tokens are defined with the move attributes `store`, which means that they can be saved to global storage. Tokens cannot be implicitly dropped and must be burned to ensure that the total balance is equal to supply. Tokens cannot be copied. That is the total balance or supply cannot be changed by anyone but the creator due to the lack of a copy operator. Note, the current APIs do not expose the ability for post creation mints. A token can be uniquely identified by either its `id` or by the tuple of `TokenType, collection name, and token name`.
@@ -60,7 +60,7 @@ Aptos defines a set of collections grouped together by their unique `id`:
 
 ```rust
 struct Collections<TokenType: copy + drop + store> has key {
-    collections: Table<ascii::String, Collection>,
+    collections: Table<string::String, Collection>,
 }
 
 struct TokenMetadata<TokenType: store> has key {
@@ -76,11 +76,11 @@ Each collection has the following fields:
 
 | Field | Type | Description |
 | ----- | ---- | ----------- |
-| `tokens` | `Table<ascii::String, TokenMetadata<TokenType>>` | Keeps track of all Tokens associated with this collection |
-| `claimed_tokens` | `Table<ascii::String, address>` | Keeps track of where tokens wth `supply == 1` are stored |
-| `description` | `ascii::String` | Describes this collection |
-| `name` | `ascii::String` | The name of this collection, must be unique within the creators account for the specified `TokenType`. |
-| `uri` | `ascii::String` | URL for additional information / media |
+| `tokens` | `Table<string::String, TokenMetadata<TokenType>>` | Keeps track of all Tokens associated with this collection |
+| `claimed_tokens` | `Table<string::String, address>` | Keeps track of where tokens wth `supply == 1` are stored |
+| `description` | `string::String` | Describes this collection |
+| `name` | `string::String` | The name of this collection, must be unique within the creators account for the specified `TokenType`. |
+| `uri` | `string::String` | URL for additional information / media |
 | `count` | `u64` | Total number of distinct Tokens tracked by this collection |
 | `maximum` | `Option<u64>` | Optional, maximum amount of tokens that can be minted within this collection |
 

@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    transaction::{ModuleBundlePayload, StateCheckpointTransaction},
+    transaction::{
+        DeleteModule, DeleteResource, DeleteTableItem, ModuleBundlePayload,
+        StateCheckpointTransaction, WriteModule, WriteResource, WriteTableItem,
+    },
     Bytecode, DirectWriteSet, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode,
     MoveResource, MoveScriptBytecode, MoveValue, ScriptFunctionId, ScriptFunctionPayload,
     ScriptPayload, ScriptWriteSet, Transaction, TransactionInfo, TransactionOnChainData,
@@ -11,6 +14,7 @@ use crate::{
 use anyhow::{bail, ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_transaction_builder::error_explain;
+use aptos_types::state_store::table::TableHandle;
 use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
@@ -166,7 +170,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     arguments: json_args,
                     function: ScriptFunctionId {
                         module: module.into(),
-                        name: function,
+                        name: function.into(),
                     },
                     type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
                 })
@@ -233,29 +237,31 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     ) -> Result<WriteSetChange> {
         let ret = match op {
             WriteOp::Deletion => match access_path.get_path() {
-                Path::Code(module_id) => WriteSetChange::DeleteModule {
+                Path::Code(module_id) => WriteSetChange::DeleteModule(DeleteModule {
                     address: access_path.address.into(),
                     state_key_hash,
                     module: module_id.into(),
-                },
-                Path::Resource(typ) => WriteSetChange::DeleteResource {
+                }),
+                Path::Resource(typ) => WriteSetChange::DeleteResource(DeleteResource {
                     address: access_path.address.into(),
                     state_key_hash,
                     resource: typ.into(),
-                },
+                }),
             },
             WriteOp::Value(val) => match access_path.get_path() {
-                Path::Code(_) => WriteSetChange::WriteModule {
+                Path::Code(_) => WriteSetChange::WriteModule(WriteModule {
                     address: access_path.address.into(),
                     state_key_hash,
                     data: MoveModuleBytecode::new(val).try_parse_abi()?,
-                },
-                Path::Resource(typ) => WriteSetChange::WriteResource {
+                }),
+                Path::Resource(typ) => WriteSetChange::WriteResource(WriteResource {
                     address: access_path.address.into(),
                     state_key_hash,
                     data: self.try_into_resource(&typ, &val)?,
-                },
+                }),
             },
+            // Deltas never use access paths.
+            WriteOp::Delta(..) => unreachable!("unexpected conversion"),
         };
         Ok(ret)
     }
@@ -263,24 +269,26 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     pub fn try_table_item_into_write_set_change(
         &self,
         state_key_hash: String,
-        handle: u128,
+        handle: TableHandle,
         key: Vec<u8>,
         op: WriteOp,
     ) -> Result<WriteSetChange> {
-        let handle = handle.to_be_bytes().to_vec().into();
+        let handle = handle.0.to_be_bytes().to_vec().into();
         let key = key.into();
         let ret = match op {
-            WriteOp::Deletion => WriteSetChange::DeleteTableItem {
+            WriteOp::Deletion => WriteSetChange::DeleteTableItem(DeleteTableItem {
                 state_key_hash,
                 handle,
                 key,
-            },
-            WriteOp::Value(value) => WriteSetChange::WriteTableItem {
+            }),
+            WriteOp::Value(value) => WriteSetChange::WriteTableItem(WriteTableItem {
                 state_key_hash,
                 handle,
                 key,
                 value: value.into(),
-            },
+            }),
+            // Deltas are materialized into WriteOP::Value(..) in executor.
+            WriteOp::Delta(..) => unreachable!("unexpected conversion"),
         };
         Ok(ret)
     }
@@ -353,7 +361,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 let module = function.module.clone();
                 let code = self.inner.get_module(&module.clone().into())? as Rc<dyn Bytecode>;
                 let func = code
-                    .find_script_function(function.name.as_ident_str())
+                    .find_script_function(function.name.0.as_ident_str())
                     .ok_or_else(|| format_err!("could not find script function by {}", function))?;
                 ensure!(
                     func.generic_type_params.len() == type_arguments.len(),
@@ -370,7 +378,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
 
                 Target::ScriptFunction(ScriptFunction::new(
                     module.into(),
-                    function.name,
+                    function.name.into(),
                     type_arguments
                         .into_iter()
                         .map(|v| v.try_into())
@@ -533,11 +541,11 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     layout
                 );
             };
-        if MoveValue::is_ascii_string(struct_tag) {
+        if MoveValue::is_utf8_string(struct_tag) {
             let string = val
                 .as_str()
-                .ok_or_else(|| format_err!("failed to parse ascii::String."))?;
-            return Ok(new_vm_ascii_string(string));
+                .ok_or_else(|| format_err!("failed to parse string::String."))?;
+            return Ok(new_vm_utf8_string(string));
         }
 
         let mut field_values = if let Value::Object(fields) = val {
@@ -637,7 +645,7 @@ impl<R: MoveResolverExt> AsConverter<R> for R {
     }
 }
 
-pub fn new_vm_ascii_string(string: &str) -> move_core_types::value::MoveValue {
+pub fn new_vm_utf8_string(string: &str) -> move_core_types::value::MoveValue {
     use move_deps::move_core_types::value::{MoveStruct, MoveValue};
 
     let byte_vector = MoveValue::Vector(

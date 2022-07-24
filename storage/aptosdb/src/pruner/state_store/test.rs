@@ -6,8 +6,10 @@ use std::collections::HashMap;
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
+use schemadb::ReadOptions;
 use storage_interface::{jmt_update_refs, jmt_updates, DbReader};
 
+use crate::stale_node_index::StaleNodeIndexSchema;
 use crate::{change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB};
 
 fn put_value_set(
@@ -72,7 +74,8 @@ fn test_state_store_pruner() {
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
             ledger_prune_window: Some(0),
-            pruning_batch_size: prune_batch_size,
+            ledger_pruning_batch_size: prune_batch_size,
+            state_store_pruning_batch_size: prune_batch_size,
         },
     );
 
@@ -141,6 +144,149 @@ fn test_state_store_pruner() {
 }
 
 #[test]
+fn test_state_store_pruner_partial_version() {
+    // ```text
+    // | batch    | 0      | 1             | 2             |
+    // | address1 | value1 |               |               |
+    // | address2 | value2 | value2_update |               |
+    // | address3 |        | value3        | value3_update |
+    // ```
+    // The stale node indexes will have 4 entries in total.
+    // ```
+    // index: StaleNodeIndex { stale_since_version: 1, node_key: NodeKey { version: 0, nibble_path:  } }
+    // index: StaleNodeIndex { stale_since_version: 1, node_key: NodeKey { version: 0, nibble_path: 2 } }
+    // index: StaleNodeIndex { stale_since_version: 2, node_key: NodeKey { version: 1, nibble_path:  } }
+    // index: StaleNodeIndex { stale_since_version: 2, node_key: NodeKey { version: 1, nibble_path: d } }
+    // ```
+    // On version 1, there are two entries, one changes address2 and the other changes the root node.
+    // On version 2, there are two entries, one changes address3 and the other changes the root node.
+    let key1 = StateKey::Raw(String::from("test_key1").into_bytes());
+    let key2 = StateKey::Raw(String::from("test_key2").into_bytes());
+    let key3 = StateKey::Raw(String::from("test_key3").into_bytes());
+
+    let value1 = StateValue::from(String::from("test_val1").into_bytes());
+    let value2 = StateValue::from(String::from("test_val2").into_bytes());
+    let value2_update = StateValue::from(String::from("test_val2_update").into_bytes());
+    let value3 = StateValue::from(String::from("test_val3").into_bytes());
+    let value3_update = StateValue::from(String::from("test_val3_update").into_bytes());
+
+    let prune_batch_size = 1;
+    let tmp_dir = TempPath::new();
+    let aptos_db = AptosDB::new_for_test(&tmp_dir);
+    let state_store = &StateStore::new(
+        Arc::clone(&aptos_db.ledger_db),
+        Arc::clone(&aptos_db.state_merkle_db),
+        false, /* hack_for_tests */
+    );
+    let pruner = Pruner::new(
+        Arc::clone(&aptos_db.ledger_db),
+        Arc::clone(&aptos_db.state_merkle_db),
+        StoragePrunerConfig {
+            state_store_prune_window: Some(0),
+            ledger_prune_window: Some(0),
+            ledger_pruning_batch_size: prune_batch_size,
+            state_store_pruning_batch_size: prune_batch_size,
+        },
+    );
+
+    let _root0 = put_value_set(
+        &aptos_db.ledger_db,
+        state_store,
+        vec![(key1.clone(), value1.clone()), (key2.clone(), value2)],
+        0, /* version */
+    );
+    let _root1 = put_value_set(
+        &aptos_db.ledger_db,
+        state_store,
+        vec![
+            (key2.clone(), value2_update.clone()),
+            (key3.clone(), value3.clone()),
+        ],
+        1, /* version */
+    );
+    let _root2 = put_value_set(
+        &aptos_db.ledger_db,
+        state_store,
+        vec![(key3.clone(), value3_update.clone())],
+        2, /* version */
+    );
+
+    // Prune till version=0. This should basically be a no-op
+    {
+        pruner
+            .wake_and_wait(
+                0, /* latest_version */
+                PrunerIndex::StateStorePrunerIndex as usize,
+            )
+            .unwrap();
+        verify_state_in_store(state_store, key1.clone(), Some(&value1), 1);
+        verify_state_in_store(state_store, key2.clone(), Some(&value2_update), 1);
+        verify_state_in_store(state_store, key3.clone(), Some(&value3), 1);
+    }
+
+    // Test for batched pruning, since we use a batch size of 1, updating the latest version to 1
+    // should prune 1 stale node with the version 0.
+    {
+        assert!(pruner
+            .wake_and_wait(
+                1, /* latest_version */
+                PrunerIndex::StateStorePrunerIndex as usize,
+            )
+            .is_ok());
+        assert!(state_store
+            .get_state_value_with_proof_by_version(&key1, 0_u64)
+            .is_err());
+        // root1 is still there.
+        verify_state_in_store(state_store, key1.clone(), Some(&value1), 1);
+        verify_state_in_store(state_store, key2.clone(), Some(&value2_update), 1);
+        verify_state_in_store(state_store, key3.clone(), Some(&value3), 1);
+    }
+    // Prune 3 more times. All version 0 and 1 stale nodes should be gone.
+    {
+        assert!(pruner
+            .wake_and_wait(
+                2, /* latest_version */
+                PrunerIndex::StateStorePrunerIndex as usize,
+            )
+            .is_ok());
+        assert!(pruner
+            .wake_and_wait(
+                2, /* latest_version */
+                PrunerIndex::StateStorePrunerIndex as usize,
+            )
+            .is_ok());
+
+        assert!(pruner
+            .wake_and_wait(
+                2, /* latest_version */
+                PrunerIndex::StateStorePrunerIndex as usize,
+            )
+            .is_ok());
+        assert!(state_store
+            .get_state_value_with_proof_by_version(&key1, 0_u64)
+            .is_err());
+        assert!(state_store
+            .get_state_value_with_proof_by_version(&key2, 1_u64)
+            .is_err());
+        // root2 is still there.
+        verify_state_in_store(state_store, key1, Some(&value1), 2);
+        verify_state_in_store(state_store, key2, Some(&value2_update), 2);
+        verify_state_in_store(state_store, key3, Some(&value3_update), 2);
+    }
+
+    // Make sure all stale indices are gone.
+    assert_eq!(
+        aptos_db
+            .state_merkle_db
+            .iter::<StaleNodeIndexSchema>(ReadOptions::default())
+            .unwrap()
+            .collect::<Vec<_>>()
+            .len(),
+        0
+    );
+}
+
+#[test]
 fn test_state_store_pruner_disabled() {
     let key = StateKey::Raw(String::from("test_key1").into_bytes());
 
@@ -159,7 +305,8 @@ fn test_state_store_pruner_disabled() {
         StoragePrunerConfig {
             state_store_prune_window: None,
             ledger_prune_window: Some(0),
-            pruning_batch_size: prune_batch_size,
+            ledger_pruning_batch_size: prune_batch_size,
+            state_store_pruning_batch_size: prune_batch_size,
         },
     );
 
@@ -258,7 +405,8 @@ fn test_worker_quit_eagerly() {
             StoragePrunerConfig {
                 state_store_prune_window: Some(1),
                 ledger_prune_window: Some(1),
-                pruning_batch_size: 100,
+                ledger_pruning_batch_size: 100,
+                state_store_pruning_batch_size: 100,
             },
         );
         command_sender

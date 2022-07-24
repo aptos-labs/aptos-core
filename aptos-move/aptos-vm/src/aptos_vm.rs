@@ -27,8 +27,8 @@ use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
-    block_metadata::BlockMetadata,
-    on_chain_config::{VMConfig, VMPublishingOption, Version},
+    block_metadata::{new_block_event_key, BlockMetadata},
+    on_chain_config::{new_epoch_event_key, VMConfig, VMPublishingOption, Version},
     transaction::{
         ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
         Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
@@ -64,6 +64,7 @@ use std::{
 };
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
+static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 
 #[derive(Clone)]
 pub struct AptosVM(pub(crate) AptosVMImpl);
@@ -109,6 +110,23 @@ impl AptosVM {
         match EXECUTION_CONCURRENCY_LEVEL.get() {
             Some(concurrency_level) => *concurrency_level,
             None => 1,
+        }
+    }
+
+    /// Sets the # of async proof reading threads.
+    pub fn set_num_proof_reading_threads_once(mut num_threads: usize) {
+        // TODO(grao): Do more analysis to tune this magic number.
+        num_threads = min(num_threads, 256);
+        // Only the first call succeeds, due to OnceCell semantics.
+        NUM_PROOF_READING_THREADS.set(num_threads).ok();
+    }
+
+    /// Returns the # of async proof reading threads if already set, otherwise return default value
+    /// (32).
+    pub fn get_num_proof_reading_threads() -> usize {
+        match NUM_PROOF_READING_THREADS.get() {
+            Some(num_threads) => *num_threads,
+            None => 32,
         }
     }
 
@@ -535,10 +553,34 @@ impl AptosVM {
         Ok(())
     }
 
+    fn validate_waypoint_change_set(
+        change_set: &ChangeSet,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(), VMStatus> {
+        let has_new_block_event = change_set
+            .events()
+            .iter()
+            .any(|e| *e.key() == new_block_event_key());
+        let has_new_epoch_event = change_set
+            .events()
+            .iter()
+            .any(|e| *e.key() == new_epoch_event_key());
+        if has_new_block_event && has_new_epoch_event {
+            Ok(())
+        } else {
+            error!(
+                *log_context,
+                "[aptos_vm] waypoint txn needs to emit new epoch and block"
+            );
+            Err(VMStatus::Error(StatusCode::INVALID_WRITE_SET))
+        }
+    }
+
     pub(crate) fn process_waypoint_change_set<S: MoveResolverExt + StateView>(
         &self,
         storage: &S,
         writeset_payload: WriteSetPayload,
+        log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
         // TODO: user specified genesis id to distinguish different genesis write sets
         let genesis_id = HashValue::zero();
@@ -551,6 +593,7 @@ impl AptosVM {
             Ok(cs) => cs,
             Err(e) => return e,
         };
+        Self::validate_waypoint_change_set(&change_set, log_context)?;
         let (write_set, events) = change_set.into_inner();
         self.read_writeset(storage, &write_set)?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
@@ -938,8 +981,11 @@ impl VMAdapter for AptosVM {
                 (vm_status, output, Some("block_prologue".to_string()))
             }
             PreprocessedTransaction::WaypointWriteSet(write_set_payload) => {
-                let (vm_status, output) =
-                    self.process_waypoint_change_set(data_cache, write_set_payload.clone())?;
+                let (vm_status, output) = self.process_waypoint_change_set(
+                    data_cache,
+                    write_set_payload.clone(),
+                    log_context,
+                )?;
                 (vm_status, output, Some("waypoint_write_set".to_string()))
             }
             PreprocessedTransaction::UserTransaction(txn) => {

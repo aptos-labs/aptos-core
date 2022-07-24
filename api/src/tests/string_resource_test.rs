@@ -21,10 +21,10 @@ async fn test_renders_move_acsii_string_into_utf8_string() {
     // module 0x87342d91af60c3a883a2812c9294c2f8::Message {
     //     use Std::ascii;
     //     struct MessageHolder has key {
-    //         message: ascii::String,
+    //         message: string::String,
     //     }
     //     public(script) fun set_message(account: signer, msg: vector<u8>) {
-    //         let message = ascii::string(msg);
+    //         let message = string::utf8(msg);
     //         move_to(&account, MessageHolder {
     //             message,
     //         });

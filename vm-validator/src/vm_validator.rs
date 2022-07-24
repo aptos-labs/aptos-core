@@ -13,6 +13,7 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use fail::fail_point;
 use std::sync::Arc;
+use storage_interface::no_proof_fetcher::NoProofFetcher;
 use storage_interface::{
     cached_state_view::CachedStateView, state_view::LatestDbStateCheckpointView, DbReader,
 };
@@ -34,7 +35,7 @@ pub trait TransactionValidation: Send + Sync + Clone {
     fn notify_commit(&mut self);
 }
 
-fn latest_state_view(db_reader: &Arc<dyn DbReader>) -> CachedStateView {
+fn latest_state_view(db_reader: &Arc<dyn DbReader>) -> CachedStateView<NoProofFetcher> {
     let ledger_view = db_reader
         .get_latest_executed_trees()
         .expect("Should not fail.");
@@ -44,14 +45,14 @@ fn latest_state_view(db_reader: &Arc<dyn DbReader>) -> CachedStateView {
             StateViewId::TransactionValidation {
                 base_version: ledger_view.version().expect("Must be bootstrapped."),
             },
-            db_reader.clone(),
+            db_reader,
         )
         .expect("failed to get latest state view.")
 }
 
 pub struct VMValidator {
     db_reader: Arc<dyn DbReader>,
-    cached_state_view: CachedStateView,
+    cached_state_view: CachedStateView<NoProofFetcher>,
     vm: AptosVM,
 }
 

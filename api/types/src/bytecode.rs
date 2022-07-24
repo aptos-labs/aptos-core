@@ -41,7 +41,7 @@ pub trait Bytecode {
 
     fn new_move_struct_field(&self, def: &FieldDefinition) -> MoveStructField {
         MoveStructField {
-            name: self.identifier_at(def.name).to_owned(),
+            name: self.identifier_at(def.name).to_owned().into(),
             typ: self.new_move_type(&def.signature.0),
         }
     }
@@ -55,8 +55,8 @@ pub trait Bytecode {
         let m_handle = self.module_handle_at(s_handle.module);
         MoveStructTag {
             address: (*self.address_identifier_at(m_handle.address)).into(),
-            module: self.identifier_at(m_handle.name).to_owned(),
-            name: self.identifier_at(s_handle.name).to_owned(),
+            module: self.identifier_at(m_handle.name).to_owned().into(),
+            name: self.identifier_at(s_handle.name).to_owned().into(),
             generic_type_params: type_params.iter().map(|t| self.new_move_type(t)).collect(),
         }
     }
@@ -111,7 +111,7 @@ pub trait Bytecode {
             .map(MoveStructGenericTypeParam::from)
             .collect();
         MoveStruct {
-            name,
+            name: name.into(),
             is_native,
             abilities,
             generic_type_params,
@@ -123,7 +123,7 @@ pub trait Bytecode {
         let fhandle = self.function_handle_at(def.function);
         let name = self.identifier_at(fhandle.name).to_owned();
         MoveFunction {
-            name,
+            name: name.into(),
             visibility: def.visibility.into(),
             is_entry: def.is_entry,
             generic_type_params: fhandle

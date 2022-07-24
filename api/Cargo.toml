@@ -1,6 +1,6 @@
 [package]
 name = "aptos-api"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos REST API"
 repository = "https://github.com/aptos-labs/aptos-core"
@@ -17,12 +17,17 @@ fail = "0.5.0"
 futures = "0.3.21"
 hex = "0.4.3"
 hyper = "0.14.18"
+mime = "0.3.16"
 once_cell = "1.10.0"
 percent-encoding = "2.1.0"
+poem = { version = "1.3.35", features = ["anyhow", "rustls"] }
+poem-openapi = { version = "2.0.5", features = ["swagger-ui", "url"] }
 serde = { version = "1.0.137", features = ["derive"], default-features = false }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
 tokio = { version = "1.18.2", features = ["full"] }
+url = "2.2.2"
 warp = { version = "0.3.2", features = ["default", "tls"] }
+warp-reverse-proxy = "0.5.0"
 
 aptos-api-types = { path = "./types", package = "aptos-api-types" }
 aptos-config = { path = "../config" }
