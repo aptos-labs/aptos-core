@@ -711,6 +711,7 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-secure-storage",
+ "aptos-sf-stream",
  "aptos-state-view",
  "aptos-telemetry",
  "aptos-temppath",
@@ -1030,6 +1031,44 @@ dependencies = [
  "serde 1.0.137",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "aptos-sf-stream"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-api",
+ "aptos-api-types",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-genesis",
+ "aptos-global-constants",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-metrics-core",
+ "aptos-proptest-helpers",
+ "aptos-sdk",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptosdb",
+ "cached-framework-packages",
+ "executor",
+ "executor-types",
+ "fail 0.5.0",
+ "futures",
+ "mempool-notifications",
+ "move-deps",
+ "once_cell",
+ "rand 0.7.3",
+ "regex",
+ "serde 1.0.137",
+ "serde_json",
+ "storage-interface",
+ "tokio",
+ "vm-validator",
 ]
 
 [[package]]
