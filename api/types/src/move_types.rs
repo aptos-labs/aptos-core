@@ -164,6 +164,18 @@ impl<'de> Deserialize<'de> for U128 {
     }
 }
 
+impl FromStr for U128 {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let data = s
+            .parse::<u128>()
+            .map_err(|e| format_err!("parse u128 string {:?} failed, caused by error: {}", s, e))?;
+
+        Ok(U128(data))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct HexEncodedBytes(Vec<u8>);
 
@@ -264,7 +276,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
 pub enum MoveValue {
     U8(u8),
     U64(U64),
@@ -1316,5 +1328,12 @@ mod tests {
 // with great caution, since it essentially rewrites the type to be a string
 // from the perspective of the OpenAPI spec, potentially losing some useful
 // type information that the client could use.
-impl_poem_type!(MoveAbility, MoveStructValue, MoveType, HexEncodedBytes);
-impl_poem_parameter!(HexEncodedBytes);
+impl_poem_type!(
+    MoveAbility,
+    MoveStructValue,
+    MoveType,
+    HexEncodedBytes,
+    MoveValue,
+    U128
+);
+impl_poem_parameter!(HexEncodedBytes, U128);
