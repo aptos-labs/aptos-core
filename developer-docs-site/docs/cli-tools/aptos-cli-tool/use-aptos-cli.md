@@ -939,7 +939,7 @@ The `aptos` tool supports bootstrapping new blockchains through what is known as
 * A set of validators and their configuration
 * The initial set of Move modules, known as a framework
 * A unique `ChainId` (u8) that distinguishes this from other deployments
-* For test chains, there also exists an account that manages the minting of AptosCoib
+* For test chains, there also exists an account that manages the minting of AptosCoin
 
 ## Generating Genesis
 
