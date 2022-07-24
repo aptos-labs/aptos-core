@@ -1,19 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Context as AnyhowContext;
-use std::convert::TryInto;
-use std::fmt::Display;
-use std::sync::Arc;
-
 use super::accept_type::{parse_accept, AcceptType};
 use super::{
-    ApiTags, AptosErrorResponse, BadRequestError, BasicResponse, BasicResponseStatus,
-    InternalError, NotFoundError,
+    build_not_found, ApiTags, AptosErrorResponse, BadRequestError, BasicResponse,
+    BasicResponseStatus, InternalError,
 };
 use super::{AptosErrorCode, BasicErrorWith404, BasicResultWith404};
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
+use anyhow::Context as AnyhowContext;
 use aptos_api_types::{AccountData, Address, AsConverter, MoveStructTag, TransactionId};
 use aptos_api_types::{LedgerInfo, MoveModuleBytecode, MoveResource};
 use aptos_types::access_path::AccessPath;
@@ -31,6 +27,8 @@ use move_deps::move_core_types::{
 use poem::web::Accept;
 use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};
+use std::convert::TryInto;
+use std::sync::Arc;
 
 pub struct AccountsApi {
     pub context: Arc<Context>,
@@ -61,10 +59,12 @@ impl AccountsApi {
 
     /// Get account resources
     ///
-    /// This API returns account resources for a specific ledger version (AKA transaction version).
-    /// If not present, the latest version is used. <---- TODO Update this comment
+    /// This endpoint returns all account resources at a given address at a
+    /// specific ledger version (AKA transaction version). If the ledger
+    /// version is not specified in the request, the latest ledger version is used.
+    ///
     /// The Aptos nodes prune account state history, via a configurable time window (link).
-    /// If the requested data has been pruned, the server responds with a 404
+    /// If the requested data has been pruned, the server responds with a 404.
     #[oai(
         path = "/accounts/:address/resources",
         method = "get",
@@ -85,7 +85,7 @@ impl AccountsApi {
 
     /// Get account modules
     ///
-    /// This API returns account resources for a specific ledger version (AKA transaction version).
+    /// This endpoint returns account resources for a specific ledger version (AKA transaction version).
     /// If not present, the latest version is used. <---- TODO Update this comment
     /// The Aptos nodes prune account state history, via a configurable time window (link).
     /// If the requested data has been pruned, the server responds with a 404
@@ -126,7 +126,7 @@ impl Account {
             requested_ledger_version.unwrap_or_else(|| latest_ledger_info.version());
 
         if ledger_version > latest_ledger_info.version() {
-            return Err(Self::not_found(
+            return Err(build_not_found(
                 "ledger",
                 TransactionId::Version(ledger_version),
                 latest_ledger_info.version(),
@@ -224,17 +224,8 @@ impl Account {
 
     // Helpers for building errors.
 
-    pub fn not_found<S: Display>(
-        resource: &str,
-        identifier: S,
-        ledger_version: u64,
-    ) -> BasicErrorWith404 {
-        BasicErrorWith404::not_found_str(&format!("{} not found by {}", resource, identifier))
-            .aptos_ledger_version(ledger_version)
-    }
-
     fn account_not_found(&self) -> BasicErrorWith404 {
-        Self::not_found(
+        build_not_found(
             "account",
             format!(
                 "address({}) and ledger version({})",
@@ -245,7 +236,7 @@ impl Account {
     }
 
     fn resource_not_found(&self, struct_tag: &StructTag) -> BasicErrorWith404 {
-        Self::not_found(
+        build_not_found(
             "resource",
             format!(
                 "address({}), struct tag({}) and ledger version({})",
@@ -260,7 +251,7 @@ impl Account {
         struct_tag: &StructTag,
         field_name: &Identifier,
     ) -> BasicErrorWith404 {
-        Self::not_found(
+        build_not_found(
             "resource",
             format!(
                 "address({}), struct tag({}), field name({}) and ledger version({})",

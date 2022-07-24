@@ -14,6 +14,7 @@ mod page;
 mod post;
 mod response;
 mod runtime;
+mod state;
 mod transactions;
 
 #[derive(Tags)]
