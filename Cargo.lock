@@ -731,6 +731,7 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-secure-storage",
+ "aptos-sf-stream",
  "aptos-state-view",
  "aptos-telemetry",
  "aptos-temppath",
@@ -1064,6 +1065,45 @@ dependencies = [
  "serde 1.0.141",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "aptos-sf-stream"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-api",
+ "aptos-api-types",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-genesis",
+ "aptos-global-constants",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-metrics-core",
+ "aptos-proptest-helpers",
+ "aptos-sdk",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptosdb",
+ "cached-framework-packages",
+ "executor",
+ "executor-types",
+ "fail 0.5.0",
+ "futures",
+ "mempool-notifications",
+ "move-deps",
+ "once_cell",
+ "protobuf",
+ "rand 0.7.3",
+ "regex",
+ "serde 1.0.137",
+ "serde_json",
+ "storage-interface",
+ "tokio",
+ "vm-validator",
 ]
 
 [[package]]
@@ -6658,6 +6698,26 @@ checksum = "2d0a014229361011dc8e69c8a1ec6c2e8d0f2af7c91e3ea3f5b2170298461e68"
 dependencies = [
  "bytes 1.2.1",
  "prost",
+]
+
+[[package]]
+name = "protobuf"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ee4a7d8b91800c8f167a6268d1a1026607368e1adc84e98fe044aeb905302f7"
+dependencies = [
+ "once_cell",
+ "protobuf-support",
+ "thiserror",
+]
+
+[[package]]
+name = "protobuf-support"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ca157fe12fc7ee2e315f2f735e27df41b3d97cdd70ea112824dac1ffb08ee1c"
+dependencies = [
+ "thiserror",
 ]
 
 [[package]]
