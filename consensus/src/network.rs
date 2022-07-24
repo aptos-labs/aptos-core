@@ -212,12 +212,6 @@ impl NetworkSender {
         self.send(msg, recipients).await
     }
 
-    pub async fn send_proposal(&self, proposal_msg: ProposalMsg, recipients: Vec<Author>) {
-        fail_point!("consensus::send::proposal", |_| ());
-        let msg = ConsensusMsg::ProposalMsg(Box::new(proposal_msg));
-        self.send(msg, recipients).await
-    }
-
     pub async fn send_epoch_change(&mut self, proof: EpochChangeProof) {
         fail_point!("consensus::send::epoch_change", |_| ());
         let msg = ConsensusMsg::EpochChangeProof(Box::new(proof));

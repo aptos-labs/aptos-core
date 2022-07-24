@@ -22,18 +22,28 @@ use std::{
     collections::BTreeMap,
     env, fmt,
     io::Write,
+    str::FromStr,
     sync::{
         mpsc::{self, Receiver, SyncSender},
         Arc,
     },
     thread,
 };
+use strum_macros::EnumString;
 
 const RUST_LOG: &str = "RUST_LOG";
 const RUST_LOG_REMOTE: &str = "RUST_LOG_REMOTE";
+const RUST_LOG_FORMAT: &str = "RUST_LOG_FORMAT";
 /// Default size of log write channel, if the channel is full, logs will be dropped
 pub const CHANNEL_SIZE: usize = 10000;
 const NUM_SEND_RETRIES: u8 = 1;
+
+#[derive(EnumString)]
+#[strum(serialize_all = "lowercase")]
+enum LogFormat {
+    Json,
+    Text,
+}
 
 /// A single log entry emitted by a logging macro with associated metadata
 #[derive(Debug, Serialize)]
@@ -180,7 +190,7 @@ impl AptosDataBuilder {
             level: Level::Info,
             remote_level: Level::Info,
             address: None,
-            printer: Some(Box::new(StderrWriter)),
+            printer: Some(Box::new(StdoutWriter)),
             is_async: false,
             custom_format: None,
         }
@@ -277,6 +287,18 @@ impl AptosDataBuilder {
             }
         };
 
+        if let Ok(log_format) = env::var(RUST_LOG_FORMAT) {
+            let log_format = LogFormat::from_str(&log_format).unwrap();
+            match log_format {
+                LogFormat::Json => {
+                    self.custom_format = Some(json_format);
+                }
+                LogFormat::Text => {
+                    self.custom_format = Some(default_format);
+                }
+            }
+        }
+
         let logger = if self.is_async {
             let (sender, receiver) = mpsc::sync_channel(self.channel_size);
             let logger = Arc::new(AptosData {
@@ -350,7 +372,7 @@ impl AptosData {
         Self::builder()
             .is_async(false)
             .enable_backtrace()
-            .printer(Box::new(StderrWriter))
+            .printer(Box::new(StdoutWriter))
             .build();
     }
 
@@ -512,13 +534,13 @@ pub trait Writer: Send + Sync {
     fn write(&self, log: String);
 }
 
-/// A struct for writing logs to stderr
-struct StderrWriter;
+/// A struct for writing logs to stdout
+struct StdoutWriter;
 
-impl Writer for StderrWriter {
-    /// Write log to stderr
+impl Writer for StdoutWriter {
+    /// Write log to stdout
     fn write(&self, log: String) {
-        eprintln!("{}", log);
+        println!("{}", log);
     }
 }
 
@@ -579,6 +601,18 @@ fn default_format(entry: &LogEntry) -> Result<String, fmt::Error> {
     }
 
     Ok(w)
+}
+
+// converts a record into json format
+fn json_format(entry: &LogEntry) -> Result<String, fmt::Error> {
+    match serde_json::to_string(&entry) {
+        Ok(s) => Ok(s),
+        Err(_) => {
+            // TODO: Improve the error handling here. Currently we're just increasing some misleadingly-named metric and dropping any context on why this could not be deserialized.
+            STRUCT_LOG_PARSE_ERROR_COUNT.inc();
+            Err(fmt::Error)
+        }
+    }
 }
 
 #[cfg(test)]
