@@ -26,16 +26,5 @@ pub fn encode_create_resource_account(
     } else {
         vec![]
     };
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::ONE,
-            ident_str!("ResourceAccount").to_owned(),
-        ),
-        ident_str!("create_resource_account").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&seed).unwrap(),
-            bcs::to_bytes(&authentication_key).unwrap(),
-        ],
-    ))
+    resource_account_create_resource_account(seed, authentication_key)
 }

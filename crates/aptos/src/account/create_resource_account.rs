@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions};
-use aptos_rest_client::{aptos_api_types::WriteSetChange, Transaction};
+use aptos_rest_client::{
+    aptos_api_types::{WriteResource, WriteSetChange},
+    Transaction,
+};
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
@@ -52,7 +55,7 @@ impl From<Transaction> for CreateResourceAccountSummary {
             summary.version = Some(txn.info.version.0);
             summary.hash = Some(txn.info.hash.to_string());
             summary.resource_account = txn.info.changes.iter().find_map(|change| match change {
-                WriteSetChange::WriteResource { address, data, .. } => {
+                WriteSetChange::WriteResource(WriteResource { address, data, .. }) => {
                     if data.typ.name.as_str() == "Account"
                         && *address.inner().to_hex() != *txn.request.sender.inner().to_hex()
                     {
