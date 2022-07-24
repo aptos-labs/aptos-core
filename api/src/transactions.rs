@@ -428,7 +428,7 @@ impl Transactions {
     ) -> Result<impl Reply, Error> {
         let txn_data = match id.clone() {
             TransactionId::Hash(hash) => self.get_by_hash(hash.into()).await?,
-            TransactionId::Version(version) => self.get_by_version(version)?,
+            TransactionId::Version(version) => self.get_by_version(version.0)?,
         }
         .ok_or_else(|| self.transaction_not_found(id))?;
 

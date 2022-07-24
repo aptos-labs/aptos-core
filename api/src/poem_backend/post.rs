@@ -12,11 +12,11 @@ use super::bcs_payload::Bcs;
 
 #[derive(ApiRequest)]
 pub enum AptosPost<T: ToJSON + ParseFromJSON + Send + Sync + Type + for<'b> Deserialize<'b>> {
-    #[oai(content_type = "application/x-bcs")]
-    Bcs(Bcs<T>),
-
     #[oai(content_type = "application/json")]
     Json(Json<T>),
+
+    #[oai(content_type = "application/x-bcs")]
+    Bcs(Bcs<T>),
 }
 
 impl<T: ToJSON + ParseFromJSON + Send + Sync + Type + for<'b> Deserialize<'b>> AptosPost<T> {

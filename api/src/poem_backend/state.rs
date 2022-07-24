@@ -12,7 +12,7 @@ use crate::failpoint::fail_point_poem;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     Address, AsConverter, IdentifierWrapper, MoveModuleBytecode, MoveStructTag,
-    MoveStructTagWrapper, MoveValue, TableItemRequest, TransactionId, U128,
+    MoveStructTagWrapper, MoveValue, TableItemRequest, TransactionId, U128, U64,
 };
 use aptos_api_types::{LedgerInfo, MoveResource};
 use aptos_state_view::StateView;
@@ -55,7 +55,7 @@ impl StateApi {
         accept: Accept,
         address: Path<Address>,
         resource_type: Path<MoveStructTagWrapper>,
-        ledger_version: Query<Option<u64>>,
+        ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveResource> {
         fail_point_poem("endpoint_get_account_resource")?;
         let accept_type = parse_accept(&accept)?;
@@ -82,7 +82,7 @@ impl StateApi {
         accept: Accept,
         address: Path<Address>,
         module_name: Path<IdentifierWrapper>,
-        ledger_version: Query<Option<u64>>,
+        ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveModuleBytecode> {
         fail_point_poem("endpoint_get_account_module")?;
         let accept_type = parse_accept(&accept)?;
@@ -102,17 +102,16 @@ impl StateApi {
     async fn get_table_item(
         &self,
         accept: Accept,
-        // TODO: Cut over to u128 or U128 once https://github.com/poem-web/poem/pull/336 lands.
         table_handle: Path<U128>,
         table_item_request: Json<TableItemRequest>,
-        ledger_version: Query<Option<u64>>,
+        ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveValue> {
         // TODO: fail_point could just be middleware.
         fail_point_poem("endpoint_get_table_item")?;
         let accept_type = parse_accept(&accept)?;
         self.table_item(
             &accept_type,
-            table_handle.0.into(),
+            table_handle.0,
             table_item_request.0,
             ledger_version.0,
         )
@@ -122,16 +121,17 @@ impl StateApi {
 impl StateApi {
     fn preprocess_request<E: NotFoundError + InternalError>(
         &self,
-        requested_ledger_version: Option<u64>,
+        requested_ledger_version: Option<U64>,
     ) -> Result<(LedgerInfo, u64, DbStateView), E> {
         let latest_ledger_info = self.context.get_latest_ledger_info_poem()?;
-        let ledger_version: u64 =
-            requested_ledger_version.unwrap_or_else(|| latest_ledger_info.version());
+        let ledger_version: u64 = requested_ledger_version
+            .map(|v| v.0)
+            .unwrap_or_else(|| latest_ledger_info.version());
 
         if ledger_version > latest_ledger_info.version() {
             return Err(build_not_found(
                 "ledger",
-                TransactionId::Version(ledger_version),
+                TransactionId::Version(U64::from(ledger_version)),
                 latest_ledger_info.version(),
             ));
         }
@@ -148,7 +148,7 @@ impl StateApi {
         accept_type: &AcceptType,
         address: Address,
         resource_type: MoveStructTagWrapper,
-        ledger_version: Option<u64>,
+        ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveResource> {
         let resource_type: MoveStructTag = resource_type.into();
         let resource_type: StructTag = resource_type
@@ -185,7 +185,7 @@ impl StateApi {
         accept_type: &AcceptType,
         address: Address,
         name: IdentifierWrapper,
-        ledger_version: Option<u64>,
+        ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveModuleBytecode> {
         let module_id = ModuleId::new(address.into(), name.into());
         let access_path = AccessPath::code_access_path(module_id.clone());
@@ -213,9 +213,9 @@ impl StateApi {
     pub fn table_item(
         &self,
         accept_type: &AcceptType,
-        table_handle: u128,
+        table_handle: U128,
         table_item_request: TableItemRequest,
-        ledger_version: Option<u64>,
+        ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveValue> {
         let key_type = table_item_request
             .key_type
@@ -242,7 +242,7 @@ impl StateApi {
             .simple_serialize()
             .ok_or_else(|| BasicErrorWith404::internal_str("Failed to serialize table key"))?;
 
-        let state_key = StateKey::table_item(TableHandle(table_handle), raw_key);
+        let state_key = StateKey::table_item(TableHandle(table_handle.0), raw_key);
         let bytes = state_view
             .get_state_value(&state_key)
             .context(format!(
