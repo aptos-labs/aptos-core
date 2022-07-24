@@ -200,6 +200,11 @@ impl RoundState {
         }
     }
 
+    /// Return if already vote for timeout
+    pub fn is_vote_timeout(&self) -> bool {
+        self.vote_sent.map_or(false, |v| v.is_timeout())
+    }
+
     /// Return the current round.
     pub fn current_round(&self) -> Round {
         self.current_round
