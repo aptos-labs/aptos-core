@@ -883,7 +883,7 @@ impl From<TransactionAuthenticator> for TransactionSignature {
 #[oai(one_of)]
 pub enum TransactionId {
     Hash(HashValue),
-    Version(u64),
+    Version(U64),
 }
 
 impl FromStr for TransactionId {
@@ -891,7 +891,7 @@ impl FromStr for TransactionId {
 
     fn from_str(hash_or_version: &str) -> Result<Self, anyhow::Error> {
         let id = match hash_or_version.parse::<u64>() {
-            Ok(version) => TransactionId::Version(version),
+            Ok(version) => TransactionId::Version(U64::from(version)),
             Err(_) => TransactionId::Hash(hash_or_version.parse()?),
         };
         Ok(id)

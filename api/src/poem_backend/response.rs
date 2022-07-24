@@ -301,7 +301,7 @@ macro_rules! generate_success_response {
                             ledger_info.ledger_version,
                             ledger_info.oldest_ledger_version,
                             ledger_info.ledger_timestamp,
-                            ledger_info.epoch.into(),
+                            ledger_info.epoch,
                         )
                     },
                     )*

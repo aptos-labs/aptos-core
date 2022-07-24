@@ -56,6 +56,9 @@ type SimulateTransactionResult<T> = poem::Result<BasicResponse<T>, SubmitTransac
 // content types possible for the POST data.
 #[derive(ApiRequest)]
 pub enum SubmitTransactionPost {
+    #[oai(content_type = "application/json")]
+    Json(Json<SubmitTransactionRequest>),
+
     // TODO: Consider just using the same BCS content type as usual, or that
     // with `+signed` on the end or something.
     // TODO: Switch from Vec<u8> to SignedTransaction. This has the benefit of
@@ -63,9 +66,6 @@ pub enum SubmitTransactionPost {
     // expected input in the OpenAPI spec.
     #[oai(content_type = "application/x.aptos.signed_transaction+bcs")]
     Bcs(Bcs<Vec<u8>>),
-
-    #[oai(content_type = "application/json")]
-    Json(Json<SubmitTransactionRequest>),
 }
 
 pub struct TransactionsApi {
@@ -86,12 +86,12 @@ impl TransactionsApi {
     async fn get_transactions(
         &self,
         accept: Accept,
-        start: Query<Option<u64>>,
+        start: Query<Option<U64>>,
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<Transaction>> {
         fail_point_poem("endppoint_get_transactions")?;
         let accept_type = parse_accept(&accept)?;
-        let page = Page::new(start.0, limit.0);
+        let page = Page::new(start.0.map(|v| v.0), limit.0);
         self.list(&accept_type, page)
     }
 
@@ -152,12 +152,12 @@ impl TransactionsApi {
         &self,
         accept: Accept,
         address: Path<Address>,
-        start: Query<Option<u64>>,
+        start: Query<Option<U64>>,
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<Transaction>> {
         fail_point_poem("endpoint_get_accounts_transactions")?;
         let accept_type = parse_accept(&accept)?;
-        let page = Page::new(start.0, limit.0);
+        let page = Page::new(start.0.map(|v| v.0), limit.0);
         self.list_by_account(&accept_type, page, address.0)
     }
 

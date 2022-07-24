@@ -10,7 +10,7 @@ use super::{AptosErrorCode, BasicErrorWith404, BasicResultWith404};
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::{AccountData, Address, AsConverter, MoveStructTag, TransactionId};
+use aptos_api_types::{AccountData, Address, AsConverter, MoveStructTag, TransactionId, U64};
 use aptos_api_types::{LedgerInfo, MoveModuleBytecode, MoveResource};
 use aptos_types::access_path::AccessPath;
 use aptos_types::account_config::AccountResource;
@@ -49,7 +49,7 @@ impl AccountsApi {
         &self,
         accept: Accept,
         address: Path<Address>,
-        ledger_version: Query<Option<u64>>,
+        ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<AccountData> {
         fail_point_poem("endpoint_get_account")?;
         let accept_type = parse_accept(&accept)?;
@@ -75,7 +75,7 @@ impl AccountsApi {
         &self,
         accept: Accept,
         address: Path<Address>,
-        ledger_version: Query<Option<u64>>,
+        ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<Vec<MoveResource>> {
         fail_point_poem("endpoint_get_account_resources")?;
         let accept_type = parse_accept(&accept)?;
@@ -99,7 +99,7 @@ impl AccountsApi {
         &self,
         accept: Accept,
         address: Path<Address>,
-        ledger_version: Query<Option<u64>>,
+        ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
         fail_point_poem("endpoint_get_account_modules")?;
         let accept_type = parse_accept(&accept)?;
@@ -119,16 +119,17 @@ impl Account {
     pub fn new(
         context: Arc<Context>,
         address: Address,
-        requested_ledger_version: Option<u64>,
+        requested_ledger_version: Option<U64>,
     ) -> Result<Self, BasicErrorWith404> {
         let latest_ledger_info = context.get_latest_ledger_info_poem()?;
-        let ledger_version: u64 =
-            requested_ledger_version.unwrap_or_else(|| latest_ledger_info.version());
+        let ledger_version: u64 = requested_ledger_version
+            .map(|v| v.0)
+            .unwrap_or_else(|| latest_ledger_info.version());
 
         if ledger_version > latest_ledger_info.version() {
             return Err(build_not_found(
                 "ledger",
-                TransactionId::Version(ledger_version),
+                TransactionId::Version(U64::from(ledger_version)),
                 latest_ledger_info.version(),
             ));
         }
