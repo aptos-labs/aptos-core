@@ -209,6 +209,7 @@ impl Transaction {
     }
 }
 
+// TODO: Remove this when we cut over to the new API fully.
 impl From<(SignedTransaction, TransactionPayload)> for Transaction {
     fn from((txn, payload): (SignedTransaction, TransactionPayload)) -> Self {
         Transaction::PendingTransaction(PendingTransaction {
@@ -306,6 +307,15 @@ pub struct PendingTransaction {
     pub request: UserTransactionRequest,
 }
 
+impl From<(SignedTransaction, TransactionPayload)> for PendingTransaction {
+    fn from((txn, payload): (SignedTransaction, TransactionPayload)) -> Self {
+        PendingTransaction {
+            request: (&txn, payload).into(),
+            hash: txn.committed_hash().into(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct UserTransaction {
     #[serde(flatten)]
@@ -327,6 +337,27 @@ pub struct StateCheckpointTransaction {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+pub struct SubmitTransactionRequest {
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub user_transaction_request: UserTransactionRequestInner,
+
+    pub signature: TransactionSignature,
+}
+
+// TODO: Rename this to remove the Inner when we cut over.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+pub struct UserTransactionRequestInner {
+    pub sender: Address,
+    pub sequence_number: U64,
+    pub max_gas_amount: U64,
+    pub gas_unit_price: U64,
+    pub expiration_timestamp_secs: U64,
+    pub payload: TransactionPayload,
+}
+
+// TODO: Remove this when we cut over.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct UserTransactionRequest {
     pub sender: Address,
     pub sequence_number: U64,
@@ -343,6 +374,15 @@ pub struct UserCreateSigningMessageRequest {
     #[serde(flatten)]
     #[oai(flatten)]
     pub transaction: UserTransactionRequest,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secondary_signers: Option<Vec<Address>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+pub struct EncodeSubmissionRequest {
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub transaction: UserTransactionRequestInner,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub secondary_signers: Option<Vec<Address>>,
 }
@@ -821,7 +861,7 @@ impl From<TransactionAuthenticator> for TransactionSignature {
 #[oai(one_of)]
 pub enum TransactionId {
     Hash(HashValue),
-    Version(u64),
+    Version(U64),
 }
 
 impl FromStr for TransactionId {
@@ -829,7 +869,7 @@ impl FromStr for TransactionId {
 
     fn from_str(hash_or_version: &str) -> Result<Self, anyhow::Error> {
         let id = match hash_or_version.parse::<u64>() {
-            Ok(version) => TransactionId::Version(version),
+            Ok(version) => TransactionId::Version(U64::from(version)),
             Err(_) => TransactionId::Hash(hash_or_version.parse()?),
         };
         Ok(id)

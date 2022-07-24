@@ -14,12 +14,25 @@ mod page;
 mod post;
 mod response;
 mod runtime;
+mod state;
 mod transactions;
 
 #[derive(Tags)]
 pub enum ApiTags {
-    /// General information.
+    /// Access to account resources and modules
+    Accounts,
+
+    /// Access to events
+    Events,
+
+    /// General information
     General,
+
+    /// Access to tables
+    Tables,
+
+    /// Access to transactions
+    Transactions,
 }
 
 pub use accept_type::AcceptType;

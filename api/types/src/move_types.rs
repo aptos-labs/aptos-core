@@ -23,7 +23,7 @@ use move_deps::{
     move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue},
 };
 
-use poem_openapi::{Enum, NewType, Object};
+use poem_openapi::{Enum, Object};
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
@@ -52,7 +52,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveResource {
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Copy, NewType)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Copy)]
 pub struct U64(pub u64);
 
 impl U64 {
@@ -64,18 +64,6 @@ impl U64 {
 impl From<u64> for U64 {
     fn from(d: u64) -> Self {
         Self(d)
-    }
-}
-
-impl FromStr for U64 {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let data = s
-            .parse::<u64>()
-            .map_err(|e| format_err!("parse u64 string {:?} failed, caused by error: {}", s, e))?;
-
-        Ok(U64(data))
     }
 }
 
@@ -119,8 +107,20 @@ impl<'de> Deserialize<'de> for U64 {
     }
 }
 
+impl FromStr for U64 {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let data = s.parse::<u64>().map_err(|e| {
+            format_err!("Parsing u64 string {:?} failed, caused by error: {}", s, e)
+        })?;
+
+        Ok(U64(data))
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Copy)]
-pub struct U128(u128);
+pub struct U128(pub u128);
 
 impl U128 {
     pub fn inner(&self) -> &u128 {
@@ -159,6 +159,18 @@ impl<'de> Deserialize<'de> for U128 {
     {
         let s = <String>::deserialize(deserializer)?;
         let data = s.parse::<u128>().map_err(D::Error::custom)?;
+
+        Ok(U128(data))
+    }
+}
+
+impl FromStr for U128 {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let data = s.parse::<u128>().map_err(|e| {
+            format_err!("Parsing u128 string {:?} failed, caused by error: {}", s, e)
+        })?;
 
         Ok(U128(data))
     }
@@ -264,7 +276,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
 pub enum MoveValue {
     U8(u8),
     U64(U64),
@@ -1316,5 +1328,13 @@ mod tests {
 // with great caution, since it essentially rewrites the type to be a string
 // from the perspective of the OpenAPI spec, potentially losing some useful
 // type information that the client could use.
-impl_poem_type!(MoveAbility, MoveStructValue, MoveType, HexEncodedBytes);
-impl_poem_parameter!(HexEncodedBytes);
+impl_poem_type!(
+    MoveAbility,
+    MoveStructValue,
+    MoveType,
+    HexEncodedBytes,
+    MoveValue,
+    U64,
+    U128
+);
+impl_poem_parameter!(HexEncodedBytes, U64, U128);

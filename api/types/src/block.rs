@@ -4,6 +4,9 @@
 use crate::HashValue;
 use serde::{Deserialize, Serialize};
 
+// TODO: Consider including this in the API.
+// If we do that, change these u64s to U64.
+
 /// A description of a block
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct BlockInfo {

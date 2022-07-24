@@ -29,6 +29,8 @@
 
 // TODO: Pending further discussion with the team, migrate back to U64 over u64.
 
+use std::fmt::Display;
+
 use super::accept_type::AcceptType;
 use aptos_api_types::U64;
 use poem_openapi::{payload::Json, types::ToJSON, Enum, Object, ResponseContent};
@@ -235,10 +237,10 @@ macro_rules! generate_success_response {
             $name(
                 $crate::poem_backend::AptosResponseContent<T>,
                 #[oai(header = "X-Aptos-Chain-Id")] u16,
-                #[oai(header = "X-Aptos-Ledger-Version")] u64,
-                #[oai(header = "X-Aptos-Ledger-Oldest-Version")] u64,
-                #[oai(header = "X-Aptos-Ledger-TimestampUsec")] u64,
-                #[oai(header = "X-Aptos-Epoch")] u64,
+                #[oai(header = "X-Aptos-Ledger-Version")] U64,
+                #[oai(header = "X-Aptos-Ledger-Oldest-Version")] U64,
+                #[oai(header = "X-Aptos-Ledger-TimestampUsec")] U64,
+                #[oai(header = "X-Aptos-Epoch")] U64,
             ),
             )*
         }
@@ -272,9 +274,9 @@ macro_rules! generate_success_response {
                         $enum_name::$name(
                             value,
                             ledger_info.chain_id as u16,
-                            ledger_info.ledger_version.into(),
-                            ledger_info.oldest_ledger_version.into(),
-                            ledger_info.ledger_timestamp.into(),
+                            ledger_info.ledger_version,
+                            ledger_info.oldest_ledger_version,
+                            ledger_info.ledger_timestamp,
                             ledger_info.epoch,
                         )
                     },
@@ -350,7 +352,14 @@ generate_success_response!(BasicResponse, (200, Ok));
 
 // Generate traits defining a "from" function for each of these status types.
 // The error response then impls these traits for each status type they mention.
-generate_error_traits!(Internal, BadRequest, NotFound);
+generate_error_traits!(
+    BadRequest,
+    NotFound,
+    PayloadTooLarge,
+    UnsupportedMediaType,
+    Internal,
+    InsufficientStorage
+);
 
 // Generate an error response that only has options for 400 and 500.
 generate_error_response!(BasicError, (400, BadRequest), (500, Internal));
@@ -366,3 +375,13 @@ generate_error_response!(
     (500, Internal)
 );
 pub type BasicResultWith404<T> = poem::Result<BasicResponse<T>, BasicErrorWith404>;
+
+// Just this one helper for a specific kind of 404.
+pub fn build_not_found<S: Display, E: NotFoundError>(
+    resource: &str,
+    identifier: S,
+    ledger_version: u64,
+) -> E {
+    E::not_found_str(&format!("{} not found by {}", resource, identifier))
+        .aptos_ledger_version(ledger_version)
+}

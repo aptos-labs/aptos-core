@@ -224,7 +224,7 @@ mod tests {
     fn response<T: Serialize>(body: &T) -> warp::reply::Response {
         let li = LedgerInfo {
             chain_id: ChainId::test().id(),
-            epoch: 1,
+            epoch: 1.into(),
             ledger_version: 5.into(),
             oldest_ledger_version: 0.into(),
             ledger_timestamp: 5.into(),

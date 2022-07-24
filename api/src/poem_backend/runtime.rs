@@ -102,6 +102,11 @@ pub fn attach_poem_to_runtime(
         let route = Route::new()
             .nest("/", api_service)
             .at("/spec.json", spec_json)
+            // TODO: Consider using something akin to openapi-format.
+            // TODO: Figure out why comments do not resolve like this: https://yaml-multiline.info/
+            // TODO: Consider using https://github.com/schemathesis/schemathesis
+            // See https://github.com/poem-web/poem/issues/333
+            // See https://github.com/poem-web/poem/issues/332
             .at("/spec.yaml", spec_yaml)
             .with(cors)
             .around(middleware_log);

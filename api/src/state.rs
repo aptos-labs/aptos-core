@@ -13,6 +13,7 @@ use crate::{
 use anyhow::anyhow;
 use aptos_api_types::{
     AsConverter, Error, LedgerInfo, MoveModuleBytecode, Response, TableItemRequest, TransactionId,
+    U64,
 };
 use aptos_state_view::StateView;
 use aptos_types::state_store::table::TableHandle;
@@ -131,7 +132,7 @@ impl State {
         if ledger_version > latest_ledger_info.version() {
             return Err(Error::not_found(
                 "ledger",
-                TransactionId::Version(ledger_version),
+                TransactionId::Version(U64::from(ledger_version)),
                 latest_ledger_info.version(),
             ));
         }

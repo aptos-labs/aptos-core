@@ -11,7 +11,7 @@ use crate::{
 
 use aptos_api_types::{
     AccountData, Address, AsConverter, Error, LedgerInfo, MoveModuleBytecode, Response,
-    TransactionId,
+    TransactionId, U64,
 };
 use aptos_types::{
     account_config::AccountResource,
@@ -113,7 +113,7 @@ impl Account {
         if ledger_version > latest_ledger_info.version() {
             return Err(Error::not_found(
                 "ledger",
-                TransactionId::Version(ledger_version),
+                TransactionId::Version(U64::from(ledger_version)),
                 latest_ledger_info.version(),
             ));
         }
