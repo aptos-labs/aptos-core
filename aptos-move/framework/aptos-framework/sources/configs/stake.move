@@ -1727,7 +1727,7 @@ module aptos_framework::stake {
         account: &signer,
         mint_cap: &MintCapability<AptosCoin>,
     ) acquires OwnerCapability, StakePool, StakePoolEvents, ValidatorConfig, ValidatorSet, ValidatorSetConfiguration {
-        coin::register<AptosCoin>(account);
+        aptos_framework::coin::register_for_test<AptosCoin>(account);
         let address = signer::address_of(account);
         coin::deposit<AptosCoin>(address, coin::mint<AptosCoin>(1000, mint_cap));
         register_validator_candidate(account, CONSENSUS_KEY_1, CONSENSUS_POP_1, vector::empty(), vector::empty());

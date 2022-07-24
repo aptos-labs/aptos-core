@@ -6,7 +6,6 @@ module aptos_framework::aptos_coin {
     use std::signer;
     use std::vector;
     use std::option::{Self, Option};
-
     use aptos_framework::coin::{Self, BurnCapability, MintCapability};
     use aptos_framework::system_addresses;
 
@@ -50,7 +49,7 @@ module aptos_framework::aptos_coin {
 
         // Mint the core resource account AptosCoin for gas so it can execute system transactions.
         // TODO: Only do this for testnets.
-        coin::register_internal<AptosCoin>(core_resource);
+        coin::register<AptosCoin>(core_resource);
         let coins = coin::mint<AptosCoin>(
             18446744073709551615,
             &mint_cap,
