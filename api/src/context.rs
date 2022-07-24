@@ -58,13 +58,15 @@ impl Context {
         }
     }
 
-    pub fn move_resolver(&self) -> Result<RemoteStorageOwned<DbStateView>> {
+    pub fn move_resolver(&self) -> Result<RemoteStorageOwned<DbStateView<Arc<dyn DbReader>>>> {
         self.db
             .latest_state_checkpoint_view()
             .map(|state_view| state_view.into_move_resolver())
     }
 
-    pub fn move_resolver_poem(&self) -> AptosInternalResult<RemoteStorageOwned<DbStateView>> {
+    pub fn move_resolver_poem(
+        &self,
+    ) -> AptosInternalResult<RemoteStorageOwned<DbStateView<Arc<dyn DbReader>>>> {
         self.move_resolver().map_err(|e| {
             AptosErrorResponse::InternalServerError(Json(
                 AptosError::new(
@@ -76,7 +78,10 @@ impl Context {
         })
     }
 
-    pub fn state_view_at_version(&self, version: Version) -> Result<DbStateView> {
+    pub fn state_view_at_version(
+        &self,
+        version: Version,
+    ) -> Result<DbStateView<Arc<dyn DbReader>>> {
         self.db.state_view_at_version(Some(version))
     }
 
