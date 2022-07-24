@@ -25,8 +25,11 @@ pub enum ApiTags {
     /// Access to events
     Events,
 
-    /// General information.
+    /// General information
     General,
+
+    /// Access to tables
+    Tables,
 
     /// Access to transactions
     Transactions,

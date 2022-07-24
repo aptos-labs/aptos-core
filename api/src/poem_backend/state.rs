@@ -12,16 +12,18 @@ use crate::failpoint::fail_point_poem;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     Address, AsConverter, IdentifierWrapper, MoveModuleBytecode, MoveStructTag,
-    MoveStructTagWrapper, TransactionId,
+    MoveStructTagWrapper, MoveValue, TableItemRequest, TransactionId, U128,
 };
 use aptos_api_types::{LedgerInfo, MoveResource};
 use aptos_state_view::StateView;
 use aptos_types::access_path::AccessPath;
 use aptos_types::state_store::state_key::StateKey;
+use aptos_types::state_store::table::TableHandle;
 use aptos_vm::data_cache::AsMoveResolver;
 use move_deps::move_core_types::language_storage::{ModuleId, ResourceKey, StructTag};
 use poem::web::Accept;
 use poem_openapi::param::Query;
+use poem_openapi::payload::Json;
 use poem_openapi::{param::Path, OpenApi};
 use std::convert::TryInto;
 use std::sync::Arc;
@@ -85,6 +87,35 @@ impl StateApi {
         fail_point_poem("endpoint_get_account_module")?;
         let accept_type = parse_accept(&accept)?;
         self.module(&accept_type, address.0, module_name.0, ledger_version.0)
+    }
+
+    // TODO: This was originally POST to handle the nasty input types.
+    /// Get table item
+    ///
+    /// todo
+    #[oai(
+        path = "/tables/:table_handle/item",
+        method = "post",
+        operation_id = "get_table_item",
+        tag = "ApiTags::Tables"
+    )]
+    async fn get_table_item(
+        &self,
+        accept: Accept,
+        // TODO: Cut over to u128 or U128 once https://github.com/poem-web/poem/pull/336 lands.
+        table_handle: Path<U128>,
+        table_item_request: Json<TableItemRequest>,
+        ledger_version: Query<Option<u64>>,
+    ) -> BasicResultWith404<MoveValue> {
+        // TODO: fail_point could just be middleware.
+        fail_point_poem("endpoint_get_table_item")?;
+        let accept_type = parse_accept(&accept)?;
+        self.table_item(
+            &accept_type,
+            table_handle.0.into(),
+            table_item_request.0,
+            ledger_version.0,
+        )
     }
 }
 
@@ -173,6 +204,61 @@ impl StateApi {
 
         BasicResponse::try_from_rust_value((
             module,
+            &ledger_info,
+            BasicResponseStatus::Ok,
+            accept_type,
+        ))
+    }
+
+    pub fn table_item(
+        &self,
+        accept_type: &AcceptType,
+        table_handle: u128,
+        table_item_request: TableItemRequest,
+        ledger_version: Option<u64>,
+    ) -> BasicResultWith404<MoveValue> {
+        let key_type = table_item_request
+            .key_type
+            .try_into()
+            .context("Failed to parse key_type")
+            .map_err(BasicErrorWith404::bad_request)?;
+        let value_type = table_item_request
+            .value_type
+            .try_into()
+            .context("Failed to parse value_type")
+            .map_err(BasicErrorWith404::bad_request)?;
+        let key = table_item_request.key;
+
+        let (ledger_info, ledger_version, state_view) = self.preprocess_request(ledger_version)?;
+
+        let resolver = state_view.as_move_resolver();
+        let converter = resolver.as_converter();
+
+        let vm_key = converter
+            .try_into_vm_value(&key_type, key.clone())
+            .map_err(BasicErrorWith404::bad_request)?;
+        let raw_key = vm_key
+            .undecorate()
+            .simple_serialize()
+            .ok_or_else(|| BasicErrorWith404::internal_str("Failed to serialize table key"))?;
+
+        let state_key = StateKey::table_item(TableHandle(table_handle), raw_key);
+        let bytes = state_view
+            .get_state_value(&state_key)
+            .context(format!(
+                "Failed when trying to retrieve table item from the DB with key: {}",
+                key
+            ))
+            .map_err(BasicErrorWith404::internal)?
+            .ok_or_else(|| build_not_found("table handle or item", key, ledger_version))?;
+
+        let move_value = converter
+            .try_into_move_value(&value_type, &bytes)
+            .context("Failed to deserialize table item retrieved from DB")
+            .map_err(BasicErrorWith404::internal)?;
+
+        BasicResponse::try_from_rust_value((
+            move_value,
             &ledger_info,
             BasicResponseStatus::Ok,
             accept_type,
