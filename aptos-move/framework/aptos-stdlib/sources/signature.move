@@ -14,6 +14,9 @@ module aptos_std::signature {
     /// Return `false` otherwise.
     /// Does not abort.
     native public fun bls12381_validate_pubkey(public_key: vector<u8>, proof_of_possesion: vector<u8>): bool;
+    spec bls12381_validate_pubkey { // TODO: temporary mockup.
+        pragma opaque;
+    }
 
     /// Return true if the Ed25519 `signature` on `message` verifies against the Ed25519 public key
     /// `public_key`.
