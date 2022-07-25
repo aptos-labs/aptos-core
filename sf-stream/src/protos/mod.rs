@@ -1,3 +1,3 @@
 // @generated
 
-pub mod demo;
+pub mod extractor;
