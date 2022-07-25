@@ -16,6 +16,10 @@ variable "BUILD_DATE" {}
 // this is the full GIT_SHA - let's use that as primary identifier going forward
 variable "GIT_SHA" {}
 
+variable "GIT_BRANCH" {}
+
+variable "GIT_TAG" {}
+
 variable "LAST_GREEN_COMMIT" {}
 
 variable "GCP_DOCKER_ARTIFACT_REPO" {}
@@ -42,6 +46,11 @@ target "builder" {
   cache-from = generate_cache_from("builder")
   cache-to   = generate_cache_to("builder")
   tags       = generate_tags("builder")
+  args       = {
+    GIT_SHA = "${GIT_SHA}"
+    GIT_BRANCH      = "${GIT_BRANCH}"
+    GIT_TAG         = "${GIT_TAG}"
+  }
 }
 
 group "all" {

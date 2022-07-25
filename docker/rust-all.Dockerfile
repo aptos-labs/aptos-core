@@ -9,6 +9,16 @@ RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-
 ### Build Rust code ###
 FROM rust-base as builder
 COPY --link . /aptos/
+
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
+
+ARG GIT_BRANCH
+ENV GIT_BRANCH ${GIT_BRANCH}
+
+ARG GIT_TAG
+ENV GIT_TAG ${GIT_TAG}
+
 RUN --mount=type=cache,target=/aptos/target --mount=type=cache,target=$CARGO_HOME/registry docker/build-rust-all.sh && rm -rf $CARGO_HOME/registry/index
 
 ### Validator Image ###

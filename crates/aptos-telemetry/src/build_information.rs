@@ -32,11 +32,17 @@ macro_rules! collect_build_information {
         // Get access to shadow BUILD information
         shadow_rs::shadow!(build);
 
+        // Get Git metadata from environment variables set during build-time.
+        // This is applicable for docker based builds.
+        const GIT_SHA: Option<&str> = option_env!("GIT_SHA");
+        const GIT_BRANCH: Option<&str> = option_env!("GIT_BRANCH");
+        const GIT_TAG: Option<&str> = option_env!("GIT_TAG");
+
         // Collect and return the build information
         let mut build_information: std::collections::BTreeMap<String, String> = BTreeMap::new();
         build_information.insert(
             aptos_telemetry::build_information::BUILD_BRANCH.into(),
-            build::BRANCH.into(),
+            GIT_BRANCH.unwrap_or(build::BRANCH).into(),
         );
         build_information.insert(
             aptos_telemetry::build_information::BUILD_CARGO_VERSION.into(),
@@ -48,7 +54,7 @@ macro_rules! collect_build_information {
         );
         build_information.insert(
             aptos_telemetry::build_information::BUILD_COMMIT_HASH.into(),
-            build::COMMIT_HASH.into(),
+            GIT_SHA.unwrap_or(build::COMMIT_HASH).into(),
         );
         build_information.insert(
             aptos_telemetry::build_information::BUILD_OS.into(),
@@ -72,7 +78,7 @@ macro_rules! collect_build_information {
         );
         build_information.insert(
             aptos_telemetry::build_information::BUILD_TAG.into(),
-            build::TAG.into(),
+            GIT_TAG.unwrap_or(build::TAG).into(),
         );
         build_information.insert(
             aptos_telemetry::build_information::BUILD_TARGET.into(),
