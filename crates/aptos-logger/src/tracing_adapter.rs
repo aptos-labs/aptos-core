@@ -83,8 +83,6 @@ fn translate_metadata(metadata: &Metadata<'static>) -> Option<dl::Metadata> {
         level,
         metadata.target(),
         metadata.module_path().unwrap_or(""),
-        metadata.file().unwrap_or(""),
-        metadata.line().unwrap_or(0),
         "",
     ))
 }

@@ -41,7 +41,7 @@ EXPOSE 6186
 
 # Capture backtrace on error
 ENV RUST_BACKTRACE 1
-
+ENV RUST_LOG_FORMAT=json
 
 
 ### Indexer Image ###
@@ -54,6 +54,8 @@ RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcp
 RUN mkdir -p /opt/aptos/bin
 COPY --link --from=builder /aptos/dist/aptos-indexer /usr/local/bin/aptos-indexer
 
+ENV RUST_LOG_FORMAT=json
+
 ### Node Checker Image ###
 
 FROM debian-base AS node-checker
@@ -64,6 +66,7 @@ RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcp
 RUN mkdir -p /opt/aptos/bin
 COPY --link --from=builder /aptos/dist/aptos-node-checker /usr/local/bin/aptos-node-checker
 
+ENV RUST_LOG_FORMAT=json
 
 ### Tools Image ###
 FROM debian-base AS tools
@@ -113,6 +116,7 @@ RUN apt-get update && apt-get install -y procps
 
 # Mint proxy listening address
 EXPOSE 8000
+ENV RUST_LOG_FORMAT=json
 
 
 
@@ -133,6 +137,6 @@ ENV PATH "$PATH:/root/bin"
 
 WORKDIR /aptos
 COPY --link --from=builder /aptos/dist/forge /usr/local/bin/forge
-
+ENV RUST_LOG_FORMAT=json
 
 ENTRYPOINT ["forge"]
