@@ -91,7 +91,7 @@ spec:
         - sh
         - -c
         - |-
-          set -ex
+          set -e
           . /tmp/genesis.sh
         resources:
           {{- toYaml .Values.genesis.resources | nindent 10 }}
