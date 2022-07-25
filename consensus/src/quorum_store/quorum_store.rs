@@ -8,7 +8,7 @@ use crate::quorum_store::{
     batch_reader::BatchReader,
     batch_store::{BatchStore, BatchStoreCommand, PersistRequest},
     network_listener::NetworkListener,
-    proof_builder::{ProofBuilder, ProofBuilderCommand},
+    proof_builder::{ProofBuilder, ProofBuilderCommand, ProofReturnChannel},
     quorum_store_db::QuorumStoreDB,
     types::{BatchId, Fragment, SerializedTransaction},
 };
@@ -21,17 +21,17 @@ use aptos_types::{
 use channel::aptos_channel;
 use consensus_types::{
     common::Round,
-    proof_of_store::{LogicalTime, ProofOfStore, SignedDigest},
+    proof_of_store::{LogicalTime, SignedDigest},
 };
 use futures::{
-    channel::oneshot,
     future::BoxFuture,
     stream::{futures_unordered::FuturesUnordered, StreamExt as _},
 };
 use std::{collections::HashMap, sync::Arc};
-use tokio::sync::mpsc::{channel, Receiver, Sender};
-
-pub type ProofReturnChannel = oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
+use tokio::sync::{
+    mpsc::{channel, Receiver, Sender},
+    oneshot,
+};
 
 #[derive(Debug)]
 pub enum QuorumStoreCommand {
@@ -42,6 +42,7 @@ pub enum QuorumStoreCommand {
         LogicalTime,
         ProofReturnChannel,
     ),
+    Shutdown(oneshot::Sender<()>),
 }
 
 #[derive(Debug)]
@@ -194,16 +195,13 @@ impl QuorumStore {
         batch_id: BatchId,
         expiration: LogicalTime,
         proof_tx: ProofReturnChannel,
-    ) -> (
-        BatchStoreCommand,
-        tokio::sync::oneshot::Receiver<SignedDigest>,
-    ) {
+    ) -> (BatchStoreCommand, oneshot::Receiver<SignedDigest>) {
         match self
             .batch_aggregator
             .end_batch(batch_id, self.fragment_id, fragment_payload.clone())
         {
             Ok((num_bytes, payload, digest_hash)) => {
-                let (persist_request_tx, persist_request_rx) = tokio::sync::oneshot::channel();
+                let (persist_request_tx, persist_request_rx) = oneshot::channel();
 
                 let fragment = Fragment::new(
                     self.epoch,
@@ -238,12 +236,32 @@ impl QuorumStore {
     }
 
     pub async fn start(mut self) {
+        debug!(
+            "[QS worker] QuorumStore worker for epoch {} starting",
+            self.epoch
+        );
+
         let mut futures: FuturesUnordered<BoxFuture<'_, _>> = FuturesUnordered::new();
 
         loop {
             tokio::select! {
                 Some(command) = self.command_rx.recv() => {
                     match command {
+                        QuorumStoreCommand::Shutdown(ack_tx) => {
+                let (batch_store_shutdown_tx, batch_store_shutdown_rx) = oneshot::channel();
+
+                self.batch_store_tx
+                .send(BatchStoreCommand::Shutdown(batch_store_shutdown_tx))
+                .await
+                .expect("Failed to send to BatchStore");
+
+                batch_store_shutdown_rx.await.expect("Failed to stop BatchStore");
+
+                ack_tx
+                .send(())
+                .expect("Failed to send shutdown ack from QuorumStore");
+                break;
+            }
                         QuorumStoreCommand::AppendToBatch(fragment_payload, batch_id) => {
                             let msg = self.handle_append_to_batch(fragment_payload, batch_id);
                             self.network_sender.broadcast_without_self(msg).await;
@@ -287,5 +305,10 @@ impl QuorumStore {
                 }
             }
         }
+
+        debug!(
+            "[QS worker] QuorumStore worker for epoch {} stopping",
+            self.epoch
+        );
     }
 }

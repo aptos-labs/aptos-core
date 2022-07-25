@@ -167,9 +167,7 @@ impl DataManager for QuorumStoreDataManager {
             Payload::DirectMempool(_) => unreachable!("Direct mempool should not be used."),
             Payload::InQuorumStore(proofs) => {
                 match self.digest_status.get(&block.id()) {
-                    None => {
-                        unreachable!()
-                    }
+                    None => unreachable!("No status in Data Manager for digest {}", block.id()),
                     Some(data_status) => {
                         if let DataStatus::Cached(data) = data_status.deref() {
                             return Ok(data.clone());

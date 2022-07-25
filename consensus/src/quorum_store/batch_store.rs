@@ -53,9 +53,9 @@ pub(crate) enum BatchStoreCommand {
         Option<oneshot::Sender<Result<Vec<SignedTransaction>, executor_types::Error>>>,
     ),
     Clean(Vec<HashValue>),
+    Shutdown(oneshot::Sender<()>),
 }
 
-///gets PersistRequest, persist, sign and return (network or oneshot to self)
 pub(crate) struct BatchStore {
     epoch: u64,
     my_peer_id: PeerId,
@@ -130,19 +130,12 @@ impl BatchStore {
 
     fn store(&self, persist_request: PersistRequest) -> Option<SignedDigest> {
         let expiration = persist_request.value.expiration.clone();
-        // Network listener should filter messages with wrong expiration epoch.
-        assert_eq!(
-            expiration.epoch(),
-            self.epoch,
-            "Persist Request for a batch with an incorrect epoch"
-        );
 
         match self
             .batch_reader
             .save(persist_request.digest, persist_request.value.clone())
         {
             Ok(needs_db) => {
-                debug!("QS: stored to cache");
                 if needs_db {
                     // TODO: Consider an async call to DB, but it could be a race with clean.
                     self.db
@@ -160,15 +153,26 @@ impl BatchStore {
 
             Err(e) => {
                 debug!("QS: failed to store to cache {:?}", e);
-                // Request to store a batch for longer than maximum gap.
                 None
             }
         }
     }
 
     pub async fn start(self, mut batch_store_rx: Receiver<BatchStoreCommand>) {
+        debug!(
+            "[QS worker] BatchStore worker for epoch {} starting",
+            self.epoch
+        );
+
         while let Some(command) = batch_store_rx.recv().await {
             match command {
+                BatchStoreCommand::Shutdown(ack_tx) => {
+                    self.batch_reader.shutdown().await;
+                    ack_tx
+                        .send(())
+                        .expect("Failed to send shutdown ack to QuorumStore");
+                    break;
+                }
                 BatchStoreCommand::Persist(persist_request, maybe_tx) => {
                     let author = persist_request.value.author;
                     if let Some(signed_digest) = self.store(persist_request) {
@@ -235,5 +239,10 @@ impl BatchStore {
                 }
             }
         }
+
+        debug!(
+            "[QS worker] BatchStore worker for epoch {} stopping",
+            self.epoch
+        );
     }
 }

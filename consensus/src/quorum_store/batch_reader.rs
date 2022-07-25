@@ -23,7 +23,7 @@ use once_cell::sync::OnceCell;
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Mutex,
     },
     time::Duration,
@@ -31,7 +31,7 @@ use std::{
 use tokio::{
     sync::{
         mpsc::{Receiver, Sender},
-        oneshot,
+        oneshot, Notify,
     },
     time,
 };
@@ -118,6 +118,8 @@ pub struct BatchReader {
     expiry_grace_rounds: Round,
     memory_quota: usize,
     db_quota: usize,
+    shutdown_flag: AtomicBool,
+    shutdown_notify: Notify,
 }
 
 impl BatchReader {
@@ -146,12 +148,28 @@ impl BatchReader {
             expiry_grace_rounds,
             memory_quota,
             db_quota,
+            shutdown_flag: AtomicBool::new(false),
+            shutdown_notify: Notify::new(),
         };
 
         let mut expired_keys = Vec::new();
         for (digest, value) in db_content {
             let expiration = value.expiration;
-            assert!(epoch >= expiration.epoch());
+
+            if epoch < expiration.epoch() {
+                debug!(
+                    "Outdated batch reader in epoch {}, observed expiration epoch {}",
+                    epoch,
+                    expiration.epoch()
+                );
+
+                // Outdated batch reader with the system, must ensure to not affect state.
+                // Can already shutdown the worker thread as an optimization.
+                self_ob.shutdown_flag.store(true, Ordering::Relaxed);
+                break;
+            }
+            // Guaranteed that epoch >= expiration.epoch() below.
+
             if epoch > expiration.epoch()
                 || last_committed_round > expiration.round() + expiry_grace_rounds
             {
@@ -206,14 +224,20 @@ impl BatchReader {
                 }
             }
             self.update_cache(digest, value)?;
+            Ok(true)
         } else {
-            bail!(
-                "Wrong expiration {:?}, last committed round = {}",
-                value.expiration,
-                self.last_committed_round()
-            );
+            bail!("Incorrect expiration {:?} for BatchReader in epoch {}, last committed round {} and max gap {}",
+	      value.expiration,
+	      self.epoch(),
+	      self.last_committed_round(),
+	      self.max_expiry_round_gap);
         }
-        Ok(true)
+    }
+
+    pub async fn shutdown(&self) {
+        if !self.shutdown_flag.swap(true, Ordering::Relaxed) {
+            self.shutdown_notify.notified().await;
+        }
     }
 
     fn clear_expired_payload(&self, certified_time: LogicalTime) -> Vec<HashValue> {
@@ -330,6 +354,11 @@ impl BatchReader {
         request_num_peers: usize,
         request_timeout_ms: usize,
     ) {
+        debug!(
+            "[QS worker] BatchReader worker for epoch {} starting",
+            self.epoch()
+        );
+
         let mut batch_requester = BatchRequester::new(
             self.epoch(),
             self.my_peer_id,
@@ -348,6 +377,9 @@ impl BatchReader {
 
                 _ = interval.tick() => {
                     batch_requester.handle_timeouts().await;
+            if self.shutdown_flag.load(Ordering::Relaxed) {
+            break;
+            }
                 },
 
                 Some(cmd) = batch_reader_rx.recv() => {
@@ -388,5 +420,11 @@ impl BatchReader {
                 }
             }
         }
+
+        self.shutdown_notify.notify_one();
+        debug!(
+            "[QS worker] BatchReader worker for epoch {} stopping",
+            self.epoch()
+        );
     }
 }

@@ -35,7 +35,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::{sync::mpsc::Sender as TokioSender, time};
+use tokio::{sync::mpsc::Sender as TokioSender, sync::oneshot as TokioOneshot, time};
 
 type ProofReceiveChannel = oneshot::Receiver<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
 
@@ -184,7 +184,6 @@ impl QuorumStoreWrapper {
             .await;
     }
 
-    // TODO: priority queue on LogicalTime to clean old proofs
     pub(crate) async fn insert_proof(&mut self, mut new_proof: ProofOfStore) {
         let maybe_proof = self.proofs_for_consensus.remove(new_proof.digest());
         if let Some(proof) = maybe_proof {
@@ -308,9 +307,14 @@ impl QuorumStoreWrapper {
         mut self,
         mut network_sender: NetworkSender,
         mut consensus_receiver: Receiver<WrapperCommand>,
-        mut shutdown: Receiver<()>,
+        mut shutdown_rx: Receiver<oneshot::Sender<()>>,
         mut network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
     ) {
+        debug!(
+            "[QS worker] QuorumStoreWrapper worker for epoch {} starting",
+            self.latest_logical_time.epoch(),
+        );
+
         let mut proofs_in_progress: FuturesUnordered<BoxFuture<'_, _>> = FuturesUnordered::new();
 
         // TODO: parameter? bring back back-off?
@@ -320,7 +324,20 @@ impl QuorumStoreWrapper {
             let _timer = counters::WRAPPER_MAIN_LOOP.start_timer();
 
             tokio::select! {
-                Some(_s) = shutdown.next() => {
+                Some(ack_tx) = shutdown_rx.next() => {
+
+            let (qs_shutdown_tx, qs_shutdown_rx) = TokioOneshot::channel();
+                    self.quorum_store_sender
+            .send(QuorumStoreCommand::Shutdown(qs_shutdown_tx))
+            .await
+            .expect("could not send to QuorumStore");
+
+            qs_shutdown_rx.await.expect("Failed to stop QuorumStore");
+
+                    ack_tx
+            .send(())
+            .expect("Failed to send shutdown ack from QuorumStoreWrapper");
+
                     break;
                 },
 
@@ -329,14 +346,11 @@ impl QuorumStoreWrapper {
                         proofs_in_progress.push(Box::pin(proof_rx));
                     }
                 },
-                Some(next) = proofs_in_progress.next() => {
-                    // TODO: handle failures
-                    if let Ok(msg) = next {
-                        debug!("QS: got proof");
-                        self.handle_local_proof(msg, &mut network_sender).await;
-                    } else{
-                        debug!("QS: channel close");
-                    }
+                Some(next_proof) = proofs_in_progress.next() => {
+            match next_proof {
+            Ok(proof) => self.handle_local_proof(proof, &mut network_sender).await,
+            Err(_) => {}
+            }
                 },
                 Some(msg) = consensus_receiver.next() => {
                     self.handle_consensus_request(msg).await;
@@ -349,6 +363,11 @@ impl QuorumStoreWrapper {
                 },
             }
         }
+
+        debug!(
+            "[QS worker] QuorumStoreWrapper worker for epoch {} stopping",
+            self.latest_logical_time.epoch(),
+        );
 
         // Periodically:
         // 1. Pull from mempool.
