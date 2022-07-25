@@ -19,6 +19,7 @@ aptos-vm = { path = "../aptos-move/aptos-vm" }
 
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
+scratchpad = { path = "../storage/scratchpad" }
 storage-interface = { path = "../storage/storage-interface" }
 
 [dev-dependencies]
