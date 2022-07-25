@@ -73,7 +73,7 @@ type SigningMessage = TxnBuilderTypes.SigningMessage;
     ),
   );
 
-  const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
+  const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
     client.getAccount(mutisigAccountAddress),
     client.getChainId(),
   ]);
@@ -83,7 +83,7 @@ type SigningMessage = TxnBuilderTypes.SigningMessage;
   const rawTxn = new TxnBuilderTypes.RawTransaction(
     // Transaction sender account address
     TxnBuilderTypes.AccountAddress.fromHex(mutisigAccountAddress),
-    BigInt(sequnceNumber),
+    BigInt(sequenceNumber),
     scriptFunctionPayload,
     // Max gas unit to spend
     1000n,
