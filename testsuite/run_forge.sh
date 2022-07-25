@@ -138,6 +138,8 @@ FORGE_CHAIN_NAME=${FORGE_CLUSTER_NAME#"aptos-"}
 # set the namespace in FORGE_NAMESPACE
 set_forge_namespace
 
+HUMIO_LOGS_LINK="https://cloud.us.humio.com/k8s/search?query=%24forgeLogs%28%29%20%7C%20$FORGE_NAMESPACE%20&live=true&start=24h&widgetType=list-view&columns=%5B%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22%40timestamp%22%2C%22format%22%3A%22timestamp%22%2C%22width%22%3A180%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22level%22%2C%22format%22%3A%22text%22%2C%22width%22%3A54%7D%2C%7B%22type%22%3A%22link%22%2C%22openInNewBrowserTab%22%3Atrue%2C%22style%22%3A%22button%22%2C%22hrefTemplate%22%3A%22https%3A%2F%2Fgithub.com%2Faptos-labs%2Faptos-core%2Fpull%2F%7B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22textTemplate%22%3A%22%7B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22header%22%3A%22Forge%20PR%22%2C%22width%22%3A79%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.namespace%22%2C%22format%22%3A%22text%22%2C%22width%22%3A104%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.pod_name%22%2C%22format%22%3A%22text%22%2C%22width%22%3A126%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.container_name%22%2C%22format%22%3A%22text%22%2C%22width%22%3A85%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22message%22%2C%22format%22%3A%22text%22%7D%5D&newestAtBottom=true&showOnlyFirstLine=false"
+
 # set the image tag in IMAGE_TAG
 set_image_tag
 
@@ -151,6 +153,7 @@ cat <<EOF >$FORGE_PRE_COMMENT
 ### Forge is running with \`${IMAGE_TAG}\`
 * [Grafana dashboard (auto-refresh)]($FORGE_DASHBOARD_LINK)
 * [Validator 0 logs (auto-refresh)]($VALIDATOR_LOGS_LINK)
+* [Humio Logs]($HUMIO_LOGS_LINK)
 EOF
 echo "=====START PRE_FORGE COMMENT====="
 cat $FORGE_PRE_COMMENT
@@ -293,6 +296,7 @@ $FORGE_REPORT_TXT
 \`\`\`
 * [Grafana dashboard]($FORGE_DASHBOARD_LINK)
 * [Validator 0 logs]($VALIDATOR_LOGS_LINK)
+* [Humio Logs]($HUMIO_LOGS_LINK)
 EOF
 
 echo "=====START FORGE COMMENT====="
