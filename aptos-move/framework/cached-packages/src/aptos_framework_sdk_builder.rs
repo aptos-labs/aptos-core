@@ -42,6 +42,11 @@ pub enum ScriptFunctionCall {
         new_auth_key: Bytes,
     },
 
+    AccountTransfer {
+        to: AccountAddress,
+        amount: u64,
+    },
+
     AccountUtilsCreateAndFundAccount {
         account: AccountAddress,
         amount: u64,
@@ -359,6 +364,7 @@ impl ScriptFunctionCall {
             AccountRotateAuthenticationKey { new_auth_key } => {
                 account_rotate_authentication_key(new_auth_key)
             }
+            AccountTransfer { to, amount } => account_transfer(to, amount),
             AccountUtilsCreateAndFundAccount { account, amount } => {
                 account_utils_create_and_fund_account(account, amount)
             }
@@ -660,6 +666,21 @@ pub fn account_rotate_authentication_key(new_auth_key: Vec<u8>) -> TransactionPa
         ident_str!("rotate_authentication_key").to_owned(),
         vec![],
         vec![bcs::to_bytes(&new_auth_key).unwrap()],
+    ))
+}
+
+pub fn account_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("transfer").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
     ))
 }
 
@@ -1686,6 +1707,17 @@ mod decoder {
         }
     }
 
+    pub fn account_transfer(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::AccountTransfer {
+                to: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn account_utils_create_and_fund_account(
         payload: &TransactionPayload,
     ) -> Option<ScriptFunctionCall> {
@@ -2304,6 +2336,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "account_rotate_authentication_key".to_string(),
             Box::new(decoder::account_rotate_authentication_key),
+        );
+        map.insert(
+            "account_transfer".to_string(),
+            Box::new(decoder::account_transfer),
         );
         map.insert(
             "account_utils_create_and_fund_account".to_string(),

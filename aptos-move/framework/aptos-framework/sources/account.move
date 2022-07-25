@@ -393,6 +393,13 @@ module aptos_framework::account {
         (signer, signer_cap)
     }
 
+    public entry fun transfer(source: &signer, to: address, amount: u64) {
+        if(!exists<Account>(to)) {
+            create_account(to)
+        };
+        coin::transfer<AptosCoin>(source, to, amount)
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     /// Capability based functions for efficient use.
     ///////////////////////////////////////////////////////////////////////////
@@ -463,4 +470,27 @@ module aptos_framework::account {
         assert!(borrow_global<Account>(addr).sequence_number == 10, 2);
     }
 
+    ///////////////////////////////////////////////////////////////////////////
+    // Test account helpers
+    ///////////////////////////////////////////////////////////////////////////
+
+    #[test(alice = @0xa11ce, mint = @0xA550C18, core = @0x1)]
+    public fun test_transfer(alice: signer, mint: signer, core: signer) {
+        let bob = create_address(x"0000000000000000000000000000000000000000000000000000000000000b0b");
+        let carol = create_address(x"00000000000000000000000000000000000000000000000000000000000ca501");
+
+        let (mint_cap, burn_cap) = aptos_framework::aptos_coin::initialize(&core, &mint);
+        create_account(signer::address_of(&alice));
+        aptos_framework::aptos_coin::mint(&mint, signer::address_of(&alice), 10000);
+        transfer(&alice, bob, 500);
+        assert!(coin::balance<AptosCoin>(bob) == 500, 0);
+        transfer(&alice, carol, 500);
+        assert!(coin::balance<AptosCoin>(carol) == 500, 1);
+        transfer(&alice, carol, 1500);
+        assert!(coin::balance<AptosCoin>(carol) == 2000, 2);
+
+        coin::destroy_mint_cap(mint_cap);
+        coin::destroy_burn_cap(burn_cap);
+        let _bob = bob;
+    }
 }
