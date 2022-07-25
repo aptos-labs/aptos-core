@@ -3,6 +3,7 @@
 
 #![allow(unused_imports)]
 
+use aptos_types::transaction::authenticator::AuthenticationKey;
 use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
 
 pub use crate::aptos_framework_sdk_builder::*;
