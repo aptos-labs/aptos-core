@@ -284,7 +284,7 @@ get_validator_logs_link
 # construct forge comment output
 if [ "$FORGE_EXIT_CODE" = "0" ]; then
     FORGE_COMMENT_HEADER="### :white_check_mark: Forge test success on \`${IMAGE_TAG}\`"
-else if [ "$FORGE_EXIT_CODE" = "2" ]
+elif [ "$FORGE_EXIT_CODE" = "2" ]; then
     FORGE_COMMENT_HEADER"### :x: Forge test perf regression on \`${IMAGE_TAG}\`"
 else
     FORGE_COMMENT_HEADER="### :x: Forge test failure on \`${IMAGE_TAG}\`"

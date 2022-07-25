@@ -84,15 +84,15 @@ jobs:
           # source this script to run and get environment variables
           source testsuite/run_forge.sh
 
-          # export env vars for next step
-          echo "FORGE_EXIT_CODE=$FORGE_EXIT_CODE" >> $GITHUB_ENV
-          echo "FORGE_COMMENT=$FORGE_COMMENT" >> $GITHUB_ENV
-
           # append some GHA-specific content to the comment
           cat << EOF >> $FORGE_COMMENT
           ${{ env.FORGE_BLOCKING == 'true' && 'Forge is land-blocking' || 'Forge is not land-blocking' }}
           * [Test runner output](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           EOF
+
+          # export env vars for next step
+          echo "FORGE_EXIT_CODE=$FORGE_EXIT_CODE" >> $GITHUB_ENV
+          echo "FORGE_COMMENT=$FORGE_COMMENT" >> $GITHUB_ENV
 
       - name: Post forge result comment
         if: env.FORGE_ENABLED == 'true' && github.event.number != null
