@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions};
+use std::str::FromStr;
 use aptos_rest_client::{
     aptos_api_types::{WriteResource, WriteSetChange},
     Transaction,
 };
 use aptos_transaction_builder::aptos_stdlib;
-use aptos_types::account_address::AccountAddress;
+use aptos_types::{account_address::AccountAddress, transaction::authenticator::AuthenticationKey};
 use async_trait::async_trait;
 use clap::Parser;
 use serde::Serialize;
@@ -26,8 +27,8 @@ pub struct CreateResourceAccount {
     pub(crate) seed: String,
 
     /// Optional Resource Account authentication key.
-    #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
-    pub(crate) authentication_key: Option<AccountAddress>,
+    #[clap(long, parse(try_from_str = AuthenticationKey::from_str))]
+    pub(crate) authentication_key: Option<AuthenticationKey>,
 }
 
 /// A shortened create resource account output

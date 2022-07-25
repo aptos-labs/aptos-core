@@ -3,6 +3,7 @@
 
 #![allow(unused_imports)]
 
+use aptos_types::transaction::authenticator::AuthenticationKey;
 use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
 
 pub use crate::aptos_framework_sdk_builder::*;
@@ -18,7 +19,7 @@ pub fn aptos_coin_transfer(to: AccountAddress, amount: u64) -> TransactionPayloa
 
 pub fn encode_create_resource_account(
     seed: &str,
-    authentication_key: Option<AccountAddress>,
+    authentication_key: Option<AuthenticationKey>,
 ) -> TransactionPayload {
     let seed: Vec<u8> = bcs::to_bytes(seed).unwrap();
     let authentication_key: Vec<u8> = if let Some(key) = authentication_key {
