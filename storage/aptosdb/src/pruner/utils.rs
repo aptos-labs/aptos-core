@@ -20,8 +20,11 @@ pub fn create_db_pruners(
     ledger_db: Arc<DB>,
     state_merkle_db: Arc<DB>,
     storage_pruner_config: StoragePrunerConfig,
-) -> Vec<Option<Mutex<Arc<dyn DBPruner + Send + Sync>>>> {
-    vec![
+) -> (
+    Option<Mutex<Arc<dyn DBPruner + Send + Sync>>>,
+    Option<Mutex<Arc<dyn DBPruner + Send + Sync>>>,
+) {
+    (
         if storage_pruner_config.state_store_prune_window.is_some() {
             Some(Mutex::new(Arc::new(StateStorePruner::new(Arc::clone(
                 &state_merkle_db,
@@ -39,5 +42,5 @@ pub fn create_db_pruners(
         } else {
             None
         },
-    ]
+    )
 }

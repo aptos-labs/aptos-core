@@ -1627,7 +1627,7 @@ impl DbWriter for AptosDB {
     fn delete_genesis(&self) -> Result<()> {
         gauged_api("delete_genesis", || {
             // Create all the db pruners
-            let db_pruners = utils::create_db_pruners(
+            let (state_pruner_option, ledger_pruner_option) = utils::create_db_pruners(
                 Arc::clone(&self.ledger_db),
                 Arc::clone(&self.state_merkle_db),
                 self.pruner_config,
@@ -1636,9 +1636,15 @@ impl DbWriter for AptosDB {
             // Execute each pruner to clean up the genesis state
             let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive).
             let max_version = 1; // We should only really be pruning at a single version.
-            for db_pruner in db_pruners.into_iter().flatten() {
-                db_pruner.lock().set_target_version(target_version);
-                db_pruner.lock().prune(max_version)?;
+
+            if let Some(state_pruner) = state_pruner_option {
+                state_pruner.lock().set_target_version(target_version);
+                state_pruner.lock().prune(max_version)?;
+            }
+
+            if let Some(ledger_pruner) = ledger_pruner_option {
+                ledger_pruner.lock().set_target_version(target_version);
+                ledger_pruner.lock().prune(max_version)?;
             }
             Ok(())
         })
