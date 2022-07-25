@@ -8808,6 +8808,7 @@ dependencies = [
  "fail 0.5.0",
  "move-deps",
  "rand 0.7.3",
+ "scratchpad",
  "storage-interface",
  "vm-genesis",
 ]
