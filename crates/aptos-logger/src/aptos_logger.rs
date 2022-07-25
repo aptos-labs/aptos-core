@@ -199,6 +199,7 @@ impl LogEntry {
 /// A builder for a `AptosData`, configures what, where, and how to write logs.
 pub struct AptosDataBuilder {
     channel_size: usize,
+    console_port: u16,
     enable_backtrace: bool,
     level: Level,
     remote_level: Level,
@@ -213,6 +214,7 @@ impl AptosDataBuilder {
     pub fn new() -> Self {
         Self {
             channel_size: CHANNEL_SIZE,
+            console_port: 6669,
             enable_backtrace: false,
             level: Level::Info,
             remote_level: Level::Info,
@@ -260,6 +262,10 @@ impl AptosDataBuilder {
         self
     }
 
+    pub fn console_port(&mut self, console_port: u16) -> &mut Self {
+        self.console_port = console_port;
+        self
+    }
     pub fn is_async(&mut self, is_async: bool) -> &mut Self {
         self.is_async = is_async;
         self
@@ -350,7 +356,12 @@ impl AptosDataBuilder {
             })
         };
 
-        crate::logger::set_global_logger(logger.clone());
+        let console_port = if cfg!(disable_tokio_console) {
+            None
+        } else {
+            Some(self.console_port)
+        };
+        crate::logger::set_global_logger(logger.clone(), console_port);
         logger
     }
 }
@@ -703,7 +714,7 @@ mod tests {
     fn set_test_logger() -> Receiver<LogEntry> {
         let (logger, receiver) = LogStream::new(true);
         let logger = Arc::new(logger);
-        crate::logger::set_global_logger(logger);
+        crate::logger::set_global_logger(logger, None);
         receiver
     }
 
@@ -743,7 +754,7 @@ mod tests {
         let original_timestamp = entry.timestamp;
         entry.timestamp = String::from("2022-07-24T23:42:29.540278Z");
         entry.hostname = Some("test-host");
-        let expected = r#"{"level":"INFO","source":{"package":"aptos_logger","file":"crates/aptos-logger/src/aptos_logger.rs:718"},"thread_name":"aptos_logger::tests::basic","hostname":"test-host","timestamp":"2022-07-24T23:42:29.540278Z","message":"This is a log","data":{"bar":"foo_bar","category":"name","display":"12345","foo":5,"test":true}}"#;
+        let expected = r#"{"level":"INFO","source":{"package":"aptos_logger","file":"crates/aptos-logger/src/aptos_logger.rs:729"},"thread_name":"aptos_logger::tests::basic","hostname":"test-host","timestamp":"2022-07-24T23:42:29.540278Z","message":"This is a log","data":{"bar":"foo_bar","category":"name","display":"12345","foo":5,"test":true}}"#;
         assert_eq!(json_format(&entry).unwrap(), expected);
         entry.timestamp = original_timestamp;
 
