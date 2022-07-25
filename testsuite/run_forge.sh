@@ -9,7 +9,7 @@
 # if the necessary environment variables are set.
 #
 
-# ensure the script is run from project root
+# ensure the script is run from aptos-core project root
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
 
 # for calculating regression
