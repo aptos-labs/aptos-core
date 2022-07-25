@@ -243,6 +243,19 @@ export function serializeArg(argVal: any, argType: TypeTag, serializer: Serializ
     return;
   }
   if (argType instanceof TypeTagVector) {
+    // We are serializing a vector<u8>
+    if (argType.value instanceof TypeTagU8) {
+      if (argVal instanceof Uint8Array) {
+        serializer.serializeBytes(argVal);
+        return;
+      }
+
+      if (typeof argVal === "string") {
+        serializer.serializeStr(argVal);
+        return;
+      }
+    }
+
     if (!(argVal instanceof Array)) {
       throw new Error("Invalid vector args.");
     }
