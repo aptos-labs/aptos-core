@@ -12,6 +12,7 @@ use crate::{
 };
 use rand::{distributions::Alphanumeric, Rng};
 use rand_core::OsRng;
+use std::convert::TryFrom;
 use std::iter::zip;
 
 /// Tests that an individual signature share computed correctly on a message m passes verification on m.
@@ -142,6 +143,21 @@ fn bls12381_multisig_should_verify() {
 
     // multisig should not verify on an incorrect message under the correct aggregate PK
     assert!(multisig.verify(&message_wrong, &aggpk).is_err());
+}
+
+/// Tests signature (de)serialization
+#[test]
+fn bls12381_serialize_sig() {
+    let mut rng = OsRng;
+    let message = b"Hello world";
+    let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
+    let signature = key_pair.private_key.sign_arbitrary_message(message);
+
+    let sig_bytes = signature.to_bytes();
+
+    let signature_deserialized = bls12381::Signature::try_from(&sig_bytes[..]).unwrap();
+
+    assert_eq!(signature, signature_deserialized);
 }
 
 /// Tests that an aggregate signature on `n` different messages verifies correctly.
@@ -292,4 +308,42 @@ fn bls12381_random_multisig_dont_verify_with_random_pk() {
     assert!(signature
         .verify(&message, &keypair_junk.public_key)
         .is_err());
+}
+
+/// Test that generates an example signature. We used this to create a test case for the BLS12-381
+/// Move submodule. For simplicity, we use `sign_arbitrary_message` to generate a signature directly on a
+/// message `m` rather than on its hash derived using the `CryptoHasher` trait. This makes it easier
+/// to verify the signature in our Move code, which uses `verify_arbitrary_message`.
+#[test]
+fn bls12381_sample_signature() {
+    let mut rng = OsRng;
+
+    let keypair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
+    let sk = keypair.private_key;
+    let pk = keypair.public_key;
+
+    let message = b"Hello Aptos!";
+    let signature = sk.sign_arbitrary_message(message);
+
+    println!("SK:        {}", hex::encode(&sk.to_bytes()));
+    println!("PK:        {}", hex::encode(&pk.to_bytes()));
+    println!("Message:   {}", std::str::from_utf8(message).unwrap());
+    println!("Signature: {}", hex::encode(signature.to_bytes()));
+}
+
+#[test]
+fn bls12381_sample_signature_verifies() {
+    let pk = PublicKey::try_from(
+        hex::decode(
+            "94209a296b739577cb076d3bfb1ca8ee936f29b69b7dae436118c4dd1cc26fd43dcd16249476a006b8b949bf022a7858"
+        ).unwrap().as_slice()
+    ).unwrap();
+
+    let sig = bls12381::Signature::try_from(
+        hex::decode(
+            "b01ce4632e94d8c611736e96aa2ad8e0528a02f927a81a92db8047b002a8c71dc2d6bfb94729d0973790c10b6ece446817e4b7543afd7ca9a17c75de301ae835d66231c26a003f11ae26802b98d90869a9e73788c38739f7ac9d52659e1f7cf7"
+        ).unwrap().as_slice()
+    ).unwrap();
+
+    assert!(sig.verify_arbitrary_msg(b"Hello Aptos!", &pk).is_ok());
 }
