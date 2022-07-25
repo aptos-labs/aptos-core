@@ -40,9 +40,10 @@ use storage_interface::DbReaderWriter;
 
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_types::aggregated_signature::AggregatedSignature;
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, collections::BTreeMap, iter::once, sync::Arc};
+use std::{boxed::Box, iter::once, sync::Arc};
 use storage_interface::state_view::DbStateView;
 use vm_validator::vm_validator::VMValidator;
 use warp::http::header::CONTENT_TYPE;
@@ -445,6 +446,6 @@ impl TestContext {
             ),
             HashValue::zero(),
         );
-        LedgerInfoWithSignatures::new(info, BTreeMap::new())
+        LedgerInfoWithSignatures::new(info, AggregatedSignature::empty())
     }
 }

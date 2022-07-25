@@ -88,7 +88,7 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
         .unwrap();
     assert_eq!(output.num_leaves(), target_version + 1);
     let ledger_info_with_sigs =
-        gen_ledger_info_with_sigs(epoch, &output, block_id, &vec![signer.clone()]);
+        gen_ledger_info_with_sigs(epoch, &output, block_id, &[signer.clone()]);
     executor
         .commit_blocks(vec![block_id], ledger_info_with_sigs)
         .unwrap();

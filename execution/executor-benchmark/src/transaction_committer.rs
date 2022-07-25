@@ -3,6 +3,7 @@
 
 use aptos_crypto::hash::HashValue;
 use aptos_logger::prelude::*;
+use aptos_types::aggregated_signature::AggregatedSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -19,7 +20,6 @@ use executor::{
 };
 use executor_types::{BlockExecutorTrait, StateSnapshotDelta};
 use std::{
-    collections::BTreeMap,
     sync::{mpsc, Arc},
     time::{Duration, Instant},
 };
@@ -40,7 +40,10 @@ pub(crate) fn gen_li_with_sigs(
         block_info,
         HashValue::zero(), /* consensus_data_hash, doesn't matter */
     );
-    LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new() /* signatures */)
+    LedgerInfoWithSignatures::new(
+        ledger_info,
+        AggregatedSignature::empty(), /* signatures */
+    )
 }
 
 pub struct TransactionCommitter {

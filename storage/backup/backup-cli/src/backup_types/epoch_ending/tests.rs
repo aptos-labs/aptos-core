@@ -24,7 +24,7 @@ use aptos_types::{
 };
 use aptosdb::AptosDB;
 use backup_service::start_backup_service;
-use proptest::{collection::vec, prelude::*, std_facade::BTreeMap};
+use proptest::{collection::vec, prelude::*};
 use std::{
     convert::TryInto,
     io::Write,

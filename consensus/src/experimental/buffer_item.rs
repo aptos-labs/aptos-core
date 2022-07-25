@@ -43,7 +43,7 @@ fn aggregate_ledger_info(
     let valid_sigs = PartialSignatures::new(
         unverified_signatures
             .signatures()
-            .into_iter()
+            .iter()
             .filter(|(author, sig)| validator.verify(**author, commit_ledger_info, sig).is_ok())
             .map(|(author, sig)| (*author, sig.clone()))
             .collect(),
@@ -291,7 +291,7 @@ impl BufferItem {
                     commit_proof.commit_info()
                 );
                 Self::Ordered(Box::new(OrderedItem {
-                    commit_proof: Some(commit_proof.clone()),
+                    commit_proof: Some(commit_proof),
                     ..ordered
                 }))
             }
