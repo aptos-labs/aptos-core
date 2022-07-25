@@ -264,6 +264,12 @@ module aptos_framework::stake {
         borrow_global<StakePool>(pool_address).locked_until_secs
     }
 
+    /// Return the remaining lockup of the stake pool at `pool_address`.
+    /// This will throw an error if there's no stake pool at `pool_address`.
+    public fun get_remaining_lockup_secs(pool_address: address): u64 acquires StakePool {
+        borrow_global<StakePool>(pool_address).locked_until_secs - timestamp::now_seconds()
+    }
+
     /// Return the different stake amounts for `pool_address` (whether the validator is active or not).
     /// The returned amounts are for (active, inactive, pending_active, pending_inactive) stake respectively.
     public fun get_stake(pool_address: address): (u64, u64, u64, u64) acquires StakePool {
@@ -309,6 +315,24 @@ module aptos_framework::stake {
     /// Return the operator of the validator at `pool_address`.
     public fun get_operator(pool_address: address): address acquires StakePool {
         borrow_global<StakePool>(pool_address).operator_address
+    }
+
+    /// Return the required min/max stake.
+    public fun get_required_stake(): (u64, u64) acquires ValidatorSetConfiguration {
+        let validator_set_config = borrow_global<ValidatorSetConfiguration>(@aptos_framework);
+        (validator_set_config.minimum_stake, validator_set_config.maximum_stake)
+    }
+
+    /// Return the required min/max lockup durations.
+    public fun get_required_lockup(): (u64, u64) acquires ValidatorSetConfiguration {
+        let validator_set_config = borrow_global<ValidatorSetConfiguration>(@aptos_framework);
+        (validator_set_config.min_lockup_duration_secs, validator_set_config.max_lockup_duration_secs)
+    }
+
+    /// Return the reward rate.
+    public fun get_reward_rate(): (u64, u64) acquires ValidatorSetConfiguration {
+        let validator_set_config = borrow_global<ValidatorSetConfiguration>(@aptos_framework);
+        (validator_set_config.rewards_rate, validator_set_config.rewards_rate_denominator)
     }
 
     /// Update the min and max stake amounts.
@@ -758,10 +782,13 @@ module aptos_framework::stake {
     }
 
     /// Withdraw from `account`'s inactive stake.
-    public entry fun withdraw(account: &signer) acquires OwnerCapability, StakePool, StakePoolEvents {
+    public entry fun withdraw(
+        account: &signer,
+        withdraw_amount: u64,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents {
         let account_addr = signer::address_of(account);
         let ownership_cap = borrow_global<OwnerCapability>(account_addr);
-        let coins = withdraw_with_cap(account_addr, ownership_cap);
+        let coins = withdraw_with_cap(account_addr, ownership_cap, withdraw_amount);
         coin::deposit<AptosCoin>(account_addr, coins);
     }
 
@@ -769,11 +796,16 @@ module aptos_framework::stake {
     public fun withdraw_with_cap(
         pool_address: address,
         owner_cap: &OwnerCapability,
+        withdraw_amount: u64,
     ): Coin<AptosCoin> acquires StakePool, StakePoolEvents {
         assert!(owner_cap.pool_address == pool_address, error::invalid_argument(ENOT_OWNER));
 
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
-        let withdraw_amount = coin::value<AptosCoin>(&stake_pool.inactive);
+        let total_withdrawable_amount = coin::value<AptosCoin>(&stake_pool.inactive);
+        // Cap withdraw amount by total withdrawable.
+        if (withdraw_amount > total_withdrawable_amount) {
+            withdraw_amount = total_withdrawable_amount;
+        };
         assert!(withdraw_amount > 0, error::invalid_argument(ENO_COINS_TO_WITHDRAW));
 
         let stake_pool_events = borrow_global_mut<StakePoolEvents>(pool_address);
@@ -1153,7 +1185,7 @@ module aptos_framework::stake {
         end_epoch();
 
         // Validator withdraws from inactive stake, including rewards on the withdrawn amount.
-        withdraw(&validator);
+        withdraw(&validator, 100);
         assert!(coin::balance<AptosCoin>(validator_address) == 900, 4);
         assert_validator_state(validator_address, 101, 0, 0, 0, 0);
     }
@@ -1263,7 +1295,7 @@ module aptos_framework::stake {
         end_epoch();
 
         // Withdraw stake.
-        let coins = withdraw_with_cap(pool_address, &owner_cap);
+        let coins = withdraw_with_cap(pool_address, &owner_cap, 100);
         // Extra rewards added.
         assert!(coin::value<AptosCoin>(&coins) == 100, 1);
         assert_validator_state(pool_address, 0, 0, 0, 0, 0);

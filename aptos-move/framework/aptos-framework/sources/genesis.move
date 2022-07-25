@@ -13,6 +13,7 @@ module aptos_framework::genesis {
     use aptos_framework::chain_id;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
+    use aptos_framework::stake_delegations;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
@@ -125,6 +126,8 @@ module aptos_framework::genesis {
             rewards_rate,
             rewards_rate_denominator,
         );
+        // TODO: Make this configurable in the genesis blob.
+        stake_delegations::initialize(&aptos_framework_account, 20);
 
         vm_config::initialize(
             &aptos_framework_account,
