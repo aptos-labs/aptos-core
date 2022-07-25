@@ -41,20 +41,14 @@ export const useSwitchNetwork = () => {
         await faucetClient.fundAccount(aptosAccount.address(), 0);
         toast({
           description: `No account with your credentials existed on ${networkUriMap[newAptosNetwork]}, a new account was initialized`,
-          duration: 5000,
-          isClosable: true,
           status: 'success',
           title: `Created new account on ${networkUriMap[newAptosNetwork]}`,
-          variant: 'solid',
         });
       } catch (err) {
         toast({
           description: `Unable to access ${newFaucetNetwork}, you are still on ${aptosNetwork}`,
-          duration: 5000,
-          isClosable: true,
           status: 'error',
           title: 'Error accessing faucet',
-          variant: 'solid',
         });
         throw new Error(`Unable to access ${newFaucetNetwork}, you are still on ${aptosNetwork}`);
       }

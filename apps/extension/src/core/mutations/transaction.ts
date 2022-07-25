@@ -217,11 +217,8 @@ export const useSubmitTestCoinTransfer = () => {
       });
       toast({
         description: (txn?.success) ? `Amount transferred: ${amount}, gas consumed: ${txn?.gas_used}` : `Transfer failed, gas consumed: ${txn?.gas_used}`,
-        duration: 5000,
-        isClosable: true,
         status: (txn?.success) ? 'success' : 'error',
         title: `Transaction ${txn?.success ? 'success' : 'error'}`,
-        variant: 'solid',
       });
     },
   });

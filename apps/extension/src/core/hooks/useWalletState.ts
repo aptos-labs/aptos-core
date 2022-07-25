@@ -14,7 +14,14 @@ import {
 } from 'core/utils/network';
 import Browser from 'core/utils/browser';
 import { AptosAccount, FaucetClient } from 'aptos';
-import { toast } from 'core/components/Toast';
+import {
+  addAccountToast,
+  addAccountErrorToast,
+  switchAccountToast,
+  switchAccountErrorToast,
+  removeAccountToast,
+  removeAccountErrorToast,
+} from 'core/components/Toast';
 
 const defaultValue: LocalStorageState = {
   accounts: undefined,
@@ -84,23 +91,9 @@ export default function useWalletState() {
         localStorageStateString,
       );
       Browser.storage()?.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: localStorageStateString });
-      toast({
-        description: 'Successfully created new account',
-        duration: 5000,
-        isClosable: true,
-        status: 'success',
-        title: 'Created account',
-        variant: 'solid',
-      });
+      addAccountToast();
     } catch (err) {
-      toast({
-        description: 'Error creating new account',
-        duration: 5000,
-        isClosable: true,
-        status: 'error',
-        title: 'Error creating account',
-        variant: 'solid',
-      });
+      addAccountErrorToast();
       console.error(err);
     }
   }, [aptosNetwork, faucetNetwork, localStorageState]);
@@ -125,23 +118,9 @@ export default function useWalletState() {
         localStorageStateString,
       );
       Browser.storage()?.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: localStorageStateString });
-      toast({
-        description: `Successfully switched account to ${accountAddress.substring(0, 6)}...`,
-        duration: 5000,
-        isClosable: true,
-        status: 'success',
-        title: 'Switched account',
-        variant: 'solid',
-      });
+      switchAccountToast(accountAddress);
     } catch (error) {
-      toast({
-        description: 'Error during account switch',
-        duration: 5000,
-        isClosable: true,
-        status: 'error',
-        title: 'Error switch account',
-        variant: 'solid',
-      });
+      switchAccountErrorToast();
       console.error(error);
     }
   }, [localStorageState]);
@@ -198,23 +177,9 @@ export default function useWalletState() {
         JSON.stringify(localStorageStateCopy),
       );
       Browser.storage()?.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: localStorageStateCopy });
-      toast({
-        description: toastMessage,
-        duration: 5000,
-        isClosable: true,
-        status: 'success',
-        title: 'Deleted account',
-        variant: 'solid',
-      });
+      removeAccountToast(toastMessage);
     } catch (err) {
-      toast({
-        description: 'Account deletion process incurred an error',
-        duration: 5000,
-        isClosable: true,
-        status: 'error',
-        title: 'Error deleting account',
-        variant: 'solid',
-      });
+      removeAccountErrorToast();
       console.error(err);
     }
   }, [currAccountAddress, localStorageState]);
