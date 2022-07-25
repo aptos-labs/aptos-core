@@ -19,7 +19,9 @@ pub struct CreateResourceAccount {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 
-    /// Resource account seed.
+    /// Resource account seed
+    ///
+    /// Seed used in generation of the AccountId of the resource account
     #[clap(long)]
     pub(crate) seed: String,
 
@@ -75,7 +77,7 @@ impl From<Transaction> for CreateResourceAccountSummary {
 #[async_trait]
 impl CliCommand<CreateResourceAccountSummary> for CreateResourceAccount {
     fn command_name(&self) -> &'static str {
-        "Create Resource Account"
+        "CreateResourceAccount"
     }
 
     async fn execute(self) -> CliTypedResult<CreateResourceAccountSummary> {

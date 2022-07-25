@@ -15,20 +15,20 @@ pub mod transfer;
 #[derive(Debug, Subcommand)]
 pub enum AccountTool {
     Create(create::CreateAccount),
+    CreateResourceAccount(create_resource_account::CreateResourceAccount),
     Fund(fund::FundAccount),
     List(list::ListAccount),
     Transfer(transfer::TransferCoins),
-    CreateResourceAccount(create_resource_account::CreateResourceAccount),
 }
 
 impl AccountTool {
     pub async fn execute(self) -> CliResult {
         match self {
             AccountTool::Create(tool) => tool.execute_serialized().await,
+            AccountTool::CreateResourceAccount(tool) => tool.execute_serialized().await,
             AccountTool::Fund(tool) => tool.execute_serialized().await,
             AccountTool::List(tool) => tool.execute_serialized().await,
             AccountTool::Transfer(tool) => tool.execute_serialized().await,
-            AccountTool::CreateResourceAccount(tool) => tool.execute_serialized().await,
         }
     }
 }
