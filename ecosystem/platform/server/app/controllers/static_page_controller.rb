@@ -35,5 +35,4 @@ class StaticPageController < ApplicationController
       job_listings['jobs'].group_by { |job| job['departments'][0]['name'] }
     end
   end
-
 end
