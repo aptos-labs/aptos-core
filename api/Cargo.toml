@@ -25,7 +25,7 @@ poem = { version = "1.3.35", features = ["anyhow", "rustls"] }
 poem-openapi = { version = "2.0.5", features = ["swagger-ui", "url"] }
 serde = { version = "1.0.137", features = ["derive"], default-features = false }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
-tokio = { version = "1.18.2", features = ["full"] }
+tokio = { version = "1.18.2", features = ["full", "tracing"] }
 url = "2.2.2"
 warp = { version = "0.3.2", features = ["default", "tls"] }
 warp-reverse-proxy = "0.5.0"

@@ -19,3 +19,6 @@ xclippy = [
   "-Aclippy::enum-variant-names",
   "-Aclippy::self-named-constructors",
 ]
+
+[build]
+rustflags = ["--cfg", "tokio_unstable"]
