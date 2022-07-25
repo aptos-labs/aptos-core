@@ -51,13 +51,16 @@ use network::{
 };
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use storage_interface::{DbReader, ExecutedTrees, Order, StartupInfo};
-use storage_service_types::{
-    CompleteDataRange, DataSummary, Epoch, EpochEndingLedgerInfoRequest,
-    NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest, ProtocolMetadata,
-    ServerProtocolVersion, StateValuesWithProofRequest, StorageServerSummary, StorageServiceError,
-    StorageServiceMessage, StorageServiceRequest, StorageServiceResponse,
+use storage_service_types::requests::{
+    EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
+    NewTransactionsWithProofRequest, StateValuesWithProofRequest, StorageServiceRequest,
     TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
+use storage_service_types::responses::{
+    CompleteDataRange, DataSummary, ProtocolMetadata, ServerProtocolVersion, StorageServerSummary,
+    StorageServiceResponse,
+};
+use storage_service_types::{Epoch, StorageServiceError, StorageServiceMessage};
 use tokio::time::timeout;
 
 /// Various test constants for storage
