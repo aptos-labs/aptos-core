@@ -11,7 +11,7 @@ This tutorial shows the steps of creating, signing and submitting a transaction 
 
 **BCS:** Submitting transactions in the BCS format is more secure than submitting in JSON format. In this method you will create the BCS-serialized signing message on the client side. For a conceptual guide on submitting in BCS format, see [Creating a Signed Transaction](../guides/sign-a-transaction.md). The Typescript SDK supports signing and submitting transactions in BCS format.
 
-**JSON:** When you submit the transactions in JSON format, you will use the REST API and rely on the Aptos server to create the signing message. This approach creates a risk that a user signs an unintended transaction faked by a malicious API server. See the tutorial [Your First Transaction](../tutorials/first-transaction.md), for how to submit transactions in JSON format. In addition, the Typescript SDK provides wrappers to significantly reduce the amount of manual work needed to prepare and submit transactions in JSON format. 
+**JSON:** When you submit the transactions in JSON format, you will use the REST API and rely on the Aptos server to create the signing message. This approach creates a risk that a user signs an unintended transaction faked by a malicious API server. See the tutorial [Your First Transaction](../tutorials/first-transaction.md), for how to submit transactions in JSON format. In addition, the Typescript SDK provides wrappers to significantly reduce the amount of manual work needed to prepare and submit transactions in JSON format.
 
 :::tip
 
@@ -23,17 +23,15 @@ We strongly recommend that you use the BCS format for submitting transactions to
 
 Before you proceed, install the latest Aptos TS SDK. Go to your project root directory and run:
 
-`npm install aptos` 
+`npm install aptos`
 
-or 
+or
 
 `yarn add aptos`
 
 :::note
 See [the source code for this tutorial](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/bcs_transaction.ts). Although Typescript is used in this tutorial, Aptos TS SDK also works in Javascript projects.
 :::
-
-
 
 ## Step 1: Create accounts
 
@@ -55,7 +53,7 @@ const alice = new AptosAccount();
 await faucetClient.fundAccount(alice.address(), 5000);
 
 let resources = await client.getAccountResources(alice.address());
-let accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
+let accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
 console.log(`Alice coins: ${(accountResource?.data as any).coin.value}. Should be 5000!`);
 
 // Generates key pair for Bob
@@ -64,7 +62,7 @@ const bob = new AptosAccount();
 await faucetClient.fundAccount(bob.address(), 0);
 
 resources = await client.getAccountResources(bob.address());
-accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
+accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
 console.log(`Bob coins: ${(accountResource?.data as any).coin.value}. Should be 0!`);
 ```
 
@@ -76,13 +74,13 @@ The Typescript SDK supports three types of transaction payloads:
 
 1. `ScriptFunction`
 2. `Script` and
-3. `ModuleBundle`. 
+3. `ModuleBundle`.
 
 See [https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html](https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html) for details.
 
-The `ScriptFunction` payload is used to invoke an on-chain Move script function. Within `ScriptFunction` payload you can specify the function name and arguments. 
+The `ScriptFunction` payload is used to invoke an on-chain Move script function. Within `ScriptFunction` payload you can specify the function name and arguments.
 
-The `Script` payload contains the bytecode for the Aptos MoveVM (Move Virtual Machine) to execute. Within the `Script` payload, you can provide the script code in bytes and the arguments to the script. 
+The `Script` payload contains the bytecode for the Aptos MoveVM (Move Virtual Machine) to execute. Within the `Script` payload, you can provide the script code in bytes and the arguments to the script.
 
 The `ModuleBundle` payload is used to publish multiple modules at once. Within `ModuleBundle` payload, you can provide the module bytecode.
 
@@ -90,7 +88,7 @@ To transfer coins from Alice’s account to Bob’s account, we need to prepare 
 
 ```ts
 // We need to pass a token type to the `transfer` function.
-const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::TestCoin::TestCoin"));
+const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
 const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
   TxnBuilderTypes.ScriptFunction.natural(
@@ -106,9 +104,9 @@ const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFuncti
 );
 ```
 
-The Move function `transfer` requires a coin type as type argument. The function `transfer` is defined here [https://github.com/aptos-labs/aptos-core/blob/faf4f94260d4716c8a774b3c17f579d203cc4013/aptos-move/framework/aptos-framework/sources/Coin.move#L311](https://github.com/aptos-labs/aptos-core/blob/faf4f94260d4716c8a774b3c17f579d203cc4013/aptos-move/framework/aptos-framework/sources/Coin.move#L311). 
+The Move function `transfer` requires a coin type as type argument. The function `transfer` is defined here [https://github.com/aptos-labs/aptos-core/blob/faf4f94260d4716c8a774b3c17f579d203cc4013/aptos-move/framework/aptos-framework/sources/Coin.move#L311](https://github.com/aptos-labs/aptos-core/blob/faf4f94260d4716c8a774b3c17f579d203cc4013/aptos-move/framework/aptos-framework/sources/Coin.move#L311).
 
-In above code snippet, we want to transfer the `TestCoin` that is defined under account `0x1` and module `TestCoin`. The fully qualified name for the `TestCoin` is therefore `0x1::TestCoin::TestCoin`.
+In above code snippet, we want to transfer the `AptosCoin` that is defined under account `0x1` and module `AptosCoin`. The fully qualified name for the `AptosCoin` is therefore `0x1::aptos_coin::AptosCoin`.
 
 :::note
 All arguments in `ScriptFunction` payload must be BCS serialized. In above code, we serialized Bob’s account address and the amount number to transfer.
@@ -153,7 +151,7 @@ const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
 await client.waitForTransaction(transactionRes.hash);
 
 resources = await client.getAccountResources(bob.address());
-accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
+accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
 console.log(`Bob coins: ${(accountResource?.data as any).coin.value}. Should be 717!`);
 ```
 
@@ -166,4 +164,3 @@ Alice coins: 5000. Should be 5000!
 Bob coins: 0. Should be 0!
 Bob coins: 717. Should be 717!
 ```
-
