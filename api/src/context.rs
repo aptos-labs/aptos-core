@@ -38,7 +38,7 @@ use crate::poem_backend::{AptosError, AptosErrorCode, AptosErrorResponse, AptosI
 #[derive(Clone)]
 pub struct Context {
     chain_id: ChainId,
-    db: Arc<dyn DbReader>,
+    pub db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
     node_config: NodeConfig,
 }

@@ -34,6 +34,8 @@ mod secure_backend_config;
 pub use secure_backend_config::*;
 mod state_sync_config;
 pub use state_sync_config::*;
+mod sf_streamer_config;
+pub use sf_streamer_config::*;
 mod storage_config;
 pub use storage_config::*;
 mod safety_rules_config;
@@ -79,6 +81,8 @@ pub struct NodeConfig {
     pub api: ApiConfig,
     #[serde(default)]
     pub state_sync: StateSyncConfig,
+    #[serde(default)]
+    pub sf_stream: SfStreamerConfig,
     #[serde(default)]
     pub storage: StorageConfig,
     #[serde(default)]
