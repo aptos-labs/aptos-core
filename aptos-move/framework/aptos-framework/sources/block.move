@@ -4,7 +4,6 @@ module aptos_framework::block {
     use std::vector;
     use aptos_std::event;
 
-    use aptos_framework::governance_proposal::GovernanceProposal;
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
     use aptos_framework::reconfiguration;
@@ -54,9 +53,10 @@ module aptos_framework::block {
     /// Update the epoch interval.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
     public fun update_epoch_interval(
-        _gov_proposal: &GovernanceProposal,
+        aptos_framework: &signer,
         new_epoch_interval: u64,
     ) acquires BlockMetadata {
+        system_addresses::assert_aptos_framework(aptos_framework);
         let block_metadata = borrow_global_mut<BlockMetadata>(@aptos_framework);
         block_metadata.epoch_internal = new_epoch_interval;
     }
@@ -147,11 +147,19 @@ module aptos_framework::block {
 
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_update_epoch_interval(aptos_framework: signer) acquires BlockMetadata {
-        use aptos_framework::governance_proposal;
-
         initialize_block_metadata(&aptos_framework, 1);
         assert!(borrow_global<BlockMetadata>(@aptos_framework).epoch_internal == 1, 0);
-        update_epoch_interval(&governance_proposal::create_test_proposal(), 2);
+        update_epoch_interval(&aptos_framework, 2);
         assert!(borrow_global<BlockMetadata>(@aptos_framework).epoch_internal == 2, 1);
+    }
+
+    #[test(aptos_framework = @aptos_framework, account = @0x123)]
+    #[expected_failure(abort_code = 0x50002)]
+    public entry fun test_update_epoch_interval_unauthorized_should_fail(
+        aptos_framework: signer,
+        account: signer,
+    ) acquires BlockMetadata {
+        initialize_block_metadata(&aptos_framework, 1);
+        update_epoch_interval(&account, 2);
     }
 }

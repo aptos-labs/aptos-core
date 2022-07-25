@@ -277,7 +277,7 @@ module aptos_framework::aptos_governance {
     }
 
     /// Return a signer for making changes to 0x1 as part of on-chain governance proposal process.
-    public fun get_framework_signer(_proposal: &GovernanceProposal): signer acquires GovernanceResponsbility {
+    public fun get_framework_signer(_proposal: GovernanceProposal): signer acquires GovernanceResponsbility {
         let governance_responsibility = borrow_global<GovernanceResponsbility>(@aptos_framework);
         create_signer_with_capability(&governance_responsibility.signer_cap)
     }
