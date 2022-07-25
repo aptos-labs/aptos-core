@@ -11,7 +11,9 @@ pub(crate) mod stream;
 pub mod test_utils;
 
 use anyhow::{anyhow, Result};
-use aptos_config::config::{RocksdbConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG};
+use aptos_config::config::{
+    AptosDbConfig, RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG, SNAPSHOT_SIZE_THRESHOLD,
+};
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{
@@ -58,7 +60,7 @@ pub struct RocksdbOpt {
     max_background_jobs: i32,
 }
 
-impl From<RocksdbOpt> for RocksdbConfigs {
+impl From<RocksdbOpt> for AptosDbConfig {
     fn from(opt: RocksdbOpt) -> Self {
         Self {
             ledger_db_config: RocksdbConfig {
@@ -71,6 +73,7 @@ impl From<RocksdbOpt> for RocksdbConfigs {
                 max_total_wal_size: opt.state_merkle_db_max_total_wal_size,
                 max_background_jobs: opt.max_background_jobs,
             },
+            snapshot_size_threshold: SNAPSHOT_SIZE_THRESHOLD,
         }
     }
 }
@@ -166,10 +169,10 @@ impl RestoreRunMode {
         }
     }
 
-    pub fn finish(&self, version: Version) {
+    pub fn finish(&self) {
         match self {
             Self::Restore { restore_handler } => {
-                restore_handler.maybe_reset_state_store(Some(version));
+                restore_handler.reset_state_store();
             }
             Self::Verify => (),
         }

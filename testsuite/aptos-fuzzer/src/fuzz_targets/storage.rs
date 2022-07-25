@@ -41,7 +41,8 @@ impl FuzzTargetImpl for StorageSaveBlocks {
 
     fn fuzz(&self, data: &[u8]) {
         let input = fuzz_data_to_value(data, arb_blocks_to_commit());
-        test_save_blocks_impl(input);
+        let threshold = fuzz_data_to_value(data, 10..20usize);
+        test_save_blocks_impl(input, threshold);
     }
 }
 

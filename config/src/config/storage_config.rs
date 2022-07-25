@@ -8,6 +8,8 @@ use std::{
     path::PathBuf,
 };
 
+pub const SNAPSHOT_SIZE_THRESHOLD: usize = 100_000;
+
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
 /// for detailed explanations.
@@ -20,12 +22,13 @@ pub struct RocksdbConfig {
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct RocksdbConfigs {
+pub struct AptosDbConfig {
     pub ledger_db_config: RocksdbConfig,
     pub state_merkle_db_config: RocksdbConfig,
+    pub snapshot_size_threshold: usize,
 }
 
-impl Default for RocksdbConfigs {
+impl Default for AptosDbConfig {
     fn default() -> Self {
         Self {
             ledger_db_config: RocksdbConfig {
@@ -48,6 +51,8 @@ impl Default for RocksdbConfigs {
                 // threads to use internally.
                 max_background_jobs: 16,
             },
+            // The threshold that determine whether a snapshot should be committed to state merkle db.
+            snapshot_size_threshold: SNAPSHOT_SIZE_THRESHOLD,
         }
     }
 }
@@ -65,7 +70,7 @@ pub struct StorageConfig {
     /// Read, Write, Connect timeout for network operations in milliseconds
     pub timeout_ms: u64,
     /// Rocksdb-specific configurations
-    pub rocksdb_configs: RocksdbConfigs,
+    pub rocksdb_configs: AptosDbConfig,
 }
 
 pub const NO_OP_STORAGE_PRUNER_CONFIG: StoragePrunerConfig = StoragePrunerConfig {
@@ -134,7 +139,7 @@ impl Default for StorageConfig {
             data_dir: PathBuf::from("/opt/aptos/data"),
             // Default read/write/connection timeout, in milliseconds
             timeout_ms: 30_000,
-            rocksdb_configs: RocksdbConfigs::default(),
+            rocksdb_configs: AptosDbConfig::default(),
         }
     }
 }

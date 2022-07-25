@@ -62,8 +62,8 @@ impl RestoreHandler {
         )
     }
 
-    pub fn maybe_reset_state_store(&self, latest_snapshot_version: Option<Version>) {
-        self.state_store.maybe_reset(latest_snapshot_version);
+    pub fn reset_state_store(&self) {
+        self.state_store.reset();
     }
 
     pub fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {

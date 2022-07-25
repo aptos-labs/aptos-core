@@ -99,6 +99,7 @@ impl<V> ChunkExecutor<V> {
                 base_view.txn_accumulator().num_leaves(),
                 base_view.state().base_version,
                 ledger_info,
+                false, /* sync_commit */
                 to_commit.result_view.state().clone(),
             )?;
         }

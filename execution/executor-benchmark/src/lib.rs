@@ -4,7 +4,6 @@
 mod account_generator;
 pub mod db_generator;
 pub mod pipeline;
-pub mod state_committer;
 pub mod transaction_committer;
 pub mod transaction_executor;
 pub mod transaction_generator;
@@ -14,7 +13,7 @@ use crate::{
     transaction_generator::TransactionGenerator,
 };
 use aptos_config::config::{
-    NodeConfig, RocksdbConfigs, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG,
+    AptosDbConfig, NodeConfig, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
@@ -22,7 +21,7 @@ use aptos_jellyfish_merkle::metrics::{
 };
 use aptosdb::AptosDB;
 
-use crate::{pipeline::Pipeline, state_committer::StateCommitter};
+use crate::pipeline::Pipeline;
 use aptos_vm::AptosVM;
 use executor::block_executor::BlockExecutor;
 use std::{fs, path::Path};
@@ -34,7 +33,7 @@ pub fn init_db_and_executor(config: &NodeConfig) -> (DbReaderWriter, BlockExecut
             &config.storage.dir(),
             false, /* readonly */
             config.storage.storage_pruner_config,
-            RocksdbConfigs::default(),
+            AptosDbConfig::default(),
         )
         .expect("DB should open."),
     );
@@ -55,7 +54,7 @@ fn create_checkpoint(source_dir: impl AsRef<Path>, checkpoint_dir: impl AsRef<Pa
         &source_dir,
         true,                        /* readonly */
         NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-        RocksdbConfigs::default(),
+        AptosDbConfig::default(),
     )
     .expect("db open failure.")
     .create_checkpoint(checkpoint_dir.as_ref())
@@ -80,7 +79,7 @@ pub fn run_benchmark(
     let (db, executor) = init_db_and_executor(&config);
     let version = db.reader.get_latest_version().unwrap();
 
-    let (pipeline, block_sender) = Pipeline::new(db.clone(), executor, version);
+    let (pipeline, block_sender) = Pipeline::new(executor, version);
 
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
@@ -136,7 +135,7 @@ fn add_accounts_impl(
 
     let version = db.reader.get_latest_version().unwrap();
 
-    let (pipeline, block_sender) = Pipeline::new(db.clone(), executor, version);
+    let (pipeline, block_sender) = Pipeline::new(executor, version);
 
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),

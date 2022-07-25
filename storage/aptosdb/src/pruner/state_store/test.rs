@@ -66,6 +66,7 @@ fn test_state_store_pruner() {
     let state_store = &StateStore::new(
         Arc::clone(&aptos_db.ledger_db),
         Arc::clone(&aptos_db.state_merkle_db),
+        1000,  /* snapshot_size_threshold, does not matter */
         false, /* hack_for_tests */
     );
     let pruner = Pruner::new(
@@ -173,11 +174,7 @@ fn test_state_store_pruner_partial_version() {
     let prune_batch_size = 1;
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
-    let state_store = &StateStore::new(
-        Arc::clone(&aptos_db.ledger_db),
-        Arc::clone(&aptos_db.state_merkle_db),
-        false, /* hack_for_tests */
-    );
+    let state_store = &aptos_db.state_store;
     let pruner = Pruner::new(
         Arc::clone(&aptos_db.ledger_db),
         Arc::clone(&aptos_db.state_merkle_db),
@@ -294,11 +291,7 @@ fn test_state_store_pruner_disabled() {
     let num_versions = 25;
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
-    let state_store = &StateStore::new(
-        Arc::clone(&aptos_db.ledger_db),
-        Arc::clone(&aptos_db.state_merkle_db),
-        false, /* hack_for_tests */
-    );
+    let state_store = &aptos_db.state_store;
     let pruner = Pruner::new(
         Arc::clone(&aptos_db.ledger_db),
         Arc::clone(&aptos_db.state_merkle_db),
@@ -370,11 +363,7 @@ fn test_worker_quit_eagerly() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let db = aptos_db.ledger_db;
-    let state_store = &StateStore::new(
-        Arc::clone(&db),
-        Arc::clone(&aptos_db.state_merkle_db),
-        false, /* hack_for_tests */
-    );
+    let state_store = &aptos_db.state_store;
 
     let _root0 = put_value_set(
         &db,

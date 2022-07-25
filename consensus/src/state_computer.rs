@@ -175,7 +175,7 @@ impl StateComputer for ExecutionProxy {
             "commit_block",
             tokio::task::spawn_blocking(move || {
                 executor
-                    .commit_blocks(block_ids, proof)
+                    .commit_blocks_ext(block_ids, proof, false)
                     .expect("Failed to commit blocks");
             })
             .await
