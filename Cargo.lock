@@ -1272,6 +1272,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-temppath",
  "aptos-types",
+ "aptos-vm",
  "arc-swap",
  "bcs",
  "byteorder",

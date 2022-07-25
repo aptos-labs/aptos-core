@@ -40,6 +40,13 @@ pub(super) fn state_merkle_db_column_families() -> Vec<ColumnFamilyName> {
     ]
 }
 
+pub(super) fn index_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        TABLE_INFO_CF_NAME,
+    ]
+}
+
 pub(super) fn gen_rocksdb_options(config: &RocksdbConfig, readonly: bool) -> Options {
     let mut db_opts = Options::default();
     db_opts.set_max_open_files(config.max_open_files);
@@ -73,6 +80,17 @@ pub(super) fn gen_ledger_cfds() -> Vec<ColumnFamilyDescriptor> {
 
 pub(super) fn gen_state_merkle_cfds() -> Vec<ColumnFamilyDescriptor> {
     let cfs = state_merkle_db_column_families();
+    let mut cfds = Vec::with_capacity(cfs.len());
+    for cf_name in cfs {
+        let mut cf_opts = Options::default();
+        cf_opts.set_compression_type(DBCompressionType::Lz4);
+        cfds.push(ColumnFamilyDescriptor::new((*cf_name).to_string(), cf_opts));
+    }
+    cfds
+}
+
+pub(super) fn gen_index_db_cfds() -> Vec<ColumnFamilyDescriptor> {
+    let cfs = index_db_column_families();
     let mut cfds = Vec::with_capacity(cfs.len());
     for cf_name in cfs {
         let mut cf_opts = Options::default();

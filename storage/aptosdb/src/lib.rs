@@ -21,6 +21,7 @@ pub mod schema;
 mod change_set;
 mod db_options;
 mod event_store;
+mod indexer;
 mod ledger_counters;
 mod ledger_store;
 mod pruner;
@@ -32,6 +33,8 @@ mod transaction_store;
 #[cfg(test)]
 mod aptosdb_test;
 
+use crate::db_options::{gen_index_db_cfds, index_db_column_families};
+use crate::table_info::TableInfoSchema;
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
     change_set::{ChangeSet, SealedChangeSet},
@@ -59,6 +62,7 @@ use aptos_crypto::hash::{HashValue, SPARSE_MERKLE_PLACEHOLDER_HASH};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::epoch_state::EpochState;
+use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::EventWithVersion,
@@ -103,6 +107,7 @@ use storage_interface::{
 
 pub const LEDGER_DB_NAME: &str = "ledger_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
+pub const INDEX_DB_NAME: &str = "intex_indexer_db";
 
 const MAX_LIMIT: u64 = 5000;
 
@@ -250,6 +255,7 @@ impl Drop for RocksdbPropertyReporter {
 pub struct AptosDB {
     ledger_db: Arc<DB>,
     state_merkle_db: Arc<DB>,
+    index_db: Arc<DB>,
     event_store: Arc<EventStore>,
     ledger_store: Arc<LedgerStore>,
     state_store: Arc<StateStore>,
@@ -265,6 +271,7 @@ impl AptosDB {
     fn new_with_dbs(
         ledger_rocksdb: DB,
         state_merkle_rocksdb: DB,
+        index_db: DB,
         storage_pruner_config: StoragePrunerConfig,
         hack_for_tests: bool,
     ) -> Self {
@@ -285,6 +292,7 @@ impl AptosDB {
         AptosDB {
             ledger_db: Arc::clone(&arc_ledger_rocksdb),
             state_merkle_db: Arc::clone(&arc_state_merkle_rocksdb),
+            index_db: Arc::new(index_db),
             event_store: Arc::new(EventStore::new(Arc::clone(&arc_ledger_rocksdb))),
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&arc_ledger_rocksdb))),
             state_store: Arc::new(StateStore::new(
@@ -317,9 +325,10 @@ impl AptosDB {
 
         let ledger_db_path = db_root_path.as_ref().join(LEDGER_DB_NAME);
         let state_merkle_db_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
+        let index_db_path = db_root_path.as_ref().join(INDEX_DB_NAME);
         let instant = Instant::now();
 
-        let (ledger_db, state_merkle_db) = if readonly {
+        let (ledger_db, state_merkle_db, index_db) = if readonly {
             (
                 DB::open_cf_readonly(
                     &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, true),
@@ -331,6 +340,12 @@ impl AptosDB {
                     &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, true),
                     state_merkle_db_path.clone(),
                     "state_merkle_db_ro",
+                    state_merkle_db_column_families(),
+                )?,
+                DB::open_cf_readonly(
+                    &gen_rocksdb_options(&rocksdb_configs.index_db_config, true),
+                    index_db_path.clone(),
+                    "index_db_ro",
                     state_merkle_db_column_families(),
                 )?,
             )
@@ -348,29 +363,44 @@ impl AptosDB {
                     "state_merkle_db",
                     gen_state_merkle_cfds(),
                 )?,
+                DB::open_cf(
+                    &gen_rocksdb_options(&rocksdb_configs.index_db_config, false),
+                    index_db_path.clone(),
+                    "index_db",
+                    gen_index_db_cfds(),
+                )?,
             )
         };
 
-        let ret = Self::new_with_dbs(ledger_db, state_merkle_db, storage_pruner_config, readonly);
+        let ret = Self::new_with_dbs(
+            ledger_db,
+            state_merkle_db,
+            index_db,
+            storage_pruner_config,
+            readonly,
+        );
         info!(
             ledger_db_path = ledger_db_path,
             state_merkle_db_path = state_merkle_db_path,
+            index_db_path = index_db_path,
             time_ms = %instant.elapsed().as_millis(),
-            "Opened AptosDB (LedgerDB + StateMerkleDB).",
+            "Opened AptosDB (LedgerDB + StateMerkleDB + IndexDB).",
         );
         Ok(ret)
     }
 
     pub fn open_as_secondary<P: AsRef<Path> + Clone>(
         db_root_path: P,
-        ledger_db_secondary_path: P,
-        state_merkle_db_secondary_path: P,
+        secondary_db_root_path: P,
         mut rocksdb_configs: RocksdbConfigs,
     ) -> Result<Self> {
         let ledger_db_primary_path = db_root_path.as_ref().join(LEDGER_DB_NAME);
-        let ledger_db_secondary_path = ledger_db_secondary_path.as_ref().to_path_buf();
+        let ledger_db_secondary_path = secondary_db_root_path.as_ref().join(LEDGER_DB_NAME);
         let state_merkle_db_primary_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
-        let state_merkle_db_secondary_path = state_merkle_db_secondary_path.as_ref().to_path_buf();
+        let state_merkle_db_secondary_path =
+            secondary_db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
+        let index_db_primary_path = db_root_path.as_ref().join(INDEX_DB_NAME);
+        let index_db_secondary_path = secondary_db_root_path.as_ref().join(INDEX_DB_NAME);
 
         // Secondary needs `max_open_files = -1` per https://github.com/facebook/rocksdb/wiki/Secondary-instance
         rocksdb_configs.ledger_db_config.max_open_files = -1;
@@ -390,6 +420,13 @@ impl AptosDB {
                 state_merkle_db_secondary_path,
                 "state_merkle_db_sec",
                 state_merkle_db_column_families(),
+            )?,
+            DB::open_cf_as_secondary(
+                &gen_rocksdb_options(&rocksdb_configs.index_db_config, false),
+                index_db_primary_path,
+                index_db_secondary_path,
+                "index_db_sec",
+                index_db_column_families(),
             )?,
             NO_OP_STORAGE_PRUNER_CONFIG,
             true,
@@ -1229,7 +1266,7 @@ impl DbReader for AptosDB {
     }
 
     fn get_latest_state_snapshot(&self) -> Result<Option<(Version, HashValue)>> {
-        gauged_api("get_latest_state_snapshot_version", || {
+        gauged_api("get_latest_state_snapshot", || {
             let num_txns = self
                 .ledger_store
                 .get_latest_transaction_info_option()?
@@ -1304,6 +1341,14 @@ impl DbReader for AptosDB {
                 }
             }
             Ok(pruner_window)
+        })
+    }
+
+    fn get_table_info(&self, handle: TableHandle) -> Result<TableInfo> {
+        gauged_api("get_table_info", || {
+            self.index_db
+                .get::<TableInfoSchema>(&handle)?
+                .ok_or_else(|| AptosDbError::NotFound(format!("TableInfo for {:?}", handle)).into())
         })
     }
 }
@@ -1544,6 +1589,11 @@ impl DbWriter for AptosDB {
                 LEDGER_VERSION.set(x.ledger_info().version() as i64);
                 NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);
             }
+
+            // TODO: make internal indexer asynchronous.
+            // Note: this must happen after txns have been saved to db because types can be newly
+            // created in this same chunk of transactions.
+            self.index_transactions(txns_to_commit)?;
 
             Ok(())
         })
