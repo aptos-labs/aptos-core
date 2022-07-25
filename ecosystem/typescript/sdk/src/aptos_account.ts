@@ -1,6 +1,8 @@
 import * as Nacl from "tweetnacl";
 import * as SHA3 from "js-sha3";
+import * as bip39 from "@scure/bip39";
 import { Buffer } from "buffer/"; // the trailing slash is important!
+import { derivePath } from "ed25519-hd-key";
 import { HexString, MaybeHexString } from "./hex_string";
 import { Types } from "./types";
 
@@ -28,6 +30,34 @@ export class AptosAccount {
 
   static fromAptosAccountObject(obj: AptosAccountObject): AptosAccount {
     return new AptosAccount(HexString.ensure(obj.privateKeyHex).toUint8Array(), obj.address);
+  }
+
+  static isValidPath = (path: string): boolean => {
+    if (
+      // eslint-disable-next-line prefer-regex-literals
+      !new RegExp("^m\\/44'\\/637'\\/[0-9]+'\\/[0-9]+'\\/[0-9]+'+$").test(
+        path,
+      )
+    ) {
+      return false;
+    }
+    return true;
+  };
+
+  static fromDerivePath(path: string, mnemonics: string): AptosAccount {
+    if (!AptosAccount.isValidPath(path)) {
+      throw new Error("Invalid derivation path");
+    }
+
+    const normalizeMnemonics = mnemonics
+      .trim()
+      .split(/\s+/)
+      .map((part) => part.toLowerCase())
+      .join(" ");
+
+    const { key } = derivePath(path, Buffer.from(bip39.mnemonicToSeedSync(normalizeMnemonics)).toString("hex"));
+
+    return new AptosAccount(new Uint8Array(key));
   }
 
   /**
