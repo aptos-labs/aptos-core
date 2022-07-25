@@ -106,7 +106,14 @@ pub(crate) async fn process_client_transaction_submission<V>(
 {
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer_client();
-    let statuses = process_incoming_transactions(&smp, vec![transaction], TimelineState::NotReady);
+    let ineligible_for_broadcast =
+        !smp.broadcast_within_validator_network() && smp.network_interface.is_validator();
+    let timeline_state = if ineligible_for_broadcast {
+        TimelineState::NonQualified
+    } else {
+        TimelineState::NotReady
+    };
+    let statuses = process_incoming_transactions(&smp, vec![transaction], timeline_state);
     log_txn_process_results(&statuses, None);
 
     if let Some(status) = statuses.get(0) {
