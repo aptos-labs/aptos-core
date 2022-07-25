@@ -16,16 +16,3 @@ pub fn aptos_coin_transfer(to: AccountAddress, amount: u64) -> TransactionPayloa
         amount,
     )
 }
-
-pub fn encode_create_resource_account(
-    seed: &str,
-    authentication_key: Option<AuthenticationKey>,
-) -> TransactionPayload {
-    let seed: Vec<u8> = bcs::to_bytes(seed).unwrap();
-    let authentication_key: Vec<u8> = if let Some(key) = authentication_key {
-        bcs::to_bytes(&key).unwrap()
-    } else {
-        vec![]
-    };
-    resource_account_create_resource_account(seed, authentication_key)
-}

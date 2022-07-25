@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions};
-use std::str::FromStr;
 use aptos_rest_client::{
     aptos_api_types::{WriteResource, WriteSetChange},
     Transaction,
 };
-use aptos_transaction_builder::aptos_stdlib;
+use aptos_transaction_builder::aptos_stdlib::resource_account_create_resource_account;
 use aptos_types::{account_address::AccountAddress, transaction::authenticator::AuthenticationKey};
 use async_trait::async_trait;
 use clap::Parser;
 use serde::Serialize;
+use std::str::FromStr;
 
 /// Command to create a resource account
 ///
@@ -23,6 +23,7 @@ pub struct CreateResourceAccount {
     /// Resource account seed
     ///
     /// Seed used in generation of the AccountId of the resource account
+    /// The seed will be converted to bytes using `BCS`
     #[clap(long)]
     pub(crate) seed: String,
 
@@ -82,10 +83,16 @@ impl CliCommand<CreateResourceAccountSummary> for CreateResourceAccount {
     }
 
     async fn execute(self) -> CliTypedResult<CreateResourceAccountSummary> {
+        let seed: Vec<u8> = bcs::to_bytes(&self.seed).unwrap();
+        let authentication_key: Vec<u8> = if let Some(key) = self.authentication_key {
+            bcs::to_bytes(&key).unwrap()
+        } else {
+            vec![]
+        };
         self.txn_options
-            .submit_transaction(aptos_stdlib::encode_create_resource_account(
-                &self.seed,
-                self.authentication_key,
+            .submit_transaction(resource_account_create_resource_account(
+                seed,
+                authentication_key,
             ))
             .await
             .map(CreateResourceAccountSummary::from)
