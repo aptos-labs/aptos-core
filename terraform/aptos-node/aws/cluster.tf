@@ -7,7 +7,7 @@ resource "aws_cloudwatch_log_group" "eks" {
 resource "aws_eks_cluster" "aptos" {
   name                      = "aptos-${local.workspace_name}"
   role_arn                  = aws_iam_role.cluster.arn
-  version                   = "1.21"
+  version                   = var.kubernetes_version
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
   tags                      = local.default_tags
 
@@ -16,6 +16,13 @@ resource "aws_eks_cluster" "aptos" {
     public_access_cidrs     = var.k8s_api_sources
     endpoint_private_access = true
     security_group_ids      = [aws_security_group.cluster.id]
+  }
+
+  lifecycle {
+    ignore_changes = [
+      # ignore autoupgrade version
+      version,
+    ]
   }
 
   depends_on = [
@@ -77,6 +84,8 @@ resource "aws_eks_node_group" "nodes" {
 
   lifecycle {
     ignore_changes = [
+      # ignore autoupgrade version
+      version,
       # ignore changes to the desired size that may occur due to cluster autoscaler
       scaling_config[0].desired_size,
       # ignore changes to max size, especially when it decreases to < desired_size, which fails

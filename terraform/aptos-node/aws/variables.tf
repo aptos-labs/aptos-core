@@ -3,6 +3,11 @@ variable "region" {
   type        = string
 }
 
+variable "kubernetes_version" {
+  description = "Version of Kubernetes to use for EKS cluster"
+  default     = "1.22"
+}
+
 variable "k8s_api_sources" {
   description = "List of CIDR subnets which can access the Kubernetes API endpoint"
   default     = ["0.0.0.0/0"]
