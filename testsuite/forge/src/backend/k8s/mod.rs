@@ -7,8 +7,9 @@ use aptos_logger::info;
 use rand::rngs::StdRng;
 use std::{convert::TryInto, num::NonZeroUsize};
 
+pub mod chaos;
 mod cluster_helper;
-mod node;
+pub mod node;
 mod swarm;
 
 pub use cluster_helper::*;

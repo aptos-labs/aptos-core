@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{ChainInfo, FullNode, NodeExt, Result, Validator, Version};
+use crate::{ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version};
 use anyhow::{anyhow, bail};
 use aptos_config::config::NodeConfig;
 use aptos_rest_client::Client as RestClient;
@@ -63,6 +63,10 @@ pub trait Swarm: Sync {
     fn chain_info(&mut self) -> ChainInfo<'_>;
 
     fn logs_location(&mut self) -> String;
+
+    /// Injects all types of chaos
+    fn inject_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
+    fn remove_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
 }
 
 impl<T: ?Sized> SwarmExt for T where T: Swarm {}
