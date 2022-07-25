@@ -4,6 +4,7 @@
 **/target
 **/*.rs.bk
 .idea/
+Cargo.lock
 
 # Ignore wallet mnemonic files used for deterministic key derivation
 *.mnemonic
