@@ -8,6 +8,8 @@ use crate::{counters::STRUCT_LOG_COUNT, Event, Metadata};
 use once_cell::sync::OnceCell;
 use std::sync::Arc;
 use tracing_subscriber::Layer;
+use tracing_subscriber::prelude::*;
+
 
 /// The global `Logger`
 static LOGGER: OnceCell<Arc<dyn Logger>> = OnceCell::new();
@@ -42,13 +44,18 @@ pub(crate) fn enabled(metadata: &Metadata) -> bool {
 
 /// Sets the global `Logger` exactly once
 pub fn set_global_logger(logger: Arc<dyn Logger>) {
+
     if LOGGER.set(logger).is_err() {
         eprintln!("Global logger has already been set");
     }
-    let _ = tracing::subscriber::set_global_default(
-        crate::tracing_adapter::TracingToAptosDataLayer
-            .with_subscriber(tracing_subscriber::Registry::default()),
-    );
+
+    let console_layer = console_subscriber::ConsoleLayer::builder()
+        .server_addr(([0, 0, 0, 0], 6669))
+        .spawn();
+
+    tracing_subscriber::registry()
+        .with(console_layer)
+        .init();
 }
 
 /// Flush the global `Logger`

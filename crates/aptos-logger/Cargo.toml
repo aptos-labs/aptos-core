@@ -24,9 +24,10 @@ strum = "0.24.1"
 strum_macros = "0.24.2"
 tracing = "0.1.34"
 tracing-subscriber = "0.3.11"
-
+tokio = {version = "1.18.2", features = ["full", "tracing"]}
 aptos-infallible = { path = "../aptos-infallible" }
 aptos-log-derive = { path = "../aptos-log-derive" }
+console-subscriber = "0.1.6"
 
 [dev-dependencies]
 pretty_assertions = "1.2.1"
