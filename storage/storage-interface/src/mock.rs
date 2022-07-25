@@ -10,6 +10,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
     account_state::AccountState,
+    event::EventHandle,
     proof::SparseMerkleProof,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
@@ -63,7 +64,8 @@ impl DbReader for MockDbReaderWriter {
 }
 
 fn get_mock_account_state() -> AccountState {
-    let account_resource = AccountResource::new(0, vec![], AccountAddress::random());
+    let account_resource =
+        AccountResource::new(0, vec![], AccountAddress::random(), EventHandle::random(0));
 
     let mut account_state = AccountState::default();
     account_state.insert(

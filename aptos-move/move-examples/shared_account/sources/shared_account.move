@@ -117,7 +117,7 @@ module shared_account::SharedAccount {
 
         let shared_account = borrow_global<SharedAccount>(resource_addr);
         let resource_signer = account::create_signer_with_capability(&shared_account.signer_capability);
-        coin::register<AptosCoin>(&resource_signer);
+        coin::register_for_test<AptosCoin>(&resource_signer);
         aptos_coin::mint(&core_framework, resource_addr, 1000);
         disperse<AptosCoin>(resource_addr);
         coin::destroy_mint_cap<AptosCoin>(mint_cap);
@@ -134,7 +134,7 @@ module shared_account::SharedAccount {
         let resource_addr = set_up(user, test_user1, test_user2);
         let shared_account = borrow_global<SharedAccount>(resource_addr);
         let resource_signer = account::create_signer_with_capability(&shared_account.signer_capability);
-        coin::register<AptosCoin>(&resource_signer);
+        coin::register_for_test<AptosCoin>(&resource_signer);
         disperse<AptosCoin>(resource_addr);
     }
 }

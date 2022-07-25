@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::event::EventHandle;
 use move_deps::move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -19,6 +20,7 @@ pub struct AccountResource {
     authentication_key: Vec<u8>,
     sequence_number: u64,
     self_address: AccountAddress,
+    coin_register_events: EventHandle,
 }
 
 impl AccountResource {
@@ -27,11 +29,13 @@ impl AccountResource {
         sequence_number: u64,
         authentication_key: Vec<u8>,
         self_address: AccountAddress,
+        coin_register_events: EventHandle,
     ) -> Self {
         AccountResource {
             authentication_key,
             sequence_number,
             self_address,
+            coin_register_events,
         }
     }
 
@@ -47,6 +51,10 @@ impl AccountResource {
 
     pub fn address(&self) -> AccountAddress {
         self.self_address
+    }
+
+    pub fn coin_register_events(&self) -> &EventHandle {
+        &self.coin_register_events
     }
 }
 

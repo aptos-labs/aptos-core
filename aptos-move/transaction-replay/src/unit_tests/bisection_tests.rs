@@ -38,12 +38,13 @@ fn test_bisection() {
 fn test_changeset_override() {
     let debugger = AptosDebugger::new(Box::new(TestInterface::genesis()));
     let address = AccountAddress::random();
+    let event = aptos_types::event::EventHandle::random(0);
     let mut override_changeset = ChangeSet::new();
     override_changeset
         .publish_resource(
             address,
             AccountResource::struct_tag(),
-            bcs::to_bytes(&AccountResource::new(0, vec![], address)).unwrap(),
+            bcs::to_bytes(&AccountResource::new(0, vec![], address, event)).unwrap(),
         )
         .unwrap();
 

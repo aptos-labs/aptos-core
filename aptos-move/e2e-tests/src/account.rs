@@ -382,6 +382,7 @@ impl CoinStore {
 pub struct AccountData {
     account: Account,
     sequence_number: u64,
+    coin_register_events: EventHandle,
     coin_store: CoinStore,
 }
 
@@ -437,6 +438,7 @@ impl AccountData {
                 new_event_handle(sent_events_count, addr),
             ),
             sequence_number,
+            coin_register_events: new_event_handle(0, addr),
         }
     }
 
@@ -447,10 +449,18 @@ impl AccountData {
 
     /// Returns the (Move value) layout of the Account::Account struct
     pub fn layout() -> MoveStructLayout {
-        use MoveStructLayout as S;
-        use MoveTypeLayout as T;
-
-        S::new(vec![T::Vector(Box::new(T::U8)), T::U64, T::Address])
+        MoveStructLayout::new(vec![
+            MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
+            MoveTypeLayout::U64,
+            MoveTypeLayout::Address,
+            MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+                MoveTypeLayout::U64,
+                MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+                    MoveTypeLayout::U64,
+                    MoveTypeLayout::Address,
+                ])),
+            ])),
+        ])
     }
 
     /// Creates and returns the top-level resources to be published under the account
@@ -459,6 +469,13 @@ impl AccountData {
             Value::vector_u8(AuthenticationKey::ed25519(&self.account.pubkey).to_vec()),
             Value::u64(self.sequence_number),
             Value::address(*self.address()),
+            Value::struct_(Struct::pack(vec![
+                Value::u64(self.coin_register_events.count()),
+                Value::struct_(Struct::pack(vec![
+                    Value::u64(self.coin_register_events.key().get_creation_number()),
+                    Value::address(self.coin_register_events.key().get_creator_address()),
+                ])),
+            ])),
         ]));
         (account, self.coin_store.to_value())
     }
@@ -475,14 +492,6 @@ impl AccountData {
     /// Use this to retrieve or publish the Account's CoinStore blob.
     pub fn make_coin_store_access_path(&self) -> AccessPath {
         self.account.make_coin_store_access_path()
-    }
-
-    pub fn transfer_event_layout() -> MoveStructLayout {
-        let event_layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-            MoveTypeLayout::U64,
-            MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
-        ]));
-        MoveStructLayout::new(vec![event_layout.clone(), event_layout])
     }
 
     /// Creates a writeset that contains the account data and can be patched to the storage
