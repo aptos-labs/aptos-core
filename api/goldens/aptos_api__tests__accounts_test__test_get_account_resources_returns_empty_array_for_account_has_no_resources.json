@@ -13,7 +13,7 @@
   {
     "type": "0x1::guid::Generator",
     "data": {
-      "counter": "9"
+      "counter": "10"
     }
   },
   {
@@ -26,7 +26,7 @@
         "guid": {
           "id": {
             "addr": "0x1",
-            "creation_num": "1"
+            "creation_num": "2"
           }
         }
       }
@@ -82,6 +82,20 @@
     }
   },
   {
+    "type": "0x1::table::TableMetadata",
+    "data": {
+      "new_table_events": {
+        "counter": "2",
+        "guid": {
+          "id": {
+            "addr": "0x1",
+            "creation_num": "0"
+          }
+        }
+      }
+    }
+  },
+  {
     "type": "0x1::voting::VotingForum<0x1::governance_proposal::GovernanceProposal>",
     "data": {
       "events": {
@@ -90,7 +104,7 @@
           "guid": {
             "id": {
               "addr": "0x1",
-              "creation_num": "2"
+              "creation_num": "3"
             }
           }
         },
@@ -99,7 +113,7 @@
           "guid": {
             "id": {
               "addr": "0x1",
-              "creation_num": "3"
+              "creation_num": "4"
             }
           }
         },
@@ -108,7 +122,7 @@
           "guid": {
             "id": {
               "addr": "0x1",
-              "creation_num": "4"
+              "creation_num": "5"
             }
           }
         },
@@ -117,7 +131,7 @@
           "guid": {
             "id": {
               "addr": "0x1",
-              "creation_num": "5"
+              "creation_num": "6"
             }
           }
         }
@@ -208,7 +222,7 @@
         "guid": {
           "id": {
             "addr": "0x1",
-            "creation_num": "0"
+            "creation_num": "1"
           }
         }
       },
@@ -248,7 +262,7 @@
         "guid": {
           "id": {
             "addr": "0x1",
-            "creation_num": "6"
+            "creation_num": "7"
           }
         }
       },
@@ -257,7 +271,7 @@
         "guid": {
           "id": {
             "addr": "0x1",
-            "creation_num": "7"
+            "creation_num": "8"
           }
         }
       },
@@ -266,7 +280,7 @@
         "guid": {
           "id": {
             "addr": "0x1",
-            "creation_num": "8"
+            "creation_num": "9"
           }
         }
       }

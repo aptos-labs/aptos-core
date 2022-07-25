@@ -17,6 +17,7 @@ module aptos_framework::genesis {
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
     use aptos_framework::vm_config;
+    use aptos_std::table;
 
     /// Invalid epoch duration.
     const EINVALID_EPOCH_DURATION: u64 = 1;
@@ -94,6 +95,9 @@ module aptos_framework::genesis {
         // deployed to. This will be entirely managed by on-chain governance and no entities have the key or privileges
         // to use this account.
         let (aptos_framework_account, framework_signer_cap) = account::create_core_framework_account();
+
+        // Initialize table in case it is used in other initializations below.
+        table::initialize(&aptos_framework_account);
 
         // Initialize account configs on aptos framework account.
         account::initialize(

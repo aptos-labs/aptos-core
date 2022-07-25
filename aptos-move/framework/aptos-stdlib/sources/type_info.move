@@ -22,8 +22,15 @@ module aptos_std::type_info {
     public native fun type_of<T>(): TypeInfo;
     public native fun type_name<T>(): string::String;
 
-    spec type_of { // TODO: temporary mockup.
+    spec type_of {
+        // TODO: temporary mockup.
         pragma opaque;
+    }
+
+    #[test_only]
+    struct TestStruct<K, V> {
+        key: K,
+        value: V,
     }
 
     #[test]
@@ -36,8 +43,6 @@ module aptos_std::type_info {
 
     #[test]
     fun test_type_name() {
-        use aptos_std::table::Table;
-
         assert!(type_name<bool>() == string::utf8(b"bool"), 0);
         assert!(type_name<u8>() == string::utf8(b"u8"), 1);
         assert!(type_name<u64>() == string::utf8(b"u64"), 2);
@@ -54,10 +59,10 @@ module aptos_std::type_info {
         // struct
         assert!(type_name<TypeInfo>() == string::utf8(b"0x1::type_info::TypeInfo"), 9);
         assert!(type_name<
-            Table<
+            TestStruct<
                 TypeInfo,
-                Table<u8, vector<TypeInfo>>
+                TestStruct<u8, vector<TypeInfo>>
             >
-        >() == string::utf8(b"0x1::table::Table<0x1::type_info::TypeInfo, 0x1::table::Table<u8, vector<0x1::type_info::TypeInfo>>>"), 10);
+        >() == string::utf8(b"0x1::type_info::TestStruct<0x1::type_info::TypeInfo, 0x1::type_info::TestStruct<u8, vector<0x1::type_info::TypeInfo>>>"), 10);
     }
 }
