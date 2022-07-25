@@ -81,6 +81,7 @@ describe("BuilderUtils", () => {
     assertStruct(structTypeTag2 as TypeTagStruct, "0x1", "test_coin", "AptosCoin2");
 
     const coinComplex = new TypeTagParser(
+      // eslint-disable-next-line max-len
       "0x1::coin::CoinStore < 0x2::coin::LPCoin < 0x1::test_coin::AptosCoin1 <u8>, vector<0x1::test_coin::AptosCoin2 > > >",
     ).parseTypeTag();
 
@@ -198,6 +199,14 @@ describe("BuilderUtils", () => {
     let serializer = new Serializer();
     serializeArg([255], new TypeTagVector(new TypeTagU8()), serializer);
     expect(serializer.getBytes()).toEqual(new Uint8Array([0x1, 0xff]));
+
+    serializer = new Serializer();
+    serializeArg("abc", new TypeTagVector(new TypeTagU8()), serializer);
+    expect(serializer.getBytes()).toEqual(new Uint8Array([0x3, 0x61, 0x62, 0x63]));
+
+    serializer = new Serializer();
+    serializeArg(new Uint8Array([0x61, 0x62, 0x63]), new TypeTagVector(new TypeTagU8()), serializer);
+    expect(serializer.getBytes()).toEqual(new Uint8Array([0x3, 0x61, 0x62, 0x63]));
 
     serializer = new Serializer();
     expect(() => {
