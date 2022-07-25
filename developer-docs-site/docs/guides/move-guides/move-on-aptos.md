@@ -31,7 +31,7 @@ Each deployment of the MoveVM has the ability to extend the core MoveVM with add
 
 The Aptos Move adapter features include:
 * Fine grained storage that decouples the amount of data stored in an account affecting the gas fees for transactions associated with the account
-* [Tables](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/Table.move) for storing key, value data within an account at scale
+* [Tables](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/aptos-framework/sources/table.move) for storing key, value data within an account at scale
 * Parallelism via [Block-STM](https://medium.com/aptoslabs/block-stm-how-we-execute-over-160k-transactions-per-second-on-the-aptos-blockchain-3b003657e4ba) that enables concurrent execution of transactions without any input from the user
 
 The Aptos framework ships with many useful libraries:
