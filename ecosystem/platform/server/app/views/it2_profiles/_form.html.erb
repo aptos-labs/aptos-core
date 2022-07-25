@@ -110,7 +110,7 @@
               <div class="text-sm">
                 <label class="flex gap-2 items-start cursor-pointer">
                   <%= f.check_box :terms_accepted, required: true %>
-                  <span class="leading-tight">I agree to the Aptos <%= render(LinkComponent.new(href: 'https://aptoslabs.com/terms-testnet/', target: '_blank', rel: 'noopener noreferrer')) { 'Testnet Participation Terms of Use' } %>
+                  <span class="leading-tight">I agree to the Aptos <%= render(LinkComponent.new(href: terms_testnet_path, target: '_blank', rel: 'noopener noreferrer')) { 'Testnet Participation Terms of Use' } %>
                     .</span>
                 </label>
               </div>

@@ -50,7 +50,7 @@
     <div class="text-sm mb-4">
       <label class="flex mb-4 gap-2 items-center cursor-pointer">
         <%= f.check_box :terms_accepted, required: true %>
-        <span>I agree to the Aptos <a href="https://aptoslabs.com/terms/" class="font-bold text-teal-400">Terms of Use</a> and <a href="https://aptoslabs.com/privacy/" class="font-bold text-teal-400">Privacy Policy</a>.</span>
+        <span>I agree to the Aptos <%= link_to 'Terms of Use', terms_path, class: 'font-bold text-teal-400' %> and <%= link_to 'Privacy Policy', privacy_path, class: 'font-bold text-teal-400' %>.</span>
       </label>
     </div>
     <div class="text-xs text-neutral-500">
