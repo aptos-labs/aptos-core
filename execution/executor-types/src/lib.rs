@@ -76,6 +76,12 @@ pub trait ChunkExecutorTrait: Send + Sync {
 
     /// Resets the chunk executor by synchronizing state with storage.
     fn reset(&self) -> Result<()>;
+
+    /// Drops the executor to ensure garbage collection occurs.
+    fn drop_executor(&self) -> Result<()> {
+        // TODO(Aaron): implement me!
+        Ok(())
+    }
 }
 
 pub struct StateSnapshotDelta {

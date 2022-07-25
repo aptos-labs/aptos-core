@@ -90,6 +90,10 @@ pub trait StorageSynchronizerInterface {
         state_value_chunk_with_proof: StateValueChunkWithProof,
     ) -> Result<(), Error>;
 
+    /// Drops the chunk executor. This is required so that the executor
+    /// is not actively held by state sync when consensus is running.
+    fn drop_chunk_executor(&mut self) -> Result<(), Error>;
+
     /// Resets the chunk executor. This is required to support continuous
     /// interaction between consensus and state sync.
     fn reset_chunk_executor(&mut self) -> Result<(), Error>;
@@ -315,6 +319,15 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizerInterface
         self.chunk_executor.reset().map_err(|error| {
             Error::UnexpectedError(format!(
                 "Failed to reset the chunk executor! Error: {:?}",
+                error
+            ))
+        })
+    }
+
+    fn drop_chunk_executor(&mut self) -> Result<(), Error> {
+        self.chunk_executor.drop_executor().map_err(|error| {
+            Error::UnexpectedError(format!(
+                "Failed to drop the chunk executor! Error: {:?}",
                 error
             ))
         })

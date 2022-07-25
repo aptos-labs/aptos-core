@@ -110,6 +110,9 @@ pub fn create_ready_storage_synchronizer(expect_reset_executor: bool) -> MockSto
         mock_storage_synchronizer
             .expect_reset_chunk_executor()
             .return_const(Ok(()));
+        mock_storage_synchronizer
+            .expect_drop_chunk_executor()
+            .return_const(Ok(()));
     }
 
     mock_storage_synchronizer
@@ -421,6 +424,8 @@ mock! {
             notification_id: NotificationId,
             state_value_chunk_with_proof: StateValueChunkWithProof,
         ) -> Result<(), crate::error::Error>;
+
+        fn drop_chunk_executor(&mut self) -> Result<(), crate::error::Error>;
 
         fn reset_chunk_executor(&mut self) -> Result<(), crate::error::Error>;
     }
