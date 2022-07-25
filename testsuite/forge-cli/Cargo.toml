@@ -12,7 +12,7 @@ edition = "2018"
 [dependencies]
 async-trait = "0.1.53"
 structopt = "0.3.21"
-tokio = { version = "1.18.2", features = ["full"] }
+tokio = { version = "1.18.2", features = ["full","tracing"] }
 url = "2.2.2"
 
 aptos-logger = { path = "../../crates/aptos-logger" }
