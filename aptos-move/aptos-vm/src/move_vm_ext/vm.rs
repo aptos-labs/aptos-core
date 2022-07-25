@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::move_vm_ext::NativeCodeContext;
 use crate::{
     move_vm_ext::{MoveResolverExt, NativeTransactionContext, SessionExt, SessionId},
     natives::aptos_natives,
@@ -40,6 +41,7 @@ impl MoveVmExt {
             _ => vec![],
         };
         extensions.add(NativeTransactionContext::new(script_hash));
+        extensions.add(NativeCodeContext::default());
 
         SessionExt::new(self.inner.new_session_with_extensions(remote, extensions))
     }
