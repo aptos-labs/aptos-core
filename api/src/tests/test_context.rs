@@ -36,7 +36,7 @@ use executor::{block_executor::BlockExecutor, db_bootstrapper};
 use executor_types::BlockExecutorTrait;
 use hyper::Response;
 use mempool_notifications::MempoolNotificationSender;
-use storage_interface::DbReaderWriter;
+use storage_interface::{DbReader, DbReaderWriter};
 
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
@@ -156,7 +156,7 @@ impl TestContext {
         LocalAccount::new(aptos_root_address(), self.root_key.private_key(), 0)
     }
 
-    pub fn latest_state_view(&self) -> DbStateView {
+    pub fn latest_state_view(&self) -> DbStateView<Arc<dyn DbReader>> {
         self.context
             .state_view_at_version(self.get_latest_ledger_info().version())
             .unwrap()

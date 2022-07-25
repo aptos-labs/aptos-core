@@ -5,17 +5,17 @@ use crate::DbReader;
 use anyhow::Result;
 use aptos_state_view::StateView;
 use aptos_types::{state_store::state_key::StateKey, transaction::Version};
-use std::sync::Arc;
 
-pub struct DbStateView {
-    db: Arc<dyn DbReader>,
+pub struct DbStateView<R: AsRef<dyn DbReader>> {
+    db: R,
     version: Option<Version>,
 }
 
-impl DbStateView {
+impl<R: AsRef<dyn DbReader>> DbStateView<R> {
     fn get(&self, key: &StateKey) -> Result<Option<Vec<u8>>> {
         if let Some(version) = self.version {
             self.db
+                .as_ref()
                 .get_state_value_by_version(key, version)
                 .map(|value_opt| {
                     // Hack: `v.maybe_bytes == None` represents deleted value, deemed non-existent
@@ -27,7 +27,7 @@ impl DbStateView {
     }
 }
 
-impl StateView for DbStateView {
+impl<R: AsRef<dyn DbReader> + Sync> StateView for DbStateView<R> {
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         self.get(state_key)
     }
@@ -37,25 +37,25 @@ impl StateView for DbStateView {
     }
 }
 
-pub trait LatestDbStateCheckpointView {
-    fn latest_state_checkpoint_view(&self) -> Result<DbStateView>;
+pub trait LatestDbStateCheckpointView<R: AsRef<dyn DbReader>> {
+    fn latest_state_checkpoint_view(&self) -> Result<DbStateView<R>>;
 }
 
-impl LatestDbStateCheckpointView for Arc<dyn DbReader> {
-    fn latest_state_checkpoint_view(&self) -> Result<DbStateView> {
+impl<R: AsRef<dyn DbReader> + Clone> LatestDbStateCheckpointView<R> for R {
+    fn latest_state_checkpoint_view(&self) -> Result<DbStateView<R>> {
         Ok(DbStateView {
             db: self.clone(),
-            version: self.get_latest_state_snapshot()?.map(|(v, _)| v),
+            version: self.as_ref().get_latest_state_snapshot()?.map(|(v, _)| v),
         })
     }
 }
 
-pub trait DbStateViewAtVersion {
-    fn state_view_at_version(&self, version: Option<Version>) -> Result<DbStateView>;
+pub trait DbStateViewAtVersion<R: AsRef<dyn DbReader>> {
+    fn state_view_at_version(&self, version: Option<Version>) -> Result<DbStateView<R>>;
 }
 
-impl DbStateViewAtVersion for Arc<dyn DbReader> {
-    fn state_view_at_version(&self, version: Option<Version>) -> Result<DbStateView> {
+impl<R: AsRef<dyn DbReader> + Clone> DbStateViewAtVersion<R> for R {
+    fn state_view_at_version(&self, version: Option<Version>) -> Result<DbStateView<R>> {
         Ok(DbStateView {
             db: self.clone(),
             version,

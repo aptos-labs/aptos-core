@@ -24,7 +24,9 @@ use move_deps::move_core_types::{
     language_storage::{ModuleId, ResourceKey, StructTag},
 };
 use std::convert::TryInto;
+use std::sync::Arc;
 use storage_interface::state_view::DbStateView;
+use storage_interface::DbReader;
 use warp::{filters::BoxedFilter, Filter, Rejection, Reply};
 
 // GET /accounts/<address>/resource/<resource_type>
@@ -113,7 +115,7 @@ async fn handle_get_table_item(
 }
 
 pub(crate) struct State {
-    state_view: DbStateView,
+    state_view: DbStateView<Arc<dyn DbReader>>,
     ledger_version: aptos_types::transaction::Version,
     latest_ledger_info: LedgerInfo,
 }
