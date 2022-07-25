@@ -36,12 +36,8 @@ env:
   AWS_ECR_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
   # In case of pull_request events by default github actions merges main into the PR branch and then runs the tests etc
   # on the prospective merge result instead of only on the tip of the PR.
-  # We want to avoid this in case of docker image builds on PRs since want more predictable images then correspond to the code state a developer pushed from local.
-  # Therefore we build the images with the head of the PR branch instead of the prospective merge result.
-  # Safety-wise the merge queue (bors/kodiak or whatever we use) will retest the PR branch merged with the base branch anyways.
-  # In case of push events, this hack is a noop as we default to `github.sha`.
   # For more info also see https://github.com/actions/checkout#checkout-pull-request-head-commit-instead-of-merge-commit
-  GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  GIT_SHA: ${{ github.sha }}
 
   # TARGET_CACHE_ID is used as part of the docker tag / cache key inside our bake.hcl docker bake files.
   # The goal here is to have a branch or PR-local cache such that consecutive pushes to a shared branch or a specific PR can
@@ -127,7 +123,7 @@ jobs:
     uses: ./.github/workflows/sdk-integration-test.yaml
     secrets: inherit
     with:
-      GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      GIT_SHA: ${{ github.sha }}
 
   forge-e2e-test:
     needs: rust-images
@@ -140,7 +136,7 @@ jobs:
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
-      GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      GIT_SHA: ${{ github.sha }}
       merge_or_canary: ${{ github.event.pull_request.auto_merge != null && 'merge' || 'canary' }}
       # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge
       # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
