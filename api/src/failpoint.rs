@@ -6,7 +6,7 @@
 use anyhow::{format_err, Result};
 use aptos_api_types::Error;
 
-use crate::poem_backend::{AptosError, AptosErrorResponse};
+use crate::poem_backend::{AptosError, InternalError};
 use poem_openapi::payload::Json;
 
 #[allow(unused_variables)]
@@ -19,10 +19,11 @@ pub fn fail_point(name: &str) -> Result<(), Error> {
 
 #[allow(unused_variables)]
 #[inline]
-pub fn fail_point_poem(name: &str) -> Result<(), AptosErrorResponse> {
+pub fn fail_point_poem<E: InternalError>(name: &str) -> Result<(), E> {
     Ok(fail::fail_point!(format!("api::{}", name).as_str(), |_| {
-        Err(AptosErrorResponse::InternalServerError(Json(
-            AptosError::new(format!("unexpected internal error for {}", name)),
+        Err(E::internal_str(&format!(
+            "unexpected internal error for {}",
+            name
         )))
     }))
 }

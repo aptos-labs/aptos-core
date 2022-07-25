@@ -1,19 +1,19 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::convert::{TryFrom, TryInto};
+use anyhow::Context as AnyhowContext;
+use std::convert::TryInto;
+use std::fmt::Display;
 use std::sync::Arc;
 
-use super::accept_type::AcceptType;
-use super::response::deserialize_from_bcs;
+use super::accept_type::{parse_accept, AcceptType};
 use super::{
-    response::{AptosInternalResult, AptosResponseResult},
-    ApiTags, AptosResponse,
+    ApiTags, AptosErrorResponse, BadRequestError, BasicResponse, BasicResponseStatus,
+    InternalError, NotFoundError,
 };
-use super::{AptosError, AptosErrorCode, AptosErrorResponse};
+use super::{AptosErrorCode, BasicErrorWith404, BasicResultWith404};
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
-use anyhow::format_err;
 use aptos_api_types::{AccountData, Address, AsConverter, MoveStructTag, TransactionId};
 use aptos_api_types::{LedgerInfo, MoveModuleBytecode, MoveResource};
 use aptos_types::access_path::AccessPath;
@@ -30,11 +30,7 @@ use move_deps::move_core_types::{
 };
 use poem::web::Accept;
 use poem_openapi::param::Query;
-use poem_openapi::payload::Json;
 use poem_openapi::{param::Path, OpenApi};
-
-// TODO: Make a helper that builds an AptosResponse from just an anyhow error,
-// that assumes that it's an internal error. We can use .context() add more info.
 
 pub struct AccountsApi {
     pub context: Arc<Context>,
@@ -56,9 +52,9 @@ impl AccountsApi {
         accept: Accept,
         address: Path<Address>,
         ledger_version: Query<Option<u64>>,
-    ) -> AptosResponseResult<AccountData> {
+    ) -> BasicResultWith404<AccountData> {
         fail_point_poem("endpoint_get_account")?;
-        let accept_type = AcceptType::try_from(&accept)?;
+        let accept_type = parse_accept(&accept)?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
         account.account(&accept_type)
     }
@@ -80,9 +76,9 @@ impl AccountsApi {
         accept: Accept,
         address: Path<Address>,
         ledger_version: Query<Option<u64>>,
-    ) -> AptosResponseResult<Vec<MoveResource>> {
+    ) -> BasicResultWith404<Vec<MoveResource>> {
         fail_point_poem("endpoint_get_account_resources")?;
-        let accept_type = AcceptType::try_from(&accept)?;
+        let accept_type = parse_accept(&accept)?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
         account.resources(&accept_type)
     }
@@ -104,9 +100,9 @@ impl AccountsApi {
         accept: Accept,
         address: Path<Address>,
         ledger_version: Query<Option<u64>>,
-    ) -> AptosResponseResult<Vec<MoveModuleBytecode>> {
-        fail_point_poem("endpoint_get_account_resources")?;
-        let accept_type = AcceptType::try_from(&accept)?;
+    ) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
+        fail_point_poem("endpoint_get_account_modules")?;
+        let accept_type = parse_accept(&accept)?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
         account.modules(&accept_type)
     }
@@ -124,13 +120,13 @@ impl Account {
         context: Arc<Context>,
         address: Address,
         requested_ledger_version: Option<u64>,
-    ) -> Result<Self, AptosErrorResponse> {
+    ) -> Result<Self, BasicErrorWith404> {
         let latest_ledger_info = context.get_latest_ledger_info_poem()?;
         let ledger_version: u64 =
             requested_ledger_version.unwrap_or_else(|| latest_ledger_info.version());
 
         if ledger_version > latest_ledger_info.version() {
-            return Err(AptosErrorResponse::not_found(
+            return Err(Self::not_found(
                 "ledger",
                 TransactionId::Version(ledger_version),
                 latest_ledger_info.version(),
@@ -147,7 +143,7 @@ impl Account {
 
     // These functions map directly to endpoint functions.
 
-    pub fn account(self, accept_type: &AcceptType) -> AptosResponseResult<AccountData> {
+    pub fn account(self, accept_type: &AcceptType) -> BasicResultWith404<AccountData> {
         let state_key = StateKey::AccessPath(AccessPath::resource_access_path(ResourceKey::new(
             self.address.into(),
             AccountResource::struct_tag(),
@@ -162,83 +158,83 @@ impl Account {
             None => return Err(self.resource_not_found(&AccountResource::struct_tag())),
         };
 
-        let account_resource = deserialize_from_bcs::<AccountResource>(&state_value)?;
+        let account_resource: AccountResource = bcs::from_bytes(&state_value)
+            .context("Internal error deserializing response from DB")
+            .map_err(BasicErrorWith404::internal)?;
         let account_data: AccountData = account_resource.into();
 
-        AptosResponse::try_from_rust_value(account_data, &self.latest_ledger_info, accept_type)
+        BasicResponse::try_from_rust_value((
+            account_data,
+            &self.latest_ledger_info,
+            BasicResponseStatus::Ok,
+            accept_type,
+        ))
     }
 
-    pub fn resources(self, accept_type: &AcceptType) -> AptosResponseResult<Vec<MoveResource>> {
+    pub fn resources(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveResource>> {
         let account_state = self.account_state()?;
         let resources = account_state.get_resources();
         let move_resolver = self.context.move_resolver_poem()?;
         let converted_resources = move_resolver
             .as_converter()
             .try_into_resources(resources)
-            .map_err(|e| {
-                AptosErrorResponse::InternalServerError(Json(
-                    AptosError::new(
-                        format_err!(
-                            "Failed to build move resource response from data in DB: {}",
-                            e
-                        )
-                        .to_string(),
-                    )
-                    .error_code(AptosErrorCode::InvalidBcsInStorageError),
-                ))
-            })?;
-        AptosResponse::<Vec<MoveResource>>::try_from_rust_value(
+            .context("Failed to build move resource response from data in DB")
+            .map_err(BasicErrorWith404::internal)
+            .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
+
+        BasicResponse::try_from_rust_value((
             converted_resources,
             &self.latest_ledger_info,
+            BasicResponseStatus::Ok,
             accept_type,
-        )
+        ))
     }
 
-    pub fn modules(self, accept_type: &AcceptType) -> AptosResponseResult<Vec<MoveModuleBytecode>> {
+    pub fn modules(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
         let mut modules = Vec::new();
         for module in self.account_state()?.into_modules() {
             modules.push(
                 MoveModuleBytecode::new(module)
                     .try_parse_abi()
-                    .map_err(|e| {
-                        AptosErrorResponse::InternalServerError(Json(
-                            AptosError::new(
-                                format_err!("Failed to parse move module ABI: {}", e).to_string(),
-                            )
-                            .error_code(AptosErrorCode::InvalidBcsInStorageError),
-                        ))
-                    })?,
+                    .context("Failed to parse move module ABI")
+                    .map_err(BasicErrorWith404::internal)
+                    .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?,
             );
         }
-        AptosResponse::<Vec<MoveModuleBytecode>>::try_from_rust_value(
+        BasicResponse::try_from_rust_value((
             modules,
             &self.latest_ledger_info,
+            BasicResponseStatus::Ok,
             accept_type,
-        )
+        ))
     }
 
     // Helpers for processing account state.
 
-    fn account_state(&self) -> AptosInternalResult<AccountState> {
+    fn account_state(&self) -> Result<AccountState, BasicErrorWith404> {
         let state = self
             .context
             .get_account_state(self.address.into(), self.ledger_version)
-            .map_err(|e| {
-                AptosErrorResponse::InternalServerError(Json(
-                    AptosError::new(
-                        format_err!("Failed to read account state from DB: {}", e).to_string(),
-                    )
-                    .error_code(AptosErrorCode::ReadFromStorageError),
-                ))
-            })?
+            .map_err(BasicErrorWith404::internal)
+            .map_err(|e| e.error_code(AptosErrorCode::ReadFromStorageError))?
             .ok_or_else(|| self.account_not_found())?;
+
         Ok(state)
     }
 
     // Helpers for building errors.
 
-    fn account_not_found(&self) -> AptosErrorResponse {
-        AptosErrorResponse::not_found(
+    pub fn not_found<S: Display>(
+        resource: &str,
+        identifier: S,
+        ledger_version: u64,
+    ) -> BasicErrorWith404 {
+        BasicErrorWith404::not_found_str(&format!("{} not found by {}", resource, identifier))
+            .aptos_ledger_version(ledger_version)
+    }
+
+    fn account_not_found(&self) -> BasicErrorWith404 {
+        Self::not_found(
             "account",
             format!(
                 "address({}) and ledger version({})",
@@ -248,8 +244,8 @@ impl Account {
         )
     }
 
-    fn resource_not_found(&self, struct_tag: &StructTag) -> AptosErrorResponse {
-        AptosErrorResponse::not_found(
+    fn resource_not_found(&self, struct_tag: &StructTag) -> BasicErrorWith404 {
+        Self::not_found(
             "resource",
             format!(
                 "address({}), struct tag({}) and ledger version({})",
@@ -263,8 +259,8 @@ impl Account {
         &self,
         struct_tag: &StructTag,
         field_name: &Identifier,
-    ) -> AptosErrorResponse {
-        AptosErrorResponse::not_found(
+    ) -> BasicErrorWith404 {
+        Self::not_found(
             "resource",
             format!(
                 "address({}), struct tag({}), field name({}) and ledger version({})",
@@ -283,12 +279,11 @@ impl Account {
         &self,
         event_handle: MoveStructTag,
         field_name: Identifier,
-    ) -> AptosInternalResult<EventKey> {
-        let struct_tag: StructTag = event_handle.try_into().map_err(|e| {
-            AptosErrorResponse::BadRequest(Json(AptosError::new(
-                format_err!("Given event handle was invalid: {}", e).to_string(),
-            )))
-        })?;
+    ) -> Result<EventKey, BasicErrorWith404> {
+        let struct_tag: StructTag = event_handle
+            .try_into()
+            .context("Given event handle was invalid")
+            .map_err(BasicErrorWith404::bad_request)?;
 
         let resource = self.find_resource(&struct_tag)?;
 
@@ -297,27 +292,24 @@ impl Account {
             .find(|(id, _)| id == &field_name)
             .ok_or_else(|| self.field_not_found(&struct_tag, &field_name))?;
 
-        // serialization should not fail, otherwise it's internal bug
-        // TODO: don't unwrap
-        let event_handle_bytes = bcs::to_bytes(&value).unwrap();
-        // deserialization may fail because the bytes are not EventHandle struct type.
-        let event_handle: EventHandle = bcs::from_bytes(&event_handle_bytes).map_err(|e| {
-            AptosErrorResponse::BadRequest(Json(AptosError::new(
-                format_err!(
-                    "Deserialization error, field({}) type is not EventHandle struct: {}",
-                    field_name,
-                    e
-                )
-                .to_string(),
-            )))
-        })?;
+        // Serialization should not fail, otherwise it's internal bug
+        let event_handle_bytes = bcs::to_bytes(&value)
+            .context("Failed to serialize event handle, this is an internal bug")
+            .map_err(BasicErrorWith404::internal)?;
+        // Deserialization may fail because the bytes are not EventHandle struct type.
+        let event_handle: EventHandle = bcs::from_bytes(&event_handle_bytes)
+            .context(format!(
+                "Deserialization error, field({}) type is not EventHandle struct",
+                field_name
+            ))
+            .map_err(BasicErrorWith404::bad_request)?;
         Ok(*event_handle.key())
     }
 
     fn find_resource(
         &self,
         struct_tag: &StructTag,
-    ) -> AptosInternalResult<Vec<(Identifier, MoveValue)>> {
+    ) -> Result<Vec<(Identifier, MoveValue)>, BasicErrorWith404> {
         let account_state = self.account_state()?;
         let (typ, data) = account_state
             .get_resources()
@@ -327,14 +319,8 @@ impl Account {
         move_resolver
             .as_converter()
             .move_struct_fields(&typ, data)
-            .map_err(|e| {
-                AptosErrorResponse::InternalServerError(Json(
-                    AptosError::new(
-                        format_err!("Failed to convert move structs: {}", e).to_string(),
-                    )
-                    .error_code(AptosErrorCode::ReadFromStorageError),
-                ))
-            })
+            .context("Failed to convert move structs")
+            .map_err(BasicErrorWith404::internal)
     }
 }
 
@@ -347,14 +333,14 @@ impl Account {
             .get_state_values(self.address.into(), self.ledger_version)
             .ok_or_else(|| self.account_not_found())?;
         match accept_type {
-            AcceptType::Bcs => Ok(AptosResponse::from_bcs(
+            AcceptType::Bcs => Ok(BasicResponse::from_bcs(
                 state_value,
                 &self.latest_ledger_info,
             )),
             AcceptType::Json => {
                 let account_resource = deserialize_from_bcs::<AccountResource>(&state_value)?;
                 let account_data: AccountData = account_resource.into();
-                Ok(AptosResponse::from_json(
+                Ok(BasicResponse::from_json(
                     account_data,
                     &self.latest_ledger_info,
                 ))

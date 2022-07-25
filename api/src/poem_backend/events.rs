@@ -1,26 +1,23 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::convert::TryFrom;
 use std::sync::Arc;
 
-use super::accept_type::AcceptType;
+use super::accept_type::{parse_accept, AcceptType};
 use super::accounts::Account;
 use super::page::Page;
-use super::{response::AptosResponseResult, ApiTags, AptosResponse};
-use super::{AptosError, AptosErrorCode, AptosErrorResponse};
+use super::{
+    ApiTags, BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus,
+    BasicResultWith404, InternalError,
+};
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
-use anyhow::format_err;
+use anyhow::Context as AnyhowContext;
 use aptos_api_types::{Address, EventKey, IdentifierWrapper, MoveStructTagWrapper};
 use aptos_api_types::{AsConverter, Event};
 use poem::web::Accept;
 use poem_openapi::param::Query;
-use poem_openapi::payload::Json;
 use poem_openapi::{param::Path, OpenApi};
-
-// TODO: Make a helper that builds an AptosResponse from just an anyhow error,
-// that assumes that it's an internal error. We can use .context() add more info.
 
 pub struct EventsApi {
     pub context: Arc<Context>,
@@ -46,9 +43,9 @@ impl EventsApi {
         event_key: Path<EventKey>,
         start: Query<Option<u64>>,
         limit: Query<Option<u16>>,
-    ) -> AptosResponseResult<Vec<Event>> {
+    ) -> BasicResultWith404<Vec<Event>> {
         fail_point_poem("endpoint_get_events_by_event_key")?;
-        let accept_type = AcceptType::try_from(&accept)?;
+        let accept_type = parse_accept(&accept)?;
         let page = Page::new(start.0, limit.0);
         self.list(&accept_type, page, event_key.0)
     }
@@ -72,9 +69,9 @@ impl EventsApi {
         field_name: Path<IdentifierWrapper>,
         start: Query<Option<u64>>,
         limit: Query<Option<u16>>,
-    ) -> AptosResponseResult<Vec<Event>> {
+    ) -> BasicResultWith404<Vec<Event>> {
         fail_point_poem("endpoint_get_events_by_event_handle")?;
-        let accept_type = AcceptType::try_from(&accept)?;
+        let accept_type = parse_accept(&accept)?;
         let page = Page::new(start.0, limit.0);
         let account = Account::new(self.context.clone(), address.0, None)?;
         let key = account
@@ -90,7 +87,7 @@ impl EventsApi {
         accept_type: &AcceptType,
         page: Page,
         event_key: EventKey,
-    ) -> AptosResponseResult<Vec<Event>> {
+    ) -> BasicResultWith404<Vec<Event>> {
         let latest_ledger_info = self.context.get_latest_ledger_info_poem()?;
         let contract_events = self
             .context
@@ -102,30 +99,21 @@ impl EventsApi {
             )
             // TODO: Previously this was a 500, but I'm making this a 400. I suspect
             // both could be true depending on the error. Make this more specific.
-            .map_err(|e| {
-                AptosErrorResponse::BadRequest(Json(
-                    AptosError::new(
-                        format_err!("Failed to find events by key {}: {}", event_key, e)
-                            .to_string(),
-                    )
-                    .error_code(AptosErrorCode::InvalidBcsInStorageError),
-                ))
-            })?;
+            .context(format!("Failed to find events by key {}", event_key))
+            .map_err(BasicErrorWith404::bad_request)?;
 
         let resolver = self.context.move_resolver_poem()?;
         let events = resolver
             .as_converter()
             .try_into_events(&contract_events)
-            .map_err(|e| {
-                AptosErrorResponse::InternalServerError(Json(
-                    AptosError::new(
-                        format_err!("Failed to convert events from storage into response: {}", e)
-                            .to_string(),
-                    )
-                    .error_code(AptosErrorCode::InvalidBcsInStorageError),
-                ))
-            })?;
+            .context("Failed to convert events from storage into response {}")
+            .map_err(BasicErrorWith404::internal)?;
 
-        AptosResponse::try_from_rust_value(events, &latest_ledger_info, accept_type)
+        BasicResponse::try_from_rust_value((
+            events,
+            &latest_ledger_info,
+            BasicResponseStatus::Ok,
+            accept_type,
+        ))
     }
 }
