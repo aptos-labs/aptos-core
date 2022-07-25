@@ -336,7 +336,7 @@ pub fn create_and_fund_account_request(
     let preimage = AuthenticationKeyPreimage::ed25519(pubkey);
     let auth_key = AuthenticationKey::from_preimage(&preimage);
     creation_account.sign_with_transaction_builder(txn_factory.payload(
-        aptos_stdlib::account_utils_create_and_fund_account(auth_key.derived_address(), amount),
+        aptos_stdlib::account_transfer(auth_key.derived_address(), amount),
     ))
 }
 

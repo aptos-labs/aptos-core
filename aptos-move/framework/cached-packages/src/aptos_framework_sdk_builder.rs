@@ -47,11 +47,6 @@ pub enum ScriptFunctionCall {
         amount: u64,
     },
 
-    AccountUtilsCreateAndFundAccount {
-        account: AccountAddress,
-        amount: u64,
-    },
-
     /// Claim the delegated mint capability and destroy the delegated token.
     AptosCoinClaimMintCapability {},
 
@@ -374,9 +369,6 @@ impl ScriptFunctionCall {
                 account_rotate_authentication_key(new_auth_key)
             }
             AccountTransfer { to, amount } => account_transfer(to, amount),
-            AccountUtilsCreateAndFundAccount { account, amount } => {
-                account_utils_create_and_fund_account(account, amount)
-            }
             AptosCoinClaimMintCapability {} => aptos_coin_claim_mint_capability(),
             AptosCoinDelegateMintCapability { to } => aptos_coin_delegate_mint_capability(to),
             AptosCoinMint { dst_addr, amount } => aptos_coin_mint(dst_addr, amount),
@@ -694,27 +686,6 @@ pub fn account_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
         ident_str!("transfer").to_owned(),
         vec![],
         vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
-    ))
-}
-
-pub fn account_utils_create_and_fund_account(
-    account: AccountAddress,
-    amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("account_utils").to_owned(),
-        ),
-        ident_str!("create_and_fund_account").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&account).unwrap(),
-            bcs::to_bytes(&amount).unwrap(),
-        ],
     ))
 }
 
@@ -1754,19 +1725,6 @@ mod decoder {
         }
     }
 
-    pub fn account_utils_create_and_fund_account(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::AccountUtilsCreateAndFundAccount {
-                account: bcs::from_bytes(script.args().get(0)?).ok()?,
-                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
     pub fn aptos_coin_claim_mint_capability(
         payload: &TransactionPayload,
     ) -> Option<ScriptFunctionCall> {
@@ -2389,10 +2347,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "account_transfer".to_string(),
             Box::new(decoder::account_transfer),
-        );
-        map.insert(
-            "account_utils_create_and_fund_account".to_string(),
-            Box::new(decoder::account_utils_create_and_fund_account),
         );
         map.insert(
             "aptos_coin_claim_mint_capability".to_string(),

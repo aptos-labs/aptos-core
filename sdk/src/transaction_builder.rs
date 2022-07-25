@@ -136,13 +136,13 @@ impl TransactionFactory {
         ))
     }
 
-    pub fn create_and_fund_user_account(
+    pub fn implicitly_create_user_account_and_transfer(
         &self,
         public_key: &Ed25519PublicKey,
         amount: u64,
     ) -> TransactionBuilder {
         let preimage = AuthenticationKeyPreimage::ed25519(public_key);
-        self.payload(aptos_stdlib::account_utils_create_and_fund_account(
+        self.payload(aptos_stdlib::account_transfer(
             AuthenticationKey::from_preimage(&preimage).derived_address(),
             amount,
         ))
