@@ -35,13 +35,13 @@ The Aptos Move adapter features include:
 * Parallelism via [Block-STM](https://medium.com/aptoslabs/block-stm-how-we-execute-over-160k-transactions-per-second-on-the-aptos-blockchain-3b003657e4ba) that enables concurrent execution of transactions without any input from the user
 
 The Aptos framework ships with many useful libraries:
-* A [Token standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/Token.move) that makes it possible to create NFTs and other rich tokens without publishing a smart contract
-* A [Coin standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/Coin.move) that makes it possible to create type-safe Coins by publishing a trivial module
-* An [iterable Table](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/IterableTable.move) that allows for traversing all the entries within a table
+* A [Token standard](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/aptos-framework/sources/token.move) that makes it possible to create NFTs and other rich tokens without publishing a smart contract
+* A [Coin standard](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/aptos-framework/sources/coin.move) that makes it possible to create type-safe Coins by publishing a trivial module
+* An [iterable Table](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/aptos-framework/sources/iterable_table.move) that allows for traversing all the entries within a table
 * A staking and delegation framework
-* A [`type_of`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/TypeInfo.move) service to identify at run-time the address, module, and struct name of a given type
+* A [`type_of`](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/aptos-framework/sources/type_info.move) service to identify at run-time the address, module, and struct name of a given type
 * Multi-signer framework that allows multiple `signer` entities
-* A [timestamp service](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/Timestamp.move) that provides a monotonically increasing clock that maps to the actual current unixtime
+* A [timestamp service](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/aptos-framework/sources/timestamp.move) that provides a monotonically increasing clock that maps to the actual current unixtime
 
 With much more coming soon...
 
@@ -93,9 +93,9 @@ Assets can be programmed to be entirely constrained within a module by making it
 Contrast the following two functions of implementing a coins transfer using deposit and withdraw:
 
 ```rust
-public fun transfer<T>(sender: &signer, reciepient: address, amount: u64) {
+public fun transfer<T>(sender: &signer, recipient: address, amount: u64) {
     let coin = withdraw(&signer, amount);
-    deposit(reciepient, coin);
+    deposit(recipient, coin);
 }
 ```
 
