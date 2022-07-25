@@ -1,18 +1,17 @@
 ---
-codecov:
-  require_ci_to_pass: true
-
 ignore:
   - testsuite/*
-  - x/*
 
 coverage:
   # range for color spectrum display, red=50%, green=80%
   range: "50...80"
-  round: down
   precision: 1
 
   status:
-    project: true
-    patch: true
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
     changes: false
