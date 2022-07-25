@@ -70,8 +70,8 @@ function Login() {
         eventType: loginEvents.LOGIN_WITH_PRIVATE_KEY,
         params: analyticsParams,
       });
-      addAccount({ account });
-      navigate(Routes.login.routePath);
+      await addAccount({ account });
+      navigate(Routes.wallet.routePath);
     } catch (err) {
       Analytics.event({
         eventType: loginEvents.ERROR_LOGIN_WITH_PRIVATE_KEY,
