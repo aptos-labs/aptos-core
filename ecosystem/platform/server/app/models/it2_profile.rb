@@ -32,7 +32,7 @@ class It2Profile < ApplicationRecord
   before_save :maybe_set_validated_to_false
 
   CHANGES_TO_REVALIDATE = Set.new %w[consensus_key account_key network_key validator_address validator_api_port
-                                     validator_metrics_port]
+                                     validator_port validator_metrics_port validator_ip]
 
   def account_address
     self.class.address_from_key account_key
@@ -67,7 +67,7 @@ class It2Profile < ApplicationRecord
     end
 
     job = NhcJob.perform_later({ it2_profile_id: id, do_location: })
-    self.nhc_job_id = job.job_id&.presence || 'default-job-id'
+    self.nhc_job_id = "#{job.job_id&.presence || 'job-id'}|#{Time.now.utc}"
     self.nhc_output = nil
     update_columns(nhc_job_id:, nhc_output: nil)
   end
@@ -75,6 +75,10 @@ class It2Profile < ApplicationRecord
   def fullnode_network_key=(value)
     value = nil if value.blank?
     super(value)
+  end
+
+  def maybe_set_validated_to_false
+    self.validator_verified = false if needs_revalidation?
   end
 
   private
@@ -86,9 +90,5 @@ class It2Profile < ApplicationRecord
     return if validator_ip.blank? || validator_ip =~ Resolv::IPv4::Regex
 
     errors.add :validator_address, 'Address must resolve to or be an IPv4'
-  end
-
-  def maybe_set_validated_to_false
-    self.validator_verified = false if needs_revalidation?
   end
 end

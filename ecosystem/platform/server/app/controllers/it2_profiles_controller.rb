@@ -31,9 +31,7 @@ class It2ProfilesController < ApplicationController
 
     return unless check_recaptcha
 
-    v = NodeHelper::NodeVerifier.new(@it2_profile.validator_address,
-                                     @it2_profile.validator_metrics_port,
-                                     @it2_profile.validator_api_port)
+    v = NodeHelper::IPResolver.new(@it2_profile.validator_address)
 
     if v.ip.ok
       @it2_profile.validator_ip = v.ip.ip
@@ -44,26 +42,16 @@ class It2ProfilesController < ApplicationController
 
     if @it2_profile.save
       log @it2_profile, 'created'
-
-      if Flipper.enabled?(:node_health_checker)
-        @it2_profile.enqueue_nhc_job(true)
-      else
-        validate_node(v, do_location: true)
-      end
-
-      if @it2_profile.validator_verified?
-        current_user.maybe_send_ait2_registration_complete_email
-        redirect_to it2_path, notice: 'AIT2 application completed successfully: your node is verified!' and return
-      end
+      @it2_profile.enqueue_nhc_job(true)
+      redirect_to it2_path,
+                  notice: 'AIT2 node information updated, running node health checker' and return
     end
     respond_with(@it2_profile, status: :unprocessable_entity)
   end
 
   # PATCH/PUT /it2_profiles/1 or /it2_profiles/1.json
   def update
-    v = NodeHelper::NodeVerifier.new(it2_profile_params[:validator_address],
-                                     it2_profile_params[:validator_metrics_port],
-                                     it2_profile_params[:validator_api_port])
+    v = NodeHelper::IPResolver.new(it2_profile_params[:validator_address])
 
     return unless check_recaptcha
 
@@ -75,71 +63,26 @@ class It2ProfilesController < ApplicationController
     end
 
     ip_changed = @it2_profile.validator_ip_changed?
+    @it2_profile.maybe_set_validated_to_false
+    needs_revalidation = @it2_profile.needs_revalidation?
     if @it2_profile.update(it2_profile_params)
       log @it2_profile, 'updated'
-      if @it2_profile.validator_verified? && !@it2_profile.needs_revalidation?
-        redirect_to it2_path,
-                    notice: 'AIT2 node information updated' and return
-      end
-
-      if Flipper.enabled?(:node_health_checker)
+      if needs_revalidation || !@it2_profile.validator_verified?
         @it2_profile.enqueue_nhc_job(ip_changed)
-      else
-        validate_node(v, do_location: ip_changed)
+        redirect_to it2_path,
+                    notice: 'AIT2 node information updated, running node health checker' and return
       end
 
       if @it2_profile.validator_verified?
-        redirect_to it2_path, notice: 'AIT2 node verification completed successfully!' and return
+        redirect_to it2_path,
+                    notice: 'AIT2 node information updated, validator is verified' and return
       end
+
     end
     respond_with(@it2_profile, status: :unprocessable_entity)
   end
 
   private
-
-  # @param [NodeHelper::NodeVerifier] node_verifier
-  # @return [Array<VerifyResult>]
-  def validate_node(node_verifier, do_location: false)
-    results = node_verifier.verify
-
-    # Save without validation to avoid needless uniqueness checks
-    is_valid = results.map(&:valid).all?
-    @it2_profile.update_attribute(:validator_verified, is_valid)
-
-    LocationJob.perform_later({ it2_profile_id: @it2_profile.id }) if is_valid && do_location
-
-    results.each do |result|
-      @it2_profile.errors.add :base, result.message unless result.valid
-    end
-    results
-  end
-
-  def validate_node_nhc(node_verifier, do_location: false)
-    results = node_verifier.verify(ENV.fetch('NODE_CHECKER_BASELINE_CONFIG'))
-
-    unless results.ok
-      @it2_profile.update_attribute(:validator_verified, false)
-      @it2_profile.errors.add :base, results.message
-      return results
-    end
-
-    # Save without validation to avoid needless uniqueness checks
-    is_valid = results.evaluation_results.map { |r| r.score == 100 }.all?
-    @it2_profile.update_attribute(:validator_verified, is_valid)
-
-    LocationJob.perform_later({ it2_profile_id: @it2_profile.id }) if is_valid && do_location
-
-    results.evaluation_results.each do |result|
-      next unless result.score < 100
-
-      message = "#{result.category}: #{result.evaluator_name} - #{result.score}\n" \
-                "#{result.headline}:\n" \
-                "#{result.explanation}\n" \
-                "#{result.links}\n"
-      @it2_profile.errors.add :base, message
-    end
-    results
-  end
 
   def check_recaptcha
     recaptcha_v3_success = verify_recaptcha(action: 'it2/update', minimum_score: 0.5,
