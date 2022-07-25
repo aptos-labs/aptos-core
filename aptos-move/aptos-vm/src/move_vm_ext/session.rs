@@ -31,6 +31,8 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use super::NativeAggregatorContext;
+
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
     Txn {
@@ -104,6 +106,10 @@ where
         let table_change_set = table_context
             .into_change_set()
             .map_err(|e| e.finish(Location::Undefined))?;
+
+        // TODO: support this once delta ops land.
+        let aggregator_context: NativeAggregatorContext = extensions.remove();
+        let _aggregator_change_set = aggregator_context.into_change_set();
 
         Ok(SessionOutput {
             change_set,
