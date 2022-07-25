@@ -3,8 +3,10 @@
 
 mod accept_type;
 mod accounts;
+mod blocks;
 pub mod context;
 mod events;
+mod failpoint;
 mod health_check;
 mod index;
 pub mod log;
@@ -13,11 +15,9 @@ mod page;
 pub mod param;
 mod poem_backend;
 pub mod runtime;
+mod set_failpoints;
 mod state;
-mod transactions;
-pub(crate) mod version;
-
-mod blocks;
-mod failpoint;
 #[cfg(any(test))]
 pub(crate) mod tests;
+mod transactions;
+pub(crate) mod version;

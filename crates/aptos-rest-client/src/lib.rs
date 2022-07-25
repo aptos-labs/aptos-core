@@ -372,6 +372,26 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn set_failpoint(&self, name: String, actions: String) -> Result<String> {
+        let mut base = self.base_url.join("set_failpoint")?;
+        let url = base
+            .query_pairs_mut()
+            .append_pair("name", &name)
+            .append_pair("actions", &actions)
+            .finish();
+        let response = self.inner.get(url.clone()).send().await?;
+
+        if !response.status().is_success() {
+            let error_response = response.json::<RestError>().await?;
+            return Err(anyhow::anyhow!("Request failed: {:?}", error_response));
+        }
+
+        response
+            .text()
+            .await
+            .map_err(|e| anyhow::anyhow!("To text failed: {:?}", e))
+    }
+
     async fn check_response(
         &self,
         response: reqwest::Response,
