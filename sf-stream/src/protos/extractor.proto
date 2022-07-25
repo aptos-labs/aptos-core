@@ -126,31 +126,31 @@ message WriteSetChange {
 
 message DeleteModule {
   AccountAddress address = 1;
-  String state_key_hash = 2;
+  string state_key_hash = 2;
   MoveModuleId module = 3;
 }
 
 message DeleteResource {
   AccountAddress address = 1;
-  String state_key_hash = 2;
+  string state_key_hash = 2;
   MoveStructTag resource = 3;
 }
 
 message DeleteTableItem {
-  String state_key_hash = 1;
+  string state_key_hash = 1;
   string handle = 2;
   string key = 3;
 }
 
 message WriteModule {
   AccountAddress address = 1;
-  String state_key_hash = 2;
+  string state_key_hash = 2;
   string data = 3;
 }
 
 message WriteResource {
   AccountAddress address = 1;
-  String state_key_hash = 2;
+  string state_key_hash = 2;
   MoveResource data = 3;
 }
 
@@ -180,7 +180,7 @@ message TransactionPayload {
     ScriptPayload script_payload = 3;
     ModuleBundlePayload module_bundle_payload = 4;
     WriteSetPayload write_set_payload = 5;
-  },
+  }
 }
 
 message ScriptFunctionPayload {
@@ -210,7 +210,7 @@ message ScriptFunctionId {
 
 message MoveResource {
   MoveStructTag type = 1;
-  string data = 1;
+  string data = 2;
 }
 
 message MoveModuleId {
@@ -243,7 +243,7 @@ message Signature {
 
 message Ed25519Signature {
   string public_key = 1;
-  string signature = 1;
+  string signature = 2;
 }
 
 message MultiEd25519Signature {
@@ -262,8 +262,8 @@ message MultiAgentSignature {
 message AccountSignature {
 
   enum AccountSignatureType {
-    ED = 1;
-    MULTI_ED = 2;
+    ED = 0;
+    MULTI_ED = 1;
   }
 
   AccountSignatureType type = 1;
