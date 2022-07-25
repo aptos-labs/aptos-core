@@ -324,10 +324,11 @@ impl TransactionGenerator {
                         .unwrap()
                         .get_random()
                         .sign_with_transaction_builder(
-                            self.transaction_factory.create_and_fund_user_account(
-                                generator.generate().public_key(),
-                                init_account_balance,
-                            ),
+                            self.transaction_factory
+                                .implicitly_create_user_account_and_transfer(
+                                    generator.generate().public_key(),
+                                    init_account_balance,
+                                ),
                         )
                 })
                 .map(Transaction::UserTransaction)
