@@ -31,8 +31,6 @@ or
 
 :::note See [the source code for this tutorial](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/bcs_transaction.ts). Although Typescript is used in this tutorial, Aptos TS SDK also works in Javascript projects. :::
 
-
-
 ## Step 1: Create accounts
 
 Let’s assume user Alice wants to send 717 test coins to user Bob. We need to create two user accounts first.
@@ -53,7 +51,7 @@ const alice = new AptosAccount();
 await faucetClient.fundAccount(alice.address(), 5000);
 
 let resources = await client.getAccountResources(alice.address());
-let accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
+let accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
 console.log(`Alice coins: ${(accountResource?.data as any).coin.value}. Should be 5000!`);
 
 // Generates key pair for Bob
@@ -62,7 +60,7 @@ const bob = new AptosAccount();
 await faucetClient.fundAccount(bob.address(), 0);
 
 resources = await client.getAccountResources(bob.address());
-accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
+accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
 console.log(`Bob coins: ${(accountResource?.data as any).coin.value}. Should be 0!`);
 ```
 
@@ -88,7 +86,7 @@ To transfer coins from Alice’s account to Bob’s account, we need to prepare 
 
 ```ts
 // We need to pass a token type to the `transfer` function.
-const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::TestCoin::TestCoin"));
+const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
 const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
   TxnBuilderTypes.ScriptFunction.natural(
@@ -106,7 +104,7 @@ const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFuncti
 
 The Move function `transfer` requires a coin type as type argument. The function `transfer` is defined here [https://github.com/aptos-labs/aptos-core/blob/faf4f94260d4716c8a774b3c17f579d203cc4013/aptos-move/framework/aptos-framework/sources/Coin.move#L311](https://github.com/aptos-labs/aptos-core/blob/faf4f94260d4716c8a774b3c17f579d203cc4013/aptos-move/framework/aptos-framework/sources/Coin.move#L311).
 
-In above code snippet, we want to transfer the `TestCoin` that is defined under account `0x1` and module `TestCoin`. The fully qualified name for the `TestCoin` is therefore `0x1::TestCoin::TestCoin`.
+In above code snippet, we want to transfer the `AptosCoin` that is defined under account `0x1` and module `AptosCoin`. The fully qualified name for the `AptosCoin` is therefore `0x1::aptos_coin::AptosCoin`.
 
 :::note All arguments in `ScriptFunction` payload must be BCS serialized. In above code, we serialized Bob’s account address and the amount number to transfer. :::
 
@@ -149,7 +147,7 @@ const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
 await client.waitForTransaction(transactionRes.hash);
 
 resources = await client.getAccountResources(bob.address());
-accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
+accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
 console.log(`Bob coins: ${(accountResource?.data as any).coin.value}. Should be 717!`);
 ```
 
@@ -162,4 +160,3 @@ Alice coins: 5000. Should be 5000!
 Bob coins: 0. Should be 0!
 Bob coins: 717. Should be 717!
 ```
-
