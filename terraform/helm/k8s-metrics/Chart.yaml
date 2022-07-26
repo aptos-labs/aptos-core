@@ -6,3 +6,6 @@ dependencies:
   - name: metrics-server
     version: 3.8.2
     repository: "https://kubernetes-sigs.github.io/metrics-server/"
+  - name: cluster-autoscaler
+    version: 9.19.2
+    repository: "https://kubernetes.github.io/autoscaler"

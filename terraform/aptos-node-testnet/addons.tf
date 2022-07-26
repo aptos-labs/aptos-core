@@ -17,8 +17,10 @@ resource "helm_release" "metrics-server" {
         maxReplicas = var.num_validators
       }
       autoscaler = {
-        enabled     = true
-        clusterName = module.validator.aws_eks_cluster.name
+        awsRegion = var.region
+        autoDiscovery = {
+          clusterName = module.validator.aws_eks_cluster.name
+        }
         image = {
           # EKS does not report patch version
           tag = "v${module.validator.aws_eks_cluster.version}.0"

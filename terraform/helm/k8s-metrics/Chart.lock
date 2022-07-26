@@ -2,5 +2,8 @@ dependencies:
 - name: metrics-server
   repository: https://kubernetes-sigs.github.io/metrics-server/
   version: 3.8.2
-digest: sha256:fa1a19fa0f1ff4bae7f9e397277af3a832718ba50351e6ddf3b72a398d17fd0a
-generated: "2022-04-12T17:19:04.312907-07:00"
+- name: cluster-autoscaler
+  repository: https://kubernetes.github.io/autoscaler
+  version: 9.19.2
+digest: sha256:9568d6ae8c23c7ac783a7d199fd205409b904b5fcbff3c9e49d06b300542d985
+generated: "2022-07-25T17:02:04.348489-07:00"
