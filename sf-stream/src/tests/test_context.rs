@@ -1,22 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    context::Context,
-    index,
-    tests::{golden_output::GoldenOutputs, pretty},
-};
 use aptos_config::config::NodeConfig;
-use aptos_crypto::{hash::HashValue, SigningKey};
+use aptos_crypto::hash::HashValue;
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{
-        account_config::aptos_root_address, transaction::SignedTransaction, AccountKey,
-        LocalAccount,
-    },
+    types::{account_config::aptos_root_address, transaction::SignedTransaction, LocalAccount},
 };
-use aptos_sf_stream_types::{mime_types, HexEncodedBytes, TransactionOnChainData};
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::AccountAddress,
@@ -28,23 +19,21 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
-use bytes::Bytes;
 use executor::{block_executor::BlockExecutor, db_bootstrapper};
 use executor_types::BlockExecutorTrait;
-use hyper::Response;
 use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
 
 use aptos_api::context::Context;
-use aptos_api_types::{HexEncodedBytes, TransactionOnChainData};
+use aptos_api_types::TransactionOnChainData;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use rand::SeedableRng;
-use serde_json::{json, Value};
 use std::{boxed::Box, collections::BTreeMap, iter::once, sync::Arc};
 use storage_interface::state_view::DbStateView;
 use vm_validator::vm_validator::VMValidator;
 
+#[allow(dead_code)]
 pub fn new_test_context(test_name: &'static str) -> TestContext {
     let tmp_dir = TempPath::new();
     tmp_dir.create_as_dir().unwrap();
@@ -89,6 +78,7 @@ pub fn new_test_context(test_name: &'static str) -> TestContext {
     )
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct TestContext {
     pub context: Context,
@@ -100,10 +90,10 @@ pub struct TestContext {
     executor: Arc<dyn BlockExecutorTrait>,
     expect_status_code: u16,
     test_name: &'static str,
-    golden_output: Option<GoldenOutputs>,
     fake_time: u64,
 }
 
+#[allow(dead_code)]
 impl TestContext {
     pub fn new(
         context: Context,
@@ -125,23 +115,9 @@ impl TestContext {
             expect_status_code: 200,
             db,
             test_name,
-            golden_output: None,
             fake_time: 0,
         }
     }
-
-    pub fn check_golden_output(&mut self, msg: Value) {
-        if self.golden_output.is_none() {
-            self.golden_output = Some(GoldenOutputs::new(self.test_name.replace(':', "_")));
-        }
-
-        let msg = pretty(&msg);
-        let re = regex::Regex::new("hash\": \".*\"").unwrap();
-        let msg = re.replace_all(&msg, "hash\": \"\"");
-
-        self.golden_output.as_ref().unwrap().log(&msg);
-    }
-
     pub fn rng(&mut self) -> &mut rand::rngs::StdRng {
         &mut self.rng
     }
@@ -182,7 +158,7 @@ impl TestContext {
         )
     }
 
-    pub fn get_latest_ledger_info(&self) -> aptos_sf_stream_types::LedgerInfo {
+    pub fn get_latest_ledger_info(&self) -> aptos_api_types::LedgerInfo {
         self.context.get_latest_ledger_info().unwrap()
     }
 
