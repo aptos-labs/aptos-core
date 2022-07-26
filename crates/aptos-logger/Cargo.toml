@@ -33,5 +33,5 @@ tracing-subscriber = "0.3.11"
 pretty_assertions = "1.2.1"
 
 [features]
-default = []
+default = ["tokio-console"]
 tokio-console = []
