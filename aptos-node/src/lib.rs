@@ -353,10 +353,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
     )?;
 
     // Create the chunk executor
-    let chunk_executor = Arc::new(
-        ChunkExecutor::<AptosVM>::new(db_rw.clone())
-            .map_err(|err| anyhow!("Failed to create chunk executor {}", err))?,
-    );
+    let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
 
     // Create the state sync multiplexer
     let state_sync_multiplexer = StateSyncMultiplexer::new(
