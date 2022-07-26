@@ -729,7 +729,6 @@ proptest! {
         let second_block_txns = ((chunk_size + overlap_size + 1..=chunk_size + overlap_size + num_new_txns)
                              .map(|i| encode_mint_transaction(gen_address(i), 100))).collect::<Vec<_>>();
 
-        executor.finish().unwrap();
         executor.reset();
         let parent_block_id = executor.committed_block_id();
         let first_block_id = gen_block_id(1);

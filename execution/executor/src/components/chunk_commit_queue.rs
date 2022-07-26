@@ -16,11 +16,7 @@ pub struct ChunkCommitQueue {
 
 impl ChunkCommitQueue {
     pub fn new_from_db(db: &Arc<dyn DbReader>) -> Result<Self> {
-        let persisted_view = match db.get_startup_info()? {
-            Some(info) => info.into_latest_executed_trees(),
-            // This is a hack for backup-types tests.
-            None => db.get_latest_executed_trees()?,
-        };
+        let persisted_view = db.get_latest_executed_trees()?;
         Ok(Self::new(persisted_view))
     }
 
