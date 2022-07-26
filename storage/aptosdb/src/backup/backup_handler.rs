@@ -103,6 +103,8 @@ impl BackupHandler {
         &self,
         version: Version,
     ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync>> {
+        unimplemented!()
+        /*
         let iterator = self
             .state_store
             .get_state_key_and_value_iter(version, HashValue::zero())?
@@ -112,7 +114,7 @@ impl BackupHandler {
                 BACKUP_STATE_SNAPSHOT_LEAF_IDX.set(idx as i64);
                 res
             });
-        Ok(Box::new(iterator))
+        Ok(Box::new(iterator))*/
     }
 
     /// Gets the proof that proves a range of accounts.

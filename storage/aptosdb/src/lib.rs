@@ -63,7 +63,6 @@ use aptos_config::config::{
 use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::EventWithVersion,
@@ -80,6 +79,7 @@ use aptos_types::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
         state_value::{StateValue, StateValueChunkWithProof},
+        table::{TableHandle, TableInfo},
     },
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
@@ -93,8 +93,7 @@ use aptosdb_indexer::Indexer;
 use itertools::zip_eq;
 use move_deps::move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
-use schemadb::db_options::gen_rocksdb_options;
-use schemadb::DB;
+use schemadb::{db_options::gen_rocksdb_options, DB};
 use std::{
     collections::HashMap,
     iter::Iterator,
@@ -104,10 +103,9 @@ use std::{
     thread::JoinHandle,
     time::{Duration, Instant},
 };
-use storage_interface::state_view::DbStateView;
 use storage_interface::{
-    state_delta::StateDelta, DbReader, DbWriter, ExecutedTrees, Order, StartupInfo,
-    StateSnapshotReceiver,
+    state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
+    StartupInfo, StateSnapshotReceiver,
 };
 
 pub const LEDGER_DB_NAME: &str = "ledger_db";

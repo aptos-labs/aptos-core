@@ -25,6 +25,7 @@ serde = "1.0.137"
 thiserror = "1.0.31"
 
 accumulator = { path = "../accumulator" }
+aptos-bsmt = { path = "../bsmt" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
@@ -59,5 +60,6 @@ schemadb = { path = "../schemadb", features = ["fuzzing"] }
 scratchpad = { path = "../scratchpad", features = ["fuzzing"] }
 
 [features]
-default = []
+default = ["bsmt"]
+bsmt = ["scratchpad/bsmt"]
 fuzzing = ["proptest", "proptest-derive", "aptos-proptest-helpers", "aptos-temppath", "aptos-crypto/fuzzing", "aptos-jellyfish-merkle/fuzzing", "aptos-types/fuzzing", "executor-types/fuzzing", "schemadb/fuzzing", "scratchpad/fuzzing"]

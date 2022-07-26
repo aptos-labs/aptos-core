@@ -79,6 +79,11 @@ mod sparse_merkle_test;
 #[cfg(any(test, feature = "bench", feature = "fuzzing"))]
 pub mod test_utils;
 
+#[cfg(not(feature = "bsmt"))]
+type TreeNodePath = NibblePath;
+#[cfg(feature = "bsmt")]
+type TreeNodePath = NodePath;
+
 use crate::sparse_merkle::{
     metrics::{LATEST_GENERATION, OLDEST_GENERATION, TIMER},
     node::{NodeInner, SubTree},
@@ -89,7 +94,9 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_infallible::Mutex;
-use aptos_types::{nibble::nibble_path::NibblePath, proof::SparseMerkleProof};
+use aptos_types::{
+    nibble::nibble_path::NibblePath, proof::SparseMerkleProof, state_store::node_path::NodePath,
+};
 use std::{
     borrow::Borrow,
     collections::{BTreeMap, HashMap},
@@ -97,7 +104,7 @@ use std::{
 };
 use thiserror::Error;
 
-type NodePosition = bitvec::vec::BitVec<bitvec::order::Msb0, u8>;
+type NodePosition = bitvec::vec::BitVec<u8, bitvec::order::Msb0>;
 
 /// To help finding the oldest ancestor of any SMT, a branch tracker is created each time
 /// the chain of SMTs forked (two or more SMTs updating the same parent).
@@ -368,7 +375,7 @@ where
         &self,
         update_batch: Vec<Vec<(HashValue, &V)>>,
         proof_reader: &impl ProofRead,
-    ) -> Result<(Vec<(HashValue, HashMap<NibblePath, HashValue>)>, Self), UpdateError> {
+    ) -> Result<(Vec<(HashValue, HashMap<TreeNodePath, HashValue>)>, Self), UpdateError> {
         self.clone()
             .freeze()
             .serial_update(update_batch, proof_reader)
@@ -463,7 +470,7 @@ where
         &self,
         update_batch: Vec<Vec<(HashValue, &V)>>,
         proof_reader: &impl ProofRead,
-    ) -> Result<(Vec<(HashValue, HashMap<NibblePath, HashValue>)>, Self), UpdateError> {
+    ) -> Result<(Vec<(HashValue, HashMap<TreeNodePath, HashValue>)>, Self), UpdateError> {
         let mut cur = self.clone();
         let mut result = Vec::with_capacity(update_batch.len());
         for updates in update_batch {
@@ -475,7 +482,7 @@ where
     }
 
     /// Compares an old and a new SMTs and return the newly created node hashes in between.
-    pub fn new_node_hashes_since(&self, since_smt: &Self) -> HashMap<NibblePath, HashValue> {
+    pub fn new_node_hashes_since(&self, since_smt: &Self) -> HashMap<TreeNodePath, HashValue> {
         let _timer = TIMER
             .with_label_values(&["new_node_hashes_since"])
             .start_timer();
@@ -491,7 +498,45 @@ where
         node_hashes
     }
 
+    #[cfg(feature = "bsmt")]
+    fn new_node_hashes_since_impl(
+        subtree: SubTree<V>,
+        since_generation: u64,
+        pos: &mut NodePosition,
+        node_hashes: &mut HashMap<NodePath, HashValue>,
+    ) {
+        if let Some(node) = subtree.get_node_if_in_mem(since_generation) {
+            node_hashes.insert(NodePath::new(pos.clone()), subtree.hash());
+            match node.inner().borrow() {
+                NodeInner::Internal(internal_node) => {
+                    let depth = pos.len();
+                    pos.push(false);
+                    Self::new_node_hashes_since_impl(
+                        internal_node.left.weak(),
+                        since_generation,
+                        pos,
+                        node_hashes,
+                    );
+                    *pos.get_mut(depth).unwrap() = true;
+                    Self::new_node_hashes_since_impl(
+                        internal_node.right.weak(),
+                        since_generation,
+                        pos,
+                        node_hashes,
+                    );
+                    pos.pop();
+                }
+                NodeInner::Leaf(leaf_node) => {
+                    let key_vec = leaf_node.key.to_vec();
+                    let path = NodePath::new_from_vec(key_vec.len() * 8, key_vec);
+                    node_hashes.insert(path, subtree.hash());
+                }
+            }
+        }
+    }
+
     /// Recursively generate the partial node update batch of jellyfish merkle
+    #[cfg(not(feature = "bsmt"))]
     fn new_node_hashes_since_impl(
         subtree: SubTree<V>,
         since_generation: u64,
@@ -535,6 +580,7 @@ where
         }
     }
 
+    #[cfg(not(feature = "bsmt"))]
     fn maybe_to_nibble_path(pos: &NodePosition) -> Option<NibblePath> {
         assert!(pos.len() <= HashValue::LENGTH_IN_BITS);
 

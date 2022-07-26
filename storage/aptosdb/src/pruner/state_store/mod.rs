@@ -2,10 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    jellyfish_merkle_node::JellyfishMerkleNodeSchema, metrics::PRUNER_LEAST_READABLE_VERSION,
-    pruner::db_pruner::DBPruner, stale_node_index::StaleNodeIndexSchema, OTHER_TIMERS_SECONDS,
+    bsmt_node::BinarySparseMerkleNodeSchema, jellyfish_merkle_node::JellyfishMerkleNodeSchema,
+    metrics::PRUNER_LEAST_READABLE_VERSION, pruner::db_pruner::DBPruner,
+    stale_node_index::StaleNodeIndexSchema, OTHER_TIMERS_SECONDS,
 };
 use anyhow::Result;
+#[cfg(feature = "bsmt")]
+use aptos_bsmt::StaleNodeIndex;
+#[cfg(not(feature = "bsmt"))]
 use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_logger::error;
 use aptos_types::transaction::{AtomicVersion, Version};
@@ -14,6 +18,11 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+
+#[cfg(not(feature = "bsmt"))]
+type PersistentTreeNodeSchema = JellyfishMerkleNodeSchema;
+#[cfg(feature = "bsmt")]
+type PersistentTreeNodeSchema = BinarySparseMerkleNodeSchema;
 
 #[cfg(test)]
 mod test;
@@ -131,7 +140,7 @@ impl StateStorePruner {
             let batch = SchemaBatch::new();
             // Delete stale nodes.
             indices.into_iter().try_for_each(|index| {
-                batch.delete::<JellyfishMerkleNodeSchema>(&index.node_key)?;
+                batch.delete::<PersistentTreeNodeSchema>(&index.node_key)?;
                 batch.delete::<StaleNodeIndexSchema>(&index)
             })?;
             // Delete the stale node indices.

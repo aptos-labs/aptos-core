@@ -103,6 +103,7 @@ members = [
     "state-sync/storage-service/types",
     "storage/accumulator",
     "storage/aptosdb",
+    "storage/bsmt",
     "storage/backup/backup-cli",
     "storage/backup/backup-service",
     "storage/indexer",

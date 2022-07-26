@@ -19,7 +19,12 @@
 
 use crate::schema::{ensure_slice_len_eq, ensure_slice_len_gt, STALE_NODE_INDEX_CF_NAME};
 use anyhow::Result;
+
+#[cfg(feature = "bsmt")]
+use aptos_bsmt::{node_type::NodeKey, StaleNodeIndex};
+#[cfg(not(feature = "bsmt"))]
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
+
 use aptos_types::transaction::Version;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use schemadb::{

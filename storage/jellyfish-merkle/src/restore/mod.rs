@@ -730,6 +730,8 @@ impl<K: crate::Key + CryptoHash + Hash + Eq, V: crate::Value> StateSnapshotResto
         version: Version,
         expected_root_hash: HashValue,
     ) -> Result<Self> {
+        unimplemented!()
+        /*
         Ok(Self {
             tree_restore: JellyfishMerkleRestore::new_overwrite(
                 Arc::clone(tree_store),
@@ -737,7 +739,7 @@ impl<K: crate::Key + CryptoHash + Hash + Eq, V: crate::Value> StateSnapshotResto
                 expected_root_hash,
             )?,
             kv_restore: StateValueRestore::new(Arc::clone(value_store), version),
-        })
+        })*/
     }
 }
 

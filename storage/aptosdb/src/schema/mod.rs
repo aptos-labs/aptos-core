@@ -6,6 +6,7 @@
 //!
 //! All schemas are `pub(crate)` so not shown in rustdoc, refer to the source code to see details.
 
+pub(crate) mod bsmt_node;
 pub(crate) mod epoch_by_version;
 pub(crate) mod event;
 pub(crate) mod event_accumulator;
@@ -26,6 +27,7 @@ pub(crate) mod write_set;
 use anyhow::{ensure, Result};
 use schemadb::ColumnFamilyName;
 
+pub const BINARY_SPARSE_MERKLE_NODE_CF_NAME: ColumnFamilyName = "binary_sparse_merkle_node";
 pub const EPOCH_BY_VERSION_CF_NAME: ColumnFamilyName = "epoch_by_version";
 pub const EVENT_ACCUMULATOR_CF_NAME: ColumnFamilyName = "event_accumulator";
 pub const EVENT_BY_KEY_CF_NAME: ColumnFamilyName = "event_by_key";
@@ -72,6 +74,7 @@ pub mod fuzzing {
     pub fn fuzz_decode(data: &[u8]) {
         #[allow(unused_must_use)]
         {
+            assert_no_panic_decoding::<super::bsmt_node::BinarySparseMerkleNodeSchema>(data);
             assert_no_panic_decoding::<super::epoch_by_version::EpochByVersionSchema>(data);
             assert_no_panic_decoding::<super::event::EventSchema>(data);
             assert_no_panic_decoding::<super::event_accumulator::EventAccumulatorSchema>(data);

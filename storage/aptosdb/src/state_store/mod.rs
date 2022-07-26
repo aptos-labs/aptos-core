@@ -14,11 +14,12 @@ use aptos_jellyfish_merkle::{
 };
 use aptos_logger::{debug, info};
 use aptos_state_view::StateViewId;
-#[cfg(test)]
-use aptos_types::nibble::nibble_path::NibblePath;
+//#[cfg(test)]
 use aptos_types::{
+    nibble::nibble_path::NibblePath,
     proof::{definition::LeafCount, SparseMerkleProof, SparseMerkleRangeProof},
     state_store::{
+        node_path::NodePath,
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
         state_value::{StateValue, StateValueChunkWithProof},
@@ -27,17 +28,15 @@ use aptos_types::{
 };
 use executor_types::in_memory_state_calculator::InMemoryStateCalculator;
 use schemadb::{ReadOptions, SchemaBatch, DB};
-use std::ops::Deref;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, ops::Deref, sync::Arc};
 use storage_interface::{
     cached_state_view::CachedStateView, state_delta::StateDelta,
     sync_proof_fetcher::SyncProofFetcher, DbReader, StateSnapshotReceiver,
 };
 
-use crate::state_store::buffered_state::BufferedState;
 use crate::{
     change_set::ChangeSet, schema::state_value::StateValueSchema, state_merkle_db::StateMerkleDb,
-    AptosDbError, LedgerStore, TransactionStore,
+    state_store::buffered_state::BufferedState, AptosDbError, LedgerStore, TransactionStore,
 };
 
 pub(crate) mod buffered_state;
@@ -46,6 +45,11 @@ mod state_snapshot_committer;
 mod state_store_test;
 
 type StateValueBatch = aptos_jellyfish_merkle::StateValueBatch<StateKey, StateValue>;
+
+#[cfg(not(feature = "bsmt"))]
+type TreeNodePath = NibblePath;
+#[cfg(feature = "bsmt")]
+type TreeNodePath = NodePath;
 
 pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 // We assume TARGET_SNAPSHOT_INTERVAL_IN_VERSION > block size.
@@ -424,7 +428,7 @@ impl StateStore {
     pub fn merklize_value_set(
         &self,
         value_set: Vec<(HashValue, &(HashValue, StateKey))>,
-        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
+        node_hashes: Option<&HashMap<TreeNodePath, HashValue>>,
         version: Version,
         base_version: Option<Version>,
     ) -> Result<HashValue> {
@@ -440,11 +444,14 @@ impl StateStore {
         self.state_merkle_db.get_leaf_count(version)
     }
 
+    /*
     pub fn get_state_key_and_value_iter(
         self: &Arc<Self>,
         version: Version,
         start_hashed_key: HashValue,
     ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync> {
+        unimplemented!()
+        /*
         let store = Arc::clone(self);
         Ok(JellyfishMerkleIterator::new(
             Arc::clone(&self.state_merkle_db),
@@ -456,8 +463,8 @@ impl StateStore {
                 Ok((key.clone(), store.expect_value_by_version(&key, version)?))
             }
             Err(err) => Err(err),
-        }))
-    }
+        }))*/
+    }*/
 
     pub fn get_value_chunk_with_proof(
         self: &Arc<Self>,
@@ -465,6 +472,8 @@ impl StateStore {
         first_index: usize,
         chunk_size: usize,
     ) -> Result<StateValueChunkWithProof> {
+        unimplemented!()
+        /*
         let result_iter = JellyfishMerkleIterator::new_by_index(
             Arc::clone(&self.state_merkle_db),
             version,
@@ -497,7 +506,7 @@ impl StateStore {
             raw_values: state_key_values,
             proof,
             root_hash,
-        })
+        })*/
     }
 
     pub fn get_snapshot_receiver(
@@ -505,12 +514,14 @@ impl StateStore {
         version: Version,
         expected_root_hash: HashValue,
     ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
+        unimplemented!()
+        /*
         Ok(Box::new(StateSnapshotRestore::new_overwrite(
             &self.state_merkle_db,
             self,
             version,
             expected_root_hash,
-        )?))
+        )?))*/
     }
 }
 

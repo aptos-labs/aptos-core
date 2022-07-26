@@ -35,6 +35,7 @@ pub(super) fn state_merkle_db_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
         JELLYFISH_MERKLE_NODE_CF_NAME,
+        BINARY_SPARSE_MERKLE_NODE_CF_NAME,
         STALE_NODE_INDEX_CF_NAME,
     ]
 }

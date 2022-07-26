@@ -1,27 +1,24 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema;
-use crate::stale_node_index::StaleNodeIndexSchema;
-use crate::OTHER_TIMERS_SECONDS;
+use crate::{
+    schema::{
+        bsmt_node::BinarySparseMerkleNodeSchema, jellyfish_merkle_node::JellyfishMerkleNodeSchema,
+    },
+    stale_node_index::StaleNodeIndexSchema,
+    OTHER_TIMERS_SECONDS,
+};
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_jellyfish_merkle::{
-    node_type::NodeKey, JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
-};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleRangeProof},
-    state_store::state_key::StateKey,
+    state_store::{node_path::NodePath, state_key::StateKey},
     transaction::Version,
 };
 use rayon::prelude::*;
 use schemadb::{SchemaBatch, DB};
 use std::{collections::HashMap, ops::Deref, sync::Arc};
-
-pub(crate) type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
-pub(crate) type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
-type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKey>;
 
 #[derive(Debug)]
 pub struct StateMerkleDb(Arc<DB>);
@@ -33,6 +30,40 @@ impl Deref for StateMerkleDb {
     }
 }
 
+#[cfg(not(feature = "bsmt"))]
+type TreeNodePath = NibblePath;
+#[cfg(not(feature = "bsmt"))]
+type PersistentTree<'a, R, K> = aptos_jellyfish_merkle::JellyfishMerkleTree<'a, R, K>;
+#[cfg(not(feature = "bsmt"))]
+type PersistentTreeNodeSchema = JellyfishMerkleNodeSchema;
+#[cfg(not(feature = "bsmt"))]
+type NodeKey = aptos_jellyfish_merkle::node_type::NodeKey;
+#[cfg(not(feature = "bsmt"))]
+use aptos_jellyfish_merkle::{TreeReader, TreeUpdateBatch, TreeWriter};
+#[cfg(not(feature = "bsmt"))]
+pub(crate) type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
+#[cfg(not(feature = "bsmt"))]
+pub(crate) type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
+#[cfg(not(feature = "bsmt"))]
+type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKey>;
+
+#[cfg(feature = "bsmt")]
+type TreeNodePath = NodePath;
+#[cfg(feature = "bsmt")]
+type PersistentTree<'a, R, K> = aptos_bsmt::BinarySparseMerkleTree<'a, R, K>;
+#[cfg(feature = "bsmt")]
+type PersistentTreeNodeSchema = BinarySparseMerkleNodeSchema;
+#[cfg(feature = "bsmt")]
+type NodeKey = aptos_bsmt::node_type::NodeKey;
+#[cfg(feature = "bsmt")]
+use aptos_bsmt::{TreeReader, TreeUpdateBatch, TreeWriter};
+#[cfg(feature = "bsmt")]
+pub(crate) type LeafNode = aptos_bsmt::node_type::LeafNode<StateKey>;
+#[cfg(feature = "bsmt")]
+pub(crate) type Node = aptos_bsmt::node_type::Node<StateKey>;
+#[cfg(feature = "bsmt")]
+type NodeBatch = aptos_bsmt::NodeBatch<StateKey>;
+
 impl StateMerkleDb {
     pub fn new(state_merkle_rocksdb: Arc<DB>) -> Self {
         Self(state_merkle_rocksdb)
@@ -43,7 +74,7 @@ impl StateMerkleDb {
         state_key: &StateKey,
         version: Version,
     ) -> Result<(Option<(HashValue, (StateKey, Version))>, SparseMerkleProof)> {
-        JellyfishMerkleTree::new(self).get_with_proof(state_key.hash(), version)
+        PersistentTree::new(self).get_with_proof(state_key.hash(), version)
     }
 
     pub fn get_range_proof(
@@ -51,25 +82,25 @@ impl StateMerkleDb {
         rightmost_key: HashValue,
         version: Version,
     ) -> Result<SparseMerkleRangeProof> {
-        JellyfishMerkleTree::new(self).get_range_proof(rightmost_key, version)
+        PersistentTree::new(self).get_range_proof(rightmost_key, version)
     }
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
-        JellyfishMerkleTree::new(self).get_root_hash(version)
+        PersistentTree::new(self).get_root_hash(version)
     }
 
     pub fn get_leaf_count(&self, version: Version) -> Result<usize> {
-        JellyfishMerkleTree::new(self).get_leaf_count(version)
+        PersistentTree::new(self).get_leaf_count(version)
     }
 
     pub fn batch_put_value_set(
         &self,
         value_set: Vec<(HashValue, &(HashValue, StateKey))>,
-        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
+        node_hashes: Option<&HashMap<TreeNodePath, HashValue>>,
         persisted_version: Option<Version>,
         version: Version,
     ) -> Result<(HashValue, TreeUpdateBatch<StateKey>)> {
-        JellyfishMerkleTree::new(self).batch_put_value_set(
+        PersistentTree::new(self).batch_put_value_set(
             value_set,
             node_hashes,
             persisted_version,
@@ -83,7 +114,7 @@ impl StateMerkleDb {
     ) -> Result<Option<Version>> {
         if next_version > 0 {
             let max_possible_version = next_version - 1;
-            let mut iter = self.rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+            let mut iter = self.rev_iter::<PersistentTreeNodeSchema>(Default::default())?;
             iter.seek_for_prev(&NodeKey::new_empty_path(max_possible_version))?;
             if let Some((key, _node)) = iter.next().transpose()? {
                 // TODO: If we break up a single update batch to multiple commits, we would need to
@@ -100,7 +131,7 @@ impl StateMerkleDb {
     pub fn merklize_value_set(
         &self,
         value_set: Vec<(HashValue, &(HashValue, StateKey))>,
-        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
+        node_hashes: Option<&HashMap<TreeNodePath, HashValue>>,
         version: Version,
         base_version: Option<Version>,
     ) -> Result<HashValue> {
@@ -125,7 +156,7 @@ impl StateMerkleDb {
                 .collect::<Vec<_>>()
                 .par_iter()
                 .with_min_len(128)
-                .map(|(node_key, node)| batch.put::<JellyfishMerkleNodeSchema>(node_key, node))
+                .map(|(node_key, node)| batch.put::<PersistentTreeNodeSchema>(node_key, node))
                 .collect::<Result<Vec<_>>>()?;
 
             tree_update_batch
@@ -152,7 +183,7 @@ impl StateMerkleDb {
     pub fn get_rightmost_leaf_naive(&self) -> Result<Option<(NodeKey, LeafNode)>> {
         let mut ret = None;
 
-        let mut iter = self.iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+        let mut iter = self.iter::<PersistentTreeNodeSchema>(Default::default())?;
         iter.seek_to_first();
 
         while let Some((node_key, node)) = iter.next().transpose()? {
@@ -174,13 +205,15 @@ impl StateMerkleDb {
 
 impl TreeReader<StateKey> for StateMerkleDb {
     fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node>> {
-        self.get::<JellyfishMerkleNodeSchema>(node_key)
+        self.get::<PersistentTreeNodeSchema>(node_key)
     }
 
     fn get_rightmost_leaf(&self) -> Result<Option<(NodeKey, LeafNode)>> {
+        unimplemented!()
+        /*
         // Since everything has the same version during restore, we seek to the first node and get
         // its version.
-        let mut iter = self.iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+        let mut iter = self.iter::<PersistentTreeNodeSchema>(Default::default())?;
         iter.seek_to_first();
         let version = match iter.next().transpose()? {
             Some((node_key, _node)) => node_key.version(),
@@ -207,7 +240,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
         let mut ret = None;
 
         for num_nibbles in 1..=ROOT_NIBBLE_HEIGHT + 1 {
-            let mut iter = self.iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+            let mut iter = self.iter::<PersistentTreeNodeSchema>(Default::default())?;
             // nibble_path is always non-empty except for the root, so if we use an empty nibble
             // path as the seek key, the iterator will end up pointing to the end of the previous
             // range.
@@ -232,6 +265,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
         }
 
         Ok(ret)
+        */
     }
 }
 
@@ -239,7 +273,7 @@ impl TreeWriter<StateKey> for StateMerkleDb {
     fn write_node_batch(&self, node_batch: &NodeBatch) -> Result<()> {
         let batch = SchemaBatch::new();
         node_batch.iter().try_for_each(|(node_key, node)| {
-            batch.put::<JellyfishMerkleNodeSchema>(node_key, node)
+            batch.put::<PersistentTreeNodeSchema>(node_key, node)
         })?;
         self.write_schemas(batch)
     }
