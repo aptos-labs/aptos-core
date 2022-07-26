@@ -1,13 +1,29 @@
 <%= content_tag :header, **@rest do %>
 
-  <a class="flex flex-nowrap items-center gap-2 md:gap-4 h-16 mr-auto" href="/" title="Aptos - Building the safest and most scalable Layer 1 blockchain">
+  <a class="flex flex-nowrap gap-2 md:gap-4 h-16 mr-auto" href="/" title="Aptos - Building the safest and most scalable Layer 1 blockchain">
     <%= render IconComponent.new(:aptos, class: 'w-8') %>
   </a>
 
-  <nav class="hidden md:flex text-base flex-row flex-wrap md:gap-8 flex justify-end mr-12 font-mono uppercase lg:text-base text-sm open:text-lg open:flex open:fixed open:m-0 open:gap-2 open:p-10 open:top-16 open:right-0 open:bg-black/95 open:text-lg open:shadow-2xl open:min-w-fit open:md:max-w-lg open:rounded-b-lg open:border-neutral-800 open:border-t open:flex-col" data-header-target="nav">
-    <% nav_items.each do |item| %>
-      <%= content_tag :a, item.name, href: item.url, title: item.title, class: 'py-2 text-neutral-200 hover:text-white', target: item.url.starts_with?('http') ? '_blank' : '' %>
+  <nav class="hidden md:flex md:h-full items-center text-base flex-row flex-wrap md:justify-end mr-32 font-mono text-sm open:flex open:fixed open:top-16 open:left-0 open:right-0 open:gap-2 open:p-10 open:bg-black/95 open:m-0" data-header-target="nav">
+    <ul class="flex flex-col md:flex-row gap-8 w-full md:h-full">
+    <% nav_groups.each do |group| %>
+      <li class="group relative md:flex items-center">
+        <%= content_tag :a, group.item.name, href: group.item.url, title: group.item.title, class: 'py-2 text-lg md:text-base text-neutral-100 hover:text-teal-400 md:hover:text-white', target: group.item.url.starts_with?('http') ? '_blank' : '' %>
+        <% if group.children.length > 0 %>
+        <div class="absolute hidden md:group-focus-within:flex md:group-hover:flex h-[3px] bottom-0 left-0 right-0 rounded bg-teal-400"></div>
+        <div class="md:hidden md:group-focus-within:flex md:group-hover:flex md:absolute md:top-full md:-ml-8">
+          <ul class="flex-1 md:mt-[1px] md:bg-neutral-800 md:rounded md:p-8 md:min-w-[270px] md:shadow">
+            <% group.children.each do |item| %>
+              <li class="text-sm py-2 md:text-base md:py-4 border-b border-neutral-700 last:border-none">
+                <%= content_tag :a, item.name, href: item.url, title: item.title, class: 'py-2 text-neutral-100 hover:text-teal-400', target: item.url.starts_with?('http') ? '_blank' : '' %>
+              </li>
+            <% end %>
+          </ul>
+        </div>
+        <% end %>
+      </li>
     <% end %>
+    </ul>
   </nav>
 
   <% if @user %>
@@ -22,7 +38,7 @@
         </span>
       </button>
       <div data-header-target="user" class="hidden open:flex absolute top-full right-0 mt-4 z-10 origin-top-right transition-opacity duration-150 cursor-default">
-        <div class="text-gray-700 p-2 bg-black/95 border-neutral-800 border-t rounded-b-lg min-w-fit shadow-xl whitespace-nowrap w-48 flex flex-col gap-2">
+        <div class="text-gray-700 p-2 bg-black/95 border-neutral-800 rounded-b-lg min-w-fit shadow whitespace-nowrap w-48 flex flex-col gap-2">
         <% if @user&.username? %>
           <div class="text-teal-400 px-3 py-2 font-mono"><%= @user.username %></div>
           <div class="block h-px bg-neutral-500"></div>
@@ -36,8 +52,7 @@
       </div>
     </div>
   <% else %>
-    <a title="Log in" href="<%= new_user_session_path %>" class="font-mono text-sm uppercase text-neutral-200 hover:text-white">Log in</a>
-    <a title="Sign up" href="<%= new_user_session_path %>" class="h-8 font-mono font-bold text-sm flex items-center justify-center leading-none py-1 px-8 rounded-lg uppercase bg-teal-400 hover:brightness-105 text-neutral-800 z-20">Sign up</a>
+    <a title="Sign in" href="<%= new_user_session_path %>" class="h-8 font-mono font-bold text-sm flex items-center justify-center leading-none py-1 px-8 rounded-lg bg-teal-400 hover:brightness-105 text-neutral-800 z-20">Sign in</a>
   <% end %>
 
   <button class="md:hidden flex-nowrap hover:text-teal-400" aria-label="Toggle navigation" data-action="click->header#toggleNav">

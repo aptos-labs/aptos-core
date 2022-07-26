@@ -20,9 +20,9 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use storage_service_types::{
-    Result, StorageServiceMessage, StorageServiceRequest, StorageServiceResponse,
-};
+use storage_service_types::requests::StorageServiceRequest;
+use storage_service_types::responses::StorageServiceResponse;
+use storage_service_types::{Result, StorageServiceMessage};
 
 pub fn network_endpoint_config(storage_config: StorageServiceConfig) -> AppConfig {
     let max_network_channel_size = storage_config.max_network_channel_size as usize;

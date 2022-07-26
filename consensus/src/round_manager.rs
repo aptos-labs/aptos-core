@@ -227,6 +227,7 @@ impl RoundManager {
             .proposer_election
             .is_valid_proposer(self.proposal_generator.author(), new_round_event.round)
         {
+            self.round_state.setup_leader_timeout();
             let proposal_msg = self.generate_proposal(new_round_event).await?;
             let mut network = self.network.clone();
             #[cfg(feature = "failpoints")]
@@ -673,7 +674,9 @@ impl RoundManager {
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
                 self.new_2chain_tc_aggregated(tc).await
             }
-            VoteReceptionResult::EchoTimeout(_) => self.process_local_timeout(round).await,
+            VoteReceptionResult::EchoTimeout(_) if !self.round_state.is_vote_timeout() => {
+                self.process_local_timeout(round).await
+            }
             _ => Ok(()),
         }
     }

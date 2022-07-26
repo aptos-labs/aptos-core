@@ -4,11 +4,11 @@
 // modified from https://rust-unofficial.github.io/too-many-lists/fourth-final.html (MIT License)
 
 // maybe later we can move this to /common
+use aptos_infallible::{Mutex, MutexGuard};
 use std::{
     cell::{Ref, RefCell, RefMut},
     rc::Rc,
 };
-use aptos_infallible::{Mutex, MutexGuard};
 
 pub struct List<T> {
     pub head: Link<T>,

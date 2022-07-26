@@ -33,12 +33,14 @@ use std::{
 };
 use storage_service_client::{StorageServiceClient, StorageServiceNetworkSender};
 use storage_service_server::network::{NetworkRequest, ResponseSender};
-use storage_service_types::{
-    CompleteDataRange, DataSummary, NewTransactionOutputsWithProofRequest,
-    NewTransactionsWithProofRequest, ProtocolMetadata, StorageServerSummary, StorageServiceError,
-    StorageServiceMessage, StorageServiceRequest, StorageServiceResponse,
+use storage_service_types::requests::{
+    NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest, StorageServiceRequest,
     TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
+use storage_service_types::responses::{
+    CompleteDataRange, DataSummary, ProtocolMetadata, StorageServerSummary, StorageServiceResponse,
+};
+use storage_service_types::{StorageServiceError, StorageServiceMessage};
 
 fn mock_ledger_info(version: Version) -> LedgerInfoWithSignatures {
     LedgerInfoWithSignatures::new(

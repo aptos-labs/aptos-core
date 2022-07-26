@@ -1,14 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::counters;
 use aptos_logger::prelude::*;
+use async_trait::async_trait;
 use futures::{
     future::{AbortHandle, Abortable},
     Future, FutureExt, SinkExt,
 };
-use std::{pin::Pin, thread, time::Duration};
-
-use crate::counters;
+use std::{pin::Pin, time::Duration};
 use tokio::{runtime::Handle, time::sleep};
 
 /// Time service is an abstraction for operations that depend on time
@@ -18,6 +18,7 @@ use tokio::{runtime::Handle, time::sleep};
 /// Time service also supports opportunities for future optimizations
 /// For example instead of scheduling O(N) tasks in TaskExecutor we could have more optimal code
 /// that only keeps single task in TaskExecutor
+#[async_trait]
 pub trait TimeService: Send + Sync {
     /// Sends message to given sender after timeout, returns a handle that could use to cancel the task.
     fn run_after(&self, timeout: Duration, task: Box<dyn ScheduledTask>) -> AbortHandle;
@@ -32,14 +33,14 @@ pub trait TimeService: Send + Sync {
     /// time_service::sleep(Y).await;
     /// Z = time_service::get_current_timestamp();
     /// assert(Z >= X + Y)
-    fn sleep(&self, t: Duration);
+    async fn sleep(&self, t: Duration);
 
     /// Wait until the Duration t since UNIX_EPOCH pass at least 1ms.
-    fn wait_until(&self, t: Duration) {
+    async fn wait_until(&self, t: Duration) {
         while let Some(mut wait_duration) = t.checked_sub(self.get_current_timestamp()) {
             wait_duration += Duration::from_millis(1);
             counters::WAIT_DURATION_S.observe_duration(wait_duration);
-            self.sleep(wait_duration);
+            self.sleep(wait_duration).await;
         }
     }
 }
@@ -102,6 +103,7 @@ impl ClockTimeService {
     }
 }
 
+#[async_trait]
 impl TimeService for ClockTimeService {
     fn run_after(&self, timeout: Duration, mut t: Box<dyn ScheduledTask>) -> AbortHandle {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
@@ -120,8 +122,8 @@ impl TimeService for ClockTimeService {
         aptos_infallible::duration_since_epoch()
     }
 
-    fn sleep(&self, t: Duration) {
-        thread::sleep(t)
+    async fn sleep(&self, t: Duration) {
+        sleep(t).await
     }
 }
 

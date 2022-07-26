@@ -12,6 +12,8 @@
 set -ex
 
 export GIT_SHA=$(git rev-parse HEAD)
+export GIT_BRANCH=$(git symbolic-ref --short HEAD)
+export GIT_TAG=$(git tag -l --contains HEAD)
 export BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 
 if [ "$CI" == "true" ]; then

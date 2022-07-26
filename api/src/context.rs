@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, ensure, format_err, Result};
+use anyhow::{anyhow, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{AsConverter, BlockInfo, Error, LedgerInfo, TransactionOnChainData, U64};
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
@@ -23,7 +23,6 @@ use aptos_types::{
 use aptos_vm::data_cache::{IntoMoveResolver, RemoteStorageOwned};
 use futures::{channel::oneshot, SinkExt};
 use move_deps::move_core_types::ident_str;
-use poem_openapi::payload::Json;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use storage_interface::{
@@ -32,7 +31,7 @@ use storage_interface::{
 };
 use warp::{filters::BoxedFilter, Filter, Reply};
 
-use crate::poem_backend::{AptosError, AptosErrorCode, AptosErrorResponse, AptosInternalResult};
+use crate::poem_backend::{AptosErrorCode, InternalError};
 
 // Context holds application scope context
 #[derive(Clone)]
@@ -64,16 +63,12 @@ impl Context {
             .map(|state_view| state_view.into_move_resolver())
     }
 
-    pub fn move_resolver_poem(&self) -> AptosInternalResult<RemoteStorageOwned<DbStateView>> {
-        self.move_resolver().map_err(|e| {
-            AptosErrorResponse::InternalServerError(Json(
-                AptosError::new(
-                    format_err!("Failed to read latest state checkpoint from DB: {}", e)
-                        .to_string(),
-                )
-                .error_code(AptosErrorCode::ReadFromStorageError),
-            ))
-        })
+    pub fn move_resolver_poem<E: InternalError>(
+        &self,
+    ) -> Result<RemoteStorageOwned<DbStateView>, E> {
+        self.move_resolver()
+            .context("Failed to read latest state checkpoint from DB")
+            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))
     }
 
     pub fn state_view_at_version(&self, version: Version) -> Result<DbStateView> {
@@ -118,13 +113,25 @@ impl Context {
         }
     }
 
-    pub fn get_latest_ledger_info_poem(&self) -> AptosInternalResult<LedgerInfo> {
-        self.get_latest_ledger_info().map_err(|e| {
-            AptosErrorResponse::InternalServerError(Json(
-                AptosError::new(format_err!("Failed to retrieve ledger info: {}", e).to_string())
-                    .error_code(AptosErrorCode::ReadFromStorageError),
+    // TODO: Add error codes to these errors.
+    pub fn get_latest_ledger_info_poem<E: InternalError>(&self) -> Result<LedgerInfo, E> {
+        if let Some(oldest_version) = self
+            .db
+            .get_first_txn_version()
+            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?
+        {
+            Ok(LedgerInfo::new(
+                &self.chain_id(),
+                &self
+                    .get_latest_ledger_info_with_signatures()
+                    .map_err(E::internal)?,
+                oldest_version,
             ))
-        })
+        } else {
+            Err(E::internal(anyhow!(
+                "Failed to retrieve latest ledger info"
+            )))
+        }
     }
 
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {
@@ -137,17 +144,14 @@ impl Context {
             .get_state_value(state_key)
     }
 
-    pub fn get_state_value_poem(
+    pub fn get_state_value_poem<E: InternalError>(
         &self,
         state_key: &StateKey,
         version: u64,
-    ) -> Result<Option<Vec<u8>>, AptosErrorResponse> {
-        self.get_state_value(state_key, version).map_err(|e| {
-            AptosErrorResponse::InternalServerError(Json(
-                AptosError::new(format_err!("Failed to retrieve state value: {}", e).to_string())
-                    .error_code(AptosErrorCode::ReadFromStorageError),
-            ))
-        })
+    ) -> Result<Option<Vec<u8>>, E> {
+        self.get_state_value(state_key, version)
+            .context("Failed to retrieve state value")
+            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))
     }
 
     pub fn get_state_values(

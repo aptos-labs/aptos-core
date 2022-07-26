@@ -4,6 +4,7 @@
 pub mod compatibility_test;
 pub mod fixed_tps_test;
 pub mod gas_price_test;
+pub mod network_chaos_test;
 pub mod partial_nodes_down_test;
 pub mod performance_test;
 pub mod reconfiguration_test;

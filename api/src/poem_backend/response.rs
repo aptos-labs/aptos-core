@@ -1,26 +1,42 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+//! The Aptos API response / error handling philosophy.
+//!
+//! The return type for every endpoint should be a
+//! poem::Result<MyResponse<T>, MyError> where MyResponse is an instance of
+//! ApiResponse that contains only the status codes that it can actually
+//! return. This will manifest in the OpenAPI spec, making it clear to users
+//! what the API can actually return. The error should operate the same way,
+//! where it only describes error codes that it can actually return.
+//!
+//! Every endpoint should be able to return data as JSON or BCS, depending on
+//! the Accept header given by the client. If none is given, default to JSON.
+//!
+//! The client should be able to provide data to POST endpoints as either JSON
+//! or BCS, given they provide the appropriate Content-Type header.
+//!
+//! Where possible, if the API is returning data as BCS, it should pull the
+//! bytes directly from the DB where possible without further processing.
+//!
+//! Internally, there are many functions that can return errors. The context
+//! for what type of error those functions return is lost if we return an
+//! opaque error type like anyhow::Error. As such, it is important that each
+//! function return error types that capture the intended status code. This
+//! module defines traits to help with this, ensuring that the error types
+//! returned by each function and its callers is enforced at compile time.
+//! See generate_error_traits and its invocations for more on this topic.
+
+// TODO: Pending further discussion with the team, migrate back to U64 over u64.
+
 use std::fmt::Display;
 
 use super::accept_type::AcceptType;
-use anyhow::format_err;
-use aptos_api_types::{LedgerInfo, U64};
-use poem::Result as PoemResult;
-use poem_openapi::{payload::Json, types::ToJSON, ApiResponse, Enum, Object, ResponseContent};
-use serde::{Deserialize, Serialize};
+use aptos_api_types::U64;
+use poem_openapi::{payload::Json, types::ToJSON, Enum, Object, ResponseContent};
 
 use super::bcs_payload::Bcs;
 
-// This should be used for endpoints, signalling that they return either a
-// response capturing success or failure.
-pub type AptosResponseResult<T> = PoemResult<AptosResponse<T>, AptosErrorResponse>;
-
-// This should be used for internal functions that need to return just a T
-// but could fail, in which case we bubble an error response up to the client.
-pub type AptosInternalResult<T> = anyhow::Result<T, AptosErrorResponse>;
-
-// TODO: Consdider having more specific error structs for different endpoints.
 /// This is the generic struct we use for all API errors, it contains a string
 /// message and an Aptos API specific error code.
 #[derive(Debug, Object)]
@@ -49,6 +65,12 @@ impl AptosError {
     }
 }
 
+impl From<anyhow::Error> for AptosError {
+    fn from(error: anyhow::Error) -> Self {
+        AptosError::new(format!("{:#}", error))
+    }
+}
+
 /// These codes provide more granular error information beyond just the HTTP
 /// status code of the response.
 // Make sure the integer codes increment one by one.
@@ -66,19 +88,12 @@ pub enum AptosErrorCode {
 
     /// We were unexpectedly unable to convert a Rust type to BCS.
     BcsSerializationError = 3,
-}
 
-// TODO: Find a less repetitive way to do this.
-#[derive(ApiResponse)]
-pub enum AptosErrorResponse {
-    #[oai(status = 400)]
-    BadRequest(Json<AptosError>),
+    /// The start param given for paging is invalid.
+    InvalidStartParam = 4,
 
-    #[oai(status = 404)]
-    NotFound(Json<AptosError>),
-
-    #[oai(status = 500)]
-    InternalServerError(Json<AptosError>),
+    /// The limit param given for paging is invalid.
+    InvalidLimitParam = 5,
 }
 
 #[derive(ResponseContent)]
@@ -95,105 +110,303 @@ pub enum AptosResponseContent<T: ToJSON + Send + Sync> {
     Bcs(Bcs<Vec<u8>>),
 }
 
-#[derive(ApiResponse)]
-pub enum AptosResponse<T: ToJSON + Send + Sync> {
-    #[oai(status = 200)]
-    Ok(
-        AptosResponseContent<T>,
-        #[oai(header = "X-Aptos-Chain-Id")] u16,
-        #[oai(header = "X-Aptos-Ledger-Version")] u64,
-        #[oai(header = "X-Aptos-Ledger-Oldest-Version")] u64,
-        #[oai(header = "X-Aptos-Ledger-TimestampUsec")] u64,
-        #[oai(header = "X-Aptos-Epoch")] u64,
-    ),
-}
+/// This trait defines common functions that all error responses should impl.
+/// As a user you shouldn't worry about this, the generate_error_response macro
+/// takes care of it for you. Mostly these are helpers to allow callers holding
+/// an error response to manipulate the AptosError inside it.
+pub trait AptosErrorResponse {
+    fn inner_mut(&mut self) -> &mut AptosError;
 
-// From impls
+    fn error_code(mut self, error_code: AptosErrorCode) -> Self
+    where
+        Self: Sized,
+    {
+        self.inner_mut().error_code = Some(error_code);
+        self
+    }
 
-impl From<anyhow::Error> for AptosError {
-    fn from(error: anyhow::Error) -> Self {
-        AptosError::new(error.to_string())
+    fn aptos_ledger_version(mut self, aptos_ledger_version: u64) -> Self
+    where
+        Self: Sized,
+    {
+        self.inner_mut().aptos_ledger_version = Some(aptos_ledger_version.into());
+        self
     }
 }
 
-impl AptosErrorResponse {
-    pub fn not_found<S: Display>(resource: &str, identifier: S, ledger_version: u64) -> Self {
-        Self::NotFound(Json(
-            AptosError::new(format!("{} not found by {}", resource, identifier))
-                .aptos_ledger_version(ledger_version),
-        ))
-    }
-
-    pub fn invalid_param<S: Display>(name: &str, value: S) -> Self {
-        Self::BadRequest(Json(AptosError::new(format!(
-            "invalid parameter {}: {}",
-            name, value
-        ))))
-    }
-}
-
-impl<T: ToJSON + Send + Sync + Serialize> AptosResponse<T> {
-    fn from_ledger_info(content: AptosResponseContent<T>, ledger_info: &LedgerInfo) -> Self {
-        AptosResponse::Ok(
-            content,
-            ledger_info.chain_id as u16,
-            ledger_info.ledger_version.into(),
-            ledger_info.oldest_ledger_version.into(),
-            ledger_info.ledger_timestamp.into(),
-            ledger_info.epoch,
-        )
-    }
-
-    /// Construct a response from bytes that you know ahead of time a BCS
-    /// encoded value.
-    pub fn from_bcs(value: Vec<u8>, ledger_info: &LedgerInfo) -> Self {
-        Self::from_ledger_info(AptosResponseContent::Bcs(Bcs(value)), ledger_info)
-    }
-
-    /// Construct an Aptos response from a Rust type, serializing it to JSON.
-    pub fn from_json(value: T, ledger_info: &LedgerInfo) -> Self {
-        Self::from_ledger_info(AptosResponseContent::Json(Json(value)), ledger_info)
-    }
-
-    /// This is a convenience function for creating a response when you have
-    /// a Rust object from the beginning. If you're starting out with bytes,
-    /// you should instead check the accept type and use either `from_bcs`
-    /// or `from_json`.
-    pub fn try_from_rust_value(
-        value: T,
-        ledger_info: &LedgerInfo,
-        accept_type: &AcceptType,
-    ) -> Result<Self, AptosErrorResponse> {
-        match accept_type {
-            AcceptType::Bcs => Ok(AptosResponse::from_bcs(
-                serialize_to_bcs(&value)?,
-                ledger_info,
-            )),
-            AcceptType::Json => Ok(AptosResponse::from_json(value, ledger_info)),
+/// This macro defines traits for all of the given status codes. In eahc trait
+/// there is a function that defines a helper for building an instance of the
+/// error type using that code. These traits are helpful for defining what
+/// error types an internal function can return. For example, the failpoint
+/// function can return an internal error, so its signature would look like:
+/// fn fail_point_poem<E: InternalError>(name: &str) -> anyhow::Result<(), E>
+/// This should be invoked just once, taking in every status that we use
+/// throughout the entire API. Every one of these traits requires that the
+/// implementor also implements AptosErrorResponse, which saves functions from
+/// having to add that bound to errors themselves.
+#[macro_export]
+macro_rules! generate_error_traits {
+    ($($trait_name:ident),*) => {
+        paste::paste! {
+        $(
+        pub trait [<$trait_name Error>]: AptosErrorResponse {
+            fn [<$trait_name:snake>](error: anyhow::Error) -> Self where Self: Sized;
+            fn [<$trait_name:snake _str>](error_str: &str) -> Self where Self: Sized;
         }
-    }
+        )*
+        }
+    };
 }
 
-/// Serialize an internal Rust type to BCS, returning a 500 if it fails.
-pub fn serialize_to_bcs<T: Serialize>(value: T) -> Result<Vec<u8>, AptosErrorResponse> {
-    bcs::to_bytes(&value).map_err(|e| {
-        AptosErrorResponse::InternalServerError(Json(
-            AptosError::new(
-                format_err!("Rust type could not be serialized to BCS: {}", e).to_string(),
-            )
-            .error_code(AptosErrorCode::BcsSerializationError),
-        ))
-    })
+/// This macro helps generate types, From impls, etc. for an error
+/// response from a Poem endpoint. It generates a response type that only has
+/// the specified response codes, which is then reflected in the OpenAPI spec.
+/// For each status code given to a particular invocation of this macro, we
+/// implement the relevant trait from generate_error_traits.
+/// See the comments in the macro for an explanation of what is happening.
+#[macro_export]
+macro_rules! generate_error_response {
+    ($enum_name:ident, $(($status:literal, $name:ident)),*) => {
+        // We use the paste crate to allows us to generate the name of the code
+        // enum, more on that in the comment above that enum.
+        paste::paste! {
+
+        // Generate an enum with name `enum_name`. Iterate through each of the
+        // response codes, generating a variant for each with the given name
+        // and status code. We always generate a variant for 500.
+        #[derive(Debug, poem_openapi::ApiResponse)]
+        pub enum $enum_name {
+            $(
+            #[oai(status = $status)]
+            $name(poem_openapi::payload::Json<$crate::poem_backend::AptosError>),
+            )*
+        }
+
+        // For each status, implement the relevant error trait. This means if
+        // the macro invocation specifies Internal and BadRequest, the
+        // functions internal(anyhow::Error) and bad_request(anyhow::Error)
+        // will be generated. There are also variants for taking in strs.
+        $(
+        impl $crate::poem_backend::[<$name Error>] for $enum_name {
+            fn [<$name:snake>](error: anyhow::Error) -> Self where Self: Sized {
+                let error = $crate::poem_backend::AptosError::from(error);
+                let payload = poem_openapi::payload::Json(error);
+                Self::from($enum_name::$name(payload))
+            }
+
+            fn [<$name:snake _str>](error_str: &str) -> Self where Self: Sized {
+                let error = $crate::poem_backend::AptosError::new(error_str.to_string());
+                let payload = poem_openapi::payload::Json(error);
+                Self::from($enum_name::$name(payload))
+            }
+        }
+        )*
+        }
+
+        // Generate a function that helps get the AptosError within.
+        impl $crate::poem_backend::AptosErrorResponse for $enum_name {
+            fn inner_mut(&mut self) -> &mut $crate::poem_backend::AptosError {
+                match self {
+                    $(
+                    $enum_name::$name(poem_openapi::payload::Json(inner)) => inner,
+                    )*
+                }
+            }
+        }
+    };
 }
 
-/// Deserialize BCS bytes into an internal Rust, returning a 500 if it fails.
-pub fn deserialize_from_bcs<T: for<'b> Deserialize<'b>>(
-    bytes: &[u8],
-) -> Result<T, AptosErrorResponse> {
-    bcs::from_bytes(bytes).map_err(|e| {
-        AptosErrorResponse::InternalServerError(Json(
-            AptosError::new(format_err!("Data in storage was not valid BCS: {}", e).to_string())
-                .error_code(AptosErrorCode::InvalidBcsInStorageError),
-        ))
-    })
+/// This macro helps generate types, From impls, etc. for a successful response
+/// from a Poem endpoint. It generates a response type that only has the
+/// specified response codes, which is then reflected in the OpenAPI spec.
+/// See the comments in the macro for an explanation of what is happening.
+#[macro_export]
+macro_rules! generate_success_response {
+    ($enum_name:ident, $(($status:literal, $name:ident)),*) => {
+        // We use the paste crate to allows us to generate the name of the code
+        // enum, more on that in the comment above that enum.
+        paste::paste! {
+
+        // Generate an enum with name `enum_name`. Iterate through each of the
+        // response codes, generating a variant for each with the given name
+        // and status code. This extra derive, bad_request_handler, tells the
+        // framework to invoke the given function when the framework tries to
+        // return some kind of bad request error, e.g. from parsing params.
+        // This allows us to convert the framework error into our custom
+        // response type. Without this the framework would return errors that
+        // don't conform to our OpenAPI spec.
+        #[derive(poem_openapi::ApiResponse)]
+        #[oai(bad_request_handler = "Self::bad_request_handler")]
+        pub enum $enum_name<T: poem_openapi::types::ToJSON + Send + Sync> {
+            $(
+            #[oai(status = $status)]
+            $name(
+                $crate::poem_backend::AptosResponseContent<T>,
+                #[oai(header = "X-Aptos-Chain-Id")] u16,
+                #[oai(header = "X-Aptos-Ledger-Version")] U64,
+                #[oai(header = "X-Aptos-Ledger-Oldest-Version")] U64,
+                #[oai(header = "X-Aptos-Ledger-TimestampUsec")] U64,
+                #[oai(header = "X-Aptos-Epoch")] U64,
+            ),
+            )*
+
+            // For any endpoint, it is possible for the framework to return a
+            // an error repesenting a bad request. As such, to enable us to use
+            // bad_request_handler, we include this status code here, since the
+            // framework expects this on the T response, not the E. All other
+            // errors should be included in the error response, not this one.
+            #[oai(status = 400)]
+            BadRequest(Json<crate::poem_backend::AptosError>),
+        }
+
+        impl<T: poem_openapi::types::ToJSON + Send + Sync> $enum_name<T> {
+            // Generate a function that converts the framework-generated error
+            // into our custom error response (JSON + AptosError).
+            pub fn bad_request_handler(error: poem::Error) -> $enum_name<T> {
+                $enum_name::BadRequest(poem_openapi::payload::Json(
+                    $crate::poem_backend::AptosError::new(error.to_string()),
+                ))
+            }
+        }
+
+        // Generate an enum that captures all the different status codes that
+        // this response type supports. To explain this funky syntax, if you
+        // named the main enum MyResponse, this would become MyResponseCode.
+        pub enum [<$enum_name Status>] {
+            $(
+            $name,
+            )*
+        }
+
+        // Generate a From impl that builds a response from AptosResponseContent.
+        // Each variant in the main enum takes in the same argument, so the macro
+        // is really just helping us enumerate and build each variant. We use this
+        // in the other From impls.
+        impl <T: poem_openapi::types::ToJSON + Send + Sync> From<($crate::poem_backend::AptosResponseContent<T>, &aptos_api_types::LedgerInfo, [<$enum_name Status>])>
+            for $enum_name<T>
+        {
+            fn from(
+                (value, ledger_info, status): (
+                    $crate::poem_backend::AptosResponseContent<T>,
+                    &aptos_api_types::LedgerInfo,
+                    [<$enum_name Status>]
+                ),
+            ) -> Self {
+                match status {
+                    $(
+                    [<$enum_name Status>]::$name => {
+                        $enum_name::$name(
+                            value,
+                            ledger_info.chain_id as u16,
+                            ledger_info.ledger_version,
+                            ledger_info.oldest_ledger_version,
+                            ledger_info.ledger_timestamp,
+                            ledger_info.epoch.into(),
+                        )
+                    },
+                    )*
+                }
+            }
+        }
+
+        // Generate a From impl that builds a response from a Json<T> and friends.
+        impl<T: poem_openapi::types::ToJSON + Send + Sync> From<(poem_openapi::payload::Json<T>, &aptos_api_types::LedgerInfo, [<$enum_name Status>])>
+            for $enum_name<T>
+        {
+            fn from(
+                (value, ledger_info, status): (poem_openapi::payload::Json<T>, &aptos_api_types::LedgerInfo, [<$enum_name Status>]),
+            ) -> Self {
+                let content = $crate::poem_backend::AptosResponseContent::Json(value);
+                Self::from((content, ledger_info, status))
+            }
+        }
+
+        // Generate a From impl that builds a response from a Bcs<Vec<u8>> and friends.
+        impl<T: poem_openapi::types::ToJSON + Send + Sync> From<($crate::poem_backend::bcs_payload::Bcs<Vec<u8>>, &aptos_api_types::LedgerInfo, [<$enum_name Status>])>
+            for $enum_name<T>
+        {
+            fn from(
+                (value, ledger_info, status): (
+                    $crate::poem_backend::bcs_payload::Bcs<Vec<u8>>,
+                    &aptos_api_types::LedgerInfo,
+                    [<$enum_name Status>]
+                ),
+            ) -> Self {
+                let content = $crate::poem_backend::AptosResponseContent::Bcs(value);
+                Self::from((content, ledger_info, status))
+            }
+        }
+
+        // Generate a TryFrom impl that builds a response from a T, an AcceptType,
+        // and all the other usual suspects. It expects to be called with a generic
+        // parameter E: InternalError, with which we can build an internal error
+        // response in case the BCS serialization fails.
+        impl<T: poem_openapi::types::ToJSON + Send + Sync + serde::Serialize> $enum_name<T> {
+            pub fn try_from_rust_value<E: InternalError>(
+                (value, ledger_info, status, accept_type): (
+                    T,
+                    &aptos_api_types::LedgerInfo,
+                    [<$enum_name Status>],
+                    &$crate::poem_backend::AcceptType
+                ),
+            ) -> Result<Self, E> {
+                match accept_type {
+                    AcceptType::Bcs => Ok(Self::from((
+                        $crate::poem_backend::bcs_payload::Bcs(
+                            bcs::to_bytes(&value)
+                                .map_err(|e| E::internal(e.into()).error_code($crate::poem_backend::AptosErrorCode::BcsSerializationError))?
+                        ),
+                        ledger_info,
+                        status
+                    ))),
+                    AcceptType::Json => Ok(Self::from((
+                        poem_openapi::payload::Json(value),
+                        ledger_info,
+                        status
+                    ))),
+                }
+            }
+        }
+        }
+    };
+}
+
+// Generate a success response that only has an option for 200.
+generate_success_response!(BasicResponse, (200, Ok));
+
+// Generate traits defining a "from" function for each of these status types.
+// The error response then impls these traits for each status type they mention.
+generate_error_traits!(
+    BadRequest,
+    NotFound,
+    PayloadTooLarge,
+    UnsupportedMediaType,
+    Internal,
+    InsufficientStorage
+);
+
+// Generate an error response that only has options for 400 and 500.
+generate_error_response!(BasicError, (400, BadRequest), (500, Internal));
+
+// This type just simplifies using BasicResponse and BasicError together.
+pub type BasicResult<T> = poem::Result<BasicResponse<T>, BasicError>;
+
+// As above but with 404.
+generate_error_response!(
+    BasicErrorWith404,
+    (400, BadRequest),
+    (404, NotFound),
+    (500, Internal)
+);
+pub type BasicResultWith404<T> = poem::Result<BasicResponse<T>, BasicErrorWith404>;
+
+#[allow(dead_code)]
+// Just this one helper for a specific kind of 404.
+pub fn build_not_found<S: Display, E: NotFoundError>(
+    resource: &str,
+    identifier: S,
+    ledger_version: u64,
+) -> E {
+    E::not_found_str(&format!("{} not found by {}", resource, identifier))
+        .aptos_ledger_version(ledger_version)
 }

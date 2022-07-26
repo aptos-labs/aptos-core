@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+### 1.2.1 (2022-07-23)
+
+
+### Features
+
+* deprecate getTokenBalance api in SDK ([2ec554e](https://github.com/aptos-labs/aptos-core/commit/2ec554e6e40a81cee4e760f6f84ef7362c570240))
+* memoize chain id in aptos client ([#1589](https://github.com/aptos-labs/aptos-core/issues/1589)) ([4a6453b](https://github.com/aptos-labs/aptos-core/commit/4a6453bf0e620247557854053b661446bff807a7))
+* **mutiagent:** support multiagent transaction submission ([#1543](https://github.com/aptos-labs/aptos-core/issues/1543)) ([0f0c70e](https://github.com/aptos-labs/aptos-core/commit/0f0c70e8ed2fefa952f0c89b7edb78edc174cb49))
+* support retrieving token balance for any account ([7f93c21](https://github.com/aptos-labs/aptos-core/commit/7f93c2100f8b8e848461a0b5a395bfb76ade8667))
+
+
+### Bug Fixes
+
+* get rid of "natual" calls ([#1678](https://github.com/aptos-labs/aptos-core/issues/1678)) ([54601f7](https://github.com/aptos-labs/aptos-core/commit/54601f79206ea0f8b8b1b0d6599d31832fc4d195))
+* **ts-sdk:** fix a typo, natual now becomes natural ([1b7d295](https://github.com/aptos-labs/aptos-core/commit/1b7d2957b79a5d2821ada0c5096cf43c412e0c2d)), closes [#1526](https://github.com/aptos-labs/aptos-core/issues/1526)
+
 ## 1.2.0 (2022-06-28)
 
 ### Features
