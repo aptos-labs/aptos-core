@@ -4,7 +4,7 @@
 //! This module defines physical storage schema storing medadata for the internal indexer
 //!
 
-use crate::indexer::metadata::{Metadata, MetadataTag};
+use crate::metadata::{Metadata, MetadataTag};
 use crate::schema::INDEXER_METADATA_CF_NAME;
 use anyhow::{anyhow, Result};
 use byteorder::ReadBytesExt;

@@ -1314,6 +1314,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "aptosdb-indexer",
  "arc-swap",
  "bcs",
  "byteorder",
@@ -1333,6 +1334,39 @@ dependencies = [
  "serde 1.0.137",
  "storage-interface",
  "thiserror",
+]
+
+[[package]]
+name = "aptosdb-indexer"
+version = "0.1.0"
+dependencies = [
+ "accumulator",
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-jellyfish-merkle",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-proptest-helpers",
+ "aptos-state-view",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "bcs",
+ "byteorder",
+ "executor-types",
+ "move-deps",
+ "num-derive",
+ "num-traits 0.2.15",
+ "num-variants",
+ "proptest",
+ "proptest-derive",
+ "rand 0.7.3",
+ "schemadb",
+ "scratchpad",
+ "serde 1.0.137",
+ "storage-interface",
 ]
 
 [[package]]
@@ -7027,6 +7061,7 @@ name = "schemadb"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",

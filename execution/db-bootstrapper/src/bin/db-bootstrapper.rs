@@ -53,6 +53,7 @@ fn main() -> Result<()> {
             false,
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
             RocksdbConfigs::default(),
+            false, /* indexer */
         )
     } else {
         // When not committing, we open the DB as secondary so the tool is usable along side a

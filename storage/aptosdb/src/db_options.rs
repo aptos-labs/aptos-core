@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::schema::*;
-use aptos_config::config::RocksdbConfig;
 use aptos_types::transaction::Version;
 use schemadb::{
     ColumnFamilyDescriptor, ColumnFamilyName, DBCompressionType, Options, SliceTransform,
@@ -40,27 +39,6 @@ pub(super) fn state_merkle_db_column_families() -> Vec<ColumnFamilyName> {
     ]
 }
 
-pub(super) fn index_db_column_families() -> Vec<ColumnFamilyName> {
-    vec![
-        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
-        INDEXER_METADATA_CF_NAME,
-        TABLE_INFO_CF_NAME,
-    ]
-}
-
-pub(super) fn gen_rocksdb_options(config: &RocksdbConfig, readonly: bool) -> Options {
-    let mut db_opts = Options::default();
-    db_opts.set_max_open_files(config.max_open_files);
-    db_opts.set_max_total_wal_size(config.max_total_wal_size);
-    db_opts.set_max_background_jobs(config.max_background_jobs);
-    if !readonly {
-        db_opts.create_if_missing(true);
-        db_opts.create_missing_column_families(true);
-    }
-
-    db_opts
-}
-
 pub(super) fn gen_ledger_cfds() -> Vec<ColumnFamilyDescriptor> {
     let cfs = ledger_db_column_families();
     let mut cfds = Vec::with_capacity(cfs.len());
@@ -81,17 +59,6 @@ pub(super) fn gen_ledger_cfds() -> Vec<ColumnFamilyDescriptor> {
 
 pub(super) fn gen_state_merkle_cfds() -> Vec<ColumnFamilyDescriptor> {
     let cfs = state_merkle_db_column_families();
-    let mut cfds = Vec::with_capacity(cfs.len());
-    for cf_name in cfs {
-        let mut cf_opts = Options::default();
-        cf_opts.set_compression_type(DBCompressionType::Lz4);
-        cfds.push(ColumnFamilyDescriptor::new((*cf_name).to_string(), cf_opts));
-    }
-    cfds
-}
-
-pub(super) fn gen_index_db_cfds() -> Vec<ColumnFamilyDescriptor> {
-    let cfs = index_db_column_families();
     let mut cfds = Vec::with_capacity(cfs.len());
     for cf_name in cfs {
         let mut cf_opts = Options::default();

@@ -77,6 +77,10 @@ pub struct StorageConfig {
     pub timeout_ms: u64,
     /// Rocksdb-specific configurations
     pub rocksdb_configs: RocksdbConfigs,
+    /// Try to enable the internal indexer. The indexer expects to have seen all transactions
+    /// since genesis. To recover operation after data loss, or to bootstrap a node in fast sync
+    /// mode, the indexer db needs to be copied in from another node.
+    pub enable_indexer: bool,
 }
 
 pub const NO_OP_STORAGE_PRUNER_CONFIG: StoragePrunerConfig = StoragePrunerConfig {
@@ -146,6 +150,7 @@ impl Default for StorageConfig {
             // Default read/write/connection timeout, in milliseconds
             timeout_ms: 30_000,
             rocksdb_configs: RocksdbConfigs::default(),
+            enable_indexer: false,
         }
     }
 }
