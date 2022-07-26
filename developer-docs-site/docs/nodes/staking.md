@@ -42,7 +42,7 @@ If you are running a validator node, then you can participate in consensus on th
 1. You must stake your Aptos coins with at least the minimum amount required, and
 2. You must lock up these staked coins for at least the minimum lockup duration required. You cannot withdraw any of your staked amount until your lockup period expires.
 
-When you satisfy the above two minimum requirements, then you can join the validator set at any time, starting validating and earning rewards.
+When you satisfy the above two minimum requirements, then you can join the validator set at any time, start validating and earn rewards.
 
 :::tip Joining the validator set
 For step-by-step instructions on how to join the validator set, see: [Joining Validator Set](https://aptos.dev/nodes/ait/connect-to-testnet#joining-validator-set).
@@ -206,7 +206,7 @@ The Aptos staking module defines a capability that represents ownership. See [ht
 
 This `OwnerCapability` resource can be used to control the node operator (i.e., who runs the validator node) and the associated stake pool.
 
-Using this owner-operator model, a custodian can stake on the Aptos blockchain. This allows delegations and staking services to be built as the owner of the funds can give money to the validator.
+Using this owner-operator model, a custodian can stake on the Aptos blockchain. This allows delegations and staking services to be built as the owner can provide funds to the validator.
 
 This section describes how this works, using Bob and Alice in the example. 
 
@@ -220,17 +220,17 @@ As an owner:
 - Bob owns the funds that will be used for staking.
 - Only Bob can add or remove funds.
 - Only Bob can extend or renew the lockup period.
-- Change the node operator Alice to some other node operator anytime Bob wishes to do so.
+- Bob can change the node operator Alice to some other node operator anytime Bob wishes to do so.
 
 ### Operator
 
 A node operator is assigned by the fund owner to run the validator node. These two entities, the owner and the operator, can be a single entity. 
 
-In this example, Alice is the validator node, operating at the behest of Bob, the fund owner.
+In this example, Alice runs the validator node, operating at the behest of Bob, the fund owner.
 
 As an operator:
 
-- Alice only has permissions to join or leave the validator set.
-- Alice will perform the validating function.
+- Alice has permissions only to join or leave the validator set.
+- As a validator, Alice will perform the validating function.
 - Alice has the permissions to change the consensus key and network addresses. The consensus key is used by Alice to participate in the validator consensus process, i.e., to vote and propose a block. Alice is allowed to change ("rotate") this key in case this key is compromised.
 - However, Alice cannot move funds (unless Alice is the owner, i.e., Alice has the `OwnerCapability` resource.
