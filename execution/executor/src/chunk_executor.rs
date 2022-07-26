@@ -15,7 +15,7 @@ use crate::{
         APTOS_EXECUTOR_EXECUTE_CHUNK_SECONDS, APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS,
     },
 };
-use anyhow::{ensure, Result};
+use anyhow::Result;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
@@ -47,7 +47,7 @@ impl<V: VMExecutor> ChunkExecutor<V> {
         }
     }
 
-    fn maybe_reset(&self) -> Result<()> {
+    fn maybe_initialize(&self) -> Result<()> {
         if self.inner.read().is_none() {
             self.reset()?;
         }
@@ -62,7 +62,7 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
-        self.maybe_reset()?;
+        self.maybe_initialize()?;
         self.inner
             .read()
             .as_ref()
@@ -130,11 +130,8 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         Ok(())
     }
 
-    fn finish(&self) -> Result<()> {
-        let mut inner = self.inner.write();
-        ensure!(inner.is_some());
-        *inner = None;
-        Ok(())
+    fn finish(&self) {
+        *self.inner.write() = None;
     }
 }
 
@@ -352,7 +349,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
         transactions: Vec<Transaction>,
         transaction_infos: Vec<TransactionInfo>,
     ) -> Result<()> {
-        self.maybe_reset()?;
+        self.maybe_initialize()?;
         self.inner
             .read()
             .as_ref()

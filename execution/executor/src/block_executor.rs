@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::logging::{LogEntry, LogSchema};
-use anyhow::{ensure, Result};
+use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
@@ -54,7 +54,7 @@ where
             .root_smt()
     }
 
-    fn maybe_reset(&self) {
+    fn maybe_initialize(&self) {
         if self.inner.read().is_none() {
             self.reset();
         }
@@ -66,7 +66,7 @@ where
     V: VMExecutor,
 {
     fn committed_block_id(&self) -> HashValue {
-        self.maybe_reset();
+        self.maybe_initialize();
         self.inner
             .read()
             .as_ref()
@@ -83,7 +83,7 @@ where
         block: (HashValue, Vec<Transaction>),
         parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error> {
-        self.maybe_reset();
+        self.maybe_initialize();
         self.inner
             .read()
             .as_ref()
@@ -104,13 +104,11 @@ where
             .commit_blocks_ext(block_ids, ledger_info_with_sigs, save_state_snapshots)
     }
 
-    fn finish(&self) -> Result<()> {
-        let mut inner = self.inner.write();
-        ensure!(inner.is_some());
-        *inner = None;
-        Ok(())
+    fn finish(&self) {
+        *self.inner.write() = None;
     }
 }
+
 struct BlockExecutorInner<V> {
     db: DbReaderWriter,
     block_tree: BlockTree,
