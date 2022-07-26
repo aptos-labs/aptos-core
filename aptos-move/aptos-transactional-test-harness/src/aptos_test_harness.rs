@@ -41,6 +41,7 @@ use move_deps::{
         identifier::{IdentStr, Identifier},
         language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
         move_resource::MoveStructType,
+        parser::parse_type_tag,
         transaction_argument::{convert_txn_args, TransactionArgument},
         value::{MoveTypeLayout, MoveValue},
     },
@@ -53,7 +54,6 @@ use move_deps::{
     move_vm_runtime::session::SerializedReturnValues,
 };
 use once_cell::sync::Lazy;
-use serde_json;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
@@ -168,6 +168,15 @@ struct BlockCommand {
 struct ViewTableCommand {
     #[structopt(long = "table_handle")]
     table_handle: u128,
+
+    #[structopt(long = "key_type", parse(try_from_str = parse_type_tag))]
+    key_type: TypeTag,
+
+    #[structopt(long = "value_type", parse(try_from_str = parse_type_tag))]
+    value_type: TypeTag,
+
+    #[structopt(long = "key_value", parse(try_from_str = serde_json::from_str))]
+    key_value: serde_json::Value,
 }
 
 /// Custom commands for the transactional test flow.
@@ -866,32 +875,11 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                 Ok(render_events(output.events()))
             }
             AptosSubCommand::ViewTableCommand(view_table_cmd) => {
-                let key_type_struct = StructTag {
-                    address: AccountAddress::from_hex_literal("0x1").unwrap(),
-                    module: Identifier::new("string").unwrap(),
-                    name: Identifier::new("String").unwrap(),
-                    type_params: vec![],
-                };
-
-                let key_type = TypeTag::Struct(key_type_struct);
-
-                let value_type_struct = StructTag {
-                    address: AccountAddress::from_hex_literal("0x1").unwrap(),
-                    module: Identifier::new("token").unwrap(),
-                    name: Identifier::new("Collection").unwrap(),
-                    type_params: vec![],
-                };
-
-                let value_type = TypeTag::Struct(value_type_struct);
-
                 let resolver = self.storage.as_move_resolver();
                 let converter = resolver.as_converter();
 
                 let vm_key = converter
-                    .try_into_vm_value(
-                        &key_type,
-                        serde_json::Value::String("aptos_punks".to_string()),
-                    )
+                    .try_into_vm_value(&view_table_cmd.key_type, view_table_cmd.key_value)
                     .unwrap();
                 let raw_key = vm_key.undecorate().simple_serialize().unwrap();
 
@@ -903,9 +891,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     .unwrap()
                     .ok_or_else(|| format_err!("Failed to fetch table item.",))?;
 
-                let move_value = converter.try_into_move_value(&value_type, &bytes)?;
+                let move_value =
+                    converter.try_into_move_value(&view_table_cmd.value_type, &bytes)?;
 
-                Ok(Some(format!("{:?}", move_value)))
+                Ok(Some(serde_json::to_string(&move_value).unwrap()))
             }
         }
     }

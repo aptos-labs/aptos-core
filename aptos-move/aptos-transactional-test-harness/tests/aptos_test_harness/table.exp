@@ -1,6 +1,6 @@
-processed 4 tasks
+processed 8 tasks
 
-task 1 'run'. lines 6-6:
+task 1 'run'. lines 6-8:
 Events:
 {
     key:     0300000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
@@ -10,7 +10,23 @@ Events:
 }mutable inputs after call: local#0: 0
 return values: 0
 
-task 2 'view'. lines 8-8:
+task 2 'run'. lines 9-9:
+Events:
+{
+    key:     0600000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
+    seq_num: 0
+    type:    0x1::token::DepositEvent
+    data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e7b00000000000000"
+}
+{
+    key:     0400000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
+    seq_num: 0
+    type:    0x1::token::CreateTokenEvent
+    data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e0b6170746f735f70756e6b73000a6765656b5f746f6b656e00010000000000000000000100000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb67b00000000000000"
+}mutable inputs after call: local#0: 0
+return values: 0
+
+task 3 'view'. lines 11-11:
 key 0x1::token::Collections {
     collections: store 0x1::table::Table<0x1::string::String, 0x1::token::Collection> {
         handle: 5713946181763753045826830927579154558u128
@@ -18,15 +34,15 @@ key 0x1::token::Collections {
     }
     token_data: store 0x1::table::Table<0x1::token::TokenId, 0x1::token::TokenData> {
         handle: 201565269216226451971031276281575418327u128
-        length: 0
+        length: 1
     }
     burn_capabilities: store 0x1::table::Table<0x1::token::TokenId, 0x1::token::BurnCapability> {
         handle: 287382435493071517965728229562421621568u128
-        length: 0
+        length: 1
     }
     mint_capabilities: store 0x1::table::Table<0x1::token::TokenId, 0x1::token::MintCapability> {
         handle: 324796155405202804299483011064140529667u128
-        length: 0
+        length: 1
     }
     create_collection_events: store 0x1::event::EventHandle<0x1::token::CreateCollectionEvent> {
         counter: 1
@@ -38,7 +54,7 @@ key 0x1::token::Collections {
         }
     }
     create_token_events: store 0x1::event::EventHandle<0x1::token::CreateTokenEvent> {
-        counter: 0
+        counter: 1
         guid: drop store 0x1::guid::GUID {
             id: copy drop store 0x1::guid::ID {
                 creation_num: 4
@@ -57,5 +73,28 @@ key 0x1::token::Collections {
     }
 }
 
-task 3 'view_table'. lines 10-10:
-Struct(MoveStructValue({Identifier("count"): String("0"), Identifier("description"): String(""), Identifier("maximum"): Object({"vec": Array([])}), Identifier("name"): String("aptos_punks"), Identifier("uri"): String("")}))
+task 4 'view_table'. lines 13-15:
+{"count":"1","description":"","maximum":{"vec":[]},"name":"aptos_punks","uri":""}
+
+task 5 'run'. lines 16-18:
+Events:
+{
+    key:     0700000000000000f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
+    seq_num: 0
+    type:    0x1::token::WithdrawEvent
+    data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e0100000000000000"
+}mutable inputs after call: local#0: 0
+return values: 0
+
+task 6 'run'. lines 19-19:
+Events:
+{
+    key:     03000000000000009c3b634ac05d0af393e0f93b9b19b61e7cac1c519f566276aa0c6fd15dac12aa
+    seq_num: 0
+    type:    0x1::token::DepositEvent
+    data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e0100000000000000"
+}mutable inputs after call: local#0: 0
+return values: 0
+
+task 7 'view_table'. lines 21-21:
+{"collection":"aptos_punks","description":"","maximum":{"vec":[]},"name":"geek_token","royalty":{"creator_account":"0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6","royalty_points_per_million":"1"},"supply":{"vec":["123"]},"uri":""}
