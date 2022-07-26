@@ -16,6 +16,11 @@ on:
         required: true
         type: string
         description: The Forge k8s namespace to be used for test. This value should manage Forge test concurrency. It may be truncated.
+      FORGE_TEST_SUITE:
+        required: false
+        type: string
+        description: The Forge test suite to exercise
+
 
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
@@ -32,6 +37,7 @@ env:
   FORGE_PRE_COMMENT: forge_pre_comment.txt
   FORGE_RUNNER_MODE: k8s
   FORGE_NAMESPACE: ${{ inputs.FORGE_NAMESPACE }}
+  FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}
 
 jobs:
   forge:

@@ -1,0 +1,19 @@
+name: Run continuous pre release testing
+on:
+  schedule:
+    # Run hourly
+    - cron: "0 * * * *"
+
+permissions:
+  contents: read
+  id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
+
+jobs:
+  run-forge:
+    uses: ./.github/workflows/run-forge.yaml
+    with:
+      GIT_SHA: HEAD
+      merge_or_canary: canary
+      FORGE_NAMESPACE: continuous
+      FORGE_TEST_SUITE: pre_release
+    secrets: inherit
