@@ -32,12 +32,12 @@ use std::{
 };
 use storage_interface::DbReader;
 use storage_service_types::requests::{
-    EpochEndingLedgerInfoRequest, StateValuesWithProofRequest, StorageServiceRequest,
+    DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest, StorageServiceRequest,
     TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
 use storage_service_types::responses::{
-    CompleteDataRange, DataSummary, ProtocolMetadata, ServerProtocolVersion, StorageServerSummary,
-    StorageServiceResponse,
+    CompleteDataRange, DataResponse, DataSummary, ProtocolMetadata, ServerProtocolVersion,
+    StorageServerSummary, StorageServiceResponse,
 };
 use storage_service_types::{Result, StorageServiceError};
 use thiserror::Error;
@@ -72,6 +72,12 @@ impl Error {
             Error::StorageErrorEncountered(_) => "storage_error",
             Error::UnexpectedErrorEncountered(_) => "unexpected_error",
         }
+    }
+}
+
+impl From<storage_service_types::responses::Error> for Error {
+    fn from(error: storage_service_types::responses::Error) -> Self {
+        Error::UnexpectedErrorEncountered(error.to_string())
     }
 }
 
@@ -134,18 +140,16 @@ impl DataSubscriptionRequest {
             })?;
 
         // Create the storage request
-        let storage_request = match &self.request {
-            StorageServiceRequest::GetNewTransactionOutputsWithProof(_) => {
-                StorageServiceRequest::GetTransactionOutputsWithProof(
-                    TransactionOutputsWithProofRequest {
-                        proof_version: target_version,
-                        start_version,
-                        end_version,
-                    },
-                )
+        let data_request = match &self.request.data_request {
+            DataRequest::GetNewTransactionOutputsWithProof(_) => {
+                DataRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
+                    proof_version: target_version,
+                    start_version,
+                    end_version,
+                })
             }
-            StorageServiceRequest::GetNewTransactionsWithProof(request) => {
-                StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+            DataRequest::GetNewTransactionsWithProof(request) => {
+                DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
                     proof_version: target_version,
                     start_version,
                     end_version,
@@ -154,27 +158,25 @@ impl DataSubscriptionRequest {
             }
             request => unreachable!("Unexpected subscription request: {:?}", request),
         };
+        let storage_request =
+            StorageServiceRequest::new(data_request, self.request.use_compression);
         Ok(storage_request)
     }
 
     /// Returns the highest version known by the peer
     fn highest_known_version(&self) -> u64 {
-        match &self.request {
-            StorageServiceRequest::GetNewTransactionOutputsWithProof(request) => {
-                request.known_version
-            }
-            StorageServiceRequest::GetNewTransactionsWithProof(request) => request.known_version,
+        match &self.request.data_request {
+            DataRequest::GetNewTransactionOutputsWithProof(request) => request.known_version,
+            DataRequest::GetNewTransactionsWithProof(request) => request.known_version,
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
     }
 
     /// Returns the highest epoch known by the peer
     fn highest_known_epoch(&self) -> u64 {
-        match &self.request {
-            StorageServiceRequest::GetNewTransactionOutputsWithProof(request) => {
-                request.known_epoch
-            }
-            StorageServiceRequest::GetNewTransactionsWithProof(request) => request.known_epoch,
+        match &self.request.data_request {
+            DataRequest::GetNewTransactionOutputsWithProof(request) => request.known_epoch,
+            DataRequest::GetNewTransactionsWithProof(request) => request.known_epoch,
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
     }
@@ -182,13 +184,11 @@ impl DataSubscriptionRequest {
     /// Returns the maximum chunk size for the request depending
     /// on the request type.
     fn max_chunk_size_for_request(&self, config: StorageServiceConfig) -> u64 {
-        match &self.request {
-            StorageServiceRequest::GetNewTransactionOutputsWithProof(_) => {
+        match &self.request.data_request {
+            DataRequest::GetNewTransactionOutputsWithProof(_) => {
                 config.max_transaction_output_chunk_size
             }
-            StorageServiceRequest::GetNewTransactionsWithProof(_) => {
-                config.max_transaction_chunk_size
-            }
+            DataRequest::GetNewTransactionsWithProof(_) => config.max_transaction_chunk_size,
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
     }
@@ -457,11 +457,14 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
     time_service: TimeService,
 ) -> Result<LedgerInfoWithSignatures, Error> {
     // Create a new storage request for the epoch ending ledger info
-    let storage_request =
-        StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
-            start_epoch: epoch,
-            expected_end_epoch: epoch,
-        });
+    let data_request = DataRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
+        start_epoch: epoch,
+        expected_end_epoch: epoch,
+    });
+    let storage_request = StorageServiceRequest::new(
+        data_request,
+        false, // Don't compress because this isn't going over the wire
+    );
 
     // Process the request
     let handler = Handler::new(
@@ -471,23 +474,25 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
         storage,
         time_service,
     );
-    let storage_data = handler.process_request(protocol, storage_request);
+    let storage_response = handler.process_request(protocol, storage_request);
 
     // Verify the response
-    match storage_data {
-        Ok(StorageServiceResponse::EpochEndingLedgerInfos(epoch_change_proof)) => {
-            if let Some(ledger_info) = epoch_change_proof.ledger_info_with_sigs.get(0) {
-                Ok(ledger_info.clone())
-            } else {
-                Err(Error::UnexpectedErrorEncountered(
-                    "Empty change proof found!".into(),
-                ))
+    match storage_response {
+        Ok(storage_response) => match &storage_response.get_data_response() {
+            Ok(DataResponse::EpochEndingLedgerInfos(epoch_change_proof)) => {
+                if let Some(ledger_info) = epoch_change_proof.ledger_info_with_sigs.get(0) {
+                    Ok(ledger_info.clone())
+                } else {
+                    Err(Error::UnexpectedErrorEncountered(
+                        "Empty change proof found!".into(),
+                    ))
+                }
             }
-        }
-        Ok(storage_service_response) => Err(Error::UnexpectedErrorEncountered(format!(
-            "Expected epoch ending ledger infos but found: {:?}",
-            storage_service_response
-        ))),
+            data_response => Err(Error::StorageErrorEncountered(format!(
+                "Failed to get epoch ending ledger info! Got: {:?}",
+                data_response
+            ))),
+        },
         Err(error) => Err(Error::StorageErrorEncountered(format!(
             "Failed to get epoch ending ledger info! Error: {:?}",
             error
@@ -509,6 +514,7 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
     match subscription.get_storage_request_for_missing_data(config, &target_ledger_info) {
         Ok(storage_request) => {
             // Handle the storage service request to fetch the missing data
+            let use_compression = storage_request.use_compression;
             let handler = Handler::new(
                 cached_storage_server_summary,
                 data_subscriptions,
@@ -516,22 +522,31 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
                 storage,
                 time_service,
             );
-            let storage_data = handler.process_request(subscription.protocol, storage_request);
+            let storage_response =
+                handler.process_request(subscription.protocol, storage_request.clone());
 
             // Transform the missing data into a subscription response
-            let transformed_response = match storage_data {
-                Ok(StorageServiceResponse::TransactionsWithProof(transactions_with_proof)) => {
-                    StorageServiceResponse::NewTransactionsWithProof((
-                        transactions_with_proof,
-                        target_ledger_info.clone(),
-                    ))
-                }
-                Ok(StorageServiceResponse::TransactionOutputsWithProof(outputs_with_proof)) => {
-                    StorageServiceResponse::NewTransactionOutputsWithProof((
-                        outputs_with_proof,
-                        target_ledger_info.clone(),
-                    ))
-                }
+            let transformed_data_response = match storage_response {
+                Ok(storage_response) => match storage_response.get_data_response() {
+                    Ok(DataResponse::TransactionsWithProof(transactions_with_proof)) => {
+                        DataResponse::NewTransactionsWithProof((
+                            transactions_with_proof,
+                            target_ledger_info.clone(),
+                        ))
+                    }
+                    Ok(DataResponse::TransactionOutputsWithProof(outputs_with_proof)) => {
+                        DataResponse::NewTransactionOutputsWithProof((
+                            outputs_with_proof,
+                            target_ledger_info.clone(),
+                        ))
+                    }
+                    data_response => {
+                        return Err(Error::UnexpectedErrorEncountered(format!(
+                            "Failed to get appropriate data response for peer! Got: {:?}",
+                            data_response
+                        )))
+                    }
+                },
                 response => {
                     return Err(Error::UnexpectedErrorEncountered(format!(
                         "Failed to fetch missing data for peer! {:?}",
@@ -539,9 +554,23 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
                     )))
                 }
             };
+            let storage_response =
+                match StorageServiceResponse::new(transformed_data_response, use_compression) {
+                    Ok(storage_response) => storage_response,
+                    Err(error) => {
+                        return Err(Error::UnexpectedErrorEncountered(format!(
+                            "Failed to create transformed response! Error: {:?}",
+                            error
+                        )));
+                    }
+                };
 
             // Send the response to the peer
-            handler.send_response(Ok(transformed_response), subscription.response_sender);
+            handler.send_response(
+                storage_request,
+                Ok(storage_response),
+                subscription.response_sender,
+            );
             Ok(())
         }
         Err(error) => Err(error),
@@ -629,18 +658,18 @@ impl<T: StorageReaderInterface> Handler<T> {
         increment_counter(
             &metrics::STORAGE_REQUESTS_RECEIVED,
             protocol,
-            request.get_label().into(),
+            request.get_label(),
         );
 
         // Handle any data subscriptions
-        if request.is_data_subscription_request() {
+        if request.data_request.is_data_subscription_request() {
             self.handle_subscription_request(peer, protocol, request, response_sender);
             return;
         }
 
         // Process the request and return the response to the client
-        let response = self.process_request(protocol, request);
-        self.send_response(response, response_sender);
+        let response = self.process_request(protocol, request.clone());
+        self.send_response(request, response, response_sender);
     }
 
     /// Processes the given request and returns the response
@@ -653,13 +682,21 @@ impl<T: StorageReaderInterface> Handler<T> {
         let _timer = start_timer(
             &metrics::STORAGE_REQUEST_PROCESSING_LATENCY,
             protocol,
-            request.get_label().into(),
+            request.get_label(),
         );
 
         // Process the request
-        let response = match &request {
-            StorageServiceRequest::GetServerProtocolVersion => self.get_server_protocol_version(),
-            StorageServiceRequest::GetStorageServerSummary => self.get_storage_server_summary(),
+        let response = match &request.data_request {
+            DataRequest::GetServerProtocolVersion => {
+                let data_response = self.get_server_protocol_version();
+                StorageServiceResponse::new(data_response, request.use_compression)
+                    .map_err(|error| error.into())
+            }
+            DataRequest::GetStorageServerSummary => {
+                let data_response = self.get_storage_server_summary();
+                StorageServiceResponse::new(data_response, request.use_compression)
+                    .map_err(|error| error.into())
+            }
             _ => self.process_cachable_request(protocol, &request),
         };
 
@@ -687,7 +724,7 @@ impl<T: StorageReaderInterface> Handler<T> {
                 increment_counter(
                     &metrics::STORAGE_RESPONSES_SENT,
                     protocol,
-                    response.get_label().into(),
+                    response.get_label(),
                 );
                 Ok(response)
             }
@@ -697,10 +734,11 @@ impl<T: StorageReaderInterface> Handler<T> {
     /// Sends a response via the provided sender
     fn send_response(
         &self,
+        request: StorageServiceRequest,
         response: Result<StorageServiceResponse>,
         response_sender: ResponseSender,
     ) {
-        log_storage_response(&response);
+        log_storage_response(request, &response);
         response_sender.send(response);
     }
 
@@ -741,46 +779,47 @@ impl<T: StorageReaderInterface> Handler<T> {
             return Ok(response.clone());
         }
 
-        // Fetch the response from storage
-        let response = match request {
-            StorageServiceRequest::GetStateValuesWithProof(request) => {
+        // Fetch the data response from storage
+        let data_response = match &request.data_request {
+            DataRequest::GetStateValuesWithProof(request) => {
                 self.get_state_value_chunk_with_proof(request)
             }
-            StorageServiceRequest::GetEpochEndingLedgerInfos(request) => {
+            DataRequest::GetEpochEndingLedgerInfos(request) => {
                 self.get_epoch_ending_ledger_infos(request)
             }
-            StorageServiceRequest::GetNumberOfStatesAtVersion(version) => {
+            DataRequest::GetNumberOfStatesAtVersion(version) => {
                 self.get_number_of_states_at_version(*version)
             }
-            StorageServiceRequest::GetTransactionOutputsWithProof(request) => {
+            DataRequest::GetTransactionOutputsWithProof(request) => {
                 self.get_transaction_outputs_with_proof(request)
             }
-            StorageServiceRequest::GetTransactionsWithProof(request) => {
+            DataRequest::GetTransactionsWithProof(request) => {
                 self.get_transactions_with_proof(request)
             }
             _ => unreachable!("Received an unexpected request: {:?}", request),
         }?;
+        let storage_response = StorageServiceResponse::new(data_response, request.use_compression)?;
 
         // Cache the response before returning
         let _ = self
             .lru_storage_cache
             .lock()
-            .put(request.clone(), response.clone());
+            .put(request.clone(), storage_response.clone());
 
-        Ok(response)
+        Ok(storage_response)
     }
 
     fn get_state_value_chunk_with_proof(
         &self,
         request: &StateValuesWithProofRequest,
-    ) -> Result<StorageServiceResponse, Error> {
+    ) -> Result<DataResponse, Error> {
         let state_value_chunk_with_proof = self.storage.get_state_value_chunk_with_proof(
             request.version,
             request.start_index,
             request.end_index,
         )?;
 
-        Ok(StorageServiceResponse::StateValueChunkWithProof(
+        Ok(DataResponse::StateValueChunkWithProof(
             state_value_chunk_with_proof,
         ))
     }
@@ -788,54 +827,43 @@ impl<T: StorageReaderInterface> Handler<T> {
     fn get_epoch_ending_ledger_infos(
         &self,
         request: &EpochEndingLedgerInfoRequest,
-    ) -> Result<StorageServiceResponse, Error> {
+    ) -> Result<DataResponse, Error> {
         let epoch_change_proof = self
             .storage
             .get_epoch_ending_ledger_infos(request.start_epoch, request.expected_end_epoch)?;
 
-        Ok(StorageServiceResponse::EpochEndingLedgerInfos(
-            epoch_change_proof,
-        ))
+        Ok(DataResponse::EpochEndingLedgerInfos(epoch_change_proof))
     }
 
-    fn get_number_of_states_at_version(
-        &self,
-        version: Version,
-    ) -> Result<StorageServiceResponse, Error> {
+    fn get_number_of_states_at_version(&self, version: Version) -> Result<DataResponse, Error> {
         let number_of_states = self.storage.get_number_of_states(version)?;
 
-        Ok(StorageServiceResponse::NumberOfStatesAtVersion(
-            number_of_states,
-        ))
+        Ok(DataResponse::NumberOfStatesAtVersion(number_of_states))
     }
 
-    fn get_server_protocol_version(&self) -> Result<StorageServiceResponse, Error> {
+    fn get_server_protocol_version(&self) -> DataResponse {
         let server_protocol_version = ServerProtocolVersion {
             protocol_version: STORAGE_SERVER_VERSION,
         };
-        Ok(StorageServiceResponse::ServerProtocolVersion(
-            server_protocol_version,
-        ))
+        DataResponse::ServerProtocolVersion(server_protocol_version)
     }
 
-    fn get_storage_server_summary(&self) -> Result<StorageServiceResponse, Error> {
+    fn get_storage_server_summary(&self) -> DataResponse {
         let storage_server_summary = self.cached_storage_server_summary.read().clone();
-        Ok(StorageServiceResponse::StorageServerSummary(
-            storage_server_summary,
-        ))
+        DataResponse::StorageServerSummary(storage_server_summary)
     }
 
     fn get_transaction_outputs_with_proof(
         &self,
         request: &TransactionOutputsWithProofRequest,
-    ) -> Result<StorageServiceResponse, Error> {
+    ) -> Result<DataResponse, Error> {
         let transaction_output_list_with_proof = self.storage.get_transaction_outputs_with_proof(
             request.proof_version,
             request.start_version,
             request.end_version,
         )?;
 
-        Ok(StorageServiceResponse::TransactionOutputsWithProof(
+        Ok(DataResponse::TransactionOutputsWithProof(
             transaction_output_list_with_proof,
         ))
     }
@@ -843,7 +871,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     fn get_transactions_with_proof(
         &self,
         request: &TransactionsWithProofRequest,
-    ) -> Result<StorageServiceResponse, Error> {
+    ) -> Result<DataResponse, Error> {
         let transactions_with_proof = self.storage.get_transactions_with_proof(
             request.proof_version,
             request.start_version,
@@ -851,9 +879,7 @@ impl<T: StorageReaderInterface> Handler<T> {
             request.include_events,
         )?;
 
-        Ok(StorageServiceResponse::TransactionsWithProof(
-            transactions_with_proof,
-        ))
+        Ok(DataResponse::TransactionsWithProof(transactions_with_proof))
     }
 }
 
@@ -1169,25 +1195,29 @@ fn inclusive_range_len(start: u64, end: u64) -> Result<u64, Error> {
 }
 
 /// Logs the response sent by storage for a peer request
-fn log_storage_response(storage_response: &Result<StorageServiceResponse, StorageServiceError>) {
+fn log_storage_response(
+    storage_request: StorageServiceRequest,
+    storage_response: &Result<StorageServiceResponse, StorageServiceError>,
+) {
     match storage_response {
         Ok(storage_response) => {
+            // We expect peers to be polling our storage server summary frequently,
+            // so only log this response periodically.
             if matches!(
-                storage_response,
-                StorageServiceResponse::StorageServerSummary(_)
+                storage_request.data_request,
+                DataRequest::GetStorageServerSummary
             ) {
-                // We expect peers to be polling our storage server summary frequently,
-                // so only log this response periodically.
                 sample!(
                     SampleRate::Duration(Duration::from_secs(SUMMARY_LOG_FREQUENCY_SECS)),
                     {
-                        let response = format!("{}", storage_response);
-                        debug!(LogSchema::new(LogEntry::SentStorageResponse).response(&response));
+                        if let Ok(data_response) = storage_response.get_data_response() {
+                            let response = format!("{}", data_response);
+                            debug!(
+                                LogSchema::new(LogEntry::SentStorageResponse).response(&response)
+                            );
+                        }
                     }
                 );
-            } else {
-                let response = format!("{}", storage_response);
-                debug!(LogSchema::new(LogEntry::SentStorageResponse).response(&response));
             }
         }
         Err(storage_error) => {
