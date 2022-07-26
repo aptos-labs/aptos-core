@@ -58,7 +58,8 @@
     <a title="Sign in" href="<%= new_user_session_path %>" class="h-8 font-mono font-bold text-sm flex items-center justify-center leading-none py-1 px-8 rounded-lg bg-teal-400 hover:brightness-105 text-neutral-800 z-20">Sign in</a>
   <% end %>
 
-  <button class="md:hidden flex-nowrap hover:text-teal-400" aria-label="Toggle navigation" data-action="click->header#toggleNav">
+  <button class="md:hidden flex-nowrap hover:text-teal-400" aria-label="Toggle navigation" data-header-target="navButton" data-action="click->header#toggleNav">
     <%= render IconComponent.new(:hamburger, size: :medium) %>
+    <%= render IconComponent.new(:close, size: :medium, class: 'hidden') %>
   </button>
 <% end %>
