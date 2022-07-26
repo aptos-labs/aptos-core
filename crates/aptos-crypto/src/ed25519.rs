@@ -32,7 +32,7 @@
 #![allow(clippy::integer_arithmetic)]
 
 use crate::{
-    hash::{CryptoHash, CryptoHasher},
+    hash::CryptoHash,
     traits::*,
 };
 use anyhow::{anyhow, Result};
@@ -407,10 +407,7 @@ impl Signature for Ed25519Signature {
         message: &T,
         public_key: &Ed25519PublicKey,
     ) -> Result<()> {
-        let mut bytes = <T::Hasher as CryptoHasher>::seed().to_vec();
-        bcs::serialize_into(&mut bytes, &message)
-            .map_err(|_| CryptoMaterialError::SerializationError)?;
-        Self::verify_arbitrary_msg(self, &bytes, public_key)
+        Self::verify_arbitrary_msg(self, &signing_message(message), public_key)
     }
 
     /// Checks that `self` is valid for an arbitrary &[u8] `message` using `public_key`.
