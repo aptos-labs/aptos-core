@@ -12,9 +12,9 @@
 # ensure the script is run from project root
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
 
-# for calculating regression
-TPS_THRESHOLD=5000
-P99_LATENCY_MS_THRESHOLD=8000
+# for calculating regression in local mode
+LOCAL_TPS_THRESHOLD=400
+LOCAL_P99_LATENCY_MS_THRESHOLD=60000
 
 # output files
 FORGE_OUTPUT=${FORGE_OUTPUT:-$(mktemp)}
@@ -168,7 +168,9 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     # more file descriptors for heavy txn generation
     ulimit -n 1048576
 
-    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --workers-per-ac 10 --avg-tps 300 --max-latency-ms 60000 test k8s-swarm \
+    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --workers-per-ac 10 --avg-tps $LOCAL_TPS_THRESHOLD \
+        --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD \
+        test k8s-swarm \
         --image-tag $IMAGE_TAG \
         --namespace $FORGE_NAMESPACE \
         --port-forward $REUSE_ARGS $KEEP_ARGS $ENABLE_HAPROXY_ARGS | tee $FORGE_OUTPUT
