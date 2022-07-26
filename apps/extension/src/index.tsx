@@ -13,6 +13,7 @@ import { Routes as PageRoutes } from 'core/routes';
 import { WalletStateProvider } from 'core/hooks/useWalletState';
 import { createStandaloneToast } from '@chakra-ui/toast';
 import SimulatedExtensionContainer from 'core/layouts/SimulatedExtensionContainer';
+import { StepsStyleConfig as Steps } from 'chakra-ui-steps';
 
 const { ToastContainer } = createStandaloneToast();
 
@@ -25,6 +26,9 @@ const { ToastContainer } = createStandaloneToast();
 // });
 
 const theme: ThemeConfig = extendTheme({
+  components: {
+    Steps,
+  },
   initialColorMode: 'light',
   styles: {
     global: {

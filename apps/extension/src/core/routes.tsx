@@ -6,7 +6,6 @@ import CreateWallet from 'pages/CreateWallet';
 import Credentials from 'pages/Credentials';
 import Gallery from 'pages/Gallery';
 import Help from 'pages/Help';
-import Login from 'pages/Login';
 import Network from 'pages/Network';
 import Password from 'pages/Password';
 import Settings from 'pages/Settings';
@@ -15,6 +14,7 @@ import Wallet from 'pages/Wallet';
 import React from 'react';
 import RecoveryPhrase from 'pages/RecoveryPhrase';
 import Transaction from 'pages/Transaction';
+import NoWallet from 'pages/NoWallet';
 
 export const Routes = Object.freeze({
   activity: {
@@ -37,13 +37,21 @@ export const Routes = Object.freeze({
     element: <Help />,
     routePath: '/help',
   },
+  importWallet: {
+    element: undefined,
+    routePath: '/import-wallet',
+  },
   login: {
-    element: <Login />,
+    element: <NoWallet />,
     routePath: '/',
   },
   network: {
     element: <Network />,
     routePath: '/settings/network',
+  },
+  noWallet: {
+    element: <NoWallet />,
+    routePath: '/no-wallet',
   },
   password: {
     element: <Password />,

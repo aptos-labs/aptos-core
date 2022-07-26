@@ -71,3 +71,8 @@ export const secondaryGridBgColor = {
   dark: 'gray.700',
   light: 'gray.100',
 };
+
+export const secondaryExtensionBodyTextColor = {
+  dark: 'gray.400',
+  light: 'gray.400',
+};

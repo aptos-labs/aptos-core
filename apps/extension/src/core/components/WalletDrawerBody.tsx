@@ -188,7 +188,7 @@ function WalletDrawerBody() {
   };
 
   const { getRadioProps, getRootProps } = useRadioGroup({
-    defaultValue: walletState.currAccountAddress,
+    defaultValue: walletState.currAccountAddress || undefined,
     name: 'aptosWalletAccount',
     onChange: onClick,
   });

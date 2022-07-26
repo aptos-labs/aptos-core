@@ -22,7 +22,14 @@ export default function Faucet() {
     isLoading: isFaucetLoading,
     mutateAsync: fundWithFaucet,
   } = useMutation(fundAccountWithFaucet, {
-    onSettled: () => {
+    onSettled: (_data, error) => {
+      if (error) {
+        toast({
+          description: `Error accessing faucet at ${faucetNetwork}: ${error}`,
+          status: 'error',
+          title: 'Faucet failure',
+        });
+      }
       queryClient.invalidateQueries('getAccountResources');
       Analytics.event({
         eventType: faucetEvents.RECEIVE_FAUCET,

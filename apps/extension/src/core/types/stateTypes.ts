@@ -17,8 +17,8 @@ export interface WalletAccount {
 }
 
 export interface LocalStorageState {
-  accounts?: {
+  accounts: {
     [address: string]: WalletAccount
-  },
-  currAccountAddress?: string;
+  } | null,
+  currAccountAddress: string | null;
 }

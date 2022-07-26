@@ -1,25 +1,33 @@
 import {
   Box,
+  Button,
   Center,
-  Heading,
-  HStack,
-  PinInput, PinInputField, useColorMode, VStack,
+  FormControl,
+  FormLabel,
+  Input,
+  useColorMode,
+  VStack,
 } from '@chakra-ui/react';
 import { AptosBlackLogo, AptosWhiteLogo } from 'core/components/AptosLogo';
 import { secondaryBgColor } from 'core/colors';
-import React, { useCallback, useState } from 'react';
+import React from 'react';
+import { SubmitHandler, useForm } from 'react-hook-form';
+
+interface FormValues {
+  password: string;
+}
 
 function Password() {
   const { colorMode } = useColorMode();
-  const [pin, setPin] = useState<string>('');
+  const { handleSubmit, register } = useForm<FormValues>({
+    defaultValues: {
+      password: '',
+    },
+  });
 
-  const pinOnChange = useCallback((value: string) => {
-    setPin(value);
-    if (value.length === 6) {
-      // eslint-disable-next-line no-alert
-      alert(pin);
-    }
-  }, [pin]);
+  const onSubmit: SubmitHandler<Record<string, any>> = async (_data, event) => {
+    event?.preventDefault();
+  };
 
   return (
     <VStack
@@ -38,21 +46,25 @@ function Password() {
           }
         </Box>
       </Center>
-      <VStack>
-        <Heading size="md" fontWeight={500} pb={2}>
-          Enter your passcode
-        </Heading>
-        <HStack>
-          <PinInput type="alphanumeric" mask autoFocus onChange={pinOnChange}>
-            <PinInputField />
-            <PinInputField />
-            <PinInputField />
-            <PinInputField />
-            <PinInputField />
-            <PinInputField />
-          </PinInput>
-        </HStack>
-      </VStack>
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <VStack gap={4}>
+          <FormControl display="flex" flexDir="column" isRequired alignItems="center">
+            <FormLabel requiredIndicator={<span />} fontSize="lg" fontWeight={500} pb={2}>
+              Enter your password
+            </FormLabel>
+            <Input
+              autoComplete="false"
+              variant="filled"
+              placeholder="Password..."
+              type="password"
+              {...register('password')}
+            />
+          </FormControl>
+          <Button width="100%" type="submit" colorScheme="teal">
+            Login
+          </Button>
+        </VStack>
+      </form>
     </VStack>
   );
 }

@@ -3550,6 +3550,21 @@
   resolved "https://registry.yarnpkg.com/@zag-js/focus-visible/-/focus-visible-0.1.0.tgz#9777bbaff8316d0b3a14a9095631e1494f69dbc7"
   integrity sha512-PeaBcTmdZWcFf7n1aM+oiOdZc+sy14qi0emPIeUuGMTjbP0xLGrZu43kdpHnWSXy7/r4Ubp/vlg50MCV8+9Isg==
 
+"@zxcvbn-ts/core@^2.0.3":
+  version "2.0.3"
+  resolved "https://registry.yarnpkg.com/@zxcvbn-ts/core/-/core-2.0.3.tgz#fbe92b3607e20f634f26fc68695eaf03813d1638"
+  integrity sha512-lHzjnnTFGquVLpG1IraXlDzZ//h/11Ws7ZuwIeDTIExaLFntEdZh1EirwgRF34S4ceou3zxG15as2Ik5W473hA==
+
+"@zxcvbn-ts/language-common@^2.0.1":
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/@zxcvbn-ts/language-common/-/language-common-2.0.1.tgz#01c371a64e86de417c317b4443aaa0a0f07f917b"
+  integrity sha512-P+v5MA/UNc9nb3FEOEoDgTyIGQc2vLc6m04pdf5YyuNOzrL0iNANhECk2TUp62JbrjouJVodqhMH0j1a8/24Bg==
+
+"@zxcvbn-ts/language-en@^2.0.1":
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/@zxcvbn-ts/language-en/-/language-en-2.0.1.tgz#75c18109f71c9fc03680259f6d2a2ab8d63499f3"
+  integrity sha512-lxwaeCJWzZdbncA+oEctZxlL05dwGCU1JSWaPztz+ItptLQfcajn16E96o+LAF/pR35wkRZf6z+Qk5mmStHWCA==
+
 abab@^2.0.3, abab@^2.0.5:
   version "2.0.6"
   resolved "https://registry.yarnpkg.com/abab/-/abab-2.0.6.tgz#41b80f2c871d19686216b82309231cfd3cb3d291"
@@ -4399,6 +4414,11 @@ ccount@^2.0.0:
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/ccount/-/ccount-2.0.1.tgz#17a3bf82302e0870d6da43a01311a8bc02a3ecf5"
   integrity sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg==
+
+chakra-ui-steps@^1.7.3:
+  version "1.7.3"
+  resolved "https://registry.yarnpkg.com/chakra-ui-steps/-/chakra-ui-steps-1.7.3.tgz#58d014fc81a7ab94167e6e811fbfeacb98179f08"
+  integrity sha512-R4EjZAjw1Rmw6otAr9OM2qRfaQmQFfds2puwRgV6t0oGVV7qnIubMK7weGYj7QoaZh/m6w6IlAPGrJYVcmkfEQ==
 
 chalk@^1.1.3:
   version "1.1.3"

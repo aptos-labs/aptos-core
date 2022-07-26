@@ -11,6 +11,12 @@ import { wordlist } from '@scure/bip39/wordlists/english';
 
 import Browser from 'core/utils/browser';
 
+export async function generateMnemonicObject(mnemonicString: string): Promise<Mnemonic> {
+  const seed = await bip39.mnemonicToSeed(mnemonicString);
+  const bufferSeed = new Uint8Array(seed.buffer);
+  return { mnemonic: mnemonicString, seed: bufferSeed };
+}
+
 export async function createNewMnemonic(): Promise<Mnemonic> {
   const mnemonic = bip39.generateMnemonic(wordlist);
   const seed = await bip39.mnemonicToSeed(mnemonic);

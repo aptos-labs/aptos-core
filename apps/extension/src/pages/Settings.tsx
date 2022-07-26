@@ -22,7 +22,7 @@ import SettingsListItem from 'core/components/SettingsListItem';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
 import { secondaryTextColor } from 'core/colors';
-import { CredentialHeaderAndBodyProps } from './CreateWallet';
+import { CredentialHeaderAndBodyProps } from 'core/components/CredentialsBody';
 
 export function CredentialRow({
   body,

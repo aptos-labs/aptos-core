@@ -13,11 +13,42 @@ import {
   DrawerContent,
   DrawerHeader,
   DrawerBody,
+  Tooltip,
+  useClipboard,
+  Text,
 } from '@chakra-ui/react';
 import React from 'react';
 import useWalletState from 'core/hooks/useWalletState';
-import { CredentialHeaderAndBody } from 'pages/CreateWallet';
 import { CredentialRow } from 'pages/Settings';
+
+export interface CredentialHeaderAndBodyProps {
+  body?: string;
+  header: string;
+}
+
+export function CredentialHeaderAndBody({
+  body,
+  header,
+}: CredentialHeaderAndBodyProps) {
+  const { hasCopied, onCopy } = useClipboard(body || '');
+  return (
+    <VStack spacing={2} maxW="100%" alignItems="flex-start">
+      <Tag>
+        {header}
+      </Tag>
+      <Tooltip label={hasCopied ? 'Copied!' : 'Copy'} closeDelay={300}>
+        <Text
+          fontSize="sm"
+          cursor="pointer"
+          wordBreak="break-word"
+          onClick={onCopy}
+        >
+          {body}
+        </Text>
+      </Tooltip>
+    </VStack>
+  );
+}
 
 export default function CredentialsBody() {
   const { isOpen, onClose, onOpen } = useDisclosure();

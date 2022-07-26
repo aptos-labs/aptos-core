@@ -24,8 +24,8 @@ import {
 } from 'core/components/Toast';
 
 const defaultValue: LocalStorageState = {
-  accounts: undefined,
-  currAccountAddress: undefined,
+  accounts: null,
+  currAccountAddress: null,
 };
 
 export interface UpdateWalletStateProps {
@@ -95,6 +95,7 @@ export default function useWalletState() {
     } catch (err) {
       addAccountErrorToast();
       console.error(err);
+      throw err;
     }
   }, [aptosNetwork, faucetNetwork, localStorageState]);
 
@@ -137,9 +138,9 @@ export default function useWalletState() {
   const removeAccount = useCallback(({
     accountAddress,
   }: RemoveAccountProps) => {
-    let newAccountAddress: string | undefined;
+    let newAccountAddress: string | null = null;
     let toastMessage = `Still using account with address: ${accountAddress?.substring(0, 6)}...`;
-    let localStorageStateCopy = { ...localStorageState };
+    let localStorageStateCopy: LocalStorageState = { ...localStorageState };
     if (
       !accountAddress
       || !localStorageStateCopy.accounts
@@ -151,18 +152,18 @@ export default function useWalletState() {
     delete localStorageStateCopy.accounts[accountAddress];
 
     if (Object.keys(localStorageStateCopy.accounts).length === 0) {
-      newAccountAddress = undefined;
+      newAccountAddress = null;
       toastMessage = 'No other accounts in wallet, signing out';
     } else if (accountAddress === currAccountAddress) {
       // switch to another account in wallet
       if (Object.keys(localStorageStateCopy.accounts).length >= 1) {
         newAccountAddress = localStorageStateCopy.accounts[
           Object.keys(localStorageStateCopy.accounts)[0]
-        ].aptosAccount.address;
+        ].aptosAccount.address!;
       }
       toastMessage = `Switching to account with address: ${newAccountAddress?.substring(0, 6)}...`;
     } else {
-      newAccountAddress = currAccountAddress;
+      newAccountAddress = currAccountAddress || null;
       toastMessage = `Using the same account with address: ${newAccountAddress?.substring(0, 6)}...`;
     }
 

@@ -24,6 +24,7 @@ export default function AuthLayout({
       case '/':
       case '/create-wallet':
       case '/help':
+      case '/no-wallet':
         return '/wallet';
       case '/gallery':
       case '/password':
@@ -44,6 +45,7 @@ export default function AuthLayout({
     case '/':
     case '/create-wallet':
     case '/help':
+    case '/no-wallet':
       return aptosAccount ? redirect : page;
     case '/gallery':
     case '/password':
