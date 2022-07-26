@@ -16,10 +16,7 @@ use aptos_sdk::{
         LocalAccount,
     },
 };
-use aptos_sf_stream_types::{
-    mime_types, HexEncodedBytes, TransactionOnChainData, X_APTOS_CHAIN_ID,
-    X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
-};
+use aptos_sf_stream_types::{mime_types, HexEncodedBytes, TransactionOnChainData};
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::AccountAddress,
@@ -38,6 +35,8 @@ use hyper::Response;
 use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
 
+use aptos_api::context::Context;
+use aptos_api_types::{HexEncodedBytes, TransactionOnChainData};
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use rand::SeedableRng;
@@ -45,7 +44,6 @@ use serde_json::{json, Value};
 use std::{boxed::Box, collections::BTreeMap, iter::once, sync::Arc};
 use storage_interface::state_view::DbStateView;
 use vm_validator::vm_validator::VMValidator;
-use warp::http::header::CONTENT_TYPE;
 
 pub fn new_test_context(test_name: &'static str) -> TestContext {
     let tmp_dir = TempPath::new();
@@ -184,20 +182,6 @@ impl TestContext {
         )
     }
 
-    pub fn create_invalid_signature_transaction(&mut self) -> SignedTransaction {
-        let factory = self.transaction_factory();
-        let root_account = self.root_account();
-        let txn = factory
-            .transfer(root_account.address(), 1)
-            .sender(root_account.address())
-            .sequence_number(root_account.sequence_number())
-            .build();
-        let invalid_key = AccountKey::generate(self.rng());
-        txn.sign(invalid_key.private_key(), root_account.public_key().clone())
-            .unwrap()
-            .into_inner()
-    }
-
     pub fn get_latest_ledger_info(&self) -> aptos_sf_stream_types::LedgerInfo {
         self.context.get_latest_ledger_info().unwrap()
     }
@@ -268,141 +252,6 @@ impl TestContext {
             .notify_new_commit(txns, timestamp, 1000)
             .await
             .unwrap();
-    }
-
-    pub async fn api_get_account_resource(
-        &self,
-        account: &LocalAccount,
-        type_name: String,
-    ) -> serde_json::Value {
-        let resources = self
-            .get(&format!(
-                "/accounts/{}/resources",
-                account.address().to_hex_literal()
-            ))
-            .await;
-        let vals: Vec<serde_json::Value> = serde_json::from_value(resources).unwrap();
-        vals.into_iter().find(|v| v["type"] == type_name).unwrap()
-    }
-
-    pub async fn api_execute_script_function(
-        &mut self,
-        account: &mut LocalAccount,
-        func_id: &str,
-        type_args: serde_json::Value,
-        args: serde_json::Value,
-    ) {
-        self.api_execute_txn(
-            account,
-            json!({
-                "type": "script_function_payload",
-                "function": format!("{}::{}", account.address().to_hex_literal(), func_id),
-                "type_arguments": type_args,
-                "arguments": args
-            }),
-        )
-        .await;
-    }
-
-    pub async fn api_publish_module(&mut self, account: &mut LocalAccount, code: HexEncodedBytes) {
-        self.api_execute_txn(
-            account,
-            json!({
-                "type": "module_bundle_payload",
-                "modules" : [
-                    {"bytecode": code},
-                ],
-            }),
-        )
-        .await;
-    }
-
-    pub async fn api_execute_txn(&mut self, account: &mut LocalAccount, payload: Value) {
-        let mut request = json!({
-            "sender": account.address(),
-            "sequence_number": account.sequence_number().to_string(),
-            "gas_unit_price": "0",
-            "max_gas_amount": "1000000",
-            "gas_currency_code": "XUS",
-            "expiration_timestamp_secs": "16373698888888",
-            "payload": payload,
-        });
-        let resp = self
-            .post("/transactions/signing_message", request.clone())
-            .await;
-
-        let signing_msg: HexEncodedBytes = resp["message"].as_str().unwrap().parse().unwrap();
-
-        let sig = account
-            .private_key()
-            .sign_arbitrary_message(signing_msg.inner());
-
-        request["signature"] = json!({
-            "type": "ed25519_signature",
-            "public_key": HexEncodedBytes::from(account.public_key().to_bytes().to_vec()),
-            "signature": HexEncodedBytes::from(sig.to_bytes().to_vec()),
-        });
-
-        self.expect_status_code(202)
-            .post("/transactions", request)
-            .await;
-        self.commit_mempool_txns(1).await;
-        *account.sequence_number_mut() += 1;
-    }
-
-    pub async fn get(&self, path: &str) -> Value {
-        self.execute(warp::test::request().method("GET").path(path))
-            .await
-    }
-
-    pub async fn post(&self, path: &str, body: Value) -> Value {
-        self.execute(warp::test::request().method("POST").path(path).json(&body))
-            .await
-    }
-
-    pub async fn post_bcs_txn(&self, path: &str, body: impl AsRef<[u8]>) -> Value {
-        self.execute(
-            warp::test::request()
-                .method("POST")
-                .path(path)
-                .header(CONTENT_TYPE, mime_types::BCS_SIGNED_TRANSACTION)
-                .body(body),
-        )
-        .await
-    }
-
-    pub async fn reply(&self, req: warp::test::RequestBuilder) -> Response<Bytes> {
-        req.reply(&index::routes(self.context.clone())).await
-    }
-
-    pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {
-        let resp = self.reply(req).await;
-
-        let headers = resp.headers();
-        assert_eq!(headers[CONTENT_TYPE], mime_types::JSON);
-
-        let body = serde_json::from_slice(resp.body()).expect("response body is JSON");
-        assert_eq!(
-            self.expect_status_code,
-            resp.status(),
-            "\nresponse: {}",
-            pretty(&body)
-        );
-
-        if self.expect_status_code < 300 {
-            let ledger_info = self.get_latest_ledger_info();
-            assert_eq!(headers[X_APTOS_CHAIN_ID], "4");
-            assert_eq!(
-                headers[X_APTOS_LEDGER_VERSION],
-                ledger_info.version().to_string()
-            );
-            assert_eq!(
-                headers[X_APTOS_LEDGER_TIMESTAMP],
-                ledger_info.timestamp().to_string()
-            );
-        }
-
-        body
     }
 
     fn new_block_metadata(&mut self) -> BlockMetadata {

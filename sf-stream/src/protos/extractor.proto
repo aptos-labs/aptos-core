@@ -28,8 +28,8 @@ message BlockMetadataTransaction {
   uint64 round = 2;
   repeated Event events = 3;
   repeated bool previous_block_votes = 4;
-  AccountAddress proposer = 5;
-  repeated int32 failed_proposer_indices = 6;
+  string proposer = 5;
+  repeated uint32 failed_proposer_indices = 6;
 }
 
 message GenesisTransaction {
@@ -65,11 +65,11 @@ message TransactionInfo {
 
 message EventKey {
   uint64 creation_number = 1;
-  AccountAddress account_address = 2;
+  string account_address = 2;
 }
 
 message UserTransactionRequest {
-  AccountAddress sender = 1;
+  string sender = 1;
   uint64 sequence_number = 2;
   uint64 max_gas_amount = 3;
   uint64 gas_unit_price = 4;
@@ -93,7 +93,7 @@ message WriteSet {
 }
 
 message ScriptWriteSet {
-  AccountAddress execute_as = 1;
+  string execute_as = 1;
   ScriptPayload script = 2;
 }
 
@@ -125,13 +125,13 @@ message WriteSetChange {
 }
 
 message DeleteModule {
-  AccountAddress address = 1;
+  string address = 1;
   string state_key_hash = 2;
   MoveModuleId module = 3;
 }
 
 message DeleteResource {
-  AccountAddress address = 1;
+  string address = 1;
   string state_key_hash = 2;
   MoveStructTag resource = 3;
 }
@@ -143,13 +143,13 @@ message DeleteTableItem {
 }
 
 message WriteModule {
-  AccountAddress address = 1;
+  string address = 1;
   string state_key_hash = 2;
   string data = 3;
 }
 
 message WriteResource {
-  AccountAddress address = 1;
+  string address = 1;
   string state_key_hash = 2;
   MoveResource data = 3;
 }
@@ -159,10 +159,6 @@ message WriteTableItem {
   string handle = 2;
   string key = 3;
   string value = 4;
-}
-
-message AccountAddress {
-  repeated uint64 address = 1;
 }
 
 message TransactionPayload {
@@ -214,12 +210,12 @@ message MoveResource {
 }
 
 message MoveModuleId {
-  AccountAddress address = 1;
+  string address = 1;
   string name = 2;
 }
 
 message MoveStructTag {
-  AccountAddress address = 1;
+  string address = 1;
   string module = 2;
   string name = 3;
   repeated string generic_type_params = 4;
@@ -255,7 +251,7 @@ message MultiEd25519Signature {
 
 message MultiAgentSignature {
   AccountSignature sender = 1;
-  repeated AccountAddress secondary_signer_addresses = 2;
+  repeated string secondary_signer_addresses = 2;
   repeated AccountSignature secondary_signers = 3;
 }
 
