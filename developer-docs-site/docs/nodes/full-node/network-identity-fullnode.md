@@ -92,17 +92,6 @@ Follow the below detailed steps:
   B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813%
   ```
 
-  **Using Docker**
-
-  Run this step from inside the `aptoslabs/tools` Docker container. Open a new terminal and `cd` into the directory where you started the Docker container for your FullNode. Making sure to provide the full path to where you want the private key TXT file to be stored, run the command as below:
-
-  ```
-  aptos-operational-tool generate-key \
-      --encoding hex \
-      --key-type x25519 \
-      --key-file /path/to/private-key.txt
-  ```
-
 3. Retrieve the peer identity
   
   **Using Aptos-core source code**
@@ -111,17 +100,6 @@ Follow the below detailed steps:
   aptos key extract-peer  --private-key-file private-key.txt  \
       --output-file peer-info.yaml
   ```
-
-   **Using Docker**
-
-   From inside the `aptoslabs/tools` Docker container:
-
-   ```
-   $ aptos-operational-tool extract-peer-from-file \
-       --encoding hex \
-       --key-file /path/to/private-key.txt \
-       --output-file /path/to/peer-info.yaml
-   ```
 
   This will create a YAML file that will have your `peer_id` corresponding to the `private-key.txt` you provided.
 
