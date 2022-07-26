@@ -8,7 +8,11 @@
     <ul class="flex flex-col md:flex-row gap-8 w-full md:h-full">
     <% nav_groups.each do |group| %>
       <li class="group relative md:flex items-center">
-        <%= content_tag :a, group.item.name, href: group.item.url, title: group.item.title, class: 'py-2 text-lg md:text-base text-neutral-100 hover:text-teal-400 md:hover:text-white', target: group.item.url.starts_with?('http') ? '_blank' : '' %>
+        <% if group.item.url %>
+          <%= content_tag :a, group.item.name, href: group.item.url, title: group.item.title, class: 'py-2 text-lg md:text-base text-neutral-100 hover:text-teal-400 md:hover:text-white', target: group.item.url.starts_with?('http') ? '_blank' : '' %>
+        <% else %>
+          <%= content_tag :span, group.item.name, title: group.item.title, class: 'py-2 text-lg md:text-base text-neutral-100 hover:text-teal-400 md:hover:text-white' %>
+        <% end %>
         <% if group.children.length > 0 %>
         <div class="absolute hidden md:group-focus-within:flex md:group-hover:flex h-[3px] bottom-0 left-0 right-0 rounded bg-teal-400"></div>
         <div class="md:hidden md:group-focus-within:flex md:group-hover:flex md:absolute md:top-full md:-ml-8">

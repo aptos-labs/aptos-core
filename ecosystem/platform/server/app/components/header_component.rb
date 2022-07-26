@@ -23,14 +23,14 @@ class HeaderComponent < ViewComponent::Base
       ]
     ),
     NavGroup.new(
-      NavItem.new('#', 'Network', 'Aptos Network'),
+      NavItem.new(nil, 'Network', 'Aptos Network'),
       [
         NavItem.new('https://explorer.devnet.aptos.dev/', 'Explorer', 'Aptos Explorer'),
         NavItem.new('https://status.devnet.aptos.dev/', 'Network Status', 'Aptos Network Status')
       ]
     ),
     NavGroup.new(
-      NavItem.new('#', 'About', 'About Aptos'),
+      NavItem.new(nil, 'About', 'About Aptos'),
       [
         NavItem.new('https://aptoslabs.com/careers', 'Careers', 'Aptos Careers')
       ]
