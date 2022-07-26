@@ -7470,6 +7470,7 @@ dependencies = [
  "aptos-global-constants",
  "aptos-indexer",
  "aptos-infallible",
+ "aptos-keygen",
  "aptos-logger",
  "aptos-management",
  "aptos-operational-tool",

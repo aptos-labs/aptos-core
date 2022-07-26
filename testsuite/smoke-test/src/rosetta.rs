@@ -29,7 +29,7 @@ pub async fn setup_test(
     num_nodes: usize,
     num_accounts: usize,
 ) -> (LocalSwarm, CliTestFramework, JoinHandle<()>, RosettaClient) {
-    let (swarm, cli, faucet) = setup_cli_test(num_nodes).await;
+    let (swarm, cli, faucet) = setup_cli_test(num_nodes, num_accounts).await;
     let validator = swarm.validators().next().unwrap();
 
     // And the client

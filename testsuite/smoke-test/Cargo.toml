@@ -25,6 +25,7 @@ aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-faucet = { path = "../../crates/aptos-faucet" }
 aptos-indexer = { path = "../../ecosystem/indexer" }
+aptos-keygen = { path = "../../crates/aptos-keygen" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-rosetta = { path = "../../crates/aptos-rosetta" }
 aptos-sdk = { path = "../../sdk" }
