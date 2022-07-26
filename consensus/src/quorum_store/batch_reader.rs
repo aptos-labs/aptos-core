@@ -149,9 +149,11 @@ impl BatchReader {
         };
 
         let mut expired_keys = Vec::new();
+        debug!("QS: Batchreader {} {} {}", db_content.len(), epoch, last_committed_round);
         for (digest, value) in db_content {
             let expiration = value.expiration;
-            assert!(epoch >= expiration.epoch());
+            debug!("QS: Batchreader recovery content exp {:?}, digest {}", expiration, digest);
+            assert!(epoch >= expiration.epoch()); // TODO: think.
             if epoch > expiration.epoch()
                 || last_committed_round > expiration.round() + expiry_grace_rounds
             {
@@ -163,6 +165,7 @@ impl BatchReader {
             }
         }
 
+        debug!("QS: Batchreader recovery expired keys len {}", expired_keys.len());
         (self_ob, expired_keys)
     }
 

@@ -84,6 +84,7 @@ impl BatchStore {
         db_quota: usize,
     ) -> (Self, Arc<BatchReader>) {
         let db_content = db.get_all_batches().expect("failed to read data from db");
+        debug!("QS: db size {}", db_content.len());
 
         let (batch_reader, expired_keys) = BatchReader::new(
             epoch,
@@ -167,6 +168,7 @@ impl BatchStore {
     }
 
     pub async fn start(self, mut batch_store_rx: Receiver<BatchStoreCommand>) {
+        debug!("QS: starting bacth store");
         while let Some(command) = batch_store_rx.recv().await {
             match command {
                 BatchStoreCommand::Persist(persist_request, maybe_tx) => {
@@ -235,5 +237,6 @@ impl BatchStore {
                 }
             }
         }
+        debug!("QS: batch store is done. Epoch {}", self.epoch);
     }
 }
