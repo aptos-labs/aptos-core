@@ -6,7 +6,7 @@ use crate::quorum_store::schema::{BatchIdSchema, BatchSchema, BATCH_CF_NAME, BAT
 use crate::quorum_store::types::{BatchId, PersistedValue};
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_logger::info;
+use aptos_logger::{debug, info};
 use consensus_types::common::Round;
 use schemadb::{Options, ReadOptions, SchemaBatch, DB};
 use std::{collections::HashMap, path::Path, time::Instant};
@@ -44,6 +44,7 @@ impl QuorumStoreDB {
     pub(crate) fn delete_batches(&self, digests: Vec<HashValue>) -> Result<(), DbError> {
         let mut batch = SchemaBatch::new();
         for digest in digests.iter() {
+            debug!("QS: db delete digest {}", digest);
             batch.delete::<BatchSchema>(digest)?;
         }
         self.db.write_schemas(batch)?;
@@ -61,6 +62,7 @@ impl QuorumStoreDB {
         digest: HashValue,
         batch: PersistedValue,
     ) -> Result<(), DbError> {
+        debug!("QS: db persists digest {} expiration {:?}", digest, batch.expiration);
         Ok(self.db.put::<BatchSchema>(&digest, &batch)?)
     }
 
