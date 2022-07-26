@@ -184,7 +184,7 @@ impl DataManager for QuorumStoreDataManager {
                         proofs.clone(),
                         LogicalTime::new(block.epoch(), block.round()),
                     )
-                    .await
+                        .await
                 };
                 let mut vec_ret = Vec::new();
                 debug!("QSE: waiting for data on {} receivers", receivers.len());
@@ -198,6 +198,7 @@ impl DataManager for QuorumStoreDataManager {
                             vec_ret.push(data);
                         }
                         Err(e) => {
+                            debug!("QS: got error from receiver {:?}", e );
                             self.digest_status.insert(block.id(), DataStatus::Remote);
                             return Err(e);
                         }
@@ -216,6 +217,7 @@ impl DataManager for QuorumStoreDataManager {
         data_reader: Arc<BatchReader>,
         quorum_store_wrapper_tx: Sender<WrapperCommand>,
     ) {
+        // TODO: check race here.
         self.data_reader.swap(Some(data_reader));
         self.quorum_store_wrapper_tx
             .swap(Some(Arc::from(quorum_store_wrapper_tx)));

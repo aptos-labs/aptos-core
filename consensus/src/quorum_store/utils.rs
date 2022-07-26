@@ -17,6 +17,7 @@ use std::{
     time::Duration,
 };
 use tokio::time::timeout;
+use aptos_logger::debug;
 
 pub(crate) struct BatchBuilder {
     id: BatchId,
@@ -99,6 +100,7 @@ impl DigestTimeouts {
 
     pub(crate) fn expire(&mut self) -> Vec<HashValue> {
         let cur_time = chrono::Utc::now().naive_utc().timestamp_millis();
+        debug!("QS: expire cur time {} timeouts len {}", cur_time, self.timeouts.len());
         let num_expired = self
             .timeouts
             .iter()
