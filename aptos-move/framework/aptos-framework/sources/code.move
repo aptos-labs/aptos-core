@@ -124,14 +124,14 @@ module aptos_framework::code {
         };
 
         // Request publish
-        native_request_publish(addr, module_names, code, pack.upgrade_policy.policy)
+        request_publish(addr, module_names, code, pack.upgrade_policy.policy)
     }
 
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
     /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
     public entry fun publish_package_txn(owner: &signer, pack_serialized: vector<u8>, code: vector<vector<u8>>)
     acquires PackageRegistry {
-        publish_package(owner, native_from_bytes<PackageMetadata>(pack_serialized), code)
+        publish_package(owner, from_bytes<PackageMetadata>(pack_serialized), code)
     }
 
     // Helpers
@@ -139,9 +139,10 @@ module aptos_framework::code {
 
     /// Checks whether the given package is upgradable, and returns true if a compatibility check is needed.
     fun check_upgradability(old_pack: &PackageMetadata, new_pack: &PackageMetadata) {
-        assert!(old_pack.upgrade_policy.policy < upgrade_policy_immutable().policy, EUPGRADE_IMMUTABLE);
-        assert!(can_change_upgrade_policy_to(
-                old_pack.upgrade_policy, new_pack.upgrade_policy), EUPGRADE_WEAKER_POLICY);
+        assert!(old_pack.upgrade_policy.policy < upgrade_policy_immutable().policy,
+            error::invalid_argument(EUPGRADE_IMMUTABLE));
+        assert!(can_change_upgrade_policy_to( old_pack.upgrade_policy, new_pack.upgrade_policy),
+            error::invalid_argument(EUPGRADE_WEAKER_POLICY));
     }
 
     /// Checks whether a new package with given names can co-exist with old package.
@@ -163,13 +164,14 @@ module aptos_framework::code {
         let module_names = vector::empty();
         let i = 0;
         while (i < vector::length(&pack.modules)) {
-            vector::push_back(&mut module_names, vector::borrow(&pack.modules, i).name)
+            vector::push_back(&mut module_names, vector::borrow(&pack.modules, i).name);
+            i = i + 1
         };
         module_names
     }
 
     /// Native function to initiate module loading
-    native fun native_request_publish(
+    native fun request_publish(
         owner: address,
         expected_modules: vector<String>,
         bundle: vector<vector<u8>>,
@@ -179,5 +181,5 @@ module aptos_framework::code {
     /// Native function to deserialize a type T.
     /// TODO: may want to move it in extra module if needed also in other places inside of the Fx.
     /// However, should not make this function public outside of the Fx.
-    native fun native_from_bytes<T: copy+drop>(bytes: vector<u8>): PackageMetadata;
+    native fun from_bytes<T: copy+drop>(bytes: vector<u8>): PackageMetadata;
 }

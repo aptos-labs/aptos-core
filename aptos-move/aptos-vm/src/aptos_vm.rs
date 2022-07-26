@@ -347,7 +347,7 @@ impl AptosVM {
             // it is ok to not have init_module function
             // init_module function should be (1) private and (2) has no return value
             if init_function.is_ok() {
-                if verify_module_init_function(&module).is_ok() {
+                if verify_module_init_function(module).is_ok() {
                     let args: Vec<Vec<u8>> = senders
                         .iter()
                         .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
