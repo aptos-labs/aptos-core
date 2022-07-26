@@ -207,11 +207,12 @@ impl StateComputer for ExecutionProxy {
 
     /// Synchronize to a commit that not present locally.
     async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+        let _guard = self.write_mutex.lock().await;
+
         // Before the state synchronization, we have to call finish() to free the in-memory SMT
         // held by BlockExecutor to prevent memory leak.
-        self.executor.finish()?;
+        self.executor.finish();
 
-        let _guard = self.write_mutex.lock().await;
         fail_point!("consensus::sync_to", |_| {
             Err(anyhow::anyhow!("Injected error in sync_to").into())
         });

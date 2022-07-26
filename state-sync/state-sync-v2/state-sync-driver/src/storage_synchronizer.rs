@@ -96,7 +96,7 @@ pub trait StorageSynchronizerInterface {
 
     /// Finish the chunk executor at this round of state sync by releasing
     /// any in-memory resources to prevent memory leak.
-    fn finish_chunk_executor(&self) -> Result<(), Error>;
+    fn finish_chunk_executor(&self);
 }
 
 /// The implementation of the `StorageSynchronizerInterface` used by state sync
@@ -324,13 +324,8 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizerInterface
         })
     }
 
-    fn finish_chunk_executor(&self) -> Result<(), Error> {
-        self.chunk_executor.finish().map_err(|error| {
-            Error::UnexpectedError(format!(
-                "Failed to reset the chunk executor! Error: {:?}",
-                error
-            ))
-        })
+    fn finish_chunk_executor(&self) {
+        self.chunk_executor.finish()
     }
 }
 

@@ -55,7 +55,7 @@ use crate::{
 };
 use anyhow::{ensure, Result};
 use aptos_config::config::{RocksdbConfigs, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
-use aptos_crypto::hash::{HashValue, SPARSE_MERKLE_PLACEHOLDER_HASH};
+use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::epoch_state::EpochState;
@@ -1126,17 +1126,12 @@ impl DbReader for AptosDB {
                                 frozen_subtrees,
                                 num_txns,
                             )?);
-                            // For now, we know there must be a state snapshot at `committed_version`. We need to recover checkpoint after make commit async.
-                            let (committed_version, committed_root_hash) = if let Some((version, hash)) = self
-                                .state_store
-                                .get_state_snapshot_before(num_txns)?
-                            {
-                                (Some(version), hash)
-                            } else {
-                                (None, *SPARSE_MERKLE_PLACEHOLDER_HASH)
-                            };
-
-                            let committed_trees = ExecutedTrees::new(StateDelta::new_at_checkpoint(committed_root_hash, committed_version), transaction_accumulator);
+                            let committed_trees = ExecutedTrees::new(StateDelta::new(executed_trees.state().base.clone(),
+                                                                                     executed_trees.state().base_version,
+                                                                                     executed_trees.state().base.clone(),
+                                                                                     executed_trees.state().base_version,
+                                HashMap::new()
+                            ), transaction_accumulator);
                             StartupInfo::new(
                                 latest_ledger_info,
                                 latest_epoch_state_if_not_in_li,
