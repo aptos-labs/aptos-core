@@ -264,7 +264,7 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
     }
 
     // Fork starts. Should fail.
-    chunk_manager.finish().unwrap();
+    chunk_manager.finish();
     chunk_manager.reset().unwrap();
 
     assert!(chunk_manager

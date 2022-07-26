@@ -51,7 +51,7 @@ struct Args {
 #[structopt(about = "Forge success criteria that includes a bunch of performance metrics")]
 pub struct SuccessCriteriaArgs {
     // general options
-    #[structopt(long, default_value = "5000")]
+    #[structopt(long, default_value = "3500")]
     avg_tps: usize,
     #[structopt(long, default_value = "8000")]
     max_latency_ms: usize,

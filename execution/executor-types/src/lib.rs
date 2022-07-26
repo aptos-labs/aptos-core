@@ -78,7 +78,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
     fn reset(&self) -> Result<()>;
 
     /// Finishes the chunk executor by releasing memory held by inner data structures(SMT).
-    fn finish(&self) -> Result<()>;
+    fn finish(&self);
 }
 
 pub struct StateSnapshotDelta {
@@ -130,7 +130,7 @@ pub trait BlockExecutorTrait: Send + Sync {
     }
 
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
-    fn finish(&self) -> Result<()>;
+    fn finish(&self);
 }
 
 pub trait TransactionReplayer: Send {
