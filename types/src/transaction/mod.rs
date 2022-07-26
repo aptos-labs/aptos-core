@@ -40,7 +40,7 @@ mod module;
 mod script;
 mod transaction_argument;
 
-pub use change_set::ChangeSet;
+pub use change_set::{ChangeSet, ChangeSetWithDeltas};
 pub use module::{Module, ModuleBundle};
 pub use script::{
     ArgumentABI, Script, ScriptABI, ScriptFunction, ScriptFunctionABI, TransactionScriptABI,
@@ -948,6 +948,45 @@ impl TransactionOutput {
             status,
         } = self;
         (write_set, events, gas_used, status)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransactionOutputWithDeltas {
+    // TODO: add deltas here (same as in ChangeSetWithDeltas).
+    output: TransactionOutput,
+}
+
+impl TransactionOutputWithDeltas {
+    pub fn new(output: TransactionOutput) -> Self {
+        TransactionOutputWithDeltas { output }
+    }
+
+    pub fn write_set(&self) -> &WriteSet {
+        &self.output.write_set
+    }
+
+    pub fn events(&self) -> &[ContractEvent] {
+        &self.output.events
+    }
+
+    pub fn gas_used(&self) -> u64 {
+        self.output.gas_used
+    }
+
+    pub fn status(&self) -> &TransactionStatus {
+        &self.output.status
+    }
+
+    pub fn into(self) -> TransactionOutput {
+        self.output
+    }
+}
+
+impl From<TransactionOutput> for TransactionOutputWithDeltas {
+    fn from(output: TransactionOutput) -> Self {
+        // Create empty deltas.
+        TransactionOutputWithDeltas { output }
     }
 }
 

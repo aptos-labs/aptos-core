@@ -27,3 +27,18 @@ impl ChangeSet {
         &self.events
     }
 }
+
+pub struct ChangeSetWithDeltas {
+    // TODO: add deltas here.
+    change_set: ChangeSet,
+}
+
+impl ChangeSetWithDeltas {
+    pub fn new(change_set: ChangeSet) -> Self {
+        ChangeSetWithDeltas { change_set }
+    }
+
+    pub fn into_inner(self) -> ChangeSet {
+        self.change_set
+    }
+}
