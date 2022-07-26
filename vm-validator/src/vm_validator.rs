@@ -13,11 +13,10 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use fail::fail_point;
 use scratchpad::SparseMerkleTree;
-use std::ops::Deref;
 use std::sync::Arc;
-use storage_interface::no_proof_fetcher::NoProofFetcher;
 use storage_interface::{
-    cached_state_view::CachedStateView, state_view::LatestDbStateCheckpointView, DbReader,
+    cached_state_view::CachedStateView, no_proof_fetcher::NoProofFetcher,
+    state_view::LatestDbStateCheckpointView, DbReader,
 };
 
 #[cfg(test)]
@@ -37,7 +36,7 @@ pub trait TransactionValidation: Send + Sync + Clone {
     fn notify_commit(&mut self);
 }
 
-fn latest_state_view(db_reader: &Arc<dyn DbReader>) -> CachedStateView<NoProofFetcher> {
+fn latest_state_view(db_reader: &Arc<dyn DbReader>) -> CachedStateView {
     let ledger_view = db_reader
         .get_latest_executed_trees()
         .expect("Should not fail.");
@@ -46,17 +45,17 @@ fn latest_state_view(db_reader: &Arc<dyn DbReader>) -> CachedStateView<NoProofFe
         StateViewId::TransactionValidation {
             base_version: ledger_view.version().expect("Must be bootstrapped."),
         },
-        db_reader.deref(),
+        Arc::clone(db_reader),
         ledger_view.txn_accumulator().num_leaves(),
         SparseMerkleTree::new(ledger_view.state().current.root_hash()),
-        NoProofFetcher::new(db_reader.clone()),
+        Arc::new(NoProofFetcher::new(db_reader.clone())),
     )
     .expect("failed to get latest state view.")
 }
 
 pub struct VMValidator {
     db_reader: Arc<dyn DbReader>,
-    cached_state_view: CachedStateView<NoProofFetcher>,
+    cached_state_view: CachedStateView,
     vm: AptosVM,
 }
 
