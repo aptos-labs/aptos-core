@@ -175,7 +175,7 @@ pub(crate) mod test_utils {
             .unwrap();
 
         // Create executor proxy
-        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw).unwrap());
+        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw));
         let executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
 
         // Get initial state
