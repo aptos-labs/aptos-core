@@ -54,6 +54,7 @@ pub async fn emit_transactions_with_cluster(
             .thread_params(thread_params)
             .invalid_transaction_ratio(args.invalid_tx)
             .transaction_type(args.transaction_type)
+            .duration(duration)
             .gas_price(1);
     if let Some(workers_per_endpoint) = args.workers_per_ac {
         emit_job_request = emit_job_request.workers_per_endpoint(workers_per_endpoint);
@@ -62,11 +63,7 @@ pub async fn emit_transactions_with_cluster(
         emit_job_request = emit_job_request.vasp();
     }
     let stats = emitter
-        .emit_txn_for_with_stats(
-            duration,
-            emit_job_request,
-            min(10, max(args.duration / 5, 1)),
-        )
+        .emit_txn_for_with_stats(emit_job_request, min(10, max(args.duration / 5, 1)))
         .await?;
     Ok(stats)
 }
