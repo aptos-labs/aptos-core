@@ -7902,9 +7902,11 @@ dependencies = [
 name = "storage-service-types"
 version = "0.1.0"
 dependencies = [
+ "aptos-compression",
  "aptos-config",
  "aptos-crypto",
  "aptos-types",
+ "bcs",
  "claim",
  "num-traits 0.2.15",
  "proptest",
