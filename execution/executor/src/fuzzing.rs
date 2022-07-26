@@ -28,7 +28,7 @@ pub fn fuzz_execute_and_commit_chunk(
     verified_target_li: LedgerInfoWithSignatures,
 ) {
     let db = DbReaderWriter::new(FakeDb {});
-    let executor = ChunkExecutor::<FakeVM>::new(db).unwrap();
+    let executor = ChunkExecutor::<FakeVM>::new(db);
 
     let _events = executor.execute_and_commit_chunk(txn_list_with_proof, &verified_target_li, None);
 }

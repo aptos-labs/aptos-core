@@ -76,6 +76,9 @@ pub trait ChunkExecutorTrait: Send + Sync {
 
     /// Resets the chunk executor by synchronizing state with storage.
     fn reset(&self) -> Result<()>;
+
+    /// Finishes the chunk executor by releasing memory held by inner data structures(SMT).
+    fn finish(&self);
 }
 
 pub struct StateSnapshotDelta {
@@ -89,7 +92,7 @@ pub trait BlockExecutorTrait: Send + Sync {
     fn committed_block_id(&self) -> HashValue;
 
     /// Reset the internal state including cache with newly fetched latest committed block from storage.
-    fn reset(&self) -> Result<(), Error>;
+    fn reset(&self);
 
     /// Executes a block.
     fn execute_block(
@@ -125,6 +128,9 @@ pub trait BlockExecutorTrait: Send + Sync {
             true, /* save_state_snapshots */
         )
     }
+
+    /// Finishes the block executor by releasing memory held by inner data structures(SMT).
+    fn finish(&self);
 }
 
 pub trait TransactionReplayer: Send {

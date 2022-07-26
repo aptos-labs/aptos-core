@@ -6,6 +6,7 @@
 use crate::logging::{LogEntry, LogSchema};
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
 use aptos_types::{
@@ -31,11 +32,90 @@ use storage_interface::{jmt_updates, DbReaderWriter};
 
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
+    inner: RwLock<Option<BlockExecutorInner<V>>>,
+}
+
+impl<V> BlockExecutor<V>
+where
+    V: VMExecutor,
+{
+    pub fn new(db: DbReaderWriter) -> Self {
+        Self {
+            db,
+            inner: RwLock::new(None),
+        }
+    }
+
+    pub fn root_smt(&self) -> SparseMerkleTree<StateValue> {
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .root_smt()
+    }
+
+    fn maybe_initialize(&self) {
+        if self.inner.read().is_none() {
+            self.reset();
+        }
+    }
+}
+
+impl<V> BlockExecutorTrait for BlockExecutor<V>
+where
+    V: VMExecutor,
+{
+    fn committed_block_id(&self) -> HashValue {
+        self.maybe_initialize();
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .committed_block_id()
+    }
+
+    fn reset(&self) {
+        *self.inner.write() = Some(BlockExecutorInner::new(self.db.clone()));
+    }
+
+    fn execute_block(
+        &self,
+        block: (HashValue, Vec<Transaction>),
+        parent_block_id: HashValue,
+    ) -> Result<StateComputeResult, Error> {
+        self.maybe_initialize();
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .execute_block(block, parent_block_id)
+    }
+
+    fn commit_blocks_ext(
+        &self,
+        block_ids: Vec<HashValue>,
+        ledger_info_with_sigs: LedgerInfoWithSignatures,
+        save_state_snapshots: bool,
+    ) -> Result<Option<StateSnapshotDelta>, Error> {
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .commit_blocks_ext(block_ids, ledger_info_with_sigs, save_state_snapshots)
+    }
+
+    fn finish(&self) {
+        *self.inner.write() = None;
+    }
+}
+
+struct BlockExecutorInner<V> {
+    db: DbReaderWriter,
     block_tree: BlockTree,
     phantom: PhantomData<V>,
 }
 
-impl<V> BlockExecutor<V>
+impl<V> BlockExecutorInner<V>
 where
     V: VMExecutor,
 {
@@ -48,7 +128,7 @@ where
         }
     }
 
-    pub fn root_smt(&self) -> SparseMerkleTree<StateValue> {
+    fn root_smt(&self) -> SparseMerkleTree<StateValue> {
         self.block_tree
             .root_block()
             .output
@@ -59,16 +139,12 @@ where
     }
 }
 
-impl<V> BlockExecutorTrait for BlockExecutor<V>
+impl<V> BlockExecutorInner<V>
 where
     V: VMExecutor,
 {
     fn committed_block_id(&self) -> HashValue {
         self.block_tree.root_block().id
-    }
-
-    fn reset(&self) -> Result<(), Error> {
-        Ok(self.block_tree.reset(&self.db.reader)?)
     }
 
     fn execute_block(
