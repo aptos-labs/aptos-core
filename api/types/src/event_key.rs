@@ -6,7 +6,7 @@ use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 
 #[derive(Clone, Debug, PartialEq, Copy)]
-pub struct EventKey(aptos_types::event::EventKey);
+pub struct EventKey(pub aptos_types::event::EventKey);
 
 impl From<aptos_types::event::EventKey> for EventKey {
     fn from(val: aptos_types::event::EventKey) -> Self {
