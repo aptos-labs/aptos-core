@@ -132,7 +132,6 @@ class TokenClient(RestClient):
 
     def get_token_balance(self, owner: str, creator: str, collection_name: str, token_name: str) -> Any:
         token_store = self.account_resource(owner, "0x1::token::TokenStore")["data"]["tokens"]["handle"]
-        print(token_store)
         token_id = {
             "token_data_id": {
                 "creator": creator,

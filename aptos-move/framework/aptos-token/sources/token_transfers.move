@@ -1,6 +1,7 @@
 /// This module provides the foundation for transferring of Tokens
 module aptos_token::token_transfers {
     use std::signer;
+    use std::string::String;
     use aptos_std::table::{Self, Table};
     use aptos_token::token::{Self, Token, TokenId};
 
@@ -21,12 +22,12 @@ module aptos_token::token_transfers {
         sender: signer,
         receiver: address,
         creator: address,
-        collection: vector<u8>,
-        name: vector<u8>,
+        collection: String,
+        name: String,
         amount: u64,
-        serial_number: u64,
+        property_version: u64,
     ) acquires TokenTransfers {
-        let token_id = token::create_token_id_raw(creator, collection, name, serial_number);
+        let token_id = token::create_token_id_raw(creator, collection, name, property_version);
         offer(&sender, receiver, token_id, amount);
     }
 
@@ -63,11 +64,11 @@ module aptos_token::token_transfers {
         receiver: signer,
         sender: address,
         creator: address,
-        collection: vector<u8>,
-        name: vector<u8>,
-        serial_number: u64,
+        collection: String,
+        name: String,
+        property_version: u64,
     ) acquires TokenTransfers {
-        let token_id = token::create_token_id_raw(creator, collection, name, serial_number);
+        let token_id = token::create_token_id_raw(creator, collection, name, property_version);
         claim(&receiver, sender, token_id);
     }
 
@@ -95,11 +96,11 @@ module aptos_token::token_transfers {
         sender: signer,
         receiver: address,
         creator: address,
-        collection: vector<u8>,
-        name: vector<u8>,
-        serial_number: u64,
+        collection: String,
+        name: String,
+        property_version: u64,
     ) acquires TokenTransfers {
-        let token_id = token::create_token_id_raw(creator, collection, name, serial_number);
+        let token_id = token::create_token_id_raw(creator, collection, name, property_version);
         cancel_offer(&sender, receiver, token_id);
     }
 

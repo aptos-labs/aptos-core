@@ -87,12 +87,12 @@ export class TokenClient {
     description: string,
     supply: number,
     uri: string,
-    royalty_payee_address: MaybeHexString,
-    royalty_points_denominator: number,
-    royalty_points_nominator: number,
-    property_keys: Array<Array<number>>,
-    property_values: Array<Array<number>>,
-    property_types: Array<Array<number>>,
+    royalty_payee_address: MaybeHexString = account.address(),
+    royalty_points_denominator: number = 0,
+    royalty_points_nominator: number = 0,
+    property_keys: Array<Array<number>> = [],
+    property_values: Array<Array<number>> = [],
+    property_types: Array<Array<number>> = [],
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
       type: "script_function_payload",
