@@ -5,20 +5,24 @@ import { Controller } from "./controller";
 
 // Connects to data-controller="header"
 export default class extends Controller {
-  static targets = ["nav", "user"];
+  static targets = ["nav", "navButton", "user"];
 
   declare readonly navTarget: HTMLElement;
+  declare readonly navButtonTarget: HTMLElement;
   declare readonly userTarget: HTMLElement;
   declare readonly hasUserTarget: boolean;
 
   toggleNav() {
     const open = this.navTarget.toggleAttribute("open");
+    for (const icon of this.navButtonTarget.children) {
+      icon.classList.toggle("hidden");
+    }
     if (open && this.hasUserTarget) this.userTarget.removeAttribute("open");
   }
 
   toggleUser() {
     const open = this.userTarget.toggleAttribute("open");
-    if (open) this.navTarget.removeAttribute("open");
+    if (open && this.navTarget.hasAttribute("open")) this.toggleNav();
   }
 
   navGroupHover(event: MouseEvent) {
