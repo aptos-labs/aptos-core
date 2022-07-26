@@ -22,8 +22,78 @@ use move_deps::{
         values::Value,
     },
 };
+use serde::{Deserialize, Serialize};
 use smallvec::smallvec;
 use std::collections::{BTreeSet, VecDeque};
+
+// ========================================================================================
+// Rust representation of PackageMetadata
+
+// The data layout must match that of the Move definitions
+
+/// The package registry at the given address.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PackageRegistry {
+    /// Packages installed at this address.
+    pub packages: Vec<PackageMetadata>,
+}
+
+/// The PackakeMetadata type.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PackageMetadata {
+    /// Name of this package.
+    pub name: String,
+    /// The upgrade policy of this package.
+    pub upgrade_policy: UpgradePolicy,
+    /// The list of modules installed by this package.
+    pub modules: Vec<ModuleMetadata>,
+    /// Address aliases which where used when the modules above were compiled.
+    pub address_aliases: Vec<AddressAlias>,
+    /// Dependencies which were used when this package was compiled.
+    pub deps: Vec<PackageDep>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ModuleMetadata {
+    /// Name of the module.
+    pub name: String,
+    /// Source map, in internal encoding
+    pub source_map: Vec<u8>,
+    /// Source text.
+    pub source: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PackageDep {
+    pub addr: AccountAddress,
+    pub name: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AddressAlias {
+    pub alias: String,
+    pub addr: AccountAddress,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct UpgradePolicy {
+    pub policy: u8,
+}
+
+impl UpgradePolicy {
+    pub fn no_compat() -> Self {
+        UpgradePolicy { policy: 0 }
+    }
+    pub fn compat() -> Self {
+        UpgradePolicy { policy: 1 }
+    }
+    pub fn immutable() -> Self {
+        UpgradePolicy { policy: 2 }
+    }
+}
+
+// ========================================================================================
+// Code Publishing Logic
 
 /// Abort code when code publishing is requested twice (0x03 == INVALID_STATE)
 const EALREADY_REQUESTED: u64 = 0x03_0000;
@@ -61,7 +131,12 @@ pub fn code_natives(addr: AccountAddress) -> NativeFunctionTable {
     )
 }
 
-/// `native fun request_publish(bundle: vector<vector<u8>>)`
+/// `native fun native_request_publish(
+//         destination: address,
+//         expected_modules: vector<String>,
+//         code: vector<vector<u8>>,
+//         policy: u8
+//     )`
 fn native_request_publish(
     context: &mut NativeContext,
     _ty_args: Vec<Type>,
@@ -69,13 +144,13 @@ fn native_request_publish(
 ) -> PartialVMResult<NativeResult> {
     debug_assert_eq!(args.len(), 4);
     let policy = pop_arg!(args, u8);
-    let mut expected_modules = BTreeSet::new();
-    for name in pop_arg!(args, Vec<Value>) {
-        expected_modules.insert(get_move_string(name)?);
-    }
     let mut code = vec![];
     for module in pop_arg!(args, Vec<Value>) {
         code.push(module.value_as::<Vec<u8>>()?);
+    }
+    let mut expected_modules = BTreeSet::new();
+    for name in pop_arg!(args, Vec<Value>) {
+        expected_modules.insert(get_move_string(name)?);
     }
     let destination = pop_arg!(args, AccountAddress);
     let code_context = context.extensions_mut().get_mut::<NativeCodeContext>();

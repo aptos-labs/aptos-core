@@ -21,6 +21,7 @@ mod genesis_initializations;
 mod mint;
 mod module_publishing;
 mod on_chain_configs;
+mod package_publishing;
 mod peer_to_peer;
 mod rotate_key;
 mod scripts;

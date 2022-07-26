@@ -11,7 +11,7 @@ mod transaction_context;
 mod vm;
 
 pub use crate::move_vm_ext::{
-    code_context::{code_natives, NativeCodeContext, PublishRequest},
+    code_context::*,
     resolver::MoveResolverExt,
     session::{SessionExt, SessionId, SessionOutput},
     transaction_context::{transaction_context_natives, NativeTransactionContext},

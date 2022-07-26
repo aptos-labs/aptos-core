@@ -139,9 +139,10 @@ module aptos_framework::code {
 
     /// Checks whether the given package is upgradable, and returns true if a compatibility check is needed.
     fun check_upgradability(old_pack: &PackageMetadata, new_pack: &PackageMetadata) {
-        assert!(old_pack.upgrade_policy.policy < upgrade_policy_immutable().policy, EUPGRADE_IMMUTABLE);
-        assert!(can_change_upgrade_policy_to(
-                old_pack.upgrade_policy, new_pack.upgrade_policy), EUPGRADE_WEAKER_POLICY);
+        assert!(old_pack.upgrade_policy.policy < upgrade_policy_immutable().policy,
+            error::invalid_argument(EUPGRADE_IMMUTABLE));
+        assert!(can_change_upgrade_policy_to( old_pack.upgrade_policy, new_pack.upgrade_policy),
+            error::invalid_argument(EUPGRADE_WEAKER_POLICY));
     }
 
     /// Checks whether a new package with given names can co-exist with old package.
@@ -163,7 +164,8 @@ module aptos_framework::code {
         let module_names = vector::empty();
         let i = 0;
         while (i < vector::length(&pack.modules)) {
-            vector::push_back(&mut module_names, vector::borrow(&pack.modules, i).name)
+            vector::push_back(&mut module_names, vector::borrow(&pack.modules, i).name);
+            i = i + 1
         };
         module_names
     }
