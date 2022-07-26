@@ -105,6 +105,7 @@ members = [
     "storage/aptosdb",
     "storage/backup/backup-cli",
     "storage/backup/backup-service",
+    "storage/indexer",
     "storage/jellyfish-merkle",
     "storage/schemadb",
     "storage/scratchpad",

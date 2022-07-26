@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::account_config::CORE_CODE_ADDRESS;
-use crate::event::EventKey;
 use core::num::ParseIntError;
 use move_deps::move_core_types::language_storage::TypeTag;
 use serde::{Deserialize, Serialize};

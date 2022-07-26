@@ -227,7 +227,9 @@ pub enum ScriptFunctionCall {
     },
 
     /// Withdraw from `account`'s inactive stake.
-    StakeWithdraw {},
+    StakeWithdraw {
+        withdraw_amount: u64,
+    },
 
     TokenCreateLimitedCollectionScript {
         name: Bytes,
@@ -478,7 +480,7 @@ impl ScriptFunctionCall {
                 new_network_addresses,
                 new_fullnode_addresses,
             ),
-            StakeWithdraw {} => stake_withdraw(),
+            StakeWithdraw { withdraw_amount } => stake_withdraw(withdraw_amount),
             TokenCreateLimitedCollectionScript {
                 name,
                 description,
@@ -1233,7 +1235,7 @@ pub fn stake_update_network_and_fullnode_addresses(
 }
 
 /// Withdraw from `account`'s inactive stake.
-pub fn stake_withdraw() -> TransactionPayload {
+pub fn stake_withdraw(withdraw_amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -1244,7 +1246,7 @@ pub fn stake_withdraw() -> TransactionPayload {
         ),
         ident_str!("withdraw").to_owned(),
         vec![],
-        vec![],
+        vec![bcs::to_bytes(&withdraw_amount).unwrap()],
     ))
 }
 
@@ -2058,8 +2060,10 @@ mod decoder {
     }
 
     pub fn stake_withdraw(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(_script) = payload {
-            Some(ScriptFunctionCall::StakeWithdraw {})
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::StakeWithdraw {
+                withdraw_amount: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
         } else {
             None
         }
