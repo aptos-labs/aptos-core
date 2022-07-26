@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-mod accounts_test;
 mod test_context;
 
 use serde_json::Value;
