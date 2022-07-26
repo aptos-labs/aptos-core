@@ -76,14 +76,14 @@ If your staked amount falls below the required minimum you will be removed from 
 
 ### When the lockup period expires
 
-When your lockup period expires, either you can either extend the lockup period so you can continue to validate and receive the rewards, or you can withdraw your total staked amount and stop validating.
+When your lockup period expires, you can either extend the lockup period so you can continue to validate and receive the rewards, or you can withdraw your total staked amount and stop validating.
 
 :::tip Set by the governance
 
 The above minimum and maximums for staked amount and the lockup period are decided by the Aptos governance and not by any special entity like the Aptos Labs. These minimum and maximum configurations are controlled by the covenants that the Aptos community members vote on.
 :::
 
-## Epochs
+## Epoch
 
 An epoch in the Aptos blockchain is defined as a duration of time, in seconds, during which a number of blocks are voted on by the validators, the validator set is updated, and the rewards are distributed to the validators. 
 
