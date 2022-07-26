@@ -8,7 +8,8 @@ message Transaction {
   uint64 version = 2;
   TransactionInfo info = 3;
   uint64 epoch = 4;
-  
+  uint64 block_height = 5;
+
   enum TransactionType {
     GENESIS = 0;
     BLOCK_METADATA = 1;
@@ -16,14 +17,15 @@ message Transaction {
     USER = 3;
   }
   
-  TransactionType type = 5;
+  TransactionType type = 6;
 
   oneof txn_data {
-    BlockMetadataTransaction block_metadata_txn = 6;
-    GenesisTransaction genesis_txn = 7;
-    StateCheckpointTransaction state_checkpoint_txn = 8;
-    UserTransaction user_txn = 9;
+    BlockMetadataTransaction block_metadata_txn = 7;
+    GenesisTransaction genesis_txn = 8;
+    StateCheckpointTransaction state_checkpoint_txn = 9;
+    UserTransaction user_txn = 10;
   }
+
 }
 
 message BlockMetadataTransaction {
