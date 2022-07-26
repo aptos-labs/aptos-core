@@ -365,7 +365,7 @@ mod tests {
             .unwrap();
 
         // Create an executor proxy
-        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw).unwrap());
+        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw));
         let mut executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
 
         // Publish a subscribed event
@@ -567,7 +567,7 @@ mod tests {
             .unwrap();
 
         // Create an executor
-        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()).unwrap());
+        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
         let mut executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
 
         // Verify that the initial configs returned to the subscriber don't contain the unknown on-chain config
@@ -650,7 +650,7 @@ mod tests {
 
         // Create the executors
         let block_executor = Box::new(BlockExecutor::<AptosVM>::new(db_rw.clone()));
-        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw).unwrap());
+        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw));
         let executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
 
         (
