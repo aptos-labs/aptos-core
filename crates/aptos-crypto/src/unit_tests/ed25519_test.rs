@@ -25,9 +25,11 @@ use curve25519_dalek::{
 };
 use ed25519_dalek::ed25519::signature::Verifier as _;
 
+use crate::test_utils::KeyPair;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use digest::Digest;
 use proptest::{collection::vec, prelude::*};
+use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 
@@ -47,6 +49,23 @@ fn eight_torsion_order(ep: EdwardsPoint) -> usize {
         }
     }
     ord
+}
+
+/// Test that generates an example proof-of-knowledge. We used this to create a test case for the
+/// Ed25519 PoK verification exported in Move.
+#[test]
+fn sample_proof_of_knowledge() {
+    let mut rng = OsRng;
+
+    let keypair = KeyPair::<Ed25519PrivateKey, Ed25519PublicKey>::generate(&mut rng);
+    let sk = keypair.private_key;
+    let pk = keypair.public_key;
+
+    let pok = sk.create_proof_of_knowledge();
+
+    println!("SK:  {}", hex::encode(&sk.to_bytes()));
+    println!("PK:  {}", hex::encode(&pk.to_bytes()));
+    println!("PoK: {}", hex::encode(pok.to_bytes()));
 }
 
 proptest! {

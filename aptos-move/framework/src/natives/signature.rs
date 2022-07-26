@@ -123,6 +123,46 @@ pub fn native_ed25519_signature_verification(
     ))
 }
 
+pub fn native_ed25519_verify_proof_of_knowledge(
+    context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    debug_assert!(_ty_args.is_empty());
+    debug_assert!(arguments.len() == 2);
+
+    // Verifying a proof-of-knowledge is more-or-less an Ed25519 signature verification, with a litte
+    // extra serialization cost.
+    let msg_len = ed25519::ED25519_PUBLIC_KEY_LENGTH * 2;
+    let cost = native_gas(
+        context.cost_table(),
+        NativeCostIndex::ED25519_VERIFY,
+        msg_len,
+    );
+
+    let pok = pop_arg!(arguments, Vec<u8>);
+    let pk = pop_arg!(arguments, Vec<u8>);
+
+    let pok = match ed25519::Ed25519Signature::try_from(pok.as_slice()) {
+        Ok(pok) => pok,
+        Err(_) => {
+            return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
+        }
+    };
+    let pk = match ed25519::Ed25519PublicKey::try_from(pk.as_slice()) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
+        }
+    };
+
+    let verify_result = pk.verify_proof_of_knowledge(&pok).is_ok();
+    Ok(NativeResult::ok(
+        cost,
+        smallvec![Value::bool(verify_result)],
+    ))
+}
+
 pub fn native_secp256k1_recover(
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,

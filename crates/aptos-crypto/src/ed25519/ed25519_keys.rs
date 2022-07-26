@@ -9,18 +9,16 @@ use crate::{
     traits::*,
 };
 use anyhow::Result;
-use aptos_crypto_derive::{
-    DeserializeKey, SerializeKey, SilentDebug, SilentDisplay,
-};
+use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use core::convert::TryFrom;
 use serde::Serialize;
 use std::fmt;
 
+use crate::ed25519::ed25519_pok::Ed25519PoKChallenge;
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::test_utils::{self, KeyPair};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;
-use crate::ed25519::ed25519_pok::Ed25519PoKChallenge;
 
 /// An Ed25519 private key
 #[derive(DeserializeKey, SerializeKey, SilentDebug, SilentDisplay)]
