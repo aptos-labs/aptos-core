@@ -68,7 +68,7 @@ impl NetworkTest for NetworkChaosTest {
         ctx.report.report_text(msg);
         let txn_stat = generate_traffic(ctx, &all_validators, duration, 1, None)?;
         ctx.report
-            .report_txn_stats(format!("{}:delay", self.name()), txn_stat, duration);
+            .report_txn_stats(format!("{}:delay", self.name()), &txn_stat, duration);
         ctx.swarm().remove_chaos(delay)?;
 
         // INJECT BANDWIDTH LIMIT AND EMIT TXNS
@@ -81,7 +81,7 @@ impl NetworkTest for NetworkChaosTest {
         ctx.report.report_text(msg);
         let txn_stat = generate_traffic(ctx, &all_validators, duration, 1, None)?;
         ctx.report
-            .report_txn_stats(format!("{}:bandwidth", self.name()), txn_stat, duration);
+            .report_txn_stats(format!("{}:bandwidth", self.name()), &txn_stat, duration);
         ctx.swarm().remove_chaos(bandwidth)?;
 
         // INJECT PARTITION AND EMIT TXNS
@@ -94,7 +94,7 @@ impl NetworkTest for NetworkChaosTest {
         ctx.report.report_text(msg);
         let txn_stat = generate_traffic(ctx, &all_validators, duration, 1, None)?;
         ctx.report
-            .report_txn_stats(format!("{}:partition", self.name()), txn_stat, duration);
+            .report_txn_stats(format!("{}:partition", self.name()), &txn_stat, duration);
         ctx.swarm().remove_chaos(partition)?;
 
         Ok(())

@@ -12,9 +12,9 @@
 # ensure the script is run from project root
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
 
-# for calculating regression
-TPS_THRESHOLD=5000
-P99_LATENCY_MS_THRESHOLD=8000
+# for calculating regression in local mode
+LOCAL_TPS_THRESHOLD=400
+LOCAL_P99_LATENCY_MS_THRESHOLD=60000
 
 # output files
 FORGE_OUTPUT=${FORGE_OUTPUT:-$(mktemp)}
@@ -168,7 +168,9 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     # more file descriptors for heavy txn generation
     ulimit -n 1048576
 
-    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --workers-per-ac 10 test k8s-swarm \
+    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --workers-per-ac 10 --avg-tps $LOCAL_TPS_THRESHOLD \
+        --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD \
+        test k8s-swarm \
         --image-tag $IMAGE_TAG \
         --namespace $FORGE_NAMESPACE \
         --port-forward $REUSE_ARGS $KEEP_ARGS $ENABLE_HAPROXY_ARGS | tee $FORGE_OUTPUT
@@ -251,30 +253,16 @@ fi
 # print the Forge report
 cat $FORGE_REPORT
 
-# detect regressions. TODO: do this in the Forge test runner itself since it's complex
-# if this script is not triggered in GHA, use a default value
 [ -z "$GITHUB_RUN_ID" ] && GITHUB_RUN_ID=0
 AVG_TPS=$(cat $FORGE_REPORT | grep -oE '[0-9]+ TPS' | awk '{print $1}')
 P99_LATENCY=$(cat $FORGE_REPORT | grep -oE '[0-9]+ ms p99 latency' | awk '{print $1}')
 if [ -n "$AVG_TPS" ]; then
     echo "AVG_TPS: ${AVG_TPS}"
     echo "forge_job_avg_tps {FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\",GITHUB_RUN_ID=\"$GITHUB_RUN_ID\"} $AVG_TPS" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
-    if [[ "$AVG_TPS" -lt "$TPS_THRESHOLD" ]]; then
-        echo "(\!) AVG_TPS: ${avg_tps} < ${TPS_THRESHOLD} tps"
-        if [ "$FORGE_RUNNER_MODE" != "local" ]; then
-            FORGE_EXIT_CODE=2
-        fi
-    fi
 fi
 if [ -n "$P99_LATENCY" ]; then
     echo "P99_LATENCY: ${P99_LATENCY}"
     echo "forge_job_p99_latency {FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\",GITHUB_RUN_ID=\"$GITHUB_RUN_ID\"} $P99_LATENCY" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
-    if [[ "$P99_LATENCY" -gt "$P99_LATENCY_MS_THRESHOLD" ]]; then
-        echo "(\!) P99_LATENCY: ${P99_LATENCY} > ${P99_LATENCY_MS_THRESHOLD} ms"
-        if [ "$FORGE_RUNNER_MODE" != "local" ]; then
-            FORGE_EXIT_CODE=2
-        fi
-    fi
 fi
 
 # Get the final o11y links that are not auto-refresh
