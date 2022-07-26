@@ -5,8 +5,8 @@ mutable inputs after call: local#0: 0
 return values: 0
 
 task 2 'view'. lines 15-15:
-key 0x1::coin::CoinStore<0x1::test_coin::TestCoin> {
-    coin: store 0x1::coin::Coin<0x1::test_coin::TestCoin> {
+key 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin> {
+    coin: store 0x1::coin::Coin<0x1::aptos_coin::AptosCoin> {
         value: 10100
     }
     deposit_events: store 0x1::event::EventHandle<0x1::coin::DepositEvent> {

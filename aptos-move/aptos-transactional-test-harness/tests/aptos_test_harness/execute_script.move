@@ -5,11 +5,11 @@
 //# run --script --signers Alice  --args @Bob 100
 script {
     use aptos_framework::coin;
-    use aptos_framework::test_coin::TestCoin;
+    use aptos_framework::aptos_coin::AptosCoin;
 
     fun main(sender: &signer, receiver: address, amount: u64) {
-        coin::transfer<TestCoin>(sender, receiver, amount);
+        coin::transfer<AptosCoin>(sender, receiver, amount);
     }
 }
 
-//# view --address Bob  --resource 0x1::coin::CoinStore<0x1::test_coin::TestCoin>
+//# view --address Bob  --resource 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
