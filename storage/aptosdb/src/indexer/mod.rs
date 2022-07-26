@@ -1,17 +1,21 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+pub(crate) mod metadata;
+
 use super::AptosDB;
+use crate::indexer::metadata::{Metadata, MetadataTag};
+use crate::indexer_metadata::IndexerMetadataSchema;
 use crate::{TableInfoSchema, OTHER_TIMERS_SECONDS};
 ///! This temporarily implements node internal indexing functionalities on the AptosDB.
-use anyhow::{bail, ensure, Result};
+use anyhow::{bail, ensure, Error, Result};
 use aptos_types::access_path::Path;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::state_store::table::TableHandle;
 use aptos_types::state_store::table::TableInfo;
 use aptos_types::transaction::{TransactionToCommit, Version};
-use aptos_types::write_set::WriteOp;
+use aptos_types::write_set::{WriteOp, WriteSet};
 use aptos_vm::data_cache::{AsMoveResolver, RemoteStorage};
 use move_deps::move_core_types::identifier::IdentStr;
 use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
@@ -20,6 +24,7 @@ use schemadb::SchemaBatch;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use storage_interface::state_view::DbStateView;
+use storage_interface::DbReader;
 
 impl AptosDB {
     pub fn index_transactions(
@@ -34,26 +39,62 @@ impl AptosDB {
             .with_label_values(&["index_transactions"])
             .start_timer();
 
+        let write_sets: Vec<_> = txns_to_commit.iter().map(|t| t.write_set()).collect();
+
+        self.index_write_sets(last_version, &write_sets)
+    }
+
+    fn index_write_sets(&self, latest_version: Version, write_sets: &[&WriteSet]) -> Result<()> {
         let state_store = self.state_store.clone();
         let state_view = DbStateView {
             db: state_store,
-            version: Some(last_version),
+            version: Some(latest_version),
         };
         let resolver = state_view.as_move_resolver();
         let annotator = MoveValueAnnotator::new(&resolver);
         let mut table_info_parser = TableInfoParser::new(self, &annotator);
 
-        for txn_to_commit in txns_to_commit {
-            for (state_key, write_op) in txn_to_commit.write_set() {
+        for write_set in write_sets {
+            for (state_key, write_op) in write_set.iter() {
                 table_info_parser.parse_write_op(state_key, write_op)?;
             }
         }
+
         let mut batch = SchemaBatch::new();
-        if table_info_parser.finish(&mut batch)? {
-            self.index_db.write_schemas(batch)?;
-        }
+        table_info_parser.finish(&mut batch)?;
+        batch.put::<IndexerMetadataSchema>(
+            &MetadataTag::LatestVersion,
+            &Metadata::LatestVersion(latest_version),
+        )?;
+        self.index_db.write_schemas(batch)?;
 
         Ok(())
+    }
+
+    pub fn catchup_indexer(&self) -> Result<()> {
+        let ledger_version = self
+            .get_latest_transaction_info_option()?
+            .map(|(v, _)| v + 1);
+        if let Some(ledger_version) = ledger_version {
+            let indexer_next_version = self.get_indexer_version()?.map_or(0, |v| v + 1);
+            if indexer_next_version <= ledger_version {
+                let write_sets = self
+                    .transaction_store
+                    .get_write_sets(indexer_next_version, ledger_version + 1)?;
+                let write_sets_ref: Vec<_> = write_sets.iter().collect();
+                self.index_write_sets(ledger_version, &write_sets_ref)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn get_indexer_version(&self) -> Result<Option<Version>> {
+        Ok(self
+            .index_db
+            .get::<IndexerMetadataSchema>(&MetadataTag::LatestVersion)?
+            .map(|data| match data {
+                Metadata::LatestVersion(version) => version,
+            }))
     }
 }
 

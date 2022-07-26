@@ -290,7 +290,7 @@ impl AptosDB {
                 pruner_config,
             ))
         };
-        AptosDB {
+        let myself = AptosDB {
             ledger_db: Arc::clone(&arc_ledger_rocksdb),
             state_merkle_db: Arc::clone(&arc_state_merkle_rocksdb),
             index_db: Arc::new(index_db),
@@ -310,7 +310,9 @@ impl AptosDB {
                 Arc::clone(&arc_state_merkle_rocksdb),
             ),
             ledger_commit_lock: std::sync::Mutex::new(()),
-        }
+        };
+        myself.catchup_indexer().unwrap();
+        myself
     }
 
     pub fn open<P: AsRef<Path> + Clone>(

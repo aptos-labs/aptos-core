@@ -43,6 +43,7 @@ pub(super) fn state_merkle_db_column_families() -> Vec<ColumnFamilyName> {
 pub(super) fn index_db_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        INDEXER_METADATA_CF_NAME,
         TABLE_INFO_CF_NAME,
     ]
 }
