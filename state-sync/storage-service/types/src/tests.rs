@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::requests::{
-    EpochEndingLedgerInfoRequest, StateValuesWithProofRequest, TransactionOutputsWithProofRequest,
-    TransactionsWithProofRequest,
+    DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest,
+    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
 use crate::responses::{CompleteDataRange, DataSummary, ProtocolMetadata};
 use crate::{Epoch, StorageServiceRequest};
@@ -43,25 +43,24 @@ fn test_data_summary_can_service_epochs_request() {
         ..Default::default()
     };
 
-    // in range, can service
+    for compression in [true, false] {
+        // in range, can service
+        assert!(summary.can_service(&epochs_request(100, 200, compression)));
+        assert!(summary.can_service(&epochs_request(125, 175, compression)));
+        assert!(summary.can_service(&epochs_request(100, 100, compression)));
+        assert!(summary.can_service(&epochs_request(150, 150, compression)));
+        assert!(summary.can_service(&epochs_request(200, 200, compression)));
 
-    assert!(summary.can_service(&create_get_epochs_request(100, 200)));
-    assert!(summary.can_service(&create_get_epochs_request(125, 175)));
-    assert!(summary.can_service(&create_get_epochs_request(100, 100)));
-    assert!(summary.can_service(&create_get_epochs_request(150, 150)));
-    assert!(summary.can_service(&create_get_epochs_request(200, 200)));
+        // out of range, can't service
+        assert!(!summary.can_service(&epochs_request(99, 200, compression)));
+        assert!(!summary.can_service(&epochs_request(100, 201, compression)));
+        assert!(!summary.can_service(&epochs_request(50, 250, compression)));
+        assert!(!summary.can_service(&epochs_request(50, 150, compression)));
+        assert!(!summary.can_service(&epochs_request(150, 250, compression)));
 
-    // out of range, can't service
-
-    assert!(!summary.can_service(&create_get_epochs_request(99, 200)));
-    assert!(!summary.can_service(&create_get_epochs_request(100, 201)));
-    assert!(!summary.can_service(&create_get_epochs_request(50, 250)));
-    assert!(!summary.can_service(&create_get_epochs_request(50, 150)));
-    assert!(!summary.can_service(&create_get_epochs_request(150, 250)));
-
-    // degenerate range, can't service
-
-    assert!(!summary.can_service(&create_get_epochs_request(150, 149)));
+        // degenerate range, can't service
+        assert!(!summary.can_service(&epochs_request(150, 149, compression)));
+    }
 }
 
 #[test]
@@ -72,29 +71,29 @@ fn test_data_summary_can_service_txns_request() {
         ..Default::default()
     };
 
-    // in range, can service
+    for compression in [true, false] {
+        // in range, can service
+        assert!(summary.can_service(&txns_request(225, 100, 200, compression)));
+        assert!(summary.can_service(&txns_request(225, 125, 175, compression)));
+        assert!(summary.can_service(&txns_request(225, 100, 100, compression)));
+        assert!(summary.can_service(&txns_request(225, 150, 150, compression)));
+        assert!(summary.can_service(&txns_request(225, 200, 200, compression)));
+        assert!(summary.can_service(&txns_request(250, 200, 200, compression)));
 
-    assert!(summary.can_service(&create_get_txns_request(225, 100, 200)));
-    assert!(summary.can_service(&create_get_txns_request(225, 125, 175)));
-    assert!(summary.can_service(&create_get_txns_request(225, 100, 100)));
-    assert!(summary.can_service(&create_get_txns_request(225, 150, 150)));
-    assert!(summary.can_service(&create_get_txns_request(225, 200, 200)));
-    assert!(summary.can_service(&create_get_txns_request(250, 200, 200)));
+        // out of range, can't service
+        assert!(!summary.can_service(&txns_request(225, 99, 200, compression)));
+        assert!(!summary.can_service(&txns_request(225, 100, 201, compression)));
+        assert!(!summary.can_service(&txns_request(225, 50, 250, compression)));
+        assert!(!summary.can_service(&txns_request(225, 50, 150, compression)));
+        assert!(!summary.can_service(&txns_request(225, 150, 250, compression)));
 
-    // out of range, can't service
-
-    assert!(!summary.can_service(&create_get_txns_request(225, 99, 200)));
-    assert!(!summary.can_service(&create_get_txns_request(225, 100, 201)));
-    assert!(!summary.can_service(&create_get_txns_request(225, 50, 250)));
-    assert!(!summary.can_service(&create_get_txns_request(225, 50, 150)));
-    assert!(!summary.can_service(&create_get_txns_request(225, 150, 250)));
-
-    assert!(!summary.can_service(&create_get_txns_request(300, 100, 200)));
-    assert!(!summary.can_service(&create_get_txns_request(300, 125, 175)));
-    assert!(!summary.can_service(&create_get_txns_request(300, 100, 100)));
-    assert!(!summary.can_service(&create_get_txns_request(300, 150, 150)));
-    assert!(!summary.can_service(&create_get_txns_request(300, 200, 200)));
-    assert!(!summary.can_service(&create_get_txns_request(251, 200, 200)));
+        assert!(!summary.can_service(&txns_request(300, 100, 200, compression)));
+        assert!(!summary.can_service(&txns_request(300, 125, 175, compression)));
+        assert!(!summary.can_service(&txns_request(300, 100, 100, compression)));
+        assert!(!summary.can_service(&txns_request(300, 150, 150, compression)));
+        assert!(!summary.can_service(&txns_request(300, 200, 200, compression)));
+        assert!(!summary.can_service(&txns_request(251, 200, 200, compression)));
+    }
 }
 
 #[test]
@@ -105,31 +104,33 @@ fn test_data_summary_can_service_txn_outputs_request() {
         ..Default::default()
     };
 
-    // in range and can provide proof => can service
-    assert!(summary.can_service(&create_get_txn_outputs_request(225, 100, 200)));
-    assert!(summary.can_service(&create_get_txn_outputs_request(225, 125, 175)));
-    assert!(summary.can_service(&create_get_txn_outputs_request(225, 100, 100)));
-    assert!(summary.can_service(&create_get_txn_outputs_request(225, 150, 150)));
-    assert!(summary.can_service(&create_get_txn_outputs_request(225, 200, 200)));
-    assert!(summary.can_service(&create_get_txn_outputs_request(250, 200, 200)));
+    for compression in [true, false] {
+        // in range and can provide proof => can service
+        assert!(summary.can_service(&outputs_request(225, 100, 200, compression)));
+        assert!(summary.can_service(&outputs_request(225, 125, 175, compression)));
+        assert!(summary.can_service(&outputs_request(225, 100, 100, compression)));
+        assert!(summary.can_service(&outputs_request(225, 150, 150, compression)));
+        assert!(summary.can_service(&outputs_request(225, 200, 200, compression)));
+        assert!(summary.can_service(&outputs_request(250, 200, 200, compression)));
 
-    // can provide proof, but out of range => cannot service
-    assert!(!summary.can_service(&create_get_txn_outputs_request(225, 99, 200)));
-    assert!(!summary.can_service(&create_get_txn_outputs_request(225, 100, 201)));
-    assert!(!summary.can_service(&create_get_txn_outputs_request(225, 50, 250)));
-    assert!(!summary.can_service(&create_get_txn_outputs_request(225, 50, 150)));
-    assert!(!summary.can_service(&create_get_txn_outputs_request(225, 150, 250)));
+        // can provide proof, but out of range => cannot service
+        assert!(!summary.can_service(&outputs_request(225, 99, 200, compression)));
+        assert!(!summary.can_service(&outputs_request(225, 100, 201, compression)));
+        assert!(!summary.can_service(&outputs_request(225, 50, 250, compression)));
+        assert!(!summary.can_service(&outputs_request(225, 50, 150, compression)));
+        assert!(!summary.can_service(&outputs_request(225, 150, 250, compression)));
 
-    // in range, but cannot provide proof => cannot service
-    assert!(!summary.can_service(&create_get_txn_outputs_request(300, 100, 200)));
-    assert!(!summary.can_service(&create_get_txn_outputs_request(300, 125, 175)));
-    assert!(!summary.can_service(&create_get_txn_outputs_request(300, 100, 100)));
-    assert!(!summary.can_service(&create_get_txn_outputs_request(300, 150, 150)));
-    assert!(!summary.can_service(&create_get_txn_outputs_request(300, 200, 200)));
-    assert!(!summary.can_service(&create_get_txn_outputs_request(251, 200, 200)));
+        // in range, but cannot provide proof => cannot service
+        assert!(!summary.can_service(&outputs_request(300, 100, 200, compression)));
+        assert!(!summary.can_service(&outputs_request(300, 125, 175, compression)));
+        assert!(!summary.can_service(&outputs_request(300, 100, 100, compression)));
+        assert!(!summary.can_service(&outputs_request(300, 150, 150, compression)));
+        assert!(!summary.can_service(&outputs_request(300, 200, 200, compression)));
+        assert!(!summary.can_service(&outputs_request(251, 200, 200, compression)));
 
-    // invalid range
-    assert!(!summary.can_service(&create_get_txn_outputs_request(225, 175, 125)));
+        // invalid range
+        assert!(!summary.can_service(&outputs_request(225, 175, 125, compression)));
+    }
 }
 
 #[test]
@@ -140,18 +141,20 @@ fn test_data_summary_can_service_state_chunk_request() {
         ..Default::default()
     };
 
-    // in range and can provide proof => can service
-    assert!(summary.can_service(&create_get_states_request(100)));
-    assert!(summary.can_service(&create_get_states_request(200)));
-    assert!(summary.can_service(&create_get_states_request(250)));
+    for compression in [true, false] {
+        // in range and can provide proof => can service
+        assert!(summary.can_service(&states_request(100, compression)));
+        assert!(summary.can_service(&states_request(200, compression)));
+        assert!(summary.can_service(&states_request(250, compression)));
 
-    // in range, but cannot provide proof => cannot service
-    assert!(!summary.can_service(&create_get_states_request(251)));
-    assert!(!summary.can_service(&create_get_states_request(300)));
+        // in range, but cannot provide proof => cannot service
+        assert!(!summary.can_service(&states_request(251, compression)));
+        assert!(!summary.can_service(&states_request(300, compression)));
 
-    // can provide proof, but out of range ==> cannot service
-    assert!(!summary.can_service(&create_get_states_request(50)));
-    assert!(!summary.can_service(&create_get_states_request(99)));
+        // can provide proof, but out of range ==> cannot service
+        assert!(!summary.can_service(&states_request(50, compression)));
+        assert!(!summary.can_service(&states_request(99, compression)));
+    }
 }
 
 #[test]
@@ -163,17 +166,19 @@ fn test_protocol_metadata_can_service() {
         max_state_chunk_size: 100,
     };
 
-    assert!(metadata.can_service(&create_get_txns_request(200, 100, 199)));
-    assert!(!metadata.can_service(&create_get_txns_request(200, 100, 200)));
+    for compression in [true, false] {
+        assert!(metadata.can_service(&txns_request(200, 100, 199, compression)));
+        assert!(!metadata.can_service(&txns_request(200, 100, 200, compression)));
 
-    assert!(metadata.can_service(&create_get_epochs_request(100, 199)));
-    assert!(!metadata.can_service(&create_get_epochs_request(100, 200)));
+        assert!(metadata.can_service(&epochs_request(100, 199, compression)));
+        assert!(!metadata.can_service(&epochs_request(100, 200, compression)));
 
-    assert!(metadata.can_service(&create_get_txn_outputs_request(200, 100, 199)));
-    assert!(!metadata.can_service(&create_get_txn_outputs_request(200, 100, 200)));
+        assert!(metadata.can_service(&outputs_request(200, 100, 199, compression)));
+        assert!(!metadata.can_service(&outputs_request(200, 100, 200, compression)));
 
-    assert!(metadata.can_service(&create_get_state_values_request(200, 100, 199)));
-    assert!(!metadata.can_service(&create_get_state_values_request(200, 100, 200)));
+        assert!(metadata.can_service(&state_values_request(200, 100, 199, compression)));
+        assert!(!metadata.can_service(&state_values_request(200, 100, 200, compression)));
+    }
 }
 
 proptest! {
@@ -200,46 +205,58 @@ fn create_range(lowest: u64, highest: u64) -> CompleteDataRange<u64> {
     CompleteDataRange::new(lowest, highest).unwrap()
 }
 
-fn create_get_epochs_request(start: Epoch, end: Epoch) -> StorageServiceRequest {
-    StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
+fn epochs_request(start: Epoch, end: Epoch, use_compression: bool) -> StorageServiceRequest {
+    let data_request = DataRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
         start_epoch: start,
         expected_end_epoch: end,
-    })
+    });
+    StorageServiceRequest::new(data_request, use_compression)
 }
 
-fn create_get_txns_request(proof: Version, start: Version, end: Version) -> StorageServiceRequest {
-    StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+fn txns_request(
+    proof: Version,
+    start: Version,
+    end: Version,
+    use_compression: bool,
+) -> StorageServiceRequest {
+    let data_request = DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
         proof_version: proof,
         start_version: start,
         end_version: end,
         include_events: true,
-    })
+    });
+    StorageServiceRequest::new(data_request, use_compression)
 }
 
-fn create_get_txn_outputs_request(
+fn outputs_request(
     proof_version: Version,
     start_version: Version,
     end_version: Version,
+    use_compression: bool,
 ) -> StorageServiceRequest {
-    StorageServiceRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
-        proof_version,
-        start_version,
-        end_version,
-    })
+    let data_request =
+        DataRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
+            proof_version,
+            start_version,
+            end_version,
+        });
+    StorageServiceRequest::new(data_request, use_compression)
 }
 
-fn create_get_state_values_request(
+fn state_values_request(
     version: Version,
     start_index: u64,
     end_index: u64,
+    use_compression: bool,
 ) -> StorageServiceRequest {
-    StorageServiceRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
+    let data_request = DataRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
         version,
         start_index,
         end_index,
-    })
+    });
+    StorageServiceRequest::new(data_request, use_compression)
 }
 
-fn create_get_states_request(version: Version) -> StorageServiceRequest {
-    create_get_state_values_request(version, 0, 1000)
+fn states_request(version: Version, use_compression: bool) -> StorageServiceRequest {
+    state_values_request(version, 0, 1000, use_compression)
 }
