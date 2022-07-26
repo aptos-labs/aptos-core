@@ -52,6 +52,11 @@ pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
         ),
         (
             "signature",
+            "ed25519_verify_proof_of_knowledge",
+            signature::native_ed25519_verify_proof_of_knowledge,
+        ),
+        (
+            "signature",
             "secp256k1_recover",
             signature::native_secp256k1_recover,
         ),
