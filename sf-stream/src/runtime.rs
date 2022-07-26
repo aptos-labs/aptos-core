@@ -120,7 +120,7 @@ impl SfStreamer {
                     for onchain_txn in transactions {
                         // TODO: assert txn.version == &self.current_version + 1?
                         // TODO: return a `Result` & check to ensure we pushed before incrementing
-                        let txn_version = onchain_txn.version.clone();
+                        let txn_version = onchain_txn.version;
                         let timestamp = self
                             .context
                             .get_block_timestamp(onchain_txn.version.clone())
