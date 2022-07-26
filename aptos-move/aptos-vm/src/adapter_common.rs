@@ -6,8 +6,7 @@ use anyhow::Result;
 use aptos_state_view::StateView;
 use aptos_types::{
     transaction::{
-        SignatureCheckedTransaction, SignedTransaction, TransactionOutputWithDeltas,
-        VMValidatorResult,
+        SignatureCheckedTransaction, SignedTransaction, TransactionOutputExt, VMValidatorResult,
     },
     vm_status::{StatusCode, VMStatus},
 };
@@ -67,7 +66,7 @@ pub trait VMAdapter {
         txn: &PreprocessedTransaction,
         data_cache: &S,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutputWithDeltas, Option<String>), VMStatus>;
+    ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus>;
 }
 
 /// Validate a signed transaction by performing the following:
@@ -202,17 +201,15 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
             debug!(log_context, "Retry after reconfiguration");
             continue;
         };
-        let (vm_status, output_with_deltas, sender) = adapter.execute_single_transaction(
+        let (vm_status, output, sender) = adapter.execute_single_transaction(
             &txn,
             &data_cache.as_move_resolver(),
             &log_context,
         )?;
-        // TODO: here we extract deltas so that we can use them later
-        let output = output_with_deltas.into();
+        // TODO: apply deltas.
+        let (_, output) = output.into();
         if !output.status().is_discarded() {
             data_cache.push_write_set(output.write_set());
-            // TODO: also apply deltas.
-            // data_cache.try_apply_deltas(deltas); (consumes deltas, error on overflow)
         } else {
             match sender {
                 Some(s) => trace!(
@@ -280,11 +277,9 @@ pub(crate) fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> Preproce
     }
 }
 
-pub(crate) fn discard_error_vm_status_with_deltas(
-    err: VMStatus,
-) -> (VMStatus, TransactionOutputWithDeltas) {
+pub(crate) fn discard_error_vm_status_ext(err: VMStatus) -> (VMStatus, TransactionOutputExt) {
     let (vm_status, empty_output) = discard_error_vm_status(err);
-    (vm_status, TransactionOutputWithDeltas::from(empty_output))
+    (vm_status, TransactionOutputExt::from(empty_output))
 }
 
 pub(crate) fn discard_error_vm_status(err: VMStatus) -> (VMStatus, TransactionOutput) {
