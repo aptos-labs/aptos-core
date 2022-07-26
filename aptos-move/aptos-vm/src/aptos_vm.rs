@@ -4,12 +4,12 @@
 use crate::{
     adapter_common,
     adapter_common::{
-        discard_error_output, discard_error_vm_status, discard_error_vm_status_with_deltas,
+        discard_error_output, discard_error_vm_status, discard_error_vm_status_ext,
         validate_signature_checked_transaction, validate_signed_transaction,
         PreprocessedTransaction, VMAdapter,
     },
     aptos_vm_impl::{
-        charge_global_write_gas_usage, get_transaction_output, get_transaction_output_with_deltas,
+        charge_global_write_gas_usage, get_transaction_output, get_transaction_output_ext,
         AptosVMImpl, AptosVMInternals,
     },
     counters::*,
@@ -33,7 +33,7 @@ use aptos_types::{
     on_chain_config::{new_epoch_event_key, VMConfig, VMPublishingOption, Version},
     transaction::{
         ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
-        Transaction, TransactionOutput, TransactionOutputWithDeltas, TransactionPayload,
+        Transaction, TransactionOutput, TransactionOutputExt, TransactionPayload,
         TransactionStatus, VMValidatorResult, WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
@@ -154,7 +154,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         storage: &S,
         log_context: &AdapterLogSchema,
-    ) -> TransactionOutputWithDeltas {
+    ) -> TransactionOutputExt {
         self.failed_transaction_cleanup_and_keep_vm_status(
             error_code,
             gas_status,
@@ -172,7 +172,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         storage: &S,
         log_context: &AdapterLogSchema,
-    ) -> (VMStatus, TransactionOutputWithDeltas) {
+    ) -> (VMStatus, TransactionOutputExt) {
         gas_status.set_metering(false);
         let mut session = self.0.new_session(storage, SessionId::txn_meta(txn_data));
         match TransactionStatus::from(error_code.clone()) {
@@ -187,21 +187,21 @@ impl AptosVM {
                     self.0
                         .run_failure_epilogue(&mut session, gas_status, txn_data, log_context)
                 {
-                    return discard_error_vm_status_with_deltas(e);
+                    return discard_error_vm_status_ext(e);
                 }
-                let txn_output = get_transaction_output_with_deltas(
+                let txn_output = get_transaction_output_ext(
                     &mut (),
                     session,
                     gas_status.remaining_gas(),
                     txn_data,
                     status,
                 )
-                .unwrap_or_else(|e| discard_error_vm_status_with_deltas(e).1);
+                .unwrap_or_else(|e| discard_error_vm_status_ext(e).1);
                 (error_code, txn_output)
             }
             TransactionStatus::Discard(status) => (
                 VMStatus::Error(status),
-                TransactionOutputWithDeltas::from(discard_error_output(status)),
+                TransactionOutputExt::from(discard_error_output(status)),
             ),
             TransactionStatus::Retry => unreachable!(),
         }
@@ -213,14 +213,14 @@ impl AptosVM {
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutputWithDeltas), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         gas_status.set_metering(false);
         self.0
             .run_success_epilogue(&mut session, gas_status, txn_data, log_context)?;
 
         Ok((
             VMStatus::Executed,
-            get_transaction_output_with_deltas(
+            get_transaction_output_ext(
                 &mut (),
                 session,
                 gas_status.remaining_gas(),
@@ -230,14 +230,14 @@ impl AptosVM {
         ))
     }
 
-    fn execute_script_or_script_function_with_deltas<S: MoveResolverExt>(
+    fn execute_script_or_script_function_ext<S: MoveResolverExt>(
         &self,
         mut session: SessionExt<S>,
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
         payload: &TransactionPayload,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutputWithDeltas), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::execute_script_or_script_function", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -307,20 +307,20 @@ impl AptosVM {
 
     fn execute_script_or_script_function<S: MoveResolverExt>(
         &self,
-        mut session: SessionExt<S>,
+        session: SessionExt<S>,
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
         payload: &TransactionPayload,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
-        self.execute_script_or_script_function_with_deltas(
+        self.execute_script_or_script_function_ext(
             session,
             gas_status,
             txn_data,
             payload,
             log_context,
         )
-        .map(|(vm_status, output)| (vm_status, output.into()))
+        .map(|(vm_status, output)| (vm_status, output.into_transaction_output()))
     }
 
     fn verify_module_bundle<S: MoveResolverExt>(
@@ -393,14 +393,14 @@ impl AptosVM {
         Ok(())
     }
 
-    fn execute_modules_with_deltas<S: MoveResolverExt>(
+    fn execute_modules_ext<S: MoveResolverExt>(
         &self,
         mut session: SessionExt<S>,
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
         modules: &ModuleBundle,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutputWithDeltas), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::execute_module", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -438,14 +438,14 @@ impl AptosVM {
 
     fn execute_modules<S: MoveResolverExt>(
         &self,
-        mut session: SessionExt<S>,
+        session: SessionExt<S>,
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
         modules: &ModuleBundle,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
-        self.execute_modules_with_deltas(session, gas_status, txn_data, modules, log_context)
-            .map(|(vm_status, output)| (vm_status, output.into()))
+        self.execute_modules_ext(session, gas_status, txn_data, modules, log_context)
+            .map(|(vm_status, output)| (vm_status, output.into_transaction_output()))
     }
 
     pub(crate) fn execute_user_transaction<S: MoveResolverExt>(
@@ -453,12 +453,12 @@ impl AptosVM {
         storage: &S,
         txn: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
-    ) -> (VMStatus, TransactionOutputWithDeltas) {
+    ) -> (VMStatus, TransactionOutputExt) {
         macro_rules! unwrap_or_discard {
             ($res: expr) => {
                 match $res {
                     Ok(s) => s,
-                    Err(e) => return discard_error_vm_status_with_deltas(e),
+                    Err(e) => return discard_error_vm_status_ext(e),
                 }
             };
         }
@@ -472,7 +472,7 @@ impl AptosVM {
             false,
             log_context,
         ) {
-            return discard_error_vm_status_with_deltas(err);
+            return discard_error_vm_status_ext(err);
         };
 
         let gas_schedule = unwrap_or_discard!(self.0.get_gas_schedule(log_context));
@@ -482,24 +482,18 @@ impl AptosVM {
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
             | payload @ TransactionPayload::ScriptFunction(_) => self
-                .execute_script_or_script_function_with_deltas(
+                .execute_script_or_script_function_ext(
                     session,
                     &mut gas_status,
                     &txn_data,
                     payload,
                     log_context,
                 ),
-            TransactionPayload::ModuleBundle(m) => self.execute_modules_with_deltas(
-                session,
-                &mut gas_status,
-                &txn_data,
-                m,
-                log_context,
-            ),
+            TransactionPayload::ModuleBundle(m) => {
+                self.execute_modules_ext(session, &mut gas_status, &txn_data, m, log_context)
+            }
             TransactionPayload::WriteSet(_) => {
-                return discard_error_vm_status_with_deltas(VMStatus::Error(
-                    StatusCode::UNREACHABLE,
-                ));
+                return discard_error_vm_status_ext(VMStatus::Error(StatusCode::UNREACHABLE));
             }
         };
 
@@ -514,7 +508,7 @@ impl AptosVM {
             Err(err) => {
                 let txn_status = TransactionStatus::from(err.clone());
                 if txn_status.is_discarded() {
-                    discard_error_vm_status_with_deltas(err)
+                    discard_error_vm_status_ext(err)
                 } else {
                     self.failed_transaction_cleanup_and_keep_vm_status(
                         err,
@@ -1012,14 +1006,14 @@ impl VMAdapter for AptosVM {
         txn: &PreprocessedTransaction,
         data_cache: &S,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutputWithDeltas, Option<String>), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus> {
         Ok(match txn {
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
                 let (vm_status, output) =
                     self.process_block_prologue(data_cache, block_metadata.clone(), log_context)?;
                 (
                     vm_status,
-                    TransactionOutputWithDeltas::from(output),
+                    TransactionOutputExt::from(output),
                     Some("block_prologue".to_string()),
                 )
             }
@@ -1031,7 +1025,7 @@ impl VMAdapter for AptosVM {
                 )?;
                 (
                     vm_status,
-                    TransactionOutputWithDeltas::from(output),
+                    TransactionOutputExt::from(output),
                     Some("waypoint_write_set".to_string()),
                 )
             }
@@ -1057,14 +1051,14 @@ impl VMAdapter for AptosVM {
                     self.process_writeset_transaction(data_cache, txn, log_context)?;
                 (
                     vm_status,
-                    TransactionOutputWithDeltas::from(output),
+                    TransactionOutputExt::from(output),
                     Some("write_set".to_string()),
                 )
             }
             PreprocessedTransaction::InvalidSignature => {
                 let (vm_status, output) =
                     discard_error_vm_status(VMStatus::Error(StatusCode::INVALID_SIGNATURE));
-                (vm_status, TransactionOutputWithDeltas::from(output), None)
+                (vm_status, TransactionOutputExt::from(output), None)
             }
             PreprocessedTransaction::StateCheckpoint => {
                 let output = TransactionOutput::new(
@@ -1075,7 +1069,7 @@ impl VMAdapter for AptosVM {
                 );
                 (
                     VMStatus::Executed,
-                    TransactionOutputWithDeltas::from(output),
+                    TransactionOutputExt::from(output),
                     Some("state_checkpoint".into()),
                 )
             }
@@ -1173,7 +1167,7 @@ impl AptosSimulationVM {
                             storage,
                             log_context,
                         );
-                    (vm_status, empty_output.into())
+                    (vm_status, empty_output.into_transaction_output())
                 }
             }
         }
