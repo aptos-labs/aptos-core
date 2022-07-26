@@ -11,6 +11,7 @@ pub(crate) mod event;
 pub(crate) mod event_accumulator;
 pub(crate) mod event_by_key;
 pub(crate) mod event_by_version;
+pub(crate) mod indexer_metadata;
 pub(crate) mod jellyfish_merkle_node;
 pub(crate) mod ledger_counters;
 pub(crate) mod ledger_info;
@@ -32,6 +33,7 @@ pub const EVENT_ACCUMULATOR_CF_NAME: ColumnFamilyName = "event_accumulator";
 pub const EVENT_BY_KEY_CF_NAME: ColumnFamilyName = "event_by_key";
 pub const EVENT_BY_VERSION_CF_NAME: ColumnFamilyName = "event_by_version";
 pub const EVENT_CF_NAME: ColumnFamilyName = "event";
+pub const INDEXER_METADATA_CF_NAME: ColumnFamilyName = "indexer_metadata";
 pub const JELLYFISH_MERKLE_NODE_CF_NAME: ColumnFamilyName = "jellyfish_merkle_node";
 pub const LEDGER_COUNTERS_CF_NAME: ColumnFamilyName = "ledger_counters";
 pub const LEDGER_INFO_CF_NAME: ColumnFamilyName = "ledger_info";
@@ -77,6 +79,7 @@ pub mod fuzzing {
             assert_no_panic_decoding::<super::event_accumulator::EventAccumulatorSchema>(data);
             assert_no_panic_decoding::<super::event_by_key::EventByKeySchema>(data);
             assert_no_panic_decoding::<super::event_by_version::EventByVersionSchema>(data);
+            assert_no_panic_decoding::<super::indexer_metadata::IndexerMetadataSchema>(data);
             assert_no_panic_decoding::<super::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
                 data,
             );
