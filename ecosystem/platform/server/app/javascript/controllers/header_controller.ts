@@ -19,4 +19,16 @@ export default class extends Controller {
     const open = this.userTarget.toggleAttribute('open');
     if (open) this.navTarget.removeAttribute('open');
   }
+
+  navGroupHover(event: MouseEvent) {
+    // If another nav group has focus (and thus its dropdown is visible),
+    // remove focus so that only one dropdown is visible at a time.
+    if (!(event.target instanceof HTMLElement)) return;
+    if (!(document.activeElement instanceof HTMLElement)) return;
+    const hoverGroup = event.target.closest('li.group');
+    const focusGroup = document.activeElement.closest('li.group');
+    if (focusGroup && focusGroup != hoverGroup) {
+      document.activeElement.blur();
+    }
+  }
 }
