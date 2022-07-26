@@ -2,6 +2,7 @@
 /* eslint-disable class-methods-use-this */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable max-classes-per-file */
+import * as SHA3 from "js-sha3";
 import { HexString } from "../../hex_string";
 import {
   Deserializer,
@@ -13,6 +14,7 @@ import {
   Uint128,
   deserializeVector,
   serializeVector,
+  bcsToBytes,
 } from "../bcs";
 import { AccountAddress } from "./account_address";
 import { TransactionAuthenticator } from "./authenticator";
@@ -560,5 +562,49 @@ export class TransactionArgumentBool extends TransactionArgument {
   static load(deserializer: Deserializer): TransactionArgumentBool {
     const value = deserializer.deserializeBool();
     return new TransactionArgumentBool(value);
+  }
+}
+
+export abstract class Transaction {
+  abstract serialize(serializer: Serializer): void;
+
+  abstract hash(): Bytes;
+
+  getHashSalt(): Bytes {
+    const hash = SHA3.sha3_256.create();
+    hash.update(Buffer.from("APTOS::Transaction"));
+    return new Uint8Array(hash.arrayBuffer());
+  }
+
+  static deserialize(deserializer: Deserializer): Transaction {
+    const index = deserializer.deserializeUleb128AsU32();
+    switch (index) {
+      case 0:
+        return UserTransaction.load(deserializer);
+      default:
+        throw new Error(`Unknown variant index for Transaction: ${index}`);
+    }
+  }
+}
+
+export class UserTransaction extends Transaction {
+  constructor(public readonly value: SignedTransaction) {
+    super();
+  }
+
+  hash(): Bytes {
+    const hash = SHA3.sha3_256.create();
+    hash.update(this.getHashSalt());
+    hash.update(bcsToBytes(this));
+    return new Uint8Array(hash.arrayBuffer());
+  }
+
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(0);
+    this.value.serialize(serializer);
+  }
+
+  static load(deserializer: Deserializer): UserTransaction {
+    return new UserTransaction(SignedTransaction.deserialize(deserializer));
   }
 }

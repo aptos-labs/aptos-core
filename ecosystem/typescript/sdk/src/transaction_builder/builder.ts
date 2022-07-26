@@ -86,7 +86,7 @@ export class TransactionBuilderEd25519 extends TransactionBuilder<SigningFn> {
     this.publicKey = publicKey;
   }
 
-  private signInternal(rawTxn: RawTransaction): SignedTransaction {
+  rawToSigned(rawTxn: RawTransaction): SignedTransaction {
     const signingMessage = TransactionBuilder.getSigningMessage(rawTxn);
     const signature = this.signingFunction(signingMessage);
 
@@ -100,7 +100,7 @@ export class TransactionBuilderEd25519 extends TransactionBuilder<SigningFn> {
 
   /** Signs a raw transaction and returns a bcs serialized transaction. */
   sign(rawTxn: RawTransaction): Bytes {
-    return bcsToBytes(this.signInternal(rawTxn));
+    return bcsToBytes(this.rawToSigned(rawTxn));
   }
 }
 
@@ -115,7 +115,7 @@ export class TransactionBuilderMultiEd25519 extends TransactionBuilder<SigningFn
     this.publicKey = publicKey;
   }
 
-  private signInternal(rawTxn: RawTransaction): SignedTransaction {
+  rawToSigned(rawTxn: RawTransaction): SignedTransaction {
     const signingMessage = TransactionBuilder.getSigningMessage(rawTxn);
     const signature = this.signingFunction(signingMessage);
 
@@ -126,7 +126,7 @@ export class TransactionBuilderMultiEd25519 extends TransactionBuilder<SigningFn
 
   /** Signs a raw transaction and returns a bcs serialized transaction. */
   sign(rawTxn: RawTransaction): Bytes {
-    return bcsToBytes(this.signInternal(rawTxn));
+    return bcsToBytes(this.rawToSigned(rawTxn));
   }
 }
 

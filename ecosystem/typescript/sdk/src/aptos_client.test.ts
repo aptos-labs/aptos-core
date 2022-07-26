@@ -7,7 +7,13 @@ import { AnyObject } from "./util";
 import { FAUCET_URL, NODE_URL } from "./util.test";
 import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";
-import { TxnBuilderTypes, TransactionBuilderMultiEd25519, BCS, TransactionBuilder } from "./transaction_builder";
+import {
+  TxnBuilderTypes,
+  TransactionBuilderMultiEd25519,
+  BCS,
+  TransactionBuilder,
+  TransactionBuilderEd25519,
+} from "./transaction_builder";
 import { TransactionPayload, WriteResource } from "./api/data-contracts";
 import { TokenClient } from "./token_client";
 import { HexString } from "./hex_string";
@@ -524,6 +530,66 @@ test(
     resources = await client.getAccountResources(account2.address());
     accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
     expect((accountResource.data as any).coin.value).toBe("144");
+  },
+  30 * 1000,
+);
+
+test(
+  "calculates transaction hash",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL, null);
+
+    const account1 = new AptosAccount();
+    await faucetClient.fundAccount(account1.address(), 5000);
+    let resources = await client.getAccountResources(account1.address());
+    let accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
+    expect((accountResource.data as any).coin.value).toBe("5000");
+
+    const account2 = new AptosAccount();
+    await faucetClient.fundAccount(account2.address(), 0);
+    resources = await client.getAccountResources(account2.address());
+    accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
+    expect((accountResource.data as any).coin.value).toBe("0");
+
+    const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
+
+    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+      TxnBuilderTypes.ScriptFunction.natural(
+        "0x1::coin",
+        "transfer",
+        [token],
+        [BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(account2.address())), BCS.bcsSerializeUint64(717)],
+      ),
+    );
+
+    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
+      client.getAccount(account1.address()),
+      client.getChainId(),
+    ]);
+
+    const rawTxn = new TxnBuilderTypes.RawTransaction(
+      TxnBuilderTypes.AccountAddress.fromHex(account1.address()),
+      BigInt(sequenceNumber),
+      scriptFunctionPayload,
+      1000n,
+      1n,
+      BigInt(Math.floor(Date.now() / 1000) + 10),
+      new TxnBuilderTypes.ChainId(chainId),
+    );
+
+    const txnBuilder = new TransactionBuilderEd25519((signingMessage: TxnBuilderTypes.SigningMessage) => {
+      // @ts-ignore
+      const sigHexStr = account1.signBuffer(signingMessage);
+      return new TxnBuilderTypes.Ed25519Signature(sigHexStr.toUint8Array());
+    }, account1.pubKey().toUint8Array());
+
+    const userTxn = new TxnBuilderTypes.UserTransaction(txnBuilder.rawToSigned(rawTxn));
+
+    const bcsTxn = txnBuilder.sign(rawTxn);
+    const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
+
+    expect(HexString.fromUint8Array(userTxn.hash()).hex()).toBe(transactionRes.hash);
   },
   30 * 1000,
 );
