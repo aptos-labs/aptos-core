@@ -1,10 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 
-use super::accept_type::AcceptType;
-use super::{response::AptosResponseResult, ApiTags, AptosResponse};
+use super::accept_type::parse_accept;
+use super::ApiTags;
+use super::{BasicResponse, BasicResponseStatus, BasicResult};
 use crate::context::Context;
 use aptos_api_types::IndexResponse;
 use poem::web::Accept;
@@ -25,11 +26,18 @@ impl IndexApi {
         operation_id = "get_ledger_info",
         tag = "ApiTags::General"
     )]
-    async fn get_ledger_info(&self, accept: Accept) -> AptosResponseResult<IndexResponse> {
-        let accept_type = AcceptType::try_from(&accept)?;
+    async fn get_ledger_info(&self, accept: Accept) -> BasicResult<IndexResponse> {
+        let accept_type = parse_accept(&accept)?;
         let ledger_info = self.context.get_latest_ledger_info_poem()?;
+
         let node_role = self.context.node_role();
         let index_response = IndexResponse::new(ledger_info.clone(), node_role);
-        AptosResponse::try_from_rust_value(index_response, &ledger_info, &accept_type)
+
+        BasicResponse::try_from_rust_value((
+            index_response,
+            &ledger_info,
+            BasicResponseStatus::Ok,
+            &accept_type,
+        ))
     }
 }
