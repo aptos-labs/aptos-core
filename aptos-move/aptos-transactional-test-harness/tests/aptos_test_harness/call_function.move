@@ -5,7 +5,7 @@
 module Alice::hello_world {
     use aptos_framework::signer;
     use aptos_framework::coin;
-    use aptos_framework::test_coin::TestCoin;
+    use aptos_framework::aptos_coin::AptosCoin;
     use std::string::{Self, String};
 
     struct ModuleData has key, store {
@@ -21,7 +21,7 @@ module Alice::hello_world {
     }
 
     public fun foo(addr: address): u64 {
-        coin::balance<TestCoin>(addr)
+        coin::balance<AptosCoin>(addr)
     }
 
     public entry fun hi(sender: &signer, msg: String) acquires ModuleData {

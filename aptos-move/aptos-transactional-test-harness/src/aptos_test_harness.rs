@@ -11,17 +11,16 @@ use aptos_crypto::{
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{aptos_root_address, AccountResource},
+    account_config::{aptos_root_address, AccountResource, CoinStoreResource},
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, table::TableHandle},
     transaction::{
         ExecutionStatus, Module as TransactionModule, RawTransaction, Script as TransactionScript,
         ScriptFunction as TransactionScriptFunction, Transaction, TransactionOutput,
         TransactionStatus,
     },
-    utility_coin::TEST_COIN_TYPE,
 };
 use aptos_vm::{
     data_cache::{AsMoveResolver, IntoMoveResolver, RemoteStorageOwned},
@@ -39,8 +38,9 @@ use move_deps::{
         account_address::AccountAddress,
         gas_schedule::{GasAlgebra, GasConstants},
         identifier::{IdentStr, Identifier},
-        language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
+        language_storage::{ModuleId, ResourceKey, TypeTag},
         move_resource::MoveStructType,
+        parser::parse_type_tag,
         transaction_argument::{convert_txn_args, TransactionArgument},
         value::{MoveTypeLayout, MoveValue},
     },
@@ -53,7 +53,6 @@ use move_deps::{
     move_vm_runtime::session::SerializedReturnValues,
 };
 use once_cell::sync::Lazy;
-use serde_json;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
@@ -168,6 +167,15 @@ struct BlockCommand {
 struct ViewTableCommand {
     #[structopt(long = "table_handle")]
     table_handle: u128,
+
+    #[structopt(long = "key_type", parse(try_from_str = parse_type_tag))]
+    key_type: TypeTag,
+
+    #[structopt(long = "value_type", parse(try_from_str = parse_type_tag))]
+    value_type: TypeTag,
+
+    #[structopt(long = "key_value", parse(try_from_str = serde_json::from_str))]
+    key_value: serde_json::Value,
 }
 
 /// Custom commands for the transactional test flow.
@@ -363,17 +371,14 @@ impl<'a> AptosTestAdapter<'a> {
         Ok(bcs::from_bytes(&account_blob).unwrap())
     }
 
-    /// Obtain the TestCoin amount under address `signer_addr`
+    /// Obtain the AptosCoin amount under address `signer_addr`
     fn fetch_account_balance(&self, signer_addr: &AccountAddress) -> Result<u64> {
-        let test_coin_tag = StructTag {
-            address: AccountAddress::ONE,
-            module: Identifier::new("coin").unwrap(),
-            name: Identifier::new("CoinStore").unwrap(),
-            type_params: vec![TEST_COIN_TYPE.clone()],
-        };
+        let aptos_coin_tag = CoinStoreResource::struct_tag();
 
-        let coin_access_path =
-            AccessPath::resource_access_path(ResourceKey::new(*signer_addr, test_coin_tag.clone()));
+        let coin_access_path = AccessPath::resource_access_path(ResourceKey::new(
+            *signer_addr,
+            aptos_coin_tag.clone(),
+        ));
 
         let balance_blob = self
             .storage
@@ -387,16 +392,20 @@ impl<'a> AptosTestAdapter<'a> {
             })?;
 
         let annotated =
-            MoveValueAnnotator::new(&self.storage).view_resource(&test_coin_tag, &balance_blob)?;
+            MoveValueAnnotator::new(&self.storage).view_resource(&aptos_coin_tag, &balance_blob)?;
 
         // Filter the Coin resource and return the resouce value
-        for (_, val) in annotated.value {
-            if let AnnotatedMoveValue::Struct(s) = val {
-                if s.type_.name.as_str() != "Coin" {
-                    continue;
-                }
+        for (key, val) in annotated.value {
+            if key != Identifier::new("coin").unwrap() {
+                continue;
+            }
 
-                for (_, val) in s.value {
+            if let AnnotatedMoveValue::Struct(s) = val {
+                for (key, val) in s.value {
+                    if key != Identifier::new("value").unwrap() {
+                        continue;
+                    }
+
                     if let AnnotatedMoveValue::U64(v) = val {
                         return Ok(v);
                     }
@@ -404,10 +413,7 @@ impl<'a> AptosTestAdapter<'a> {
             }
         }
 
-        bail!(
-            "Failed to fetch balance resource under address {}.",
-            signer_addr
-        )
+        bail!("Failed to fetch balance under address {}.", signer_addr)
     }
 
     /// Derive the default transaction parameters from the account and balance resources fetched
@@ -485,7 +491,7 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             aptos_root_address(),
             parameters.sequence_number,
-            aptos_transaction_builder::aptos_stdlib::encode_account_create_account(account_addr),
+            aptos_transaction_builder::aptos_stdlib::account_create_account(account_addr),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
             parameters.expiration_timestamp_secs,
@@ -501,7 +507,7 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             aptos_root_address(),
             parameters.sequence_number + 1,
-            aptos_transaction_builder::aptos_stdlib::encode_test_coin_mint(account_addr, amount),
+            aptos_transaction_builder::aptos_stdlib::aptos_coin_mint(account_addr, amount),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
             parameters.expiration_timestamp_secs,
@@ -512,7 +518,7 @@ impl<'a> AptosTestAdapter<'a> {
         .into_inner();
 
         self.run_transaction(Transaction::UserTransaction(txn))
-            .expect("Failed to mint test coin. This should not happen.");
+            .expect("Failed to mint aptos coin. This should not happen.");
     }
 }
 
@@ -866,36 +872,16 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                 Ok(render_events(output.events()))
             }
             AptosSubCommand::ViewTableCommand(view_table_cmd) => {
-                let key_type_struct = StructTag {
-                    address: AccountAddress::from_hex_literal("0x1").unwrap(),
-                    module: Identifier::new("string").unwrap(),
-                    name: Identifier::new("String").unwrap(),
-                    type_params: vec![],
-                };
-
-                let key_type = TypeTag::Struct(key_type_struct);
-
-                let value_type_struct = StructTag {
-                    address: AccountAddress::from_hex_literal("0x1").unwrap(),
-                    module: Identifier::new("token").unwrap(),
-                    name: Identifier::new("Collection").unwrap(),
-                    type_params: vec![],
-                };
-
-                let value_type = TypeTag::Struct(value_type_struct);
-
                 let resolver = self.storage.as_move_resolver();
                 let converter = resolver.as_converter();
 
                 let vm_key = converter
-                    .try_into_vm_value(
-                        &key_type,
-                        serde_json::Value::String("aptos_punks".to_string()),
-                    )
+                    .try_into_vm_value(&view_table_cmd.key_type, view_table_cmd.key_value)
                     .unwrap();
                 let raw_key = vm_key.undecorate().simple_serialize().unwrap();
 
-                let state_key = StateKey::table_item(view_table_cmd.table_handle, raw_key);
+                let state_key =
+                    StateKey::table_item(TableHandle(view_table_cmd.table_handle), raw_key);
 
                 let bytes = self
                     .storage
@@ -903,9 +889,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     .unwrap()
                     .ok_or_else(|| format_err!("Failed to fetch table item.",))?;
 
-                let move_value = converter.try_into_move_value(&value_type, &bytes)?;
+                let move_value =
+                    converter.try_into_move_value(&view_table_cmd.value_type, &bytes)?;
 
-                Ok(Some(format!("{:?}", move_value)))
+                Ok(Some(serde_json::to_string(&move_value).unwrap()))
             }
         }
     }
