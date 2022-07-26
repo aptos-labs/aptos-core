@@ -496,6 +496,15 @@ proptest! {
         let sig = Ed25519Signature::from_bytes_unchecked(sig_bytes.as_ref()).unwrap();
         prop_assert!(pk.verify_struct_signature(&m, &sig).is_err());
     }
+
+    #[test]
+    fn test_proof_of_knowledge(
+        keypair in uniform_keypair_strategy::<Ed25519PrivateKey, Ed25519PublicKey>()
+    ) {
+        let pok = keypair.private_key.create_proof_of_knowledge();
+
+        prop_assert!(keypair.public_key.verify_proof_of_knowledge(&pok).is_ok());
+    }
 }
 
 // The 8-torsion subgroup E[8].

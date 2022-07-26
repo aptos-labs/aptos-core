@@ -24,6 +24,11 @@ mod unit_tests;
 pub use self::traits::*;
 pub use hash::HashValue;
 
+// We need to add this here if we want to use aptos-crypto-derive's CryptoHasher and BCSCryptoHasher
+// macros because these macros generate a `use aptos_crypto::hash::CryptoHash` line which will fail
+// inside this crate (i.e., it would need to be a `use crate::hash::CryptoHash` line instead).
+extern crate self as aptos_crypto;
+
 // Reexport once_cell and serde_name for use in CryptoHasher Derive implementation.
 #[doc(hidden)]
 pub use once_cell as _once_cell;

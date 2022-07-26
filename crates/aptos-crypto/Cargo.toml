@@ -14,7 +14,7 @@ anyhow = "1.0.57"
 bcs = "0.1.3"
 blst = "0.3.7"
 bytes = "1.1.0"
-curve25519-dalek = { version = "3", default-features = false }
+curve25519-dalek = { version = "3", default-features = false, features = ["serde"] }
 digest = "0.9.0"
 ed25519-dalek = { version = "1.0.1", features = ["std", "serde"] }
 hex = "0.4.3"

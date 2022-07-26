@@ -45,6 +45,7 @@ const L: [u8; 32] = [
 
 pub mod ed25519_keys;
 pub mod ed25519_sigs;
+pub mod ed25519_pok;
 
 #[cfg(any(test, feature = "fuzzing"))]
 pub use ed25519_keys::keypair_strategy;

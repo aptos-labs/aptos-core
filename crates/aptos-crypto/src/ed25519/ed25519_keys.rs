@@ -8,6 +8,7 @@ use crate::{
     hash::CryptoHash,
     traits::*,
 };
+use anyhow::Result;
 use aptos_crypto_derive::{
     DeserializeKey, SerializeKey, SilentDebug, SilentDisplay,
 };
@@ -19,6 +20,7 @@ use std::fmt;
 use crate::test_utils::{self, KeyPair};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;
+use crate::ed25519::ed25519_pok::Ed25519PoKChallenge;
 
 /// An Ed25519 private key
 #[derive(DeserializeKey, SerializeKey, SilentDebug, SilentDisplay)]
@@ -67,6 +69,18 @@ impl Ed25519PrivateKey {
             ed25519_dalek::ExpandedSecretKey::from(secret_key);
         let sig = expanded_secret_key.sign(message.as_ref(), &public_key.0);
         Ed25519Signature(sig)
+    }
+
+    /// Creates a proof-of-knowledge (PoK) of this Ed25519 private key, which is merely a signature
+    /// on its associated public key.
+    pub fn create_proof_of_knowledge(&self) -> Ed25519Signature {
+        let pk = self.into();
+        let chal = Ed25519PoKChallenge(
+            pk,
+            curve25519_dalek::constants::ED25519_BASEPOINT_COMPRESSED,
+        );
+
+        self.sign(&chal)
     }
 }
 
@@ -124,6 +138,17 @@ impl Ed25519PublicKey {
             .to_edwards(sign)
             .ok_or(CryptoMaterialError::DeserializationError)?;
         Ed25519PublicKey::try_from(&ed_point.compress().as_bytes()[..])
+    }
+
+    /// Verifies a proof-of-knowledge (PoK) of the Ed25519 private key corresponding to this public
+    /// key, which is merely a signature on this public key.
+    pub fn verify_proof_of_knowledge(&self, sig: &Ed25519Signature) -> Result<()> {
+        let chal = Ed25519PoKChallenge(
+            self.clone(),
+            curve25519_dalek::constants::ED25519_BASEPOINT_COMPRESSED,
+        );
+
+        sig.verify(&chal, self)
     }
 }
 
