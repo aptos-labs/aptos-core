@@ -11,9 +11,9 @@ on:
 jobs:
   run-forge:
     uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
     with:
       GIT_SHA: ${{ github.sha }}
       FORGE_NAMESPACE: continuous
       FORGE_TEST_SUITE: pre_release
       FORGE_CLUSTER_NAME: ${{ secrets.FORGE_CLUSTER_NAME_CONTINUOUS }}
-    secrets: inherit
