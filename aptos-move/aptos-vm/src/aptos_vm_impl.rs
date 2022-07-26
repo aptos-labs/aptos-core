@@ -18,9 +18,7 @@ use aptos_types::{
     on_chain_config::{
         ConfigStorage, OnChainConfig, VMConfig, VMPublishingOption, Version, APTOS_VERSION_3,
     },
-    transaction::{
-        ExecutionStatus, TransactionOutput, TransactionOutputWithDeltas, TransactionStatus,
-    },
+    transaction::{ExecutionStatus, TransactionOutput, TransactionOutputExt, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
 use fail::fail_point;
@@ -565,30 +563,23 @@ pub(crate) fn charge_global_write_gas_usage<R: MoveResolverExt>(
         .map_err(|p_err| p_err.finish(Location::Undefined).into_vm_status())
 }
 
-pub(crate) fn get_transaction_output_with_deltas<A: AccessPathCache, S: MoveResolverExt>(
+pub(crate) fn get_transaction_output_ext<A: AccessPathCache, S: MoveResolverExt>(
     ap_cache: &mut A,
     session: SessionExt<S>,
     gas_left: GasUnits<GasCarrier>,
     txn_data: &TransactionMetadata,
     status: ExecutionStatus,
-) -> Result<TransactionOutputWithDeltas, VMStatus> {
+) -> Result<TransactionOutputExt, VMStatus> {
     let gas_used: u64 = txn_data.max_gas_amount().sub(gas_left).get();
 
     let session_out = session.finish().map_err(|e| e.into_vm_status())?;
-
-    // TODO: this will also extract deltas, which can be preocessed separately.
-    //
-    // let (deltas, change_set) = ...
-    //
-    let change_set = session_out
-        .into_change_set_with_deltas(ap_cache)?
-        .into_inner();
+    let (delta_set, change_set) = session_out.into_change_set_ext(ap_cache)?.into_inner();
     let (write_set, events) = change_set.into_inner();
 
     let txn_output =
         TransactionOutput::new(write_set, events, gas_used, TransactionStatus::Keep(status));
 
-    Ok(TransactionOutputWithDeltas::new(txn_output))
+    Ok(TransactionOutputExt::new(delta_set, txn_output))
 }
 
 pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
@@ -598,8 +589,8 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
     txn_data: &TransactionMetadata,
     status: ExecutionStatus,
 ) -> Result<TransactionOutput, VMStatus> {
-    get_transaction_output_with_deltas(ap_cache, session, gas_left, txn_data, status)
-        .map(TransactionOutputWithDeltas::into)
+    get_transaction_output_ext(ap_cache, session, gas_left, txn_data, status)
+        .map(TransactionOutputExt::into_transaction_output)
 }
 
 #[test]

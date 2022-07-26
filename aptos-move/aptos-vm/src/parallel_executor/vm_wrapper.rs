@@ -66,9 +66,9 @@ impl<'a, S: 'a + StateView> ExecutorTask for AptosVMWrapper<'a, S> {
             .vm
             .execute_single_transaction(txn, &versioned_view, &log_context)
         {
-            Ok((vm_status, output_with_deltas, sender)) => {
-                // TODO: here also extract deltas.
-                let output = output_with_deltas.into();
+            Ok((vm_status, output, sender)) => {
+                // TODO: pass deltas to `AptosTransactionOutput` once we support parallel execution.
+                let (_, output) = output.into();
 
                 if output.status().is_discarded() {
                     match sender {
