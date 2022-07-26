@@ -39,9 +39,9 @@ pub use response::{
 pub use table::TableItemRequest;
 pub use transaction::{
     BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem, DirectWriteSet,
-    EncodeSubmissionRequest, Event, GenesisTransaction, PendingTransaction, ScriptFunctionPayload,
-    ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction, TransactionData,
-    TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
+    EncodeSubmissionRequest, Event, GenesisPayload, GenesisTransaction, PendingTransaction,
+    ScriptFunctionPayload, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction,
+    TransactionData, TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
     TransactionSigningMessage, UserCreateSigningMessageRequest, UserTransaction,
     UserTransactionRequest, WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload,
     WriteTableItem,
