@@ -6,6 +6,7 @@ use crate::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
+    delta_set::DeltaSet,
     ledger_info::LedgerInfo,
     proof::{
         accumulator::InMemoryAccumulator, TransactionInfoListWithProof, TransactionInfoWithProof,
@@ -40,7 +41,7 @@ mod module;
 mod script;
 mod transaction_argument;
 
-pub use change_set::{ChangeSet, ChangeSetWithDeltas};
+pub use change_set::{ChangeSet, ChangeSetExt};
 pub use module::{Module, ModuleBundle};
 pub use script::{
     ArgumentABI, Script, ScriptABI, ScriptFunction, ScriptFunctionABI, TransactionScriptABI,
@@ -951,15 +952,20 @@ impl TransactionOutput {
     }
 }
 
+/// Extension of `TransactionOutput` that also holds `DeltaSet`
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TransactionOutputWithDeltas {
-    // TODO: add deltas here (same as in ChangeSetWithDeltas).
+pub struct TransactionOutputExt {
+    delta_set: DeltaSet,
     output: TransactionOutput,
 }
 
-impl TransactionOutputWithDeltas {
-    pub fn new(output: TransactionOutput) -> Self {
-        TransactionOutputWithDeltas { output }
+impl TransactionOutputExt {
+    pub fn new(delta_set: DeltaSet, output: TransactionOutput) -> Self {
+        TransactionOutputExt { delta_set, output }
+    }
+
+    pub fn delta_set(&self) -> &DeltaSet {
+        &self.delta_set
     }
 
     pub fn write_set(&self) -> &WriteSet {
@@ -978,15 +984,21 @@ impl TransactionOutputWithDeltas {
         &self.output.status
     }
 
-    pub fn into(self) -> TransactionOutput {
+    pub fn into(self) -> (DeltaSet, TransactionOutput) {
+        (self.delta_set, self.output)
+    }
+
+    pub fn into_transaction_output(self) -> TransactionOutput {
         self.output
     }
 }
 
-impl From<TransactionOutput> for TransactionOutputWithDeltas {
+impl From<TransactionOutput> for TransactionOutputExt {
     fn from(output: TransactionOutput) -> Self {
-        // Create empty deltas.
-        TransactionOutputWithDeltas { output }
+        TransactionOutputExt {
+            delta_set: DeltaSet::default(),
+            output,
+        }
     }
 }
 
