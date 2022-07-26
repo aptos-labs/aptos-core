@@ -27,6 +27,7 @@ use hex::FromHex;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use reqwest::Url;
+use serde::de::DeserializeOwned;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{
@@ -92,7 +93,7 @@ impl CliCommand<Transaction> for AddStake {
         self.txn_options
             .submit_script_function(
                 AccountAddress::ONE,
-                "Stake",
+                "stake",
                 "add_stake",
                 vec![],
                 vec![bcs::to_bytes(&self.amount)?],
@@ -123,7 +124,7 @@ impl CliCommand<Transaction> for UnlockStake {
         self.txn_options
             .submit_script_function(
                 AccountAddress::ONE,
-                "Stake",
+                "stake",
                 "unlock",
                 vec![],
                 vec![bcs::to_bytes(&self.amount)?],
@@ -149,7 +150,7 @@ impl CliCommand<Transaction> for WithdrawStake {
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         self.node_op_options
-            .submit_script_function(AccountAddress::ONE, "Stake", "withdraw", vec![], vec![])
+            .submit_script_function(AccountAddress::ONE, "stake", "withdraw", vec![], vec![])
             .await
     }
 }
@@ -188,7 +189,7 @@ impl CliCommand<Transaction> for IncreaseLockup {
         self.txn_options
             .submit_script_function(
                 AccountAddress::ONE,
-                "Stake",
+                "stake",
                 "increase_lockup",
                 vec![],
                 vec![bcs::to_bytes(&lockup_timestamp_secs)?],
@@ -197,17 +198,18 @@ impl CliCommand<Transaction> for IncreaseLockup {
     }
 }
 
-/// Register the current account as a Validator candidate
 #[derive(Parser)]
-pub struct RegisterValidatorCandidate {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
+pub struct ValidatorConfigArgs {
     /// Validator Configuration file, created from the `genesis set-validator-configuration` command
     #[clap(long)]
     pub(crate) validator_config_file: Option<PathBuf>,
     /// Hex encoded Consensus public key
     #[clap(long, parse(try_from_str = bls12381::PublicKey::from_encoded_string))]
     pub(crate) consensus_public_key: Option<bls12381::PublicKey>,
+    /// Hex encoded Consensus proof of possession
+    #[clap(long, parse(try_from_str = bls12381::ProofOfPossession::from_encoded_string))]
+    pub(crate) proof_of_possession: Option<bls12381::ProofOfPossession>,
+
     /// Host and port pair for the validator e.g. 127.0.0.1:6180
     #[clap(long)]
     pub(crate) validator_host: Option<HostAndPort>,
@@ -222,18 +224,11 @@ pub struct RegisterValidatorCandidate {
     pub(crate) full_node_network_public_key: Option<x25519::PublicKey>,
 }
 
-impl RegisterValidatorCandidate {
-    fn process_inputs(
+impl ValidatorConfigArgs {
+    fn get_consensus_public_key(
         &self,
-    ) -> CliTypedResult<(
-        bls12381::PublicKey,
-        x25519::PublicKey,
-        Option<x25519::PublicKey>,
-        HostAndPort,
-        Option<HostAndPort>,
-    )> {
-        let validator_config = self.read_validator_config()?;
-
+        validator_config: &Option<ValidatorConfiguration>,
+    ) -> CliTypedResult<bls12381::PublicKey> {
         let consensus_public_key = if let Some(ref consensus_public_key) = self.consensus_public_key
         {
             consensus_public_key.clone()
@@ -244,7 +239,35 @@ impl RegisterValidatorCandidate {
                 "Must provide either --validator-config-file or --consensus-public-key".to_string(),
             ));
         };
+        Ok(consensus_public_key)
+    }
 
+    fn get_consensus_proof_of_possession(
+        &self,
+        validator_config: &Option<ValidatorConfiguration>,
+    ) -> CliTypedResult<bls12381::ProofOfPossession> {
+        let proof_of_possession = if let Some(ref proof_of_possession) = self.proof_of_possession {
+            proof_of_possession.clone()
+        } else if let Some(ref validator_config) = validator_config {
+            validator_config.proof_of_possession.clone()
+        } else {
+            return Err(CliError::CommandArgumentError(
+                "Must provide either --validator-config-file or --consensus-proof-of-possession"
+                    .to_string(),
+            ));
+        };
+        Ok(proof_of_possession)
+    }
+
+    fn get_newtork_configs(
+        &self,
+        validator_config: &Option<ValidatorConfiguration>,
+    ) -> CliTypedResult<(
+        x25519::PublicKey,
+        Option<x25519::PublicKey>,
+        HostAndPort,
+        Option<HostAndPort>,
+    )> {
         let validator_network_public_key =
             if let Some(public_key) = self.validator_network_public_key {
                 public_key
@@ -285,7 +308,6 @@ impl RegisterValidatorCandidate {
         };
 
         Ok((
-            consensus_public_key,
             validator_network_public_key,
             full_node_network_public_key,
             validator_host,
@@ -304,6 +326,16 @@ impl RegisterValidatorCandidate {
     }
 }
 
+#[derive(Parser)]
+/// Register the current account as a Validator candidate
+pub struct RegisterValidatorCandidate {
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+
+    #[clap(flatten)]
+    pub(crate) validator_config_args: ValidatorConfigArgs,
+}
+
 #[async_trait]
 impl CliCommand<Transaction> for RegisterValidatorCandidate {
     fn command_name(&self) -> &'static str {
@@ -311,13 +343,21 @@ impl CliCommand<Transaction> for RegisterValidatorCandidate {
     }
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
+        let validator_config = self.validator_config_args.read_validator_config()?;
+        let consensus_public_key = self
+            .validator_config_args
+            .get_consensus_public_key(&validator_config)?;
+        let consensus_proof_of_possession = self
+            .validator_config_args
+            .get_consensus_proof_of_possession(&validator_config)?;
         let (
-            consensus_public_key,
             validator_network_public_key,
             full_node_network_public_key,
             validator_host,
             full_node_host,
-        ) = self.process_inputs()?;
+        ) = self
+            .validator_config_args
+            .get_newtork_configs(&validator_config)?;
         let validator_network_addresses =
             vec![validator_host.as_network_address(validator_network_public_key)?];
         let full_node_network_addresses =
@@ -329,11 +369,12 @@ impl CliCommand<Transaction> for RegisterValidatorCandidate {
         self.txn_options
             .submit_script_function(
                 AccountAddress::ONE,
-                "Stake",
+                "stake",
                 "register_validator_candidate",
                 vec![],
                 vec![
                     bcs::to_bytes(&consensus_public_key)?,
+                    bcs::to_bytes(&consensus_proof_of_possession)?,
                     // Double BCS encode, so that we can hide the original type
                     bcs::to_bytes(&bcs::to_bytes(&validator_network_addresses)?)?,
                     bcs::to_bytes(&bcs::to_bytes(&full_node_network_addresses)?)?,
@@ -384,7 +425,7 @@ impl CliCommand<Transaction> for JoinValidatorSet {
         self.txn_options
             .submit_script_function(
                 AccountAddress::ONE,
-                "Stake",
+                "stake",
                 "join_validator_set",
                 vec![],
                 vec![bcs::to_bytes(&address)?],
@@ -416,7 +457,7 @@ impl CliCommand<Transaction> for LeaveValidatorSet {
         self.txn_options
             .submit_script_function(
                 AccountAddress::ONE,
-                "Stake",
+                "stake",
                 "leave_validator_set",
                 vec![],
                 vec![bcs::to_bytes(&address)?],
@@ -515,12 +556,12 @@ impl CliCommand<serde_json::Value> for ShowValidatorSet {
     }
 }
 
-async fn get_resource_migration(
+async fn get_resource_migration<T: DeserializeOwned>(
     client: &aptos_rest_client::Client,
     address: AccountAddress,
     original_resource: &'static str,
     new_resource: &'static str,
-) -> CliTypedResult<Response<serde_json::Value>> {
+) -> CliTypedResult<Response<T>> {
     if let Ok(response) = client.get_resource(address, original_resource).await {
         Ok(response)
     } else {
