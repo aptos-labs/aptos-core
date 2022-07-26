@@ -6,8 +6,9 @@ pub mod hash;
 pub mod signature;
 pub mod type_info;
 
+use move_deps::move_vm_runtime::native_functions;
 use move_deps::{
-    move_core_types::{account_address::AccountAddress, identifier::Identifier},
+    move_core_types::account_address::AccountAddress,
     move_vm_runtime::native_functions::{NativeFunction, NativeFunctionTable},
 };
 
@@ -59,25 +60,5 @@ pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
         ("type_info", "type_name", type_info::type_name),
         ("hash", "sip_hash", hash::native_sip_hash),
     ];
-    NATIVES
-        .iter()
-        .cloned()
-        .map(|(module_name, func_name, func)| {
-            (
-                framework_addr,
-                Identifier::new(module_name).unwrap(),
-                Identifier::new(func_name).unwrap(),
-                func,
-            )
-        })
-        .collect()
-}
-
-/// A temporary hack to patch Table -> table module name as long as it is not upgraded
-/// in the Move repo.
-pub fn patch_table_module(table: NativeFunctionTable) -> NativeFunctionTable {
-    table
-        .into_iter()
-        .map(|(m, _, f, i)| (m, Identifier::new("table").unwrap(), f, i))
-        .collect()
+    native_functions::make_table(framework_addr, NATIVES)
 }
