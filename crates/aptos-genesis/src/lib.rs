@@ -125,6 +125,7 @@ impl GenesisInfo {
             false,
             NO_OP_STORAGE_PRUNER_CONFIG,
             RocksdbConfigs::default(),
+            false,
         )?;
         let db_rw = DbReaderWriter::new(aptosdb);
         executor::db_bootstrapper::generate_waypoint::<AptosVM>(&db_rw, genesis)

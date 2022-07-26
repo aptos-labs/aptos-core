@@ -35,6 +35,7 @@ pub fn init_db_and_executor(config: &NodeConfig) -> (DbReaderWriter, BlockExecut
             false, /* readonly */
             config.storage.storage_pruner_config,
             RocksdbConfigs::default(),
+            false,
         )
         .expect("DB should open."),
     );
@@ -56,6 +57,7 @@ fn create_checkpoint(source_dir: impl AsRef<Path>, checkpoint_dir: impl AsRef<Pa
         true,                        /* readonly */
         NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
         RocksdbConfigs::default(),
+        false,
     )
     .expect("db open failure.")
     .create_checkpoint(checkpoint_dir.as_ref())

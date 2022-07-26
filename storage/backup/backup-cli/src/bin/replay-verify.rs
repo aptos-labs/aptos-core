@@ -59,6 +59,7 @@ async fn main_impl() -> Result<()> {
         false,                       /* read_only */
         NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
         opt.rocksdb_opt.into(),
+        false,
     )?)
     .get_restore_handler();
     ReplayVerifyCoordinator::new(

@@ -1,59 +1,113 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-pub(crate) mod metadata;
+mod db;
+mod metadata;
+mod schema;
 
-use super::AptosDB;
-use crate::indexer::metadata::{Metadata, MetadataTag};
-use crate::indexer_metadata::IndexerMetadataSchema;
-use crate::{TableInfoSchema, OTHER_TIMERS_SECONDS};
-///! This temporarily implements node internal indexing functionalities on the AptosDB.
-use anyhow::{bail, ensure, Error, Result};
+use crate::db::INDEX_DB_NAME;
+use crate::metadata::{Metadata, MetadataTag};
+use crate::schema::column_families;
+use crate::schema::indexer_metadata::IndexerMetadataSchema;
+use crate::schema::table_info::TableInfoSchema;
+use anyhow::{bail, ensure, Result};
+use aptos_config::config::RocksdbConfig;
+use aptos_logger::warn;
 use aptos_types::access_path::Path;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::state_store::table::TableHandle;
 use aptos_types::state_store::table::TableInfo;
-use aptos_types::transaction::{TransactionToCommit, Version};
+use aptos_types::transaction::{AtomicVersion, Version};
 use aptos_types::write_set::{WriteOp, WriteSet};
 use aptos_vm::data_cache::{AsMoveResolver, RemoteStorage};
 use move_deps::move_core_types::identifier::IdentStr;
 use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
 use move_deps::move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
-use schemadb::SchemaBatch;
+use schemadb::db_options::gen_rocksdb_options;
+use schemadb::{SchemaBatch, DB};
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use storage_interface::state_view::DbStateView;
 use storage_interface::DbReader;
 
-impl AptosDB {
-    pub fn index_transactions(
-        &self,
-        last_version: Version,
-        txns_to_commit: &[TransactionToCommit],
-    ) -> Result<()> {
-        if txns_to_commit.is_empty() {
-            return Ok(());
-        }
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["index_transactions"])
-            .start_timer();
+#[derive(Debug)]
+pub struct Indexer {
+    db: DB,
+    next_version: AtomicVersion,
+}
 
-        let write_sets: Vec<_> = txns_to_commit.iter().map(|t| t.write_set()).collect();
+impl Indexer {
+    // FIXME(aldenhu): remove
 
-        self.index_write_sets(last_version, &write_sets)
+    pub fn open(
+        db_root_path: impl AsRef<std::path::Path>,
+        rocksdb_config: RocksdbConfig,
+    ) -> Result<Self> {
+        let db_path = db_root_path.as_ref().join(INDEX_DB_NAME);
+
+        let db = DB::open(
+            db_path,
+            "index_db",
+            column_families(),
+            &gen_rocksdb_options(&rocksdb_config, false),
+        )?;
+
+        let next_version = db
+            .get::<IndexerMetadataSchema>(&MetadataTag::LatestVersion)?
+            .map_or(0, |meta| match meta {
+                Metadata::LatestVersion(version) => version + 1,
+            });
+
+        Ok(Self {
+            db,
+            next_version: AtomicVersion::new(next_version),
+        })
     }
 
-    fn index_write_sets(&self, latest_version: Version, write_sets: &[&WriteSet]) -> Result<()> {
-        let state_store = self.state_store.clone();
+    pub fn index(
+        &self,
+        db_reader: Arc<dyn DbReader>,
+        first_version: Version,
+        write_sets: &[&WriteSet],
+    ) -> Result<()> {
+        let last_version = first_version + write_sets.len() as Version;
         let state_view = DbStateView {
-            db: state_store,
-            version: Some(latest_version),
+            db: db_reader,
+            version: Some(last_version),
         };
         let resolver = state_view.as_move_resolver();
         let annotator = MoveValueAnnotator::new(&resolver);
-        let mut table_info_parser = TableInfoParser::new(self, &annotator);
+        self.index_with_annotator(&annotator, first_version, write_sets)
+    }
 
+    pub fn index_with_annotator(
+        &self,
+        annotator: &MoveValueAnnotator<RemoteStorage<DbStateView>>,
+        first_version: Version,
+        write_sets: &[&WriteSet],
+    ) -> Result<()> {
+        let next_version = self.next_version();
+        ensure!(
+            first_version <= next_version,
+            "Indexer expects to see continuous transaction versions. Expecting: {}, got: {}",
+            next_version,
+            first_version,
+        );
+        let end_version = first_version + write_sets.len() as Version;
+        if end_version <= next_version {
+            warn!(
+                "Seeing old transactions. Expecting version: {}, got {} transactions starting from version {}.",
+                next_version,
+                write_sets.len(),
+                first_version,
+            );
+            return Ok(());
+        }
+
+        let mut table_info_parser = TableInfoParser::new(self, annotator);
         for write_set in write_sets {
             for (state_key, write_op) in write_set.iter() {
                 table_info_parser.parse_write_op(state_key, write_op)?;
@@ -64,42 +118,25 @@ impl AptosDB {
         table_info_parser.finish(&mut batch)?;
         batch.put::<IndexerMetadataSchema>(
             &MetadataTag::LatestVersion,
-            &Metadata::LatestVersion(latest_version),
+            &Metadata::LatestVersion(end_version - 1),
         )?;
-        self.index_db.write_schemas(batch)?;
+        self.db.write_schemas(batch)?;
+        self.next_version.store(end_version, Ordering::Relaxed);
 
         Ok(())
     }
 
-    pub fn catchup_indexer(&self) -> Result<()> {
-        let ledger_version = self
-            .get_latest_transaction_info_option()?
-            .map(|(v, _)| v + 1);
-        if let Some(ledger_version) = ledger_version {
-            let indexer_next_version = self.get_indexer_version()?.map_or(0, |v| v + 1);
-            if indexer_next_version <= ledger_version {
-                let write_sets = self
-                    .transaction_store
-                    .get_write_sets(indexer_next_version, ledger_version + 1)?;
-                let write_sets_ref: Vec<_> = write_sets.iter().collect();
-                self.index_write_sets(ledger_version, &write_sets_ref)?;
-            }
-        }
-        Ok(())
+    pub fn next_version(&self) -> Version {
+        self.next_version.load(Ordering::Relaxed)
     }
 
-    pub fn get_indexer_version(&self) -> Result<Option<Version>> {
-        Ok(self
-            .index_db
-            .get::<IndexerMetadataSchema>(&MetadataTag::LatestVersion)?
-            .map(|data| match data {
-                Metadata::LatestVersion(version) => version,
-            }))
+    pub fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
+        self.db.get::<TableInfoSchema>(&handle)
     }
 }
 
 struct TableInfoParser<'a> {
-    db: &'a AptosDB,
+    indexer: &'a Indexer,
     annotator: &'a MoveValueAnnotator<'a, RemoteStorage<'a, DbStateView>>,
     result: HashMap<TableHandle, TableInfo>,
     pending_on: HashMap<TableHandle, Vec<&'a [u8]>>,
@@ -107,11 +144,11 @@ struct TableInfoParser<'a> {
 
 impl<'a> TableInfoParser<'a> {
     pub fn new(
-        db: &'a AptosDB,
+        indexer: &'a Indexer,
         annotator: &'a MoveValueAnnotator<RemoteStorage<DbStateView>>,
     ) -> Self {
         Self {
-            db,
+            indexer,
             annotator,
             result: HashMap::new(),
             pending_on: HashMap::new(),
@@ -222,7 +259,7 @@ impl<'a> TableInfoParser<'a> {
     fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         match self.result.get(&handle) {
             Some(table_info) => Ok(Some(table_info.clone())),
-            None => self.db.get_table_info_option(handle),
+            None => self.indexer.get_table_info(handle),
         }
     }
 

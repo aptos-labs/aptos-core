@@ -205,6 +205,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
                 false,                       /* read_only */
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
                 opt.rocksdb_opt.into(),
+                false,
             )?)
             .get_restore_handler();
             RestoreRunMode::Restore { restore_handler }

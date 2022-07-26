@@ -476,6 +476,7 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
             false, /* readonly */
             node_config.storage.storage_pruner_config,
             node_config.storage.rocksdb_configs,
+            node_config.storage.enable_indexer,
         )
         .map_err(|err| anyhow!("DB failed to open {}", err))?,
     );
