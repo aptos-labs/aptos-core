@@ -194,6 +194,8 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
     specfile=$(mktemp)
     echo "Forge test-runner pod Spec : ${specfile}"
 
+    [[ "$GITHUB_ACTIONS" == "true" ]] && FORGE_TRIGGERED_BY=github-actions || FORGE_TRIGGERED_BY=other
+
     sed -e "s/{FORGE_POD_NAME}/${FORGE_POD_NAME}/g" \
         -e "s/{FORGE_TEST_SUITE}/${FORGE_TEST_SUITE}/g" \
         -e "s/{IMAGE_TAG}/${IMAGE_TAG}/g" \
@@ -203,6 +205,7 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
         -e "s/{REUSE_ARGS}/${REUSE_ARGS}/g" \
         -e "s/{KEEP_ARGS}/${KEEP_ARGS}/g" \
         -e "s/{ENABLE_HAPROXY_ARGS}/${ENABLE_HAPROXY_ARGS}/g" \
+        -e "s/{FORGE_TRIGGERED_BY}/${FORGE_TRIGGERED_BY}/g" \
         testsuite/forge-test-runner-template.yaml >${specfile}
 
     kubectl apply -n default -f $specfile
