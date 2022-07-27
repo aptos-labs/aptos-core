@@ -689,7 +689,15 @@ pub struct MovePackageDir {
 }
 
 impl MovePackageDir {
-    pub fn get_package_dir(&self) -> CliTypedResult<PathBuf> {
+    pub fn new(package_dir: PathBuf) -> Self {
+        Self {
+            package_dir: Some(package_dir),
+            output_dir: None,
+            named_addresses: Default::default(),
+        }
+    }
+
+    pub fn get_package_path(&self) -> CliTypedResult<PathBuf> {
         dir_default_to_current(self.package_dir.clone())
     }
 

@@ -20,35 +20,22 @@ module aptos_framework::code {
         name: String,
         /// The upgrade policy of this package.
         upgrade_policy: UpgradePolicy,
+        /// The package manifest, in the Move.toml format.
+        manifest: String,
         /// The list of modules installed by this package.
         modules: vector<ModuleMetadata>,
-        /// Address aliases which where used when the modules above were compiled.
-        address_aliases: vector<AddressAlias>,
-        /// Dependencies which were used when this package was compiled.
-        deps: vector<PackageDep>,
     }
 
     /// Metadata about a module in a package.
     struct ModuleMetadata has store, copy, drop {
         /// Name of the module.
         name: String,
-        /// Source map, in internal encoding
-        source_map: vector<u8>,
         /// Source text.
         source: String,
-    }
-
-    /// A package dependency. This consists of an address and the name of a package
-    /// at this address.
-    struct PackageDep has store, copy, drop {
-        addr: address,
-        name: String,
-    }
-
-    /// An address alias.
-    struct AddressAlias has store, copy, drop {
-        alias: String,
-        addr: address
+        /// Source map, in internal encoding
+        source_map: vector<u8>,
+        /// ABI, in JSON byte encoding.
+        abi: vector<u8>,
     }
 
     /// Describes an upgrade policy
