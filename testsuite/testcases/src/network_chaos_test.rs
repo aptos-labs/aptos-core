@@ -12,7 +12,7 @@ use forge::{
 pub struct NetworkChaosTest;
 
 // Delay
-pub const LATENCY_MS: u64 = 80;
+pub const LATENCY_MS: u64 = 300;
 pub const JITTER_MS: u64 = 20;
 pub const CORRELATION_PERCENTAGE: u64 = 10;
 
