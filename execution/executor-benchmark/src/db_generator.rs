@@ -58,6 +58,7 @@ fn bootstrap_with_genesis(db_dir: impl AsRef<Path>) {
             false, /* readonly */
             NO_OP_STORAGE_PRUNER_CONFIG,
             rocksdb_configs,
+            false, /* indexer */
         )
         .expect("DB should open."),
     );

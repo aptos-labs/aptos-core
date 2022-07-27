@@ -54,6 +54,10 @@ pub struct RocksdbOpt {
     state_merkle_db_max_open_files: i32,
     #[structopt(long, default_value = "1073741824")] // 1GB
     state_merkle_db_max_total_wal_size: u64,
+    #[structopt(long, default_value = "1000")]
+    index_db_max_open_files: i32,
+    #[structopt(long, default_value = "1073741824")] // 1GB
+    index_db_max_total_wal_size: u64,
     #[structopt(long, default_value = "16")]
     max_background_jobs: i32,
 }
@@ -69,6 +73,11 @@ impl From<RocksdbOpt> for RocksdbConfigs {
             state_merkle_db_config: RocksdbConfig {
                 max_open_files: opt.state_merkle_db_max_open_files,
                 max_total_wal_size: opt.state_merkle_db_max_total_wal_size,
+                max_background_jobs: opt.max_background_jobs,
+            },
+            index_db_config: RocksdbConfig {
+                max_open_files: opt.index_db_max_open_files,
+                max_total_wal_size: opt.index_db_max_total_wal_size,
                 max_background_jobs: opt.max_background_jobs,
             },
         }
@@ -196,6 +205,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
                 false,                       /* read_only */
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
                 opt.rocksdb_opt.into(),
+                false,
             )?)
             .get_restore_handler();
             RestoreRunMode::Restore { restore_handler }

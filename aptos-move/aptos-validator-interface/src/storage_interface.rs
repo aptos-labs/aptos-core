@@ -25,6 +25,7 @@ impl DBDebuggerInterface {
             true,
             NO_OP_STORAGE_PRUNER_CONFIG,
             RocksdbConfigs::default(),
+            false,
         )?)))
     }
 }
