@@ -41,7 +41,6 @@ pub mod cached_state_view;
 mod executed_trees;
 #[cfg(any(feature = "fuzzing"))]
 pub mod mock;
-pub mod no_proof_fetcher;
 pub mod proof_fetcher;
 pub mod state_delta;
 pub mod state_view;

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_state_view::{account_with_state_view::AsAccountWithStateView, StateViewId};
+use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountSequenceInfo,
@@ -12,11 +12,10 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use fail::fail_point;
-use scratchpad::SparseMerkleTree;
 use std::sync::Arc;
 use storage_interface::{
-    cached_state_view::CachedStateView, no_proof_fetcher::NoProofFetcher,
-    state_view::LatestDbStateCheckpointView, DbReader,
+    state_view::{DbStateView, LatestDbStateCheckpointView},
+    DbReader,
 };
 
 #[cfg(test)]
@@ -36,26 +35,9 @@ pub trait TransactionValidation: Send + Sync + Clone {
     fn notify_commit(&mut self);
 }
 
-fn latest_state_view(db_reader: &Arc<dyn DbReader>) -> CachedStateView {
-    let ledger_view = db_reader
-        .get_latest_executed_trees()
-        .expect("Should not fail.");
-
-    CachedStateView::new(
-        StateViewId::TransactionValidation {
-            base_version: ledger_view.version().expect("Must be bootstrapped."),
-        },
-        Arc::clone(db_reader),
-        ledger_view.txn_accumulator().num_leaves(),
-        SparseMerkleTree::new(ledger_view.state().current.root_hash()),
-        Arc::new(NoProofFetcher::new(db_reader.clone())),
-    )
-    .expect("failed to get latest state view.")
-}
-
 pub struct VMValidator {
     db_reader: Arc<dyn DbReader>,
-    cached_state_view: CachedStateView,
+    db_state_view: DbStateView,
     vm: AptosVM,
 }
 
@@ -67,12 +49,14 @@ impl Clone for VMValidator {
 
 impl VMValidator {
     pub fn new(db_reader: Arc<dyn DbReader>) -> Self {
-        let cached_state_view = latest_state_view(&db_reader);
+        let db_state_view = db_reader
+            .latest_state_checkpoint_view()
+            .expect("Get db view cannot fail");
 
-        let vm = AptosVM::new_for_validation(&cached_state_view);
+        let vm = AptosVM::new_for_validation(&db_state_view);
         VMValidator {
             db_reader,
-            cached_state_view,
+            db_state_view,
             vm,
         }
     }
@@ -89,18 +73,21 @@ impl TransactionValidation for VMValidator {
         });
         use aptos_vm::VMValidator;
 
-        Ok(self.vm.validate_transaction(txn, &self.cached_state_view))
+        Ok(self.vm.validate_transaction(txn, &self.db_state_view))
     }
 
     fn restart(&mut self, _config: OnChainConfigPayload) -> Result<()> {
         self.notify_commit();
 
-        self.vm = AptosVM::new_for_validation(&self.cached_state_view);
+        self.vm = AptosVM::new_for_validation(&self.db_state_view);
         Ok(())
     }
 
     fn notify_commit(&mut self) {
-        self.cached_state_view = latest_state_view(&self.db_reader);
+        self.db_state_view = self
+            .db_reader
+            .latest_state_checkpoint_view()
+            .expect("Get db view cannot fail");
     }
 }
 
