@@ -9,7 +9,8 @@ use aptos_api::context::Context;
 use aptos_api_types::{AsConverter, Transaction};
 use aptos_config::config::NodeConfig;
 use aptos_logger::{debug, error, warn};
-use aptos_types::{chain_id::ChainId, transaction::Transaction::BlockMetadata};
+use aptos_mempool::MempoolClientSender;
+use aptos_types::chain_id::ChainId;
 use aptos_vm::data_cache::RemoteStorageOwned;
 use futures::channel::mpsc::channel;
 use std::time::Duration;
@@ -25,6 +26,7 @@ pub fn bootstrap(
     config: &NodeConfig,
     chain_id: ChainId,
     db: Arc<dyn DbReader>,
+    mp_sender: MempoolClientSender,
 ) -> anyhow::Result<Runtime> {
     let runtime = Builder::new_multi_thread()
         .thread_name("sf-stream")
@@ -37,17 +39,15 @@ pub fn bootstrap(
     // TODO: put this into an arg param
     let starting_version: Option<u64> = None;
 
-    // fake mempool client/sender, so we can use the same code for both api and sf-streamer
-    let (mp_client_sender, _mp_client_events) = channel(1);
-
     runtime.spawn(async move {
         if node_config.sf_stream.enabled {
-            let context = Context::new(chain_id, db, mp_client_sender, node_config.clone());
+            let context = Context::new(chain_id, db, mp_sender.clone(), node_config.clone());
             let context_arc = Arc::new(context);
             let mut streamer = SfStreamer::new(
                 node_config.sf_stream.target_address,
                 context_arc,
                 starting_version.unwrap_or_default(),
+                Some(mp_sender),
             );
             streamer.start().await;
         }
@@ -62,30 +62,50 @@ pub struct SfStreamer {
     pub resolver: Arc<RemoteStorageOwned<DbStateView>>,
     pub block_height: u64,
     pub current_epoch: u64,
+    // This is only ever used for testing
+    pub mp_sender: MempoolClientSender,
 }
 
 impl SfStreamer {
-    pub fn new(target_address: SocketAddr, context: Arc<Context>, starting_version: u64) -> Self {
+    pub fn new(
+        target_address: SocketAddr,
+        context: Arc<Context>,
+        starting_version: u64,
+        mp_client_sender: Option<MempoolClientSender>,
+    ) -> Self {
         let resolver = Arc::new(context.move_resolver().unwrap());
         let latest = context.get_latest_ledger_info().unwrap();
         let block_info = context
             .get_block_info(starting_version, latest.ledger_version.0)
             .unwrap();
-        let block_metadata = context
+        let starting_tnx = context
             .get_transaction_by_version(block_info.start_version, latest.ledger_version.0)
             .unwrap();
 
-        if let BlockMetadata(bmt) = block_metadata.transaction {
-            return Self {
-                target_address,
-                context,
-                current_version: block_metadata.version,
-                resolver,
-                block_height: block_info.block_height,
-                current_epoch: bmt.epoch(),
-            };
-        } else {
-            panic!("block_metadata is not a block metadata");
+        let (version, epoch) = match starting_tnx.transaction {
+            aptos_types::transaction::Transaction::BlockMetadata(bmt) => {
+                (starting_tnx.version, bmt.epoch())
+            }
+            aptos_types::transaction::Transaction::GenesisTransaction(_gt) => (0, 0),
+            _ => panic!(
+                "[sf-stream] first transaction is not a block metadata or genesis transaction"
+            ),
+        };
+
+        // fake mempool client/sender, if we need to, so we can use the same code for both api and sf-streamer
+        let mp_client_sender = mp_client_sender.unwrap_or_else(|| {
+            let (mp_client_sender, _mp_client_events) = channel(1);
+            mp_client_sender
+        });
+
+        Self {
+            target_address,
+            context,
+            current_version: version,
+            resolver,
+            block_height: block_info.block_height,
+            current_epoch: epoch,
+            mp_sender: mp_client_sender,
         }
     }
 
