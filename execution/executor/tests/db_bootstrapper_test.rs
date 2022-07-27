@@ -10,8 +10,9 @@ use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{aptos_root_address, CoinStoreResource, CORE_CODE_ADDRESS},
+    account_config::{aptos_root_address, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
     account_view::AccountView,
+    block_metadata::new_block_event_key,
     contract_event::ContractEvent,
     event::EventHandle,
     on_chain_config::{access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet},
@@ -115,7 +116,7 @@ fn get_demo_accounts() -> (
     (account1, privkey1, account2, privkey2)
 }
 
-fn get_test_coin_mint_transaction(
+fn get_aptos_coin_mint_transaction(
     aptos_root_key: &Ed25519PrivateKey,
     aptos_root_seq_num: u64,
     account: &AccountAddress,
@@ -126,7 +127,7 @@ fn get_test_coin_mint_transaction(
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(aptos_stdlib::encode_test_coin_mint(*account, amount)),
+        Some(aptos_stdlib::aptos_coin_mint(*account, amount)),
     )
 }
 
@@ -141,11 +142,11 @@ fn get_account_transaction(
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(aptos_stdlib::encode_account_create_account(*account)),
+        Some(aptos_stdlib::account_create_account(*account)),
     )
 }
 
-fn get_test_coin_transfer_transaction(
+fn get_aptos_coin_transfer_transaction(
     sender: AccountAddress,
     sender_seq_number: u64,
     sender_key: &Ed25519PrivateKey,
@@ -157,7 +158,7 @@ fn get_test_coin_transfer_transaction(
         sender_seq_number,
         sender_key.clone(),
         sender_key.public_key(),
-        Some(aptos_stdlib::encode_test_coin_transfer(recipient, amount)),
+        Some(aptos_stdlib::aptos_coin_transfer(recipient, amount)),
     )
 }
 
@@ -199,8 +200,8 @@ fn test_new_genesis() {
     let (account1, account1_key, account2, account2_key) = get_demo_accounts();
     let txn1 = get_account_transaction(genesis_key, 0, &account1, &account1_key);
     let txn2 = get_account_transaction(genesis_key, 1, &account2, &account2_key);
-    let txn3 = get_test_coin_mint_transaction(genesis_key, 2, &account1, 2_000_000);
-    let txn4 = get_test_coin_mint_transaction(genesis_key, 3, &account2, 2_000_000);
+    let txn3 = get_aptos_coin_mint_transaction(genesis_key, 2, &account1, 2_000_000);
+    let txn4 = get_aptos_coin_mint_transaction(genesis_key, 3, &account2, 2_000_000);
     execute_and_commit(block(vec![txn1, txn2, txn3, txn4]), &db, &signer);
     assert_eq!(get_balance(&account1, &db), 2_000_000);
     assert_eq!(get_balance(&account2, &db), 2_000_000);
@@ -242,12 +243,20 @@ fn test_new_genesis() {
         ])
         .freeze()
         .unwrap(),
-        vec![ContractEvent::new(
-            *configuration.events().key(),
-            0,
-            TypeTag::Struct(ConfigurationResource::struct_tag()),
-            vec![],
-        )],
+        vec![
+            ContractEvent::new(
+                *configuration.events().key(),
+                0,
+                TypeTag::Struct(ConfigurationResource::struct_tag()),
+                vec![],
+            ),
+            ContractEvent::new(
+                new_block_event_key(),
+                0,
+                TypeTag::Struct(NewBlockEvent::struct_tag()),
+                vec![],
+            ),
+        ],
     )));
 
     // Bootstrap DB into new genesis.
@@ -269,7 +278,7 @@ fn test_new_genesis() {
     assert_eq!(get_balance(&account2, &db), 2_000_000);
 
     // Transfer some money.
-    let txn = get_test_coin_transfer_transaction(account1, 0, &account1_key, account2, 500_000);
+    let txn = get_aptos_coin_transfer_transaction(account1, 0, &account1_key, account2, 500_000);
     execute_and_commit(block(vec![txn]), &db, &signer);
 
     // And verify.

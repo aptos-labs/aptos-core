@@ -20,6 +20,7 @@ use std::fmt::Debug;
 use url::Url;
 
 /// Client for testing & interacting with a Rosetta service
+#[derive(Debug, Clone)]
 pub struct RosettaClient {
     address: Url,
     inner: ReqwestClient,

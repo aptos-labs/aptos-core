@@ -36,10 +36,6 @@ env:
   AWS_ECR_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
   # In case of pull_request events by default github actions merges main into the PR branch and then runs the tests etc
   # on the prospective merge result instead of only on the tip of the PR.
-  # We want to avoid this in case of docker image builds on PRs since want more predictable images then correspond to the code state a developer pushed from local.
-  # Therefore we build the images with the head of the PR branch instead of the prospective merge result.
-  # Safety-wise the merge queue (bors/kodiak or whatever we use) will retest the PR branch merged with the base branch anyways.
-  # In case of push events, this hack is a noop as we default to `github.sha`.
   # For more info also see https://github.com/actions/checkout#checkout-pull-request-head-commit-instead-of-merge-commit
   GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -68,7 +64,8 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'CICD:build-images') ||
       contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
       contains(github.event.pull_request.labels.*.name, 'CICD:deploy-community-platform-to-staging') ||
-      github.event.pull_request.auto_merge != null
+      github.event.pull_request.auto_merge != null ||
+      contains(github.event.pull_request.body, '#e2e')
     runs-on: ubuntu-latest
     steps:
       - name: Check repository permission for user which triggered workflow
@@ -123,7 +120,8 @@ jobs:
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
       contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-      github.event.pull_request.auto_merge != null)
+      github.event.pull_request.auto_merge != null) ||
+      contains(github.event.pull_request.body, '#e2e')
     uses: ./.github/workflows/sdk-integration-test.yaml
     secrets: inherit
     with:
@@ -133,10 +131,12 @@ jobs:
     needs: rust-images
     if: |
       !contains(github.event.pull_request.labels.*.name, 'CICD:skip-forge-e2e-test') && (
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-      github.event.pull_request.auto_merge != null)
+        github.event_name == 'push' ||
+        github.event_name == 'workflow_dispatch' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null ||
+        contains(github.event.pull_request.body, '#e2e')
+      )
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:

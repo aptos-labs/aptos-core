@@ -22,7 +22,8 @@ impl HelloBlockchainClient {
             "type": "module_bundle_payload",
             "modules": [{"bytecode": format!("0x{}", module_hex)}],
         });
-        self.rest_client.execution_transaction_with_payload(account_from, payload)
+        self.rest_client
+            .execution_transaction_with_payload(account_from, payload)
     }
     //<:!:section_1
     //:!:>section_2
@@ -50,7 +51,8 @@ impl HelloBlockchainClient {
             "type_arguments": [],
             "arguments": [message_hex]
         });
-        self.rest_client.execution_transaction_with_payload(account_from, payload)
+        self.rest_client
+            .execution_transaction_with_payload(account_from, payload)
     }
     //<:!:section_3
 }

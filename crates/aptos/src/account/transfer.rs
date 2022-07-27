@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions};
-use aptos_rest_client::{aptos_api_types::WriteSetChange, Transaction};
+use aptos_rest_client::{
+    aptos_api_types::{WriteResource, WriteSetChange},
+    Transaction,
+};
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use cached_framework_packages::aptos_stdlib;
@@ -34,18 +37,15 @@ impl CliCommand<TransferSummary> for TransferCoins {
 
     async fn execute(self) -> CliTypedResult<TransferSummary> {
         self.txn_options
-            .submit_transaction(aptos_stdlib::encode_test_coin_transfer(
-                self.account,
-                self.amount,
-            ))
+            .submit_transaction(aptos_stdlib::aptos_coin_transfer(self.account, self.amount))
             .await
             .map(TransferSummary::from)
     }
 }
 
 const SUPPORTED_COINS: [&str; 2] = [
-    "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
-    "0x1::coin::CoinStore<0x1::testcoin::TestCoin>",
+    "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+    "0x1::coin::CoinStore<0x1::aptoscoin::AptosCoin>",
 ];
 
 /// A shortened transaction output
@@ -77,7 +77,7 @@ impl From<Transaction> for TransferSummary {
                 .changes
                 .iter()
                 .filter_map(|change| match change {
-                    WriteSetChange::WriteResource { address, data, .. } => {
+                    WriteSetChange::WriteResource(WriteResource { address, data, .. }) => {
                         if SUPPORTED_COINS.contains(&data.typ.to_string().as_str()) {
                             Some((
                                 *address.inner(),

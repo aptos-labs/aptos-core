@@ -13,6 +13,7 @@ env:
   HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
   HAS_DATADOG_SECRETS: ${{ secrets.DD_API_KEY != '' }}
   CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
 
 # cancel redundant builds
 concurrency:
@@ -120,22 +121,22 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/rust-setup
-      - run: cargo x lint
-      - run: cargo xclippy --workspace --all-targets
+      - uses: pre-commit/action@v3.0.0
+      - run: cargo xclippy
       - run: cargo fmt --check
       - run: cargo install cargo-sort
       - run: cargo sort --grouped --check --workspace
 
-  rust-unit-xtest:
+  rust-doc-test:
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: ./.github/actions/rust-setup
-      - run: cargo xtest --doc --unit --changed-since "origin/main" --exclude aptos-node-checker
+      - run: cargo test --doc --workspace --exclude aptos-node-checker
 
-  rust-unit-nextest:
+  rust-unit-test:
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
@@ -143,61 +144,40 @@ jobs:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: ./.github/actions/rust-setup
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo nextest --nextest-profile ci --unit --exclude backup-cli --changed-since "origin/main"
+      - uses: taiki-e/install-action@v1.5.6
+        with:
+          tool: nextest
+      - run: cargo nextest run --profile ci --workspace --exclude smoke-test --exclude backup-cli --exclude testcases
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 
-      - name: Upload test results to BuildPulse for flaky test detection
-        # Only run this step for branches where where we have access to secrets.
-        # Run this step even when the tests fail. Skip if the workflow is cancelled.
-        if: env.HAS_BUILDPULSE_SECRETS == 'true' && !cancelled()
-        uses: Workshop64/buildpulse-action@main
+      - uses: ./.github/actions/upload-test-results
         with:
-          account: 99841612
-          repository: 462597790
-          path: target/nextest/ci/junit.xml
-          key: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
-          secret: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
+          BUILDPULSE_ACCESS_KEY_ID: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
+          BUILDPULSE_SECRET_ACCESS_KEY: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          SUITE: rust-unit
 
-      - uses: datadog/junit-upload-github-action@v1
-        if: env.HAS_DATADOG_SECRETS == 'true' && !cancelled()
-        with:
-          api-key: ${{ secrets.DD_API_KEY }}
-          datadog-site: us5.datadoghq.com
-          service: rust-unit-nextest
-          files: target/nextest/ci/junit.xml
-
-  rust-e2e-test:
+  rust-smoke-test:
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/rust-setup
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - uses: taiki-e/install-action@v1.5.6
+        with:
+          tool: nextest
       # --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
-      - run: cargo nextest --nextest-profile ci --package smoke-test --test-threads 6 --retries 3
+      - run: cargo nextest run --profile ci --package smoke-test --test-threads 6 --retries 3
         env:
-          RUST_BACKTRACE: full
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 
-      - name: Upload test results to BuildPulse for flaky test detection
-        # Only run this step for branches where where we have access to secrets.
-        # Run this step even when the tests fail. Skip if the workflow is cancelled.
-        if: env.HAS_BUILDPULSE_SECRETS == 'true' && !cancelled()
-        uses: Workshop64/buildpulse-action@main
+      - uses: ./.github/actions/upload-test-results
         with:
-          account: 99841612
-          repository: 462597790
-          path: target/nextest/ci/junit.xml
-          key: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
-          secret: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
-
-      - uses: datadog/junit-upload-github-action@v1
-        if: env.HAS_DATADOG_SECRETS == 'true' && !cancelled()
-        with:
-          api-key: ${{ secrets.DD_API_KEY }}
-          datadog-site: us5.datadoghq.com
-          service: rust-e2e-test
-          files: target/nextest/ci/junit.xml
+          BUILDPULSE_ACCESS_KEY_ID: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
+          BUILDPULSE_SECRET_ACCESS_KEY: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          SUITE: rust-smoke
 
       - name: Upload smoke test logs for failures
         uses: actions/upload-artifact@v3
@@ -209,3 +189,4 @@ jobs:
             /tmp/.tmp*
             !/tmp/.tmp*/**/db/
           retention-days: 1
+

@@ -75,6 +75,7 @@ impl TestBlockBuilder {
         NewBlockEvent::new(
             self.epoch,
             self.round,
+            self.round,
             voters,
             proposer,
             failed_proposers,
@@ -528,6 +529,7 @@ impl MockDbReader {
                 TypeTag::Struct(NewBlockEvent::struct_tag()),
                 bcs::to_bytes(&NewBlockEvent::new(
                     epoch,
+                    round,
                     round,
                     vec![],
                     self.random_address,

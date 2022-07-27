@@ -1,9 +1,9 @@
 /// This module defines a struct storing the metadata of the block and new block events.
 module aptos_framework::block {
-    use std::errors;
-    use std::event;
+    use std::error;
+    use std::vector;
+    use aptos_std::event;
 
-    use aptos_framework::governance_proposal::GovernanceProposal;
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
     use aptos_framework::reconfiguration;
@@ -21,10 +21,11 @@ module aptos_framework::block {
     struct NewBlockEvent has drop, store {
         epoch: u64,
         round: u64,
+        height: u64,
         previous_block_votes: vector<bool>,
         proposer: address,
         failed_proposer_indices: vector<u64>,
-        /// On-chain time during  he block at the given height
+        /// On-chain time during the block at the given height
         time_microseconds: u64,
     }
 
@@ -38,7 +39,7 @@ module aptos_framework::block {
         timestamp::assert_genesis();
         system_addresses::assert_aptos_framework(account);
 
-        assert!(!is_initialized(), errors::already_published(EBLOCK_METADATA));
+        assert!(!is_initialized(), error::already_exists(EBLOCK_METADATA));
         move_to<BlockMetadata>(
             account,
             BlockMetadata {
@@ -52,9 +53,10 @@ module aptos_framework::block {
     /// Update the epoch interval.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
     public fun update_epoch_interval(
-        _gov_proposal: GovernanceProposal,
+        aptos_framework: &signer,
         new_epoch_interval: u64,
     ) acquires BlockMetadata {
+        system_addresses::assert_aptos_framework(aptos_framework);
         let block_metadata = borrow_global_mut<BlockMetadata>(@aptos_framework);
         block_metadata.epoch_internal = new_epoch_interval;
     }
@@ -83,23 +85,23 @@ module aptos_framework::block {
         // Authorization
         assert!(
             proposer == @vm_reserved || stake::is_current_epoch_validator(proposer),
-        errors::requires_address(EVM_OR_VALIDATOR)
+        error::permission_denied(EVM_OR_VALIDATOR)
         );
 
+        let height = borrow_global_mut<BlockMetadata>(@aptos_framework).height;
+
+        let new_block_event = NewBlockEvent {
+            epoch,
+            round,
+            height,
+            previous_block_votes,
+            proposer,
+            failed_proposer_indices,
+            time_microseconds: timestamp,
+        };
+        emit_new_block_event(&vm, new_block_event);
+
         let block_metadata_ref = borrow_global_mut<BlockMetadata>(@aptos_framework);
-        timestamp::update_global_time(&vm, proposer, timestamp);
-        block_metadata_ref.height = block_metadata_ref.height + 1;
-        event::emit_event<NewBlockEvent>(
-            &mut block_metadata_ref.new_block_events,
-            NewBlockEvent {
-                epoch,
-                round,
-                previous_block_votes,
-                proposer,
-                failed_proposer_indices,
-                time_microseconds: timestamp,
-            }
-        );
 
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
@@ -112,7 +114,52 @@ module aptos_framework::block {
 
     /// Get the current block height
     public fun get_current_block_height(): u64 acquires BlockMetadata {
-        assert!(is_initialized(), errors::not_published(EBLOCK_METADATA));
+        assert!(is_initialized(), error::not_found(EBLOCK_METADATA));
         borrow_global<BlockMetadata>(@aptos_framework).height
+    }
+
+    /// Emit the event and update height and global timestamp
+    fun emit_new_block_event(vm: &signer, new_block_event: NewBlockEvent) acquires BlockMetadata {
+        let block_metadata_ref = borrow_global_mut<BlockMetadata>(@aptos_framework);
+        assert!(block_metadata_ref.height == new_block_event.height, error::invalid_state(EBLOCK_METADATA));
+        block_metadata_ref.height = new_block_event.height + 1;
+        timestamp::update_global_time(vm, new_block_event.proposer, new_block_event.time_microseconds);
+        event::emit_event<NewBlockEvent>(&mut block_metadata_ref.new_block_events, new_block_event);
+    }
+
+    /// Emit a `NewEpochEvent` event. This function will be invoked by genesis directly to generate the very first
+    /// reconfiguration event.
+    fun emit_genesis_block_event(vm: signer) acquires BlockMetadata {
+        emit_new_block_event(
+            &vm,
+            NewBlockEvent {
+                epoch: 0,
+                round: 0,
+                height: 0,
+                previous_block_votes: vector::empty(),
+                proposer: @vm_reserved,
+                failed_proposer_indices: vector::empty(),
+                time_microseconds: 0,
+            }
+        );
+    }
+
+
+    #[test(aptos_framework = @aptos_framework)]
+    public entry fun test_update_epoch_interval(aptos_framework: signer) acquires BlockMetadata {
+        initialize_block_metadata(&aptos_framework, 1);
+        assert!(borrow_global<BlockMetadata>(@aptos_framework).epoch_internal == 1, 0);
+        update_epoch_interval(&aptos_framework, 2);
+        assert!(borrow_global<BlockMetadata>(@aptos_framework).epoch_internal == 2, 1);
+    }
+
+    #[test(aptos_framework = @aptos_framework, account = @0x123)]
+    #[expected_failure(abort_code = 0x50002)]
+    public entry fun test_update_epoch_interval_unauthorized_should_fail(
+        aptos_framework: signer,
+        account: signer,
+    ) acquires BlockMetadata {
+        initialize_block_metadata(&aptos_framework, 1);
+        update_epoch_interval(&account, 2);
     }
 }

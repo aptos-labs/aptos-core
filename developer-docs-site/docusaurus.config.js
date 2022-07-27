@@ -154,15 +154,20 @@ const config = {
                 docId: "nodes/run-a-local-testnet",
               },
               {
-                label: "Node Health Checker FAQ",
+                label: "Node Health Checker",
                 type: "doc",
-                docId: "nodes/node-health-checker-faq",
+                docId: "nodes/node-health-checker",
+              },
+              {
+                label: "Staking",
+                type: "doc",
+                docId: "nodes/staking",
               },
             ],
           },
           {
             position: "left",
-            href: "/rest-api",
+            href: "https://fullnode.devnet.aptoslabs.com/spec.html#/",
             label: "REST API",
           },
         ],

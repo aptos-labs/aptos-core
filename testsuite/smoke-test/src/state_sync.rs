@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::new_local_swarm_with_aptos,
+    smoke_test_environment::{new_local_swarm_with_aptos, new_local_swarm_with_aptos_and_config},
     test_utils::{assert_balance, create_and_fund_account, transfer_coins},
 };
 use forge::{NodeExt, Swarm, SwarmExt};
 use std::{
     fs,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -20,14 +21,13 @@ async fn test_basic_state_synchronization() {
     // - Verify that the restarted node has synced up with the submitted transactions.
 
     // we set a smaller chunk limit (=5) here to properly test multi-chunk state sync
-    let mut swarm = new_local_swarm_with_aptos(4).await;
-    for validator in swarm.validators_mut() {
-        let mut config = validator.config().clone();
-        config.state_sync.chunk_limit = 5;
-        config.save(validator.config_path()).unwrap();
-        validator.restart().await.unwrap();
-    }
-    swarm.launch().await.unwrap(); // Make sure all nodes are healthy and live
+    let mut swarm = new_local_swarm_with_aptos_and_config(
+        4,
+        Arc::new(|_, config| {
+            config.state_sync.chunk_limit = 5;
+        }),
+    )
+    .await;
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
     let client_1 = swarm
@@ -206,7 +206,6 @@ async fn test_state_sync_multichunk_epoch() {
         config.save(validator.config_path()).unwrap();
         validator.restart().await.unwrap();
     }
-    swarm.launch().await.unwrap(); // Make sure all nodes are healthy and live
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
     let client_0 = swarm

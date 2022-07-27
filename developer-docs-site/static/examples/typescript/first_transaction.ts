@@ -168,7 +168,7 @@ export class RestClient {
   //:!:>section_5
   /** Returns the test coin balance associated with the account */
   async accountBalance(accountAddress: string): Promise<number | null> {
-    const resource = await this.accountResource(accountAddress, "0x1::coin::CoinStore<0x1::test_coin::TestCoin>");
+    const resource = await this.accountResource(accountAddress, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
     if (resource == null) {
       return null;
     }
@@ -181,7 +181,7 @@ export class RestClient {
     const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
       function: "0x1::coin::transfer",
-      type_arguments: ["0x1::test_coin::TestCoin"],
+      type_arguments: ["0x1::aptos_coin::AptosCoin"],
       arguments: [`0x${recipient}`, amount.toString()],
     };
     const txnRequest = await this.generateTransaction(accountFrom.address(), payload);

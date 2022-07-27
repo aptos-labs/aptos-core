@@ -6,9 +6,11 @@ use crate::{
     nodes_healthcheck, K8sNode, Result, DEFAULT_ROOT_KEY, FULLNODE_HAPROXY_SERVICE_SUFFIX,
     FULLNODE_SERVICE_SUFFIX, VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
 };
+use again::RetryPolicy;
 use anyhow::{bail, format_err};
 use aptos_logger::info;
 use aptos_sdk::types::PeerId;
+use async_trait::async_trait;
 use k8s_openapi::api::{
     apps::v1::{Deployment, StatefulSet},
     batch::v1::Job,
@@ -19,7 +21,6 @@ use kube::{
     client::Client as K8sClient,
     Config, Error as KubeError,
 };
-use rand::Rng;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::{
@@ -30,9 +31,12 @@ use std::{
     path::Path,
     process::{Command, Stdio},
     str,
+    sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 use tempfile::TempDir;
+use thiserror::Error;
+use tokio::time::Duration;
 
 // binaries expected to be present on test runner
 const HELM_BIN: &str = "helm";
@@ -398,10 +402,10 @@ pub async fn install_testnet_resources(
     genesis_modules_path: Option<String>,
     use_port_forward: bool,
     enable_haproxy: bool,
-) -> Result<(String, HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
+) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     assert!(base_num_validators <= MAX_NUM_VALIDATORS);
 
-    let new_era = get_new_era().unwrap();
+    let new_era = "fg".to_string();
     let kube_client = create_k8s_client().await;
 
     // get deployment-specific helm values and cache it
@@ -485,6 +489,26 @@ pub async fn install_testnet_resources(
         kube_namespace.clone(),
     )?;
 
+    let (validators, fullnodes) = collect_running_nodes(
+        &kube_client,
+        kube_namespace,
+        base_validator_image_tag,
+        use_port_forward,
+        enable_haproxy,
+    )
+    .await?;
+
+    Ok((validators, fullnodes))
+}
+
+/// Collect the running nodes in the network into K8sNodes
+pub async fn collect_running_nodes(
+    kube_client: &K8sClient,
+    kube_namespace: String,
+    base_validator_image_tag: String,
+    use_port_forward: bool,
+    enable_haproxy: bool,
+) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     // get all validators
     let validators = get_validators(
         kube_client.clone(),
@@ -497,17 +521,16 @@ pub async fn install_testnet_resources(
     .unwrap();
 
     // wait for all validator STS to spin up
-    wait_node_stateful_set(&kube_client, &kube_namespace, &validators).await?;
+    wait_node_stateful_set(kube_client, &kube_namespace, &validators).await?;
 
     if enable_haproxy {
-        wait_node_haproxy(&kube_client, &kube_namespace, validators.len()).await?;
+        wait_node_haproxy(kube_client, &kube_namespace, validators.len()).await?;
     }
 
     // get all fullnodes
     let fullnodes = get_fullnodes(
         kube_client.clone(),
         &base_validator_image_tag,
-        &new_era,
         &kube_namespace,
         use_port_forward,
         enable_haproxy,
@@ -515,13 +538,14 @@ pub async fn install_testnet_resources(
     .await
     .unwrap();
 
-    wait_node_stateful_set(&kube_client, &kube_namespace, &fullnodes).await?;
+    wait_node_stateful_set(kube_client, &kube_namespace, &fullnodes).await?;
 
     let nodes = validators
         .values()
         // .chain(fullnodes.values())
         .collect::<Vec<&K8sNode>>();
 
+    // start port-forward for each of the validators
     if use_port_forward {
         for node in nodes.iter() {
             node.spawn_port_forward()?;
@@ -530,17 +554,7 @@ pub async fn install_testnet_resources(
     }
 
     nodes_healthcheck(nodes).await?;
-
-    // start port-forward for each of the validators
-    Ok((new_era, validators, fullnodes))
-}
-
-fn get_new_era() -> Result<String> {
-    // get a random new era to wipe the chain
-    let mut rng = rand::thread_rng();
-    let new_era: &str = &format!("fg{}", rng.gen::<u32>());
-    info!("new chain era: {}", new_era);
-    Ok(new_era.to_string())
+    Ok((validators, fullnodes))
 }
 
 pub async fn create_k8s_client() -> K8sClient {
@@ -593,7 +607,11 @@ fn get_helm_status(helm_release_name: &str) -> Result<Value> {
         .map_err(|e| format_err!("failed to deserialize helm values: {}", e))
 }
 
-fn dump_string_to_file(file_name: String, content: String, tmp_dir: &TempDir) -> Result<String> {
+pub fn dump_string_to_file(
+    file_name: String,
+    content: String,
+    tmp_dir: &TempDir,
+) -> Result<String> {
     let file_path = tmp_dir.path().join(file_name.clone());
     info!("Wrote content to: {:?}", &file_path);
     let mut file = File::create(file_path).expect("Could not create file in temp dir");
@@ -613,49 +631,97 @@ fn dump_helm_values_to_file(helm_release_name: &str, tmp_dir: &TempDir) -> Resul
     dump_string_to_file(file_name, content, tmp_dir)
 }
 
+struct K8sNamespacesApi {
+    api: Api<Namespace>,
+}
+
+#[async_trait]
+trait CreateNamespace: Send + Sync {
+    async fn create(&self, pp: &PostParams, namespace: &Namespace) -> Result<Namespace, KubeError>;
+}
+
+#[async_trait]
+impl CreateNamespace for Api<Namespace> {
+    async fn create(&self, pp: &PostParams, namespace: &Namespace) -> Result<Namespace, KubeError> {
+        self.create(pp, namespace).await
+    }
+}
+
+impl K8sNamespacesApi {
+    fn from_client(kube_client: K8sClient) -> Self {
+        K8sNamespacesApi {
+            api: Api::all(kube_client),
+        }
+    }
+}
+
+#[async_trait]
+impl CreateNamespace for K8sNamespacesApi {
+    async fn create(&self, pp: &PostParams, namespace: &Namespace) -> Result<Namespace, KubeError> {
+        self.api.create(pp, namespace).await
+    }
+}
+
+#[derive(Error, Debug)]
+#[error("{0}")]
+enum ApiError {
+    RetryableError(String),
+    FinalError(String),
+}
+
+async fn create_namespace(
+    namespace_creator: Arc<dyn CreateNamespace>,
+    kube_namespace: String,
+) -> Result<(), ApiError> {
+    let kube_namespace_name = kube_namespace.clone();
+    let namespace = Namespace {
+        metadata: ObjectMeta {
+            name: Some(kube_namespace_name.clone()),
+            ..ObjectMeta::default()
+        },
+        spec: None,
+        status: None,
+    };
+    if let Err(KubeError::Api(api_err)) = namespace_creator
+        .create(&PostParams::default(), &namespace)
+        .await
+    {
+        if api_err.code == 409 {
+            return Err(ApiError::RetryableError(format!(
+                "Namespace {} already exists, continuing with it",
+                &kube_namespace_name
+            )));
+        } else if api_err.code == 401 {
+            return Err(ApiError::FinalError(
+                "Unauthorized, did you authorize with kubernetes? \
+                    Try running `kubectl get current-context`"
+                    .to_string(),
+            ));
+        } else {
+            return Err(ApiError::RetryableError(format!(
+                "Failed to use existing namespace {}: {:?}",
+                &kube_namespace_name, api_err
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub async fn create_management_configmap(kube_namespace: String, keep: bool) -> Result<()> {
     let kube_client = create_k8s_client().await;
+    let namespaces_api = Arc::new(K8sNamespacesApi::from_client(kube_client.clone()));
+    let other_kube_namespace = kube_namespace.clone();
 
     // try to create a new namespace
     // * if it errors with 409, the namespace exists already and we should use it
     // * if it errors with 403, the namespace is likely in the process of being terminated, so try again
-    aptos_retrier::retry_async(k8s_wait_genesis_strategy(), || {
-        let namespaces_api: Api<Namespace> = Api::all(kube_client.clone());
-        let kube_namespace_name = kube_namespace.clone();
-        let namespace = Namespace {
-            metadata: ObjectMeta {
-                name: Some(kube_namespace_name.clone()),
-                ..ObjectMeta::default()
-            },
-            spec: None,
-            status: None,
-        };
-        Box::pin(async move {
-            if let Err(KubeError::Api(api_err)) = namespaces_api
-                .create(&PostParams::default(), &namespace)
-                .await
-            {
-                if api_err.code == 409 {
-                    info!(
-                        "Namespace {} already exists, continuing with it",
-                        &kube_namespace_name
-                    );
-                } else {
-                    info!(
-                        "Failed to use existing namespace {}: {:?}",
-                        &kube_namespace_name, api_err
-                    );
-                    bail!(
-                        "Failed to use existing namespace {}: {:?}",
-                        &kube_namespace_name,
-                        api_err
-                    );
-                }
-            };
-            Ok(())
-        })
-    })
-    .await?;
+    RetryPolicy::exponential(Duration::from_millis(1000))
+        .with_max_delay(Duration::from_millis(10 * 60 * 1000))
+        .retry_if(
+            move || create_namespace(namespaces_api.clone(), other_kube_namespace.clone()),
+            |e: &ApiError| matches!(e, ApiError::RetryableError(_)),
+        )
+        .await?;
 
     let configmap: Api<ConfigMap> = Api::namespaced(kube_client.clone(), &kube_namespace);
 
@@ -677,12 +743,25 @@ pub async fn create_management_configmap(kube_namespace: String, keep: bool) -> 
             ..ObjectMeta::default()
         },
     };
-    configmap.create(&PostParams::default(), &config).await?;
-
-    info!(
-        "Created configmap {} with data {:?}",
-        management_configmap_name, data
-    );
+    if let Err(KubeError::Api(api_err)) = configmap.create(&PostParams::default(), &config).await {
+        if api_err.code == 409 {
+            info!(
+                "Configmap {} already exists, continuing with it",
+                &management_configmap_name
+            );
+        } else {
+            bail!(
+                "Failed to use existing management configmap {}: {:?}",
+                &kube_namespace,
+                api_err
+            );
+        }
+    } else {
+        info!(
+            "Created configmap {} with data {:?}",
+            management_configmap_name, data
+        );
+    }
 
     Ok(())
 }
@@ -771,4 +850,58 @@ pub async fn cleanup_cluster_with_management() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hyper::http::StatusCode;
+    use kube::error::ErrorResponse;
+
+    struct FailedNamespacesApi {
+        status_code: u16,
+    }
+
+    impl FailedNamespacesApi {
+        fn from_status_code(status_code: u16) -> Self {
+            FailedNamespacesApi { status_code }
+        }
+    }
+
+    #[async_trait]
+    impl CreateNamespace for FailedNamespacesApi {
+        async fn create(
+            &self,
+            _pp: &PostParams,
+            _namespace: &Namespace,
+        ) -> Result<Namespace, KubeError> {
+            let status = StatusCode::from_u16(self.status_code).unwrap();
+            Err(KubeError::Api(ErrorResponse {
+                status: status.to_string(),
+                code: status.as_u16(),
+                message: "Failed to create namespace".to_string(),
+                reason: "Failed to parse error data".into(),
+            }))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_namespace_final_error() {
+        let namespace_creator = Arc::new(FailedNamespacesApi::from_status_code(401));
+        let result = create_namespace(namespace_creator, "banana".to_string()).await;
+        match result {
+            Err(ApiError::FinalError(_)) => {}
+            _ => panic!("Expected final error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_namespace_retryable_error() {
+        let namespace_creator = Arc::new(FailedNamespacesApi::from_status_code(403));
+        let result = create_namespace(namespace_creator, "banana".to_string()).await;
+        match result {
+            Err(ApiError::RetryableError(_)) => {}
+            _ => panic!("Expected retryable error"),
+        }
+    }
 }

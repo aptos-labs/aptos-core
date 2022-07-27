@@ -35,7 +35,7 @@ use std::{
 use storage_interface::{DbReader, DbReaderWriter};
 use tokio::{
     runtime::{Handle, Runtime},
-    task::{yield_now, JoinHandle},
+    task::JoinHandle,
 };
 
 /// Synchronizes the storage of the node by verifying and storing new data
@@ -92,7 +92,11 @@ pub trait StorageSynchronizerInterface {
 
     /// Resets the chunk executor. This is required to support continuous
     /// interaction between consensus and state sync.
-    fn reset_chunk_executor(&mut self) -> Result<(), Error>;
+    fn reset_chunk_executor(&self) -> Result<(), Error>;
+
+    /// Finish the chunk executor at this round of state sync by releasing
+    /// any in-memory resources to prevent memory leak.
+    fn finish_chunk_executor(&self);
 }
 
 /// The implementation of the `StorageSynchronizerInterface` used by state sync
@@ -311,13 +315,17 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizerInterface
         }
     }
 
-    fn reset_chunk_executor(&mut self) -> Result<(), Error> {
+    fn reset_chunk_executor(&self) -> Result<(), Error> {
         self.chunk_executor.reset().map_err(|error| {
             Error::UnexpectedError(format!(
                 "Failed to reset the chunk executor! Error: {:?}",
                 error
             ))
         })
+    }
+
+    fn finish_chunk_executor(&self) {
+        self.chunk_executor.finish()
     }
 }
 
@@ -413,7 +421,6 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             decrement_pending_data_chunks(pending_transaction_chunks.clone());
                         }
                     }
-                    yield_thread().await;
                 }
             }
         }
@@ -483,7 +490,6 @@ fn spawn_committer<
                         }
                     };
                     decrement_pending_data_chunks(pending_transaction_chunks.clone());
-                    yield_thread().await;
                 }
             }
         }
@@ -558,7 +564,6 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                         }
 
                                         decrement_pending_data_chunks(pending_transaction_chunks.clone());
-                                        yield_thread().await;
                                         continue; // Wait for the next chunk
                                     }
 
@@ -699,15 +704,4 @@ async fn send_storage_synchronizer_error(
 
     // Update the metrics
     metrics::increment_counter(&metrics::STORAGE_SYNCHRONIZER_ERRORS, error.get_label());
-}
-
-/// This yields the currently executing thread. This is required
-/// to avoid starvation of other threads when the system is under
-/// heavy load (see: https://github.com/aptos-labs/aptos-core/issues/623).
-///
-/// TODO(joshlind): identify a better solution. It likely requires
-/// using spawn_blocking() at a lower level, or merging runtimes.
-async fn yield_thread() {
-    // We have a 50% chance of yielding here.
-    sample!(SampleRate::Frequency(2), yield_now().await;);
 }

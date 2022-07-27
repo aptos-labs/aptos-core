@@ -2,17 +2,46 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! For each transaction the VM executes, the VM will output a `WriteSet` that contains each access
-//! path it updates. For each access path, the VM can either give its new value or delete it.
+//! path it updates. For each access path, the VM can either give its new value or delete it. For
+//! aggregator, delta updates are used (note: this is a temporary solution and ideally we should
+//! modify `ChangeSet` and `TransactionOutput` to keep deltas internal to executor).
 
 use crate::state_store::state_key::StateKey;
 use anyhow::Result;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use serde::{Deserialize, Serialize};
 
+/// Specifies partial function such as +X or -X to use with `WriteOp::Delta`.
+#[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub enum DeltaOperation {
+    Addition(u128),
+    Subtraction(u128),
+}
+
+impl std::fmt::Debug for DeltaOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeltaOperation::Addition(value) => write!(f, "+{}", value),
+            DeltaOperation::Subtraction(value) => write!(f, "-{}", value),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub struct DeltaLimit(pub u128);
+
+impl std::fmt::Debug for DeltaLimit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "result <= {}", self.0)
+    }
+}
+
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {
     Deletion,
     Value(#[serde(with = "serde_bytes")] Vec<u8>),
+    #[serde(skip)]
+    Delta(DeltaOperation, DeltaLimit),
 }
 
 impl WriteOp {
@@ -20,6 +49,7 @@ impl WriteOp {
     pub fn is_deletion(&self) -> bool {
         match self {
             WriteOp::Deletion => true,
+            WriteOp::Delta(..) => false,
             WriteOp::Value(_) => false,
         }
     }
@@ -36,6 +66,9 @@ impl std::fmt::Debug for WriteOp {
                     .map(|byte| format!("{:02x}", byte))
                     .collect::<String>()
             ),
+            WriteOp::Delta(op, limit) => {
+                write!(f, "Delta({:?} ensures {:?})", op, limit)
+            }
             WriteOp::Deletion => write!(f, "Deletion"),
         }
     }

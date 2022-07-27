@@ -11,8 +11,7 @@
 /// which reflect that the system has been successfully initialized.
 module aptos_framework::timestamp {
     use aptos_framework::system_addresses;
-    use std::signer;
-    use std::errors;
+    use std::error;
 
     friend aptos_framework::genesis;
 
@@ -46,16 +45,13 @@ module aptos_framework::timestamp {
         /// and need to hold.
         pragma delegate_invariants_to_caller;
         include AbortsIfNotGenesis;
-        include system_addresses::AbortsIfNotaptos_framework{account: signer::address_of(account)};
+        include system_addresses::AbortsIfNotAptosFramework{account};
         ensures is_operating();
     }
 
     #[test_only]
     public fun set_time_has_started_for_testing(account: &signer) {
         set_time_has_started(account);
-    }
-    spec set_time_has_started_for_testing {
-        pragma verify = false;
     }
 
     /// Updates the wall clock time by consensus. Requires VM privilege and will be invoked during block prologue.
@@ -72,10 +68,10 @@ module aptos_framework::timestamp {
         let now = global_timer.microseconds;
         if (proposer == @vm_reserved) {
             // NIL block with null address as proposer. Timestamp must be equal.
-            assert!(now == timestamp, errors::invalid_argument(ETIMESTAMP));
+            assert!(now == timestamp, error::invalid_argument(ETIMESTAMP));
         } else {
             // Normal block. Time must advance
-            assert!(now < timestamp, errors::invalid_argument(ETIMESTAMP));
+            assert!(now < timestamp, error::invalid_argument(ETIMESTAMP));
         };
         global_timer.microseconds = timestamp;
     }
@@ -99,7 +95,7 @@ module aptos_framework::timestamp {
                 now >= timestamp
              }
             )
-            with errors::INVALID_ARGUMENT;
+            with error::INVALID_ARGUMENT;
     }
 
     /// Gets the current time in microseconds.
@@ -136,7 +132,7 @@ module aptos_framework::timestamp {
 
     /// Helper function to assert genesis state.
     public fun assert_genesis() {
-        assert!(is_genesis(), errors::invalid_state(ENOT_GENESIS));
+        assert!(is_genesis(), error::invalid_state(ENOT_GENESIS));
     }
     spec assert_genesis {
         pragma opaque = true;
@@ -150,12 +146,12 @@ module aptos_framework::timestamp {
     }
     /// Helper schema to specify that a function aborts if not in genesis.
     spec schema AbortsIfNotGenesis {
-        aborts_if !is_genesis() with errors::INVALID_STATE;
+        aborts_if !is_genesis() with error::INVALID_STATE;
     }
 
     /// Helper function to assert operating (!genesis) state.
     public fun assert_operating() {
-        assert!(is_operating(), errors::invalid_state(ENOT_OPERATING));
+        assert!(is_operating(), error::invalid_state(ENOT_OPERATING));
     }
     spec assert_operating {
         pragma opaque = true;
@@ -164,14 +160,14 @@ module aptos_framework::timestamp {
 
     /// Helper schema to specify that a function aborts if not operating.
     spec schema AbortsIfNotOperating {
-        aborts_if !is_operating() with errors::INVALID_STATE;
+        aborts_if !is_operating() with error::INVALID_STATE;
     }
 
     #[test_only]
     public fun update_global_time_for_test(timestamp: u64) acquires CurrentTimeMicroseconds {
         let global_timer = borrow_global_mut<CurrentTimeMicroseconds>(@aptos_framework);
         let now = global_timer.microseconds;
-        assert!(now < timestamp, errors::invalid_argument(ETIMESTAMP));
+        assert!(now < timestamp, error::invalid_argument(ETIMESTAMP));
         global_timer.microseconds = timestamp;
     }
 

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::move_vm_ext::{NativeCodeContext, PublishRequest};
 use crate::{
     adapter_common,
     adapter_common::{
@@ -27,8 +28,8 @@ use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
-    block_metadata::BlockMetadata,
-    on_chain_config::{VMConfig, VMPublishingOption, Version},
+    block_metadata::{new_block_event_key, BlockMetadata},
+    on_chain_config::{new_epoch_event_key, VMConfig, VMPublishingOption, Version},
     transaction::{
         ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
         Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
@@ -56,6 +57,7 @@ use move_deps::{
 };
 use num_cpus;
 use once_cell::sync::OnceCell;
+use std::collections::BTreeSet;
 use std::{
     cmp::min,
     collections::HashSet,
@@ -64,6 +66,7 @@ use std::{
 };
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
+static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 
 #[derive(Clone)]
 pub struct AptosVM(pub(crate) AptosVMImpl);
@@ -109,6 +112,23 @@ impl AptosVM {
         match EXECUTION_CONCURRENCY_LEVEL.get() {
             Some(concurrency_level) => *concurrency_level,
             None => 1,
+        }
+    }
+
+    /// Sets the # of async proof reading threads.
+    pub fn set_num_proof_reading_threads_once(mut num_threads: usize) {
+        // TODO(grao): Do more analysis to tune this magic number.
+        num_threads = min(num_threads, 256);
+        // Only the first call succeeds, due to OnceCell semantics.
+        NUM_PROOF_READING_THREADS.set(num_threads).ok();
+    }
+
+    /// Returns the # of async proof reading threads if already set, otherwise return default value
+    /// (32).
+    pub fn get_num_proof_reading_threads() -> usize {
+        match NUM_PROOF_READING_THREADS.get() {
+            Some(num_threads) => *num_threads,
+            None => 32,
         }
     }
 
@@ -278,6 +298,8 @@ impl AptosVM {
             }
             .map_err(|e| e.into_vm_status())?;
 
+            self.resolve_pending_code_publish(&mut session, gas_status)?;
+
             charge_global_write_gas_usage(gas_status, &session, &txn_data.sender())?;
 
             self.success_transaction_cleanup(session, gas_status, txn_data, log_context)
@@ -311,39 +333,48 @@ impl AptosVM {
         Ok(())
     }
 
+    /// Execute all module initializers.
     fn execute_module_initialization<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
         gas_status: &mut GasStatus,
-        modules: &ModuleBundle,
+        modules: &[CompiledModule],
         senders: &[AccountAddress],
     ) -> VMResult<()> {
         let init_func_name = ident_str!("init_module");
+        for module in modules {
+            let init_function = session.load_function(&module.self_id(), init_func_name, &[]);
+            // it is ok to not have init_module function
+            // init_module function should be (1) private and (2) has no return value
+            if init_function.is_ok() {
+                if verify_module_init_function(module).is_ok() {
+                    let args: Vec<Vec<u8>> = senders
+                        .iter()
+                        .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
+                        .collect();
+                    session.execute_function_bypass_visibility(
+                        &module.self_id(),
+                        init_func_name,
+                        vec![],
+                        args,
+                        gas_status,
+                    )?;
+                } else {
+                    return Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
+                        .finish(Location::Undefined));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Deserialize a module bundle.
+    fn deserialize_module_bundle(&self, modules: &ModuleBundle) -> VMResult<Vec<CompiledModule>> {
+        let mut result = vec![];
         for module_blob in modules.iter() {
-            let args: Vec<Vec<u8>> = senders
-                .iter()
-                .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
-                .collect();
             match CompiledModule::deserialize(module_blob.code()) {
                 Ok(module) => {
-                    let init_function =
-                        session.load_function(&module.self_id(), init_func_name, &[]);
-                    // it is ok to not have init_module function
-                    // init_module function should be (1) private and (2) has no return value
-                    if init_function.is_ok() {
-                        if verify_module_init_function(&module).is_ok() {
-                            session.execute_function_bypass_visibility(
-                                &module.self_id(),
-                                init_func_name,
-                                vec![],
-                                args,
-                                gas_status,
-                            )?;
-                        } else {
-                            return Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
-                                .finish(Location::Undefined));
-                        }
-                    }
+                    result.push(module);
                 }
                 Err(_err) => {
                     return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
@@ -351,9 +382,12 @@ impl AptosVM {
                 }
             }
         }
-        Ok(())
+        Ok(result)
     }
 
+    /// Execute a module bundle load request.
+    /// TODO: this is going to be deprecated and removed in favor of code publishing via
+    /// NativeCodeContext
     fn execute_modules<S: MoveResolverExt>(
         &self,
         mut session: SessionExt<S>,
@@ -390,11 +424,70 @@ impl AptosVM {
         self.execute_module_initialization(
             &mut session,
             gas_status,
-            modules,
+            &self.deserialize_module_bundle(modules)?,
             &[txn_data.sender()],
         )?;
 
         self.success_transaction_cleanup(session, gas_status, txn_data, log_context)
+    }
+
+    /// Resolve a pending code publish request registered via the NativeCodeContext.
+    fn resolve_pending_code_publish<S: MoveResolverExt>(
+        &self,
+        session: &mut SessionExt<S>,
+        gas_status: &mut GasStatus,
+    ) -> VMResult<()> {
+        if let Some(PublishRequest {
+            destination,
+            bundle,
+            expected_modules,
+            check_compat,
+        }) = NativeCodeContext::extract_publish_request(session)
+        {
+            // TODO: unfortunately we need to deserialize the entire bundle here to handle
+            // `init_module` and verify some deployment conditions, while the VM need to do
+            // the deserialization again. Consider adding an API to MoveVM which allows to
+            // directly pass CompiledModule.
+            let modules = self.deserialize_module_bundle(&bundle)?;
+
+            // Validate the module bundle
+            self.validate_publish_request(&modules, expected_modules)?;
+
+            // Publish the bundle
+            if check_compat {
+                session.publish_module_bundle(bundle.into_inner(), destination, gas_status)?
+            } else {
+                session.publish_module_bundle_relax_compatibility(
+                    bundle.into_inner(),
+                    destination,
+                    gas_status,
+                )?
+            }
+
+            // Execute initializers
+            self.execute_module_initialization(session, gas_status, &modules, &[destination])
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Validate a publish request.
+    fn validate_publish_request(
+        &self,
+        modules: &[CompiledModule],
+        expected_names: BTreeSet<String>,
+    ) -> VMResult<()> {
+        let given_names = modules
+            .iter()
+            .map(|m| m.self_id().name().as_str().to_string())
+            .collect::<BTreeSet<_>>();
+        if given_names != expected_names {
+            Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
+                .with_message("metadata and code bundle mismatch".to_owned())
+                .finish(Location::Undefined))
+        } else {
+            Ok(())
+        }
     }
 
     pub(crate) fn execute_user_transaction<S: MoveResolverExt>(
@@ -535,10 +628,34 @@ impl AptosVM {
         Ok(())
     }
 
+    fn validate_waypoint_change_set(
+        change_set: &ChangeSet,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(), VMStatus> {
+        let has_new_block_event = change_set
+            .events()
+            .iter()
+            .any(|e| *e.key() == new_block_event_key());
+        let has_new_epoch_event = change_set
+            .events()
+            .iter()
+            .any(|e| *e.key() == new_epoch_event_key());
+        if has_new_block_event && has_new_epoch_event {
+            Ok(())
+        } else {
+            error!(
+                *log_context,
+                "[aptos_vm] waypoint txn needs to emit new epoch and block"
+            );
+            Err(VMStatus::Error(StatusCode::INVALID_WRITE_SET))
+        }
+    }
+
     pub(crate) fn process_waypoint_change_set<S: MoveResolverExt + StateView>(
         &self,
         storage: &S,
         writeset_payload: WriteSetPayload,
+        log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
         // TODO: user specified genesis id to distinguish different genesis write sets
         let genesis_id = HashValue::zero();
@@ -551,6 +668,7 @@ impl AptosVM {
             Ok(cs) => cs,
             Err(e) => return e,
         };
+        Self::validate_waypoint_change_set(&change_set, log_context)?;
         let (write_set, events) = change_set.into_inner();
         self.read_writeset(storage, &write_set)?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
@@ -938,8 +1056,11 @@ impl VMAdapter for AptosVM {
                 (vm_status, output, Some("block_prologue".to_string()))
             }
             PreprocessedTransaction::WaypointWriteSet(write_set_payload) => {
-                let (vm_status, output) =
-                    self.process_waypoint_change_set(data_cache, write_set_payload.clone())?;
+                let (vm_status, output) = self.process_waypoint_change_set(
+                    data_cache,
+                    write_set_payload.clone(),
+                    log_context,
+                )?;
                 (vm_status, output, Some("waypoint_write_set".to_string()))
             }
             PreprocessedTransaction::UserTransaction(txn) => {

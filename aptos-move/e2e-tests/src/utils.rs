@@ -61,7 +61,7 @@ pub fn upgrade_df(
         executor.execute_and_apply(
             dr_account
                 .transaction()
-                .payload(aptos_stdlib::encode_version_set_version(version_number))
+                .payload(aptos_stdlib::version_set_version(version_number))
                 .sequence_number(*dr_seqno)
                 .sign(),
         );

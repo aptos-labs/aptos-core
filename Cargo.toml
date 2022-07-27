@@ -7,7 +7,9 @@ members = [
     "aptos-move/af-cli",
     "aptos-move/aptos-module-verifier",
     "aptos-move/aptos-resource-viewer",
+    "aptos-move/aptos-sdk-builder",
     "aptos-move/aptos-transaction-benchmarks",
+    "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
     "aptos-move/e2e-tests",
@@ -19,7 +21,6 @@ members = [
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/parallel-executor",
-    "aptos-move/transaction-builder-generator",
     "aptos-move/transaction-replay",
     "aptos-move/vm-genesis",
     "aptos-move/writeset-transaction-generator",
@@ -34,6 +35,7 @@ members = [
     "consensus/safety-rules",
     "crates/aptos",
     "crates/aptos-bitvec",
+    "crates/aptos-compression",
     "crates/aptos-crypto",
     "crates/aptos-crypto-derive",
     "crates/aptos-faucet",
@@ -45,6 +47,7 @@ members = [
     "crates/aptos-log-derive",
     "crates/aptos-logger",
     "crates/aptos-metrics-core",
+    "crates/aptos-openapi",
     "crates/aptos-proptest-helpers",
     "crates/aptos-rate-limiter",
     "crates/aptos-rest-client",
@@ -64,9 +67,6 @@ members = [
     "crates/short-hex-str",
     "crates/transaction-emitter",
     "crates/transaction-emitter-lib",
-    "devtools/x",
-    "devtools/x-core",
-    "devtools/x-lint",
     "ecosystem/indexer",
     "ecosystem/node-checker",
     "execution/db-bootstrapper",
@@ -161,7 +161,3 @@ codegen-units = 1
 
 [profile.bench]
 debug = true
-
-# Build guppy in opt mode so that x commands are faster.
-[profile.dev.package.guppy]
-opt-level = 3

@@ -12,8 +12,8 @@
  *
  */
 module aptos_framework::aptos_governance {
-    use std::errors;
-    use std::event::{Self, EventHandle};
+    use std::error;
+    use aptos_std::event::{Self, EventHandle};
     use std::option;
     use std::signer;
     use std::string::utf8;
@@ -24,8 +24,8 @@ module aptos_framework::aptos_governance {
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
     use aptos_framework::system_addresses;
-    use aptos_framework::table::{Self, Table};
-    use aptos_framework::test_coin::TestCoin;
+    use aptos_std::table::{Self, Table};
+    use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::timestamp;
     use aptos_framework::voting;
 
@@ -72,6 +72,8 @@ module aptos_framework::aptos_governance {
         stake_pool: address,
         proposal_id: u64,
         execution_hash: vector<u8>,
+        metadata_location: vector<u8>,
+        metadata_hash: vector<u8>,
     }
 
     /// Event emitted when there's a vote on a proposa;
@@ -157,19 +159,18 @@ module aptos_framework::aptos_governance {
         proposer: &signer,
         stake_pool: address,
         execution_hash: vector<u8>,
-        code_location: vector<u8>,
-        title: vector<u8>,
-        description: vector<u8>,
+        metadata_location: vector<u8>,
+        metadata_hash: vector<u8>,
     ) acquires GovernanceConfig, GovernanceEvents {
         let proposer_address = signer::address_of(proposer);
-        assert!(stake::is_delegated_voter(stake_pool, proposer_address), errors::invalid_argument(ENOT_DELEGATED_VOTER));
+        assert!(stake::get_delegated_voter(stake_pool) == proposer_address, error::invalid_argument(ENOT_DELEGATED_VOTER));
 
         // The proposer's stake needs to be at least the required bond amount.
         let governance_config = borrow_global<GovernanceConfig>(@aptos_framework);
         let stake_balance = stake::get_active_staked_balance(stake_pool);
         assert!(
             stake_balance >= governance_config.required_proposer_stake,
-            errors::invalid_argument(EINSUFFICIENT_PROPOSER_STAKE),
+            error::invalid_argument(EINSUFFICIENT_PROPOSER_STAKE),
         );
 
         // The proposer's stake needs to be locked up at least as long as the proposal's voting period.
@@ -177,14 +178,14 @@ module aptos_framework::aptos_governance {
         let proposal_expiration = current_time + governance_config.voting_period_secs;
         assert!(
             stake::get_lockup_secs(stake_pool) >= proposal_expiration,
-            errors::invalid_argument(EINSUFFICIENT_STAKE_LOCKUP),
+            error::invalid_argument(EINSUFFICIENT_STAKE_LOCKUP),
         );
 
         // We want to allow early resolution of proposals if more than 50% of the total supply of the network coins
         // has voted. This doesn't take into subsequent inflation/deflation (rewards are issued every epoch and gas fees
         // are burnt after every transaction), but inflation/delation is very unlikely to have a major impact on total
         // supply during the voting period.
-        let total_voting_token_supply = coin::supply<TestCoin>();
+        let total_voting_token_supply = coin::supply<AptosCoin>();
         let early_resolution_vote_threshold = option::none<u128>();
         if (option::is_some(&total_voting_token_supply)) {
             let total_supply = *option::borrow(&total_voting_token_supply);
@@ -196,9 +197,8 @@ module aptos_framework::aptos_governance {
             proposer_address,
             @aptos_framework,
             governance_proposal::create_proposal(
-                utf8(code_location),
-                utf8(title),
-                utf8(description),
+                utf8(metadata_location),
+                utf8(metadata_hash),
             ),
             execution_hash,
             governance_config.min_voting_threshold,
@@ -214,6 +214,8 @@ module aptos_framework::aptos_governance {
                 proposer: proposer_address,
                 stake_pool,
                 execution_hash,
+                metadata_location,
+                metadata_hash,
             },
         );
     }
@@ -226,20 +228,20 @@ module aptos_framework::aptos_governance {
         should_pass: bool,
     ) acquires GovernanceEvents, VotingRecords {
         let voter_address = signer::address_of(voter);
-        assert!(stake::is_delegated_voter(stake_pool, voter_address), errors::invalid_argument(ENOT_DELEGATED_VOTER));
+        assert!(stake::get_delegated_voter(stake_pool) == voter_address, error::invalid_argument(ENOT_DELEGATED_VOTER));
 
         // Voting power does not include pending_active or pending_inactive balances.
         // In general, the stake pool should not have pending_inactive balance if it still has lockup (required to vote)
         // And if pending_active will be added to active in the next epoch.
         let voting_power = stake::get_active_staked_balance(stake_pool);
         // Short-circuit if the voter has no voting power.
-        assert!(voting_power > 0, errors::invalid_argument(ENO_VOTING_POWER));
+        assert!(voting_power > 0, error::invalid_argument(ENO_VOTING_POWER));
 
         // The voter's stake needs to be locked up at least as long as the proposal's expiration.
         let proposal_expiration = voting::get_proposal_expiration_secs<GovernanceProposal>(@aptos_framework, proposal_id);
         assert!(
             stake::get_lockup_secs(stake_pool) >= proposal_expiration,
-            errors::invalid_argument(EINSUFFICIENT_STAKE_LOCKUP),
+            error::invalid_argument(EINSUFFICIENT_STAKE_LOCKUP),
         );
 
         // Ensure the voter doesn't double vote.
@@ -250,7 +252,7 @@ module aptos_framework::aptos_governance {
         };
         assert!(
             !table::contains(&voting_records.votes, record_key),
-            errors::invalid_argument(EALREADY_VOTED));
+            error::invalid_argument(EALREADY_VOTED));
         table::add(&mut voting_records.votes, record_key, true);
 
         voting::vote<GovernanceProposal>(
@@ -275,7 +277,7 @@ module aptos_framework::aptos_governance {
     }
 
     /// Return a signer for making changes to 0x1 as part of on-chain governance proposal process.
-    public fun get_framework_signer(_proposal: &GovernanceProposal): signer acquires GovernanceResponsbility {
+    public fun get_framework_signer(_proposal: GovernanceProposal): signer acquires GovernanceResponsbility {
         let governance_responsibility = borrow_global<GovernanceResponsbility>(@aptos_framework);
         create_signer_with_capability(&governance_responsibility.signer_cap)
     }
@@ -304,8 +306,7 @@ module aptos_framework::aptos_governance {
         create_proposal(
             &proposer,
             signer::address_of(&proposer),
-            b"",
-            b"",
+            b"123",
             b"",
             b"",
         );
@@ -320,7 +321,7 @@ module aptos_framework::aptos_governance {
     }
 
     #[test(core_resources = @core_resources, aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
-    #[expected_failure(abort_code = 1031)]
+    #[expected_failure(abort_code = 0x10004)]
     public entry fun test_cannot_double_vote(
         core_resources: signer,
         aptos_framework: signer,
@@ -342,7 +343,6 @@ module aptos_framework::aptos_governance {
             b"",
             b"",
             b"",
-            b"",
         );
 
         // Double voting should throw an error.
@@ -351,7 +351,7 @@ module aptos_framework::aptos_governance {
     }
 
     #[test(core_resources = @core_resources, aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
-    #[expected_failure(abort_code = 1031)]
+    #[expected_failure(abort_code = 0x10004)]
     public entry fun test_cannot_double_vote_with_different_voter_addresses(
         core_resources: signer,
         aptos_framework: signer,
@@ -373,7 +373,6 @@ module aptos_framework::aptos_governance {
             b"",
             b"",
             b"",
-            b"",
         );
 
         // Double voting should throw an error for 2 different voters if they still use the same stake pool.
@@ -391,9 +390,8 @@ module aptos_framework::aptos_governance {
         no_voter: &signer,
     ) {
         use std::vector;
-
         use aptos_framework::coin;
-        use aptos_framework::test_coin::{Self, TestCoin};
+        use aptos_framework::aptos_coin::{Self, AptosCoin};
 
         timestamp::set_time_has_started_for_testing(aptos_framework);
 
@@ -407,14 +405,14 @@ module aptos_framework::aptos_governance {
         vector::push_back(&mut active_validators, signer::address_of(no_voter));
         stake::create_validator_set(aptos_framework, active_validators);
 
-        let (mint_cap, burn_cap) = test_coin::initialize(aptos_framework, core_resources);
+        let (mint_cap, burn_cap) = aptos_coin::initialize(aptos_framework, core_resources);
         let proposer_stake = coin::mint(100, &mint_cap);
         let yes_voter_stake = coin::mint(20, &mint_cap);
         let no_voter_stake = coin::mint(10, &mint_cap);
         stake::create_stake_pool(proposer, proposer_stake, 10000);
         stake::create_stake_pool(yes_voter, yes_voter_stake, 10000);
         stake::create_stake_pool(no_voter, no_voter_stake, 10000);
-        coin::destroy_mint_cap<TestCoin>(mint_cap);
-        coin::destroy_burn_cap<TestCoin>(burn_cap);
+        coin::destroy_mint_cap<AptosCoin>(mint_cap);
+        coin::destroy_burn_cap<AptosCoin>(burn_cap);
     }
 }

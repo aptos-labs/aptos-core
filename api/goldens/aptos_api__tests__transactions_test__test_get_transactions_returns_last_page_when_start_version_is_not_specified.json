@@ -60,7 +60,7 @@
         "address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -124,8 +124,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }
@@ -164,13 +164,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "13",
+            "height": "14",
             "new_block_events": {
-              "counter": "13",
+              "counter": "14",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -208,12 +208,13 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "12",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "13",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
           "failed_proposer_indices": [],
+          "height": "13",
           "previous_block_votes": [
             false
           ],
@@ -291,7 +292,7 @@
         "address": "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -355,8 +356,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }
@@ -395,13 +396,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "14",
+            "height": "15",
             "new_block_events": {
-              "counter": "14",
+              "counter": "15",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -439,12 +440,13 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "13",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "14",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
           "failed_proposer_indices": [],
+          "height": "14",
           "previous_block_votes": [
             false
           ],
@@ -522,7 +524,7 @@
         "address": "0x95f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -586,8 +588,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }
@@ -626,13 +628,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "15",
+            "height": "16",
             "new_block_events": {
-              "counter": "15",
+              "counter": "16",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -670,12 +672,13 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "14",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "15",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
           "failed_proposer_indices": [],
+          "height": "15",
           "previous_block_votes": [
             false
           ],
@@ -753,7 +756,7 @@
         "address": "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -817,8 +820,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }
@@ -857,13 +860,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "16",
+            "height": "17",
             "new_block_events": {
-              "counter": "16",
+              "counter": "17",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -901,12 +904,13 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "15",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "16",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
           "failed_proposer_indices": [],
+          "height": "16",
           "previous_block_votes": [
             false
           ],
@@ -984,7 +988,7 @@
         "address": "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -1048,8 +1052,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }
@@ -1088,13 +1092,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "17",
+            "height": "18",
             "new_block_events": {
-              "counter": "17",
+              "counter": "18",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -1132,12 +1136,13 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "16",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "17",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
           "failed_proposer_indices": [],
+          "height": "17",
           "previous_block_votes": [
             false
           ],
@@ -1215,7 +1220,7 @@
         "address": "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -1279,8 +1284,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }
@@ -1319,13 +1324,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "18",
+            "height": "19",
             "new_block_events": {
-              "counter": "18",
+              "counter": "19",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -1363,12 +1368,13 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "17",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "18",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
           "failed_proposer_indices": [],
+          "height": "18",
           "previous_block_votes": [
             false
           ],
@@ -1446,7 +1452,7 @@
         "address": "0x99acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -1510,8 +1516,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }
@@ -1550,13 +1556,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "19",
+            "height": "20",
             "new_block_events": {
-              "counter": "19",
+              "counter": "20",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -1594,12 +1600,13 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "18",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "19",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
           "failed_proposer_indices": [],
+          "height": "19",
           "previous_block_votes": [
             false
           ],
@@ -1677,7 +1684,7 @@
         "address": "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -1741,8 +1748,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }
@@ -1781,13 +1788,13 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "20",
+            "height": "21",
             "new_block_events": {
-              "counter": "20",
+              "counter": "21",
               "guid": {
                 "id": {
                   "addr": "0x1",
-                  "creation_num": "3"
+                  "creation_num": "1"
                 }
               }
             }
@@ -1825,12 +1832,13 @@
     "round": "1",
     "events": [
       {
-        "key": "0x03000000000000000000000000000000000000000000000000000000000000000000000000000001",
-        "sequence_number": "19",
+        "key": "0x01000000000000000000000000000000000000000000000000000000000000000000000000000001",
+        "sequence_number": "20",
         "type": "0x1::block::NewBlockEvent",
         "data": {
           "epoch": "0",
           "failed_proposer_indices": [],
+          "height": "20",
           "previous_block_votes": [
             false
           ],
@@ -1908,7 +1916,7 @@
         "address": "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::coin::CoinStore<0x1::test_coin::TestCoin>",
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -1972,8 +1980,8 @@
         "data": {
           "type_info": {
             "account_address": "0x1",
-            "module_name": "0x746573745f636f696e",
-            "struct_name": "0x54657374436f696e"
+            "module_name": "0x6170746f735f636f696e",
+            "struct_name": "0x4170746f73436f696e"
           }
         }
       }

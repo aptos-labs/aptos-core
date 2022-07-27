@@ -1,12 +1,12 @@
 /// This module provides the foundation for typesafe Coins.
 module aptos_framework::coin {
-    use std::ascii;
-    use std::errors;
-    use std::event::{Self, EventHandle};
+    use std::string;
+    use std::error;
+    use aptos_std::event::{Self, EventHandle};
     use std::option::{Self, Option};
     use std::signer;
 
-    use aptos_framework::type_info::{Self, TypeInfo};
+    use aptos_std::type_info::{Self, TypeInfo};
 
     //
     // Errors.
@@ -64,10 +64,10 @@ module aptos_framework::coin {
 
     /// Information about a specific coin type. Stored on the creator of the coin's account.
     struct CoinInfo<phantom CoinType> has key {
-        name: ascii::String,
+        name: string::String,
         /// Symbol of the coin, usually a shorter version of the name.
         /// For example, Singapore Dollar is SGD.
-        symbol: ascii::String,
+        symbol: string::String,
         /// Number of decimals used to get its user representation.
         /// For example, if `decimals` equals `2`, a balance of `505` coins should
         /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
@@ -105,7 +105,7 @@ module aptos_framework::coin {
     public fun balance<CoinType>(owner: address): u64 acquires CoinStore {
         assert!(
             is_account_registered<CoinType>(owner),
-            errors::not_published(ECOIN_STORE_NOT_PUBLISHED),
+            error::not_found(ECOIN_STORE_NOT_PUBLISHED),
         );
         borrow_global<CoinStore<CoinType>>(owner).coin.value
     }
@@ -123,14 +123,14 @@ module aptos_framework::coin {
     }
 
     /// Returns the name of the coin.
-    public fun name<CoinType>(): ascii::String acquires CoinInfo {
+    public fun name<CoinType>(): string::String acquires CoinInfo {
         let type_info = type_info::type_of<CoinType>();
         let coin_address = type_info::account_address(&type_info);
         borrow_global<CoinInfo<CoinType>>(coin_address).name
     }
 
     /// Returns the symbol of the coin, usually a shorter version of the name.
-    public fun symbol<CoinType>(): ascii::String acquires CoinInfo {
+    public fun symbol<CoinType>(): string::String acquires CoinInfo {
         let type_info = type_info::type_of<CoinType>();
         let coin_address = type_info::account_address(&type_info);
         borrow_global<CoinInfo<CoinType>>(coin_address).symbol
@@ -160,7 +160,7 @@ module aptos_framework::coin {
         _cap: &BurnCapability<CoinType>,
     ) acquires CoinInfo {
         let Coin { value: amount } = coin;
-        assert!(amount > 0, errors::invalid_argument(EINVALID_COIN_AMOUNT));
+        assert!(amount > 0, error::invalid_argument(EINVALID_COIN_AMOUNT));
 
         let coin_addr = type_info::account_address(&type_info::type_of<CoinType>());
         let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_addr).supply;
@@ -192,7 +192,7 @@ module aptos_framework::coin {
     public fun deposit<CoinType>(account_addr: address, coin: Coin<CoinType>) acquires CoinStore {
         assert!(
             is_account_registered<CoinType>(account_addr),
-            errors::not_published(ECOIN_STORE_NOT_PUBLISHED),
+            error::not_found(ECOIN_STORE_NOT_PUBLISHED),
         );
 
         let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
@@ -209,12 +209,12 @@ module aptos_framework::coin {
     /// a `BurnCapability` for the specific `CoinType`.
     public fun destroy_zero<CoinType>(zero_coin: Coin<CoinType>) {
         let Coin { value } = zero_coin;
-        assert!(value == 0, errors::invalid_argument(EDESTRUCTION_OF_NONZERO_TOKEN))
+        assert!(value == 0, error::invalid_argument(EDESTRUCTION_OF_NONZERO_TOKEN))
     }
 
     /// Extracts `amount` from the passed-in `coin`, where the original token is modified in place.
     public fun extract<CoinType>(coin: &mut Coin<CoinType>, amount: u64): Coin<CoinType> {
-        assert!(coin.value >= amount, errors::invalid_argument(EINSUFFICIENT_BALANCE));
+        assert!(coin.value >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
         coin.value = coin.value - amount;
         Coin { value: amount }
     }
@@ -231,8 +231,8 @@ module aptos_framework::coin {
     /// about the coin (name, supply, etc.).
     public fun initialize<CoinType>(
         account: &signer,
-        name: ascii::String,
-        symbol: ascii::String,
+        name: string::String,
+        symbol: string::String,
         decimals: u64,
         monitor_supply: bool,
     ): (MintCapability<CoinType>, BurnCapability<CoinType>) {
@@ -241,12 +241,12 @@ module aptos_framework::coin {
         let type_info = type_info::type_of<CoinType>();
         assert!(
             type_info::account_address(&type_info) == account_addr,
-            errors::invalid_argument(ECOIN_INFO_ADDRESS_MISMATCH),
+            error::invalid_argument(ECOIN_INFO_ADDRESS_MISMATCH),
         );
 
         assert!(
             !exists<CoinInfo<CoinType>>(account_addr),
-            errors::already_published(ECOIN_INFO_ALREADY_PUBLISHED),
+            error::already_exists(ECOIN_INFO_ALREADY_PUBLISHED),
         );
 
         let coin_info = CoinInfo<CoinType> {
@@ -283,7 +283,7 @@ module aptos_framework::coin {
         if (option::is_some(supply)) {
             let supply = option::borrow_mut(supply);
             let amount_u128 = (amount as u128);
-            assert!(*supply <= MAX_U128 - amount_u128, errors::invalid_argument(ETOTAL_SUPPLY_OVERFLOW));
+            assert!(*supply <= MAX_U128 - amount_u128, error::invalid_argument(ETOTAL_SUPPLY_OVERFLOW));
             *supply = *supply + amount_u128;
         };
 
@@ -301,7 +301,7 @@ module aptos_framework::coin {
         let account_addr = signer::address_of(account);
         assert!(
             !is_account_registered<CoinType>(account_addr),
-            errors::already_published(ECOIN_STORE_ALREADY_PUBLISHED),
+            error::already_exists(ECOIN_STORE_ALREADY_PUBLISHED),
         );
 
         // Also add the central coin events resource if the account doesn't have one yet.
@@ -350,7 +350,7 @@ module aptos_framework::coin {
         let account_addr = signer::address_of(account);
         assert!(
             is_account_registered<CoinType>(account_addr),
-            errors::not_published(ECOIN_STORE_NOT_PUBLISHED),
+            error::not_found(ECOIN_STORE_NOT_PUBLISHED),
         );
         let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
 
@@ -388,8 +388,8 @@ module aptos_framework::coin {
         destination: &signer,
         amount: u64
     ) acquires CoinEvents, CoinInfo, CoinStore {
-        let name = ascii::string(b"Fake money");
-        let symbol = ascii::string(b"FMD");
+        let name = string::utf8(b"Fake money");
+        let symbol = string::utf8(b"FMD");
 
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             source,
@@ -416,8 +416,8 @@ module aptos_framework::coin {
         let source_addr = signer::address_of(&source);
         let destination_addr = signer::address_of(&destination);
 
-        let name = ascii::string(b"Fake money");
-        let symbol = ascii::string(b"FMD");
+        let name = string::utf8(b"Fake money");
+        let symbol = string::utf8(b"FMD");
 
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
@@ -463,8 +463,8 @@ module aptos_framework::coin {
 
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
-            ascii::string(b"Fake money"),
-            ascii::string(b"FMD"),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
             1,
             false,
         );
@@ -492,12 +492,12 @@ module aptos_framework::coin {
     }
 
     #[test(source = @0x2)]
-    #[expected_failure(abort_code = 7)]
+    #[expected_failure(abort_code = 0x10000)]
     public fun fail_initialize(source: signer) {
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
-            ascii::string(b"Fake money"),
-            ascii::string(b"FMD"),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
             1,
             true,
         );
@@ -509,7 +509,7 @@ module aptos_framework::coin {
     }
 
     #[test(source = @0x1, destination = @0x2)]
-    #[expected_failure(abort_code = 1029)]
+    #[expected_failure(abort_code = 0x60004)]
     public entry fun fail_transfer(
         source: signer,
         destination: signer,
@@ -519,8 +519,8 @@ module aptos_framework::coin {
 
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
-            ascii::string(b"Fake money"),
-            ascii::string(b"FMD"),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
             1,
             true,
         );
@@ -545,8 +545,8 @@ module aptos_framework::coin {
 
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
-            ascii::string(b"Fake money"),
-            ascii::string(b"FMD"),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
             1,
             true
         );
@@ -568,14 +568,14 @@ module aptos_framework::coin {
     }
 
     #[test(source = @0x1)]
-    #[expected_failure(abort_code = 1543)]
+    #[expected_failure(abort_code = 0x10006)]
     public fun test_destroy_non_zero(
         source: signer,
     ) acquires CoinInfo {
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
-            ascii::string(b"Fake money"),
-            ascii::string(b"FMD"),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
             1,
             true,
         );
@@ -597,8 +597,8 @@ module aptos_framework::coin {
 
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
-            ascii::string(b"Fake money"),
-            ascii::string(b"FMD"),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
             1,
             true
         );
@@ -627,8 +627,8 @@ module aptos_framework::coin {
         assert!(!is_coin_initialized<FakeMoney>(), 0);
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
-            ascii::string(b"Fake money"),
-            ascii::string(b"FMD"),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
             1,
             true
         );

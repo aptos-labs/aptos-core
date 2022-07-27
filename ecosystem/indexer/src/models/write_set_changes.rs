@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{models::transactions::Transaction, schema::write_set_changes};
-use aptos_rest_client::aptos_api_types::WriteSetChange as APIWriteSetChange;
+use aptos_rest_client::aptos_api_types::{
+    DeleteModule, DeleteResource, DeleteTableItem, WriteModule, WriteResource,
+    WriteSetChange as APIWriteSetChange, WriteTableItem,
+};
 use serde::Serialize;
 use serde_json::json;
 
@@ -30,11 +33,11 @@ impl WriteSetChange {
         write_set_change: &APIWriteSetChange,
     ) -> Self {
         match write_set_change {
-            APIWriteSetChange::DeleteModule {
+            APIWriteSetChange::DeleteModule(DeleteModule {
                 address,
                 state_key_hash,
                 module,
-            } => WriteSetChange {
+            }) => WriteSetChange {
                 transaction_hash,
                 hash: state_key_hash.clone(),
                 type_: write_set_change.type_str().to_string(),
@@ -44,11 +47,11 @@ impl WriteSetChange {
                 data: Default::default(),
                 inserted_at: chrono::Utc::now().naive_utc(),
             },
-            APIWriteSetChange::DeleteResource {
+            APIWriteSetChange::DeleteResource(DeleteResource {
                 address,
                 state_key_hash,
                 resource,
-            } => WriteSetChange {
+            }) => WriteSetChange {
                 transaction_hash,
                 hash: state_key_hash.clone(),
                 type_: write_set_change.type_str().to_string(),
@@ -58,11 +61,11 @@ impl WriteSetChange {
                 data: Default::default(),
                 inserted_at: chrono::Utc::now().naive_utc(),
             },
-            APIWriteSetChange::DeleteTableItem {
+            APIWriteSetChange::DeleteTableItem(DeleteTableItem {
                 state_key_hash,
                 handle,
                 key,
-            } => WriteSetChange {
+            }) => WriteSetChange {
                 transaction_hash,
                 hash: state_key_hash.clone(),
                 type_: write_set_change.type_str().to_string(),
@@ -75,11 +78,11 @@ impl WriteSetChange {
                 }),
                 inserted_at: chrono::Utc::now().naive_utc(),
             },
-            APIWriteSetChange::WriteModule {
+            APIWriteSetChange::WriteModule(WriteModule {
                 address,
                 state_key_hash,
                 data,
-            } => WriteSetChange {
+            }) => WriteSetChange {
                 transaction_hash,
                 hash: state_key_hash.clone(),
                 type_: write_set_change.type_str().to_string(),
@@ -89,11 +92,11 @@ impl WriteSetChange {
                 data: serde_json::to_value(data).unwrap(),
                 inserted_at: chrono::Utc::now().naive_utc(),
             },
-            APIWriteSetChange::WriteResource {
+            APIWriteSetChange::WriteResource(WriteResource {
                 address,
                 state_key_hash,
                 data,
-            } => WriteSetChange {
+            }) => WriteSetChange {
                 transaction_hash,
                 hash: state_key_hash.clone(),
                 type_: write_set_change.type_str().to_string(),
@@ -103,12 +106,12 @@ impl WriteSetChange {
                 data: serde_json::to_value(data).unwrap(),
                 inserted_at: chrono::Utc::now().naive_utc(),
             },
-            APIWriteSetChange::WriteTableItem {
+            APIWriteSetChange::WriteTableItem(WriteTableItem {
                 state_key_hash,
                 handle,
                 key,
                 value,
-            } => WriteSetChange {
+            }) => WriteSetChange {
                 transaction_hash,
                 hash: state_key_hash.clone(),
                 type_: write_set_change.type_str().to_string(),

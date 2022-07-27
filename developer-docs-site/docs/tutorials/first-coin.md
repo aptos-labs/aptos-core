@@ -130,7 +130,7 @@ Update the module with Alice's address, build, copy to the provided path, and pr
 
 ## Step 2) Initialize MoonCoin
 
-The MoonCoin module has alreayd been deployed. The next step is to initialize MoonCoin. In this example, we'll be using 0x1::ManagedCoin::initialize since we want the ability to mint/burn our new MoonCoin. This adds standard functionalities to MoonCoin such as transfer, mint, burn and standard events (register, deposit, withdraw).
+The MoonCoin module has alreayd been deployed. The next step is to initialize MoonCoin. In this example, we'll be using 0x1::managed_coin::initialize since we want the ability to mint/burn our new MoonCoin. This adds standard functionalities to MoonCoin such as transfer, mint, burn and standard events (register, deposit, withdraw).
 
 <Tabs>
   <TabItem value="python" label="Python" default>
@@ -188,7 +188,7 @@ To register, the recipient just needs to call ```0x1::coin::register<CoinType>``
 
 ## Step 4) Mint MoonCoin to the recipient as the owner of the MoonCoin
 
-When initializing a new Coin (Step 2), the owning account receives capabilities to mint/burn the new coin. The owner account can mint MoonCoin by calling 0x1::ManagedCoin::mint.
+When initializing a new Coin (Step 2), the owning account receives capabilities to mint/burn the new coin. The owner account can mint MoonCoin by calling 0x1::managed_coin::mint.
 
 <Tabs>
   <TabItem value="python" label="Python" default>

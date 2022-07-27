@@ -117,12 +117,10 @@ const getCollectionById = ({
   async (resolve, reject) => {
     try {
       const [creator, name] = collectionId.split('::');
-      const data = await prisma.collections.findUnique({
+      const data = await prisma.collections.findFirst({
         where: {
-          creator_name: {
-            creator,
-            name,
-          },
+          creator,
+          name,
         },
       });
       resolve(Service.successResponse(data));
@@ -152,12 +150,10 @@ const getOwnershipById = ({
     try {
       const [creator, collectionName, tokenName, ownerAddress] = ownershipId.split('::');
       const token_id = `${creator}::${collectionName}::${tokenName}`;
-      const data = await prisma.ownerships.findUnique({
+      const data = await prisma.ownerships.findFirst({
         where: {
-          token_id_owner: {
-            owner: ownerAddress,
-            token_id,
-          },
+          owner: ownerAddress,
+          token_id,
         },
       });
       resolve(Service.successResponse(data));
@@ -175,14 +171,14 @@ interface GetOwnershipsByIdsParams {
 }
 
 /**
-* Returns Ownerships by Ids
-*
-* @param ownershipIds OwnershipIds
-* @returns Ownership
-* */
+ * Returns Ownerships by Ids
+ *
+ * @param ownershipIds OwnershipIds
+ * @returns Ownership
+ * */
 const getOwnershipsByIds = ({
   ownershipIds,
-}: GetOwnershipsByIdsParams) => new Promise<SuccessResponseType<PrismaOwnerships []>>(
+}: GetOwnershipsByIdsParams) => new Promise<SuccessResponseType<PrismaOwnerships[]>>(
   async (resolve, reject) => {
     try {
       const owners: string[] = [];
@@ -200,6 +196,39 @@ const getOwnershipsByIds = ({
           token_id: {
             in: tokenIds,
           },
+        },
+      });
+      resolve(Service.successResponse(data));
+    } catch (e: any) {
+      reject(Service.rejectResponse(
+        e.message || 'Invalid input',
+        e.status || 405,
+      ));
+    }
+  },
+);
+
+interface GetOwnershipByOwnerParams {
+  ownerAddress: string;
+}
+
+/**
+* Returns ownership by owner address
+*
+* @param ownerAddress ownerAddress
+* @returns Ownership
+* */
+const getOwnershipsByOwner = ({
+  ownerAddress,
+}: GetOwnershipByOwnerParams) => new Promise<SuccessResponseType<PrismaOwnerships | null>>(
+  async (resolve, reject) => {
+    try {
+      const data = await prisma.ownerships.findMany({
+        where: {
+          amount: {
+            gt: 0,
+          },
+          owner: ownerAddress,
         },
       });
       resolve(Service.successResponse(data));
@@ -230,7 +259,7 @@ const getOwnershipsByToken = ({
   offset,
   size,
   tokenId,
-}: GetOwnershipsByTokenParams) => new Promise<SuccessResponseType<PrismaOwnerships []>>(
+}: GetOwnershipsByTokenParams) => new Promise<SuccessResponseType<PrismaOwnerships[]>>(
   async (resolve, reject) => {
     try {
       const data = await prisma.ownerships.findMany({
@@ -351,7 +380,7 @@ type GetTokenMetaDataByIdsParams = GetTokenByIdsParams;
 * */
 const getTokenMetaDataByIds = ({
   tokenIds,
-}: GetTokenMetaDataByIdsParams) => new Promise<SuccessResponseType<PrismaMetadatas []>>(
+}: GetTokenMetaDataByIdsParams) => new Promise<SuccessResponseType<PrismaMetadatas[]>>(
   async (resolve, reject) => {
     try {
       const data = await prisma.metadatas.findMany({
@@ -402,6 +431,7 @@ export const DefaultServiceFunctions = {
   getCollectionById,
   getOwnershipById,
   getOwnershipsByIds,
+  getOwnershipsByOwner,
   getOwnershipsByToken,
   getTokenById,
   getTokenByIds,
@@ -417,6 +447,7 @@ export default {
   getCollectionById,
   getOwnershipById,
   getOwnershipsByIds,
+  getOwnershipsByOwner,
   getOwnershipsByToken,
   getTokenById,
   getTokenByIds,

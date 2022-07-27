@@ -56,6 +56,9 @@ class SettingsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'deletes account successfully' do
+    @user.it1_profile = FactoryBot.create(:it1_profile, user: @user)
+    @user.it2_profile = FactoryBot.create(:it2_profile, user: @user)
+    @user.it2_survey = FactoryBot.create(:it2_survey, user: @user)
     delete settings_delete_account_url,
            params: { user: { verification_text: 'delete my account 55555', verification_number: 55_555 } }
     follow_redirect!

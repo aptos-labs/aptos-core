@@ -276,6 +276,7 @@ prop_compose! {
             let new_block_event = NewBlockEvent::new(
                 0, // epoch
                 seq, // round
+                seq, // height
                 vec![], // prev block voters
                 address, // proposer
                 Vec::new(), // failed_proposers

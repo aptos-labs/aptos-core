@@ -55,14 +55,14 @@ use crate::{
 };
 use anyhow::{ensure, Result};
 use aptos_config::config::{RocksdbConfigs, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
-use aptos_crypto::hash::{HashValue, SPARSE_MERKLE_PLACEHOLDER_HASH};
+use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_types::epoch_state::EpochState;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
+    epoch_state::EpochState,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     nibble::nibble_path::NibblePath,
@@ -85,7 +85,7 @@ use aptos_types::{
 };
 use itertools::zip_eq;
 use once_cell::sync::Lazy;
-use schemadb::{SchemaBatch, DB};
+use schemadb::DB;
 use scratchpad::SparseMerkleTree;
 use std::{
     collections::HashMap,
@@ -287,11 +287,11 @@ impl AptosDB {
             state_merkle_db: Arc::clone(&arc_state_merkle_rocksdb),
             event_store: Arc::new(EventStore::new(Arc::clone(&arc_ledger_rocksdb))),
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&arc_ledger_rocksdb))),
-            state_store: Arc::new(StateStore::new(
+            state_store: StateStore::new(
                 Arc::clone(&arc_ledger_rocksdb),
                 Arc::clone(&arc_state_merkle_rocksdb),
                 hack_for_tests,
-            )),
+            ),
             system_store: Arc::new(SystemStore::new(Arc::clone(&arc_ledger_rocksdb))),
             transaction_store: Arc::new(TransactionStore::new(Arc::clone(&arc_ledger_rocksdb))),
             pruner_config,
@@ -1126,17 +1126,12 @@ impl DbReader for AptosDB {
                                 frozen_subtrees,
                                 num_txns,
                             )?);
-                            // For now, we know there must be a state snapshot at `committed_version`. We need to recover checkpoint after make commit async.
-                            let (committed_version, committed_root_hash) = if let Some((version, hash)) = self
-                                .state_store
-                                .get_state_snapshot_before(num_txns)?
-                            {
-                                (Some(version), hash)
-                            } else {
-                                (None, *SPARSE_MERKLE_PLACEHOLDER_HASH)
-                            };
-
-                            let committed_trees = ExecutedTrees::new(StateDelta::new_at_checkpoint(committed_root_hash, committed_version), transaction_accumulator);
+                            let committed_trees = ExecutedTrees::new(StateDelta::new(executed_trees.state().base.clone(),
+                                                                                     executed_trees.state().base_version,
+                                                                                     executed_trees.state().base.clone(),
+                                                                                     executed_trees.state().base_version,
+                                HashMap::new()
+                            ), transaction_accumulator);
                             StartupInfo::new(
                                 latest_ledger_info,
                                 latest_epoch_state_if_not_in_li,
@@ -1627,21 +1622,25 @@ impl DbWriter for AptosDB {
     fn delete_genesis(&self) -> Result<()> {
         gauged_api("delete_genesis", || {
             // Create all the db pruners
-            let db_pruners = utils::create_db_pruners(
-                Arc::clone(&self.ledger_db),
-                Arc::clone(&self.state_merkle_db),
-                self.pruner_config,
-            );
+            let state_pruner_option =
+                utils::create_state_pruner(Arc::clone(&self.state_merkle_db), self.pruner_config);
+            let ledger_pruner_option =
+                utils::create_ledger_pruner(Arc::clone(&self.ledger_db), self.pruner_config);
 
             // Execute each pruner to clean up the genesis state
             let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive).
             let max_version = 1; // We should only really be pruning at a single version.
-            let mut db_batch = SchemaBatch::new();
-            for db_pruner in db_pruners.into_iter().flatten() {
-                db_pruner.lock().set_target_version(target_version);
-                db_pruner.lock().prune(&mut db_batch, max_version)?;
+
+            if let Some(state_pruner) = state_pruner_option {
+                state_pruner.lock().set_target_version(target_version);
+                state_pruner.lock().prune(max_version)?;
             }
-            self.ledger_db.write_schemas(db_batch)
+
+            if let Some(ledger_pruner) = ledger_pruner_option {
+                ledger_pruner.lock().set_target_version(target_version);
+                ledger_pruner.lock().prune(max_version)?;
+            }
+            Ok(())
         })
     }
 }

@@ -16,7 +16,7 @@ use crate::{
     },
 };
 use anyhow::Result;
-use aptos_infallible::Mutex;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
 use aptos_types::{
@@ -31,16 +31,119 @@ use executor_types::{
 };
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
-use storage_interface::sync_proof_fetcher::SyncProofFetcher;
-use storage_interface::{cached_state_view::CachedStateView, DbReaderWriter, ExecutedTrees};
+use storage_interface::{
+    cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
+    ExecutedTrees,
+};
 
 pub struct ChunkExecutor<V> {
+    db: DbReaderWriter,
+    inner: RwLock<Option<ChunkExecutorInner<V>>>,
+}
+
+impl<V: VMExecutor> ChunkExecutor<V> {
+    pub fn new(db: DbReaderWriter) -> Self {
+        Self {
+            db,
+            inner: RwLock::new(None),
+        }
+    }
+
+    fn maybe_initialize(&self) -> Result<()> {
+        if self.inner.read().is_none() {
+            self.reset()?;
+        }
+        Ok(())
+    }
+}
+
+impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
+    fn execute_chunk(
+        &self,
+        txn_list_with_proof: TransactionListWithProof,
+        verified_target_li: &LedgerInfoWithSignatures,
+        epoch_change_li: Option<&LedgerInfoWithSignatures>,
+    ) -> Result<()> {
+        self.maybe_initialize()?;
+        self.inner
+            .read()
+            .as_ref()
+            .expect("not reset")
+            .execute_chunk(txn_list_with_proof, verified_target_li, epoch_change_li)
+    }
+
+    fn apply_chunk(
+        &self,
+        txn_output_list_with_proof: TransactionOutputListWithProof,
+        verified_target_li: &LedgerInfoWithSignatures,
+        epoch_change_li: Option<&LedgerInfoWithSignatures>,
+    ) -> Result<()> {
+        self.inner.read().as_ref().expect("not reset").apply_chunk(
+            txn_output_list_with_proof,
+            verified_target_li,
+            epoch_change_li,
+        )
+    }
+
+    fn commit_chunk(&self) -> Result<ChunkCommitNotification> {
+        self.inner
+            .read()
+            .as_ref()
+            .expect("not reset")
+            .commit_chunk()
+    }
+
+    fn execute_and_commit_chunk(
+        &self,
+        txn_list_with_proof: TransactionListWithProof,
+        verified_target_li: &LedgerInfoWithSignatures,
+        epoch_change_li: Option<&LedgerInfoWithSignatures>,
+    ) -> Result<ChunkCommitNotification> {
+        // Re-sync with DB, make sure the queue is empty.
+        self.reset()?;
+        self.inner
+            .read()
+            .as_ref()
+            .expect("not reset")
+            .execute_and_commit_chunk(txn_list_with_proof, verified_target_li, epoch_change_li)
+    }
+
+    fn apply_and_commit_chunk(
+        &self,
+        txn_output_list_with_proof: TransactionOutputListWithProof,
+        verified_target_li: &LedgerInfoWithSignatures,
+        epoch_change_li: Option<&LedgerInfoWithSignatures>,
+    ) -> Result<ChunkCommitNotification> {
+        // Re-sync with DB, make sure the queue is empty.
+        self.reset()?;
+        self.inner
+            .read()
+            .as_ref()
+            .expect("not reset")
+            .apply_and_commit_chunk(
+                txn_output_list_with_proof,
+                verified_target_li,
+                epoch_change_li,
+            )
+    }
+
+    fn reset(&self) -> Result<()> {
+        *self.inner.write() = Some(ChunkExecutorInner::new(self.db.clone())?);
+        Ok(())
+    }
+
+    fn finish(&self) {
+        *self.inner.write() = None;
+    }
+}
+
+struct ChunkExecutorInner<V> {
     db: DbReaderWriter,
     commit_queue: Mutex<ChunkCommitQueue>,
     _phantom: PhantomData<V>,
 }
 
-impl<V> ChunkExecutor<V> {
+impl<V: VMExecutor> ChunkExecutorInner<V> {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
         let commit_queue = Mutex::new(ChunkCommitQueue::new_from_db(&db.reader)?);
         Ok(Self {
@@ -50,21 +153,13 @@ impl<V> ChunkExecutor<V> {
         })
     }
 
-    pub fn new_with_view(db: DbReaderWriter, persisted_view: ExecutedTrees) -> Self {
-        let commit_queue = Mutex::new(ChunkCommitQueue::new(persisted_view));
-        Self {
-            db,
-            commit_queue,
-            _phantom: PhantomData,
-        }
-    }
-
-    fn state_view(&self, latest_view: &ExecutedTrees) -> Result<CachedStateView<SyncProofFetcher>> {
+    fn state_view(&self, latest_view: &ExecutedTrees) -> Result<CachedStateView> {
         latest_view.verified_state_view(
             StateViewId::ChunkExecution {
                 first_version: latest_view.txn_accumulator().num_leaves(),
             },
-            &*self.db.reader,
+            Arc::clone(&self.db.reader),
+            Arc::new(SyncProofFetcher::new(self.db.reader.clone())),
         )
     }
 
@@ -106,9 +201,8 @@ impl<V> ChunkExecutor<V> {
         self.commit_queue.lock().dequeue()?;
         Ok(to_commit)
     }
-}
 
-impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
+    // ************************* Block Executor Implementation *************************
     fn execute_chunk(
         &self,
         txn_list_with_proof: TransactionListWithProof,
@@ -233,9 +327,6 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<ChunkCommitNotification> {
-        // Re-sync with DB, make sure the queue is empty.
-        self.reset()?;
-
         self.execute_chunk(txn_list_with_proof, verified_target_li, epoch_change_li)?;
         self.commit_chunk()
     }
@@ -246,9 +337,6 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<ChunkCommitNotification> {
-        // Re-sync with DB, make sure the queue is empty.
-        self.reset()?;
-
         self.apply_chunk(
             txn_output_list_with_proof,
             verified_target_li,
@@ -256,16 +344,28 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         )?;
         self.commit_chunk()
     }
+}
 
-    fn reset(&self) -> Result<()> {
-        *self.commit_queue.lock() = ChunkCommitQueue::new_from_db(&self.db.reader)?;
-        Ok(())
+impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
+    fn replay(
+        &self,
+        transactions: Vec<Transaction>,
+        transaction_infos: Vec<TransactionInfo>,
+    ) -> Result<()> {
+        self.maybe_initialize()?;
+        self.inner
+            .read()
+            .as_ref()
+            .expect("not reset")
+            .replay(transactions, transaction_infos)
+    }
+
+    fn commit(&self) -> Result<Arc<ExecutedChunk>> {
+        self.inner.read().as_ref().expect("not reset").commit()
     }
 }
 
-impl<V: VMExecutor> ChunkExecutor<V> {}
-
-impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
+impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
     fn replay(
         &self,
         transactions: Vec<Transaction>,

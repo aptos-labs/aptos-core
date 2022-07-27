@@ -80,7 +80,7 @@
     }
   },
   {
-    "type": "0x1::test_coin::Balance",
+    "type": "0x1::aptos_coin::Balance",
     "data": {
       "coin": {
         "value": "18446744073709551614"
@@ -88,31 +88,31 @@
     }
   },
   {
-    "type": "0x1::test_coin::CoinInfo",
+    "type": "0x1::aptos_coin::CoinInfo",
     "data": {
       "scaling_factor": "1000000"
     }
   },
   {
-    "type": "0x1::test_coin::Delegations",
+    "type": "0x1::aptos_coin::Delegations",
     "data": {
       "inner": []
     }
   },
   {
-    "type": "0x1::test_coin::BurnCapability",
+    "type": "0x1::aptos_coin::BurnCapability",
     "data": {
       "dummy_field": false
     }
   },
   {
-    "type": "0x1::test_coin::MintCapability",
+    "type": "0x1::aptos_coin::MintCapability",
     "data": {
       "dummy_field": false
     }
   },
   {
-    "type": "0x1::test_coin::TransferEvents",
+    "type": "0x1::aptos_coin::TransferEvents",
     "data": {
       "received_events": {
         "counter": "0",

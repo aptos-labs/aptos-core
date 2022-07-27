@@ -96,7 +96,6 @@ impl<'t> AccountMinter<'t> {
             "Minting additional {} accounts with {} coins each",
             num_accounts, coins_per_account
         );
-        // tokio::time::sleep(Duration::from_secs(10)).await;
 
         let seed_rngs = gen_rng_for_reusable_account(actual_num_seed_accounts);
         // For each seed account, create a future and transfer coins from that seed account to new accounts
@@ -337,10 +336,7 @@ pub fn create_and_fund_account_request(
     let preimage = AuthenticationKeyPreimage::ed25519(pubkey);
     let auth_key = AuthenticationKey::from_preimage(&preimage);
     creation_account.sign_with_transaction_builder(txn_factory.payload(
-        aptos_stdlib::encode_account_utils_create_and_fund_account(
-            auth_key.derived_address(),
-            amount,
-        ),
+        aptos_stdlib::account_utils_create_and_fund_account(auth_key.derived_address(), amount),
     ))
 }
 

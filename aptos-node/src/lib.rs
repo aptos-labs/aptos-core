@@ -259,7 +259,7 @@ where
             .with_randomize_first_validator_ports(random_ports)
             .with_initial_lockup_timestamp(now_secs + EPOCH_LENGTH_SECS)
             .with_min_lockup_duration_secs(0)
-            .with_max_lockup_duration_secs(86400);
+            .with_max_lockup_duration_secs(86400 * 14);
 
         let (root_key, _genesis, genesis_waypoint, validators) = builder.build(rng)?;
 
@@ -353,10 +353,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
     )?;
 
     // Create the chunk executor
-    let chunk_executor = Arc::new(
-        ChunkExecutor::<AptosVM>::new(db_rw.clone())
-            .map_err(|err| anyhow!("Failed to create chunk executor {}", err))?,
-    );
+    let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
 
     // Create the state sync multiplexer
     let state_sync_multiplexer = StateSyncMultiplexer::new(
@@ -496,6 +493,9 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         info!("Genesis txn not provided, it's fine if you don't expect to apply it otherwise please double check config");
     }
     AptosVM::set_concurrency_level_once(node_config.execution.concurrency_level as usize);
+    AptosVM::set_num_proof_reading_threads_once(
+        node_config.execution.num_proof_reading_threads as usize,
+    );
 
     debug!(
         "Storage service started in {} ms",

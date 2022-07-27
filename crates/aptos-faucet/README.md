@@ -1,6 +1,6 @@
 # Faucet
 
-Faucet is a service for creating and funding accounts on the Aptos Network. It is meant to be used for devnets and testnets. By default, the Faucet takes the provided account, creates a new account, mints a lot of Coin<TestCoin> into that account, and delegates minting capability to that account. That account is then used to provide mint services via the faucet.
+Faucet is a service for creating and funding accounts on the Aptos Network. It is meant to be used for devnets and testnets. By default, the Faucet takes the provided account, creates a new account, mints a lot of Coin<AptosCoin> into that account, and delegates minting capability to that account. That account is then used to provide mint services via the faucet.
 
 
 ## Mint API
@@ -33,7 +33,7 @@ If the query param `return_txns` is not provided, or it is not "true", the serve
 If the query param `return_txns` is set, the server will respond with the transactions for creating and funding your account.
 The response HTTP body is hex encoded bytes of BCS encoded `Vec<aptos_types::transaction::SignedTransaction>`.
 
-Decode Example ([source code generator](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/transaction-builder-generator)):
+Decode Example ([source code generator](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/aptos-sdk-builder)):
 
 ``` python
   de = bcs.BcsDeserializer(bytes.fromhex(response.text))

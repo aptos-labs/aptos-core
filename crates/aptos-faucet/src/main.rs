@@ -194,7 +194,7 @@ mod tests {
                     let previous = writer.insert(address, AccountState::new(0));
                     assert!(previous.is_none(), "should not create account twice");
                 }
-                ScriptFunctionCall::TestCoinMint {
+                ScriptFunctionCall::AptosCoinMint {
                     dst_addr, amount, ..
                 } => {
                     // Sometimes we call CreateAccount and Mint at the same time (from our tests: this is a test method)

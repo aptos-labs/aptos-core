@@ -8,10 +8,9 @@ use move_deps::{
 };
 use once_cell::sync::Lazy;
 
+pub mod aptos_framework_sdk_builder;
 pub mod aptos_stdlib;
-pub mod aptos_token_stdlib;
-mod generated_aptos_txn_builder;
-mod generated_token_txn_builder;
+pub mod aptos_token_sdk_builder;
 
 static PACKAGE: Dir<'static> = include_dir!("$OUT_DIR/framework");
 

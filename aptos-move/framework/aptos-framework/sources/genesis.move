@@ -1,7 +1,6 @@
 module aptos_framework::genesis {
     use std::signer;
-    use std::errors;
-    use std::event;
+    use std::error;
     use std::vector;
 
     use aptos_framework::account;
@@ -14,7 +13,7 @@ module aptos_framework::genesis {
     use aptos_framework::chain_id;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
-    use aptos_framework::test_coin::{Self, TestCoin};
+    use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
     use aptos_framework::vm_config;
@@ -43,7 +42,7 @@ module aptos_framework::genesis {
         rewards_rate_denominator: u64,
     ) {
         // This can fail genesis but is necessary so that any misconfigurations can be corrected before genesis succeeds
-        assert!(epoch_interval > 0, errors::invalid_argument(EINVALID_EPOCH_DURATION));
+        assert!(epoch_interval > 0, error::invalid_argument(EINVALID_EPOCH_DURATION));
 
         initialize_internal(
             &core_resource_account,
@@ -139,19 +138,13 @@ module aptos_framework::genesis {
 
         // This is testnet-specific configuration and can be skipped for mainnet.
         // Mainnet can call Coin::initialize<MainnetCoin> directly and give mint capability to the Staking module.
-        let (mint_cap, burn_cap) = test_coin::initialize(&aptos_framework_account, core_resource_account);
+        let (mint_cap, burn_cap) = aptos_coin::initialize(&aptos_framework_account, core_resource_account);
 
-        // Give Stake module MintCapability<TestCoin> so it can mint rewards.
-        stake::store_test_coin_mint_cap(&aptos_framework_account, mint_cap);
+        // Give Stake module MintCapability<AptosCoin> so it can mint rewards.
+        stake::store_aptos_coin_mint_cap(&aptos_framework_account, mint_cap);
 
-        // Give TransactionFee BurnCapability<TestCoin> so it can burn gas.
-        transaction_fee::store_test_coin_burn_cap(&aptos_framework_account, burn_cap);
-
-        // Pad the event counter for the Root account to match DPN. This
-        // _MUST_ match the new epoch event counter otherwise all manner of
-        // things start to break.
-        event::destroy_handle(event::new_event_handle<u64>(&aptos_framework_account));
-        event::destroy_handle(event::new_event_handle<u64>(&aptos_framework_account));
+        // Give TransactionFee BurnCapability<AptosCoin> so it can burn gas.
+        transaction_fee::store_aptos_coin_burn_cap(&aptos_framework_account, burn_cap);
 
         // This needs to be called at the very end.
         chain_id::initialize(&aptos_framework_account, chain_id);
@@ -209,8 +202,8 @@ module aptos_framework::genesis {
             let amount = *vector::borrow(&staking_distribution, i);
             // Transfer coins from the root account to the validator, so they can stake and have non-zero voting power
             // and can complete consensus on the genesis block.
-            coin::register<TestCoin>(&owner_account);
-            test_coin::mint(&aptos_framework_account, *owner, amount);
+            coin::register<AptosCoin>(&owner_account);
+            aptos_coin::mint(&aptos_framework_account, *owner, amount);
             stake::add_stake(&owner_account, amount);
             stake::join_validator_set_internal(&owner_account, *owner);
 

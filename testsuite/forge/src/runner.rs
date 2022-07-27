@@ -12,6 +12,7 @@ use structopt::{clap::arg_enum, StructOpt};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use tokio::runtime::Runtime;
 // TODO going to remove random seed once cluster deployment supports re-run genesis
+use crate::success_criteria::SuccessCriteria;
 use rand::rngs::OsRng;
 
 #[derive(Debug, StructOpt)]
@@ -86,7 +87,13 @@ impl Default for Format {
 }
 
 pub fn forge_main<F: Factory>(tests: ForgeConfig<'_>, factory: F, options: &Options) -> Result<()> {
-    let forge = Forge::new(options, tests, factory, EmitJobRequest::default());
+    let forge = Forge::new(
+        options,
+        tests,
+        factory,
+        EmitJobRequest::default(),
+        SuccessCriteria::default(),
+    );
 
     if options.list {
         forge.list()?;
@@ -195,6 +202,7 @@ pub struct Forge<'cfg, F> {
     tests: ForgeConfig<'cfg>,
     factory: F,
     global_job_request: EmitJobRequest,
+    success_criteria: SuccessCriteria,
 }
 
 impl<'cfg, F: Factory> Forge<'cfg, F> {
@@ -203,12 +211,14 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         tests: ForgeConfig<'cfg>,
         factory: F,
         global_job_request: EmitJobRequest,
+        success_criteria: SuccessCriteria,
     ) -> Self {
         Self {
             options,
             tests,
             factory,
             global_job_request,
+            success_criteria,
         }
     }
 
@@ -300,6 +310,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     &mut *swarm,
                     &mut report,
                     self.global_job_request.clone(),
+                    self.success_criteria.clone(),
                 );
                 let result = run_test(|| test.run(&mut network_ctx));
                 summary.handle_result(test.name().to_owned(), result)?;

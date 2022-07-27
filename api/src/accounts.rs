@@ -142,9 +142,9 @@ impl Account {
             .map_err(anyhow::Error::from)?
             .ok_or_else(|| self.resource_not_found(&AccountResource::struct_tag()))?;
 
-        let account: AccountData = account_resource.into();
+        let account_data: AccountData = account_resource.into();
 
-        Response::new(self.latest_ledger_info, &account)
+        Response::new(self.latest_ledger_info, &account_data)
     }
 
     pub fn resources(self) -> Result<impl Reply, Error> {

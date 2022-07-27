@@ -38,7 +38,7 @@ use futures::StreamExt;
 use mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
 use move_deps::move_core_types::language_storage::TypeTag;
 use std::collections::BTreeMap;
-use storage_service_types::CompleteDataRange;
+use storage_service_types::responses::CompleteDataRange;
 
 /// Creates a new data stream listener and notification sender pair
 pub fn create_data_stream_listener() -> (Sender<(), DataNotification>, DataStreamListener) {

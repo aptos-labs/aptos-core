@@ -1,17 +1,17 @@
 module DebugDemo::Message {
-    use std::ascii;
+    use std::string;
     use std::signer;
     use std::Debug;
 
     struct MessageHolder has key {
-        message: ascii::String,
+        message: string::String,
     }
 
 
     public entry fun set_message(account: signer, message_bytes: vector<u8>)
     acquires MessageHolder {
         Debug::print_stack_trace();
-        let message = ascii::string(message_bytes);
+        let message = string::utf8(message_bytes);
         let account_addr = signer::address_of(&account);
         if (!exists<MessageHolder>(account_addr)) {
             move_to(&account, MessageHolder {

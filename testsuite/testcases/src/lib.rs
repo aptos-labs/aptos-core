@@ -4,6 +4,7 @@
 pub mod compatibility_test;
 pub mod fixed_tps_test;
 pub mod gas_price_test;
+pub mod network_chaos_test;
 pub mod partial_nodes_down_test;
 pub mod performance_test;
 pub mod reconfiguration_test;
@@ -69,11 +70,12 @@ pub fn generate_traffic<'t>(
 
     emit_job_request = emit_job_request
         .rest_clients(validator_clients)
-        .gas_price(gas_price);
+        .gas_price(gas_price)
+        .duration(duration);
     if let Some(target_tps) = fixed_tps {
         emit_job_request = emit_job_request.fixed_tps(target_tps.try_into().unwrap());
     }
-    let stats = rt.block_on(emitter.emit_txn_for(duration, emit_job_request))?;
+    let stats = rt.block_on(emitter.emit_txn_for(emit_job_request))?;
 
     Ok(stats)
 }

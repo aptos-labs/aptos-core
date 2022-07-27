@@ -50,7 +50,7 @@ pub use script::{
 use crate::state_store::{state_key::StateKey, state_value::StateValue};
 use move_deps::move_core_types::vm_status::AbortLocation;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
-pub use transaction_argument::{parse_transaction_argument, TransactionArgument, VecBytes};
+pub use transaction_argument::{parse_transaction_argument, TransactionArgument};
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;

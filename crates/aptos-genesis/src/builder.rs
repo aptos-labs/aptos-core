@@ -31,6 +31,7 @@ use std::{
     io::{Read, Write},
     num::NonZeroUsize,
     path::{Path, PathBuf},
+    sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -359,6 +360,8 @@ fn write_yaml<T: Serialize>(path: &Path, object: &T) -> anyhow::Result<()> {
 const ONE_DAY: u64 = 86400;
 const ONE_YEAR: u64 = 31536000;
 
+pub type InitConfigFn = Arc<dyn Fn(usize, &mut NodeConfig) + Send + Sync>;
+
 /// Builder that builds a network of validator nodes that can run locally
 #[derive(Clone)]
 pub struct Builder {
@@ -367,6 +370,7 @@ pub struct Builder {
     num_validators: NonZeroUsize,
     randomize_first_validator_ports: bool,
     template: NodeConfig,
+    init_config: Option<InitConfigFn>,
     min_price_per_gas_unit: u64,
     allow_new_validators: bool,
     min_stake: u64,
@@ -395,6 +399,7 @@ impl Builder {
             num_validators: NonZeroUsize::new(1).unwrap(),
             randomize_first_validator_ports: true,
             template: NodeConfig::default_for_validator(),
+            init_config: None,
             min_price_per_gas_unit: 1,
             allow_new_validators: false,
             min_stake: 0,
@@ -418,6 +423,11 @@ impl Builder {
 
     pub fn with_template(mut self, template: NodeConfig) -> Self {
         self.template = template;
+        self
+    }
+
+    pub fn with_init_config(mut self, init_config: Option<InitConfigFn>) -> Self {
+        self.init_config = init_config;
         self
     }
 
@@ -506,8 +516,12 @@ impl Builder {
     {
         let name = index.to_string();
 
-        let mut validator =
-            ValidatorNodeConfig::new(name, self.config_dir.as_path(), self.template.clone())?;
+        let mut config = self.template.clone();
+        if let Some(init_config) = &self.init_config {
+            (init_config)(index, &mut config);
+        }
+
+        let mut validator = ValidatorNodeConfig::new(name, self.config_dir.as_path(), config)?;
 
         validator.init_keys(Some(rng.gen()))?;
 

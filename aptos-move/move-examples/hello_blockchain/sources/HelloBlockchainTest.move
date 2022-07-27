@@ -3,7 +3,7 @@ module HelloBlockchain::MessageTests {
     use std::signer;
     use std::unit_test;
     use std::vector;
-    use std::ascii;
+    use std::string;
 
     use HelloBlockchain::Message;
 
@@ -18,7 +18,7 @@ module HelloBlockchain::MessageTests {
         Message::set_message(account,  b"Hello, Blockchain");
 
         assert!(
-          Message::get_message(addr) == ascii::string(b"Hello, Blockchain"),
+          Message::get_message(addr) == string::utf8(b"Hello, Blockchain"),
           0
         );
     }

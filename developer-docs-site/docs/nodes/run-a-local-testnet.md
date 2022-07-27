@@ -17,8 +17,8 @@ You can run a local testnet in two ways:
 
 The rest of this document describes:
 
-- How to start your local testnet with a single Validator node, using both the methods, and
-- How to start a Faucet service and attach it to your testnet.
+- How to start your local testnet with a single Validator node, and
+- How to start a Faucet service and attach it to your local testnet.
 
 ## Using the Aptos-core source code
 
@@ -48,8 +48,10 @@ The rest of this document describes:
 
 5. With your development environment ready, now you can start your testnet network. Before you proceed, make a note of the following:
 
-  - When you run the below command to start the local testnet, your terminal will enter into an interactive mode, with an option to terminate the testnet. Hence, you will need to open another shell terminal for the subsequent steps described in this section.
-  - After the below command runs, you will need to copy the `Config path` information from the terminal output for the next step.
+    :::tip
+     - When you run the below command to start the local testnet, your terminal will enter into an interactive mode, with a message `Aptos is running, press ctrl-c to exit`. Hence, you will need to open another shell terminal for the subsequent steps described in this section.
+     - After the below command runs, copy the `Test dir` information from the terminal output for the next step.
+    :::
 
     To start your testnet locally, run the following command:
 
@@ -57,7 +59,7 @@ The rest of this document describes:
     CARGO_NET_GIT_FETCH_WITH_CLI=true cargo run -p aptos-node -- --test
     ```
 
-    See below for an example of the partial output. Make a note of the `Config path` from the output.
+    See below for an example of the partial output. Make a note of the `Test dir` from the output.
 
     ```
     ...
@@ -66,7 +68,7 @@ The rest of this document describes:
 
     Completed generating configuration:
         Log file: "/private/var/folders/gn/m74t8ylx55z935q8wx035qn80000gn/T/b3adc18c144bfcc78a1541953893bc1c/validator.log"
-        Config path: "/private/var/folders/gn/m74t8ylx55z935q8wx035qn80000gn/T/b3adc18c144bfcc78a1541953893bc1c/0/node.yaml"
+        Test dir: "/private/var/folders/gn/m74t8ylx55z935q8wx035qn80000gn/T/b3adc18c144bfcc78a1541953893bc1c/0/node.yaml"
         Aptos root key path: "/private/var/folders/gn/m74t8ylx55z935q8wx035qn80000gn/T/b3adc18c144bfcc78a1541953893bc1c/mint.key"
         Waypoint: 0:47e676b5fe38ebe2aec6053db7b3daa0b805693d6422e3475e46e89499464ecf
         ChainId: TESTING
@@ -152,13 +154,13 @@ If you intend to use your testnet over an extended period of time, you should pi
 
 ## Interacting with the local test testnet
 
-After starting your local testnet, you should see the following:
+After starting your local testnet, you will see the following:
 
 ```
 Entering test mode, this should never be used in production!
 Completed generating configuration:
         Log file: "/tmp/694173aa3bbe019499bbd5cf3fe0e2fc/validator.log"
-        Config path: "/tmp/694173aa3bbe019499bbd5cf3fe0e2fc/0/node.yaml"
+        Test dir: "/tmp/694173aa3bbe019499bbd5cf3fe0e2fc/0/node.yaml"
         Aptos root key path: "/tmp/694173aa3bbe019499bbd5cf3fe0e2fc/mint.key"
         Waypoint: 0:197bc8b76761622c2d2054d8bf93c1802fa0eb4bc55f0f3d4442878fdecc297f
         ChainId: TESTING

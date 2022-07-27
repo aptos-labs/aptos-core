@@ -36,11 +36,11 @@
 /// }
 /// ```
 module aptos_framework::resource_account {
-    use std::errors;
+    use std::error;
     use std::signer;
     use std::vector;
     use aptos_framework::account;
-    use aptos_framework::simple_map::{Self, SimpleMap};
+    use aptos_std::simple_map::{Self, SimpleMap};
 
     const ECONTAINER_NOT_PUBLISHED: u64 = 0;
 
@@ -82,7 +82,7 @@ module aptos_framework::resource_account {
         resource: &signer,
         source_addr: address,
     ): account::SignerCapability acquires Container {
-        assert!(exists<Container>(source_addr), errors::not_published(ECONTAINER_NOT_PUBLISHED));
+        assert!(exists<Container>(source_addr), error::not_found(ECONTAINER_NOT_PUBLISHED));
 
         let resource_addr = signer::address_of(resource);
         let (resource_signer_cap, empty_container) = {

@@ -3,10 +3,10 @@
 /// Compare to other implementation, linear hashing splits one bucket a time instead of doubling buckets when expanding to avoid unexpected gas cost.
 /// BucketTable uses faster hash function SipHash instead of cryptographically secure hash functions like sha3-256 since it tolerates collisions.
 module aptos_framework::bucket_table {
-    use std::errors;
+    use std::error;
     use std::vector;
     use std::hash::sip_hash;
-    use aptos_framework::table::{Self, Table};
+    use aptos_std::table::{Self, Table};
 
     const TARGET_LOAD_PER_BUCKET: u64 = 10;
     const SPLIT_THRESHOLD: u64 = 75;
@@ -38,7 +38,7 @@ module aptos_framework::bucket_table {
 
     /// Create an empty BucketTable with `initial_buckets` buckets.
     public fun new<K: drop + store, V: store>(initial_buckets: u64): BucketTable<K, V> {
-        assert!(initial_buckets > 0, errors::invalid_argument(EZERO_CAPACITY));
+        assert!(initial_buckets > 0, error::invalid_argument(EZERO_CAPACITY));
         let buckets = table::new();
         table::add(&mut buckets, 0, vector::empty());
         let map = BucketTable {
@@ -54,7 +54,7 @@ module aptos_framework::bucket_table {
     /// Destroy empty map.
     /// Aborts if it's not empty.
     public fun destroy_empty<K, V>(map: BucketTable<K, V>) {
-        assert!(map.len == 0, errors::invalid_argument(ENOT_EMPTY));
+        assert!(map.len == 0, error::invalid_argument(ENOT_EMPTY));
         let i = 0;
         while (i < map.num_buckets) {
             vector::destroy_empty(table::remove(&mut map.buckets, i));
@@ -75,7 +75,7 @@ module aptos_framework::bucket_table {
         let len = vector::length(bucket);
         while (i < len) {
             let entry = vector::borrow(bucket, i);
-            assert!(&entry.key != &key, errors::invalid_argument(EALREADY_EXIST));
+            assert!(&entry.key != &key, error::invalid_argument(EALREADY_EXIST));
             i = i + 1;
         };
         vector::push_back(bucket, Entry {hash, key, value});
@@ -86,11 +86,19 @@ module aptos_framework::bucket_table {
         }
     }
 
+    fun xor(a: u64, b: u64): u64 {
+        a ^ b
+    }
+    spec xor { // TODO: temporary mockup until Prover supports the operator `^`.
+        pragma opaque;
+        pragma verify = false;
+    }
+
     /// Split the next bucket into two and re-insert existing items.
     fun split_one_bucket<K, V>(map: &mut BucketTable<K, V>) {
         let new_bucket_index = map.num_buckets;
         // the next bucket to split is num_bucket without the most significant bit.
-        let to_split = new_bucket_index ^ (1 << map.level);
+        let to_split = xor(new_bucket_index, (1 << map.level));
         let new_bucket = vector::empty();
         map.num_buckets = new_bucket_index + 1;
         // if the whole level is splitted once, bump the level.
@@ -148,7 +156,7 @@ module aptos_framework::bucket_table {
             };
             i = i + 1;
         };
-        abort errors::invalid_argument(ENOT_FOUND)
+        abort error::invalid_argument(ENOT_FOUND)
     }
 
     /// Acquire a mutable reference to the value which `key` maps to.
@@ -165,7 +173,7 @@ module aptos_framework::bucket_table {
             };
             i = i + 1;
         };
-        abort errors::invalid_argument(ENOT_FOUND)
+        abort error::invalid_argument(ENOT_FOUND)
     }
 
     /// Returns true iff `table` contains an entry for `key`.
@@ -200,7 +208,7 @@ module aptos_framework::bucket_table {
             };
             i = i + 1;
         };
-        abort errors::invalid_argument(ENOT_FOUND)
+        abort error::invalid_argument(ENOT_FOUND)
     }
 
     /// Returns the length of the table, i.e. the number of entries.
@@ -278,7 +286,7 @@ module aptos_framework::bucket_table {
         while (i < 256) {
             let j = i & 15; // i % 16
             if (j >= map.num_buckets) {
-                j = j ^ 8; // i % 8
+                j = xor(j, 8); // i % 8
             };
             let index = bucket_index(map.level, map.num_buckets, i);
             assert!(index == j, 0);

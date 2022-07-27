@@ -1,7 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::utils::start_logger;
+use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current, start_logger};
+use crate::config::GlobalConfig;
 use crate::{
     common::{
         init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
@@ -18,7 +19,9 @@ use aptos_crypto::{
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
 use aptos_keygen::KeyGen;
-use aptos_logger::debug;
+use aptos_rest_client::aptos_api_types::{
+    DeleteModule, DeleteResource, DeleteTableItem, WriteModule, WriteResource, WriteTableItem,
+};
 use aptos_rest_client::{aptos_api_types::WriteSetChange, Client, Transaction};
 use aptos_sdk::{
     move_types::{
@@ -75,6 +78,8 @@ pub enum CliError {
     MoveCompilationError(String),
     #[error("Move unit tests failed")]
     MoveTestError,
+    #[error("Move Prover failed")]
+    MoveProverError,
     #[error("Unable to parse '{0}': error: {1}")]
     UnableToParse(&'static str, String),
     #[error("Unable to read file '{0}', error: {1}")]
@@ -95,6 +100,7 @@ impl CliError {
             CliError::IO(_, _) => "IO",
             CliError::MoveCompilationError(_) => "MoveCompilationError",
             CliError::MoveTestError => "MoveTestError",
+            CliError::MoveProverError => "MoveProverError",
             CliError::UnableToParse(_, _) => "UnableToParse",
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
@@ -165,7 +171,7 @@ pub struct CliConfig {
 
 const CONFIG_FILE: &str = "config.yaml";
 const LEGACY_CONFIG_FILE: &str = "config.yml";
-const CONFIG_FOLDER: &str = ".aptos";
+pub const CONFIG_FOLDER: &str = ".aptos";
 
 /// An individual profile
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -244,18 +250,7 @@ impl CliConfig {
         let aptos_folder = Self::aptos_folder()?;
 
         // Create if it doesn't exist
-        if !aptos_folder.exists() {
-            std::fs::create_dir(&aptos_folder).map_err(|err| {
-                CliError::CommandArgumentError(format!(
-                    "Unable to create {} directory {}",
-                    aptos_folder.display(),
-                    err
-                ))
-            })?;
-            debug!("Created {} folder", aptos_folder.display());
-        } else {
-            debug!("{} folder already initialized", aptos_folder.display());
-        }
+        create_dir_if_not_exist(aptos_folder.as_path())?;
 
         // Save over previous config file
         let config_file = aptos_folder.join(CONFIG_FILE);
@@ -275,11 +270,8 @@ impl CliConfig {
 
     /// Finds the current directory's .aptos folder
     fn aptos_folder() -> CliTypedResult<PathBuf> {
-        std::env::current_dir()
-            .map_err(|err| {
-                CliError::UnexpectedError(format!("Unable to get current directory {}", err))
-            })
-            .map(|dir| dir.join(CONFIG_FOLDER))
+        let global_config = GlobalConfig::load()?;
+        global_config.get_config_location()
     }
 }
 
@@ -384,12 +376,12 @@ impl EncodingType {
         match self {
             EncodingType::BCS => bcs::from_bytes(&data).map_err(|err| CliError::BCS(name, err)),
             EncodingType::Hex => {
-                let hex_string = String::from_utf8(data).unwrap();
+                let hex_string = String::from_utf8(data)?;
                 Key::from_encoded_string(hex_string.trim())
                     .map_err(|err| CliError::UnableToParse(name, err.to_string()))
             }
             EncodingType::Base64 => {
-                let string = String::from_utf8(data).unwrap();
+                let string = String::from_utf8(data)?;
                 let bytes = base64::decode(string.trim())
                     .map_err(|err| CliError::UnableToParse(name, err.to_string()))?;
                 Key::try_from(bytes.as_slice()).map_err(|err| {
@@ -680,8 +672,8 @@ impl RestOptions {
 #[derive(Debug, Parser)]
 pub struct MovePackageDir {
     /// Path to a move package (the folder with a Move.toml file)
-    #[clap(long, parse(from_os_str), default_value = ".")]
-    pub package_dir: PathBuf,
+    #[clap(long, parse(from_os_str))]
+    pub package_dir: Option<PathBuf>,
     /// Path to save the compiled move package
     ///
     /// Defaults to `<package_dir>/build`
@@ -697,6 +689,10 @@ pub struct MovePackageDir {
 }
 
 impl MovePackageDir {
+    pub fn get_package_dir(&self) -> CliTypedResult<PathBuf> {
+        dir_default_to_current(self.package_dir.clone())
+    }
+
     /// Retrieve the NamedAddresses, resolving all the account addresses accordingly
     pub fn named_addresses(&self) -> BTreeMap<String, AccountAddress> {
         self.named_addresses
@@ -800,40 +796,44 @@ impl From<Transaction> for TransactionSummary {
                 .changes
                 .iter()
                 .map(|change| match change {
-                    WriteSetChange::DeleteModule { module, .. } => ChangeSummary {
+                    WriteSetChange::DeleteModule(DeleteModule { module, .. }) => ChangeSummary {
                         event: change.type_str(),
                         module: Some(module.to_string()),
                         ..Default::default()
                     },
-                    WriteSetChange::DeleteResource {
+                    WriteSetChange::DeleteResource(DeleteResource {
                         address, resource, ..
-                    } => ChangeSummary {
+                    }) => ChangeSummary {
                         event: change.type_str(),
                         address: Some(*address.inner()),
                         resource: Some(resource.to_string()),
                         ..Default::default()
                     },
-                    WriteSetChange::DeleteTableItem { handle, key, .. } => ChangeSummary {
-                        event: change.type_str(),
-                        handle: Some(handle.to_string()),
-                        key: Some(key.to_string()),
-                        ..Default::default()
-                    },
-                    WriteSetChange::WriteModule { address, .. } => ChangeSummary {
-                        event: change.type_str(),
-                        address: Some(*address.inner()),
-                        ..Default::default()
-                    },
-                    WriteSetChange::WriteResource { address, data, .. } => ChangeSummary {
+                    WriteSetChange::DeleteTableItem(DeleteTableItem { handle, key, .. }) => {
+                        ChangeSummary {
+                            event: change.type_str(),
+                            handle: Some(handle.to_string()),
+                            key: Some(key.to_string()),
+                            ..Default::default()
+                        }
+                    }
+                    WriteSetChange::WriteModule(WriteModule { address, .. }) => ChangeSummary {
                         event: change.type_str(),
                         address: Some(*address.inner()),
-                        resource: Some(data.typ.to_string()),
-                        data: Some(serde_json::to_value(&data.data).unwrap_or_default()),
                         ..Default::default()
                     },
-                    WriteSetChange::WriteTableItem {
+                    WriteSetChange::WriteResource(WriteResource { address, data, .. }) => {
+                        ChangeSummary {
+                            event: change.type_str(),
+                            address: Some(*address.inner()),
+                            resource: Some(data.typ.to_string()),
+                            data: Some(serde_json::to_value(&data.data).unwrap_or_default()),
+                            ..Default::default()
+                        }
+                    }
+                    WriteSetChange::WriteTableItem(WriteTableItem {
                         handle, key, value, ..
-                    } => ChangeSummary {
+                    }) => ChangeSummary {
                         event: change.type_str(),
                         handle: Some(handle.to_string()),
                         key: Some(key.to_string()),

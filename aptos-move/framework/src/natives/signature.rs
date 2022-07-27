@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{bls12381, ed25519, traits::*};
+use curve25519_dalek::edwards::CompressedEdwardsY;
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
     move_core_types::gas_schedule::GasCost,
@@ -41,12 +42,9 @@ pub fn native_bls12381_public_key_validation(
         Err(_) => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
     };
 
-    let ret = if pop.verify(&public_key).is_ok() {
-        Value::bool(true)
-    } else {
-        Value::bool(false)
-    };
-    Ok(NativeResult::ok(cost, smallvec![ret]))
+    let valid = pop.verify(&public_key).is_ok();
+
+    Ok(NativeResult::ok(cost, smallvec![Value::bool(valid)]))
 }
 
 pub fn native_ed25519_publickey_validation(
@@ -65,8 +63,25 @@ pub fn native_ed25519_publickey_validation(
         key_bytes.len(),
     );
 
-    // This deserialization performs point-on-curve and small subgroup checks
-    let valid = ed25519::Ed25519PublicKey::try_from(&key_bytes[..]).is_ok();
+    let key_bytes_slice = match <[u8; 32]>::try_from(key_bytes) {
+        Ok(slice) => slice,
+        Err(_) => {
+            return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
+        }
+    };
+
+    // This deserialization only performs point-on-curve checks, so we check for small subgroup below
+    let point = match CompressedEdwardsY(key_bytes_slice).decompress() {
+        Some(point) => point,
+        None => {
+            return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
+        }
+    };
+
+    // Check if the point lies on a small subgroup. This is required when using curves with a
+    // small cofactor (e.g., in Ed25519, cofactor = 8).
+    let valid = !point.is_small_order();
+
     Ok(NativeResult::ok(cost, smallvec![Value::bool(valid)]))
 }
 
@@ -166,5 +181,42 @@ pub fn native_secp256k1_recover(
             Value::vector_u8(pk.serialize()[1..].to_vec()),
             Value::bool(true)
         ],
+    ))
+}
+
+pub fn native_bls12381_verify_signature(
+    _context: &mut NativeContext,
+    _ty_args: Vec<Type>,
+    mut arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    debug_assert!(_ty_args.is_empty());
+    debug_assert!(arguments.len() == 3);
+
+    // TODO: replace with proper gas cost
+    let cost = GasCost::new(super::cost::APTOS_LIB_TYPE_OF, 1).total();
+
+    let msg_bytes = pop_arg!(arguments, Vec<u8>);
+    let pk_bytes = pop_arg!(arguments, Vec<u8>);
+    let sig_bytes = pop_arg!(arguments, Vec<u8>);
+
+    let pk = match bls12381::PublicKey::try_from(&pk_bytes[..]) {
+        Ok(pk) => pk,
+        Err(_) => {
+            return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
+        }
+    };
+
+    let sig = match bls12381::Signature::try_from(&sig_bytes[..]) {
+        Ok(sig) => sig,
+        Err(_) => {
+            return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
+        }
+    };
+
+    let verify_result = sig.verify_arbitrary_msg(&msg_bytes[..], &pk).is_ok();
+
+    Ok(NativeResult::ok(
+        cost,
+        smallvec![Value::bool(verify_result)],
     ))
 }

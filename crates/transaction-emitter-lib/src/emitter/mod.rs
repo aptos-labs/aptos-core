@@ -88,6 +88,7 @@ pub struct EmitJobRequest {
     thread_params: EmitThreadParams,
     gas_price: u64,
     invalid_transaction_ratio: usize,
+    pub duration: Duration,
     vasp: bool,
     transaction_type: TransactionType,
 }
@@ -101,6 +102,7 @@ impl Default for EmitJobRequest {
             thread_params: EmitThreadParams::default(),
             gas_price: 0,
             invalid_transaction_ratio: 0,
+            duration: Duration::from_secs(300),
             vasp: false,
             transaction_type: TransactionType::P2P,
         }
@@ -164,6 +166,11 @@ impl EmitJobRequest {
 
     pub fn vasp(mut self) -> Self {
         self.vasp = true;
+        self
+    }
+
+    pub fn duration(mut self, duration: Duration) -> Self {
+        self.duration = duration;
         self
     }
 }
@@ -241,7 +248,7 @@ impl<'t> TxnEmitter<'t> {
         let workers_per_endpoint = match req.workers_per_endpoint {
             Some(x) => x,
             None => {
-                let target_threads = 1200;
+                let target_threads = 800;
                 // Trying to create somewhere between target_threads/2..target_threads threads
                 // We want to have equal numbers of threads for each endpoint, so that they are equally loaded
                 // Otherwise things like flamegrap/perf going to show different numbers depending on which endpoint is chosen
@@ -355,11 +362,8 @@ impl<'t> TxnEmitter<'t> {
         }
     }
 
-    pub async fn emit_txn_for(
-        &mut self,
-        duration: Duration,
-        emit_job_request: EmitJobRequest,
-    ) -> Result<TxnStats> {
+    pub async fn emit_txn_for(&mut self, emit_job_request: EmitJobRequest) -> Result<TxnStats> {
+        let duration = emit_job_request.duration;
         let job = self.start_job(emit_job_request).await?;
         info!("Starting emitting txns for {} secs", duration.as_secs());
         time::sleep(duration).await;
@@ -371,10 +375,10 @@ impl<'t> TxnEmitter<'t> {
 
     pub async fn emit_txn_for_with_stats(
         &mut self,
-        duration: Duration,
         emit_job_request: EmitJobRequest,
         interval_secs: u64,
     ) -> Result<TxnStats> {
+        let duration = emit_job_request.duration;
         info!("Starting emitting txns for {} secs", duration.as_secs());
         let job = self.start_job(emit_job_request).await?;
         self.periodic_stat(&job, duration, interval_secs).await;
@@ -519,9 +523,7 @@ pub fn gen_transfer_txn_request(
 ) -> SignedTransaction {
     sender.sign_with_transaction_builder(
         txn_factory
-            .payload(aptos_stdlib::encode_test_coin_transfer(
-                *receiver, num_coins,
-            ))
+            .payload(aptos_stdlib::aptos_coin_transfer(*receiver, num_coins))
             .gas_unit_price(gas_price),
     )
 }

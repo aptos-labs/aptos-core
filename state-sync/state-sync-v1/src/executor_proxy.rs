@@ -365,7 +365,7 @@ mod tests {
             .unwrap();
 
         // Create an executor proxy
-        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw).unwrap());
+        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw));
         let mut executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
 
         // Publish a subscribed event
@@ -567,7 +567,7 @@ mod tests {
             .unwrap();
 
         // Create an executor
-        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()).unwrap());
+        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
         let mut executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
 
         // Verify that the initial configs returned to the subscriber don't contain the unknown on-chain config
@@ -650,7 +650,7 @@ mod tests {
 
         // Create the executors
         let block_executor = Box::new(BlockExecutor::<AptosVM>::new(db_rw.clone()));
-        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw).unwrap());
+        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw));
         let executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
 
         (
@@ -677,7 +677,7 @@ mod tests {
             operator_key,
             operator_public_key,
             Some(
-                aptos_stdlib::encode_validator_set_script_set_validator_config_and_reconfigure(
+                aptos_stdlib::validator_set_script_set_validator_config_and_reconfigure(
                     validator.data.address,
                     new_consensus_key.to_bytes().to_vec(),
                     Vec::new(),
@@ -708,7 +708,7 @@ mod tests {
             sequence_number,
             genesis_key.clone(),
             genesis_key.public_key(),
-            Some(aptos_stdlib::encode_version_set_version(
+            Some(aptos_stdlib::version_set_version(
                 7, // version
             )),
         )
@@ -723,7 +723,7 @@ mod tests {
         //     sequence_number,
         //     genesis_key.clone(),
         //     genesis_key.public_key(),
-        //     Some(aptos_stdlib::encode_update_aptos_consensus_config_script_function(
+        //     Some(aptos_stdlib::update_aptos_consensus_config_script_function(
         //         0,
         //         bcs::to_bytes(&OnChainConsensusConfig::V1(ConsensusConfigV1 {
         //             two_chain: false,
@@ -744,7 +744,7 @@ mod tests {
             sequence_number,
             genesis_key.clone(),
             genesis_key.public_key(),
-            Some(aptos_stdlib::encode_test_coin_transfer(
+            Some(aptos_stdlib::aptos_coin_transfer(
                 validator_account,
                 1_000_000,
             )),

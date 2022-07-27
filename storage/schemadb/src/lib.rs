@@ -28,6 +28,7 @@ use crate::{
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
 };
 use anyhow::{format_err, Result};
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use std::{collections::HashMap, iter::Iterator, marker::PhantomData, path::Path};
 
@@ -48,9 +49,17 @@ enum WriteOp {
 
 /// `SchemaBatch` holds a collection of updates that can be applied to a DB atomically. The updates
 /// will be applied in the order in which they are added to the `SchemaBatch`.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct SchemaBatch {
-    rows: HashMap<ColumnFamilyName, Vec<WriteOp>>,
+    rows: Mutex<HashMap<ColumnFamilyName, Vec<WriteOp>>>,
+}
+
+impl Default for SchemaBatch {
+    fn default() -> Self {
+        Self {
+            rows: Mutex::new(HashMap::new()),
+        }
+    }
 }
 
 impl SchemaBatch {
@@ -60,13 +69,14 @@ impl SchemaBatch {
     }
 
     /// Adds an insert/update operation to the batch.
-    pub fn put<S: Schema>(&mut self, key: &S::Key, value: &S::Value) -> Result<()> {
+    pub fn put<S: Schema>(&self, key: &S::Key, value: &S::Value) -> Result<()> {
         let _timer = APTOS_SCHEMADB_BATCH_PUT_LATENCY_SECONDS
             .with_label_values(&["unknown"])
             .start_timer();
         let key = <S::Key as KeyCodec<S>>::encode_key(key)?;
         let value = <S::Value as ValueCodec<S>>::encode_value(value)?;
         self.rows
+            .lock()
             .entry(S::COLUMN_FAMILY_NAME)
             .or_insert_with(Vec::new)
             .push(WriteOp::Value { key, value });
@@ -75,9 +85,10 @@ impl SchemaBatch {
     }
 
     /// Adds a delete operation to the batch.
-    pub fn delete<S: Schema>(&mut self, key: &S::Key) -> Result<()> {
+    pub fn delete<S: Schema>(&self, key: &S::Key) -> Result<()> {
         let key = <S::Key as KeyCodec<S>>::encode_key(key)?;
         self.rows
+            .lock()
             .entry(S::COLUMN_FAMILY_NAME)
             .or_insert_with(Vec::new)
             .push(WriteOp::Deletion { key });
@@ -86,10 +97,11 @@ impl SchemaBatch {
     }
 
     /// Adds a delete range operation that delete a range [start, end)
-    pub fn delete_range<S: Schema>(&mut self, begin: &S::Key, end: &S::Key) -> Result<()> {
+    pub fn delete_range<S: Schema>(&self, begin: &S::Key, end: &S::Key) -> Result<()> {
         let begin = <S::Key as KeyCodec<S>>::encode_key(begin)?;
         let end = <S::Key as KeyCodec<S>>::encode_key(end)?;
         self.rows
+            .lock()
             .entry(S::COLUMN_FAMILY_NAME)
             .or_insert_with(Vec::new)
             .push(WriteOp::DeletionRange { begin, end });
@@ -97,14 +109,11 @@ impl SchemaBatch {
     }
 
     /// Adds a delete range operation that delete a range [start, end] including end
-    pub fn delete_range_inclusive<S: Schema>(
-        &mut self,
-        begin: &S::Key,
-        end: &S::Key,
-    ) -> Result<()> {
+    pub fn delete_range_inclusive<S: Schema>(&self, begin: &S::Key, end: &S::Key) -> Result<()> {
         let begin = <S::Key as KeyCodec<S>>::encode_key(begin)?;
         let end = <S::Key as KeyCodec<S>>::encode_key(end)?;
         self.rows
+            .lock()
             .entry(S::COLUMN_FAMILY_NAME)
             .or_insert_with(Vec::new)
             .push(WriteOp::DeletionRangeInclusive { begin, end });
@@ -305,7 +314,7 @@ impl DB {
     pub fn put<S: Schema>(&self, key: &S::Key, value: &S::Value) -> Result<()> {
         // Not necessary to use a batch, but we'd like a central place to bump counters.
         // Used in tests only anyway.
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         batch.put::<S>(key, value)?;
         self.write_schemas(batch)
     }
@@ -355,9 +364,10 @@ impl DB {
         let _timer = APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS
             .with_label_values(&[self.name])
             .start_timer();
+        let rows_locked = batch.rows.lock();
 
         let mut db_batch = rocksdb::WriteBatch::default();
-        for (cf_name, rows) in &batch.rows {
+        for (cf_name, rows) in rows_locked.iter() {
             let cf_handle = self.get_cf_handle(cf_name)?;
             for write_op in rows {
                 match write_op {
@@ -378,7 +388,7 @@ impl DB {
         self.inner.write_opt(db_batch, &default_write_options())?;
 
         // Bump counters only after DB write succeeds.
-        for (cf_name, rows) in &batch.rows {
+        for (cf_name, rows) in rows_locked.iter() {
             for write_op in rows {
                 match write_op {
                     WriteOp::Value { key, value } => {
