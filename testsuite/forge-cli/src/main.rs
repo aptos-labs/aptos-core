@@ -36,7 +36,7 @@ struct Args {
     #[structopt(
         long,
         help = "Specify a test suite to run",
-        default_value = "land_blocking"
+        default_value = "pre_release"
     )]
     suite: String,
     #[structopt(long, multiple = true)]

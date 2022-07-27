@@ -71,32 +71,6 @@ impl NetworkTest for NetworkChaosTest {
             .report_txn_stats(format!("{}:delay", self.name()), &txn_stat, duration);
         ctx.swarm().remove_chaos(delay)?;
 
-        // INJECT BANDWIDTH LIMIT AND EMIT TXNS
-        ctx.swarm().inject_chaos(bandwidth.clone())?;
-        let msg = format!(
-            "Limited bandwidth to {}mbps with limit {} and buffer {} to namespace",
-            RATE_MBPS, LIMIT_BYTES, BUFFER_BYTES
-        );
-        println!("{}", msg);
-        ctx.report.report_text(msg);
-        let txn_stat = generate_traffic(ctx, &all_validators, duration, 1, None)?;
-        ctx.report
-            .report_txn_stats(format!("{}:bandwidth", self.name()), &txn_stat, duration);
-        ctx.swarm().remove_chaos(bandwidth)?;
-
-        // INJECT PARTITION AND EMIT TXNS
-        ctx.swarm().inject_chaos(partition.clone())?;
-        let msg = format!(
-            "Partitioned {}% validators in namespace",
-            PARTITION_PERCENTAGE
-        );
-        println!("{}", msg);
-        ctx.report.report_text(msg);
-        let txn_stat = generate_traffic(ctx, &all_validators, duration, 1, None)?;
-        ctx.report
-            .report_txn_stats(format!("{}:partition", self.name()), &txn_stat, duration);
-        ctx.swarm().remove_chaos(partition)?;
-
         Ok(())
     }
 }
