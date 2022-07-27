@@ -85,7 +85,7 @@ See the `first_transaction.ts` code in the [Typescript project](https://github.c
 
 ## Step 1: Create a representation of an account
 
-This steps creates the representation of an account. See also [Aptos accounts][account_basics] and [Creating a Signed Transaction](/docs/guides/sign-a-transaction.md).
+This step creates the representation of an account. See also [Aptos accounts][account_basics] and [Creating a Signed Transaction](/docs/guides/sign-a-transaction.md).
 
 <Tabs>
   <TabItem value="python" label="Python" default>
