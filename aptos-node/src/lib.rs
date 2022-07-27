@@ -658,8 +658,13 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
 
     let (mp_client_sender, mp_client_events) = channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
-    let api_runtime = bootstrap_api(&node_config, chain_id, aptos_db.clone(), mp_client_sender)?;
-    let sf_runtime = bootstrap_sf_stream(&node_config, chain_id, aptos_db)?;
+    let api_runtime = bootstrap_api(
+        &node_config,
+        chain_id,
+        aptos_db.clone(),
+        mp_client_sender.clone(),
+    )?;
+    let sf_runtime = bootstrap_sf_stream(&node_config, chain_id, aptos_db, mp_client_sender)?;
 
     let mut consensus_runtime = None;
     let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
