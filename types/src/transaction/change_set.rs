@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{contract_event::ContractEvent, delta_set::DeltaSet, write_set::WriteSet};
+use crate::{contract_event::ContractEvent, delta_change_set::DeltaChangeSet, write_set::WriteSet};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -30,19 +30,19 @@ impl ChangeSet {
 
 /// Extension of `ChangeSet` that also holds deltas.
 pub struct ChangeSetExt {
-    delta_set: DeltaSet,
+    delta_change_set: DeltaChangeSet,
     change_set: ChangeSet,
 }
 
 impl ChangeSetExt {
-    pub fn new(delta_set: DeltaSet, change_set: ChangeSet) -> Self {
+    pub fn new(delta_change_set: DeltaChangeSet, change_set: ChangeSet) -> Self {
         ChangeSetExt {
-            delta_set,
+            delta_change_set,
             change_set,
         }
     }
 
-    pub fn into_inner(self) -> (DeltaSet, ChangeSet) {
-        (self.delta_set, self.change_set)
+    pub fn into_inner(self) -> (DeltaChangeSet, ChangeSet) {
+        (self.delta_change_set, self.change_set)
     }
 }
