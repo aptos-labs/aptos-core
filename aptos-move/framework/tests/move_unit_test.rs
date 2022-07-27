@@ -7,12 +7,10 @@ use move_deps::move_cli::base::test::run_move_unit_tests;
 use move_deps::{
     move_unit_test::UnitTestingConfig, move_vm_runtime::native_functions::NativeFunctionTable,
 };
-use once_cell::sync::Lazy;
 use tempfile::tempdir;
 
 fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
-    extensions::set_extension_hook(Box::new(add_aggregator_context));
     run_move_unit_tests(
         &pkg_path,
         move_deps::move_package::BuildConfig {
