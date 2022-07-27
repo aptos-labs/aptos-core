@@ -96,7 +96,7 @@ async fn test_block_height_works() {
     let account = test_context.gen_account();
     let txn = test_context.create_user_account_by(&mut root_account, &account);
     test_context.commit_block(&vec![txn.clone()]).await;
-    test_context.commit_block(&vec![]).await;
+    test_context.commit_block(&[]).await;
 
     // key is version and value is block_height
     let block_mapping = HashMap::from([
