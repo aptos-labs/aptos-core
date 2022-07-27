@@ -122,27 +122,27 @@ impl DbReader for StateStore {
 }
 
 impl StateStore {
-    pub fn new(ledger_db: Arc<DB>, state_merkle_db: Arc<DB>, hack_for_tests: bool) -> Self {
+    pub fn new(ledger_db: Arc<DB>, state_merkle_db: Arc<DB>, hack_for_tests: bool) -> Arc<Self> {
         let state_merkle_db = Arc::new(StateMerkleDb::new(state_merkle_db));
-        let store = Self {
+        let store = Arc::new(Self {
             ledger_db,
             state_merkle_db,
             buffered_state: Mutex::new(StateDelta::new_empty()),
-        };
+        });
         store
             .initialize(hack_for_tests)
             .expect("StateStore initialization failed.");
         store
     }
 
-    pub fn maybe_reset(&self, latest_snapshot_version: Option<Version>) {
+    pub fn maybe_reset(self: &Arc<Self>, latest_snapshot_version: Option<Version>) {
         if self.buffered_state.lock().base_version < latest_snapshot_version {
             self.initialize(false)
                 .expect("StateStore initialization failed.")
         }
     }
 
-    fn initialize(&self, hack_for_tests: bool) -> Result<()> {
+    fn initialize(self: &Arc<Self>, hack_for_tests: bool) -> Result<()> {
         let num_transactions = LedgerStore::new(Arc::clone(&self.ledger_db))
             .get_latest_transaction_info_option()?
             .map(|(version, _)| version + 1)
@@ -191,10 +191,10 @@ impl StateStore {
             let mut buffered_state = self.buffered_state.lock();
             let latest_snapshot_state_view = CachedStateView::new(
                 StateViewId::Miscellaneous,
-                self,
+                self.clone(),
                 num_transactions,
                 buffered_state.current.clone(),
-                SyncProofFetcher::new(self),
+                Arc::new(SyncProofFetcher::new(self.clone())),
             )?;
             let write_sets = TransactionStore::new(Arc::clone(&self.ledger_db))
                 .get_write_sets(snapshot_next_version, num_transactions)?;

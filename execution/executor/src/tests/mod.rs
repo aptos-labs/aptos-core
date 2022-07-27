@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::ops::Deref;
-use std::{collections::BTreeMap, iter::once};
+use std::{collections::BTreeMap, iter::once, sync::Arc};
 
 use proptest::prelude::*;
 
@@ -25,7 +24,7 @@ use aptos_types::{
 };
 use aptosdb::AptosDB;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
-use storage_interface::{DbReaderWriter, ExecutedTrees};
+use storage_interface::{sync_proof_fetcher::SyncProofFetcher, DbReaderWriter, ExecutedTrees};
 
 use crate::{
     block_executor::BlockExecutor,
@@ -388,7 +387,11 @@ fn apply_transaction_by_writeset(
         .collect();
 
     let state_view = ledger_view
-        .verified_state_view(StateViewId::Miscellaneous, db.reader.deref())
+        .verified_state_view(
+            StateViewId::Miscellaneous,
+            Arc::clone(&db.reader),
+            Arc::new(SyncProofFetcher::new(db.reader.clone())),
+        )
         .unwrap();
 
     let chunk_output =
@@ -527,7 +530,11 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
         let out = ChunkOutput::by_transaction_execution::<MockVM>(
             vec![txn],
             ledger_view
-                .verified_state_view(StateViewId::Miscellaneous, db.reader.deref())
+                .verified_state_view(
+                    StateViewId::Miscellaneous,
+                    Arc::clone(&db.reader),
+                    Arc::new(SyncProofFetcher::new(db.reader.clone())),
+                )
                 .unwrap(),
         )
         .unwrap();

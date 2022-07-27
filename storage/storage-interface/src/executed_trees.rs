@@ -2,14 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    cached_state_view::CachedStateView, no_proof_fetcher::NoProofFetcher, state_delta::StateDelta,
-    sync_proof_fetcher::SyncProofFetcher, DbReader,
+    cached_state_view::CachedStateView, no_proof_fetcher::NoProofFetcher,
+    proof_fetcher::ProofFetcher, state_delta::StateDelta, DbReader,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::TransactionAccumulatorHasher, HashValue};
 use aptos_state_view::StateViewId;
 use aptos_types::{proof::accumulator::InMemoryAccumulator, transaction::Version};
-use std::ops::Deref;
 use std::sync::Arc;
 
 /// A wrapper of the in-memory state sparse merkle tree and the transaction accumulator that
@@ -88,31 +87,32 @@ impl ExecutedTrees {
             && self.transaction_accumulator.root_hash() == rhs.transaction_accumulator.root_hash()
     }
 
-    pub fn verified_state_view<'a>(
+    pub fn verified_state_view(
         &self,
         id: StateViewId,
-        reader: &'a dyn DbReader,
-    ) -> Result<CachedStateView<SyncProofFetcher<'a>>> {
+        reader: Arc<dyn DbReader>,
+        proof_fetcher: Arc<dyn ProofFetcher>,
+    ) -> Result<CachedStateView> {
         CachedStateView::new(
             id,
             reader,
             self.transaction_accumulator.num_leaves(),
             self.state.current.clone(),
-            SyncProofFetcher::new(reader),
+            proof_fetcher,
         )
     }
 
     pub fn state_view(
         &self,
         id: StateViewId,
-        reader: &Arc<dyn DbReader>,
-    ) -> Result<CachedStateView<NoProofFetcher>> {
+        reader: Arc<dyn DbReader>,
+    ) -> Result<CachedStateView> {
         CachedStateView::new(
             id,
-            reader.deref(),
+            Arc::clone(&reader),
             self.transaction_accumulator.num_leaves(),
             self.state.current.clone(),
-            NoProofFetcher::new(reader.clone()),
+            Arc::new(NoProofFetcher::new(reader.clone())),
         )
     }
 }
