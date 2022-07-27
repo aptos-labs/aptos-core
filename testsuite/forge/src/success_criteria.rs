@@ -26,14 +26,15 @@ impl SuccessCriteria {
         let p99_latency = stats.latency_buckets.percentile(99, 100);
         if avg_tps < self.avg_tps as u64 {
             bail!(
-                "TPS requirement failed. Average TPS {}, minimum TPS requirement {}",
+                // ::error:: is github specific syntax to set an error on the job that is highlighted as described here https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-error-message
+                "::error::TPS requirement failed. Average TPS {}, minimum TPS requirement {}",
                 avg_tps,
                 self.avg_tps
             )
         }
         if p99_latency > self.max_latency_ms as u64 {
             bail!(
-                "Latency requirement failed. P99 latency {}, maximum latency requirement {}",
+                "::error::Latency requirement failed. P99 latency {}, maximum latency requirement {}",
                 p99_latency,
                 self.max_latency_ms
             )
