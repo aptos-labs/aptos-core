@@ -161,7 +161,7 @@ module aptos_framework::aptos_governance {
         execution_hash: vector<u8>,
         metadata_location: vector<u8>,
         metadata_hash: vector<u8>,
-    ): u64 acquires GovernanceConfig, GovernanceEvents {
+    ) acquires GovernanceConfig, GovernanceEvents {
         let proposer_address = signer::address_of(proposer);
         assert!(stake::get_delegated_voter(stake_pool) == proposer_address, error::invalid_argument(ENOT_DELEGATED_VOTER));
 
@@ -218,8 +218,6 @@ module aptos_framework::aptos_governance {
                 metadata_hash,
             },
         );
-
-        proposal_id
     }
 
     /// Vote on proposal with `proposal_id` and voting power from `stake_pool`.
@@ -305,7 +303,7 @@ module aptos_framework::aptos_governance {
             &no_voter,
         );
 
-        let proposal_id = create_proposal(
+        create_proposal(
             &proposer,
             signer::address_of(&proposer),
             b"123",
@@ -318,7 +316,7 @@ module aptos_framework::aptos_governance {
         // Once expiration time has passed, the proposal should be considered resolve now as there are more yes votes
         // than no.
         timestamp::update_global_time_for_test(100001000000);
-        let proposal_state = voting::get_proposal_state<GovernanceProposal>(signer::address_of(&aptos_framework), proposal_id);
+        let proposal_state = voting::get_proposal_state<GovernanceProposal>(signer::address_of(&aptos_framework), 0);
         assert!(proposal_state == 1, proposal_state);
     }
 
@@ -339,7 +337,7 @@ module aptos_framework::aptos_governance {
             &voter_2,
         );
 
-        let proposal_id = create_proposal(
+        create_proposal(
             &proposer,
             signer::address_of(&proposer),
             b"",
@@ -348,8 +346,8 @@ module aptos_framework::aptos_governance {
         );
 
         // Double voting should throw an error.
-        vote(&voter_1, signer::address_of(&voter_1), proposal_id, true);
-        vote(&voter_1, signer::address_of(&voter_1), proposal_id, true);
+        vote(&voter_1, signer::address_of(&voter_1), 0, true);
+        vote(&voter_1, signer::address_of(&voter_1), 0, true);
     }
 
     #[test(core_resources = @core_resources, aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
@@ -369,7 +367,7 @@ module aptos_framework::aptos_governance {
             &voter_2,
         );
 
-        let proposal_id = create_proposal(
+        create_proposal(
             &proposer,
             signer::address_of(&proposer),
             b"",
@@ -378,9 +376,9 @@ module aptos_framework::aptos_governance {
         );
 
         // Double voting should throw an error for 2 different voters if they still use the same stake pool.
-        vote(&voter_1, signer::address_of(&voter_1), proposal_id, true);
+        vote(&voter_1, signer::address_of(&voter_1), 0, true);
         stake::set_delegated_voter(&voter_1, signer::address_of(&voter_2));
-        vote(&voter_2, signer::address_of(&voter_1), proposal_id, true);
+        vote(&voter_2, signer::address_of(&voter_1), 0, true);
     }
 
     #[test_only]
