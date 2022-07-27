@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::FaucetOptions;
+use crate::node::{
+    OperatorArgs, RegisterValidatorCandidate, ShowValidatorConfig, ValidatorConfigArgs,
+};
 use crate::{
     account::{
         create::{CreateAccount, DEFAULT_FUNDED_COINS},
@@ -19,7 +22,10 @@ use crate::{
     CliCommand,
 };
 use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_crypto::{bls12381, x25519};
+use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
+use aptos_rest_client::Transaction;
 use aptos_sdk::move_types::account_address::AccountAddress;
 use reqwest::Url;
 use serde_json::Value;
@@ -119,15 +125,43 @@ impl CliTestFramework {
         let receiver_account = Self::account_id(receiver_index);
 
         TransferCoins {
-            txn_options: TransactionOptions {
-                private_key_options: PrivateKeyInputOptions::default(),
-                encoding_options: Default::default(),
-                profile_options: profile(sender_index),
-                rest_options: self.rest_options(),
-                gas_options: Default::default(),
-            },
+            txn_options: self.transaction_options(sender_index),
             account: receiver_account,
             amount,
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn show_validator_config(&self, index: usize) -> CliTypedResult<serde_json::Value> {
+        ShowValidatorConfig {
+            rest_options: self.rest_options(),
+            profile_options: profile(index),
+            operator_args: OperatorArgs { pool_address: None },
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn register_validator_candidate(
+        &self,
+        index: usize,
+        consensus_public_key: bls12381::PublicKey,
+        proof_of_possession: bls12381::ProofOfPossession,
+        validator_host: HostAndPort,
+        validator_network_public_key: x25519::PublicKey,
+    ) -> CliTypedResult<Transaction> {
+        RegisterValidatorCandidate {
+            txn_options: self.transaction_options(index),
+            validator_config_args: ValidatorConfigArgs {
+                validator_config_file: None,
+                consensus_public_key: Some(consensus_public_key),
+                proof_of_possession: Some(proof_of_possession),
+                validator_host: Some(validator_host),
+                validator_network_public_key: Some(validator_network_public_key),
+                full_node_host: None,
+                full_node_network_public_key: None,
+            },
         }
         .execute()
         .await
@@ -212,6 +246,16 @@ impl CliTestFramework {
 
     pub fn faucet_options(&self) -> FaucetOptions {
         FaucetOptions::new(Some(self.faucet_endpoint.clone()))
+    }
+
+    fn transaction_options(&self, index: usize) -> TransactionOptions {
+        TransactionOptions {
+            private_key_options: PrivateKeyInputOptions::default(),
+            encoding_options: Default::default(),
+            profile_options: profile(index),
+            rest_options: self.rest_options(),
+            gas_options: Default::default(),
+        }
     }
 
     pub fn account_id(index: usize) -> AccountAddress {
