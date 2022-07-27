@@ -138,9 +138,10 @@ impl SfStreamer {
             }
         }
 
+        let ledger_info = self.context.get_latest_ledger_info().unwrap();
         match self
             .context
-            .get_transactions(self.current_version, batch_size, self.current_version)
+            .get_transactions(self.current_version, batch_size, ledger_info.version())
         {
             Ok(transactions) => {
                 if transactions.is_empty() {
@@ -176,6 +177,7 @@ impl SfStreamer {
                     result.push(txn_proto);
                     self.current_version = txn_version;
                 }
+                self.current_version += 1;
             }
             Err(err) => {
                 error!("[sf-stream] failed to get transactions: {}", err);
@@ -201,7 +203,7 @@ impl SfStreamer {
 
     pub async fn print_transaction(&self, transaction: &extractor::Transaction) {
         let pb_b64 = &base64::encode(transaction.write_to_bytes().unwrap());
-        println!("DMLOG TRX <sf.aptos.types.v1.TransactionTrace> {}", pb_b64);
+        println!("DMLOG TRX {}", pb_b64);
         metrics::TRANSACTIONS_SENT.inc();
     }
 }
