@@ -69,3 +69,11 @@ pub trait DBPruner {
         self.target_version() > self.min_readable_version()
     }
 }
+
+pub enum Command {
+    Quit,
+    Prune {
+        /// The target DB version for the pruner.
+        target_db_version: Option<Version>,
+    },
+}
