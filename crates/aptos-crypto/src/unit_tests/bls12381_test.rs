@@ -347,3 +347,47 @@ fn bls12381_sample_signature_verifies() {
 
     assert!(sig.verify_arbitrary_msg(b"Hello Aptos!", &pk).is_ok());
 }
+
+#[test]
+fn bls12381_sample_aggregate_pk_and_multisig() {
+    let mut rng = OsRng;
+
+    let num = 5;
+    let message = b"Hello, Aptoverse!";
+
+    let mut pks = vec![];
+    let mut agg_pks = vec![];
+    let mut sigs = vec![];
+    let mut multisigs = vec![];
+
+    for _i in 1..=num {
+        let keypair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
+
+        pks.push(keypair.public_key);
+        sigs.push(keypair.private_key.sign_arbitrary_message(message));
+
+        multisigs.push(bls12381::Signature::aggregate(sigs.clone()).unwrap());
+
+        let pk_refs = pks.iter().collect::<Vec<&PublicKey>>();
+        agg_pks.push(PublicKey::aggregate(pk_refs).unwrap());
+    }
+
+    println!("let pks = vector[");
+    for pk in pks {
+        println!("    x\"{}\",", pk);
+    }
+    println!("];\n");
+
+    println!("let agg_pks = vector[");
+    for aggpk in agg_pks {
+        println!("    x\"{}\",", aggpk);
+    }
+    println!("];\n");
+
+    println!("// The signed message is \"Hello, Aptoverse!\"");
+    println!("let multisigs = vector[");
+    for multisig in multisigs {
+        println!("    x\"{}\",", multisig);
+    }
+    println!("];");
+}

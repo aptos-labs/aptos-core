@@ -30,6 +30,7 @@ use aptos_crypto_derive::{DeserializeKey, SerializeKey};
 use blst::BLST_ERROR;
 use serde::Serialize;
 use std::convert::TryFrom;
+use std::fmt;
 
 #[derive(Debug, Clone, Eq, SerializeKey, DeserializeKey)]
 /// Either (1) a BLS signature share from an individual signer, (2) a BLS multisignature or (3) a
@@ -174,6 +175,12 @@ impl ValidCryptoMaterial for Signature {
 impl Length for Signature {
     fn length(&self) -> usize {
         Self::LENGTH
+    }
+}
+
+impl fmt::Display for Signature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(&self.to_bytes()))
     }
 }
 

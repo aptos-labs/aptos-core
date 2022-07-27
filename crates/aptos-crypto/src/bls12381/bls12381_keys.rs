@@ -11,8 +11,8 @@
 //! `ProofOfPossession::verify`.
 //!
 //! The `PublicKey::aggregate` API assumes the caller has already verified
-//! proofs-of-possession for all the given public keys and therefore all public keys are valid group
-//! elements.
+//! proofs-of-possession for all the given public keys and therefore all public keys are valid,
+//! prime-order subgroup elements.
 //!
 //! In general, with the exception of `ProofOfPossession::verify` no library function should
 //! be given a public key as argument without first verifying that public key's PoP. Note that
@@ -58,7 +58,8 @@ impl PublicKey {
         self.pubkey.to_bytes()
     }
 
-    /// Group-checks the public key (i.e., verifies the public key is a valid group element).
+    /// Group-checks the public key (i.e., verifies the public key is an element of the prime-order
+    /// subgroup and it is not the identity element).
     ///
     /// WARNING: Group-checking is done implicitly when verifying the proof-of-possession (PoP) for
     /// this public key  in `ProofOfPossession::verify`, so this function should not be called

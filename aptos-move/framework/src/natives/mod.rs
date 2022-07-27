@@ -33,8 +33,18 @@ pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
         ("account", "create_signer", account::native_create_signer),
         (
             "signature",
+            "bls12381_aggregate_unvalidated_pubkeys",
+            signature::native_bls12381_aggregate_unvalidated_pubkeys,
+        ),
+        (
+            "signature",
             "bls12381_validate_pubkey",
-            signature::native_bls12381_public_key_validation,
+            signature::native_bls12381_validate_pubkey,
+        ),
+        (
+            "signature",
+            "bls12381_verify_proof_of_possession",
+            signature::native_bls12381_verify_proof_of_possession,
         ),
         (
             "signature",
@@ -44,12 +54,12 @@ pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
         (
             "signature",
             "ed25519_validate_pubkey",
-            signature::native_ed25519_publickey_validation,
+            signature::native_ed25519_validate_pubkey,
         ),
         (
             "signature",
             "ed25519_verify",
-            signature::native_ed25519_signature_verification,
+            signature::native_ed25519_verify_signature,
         ),
         (
             "signature",
