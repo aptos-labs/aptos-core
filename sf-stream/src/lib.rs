@@ -7,6 +7,5 @@ pub mod runtime;
 
 pub mod protos;
 
-mod failpoint;
 #[cfg(any(test))]
 pub(crate) mod tests;

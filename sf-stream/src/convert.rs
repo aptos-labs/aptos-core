@@ -102,6 +102,11 @@ pub fn convert_transaction_payload(payload: &TransactionPayload) -> extractor::T
     }
 }
 
+#[inline]
+pub fn convert_events(events: &[Event]) -> Vec<extractor::Event> {
+    events.iter().map(convert_event).collect()
+}
+
 pub fn convert_write_set(write_set: &WriteSet) -> protobuf::MessageField<extractor::WriteSet> {
     let (write_set_type, write_set) = match write_set {
         WriteSet::ScriptWriteSet(sws) => {
@@ -122,16 +127,8 @@ pub fn convert_write_set(write_set: &WriteSet) -> protobuf::MessageField<extract
 
             let write_set =
                 extractor::write_set::Write_set::DirectWriteSet(extractor::DirectWriteSet {
-                    write_set_change: dws
-                        .changes
-                        .iter()
-                        .map(|change| convert_write_set_change(change))
-                        .collect(),
-                    events: dws
-                        .events
-                        .iter()
-                        .map(|event| convert_event(event))
-                        .collect(),
+                    write_set_change: convert_write_set_changes(&dws.changes),
+                    events: convert_events(&dws.events),
                     special_fields: Default::default(),
                 });
             (write_set_type, Some(write_set))
@@ -142,6 +139,11 @@ pub fn convert_write_set(write_set: &WriteSet) -> protobuf::MessageField<extract
         write_set,
         special_fields: Default::default(),
     })
+}
+
+#[inline]
+pub fn convert_write_set_changes(changes: &[WriteSetChange]) -> Vec<extractor::WriteSetChange> {
+    changes.iter().map(convert_write_set_change).collect()
 }
 
 pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetChange {
@@ -305,11 +307,7 @@ pub fn convert_transaction_info(transaction_info: &TransactionInfo) -> extractor
         success: transaction_info.success,
         vm_status: transaction_info.vm_status.to_string(),
         accumulator_root_hash: transaction_info.accumulator_root_hash.to_string(),
-        changes: transaction_info
-            .changes
-            .iter()
-            .map(|change| convert_write_set_change(change))
-            .collect(),
+        changes: convert_write_set_changes(&transaction_info.changes),
         special_fields: Default::default(),
     }
 }
@@ -346,7 +344,7 @@ pub fn convert_transaction(
                     signature: Default::default(),
                     special_fields: Default::default(),
                 }),
-                events: ut.events.iter().map(|event| convert_event(event)).collect(),
+                events: convert_events(&ut.events),
                 special_fields: Default::default(),
             })
         }
@@ -356,7 +354,7 @@ pub fn convert_transaction(
             };
             extractor::transaction::Txn_data::GenesisTxn(extractor::GenesisTransaction {
                 payload,
-                events: gt.events.iter().map(|event| convert_event(event)).collect(),
+                events: convert_events(&gt.events),
                 special_fields: Default::default(),
             })
         }
@@ -364,7 +362,7 @@ pub fn convert_transaction(
             extractor::transaction::Txn_data::BlockMetadataTxn(
                 extractor::BlockMetadataTransaction {
                     id: bm.id.to_string(),
-                    events: bm.events.iter().map(|event| convert_event(event)).collect(),
+                    events: convert_events(&bm.events),
                     previous_block_votes: bm.previous_block_votes.clone(),
                     proposer: bm.proposer.to_string(),
                     failed_proposer_indices: bm.failed_proposer_indices.clone(),
