@@ -39,7 +39,6 @@ pub mod async_proof_fetcher;
 pub mod cached_state_view;
 mod executed_trees;
 pub mod mock;
-pub mod no_proof_fetcher;
 pub mod proof_fetcher;
 pub mod state_delta;
 pub mod state_view;
@@ -536,8 +535,8 @@ impl MoveStorage for &dyn DbReader {
         access_path: AccessPath,
         version: Version,
     ) -> Result<Vec<u8>> {
-        let state_value = self
-            .get_state_value_by_version(&StateKey::AccessPath(access_path), version)?;
+        let state_value =
+            self.get_state_value_by_version(&StateKey::AccessPath(access_path), version)?;
 
         state_value
             .ok_or_else(|| format_err!("no value found in DB"))?

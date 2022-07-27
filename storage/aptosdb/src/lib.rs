@@ -1253,7 +1253,11 @@ impl DbReader for AptosDB {
 
     fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         gauged_api("get_latest_state_checkpoint_version", || {
-            Ok(self.state_store.buffered_state().lock().current_checkpoint_version())
+            Ok(self
+                .state_store
+                .buffered_state()
+                .lock()
+                .current_checkpoint_version())
         })
     }
 
