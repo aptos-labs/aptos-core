@@ -28,7 +28,7 @@ env:
   FORGE_CLUSTER_NAME: ${{ secrets.FORGE_CLUSTER_NAME }}
   FORGE_OUTPUT: forge_output.txt
   FORGE_REPORT: forge_report.json
-  FORGE_COMMENT_FILE: forge_comment.txt
+  FORGE_COMMENT: forge_comment.txt
   FORGE_PRE_COMMENT: forge_pre_comment.txt
   FORGE_RUNNER_MODE: k8s
   FORGE_NAMESPACE: ${{ inputs.FORGE_NAMESPACE }}
@@ -60,11 +60,18 @@ jobs:
           # export env vars for next step
           echo "FORGE_PRE_COMMENT=$FORGE_PRE_COMMENT" >> $GITHUB_ENV
 
+          # append some GHA-specific content to the comment
+          cat << EOF >> $FORGE_PRE_COMMENT
+          * [Test runner output](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          * Pending test run ${{ github.run_attempt }} ${{ env.FORGE_BLOCKING == 'true' && 'is land-blocking' || 'is not land-blocking' }}
+          EOF
+
       - name: Post pre-Forge comment
         if: env.FORGE_ENABLED == 'true' && github.event.number != null
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           recreate: true
+          header: forge-comment-${{ github.run_attempt }}
           path: ${{ env.FORGE_PRE_COMMENT }}
 
       - name: Run Forge
@@ -81,13 +88,13 @@ jobs:
           source testsuite/run_forge.sh
 
           # append some GHA-specific content to the comment
-          cat << EOF >> $FORGE_COMMENT_FILE
-          ${{ env.FORGE_BLOCKING == 'true' && 'Forge is land-blocking' || 'Forge is not land-blocking' }}
+          cat << EOF >> $FORGE_COMMENT
           * [Test runner output](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          * Test run ${{ github.run_attempt }} ${{ env.FORGE_BLOCKING == 'true' && 'is land-blocking' || 'is not land-blocking' }}
           EOF
 
           # add github step summary as described here https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary
-          cat $FORGE_COMMENT_FILE >> $GITHUB_STEP_SUMMARY
+          cat $FORGE_COMMENT >> $GITHUB_STEP_SUMMARY
 
           if [ "$FORGE_BLOCKING" = "true" ]; then
             exit $FORGE_EXIT_CODE
@@ -98,4 +105,5 @@ jobs:
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           recreate: true
-          path: ${{ env.FORGE_COMMENT_FILE }}
+          path: ${{ env.FORGE_COMMENT }}
+          header: forge-comment-${{ github.run_attempt }}
