@@ -19,3 +19,10 @@ xclippy = [
   "-Aclippy::enum-variant-names",
   "-Aclippy::self-named-constructors",
 ]
+
+# This is a temporary workaround to avoid multiple library
+# definitions for LZ4 (caused by rocksdb).
+# This will be removed once rocksdb provides a fix, see:
+# https://github.com/rust-rocksdb/rust-rocksdb/issues/666
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-Wl,--allow-multiple-definition"]
