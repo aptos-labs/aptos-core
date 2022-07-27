@@ -2,8 +2,8 @@
   <%= form_with(model: it2_profile, class: 'flex basis-full flex-col md:flex-row md:gap-10 md:justify-between', data: { turbo: !@show_recaptcha_v2, controller: 'recaptcha', action: 'recaptcha#validate' }, builder: AptosFormBuilder) do |f| %>
     <div>
       <% if it2_profile.errors.any? %>
-        <div id="error_explanation" class="flex p-4 mb-4 bg-red-100 rounded-lg dark:bg-red-200 lg:w-96" role="alert">
-          <div class="ml-3 text-sm font-medium text-red-700 dark:text-red-800">
+        <div id="error_explanation" class="flex p-4 mb-4 bg-red-100 rounded-lg lg:w-96" role="alert">
+          <div class="ml-3 text-sm font-medium text-red-700">
             <h2><%= pluralize(it2_profile.errors.count, 'error') %> prohibited this from being saved:</h2>
 
             <ul>

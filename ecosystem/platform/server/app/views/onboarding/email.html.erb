@@ -4,8 +4,8 @@
   <%= render 'layouts/flash' %>
 
   <% if current_user.errors.any? %>
-    <div id="error_explanation" class="flex p-4 mb-4 bg-red-100 rounded-lg dark:bg-red-200" role="alert">
-      <div class="ml-3 text-sm font-medium text-red-700 dark:text-red-800">
+    <div id="error_explanation" class="flex p-4 mb-4 bg-red-100 rounded-lg" role="alert">
+      <div class="ml-3 text-sm font-medium text-red-700">
         <h2><%= pluralize(current_user.errors.count, 'error') %> prohibited this user from being saved:</h2>
 
         <ul>
