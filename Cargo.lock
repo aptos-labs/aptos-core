@@ -3160,6 +3160,7 @@ dependencies = [
  "inspection-service",
  "k8s-openapi",
  "kube",
+ "prometheus-http-query",
  "rand 0.7.3",
  "rayon",
  "regex",
@@ -6350,6 +6351,19 @@ dependencies = [
  "memchr",
  "parking_lot 0.11.2",
  "thiserror",
+]
+
+[[package]]
+name = "prometheus-http-query"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ae2f6a3f14ff35c16b51ac796d1dc73c15ad6472c48836c6c467f6d52266648"
+dependencies = [
+ "reqwest",
+ "serde 1.0.137",
+ "serde_json",
+ "time 0.3.9",
+ "url",
 ]
 
 [[package]]
