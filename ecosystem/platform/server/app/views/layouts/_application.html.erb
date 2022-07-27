@@ -26,7 +26,9 @@
       <meta name="twitter:image" content="https://aptoslabs.com/images/meta/APTOS_meta_twitter_051222.jpg">
     <% end %>
 
-    <%= favicon_link_tag asset_path('favicon.ico') %>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/image/png" href="/favicon.png">
 
     <%= stylesheet_link_tag "https://use.typekit.net/#{ENV.fetch('TYPEKIT_CSS_ID')}.css" %>
     <%= stylesheet_link_tag 'application', 'data-turbo-track': 'reload' %>
