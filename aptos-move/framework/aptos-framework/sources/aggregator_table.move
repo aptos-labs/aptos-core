@@ -4,10 +4,10 @@ module aptos_framework::aggregator_table {
     use aptos_framework::aggregator::{Self, Aggregator};
     use aptos_framework::table::{Self, Table};
 
-    /// When aggregator table has already been published. 
+    /// When aggregator table has already been published.
     const EAGGREGATOR_TABLE_EXISTS: u64 = 1500;
 
-    /// When aggregator table does not exist. 
+    /// When aggregator table does not exist.
     const EAGGREGATOR_TABLE_DOES_NOT_EXIST: u64 = 1501;
 
     /// A global table of all registered aggregators stored as pairs:
@@ -34,7 +34,7 @@ module aptos_framework::aggregator_table {
     }
 
     /// Creates a new aggregator instance associated with `aggregator_table`
-    /// and which overflows on exceeding `limit`. 
+    /// and which overflows on exceeding `limit`.
     native fun new_aggregator(aggregator_table: &mut AggregatorTable, limit: u128): Aggregator;
 
     #[test(account = @0xFF)]
@@ -43,7 +43,7 @@ module aptos_framework::aggregator_table {
 
         let addr = signer::address_of(&account);
         let aggregator_table = borrow_global_mut<AggregatorTable>(addr);
-        
+
         let aggregator = new_aggregator(aggregator_table, /*limit=*/1000);
 
         aggregator::add(&mut aggregator, 12);
@@ -86,7 +86,7 @@ module aptos_framework::aggregator_table {
 
         let addr = signer::address_of(&account);
         let aggregator_table = borrow_global_mut<AggregatorTable>(addr);
-    
+
         let aggregator = new_aggregator(aggregator_table, /*limit=*/10);
 
         // Underflow!
