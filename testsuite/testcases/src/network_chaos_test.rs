@@ -12,7 +12,7 @@ use forge::{
 pub struct NetworkChaosTest;
 
 // Delay
-pub const LATENCY_MS: u64 = 300;
+pub const LATENCY_MS: u64 = 250;
 pub const JITTER_MS: u64 = 20;
 pub const CORRELATION_PERCENTAGE: u64 = 10;
 
@@ -36,20 +36,20 @@ impl Test for NetworkChaosTest {
 impl NetworkTest for NetworkChaosTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
         // test each phase with 30s txn emission
-        let duration = Duration::from_secs(30);
+        let duration = Duration::from_secs(300);
         let delay = SwarmChaos::Delay(SwarmNetworkDelay {
             latency_ms: LATENCY_MS,
             jitter_ms: JITTER_MS,
             correlation_percentage: CORRELATION_PERCENTAGE,
         });
-        let bandwidth = SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
-            rate: RATE_MBPS,
-            limit: LIMIT_BYTES,
-            buffer: BUFFER_BYTES,
-        });
-        let partition = SwarmChaos::Partition(SwarmNetworkPartition {
-            partition_percentage: PARTITION_PERCENTAGE,
-        });
+        // let bandwidth = SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
+        //     rate: RATE_MBPS,
+        //     limit: LIMIT_BYTES,
+        //     buffer: BUFFER_BYTES,
+        // });
+        // let partition = SwarmChaos::Partition(SwarmNetworkPartition {
+        //     partition_percentage: PARTITION_PERCENTAGE,
+        // });
 
         // emit to all validator
         let all_validators = ctx
