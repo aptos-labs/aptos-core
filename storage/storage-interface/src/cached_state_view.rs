@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::state_view::DbStateView;
 use crate::{proof_fetcher::ProofFetcher, DbReader};
 use anyhow::{format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -185,5 +186,46 @@ impl StateView for CachedStateView {
 
     fn is_genesis(&self) -> bool {
         self.snapshot.is_none()
+    }
+}
+
+pub struct CachedDbStateView {
+    db_state_view: DbStateView,
+    state_cache: RwLock<HashMap<StateKey, Option<Vec<u8>>>>,
+}
+
+impl From<DbStateView> for CachedDbStateView {
+    fn from(db_state_view: DbStateView) -> Self {
+        Self {
+            db_state_view,
+            state_cache: RwLock::new(HashMap::new()),
+        }
+    }
+}
+
+impl StateView for CachedDbStateView {
+    fn id(&self) -> StateViewId {
+        self.db_state_view.id()
+    }
+
+    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+        // First check if the cache has the state value.
+        if let Some(contents) = self.state_cache.read().get(state_key) {
+            // This can return None, which means the value has been deleted from the DB.
+            return Ok(contents.clone());
+        }
+        let state_value_option = self
+            .db_state_view
+            .get_state_value(state_key)?;
+        // Update the cache if still empty
+        let mut cache = self.state_cache.write();
+        let new_value = cache
+            .entry(state_key.clone())
+            .or_insert_with(|| state_value_option);
+        Ok(new_value.clone())
+    }
+
+    fn is_genesis(&self) -> bool {
+        self.db_state_view.is_genesis()
     }
 }
