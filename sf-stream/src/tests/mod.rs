@@ -1,13 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-mod test_context;
 mod proto_converter_tests;
+mod test_context;
 
 pub use test_context::{new_test_context, TestContext};
 
-/// Returns the name of the current function. This macro is used to derive the name for the golden
-/// file of each test case.
+/// Returns the name of the current function
 #[macro_export]
 macro_rules! current_function_name {
     () => {{
