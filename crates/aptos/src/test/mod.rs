@@ -210,9 +210,10 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn withdraw_stake(&self, index: usize) -> CliTypedResult<Transaction> {
+    pub async fn withdraw_stake(&self, index: usize, amount: u64) -> CliTypedResult<Transaction> {
         WithdrawStake {
             node_op_options: self.transaction_options(index),
+            amount,
         }
         .execute()
         .await
