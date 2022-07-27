@@ -145,7 +145,7 @@ impl GenerateKey {
         let args = format!(
             "generate --key-type {key_type:?} --output-file {key_file} --encoding {encoding:?} --assume-yes",
             key_type = KeyType::X25519,
-            key_file = key_file.to_str().unwrap(),
+            key_file = key_file.display(),
             encoding = encoding,
         );
         let command = GenerateKey::parse_from(args.split_whitespace());
@@ -167,7 +167,7 @@ impl GenerateKey {
         let args = format!(
             "generate --key-type {key_type:?} --output-file {key_file} --encoding {encoding:?} --assume-yes",
             key_type = KeyType::Ed25519,
-            key_file = key_file.to_str().unwrap(),
+            key_file = key_file.display(),
             encoding = encoding,
         );
         let command = GenerateKey::parse_from(args.split_whitespace());
