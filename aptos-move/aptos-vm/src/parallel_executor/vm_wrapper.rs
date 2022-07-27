@@ -83,8 +83,6 @@ impl<'a, S: 'a + StateView> ExecutorTask for AptosVMWrapper<'a, S> {
                         }
                     };
                 }
-
-                // TODO: here also pass deltas to `AptosTransactionOutput::new`.
                 if AptosVM::should_restart_execution(&output) {
                     ExecutionStatus::SkipRest(AptosTransactionOutput::new(output))
                 } else {
