@@ -414,7 +414,7 @@ pub fn convert_transaction(
     };
 
     extractor::Transaction {
-        timestamp: timestamp.unwrap_or_else(|| convert_timestamp_secs(transaction.timestamp())),
+        timestamp: timestamp.unwrap_or_else(|| convert_timestamp_nanos(transaction.timestamp())),
         version: transaction.version().unwrap(),
         info: protobuf::MessageField::some(convert_transaction_info(
             transaction.transaction_info().unwrap(),
