@@ -10,7 +10,7 @@ use std::{
 };
 
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, PartialOrd, Ord)]
-pub struct HashValue(aptos_crypto::hash::HashValue);
+pub struct HashValue(pub aptos_crypto::hash::HashValue);
 
 impl From<aptos_crypto::hash::HashValue> for HashValue {
     fn from(val: aptos_crypto::hash::HashValue) -> Self {

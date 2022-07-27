@@ -10,8 +10,8 @@ use crate::{
 };
 use aptos_sdk::types::account_config::aptos_root_address;
 use move_deps::move_core_types::value::MoveValue;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use serde_json::Value;
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 #[tokio::test]
 async fn test_genesis_works() {
@@ -27,7 +27,7 @@ async fn test_genesis_works() {
     assert_eq!(txn.version, 0);
     assert_eq!(txn.type_.unwrap(), TransactionType::GENESIS);
     assert_eq!(txn.block_height, 0);
-    if let Txn_data::GenesisTxn(txn) = txn.txn_data.unwrap() {
+    if let Txn_data::Genesis(txn) = txn.txn_data.unwrap() {
         assert_eq!(
             txn.events[0].key.account_address,
             aptos_root_address().to_string()
@@ -60,14 +60,14 @@ async fn test_block_transactions_work() {
     let txn = converted_1[0].clone();
     assert_eq!(txn.version, 1);
     assert_eq!(txn.type_.unwrap(), TransactionType::BLOCK_METADATA);
-    if let Txn_data::BlockMetadataTxn(txn) = txn.txn_data.unwrap() {
+    if let Txn_data::BlockMetadata(txn) = txn.txn_data.unwrap() {
         assert_eq!(txn.round, 1);
     }
     // user txn expected
     let txn = converted_1[1].clone();
     assert_eq!(txn.version, 2);
     assert_eq!(txn.type_.unwrap(), TransactionType::USER);
-    if let Txn_data::UserTxn(txn) = txn.txn_data.unwrap() {
+    if let Txn_data::User(txn) = txn.txn_data.unwrap() {
         assert_eq!(
             txn.request.payload.type_.unwrap(),
             PayloadType::SCRIPT_FUNCTION_PAYLOAD

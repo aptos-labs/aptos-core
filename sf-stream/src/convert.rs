@@ -3,9 +3,10 @@
 
 use crate::protos::extractor;
 use aptos_api_types::{
-    Event, GenesisPayload, MoveModuleId, ScriptPayload, Transaction, TransactionInfo,
+    Event, GenesisPayload, HashValue, MoveModuleId, ScriptPayload, Transaction, TransactionInfo,
     TransactionPayload, WriteSet, WriteSetChange,
 };
+use std::str::FromStr;
 
 pub fn convert_move_module_id(move_module_id: &MoveModuleId) -> extractor::MoveModuleId {
     extractor::MoveModuleId {
@@ -146,6 +147,11 @@ pub fn convert_write_set_changes(changes: &[WriteSetChange]) -> Vec<extractor::W
     changes.iter().map(convert_write_set_change).collect()
 }
 
+#[inline]
+pub fn convert_hex_string_to_bytes(hex_string: &str) -> Vec<u8> {
+    HashValue::from_str(hex_string).unwrap().0.to_vec()
+}
+
 pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetChange {
     match change {
         WriteSetChange::DeleteModule(delete_module) => extractor::WriteSetChange {
@@ -155,7 +161,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             change: Some(extractor::write_set_change::Change::DeleteModule(
                 extractor::DeleteModule {
                     address: delete_module.address.to_string(),
-                    state_key_hash: delete_module.state_key_hash.to_string(),
+                    state_key_hash: convert_hex_string_to_bytes(&delete_module.state_key_hash),
                     module: protobuf::MessageField::some(extractor::MoveModuleId {
                         address: delete_module.module.address.to_string(),
                         name: delete_module.module.name.to_string(),
@@ -173,7 +179,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             change: Some(extractor::write_set_change::Change::DeleteResource(
                 extractor::DeleteResource {
                     address: delete_resource.address.to_string(),
-                    state_key_hash: delete_resource.state_key_hash.to_string(),
+                    state_key_hash: convert_hex_string_to_bytes(&delete_resource.state_key_hash),
                     resource: protobuf::MessageField::some(extractor::MoveStructTag {
                         address: delete_resource.address.to_string(),
                         module: delete_resource.resource.module.to_string(),
@@ -197,7 +203,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             ),
             change: Some(extractor::write_set_change::Change::DeleteTableItem(
                 extractor::DeleteTableItem {
-                    state_key_hash: delete_table_item.state_key_hash.to_string(),
+                    state_key_hash: convert_hex_string_to_bytes(&delete_table_item.state_key_hash),
                     handle: delete_table_item.handle.to_string(),
                     key: delete_table_item.key.to_string(),
                     special_fields: Default::default(),
@@ -212,7 +218,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             change: Some(extractor::write_set_change::Change::WriteModule(
                 extractor::WriteModule {
                     address: write_module.address.to_string(),
-                    state_key_hash: write_module.state_key_hash.to_string(),
+                    state_key_hash: convert_hex_string_to_bytes(&write_module.state_key_hash),
                     data: write_module.data.bytecode.to_string(),
                     special_fields: Default::default(),
                 },
@@ -226,7 +232,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             change: Some(extractor::write_set_change::Change::WriteResource(
                 extractor::WriteResource {
                     address: write_resource.address.to_string(),
-                    state_key_hash: write_resource.state_key_hash.to_string(),
+                    state_key_hash: convert_hex_string_to_bytes(&write_resource.state_key_hash),
                     data: protobuf::MessageField::some(extractor::MoveResource {
                         type_: protobuf::MessageField::some(extractor::MoveStructTag {
                             address: write_resource.data.typ.address.to_string(),
@@ -255,7 +261,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             ),
             change: Some(extractor::write_set_change::Change::WriteTableItem(
                 extractor::WriteTableItem {
-                    state_key_hash: write_table_item.state_key_hash.to_string(),
+                    state_key_hash: convert_hex_string_to_bytes(&write_table_item.state_key_hash),
                     handle: write_table_item.handle.to_string(),
                     key: write_table_item.key.to_string(),
                     value: write_table_item.value.to_string(),
@@ -298,15 +304,35 @@ pub fn convert_event(event: &Event) -> extractor::Event {
     }
 }
 
+pub fn convert_timestamp_secs(
+    timestamp: u64,
+) -> protobuf::MessageField<protobuf::well_known_types::timestamp::Timestamp> {
+    protobuf::MessageField::some(protobuf::well_known_types::timestamp::Timestamp {
+        seconds: timestamp as i64,
+        nanos: 0,
+        special_fields: Default::default(),
+    })
+}
+
+pub fn convert_timestamp_nanos(
+    timestamp: u64,
+) -> protobuf::MessageField<protobuf::well_known_types::timestamp::Timestamp> {
+    protobuf::MessageField::some(protobuf::well_known_types::timestamp::Timestamp {
+        seconds: timestamp as i64 / 1000000,
+        nanos: (timestamp % 1000000) as i32,
+        special_fields: Default::default(),
+    })
+}
+
 pub fn convert_transaction_info(transaction_info: &TransactionInfo) -> extractor::TransactionInfo {
     extractor::TransactionInfo {
-        hash: transaction_info.hash.to_string(),
-        state_root_hash: transaction_info.state_root_hash.to_string(),
-        event_root_hash: transaction_info.event_root_hash.to_string(),
+        hash: transaction_info.hash.0.to_vec(),
+        state_root_hash: transaction_info.state_root_hash.0.to_vec(),
+        event_root_hash: transaction_info.event_root_hash.0.to_vec(),
         gas_used: transaction_info.gas_used.0,
         success: transaction_info.success,
         vm_status: transaction_info.vm_status.to_string(),
-        accumulator_root_hash: transaction_info.accumulator_root_hash.to_string(),
+        accumulator_root_hash: transaction_info.accumulator_root_hash.0.to_vec(),
         changes: convert_write_set_changes(&transaction_info.changes),
         special_fields: Default::default(),
     }
@@ -317,6 +343,10 @@ pub fn convert_transaction(
     block_height: u64,
     current_epoch: u64,
 ) -> extractor::Transaction {
+    let mut timestamp: Option<
+        protobuf::MessageField<protobuf::well_known_types::timestamp::Timestamp>,
+    > = None;
+
     let txn_type = match transaction {
         Transaction::UserTransaction(_) => extractor::transaction::TransactionType::USER,
         Transaction::GenesisTransaction(_) => extractor::transaction::TransactionType::GENESIS,
@@ -331,13 +361,16 @@ pub fn convert_transaction(
 
     let txn_data = match &transaction {
         Transaction::UserTransaction(ut) => {
-            extractor::transaction::Txn_data::UserTxn(extractor::UserTransaction {
+            timestamp = Some(convert_timestamp_nanos(ut.timestamp.0));
+            extractor::transaction::Txn_data::User(extractor::UserTransaction {
                 request: protobuf::MessageField::some(extractor::UserTransactionRequest {
                     sender: ut.request.sender.to_string(),
                     sequence_number: ut.request.sequence_number.0,
                     max_gas_amount: ut.request.max_gas_amount.0,
                     gas_unit_price: ut.request.gas_unit_price.0,
-                    expiration_timestamp_secs: ut.request.expiration_timestamp_secs.0,
+                    expiration_timestamp_secs: convert_timestamp_secs(
+                        ut.request.expiration_timestamp_secs.0,
+                    ),
                     payload: protobuf::MessageField::some(convert_transaction_payload(
                         &ut.request.payload,
                     )),
@@ -352,27 +385,26 @@ pub fn convert_transaction(
             let payload = match &gt.payload {
                 GenesisPayload::WriteSetPayload(wsp) => convert_write_set(&wsp.write_set),
             };
-            extractor::transaction::Txn_data::GenesisTxn(extractor::GenesisTransaction {
+            extractor::transaction::Txn_data::Genesis(extractor::GenesisTransaction {
                 payload,
                 events: convert_events(&gt.events),
                 special_fields: Default::default(),
             })
         }
         Transaction::BlockMetadataTransaction(bm) => {
-            extractor::transaction::Txn_data::BlockMetadataTxn(
-                extractor::BlockMetadataTransaction {
-                    id: bm.id.to_string(),
-                    events: convert_events(&bm.events),
-                    previous_block_votes: bm.previous_block_votes.clone(),
-                    proposer: bm.proposer.to_string(),
-                    failed_proposer_indices: bm.failed_proposer_indices.clone(),
-                    round: bm.round.0,
-                    special_fields: Default::default(),
-                },
-            )
+            timestamp = Some(convert_timestamp_nanos(bm.timestamp.0));
+            extractor::transaction::Txn_data::BlockMetadata(extractor::BlockMetadataTransaction {
+                id: bm.id.to_string(),
+                events: convert_events(&bm.events),
+                previous_block_votes: bm.previous_block_votes.clone(),
+                proposer: bm.proposer.to_string(),
+                failed_proposer_indices: bm.failed_proposer_indices.clone(),
+                round: bm.round.0,
+                special_fields: Default::default(),
+            })
         }
         Transaction::StateCheckpointTransaction(_st) => {
-            extractor::transaction::Txn_data::StateCheckpointTxn(
+            extractor::transaction::Txn_data::StateCheckpoint(
                 extractor::StateCheckpointTransaction {
                     special_fields: Default::default(),
                 },
@@ -382,7 +414,7 @@ pub fn convert_transaction(
     };
 
     extractor::Transaction {
-        timestamp: transaction.timestamp(),
+        timestamp: timestamp.unwrap_or_else(|| convert_timestamp_secs(transaction.timestamp())),
         version: transaction.version().unwrap(),
         info: protobuf::MessageField::some(convert_transaction_info(
             transaction.transaction_info().unwrap(),

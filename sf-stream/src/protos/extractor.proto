@@ -3,8 +3,10 @@
 
 syntax = "proto3";
 
+import "google/protobuf/timestamp.proto";
+
 message Transaction {
-  uint64 timestamp = 1;
+  google.protobuf.Timestamp timestamp = 1;
   uint64 version = 2;
   TransactionInfo info = 3;
   uint64 epoch = 4;
@@ -20,10 +22,10 @@ message Transaction {
   TransactionType type = 6;
 
   oneof txn_data {
-    BlockMetadataTransaction block_metadata_txn = 7;
-    GenesisTransaction genesis_txn = 8;
-    StateCheckpointTransaction state_checkpoint_txn = 9;
-    UserTransaction user_txn = 10;
+    BlockMetadataTransaction block_metadata = 7;
+    GenesisTransaction genesis = 8;
+    StateCheckpointTransaction state_checkpoint = 9;
+    UserTransaction user = 10;
   }
 
 }
@@ -58,13 +60,13 @@ message Event {
 }
 
 message TransactionInfo {
-  string hash = 1;
-  string state_root_hash = 2;
-  string event_root_hash = 3;
+  bytes hash = 1;
+  bytes state_root_hash = 2;
+  bytes event_root_hash = 3;
   uint64 gas_used = 4;
   bool success = 5;
   string vm_status = 6;
-  string accumulator_root_hash = 7;
+  bytes accumulator_root_hash = 7;
   repeated WriteSetChange changes = 8;
 }
 
@@ -78,7 +80,7 @@ message UserTransactionRequest {
   uint64 sequence_number = 2;
   uint64 max_gas_amount = 3;
   uint64 gas_unit_price = 4;
-  uint64 expiration_timestamp_secs = 5;
+  google.protobuf.Timestamp expiration_timestamp_secs = 5;
   TransactionPayload payload = 6;
   Signature signature = 7;
 }
@@ -131,36 +133,36 @@ message WriteSetChange {
 
 message DeleteModule {
   string address = 1;
-  string state_key_hash = 2;
+  bytes state_key_hash = 2;
   MoveModuleId module = 3;
 }
 
 message DeleteResource {
   string address = 1;
-  string state_key_hash = 2;
+  bytes state_key_hash = 2;
   MoveStructTag resource = 3;
 }
 
 message DeleteTableItem {
-  string state_key_hash = 1;
+  bytes state_key_hash = 1;
   string handle = 2;
   string key = 3;
 }
 
 message WriteModule {
   string address = 1;
-  string state_key_hash = 2;
+  bytes state_key_hash = 2;
   string data = 3;
 }
 
 message WriteResource {
   string address = 1;
-  string state_key_hash = 2;
+  bytes state_key_hash = 2;
   MoveResource data = 3;
 }
 
 message WriteTableItem {
-  string state_key_hash = 1;
+  bytes state_key_hash = 1;
   string handle = 2;
   string key = 3;
   string value = 4;
