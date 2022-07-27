@@ -17,6 +17,9 @@ spec:
     - |
       ulimit -n 1048576
       forge --suite {FORGE_TEST_SUITE} test k8s-swarm --image-tag {IMAGE_TAG} --namespace {FORGE_NAMESPACE} {REUSE_ARGS} {KEEP_ARGS} {ENABLE_HAPROXY_ARGS}
+    env:
+    - name: FORGE_TRIGGERED_BY
+      value: {FORGE_TRIGGERED_BY}
   affinity:
     # avoid scheduling with other forge or validator/fullnode pods
     podAntiAffinity:
