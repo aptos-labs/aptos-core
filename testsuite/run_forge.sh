@@ -49,7 +49,6 @@ FORGE_TEST_SUITE=${FORGE_TEST_SUITE:-land_blocking}
 [ "$FORGE_NAMESPACE_KEEP" = "true" ] && KEEP_ARGS="--keep"
 [ "$FORGE_ENABLE_HAPROXY" = "true" ] && ENABLE_HAPROXY_ARGS="--enable-haproxy"
 
-
 # Set variables for o11y resource locations depending on the type of cluster that is running Forge
 set_o11y_resources() {
     if echo $FORGE_CLUSTER_NAME | grep "forge"; then
@@ -95,12 +94,12 @@ set_image_tag() {
 get_validator_logs_link() {
     # build the logs link in a readable way...
     # filter by:
-    #   * chain_name: name of the Forge cluster "chain"
+    #   * chain_name: name of the Forge cluster/chain
     #   * namespace: kubernetes namespace the Forge test was executed in
     #   * hostname: name of a kubernetes pod e.g. validator name
     if [ -n "$ENABLE_LOG_AUTO_REFRESH" ]; then
         ES_TIME_FILTER="refreshInterval:(pause:!f,value:10000),time:(from:now-15m,to:now)"
-    else 
+    else
         ES_TIME_FILTER="refreshInterval:(pause:!t,value:0),time:(from:'${ES_START_TIME}',to:'${ES_END_TIME}')"
     fi
     VAL0_HOSTNAME="aptos-node-0-validator-0"
@@ -122,7 +121,7 @@ get_dashboard_link() {
     fi
     if [ -n "$ENABLE_DASHBOARD_AUTO_REFRESH" ]; then
         GRAFANA_TIME_FILTER="&refresh=10s&from=now-15m&to=now"
-    else 
+    else
         GRAFANA_TIME_FILTER="&from=${FORGE_START_TIME_MS}&to=${FORGE_END_TIME_MS}"
     fi
     FORGE_DASHBOARD_LINK="${GRAFANA_BASE_URL}&var-namespace=${FORGE_NAMESPACE}&var-chain_name=${FORGE_CHAIN_NAME}${GRAFANA_TIME_FILTER}"
