@@ -10,6 +10,7 @@ use std::{convert::TryInto, num::NonZeroUsize};
 pub mod chaos;
 mod cluster_helper;
 pub mod node;
+pub mod prometheus;
 mod swarm;
 
 pub use cluster_helper::*;
