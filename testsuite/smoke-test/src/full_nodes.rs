@@ -156,8 +156,8 @@ async fn test_vfn_failover() {
     }
 
     // Setup accounts
-    let mut account_0 = create_and_fund_account(&mut swarm, 100).await;
-    let account_1 = create_and_fund_account(&mut swarm, 100).await;
+    let mut account_0 = create_and_fund_account(&mut swarm, 10).await;
+    let account_1 = create_and_fund_account(&mut swarm, 10).await;
 
     swarm
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(10))
@@ -170,7 +170,7 @@ async fn test_vfn_failover() {
     // submit client requests directly to VFN of dead V
     swarm.validator_mut(validator).unwrap().stop();
 
-    transfer_coins(
+    let txn = transfer_coins_non_blocking(
         &vfn_client,
         &transaction_factory,
         &mut account_0,
@@ -179,25 +179,27 @@ async fn test_vfn_failover() {
     )
     .await;
 
-    for _ in 0..8 {
-        transfer_coins_non_blocking(
-            &vfn_client,
-            &transaction_factory,
-            &mut account_0,
-            &account_1,
-            1,
-        )
-        .await;
-    }
+    let running_validator_client = swarm
+        .validator(validator_peer_ids[0])
+        .unwrap()
+        .rest_client();
 
-    transfer_coins(
-        &vfn_client,
-        &transaction_factory,
-        &mut account_0,
-        &account_1,
-        1,
-    )
-    .await;
+    assert_balance(&running_validator_client, &account_0, 10).await;
+    assert_balance(&running_validator_client, &account_1, 10).await;
+
+    // revive dead V
+    swarm.validator_mut(validator).unwrap().start().unwrap();
+    swarm
+        .validator_mut(validator)
+        .unwrap()
+        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .await
+        .unwrap();
+
+    vfn_client.wait_for_signed_transaction(&txn).await.unwrap();
+
+    assert_balance(&vfn_client, &account_0, 9).await;
+    assert_balance(&vfn_client, &account_1, 11).await;
 }
 
 #[tokio::test]

@@ -303,6 +303,7 @@ impl FullnodeNodeConfig {
             .expect("VFN should have a public network");
         fullnode_public_network.identity = public_network.identity;
         fullnode_public_network.listen_address = public_network.listen_address;
+        fullnode_public_network.max_outbound_connections = 0;
 
         // Grab the validator's vfn network information and configure it as a seed for the VFN's
         // vfn network
