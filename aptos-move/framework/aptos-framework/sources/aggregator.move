@@ -1,15 +1,11 @@
+/// This module provides an API for aggregatable integers that allow addition,
+/// subtraction, and reading.
 module aptos_framework::aggregator {
 
     /// When aggregator's value (actual or accumulated) overflows (raised by
     /// native code).
     const EAGGREGATOR_OVERFLOW: u64 = 1600;
 
-    /// When aggregator's actual value goes below zero (raised by native code).
-    const EAGGREGATOR_UNDERFLOW: u64 = 1601;
-
-    /// Aggregator struct that can be uniquely identified by a key, internally
-    /// stores an opaque value, initialized to 0, and overflowing on exceeding
-    /// `limit`. `table_handle` identifies the parent `AggregatorTable`.
     struct Aggregator has store {
         table_handle: u128,
         key: u128,
