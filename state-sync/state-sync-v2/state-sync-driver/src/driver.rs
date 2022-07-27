@@ -470,6 +470,7 @@ impl<
         // so that in the event another sync request occurs, we have a fresh state.
         if !self.active_sync_request() {
             self.continuous_syncer.reset_active_stream();
+            self.storage_synchronizer.finish_chunk_executor(); // Consensus is now in control
         }
         Ok(())
     }

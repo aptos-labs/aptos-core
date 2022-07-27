@@ -13,7 +13,7 @@
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
 
 # for calculating regression
-TPS_THRESHOLD=5000
+TPS_THRESHOLD=3500
 P99_LATENCY_MS_THRESHOLD=6000
 
 FORGE_OUTPUT=${FORGE_OUTPUT:-forge_output.txt}
