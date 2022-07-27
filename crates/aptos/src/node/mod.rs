@@ -51,6 +51,7 @@ pub enum NodeTool {
     ShowValidatorSet(ShowValidatorSet),
     ShowValidatorStake(ShowValidatorStake),
     RunLocalTestnet(RunLocalTestnet),
+    UpdateValidatorNetworkAddresses(UpdateValidatorNetworkAddresses),
 }
 
 impl NodeTool {
@@ -68,6 +69,7 @@ impl NodeTool {
             ShowValidatorStake(tool) => tool.execute_serialized().await,
             ShowValidatorConfig(tool) => tool.execute_serialized().await,
             RunLocalTestnet(tool) => tool.execute_serialized_without_logger().await,
+            UpdateValidatorNetworkAddresses(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -361,7 +363,13 @@ impl CliCommand<Transaction> for RegisterValidatorCandidate {
         let full_node_network_addresses =
             match (full_node_host.as_ref(), full_node_network_public_key) {
                 (Some(host), Some(public_key)) => vec![host.as_network_address(public_key)?],
-                _ => vec![],
+                (None, None) => vec![],
+                _ => {
+                    return Err(CliError::CommandArgumentError(
+                        "If specifying fullnode addresses, both host and public key are required."
+                            .to_string(),
+                    ))
+                }
             };
 
         self.txn_options
@@ -691,5 +699,69 @@ impl CliCommand<()> for RunLocalTestnet {
             std::thread::park();
         }
         Ok(())
+    }
+}
+
+/// Update the current validator's network and fullnode addresses
+#[derive(Parser)]
+pub struct UpdateValidatorNetworkAddresses {
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+
+    #[clap(flatten)]
+    pub(crate) operator_args: OperatorArgs,
+
+    #[clap(flatten)]
+    pub(crate) validator_config_args: ValidatorConfigArgs,
+}
+
+#[async_trait]
+impl CliCommand<Transaction> for UpdateValidatorNetworkAddresses {
+    fn command_name(&self) -> &'static str {
+        "UpdateValidatorNetworkAddresses"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<Transaction> {
+        let address = self
+            .operator_args
+            .address(&self.txn_options.profile_options)?;
+
+        let validator_config = self.validator_config_args.read_validator_config()?;
+        let (
+            validator_network_public_key,
+            full_node_network_public_key,
+            validator_host,
+            full_node_host,
+        ) = self
+            .validator_config_args
+            .get_network_configs(&validator_config)?;
+        let validator_network_addresses =
+            vec![validator_host.as_network_address(validator_network_public_key)?];
+        let full_node_network_addresses =
+            match (full_node_host.as_ref(), full_node_network_public_key) {
+                (Some(host), Some(public_key)) => vec![host.as_network_address(public_key)?],
+                (None, None) => vec![],
+                _ => {
+                    return Err(CliError::CommandArgumentError(
+                        "If specifying fullnode addresses, both host and public key are required."
+                            .to_string(),
+                    ))
+                }
+            };
+
+        self.txn_options
+            .submit_script_function(
+                AccountAddress::ONE,
+                "stake",
+                "update_network_and_fullnode_addresses",
+                vec![],
+                vec![
+                    bcs::to_bytes(&address)?,
+                    // Double BCS encode, so that we can hide the original type
+                    bcs::to_bytes(&bcs::to_bytes(&validator_network_addresses)?)?,
+                    bcs::to_bytes(&bcs::to_bytes(&full_node_network_addresses)?)?,
+                ],
+            )
+            .await
     }
 }

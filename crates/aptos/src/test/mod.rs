@@ -3,7 +3,9 @@
 
 use crate::common::types::FaucetOptions;
 use crate::node::{
-    OperatorArgs, RegisterValidatorCandidate, ShowValidatorConfig, ValidatorConfigArgs,
+    AddStake, IncreaseLockup, JoinValidatorSet, LeaveValidatorSet, OperatorArgs,
+    RegisterValidatorCandidate, ShowValidatorConfig, ShowValidatorSet, ShowValidatorStake,
+    UnlockStake, UpdateValidatorNetworkAddresses, ValidatorConfigArgs, WithdrawStake,
 };
 use crate::{
     account::{
@@ -27,6 +29,8 @@ use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_rest_client::Transaction;
 use aptos_sdk::move_types::account_address::AccountAddress;
+use aptos_types::validator_info::ValidatorInfo;
+use aptos_types::{on_chain_config::ConsensusScheme, validator_config::ValidatorConfig};
 use reqwest::Url;
 use serde_json::Value;
 use std::{str::FromStr, time::Duration};
@@ -133,8 +137,29 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn show_validator_config(&self, index: usize) -> CliTypedResult<serde_json::Value> {
+    pub async fn show_validator_config(&self, index: usize) -> CliTypedResult<ValidatorConfig> {
         ShowValidatorConfig {
+            rest_options: self.rest_options(),
+            profile_options: profile(index),
+            operator_args: OperatorArgs { pool_address: None },
+        }
+        .execute()
+        .await
+        .map(|v| to_validator_config(&v))
+    }
+
+    pub async fn show_validator_set(&self, index: usize) -> CliTypedResult<ValidatorSet> {
+        ShowValidatorSet {
+            rest_options: self.rest_options(),
+            profile_options: profile(index),
+        }
+        .execute()
+        .await
+        .map(|v| to_validator_set(&v))
+    }
+
+    pub async fn show_validator_stake(&self, index: usize) -> CliTypedResult<Value> {
+        ShowValidatorStake {
             rest_options: self.rest_options(),
             profile_options: profile(index),
             operator_args: OperatorArgs { pool_address: None },
@@ -157,6 +182,86 @@ impl CliTestFramework {
                 validator_config_file: None,
                 consensus_public_key: Some(consensus_public_key),
                 proof_of_possession: Some(proof_of_possession),
+                validator_host: Some(validator_host),
+                validator_network_public_key: Some(validator_network_public_key),
+                full_node_host: None,
+                full_node_network_public_key: None,
+            },
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn add_stake(&self, index: usize, amount: u64) -> CliTypedResult<Transaction> {
+        AddStake {
+            txn_options: self.transaction_options(index),
+            amount,
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn unlock_stake(&self, index: usize, amount: u64) -> CliTypedResult<Transaction> {
+        UnlockStake {
+            txn_options: self.transaction_options(index),
+            amount,
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn withdraw_stake(&self, index: usize) -> CliTypedResult<Transaction> {
+        WithdrawStake {
+            node_op_options: self.transaction_options(index),
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn increase_lockup(
+        &self,
+        index: usize,
+        lockup_duration: Duration,
+    ) -> CliTypedResult<Transaction> {
+        IncreaseLockup {
+            txn_options: self.transaction_options(index),
+            lockup_duration,
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn join_validator_set(&self, index: usize) -> CliTypedResult<Transaction> {
+        JoinValidatorSet {
+            txn_options: self.transaction_options(index),
+            operator_args: OperatorArgs { pool_address: None },
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn leave_validator_set(&self, index: usize) -> CliTypedResult<Transaction> {
+        LeaveValidatorSet {
+            txn_options: self.transaction_options(index),
+            operator_args: OperatorArgs { pool_address: None },
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn update_validator_network_addresses(
+        &self,
+        index: usize,
+        validator_host: HostAndPort,
+        validator_network_public_key: x25519::PublicKey,
+    ) -> CliTypedResult<Transaction> {
+        UpdateValidatorNetworkAddresses {
+            txn_options: self.transaction_options(index),
+            operator_args: OperatorArgs { pool_address: None },
+            validator_config_args: ValidatorConfigArgs {
+                validator_config_file: None,
+                consensus_public_key: None,
+                proof_of_possession: None,
                 validator_host: Some(validator_host),
                 validator_network_public_key: Some(validator_network_public_key),
                 full_node_host: None,
@@ -275,4 +380,65 @@ fn profile(index: usize) -> ProfileOptions {
 fn private_key_options(private_key: &Ed25519PrivateKey) -> PrivateKeyInputOptions {
     PrivateKeyInputOptions::from_private_key(private_key)
         .expect("Must serialize private key to hex")
+}
+
+// ValidatorConfig/ValidatorSet doesn't match Move ValidatorSet struct,
+// and json is serialized with different types from both, so hardcoding deserialization.
+
+fn str_to_vec(value: &serde_json::Value) -> Vec<u8> {
+    let str = value.as_str().unwrap();
+    (&*hex::decode(&str[2..str.len()]).unwrap()).to_vec()
+}
+
+fn to_validator_config(value: &serde_json::Value) -> ValidatorConfig {
+    ValidatorConfig {
+        consensus_public_key: serde_json::from_value(
+            value.get("consensus_pubkey").unwrap().clone(),
+        )
+        .unwrap(),
+        validator_network_addresses: str_to_vec(value.get("network_addresses").unwrap()),
+        fullnode_network_addresses: str_to_vec(value.get("fullnode_addresses").unwrap()),
+        validator_index: u64::from_str(value.get("validator_index").unwrap().as_str().unwrap())
+            .unwrap(),
+    }
+}
+
+fn to_validator_info_vec(value: &serde_json::Value) -> Vec<ValidatorInfo> {
+    value
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|value| {
+            let account_addr =
+                AccountAddress::from_hex_literal(value.get("addr").unwrap().as_str().unwrap())
+                    .unwrap();
+            ValidatorInfo::new(
+                account_addr,
+                u64::from_str(value.get("voting_power").unwrap().as_str().unwrap()).unwrap(),
+                to_validator_config(value.get("config").unwrap()),
+            )
+        })
+        .collect()
+}
+
+// Original ValidatorSet has private fields, to make sure invariants are kept,
+// so creating a new one for testing
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ValidatorSet {
+    pub consensus_scheme: ConsensusScheme,
+    pub active_validators: Vec<ValidatorInfo>,
+    pub pending_inactive: Vec<ValidatorInfo>,
+    pub pending_active: Vec<ValidatorInfo>,
+}
+
+fn to_validator_set(value: &serde_json::Value) -> ValidatorSet {
+    ValidatorSet {
+        consensus_scheme: match value.get("consensus_scheme").unwrap().as_u64().unwrap() {
+            0u64 => ConsensusScheme::Ed25519,
+            _ => panic!(),
+        },
+        active_validators: to_validator_info_vec(value.get("active_validators").unwrap()),
+        pending_inactive: to_validator_info_vec(value.get("pending_inactive").unwrap()),
+        pending_active: to_validator_info_vec(value.get("pending_active").unwrap()),
+    }
 }

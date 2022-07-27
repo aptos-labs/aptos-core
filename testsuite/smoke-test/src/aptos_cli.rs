@@ -2,17 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use crate::test_utils::reconfig;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_config::{keys::ConfigKey, utils::get_available_port};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_crypto::{bls12381, ValidCryptoMaterialStringExt};
+use aptos_crypto::{bls12381, x25519};
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_types::{
     account_config::aptos_root_address, chain_id::ChainId, network_address::DnsName,
 };
-use forge::{LocalSwarm, Node};
+use forge::{LocalSwarm, Node, NodeExt, Swarm};
 use std::convert::TryFrom;
 use std::path::PathBuf;
 use tokio::task::JoinHandle;
@@ -104,33 +105,54 @@ async fn test_account_flow() {
 }
 
 #[tokio::test]
-async fn test_register_and_update_validator() {
-    let (_swarm, cli, _faucet) = setup_cli_test(1, 0).await;
-    let mut keygen = KeyGen::from_os_rng();
-    let private_key = keygen.generate_ed25519_private_key();
-    let network_private_key = keygen.generate_x25519_private_key().unwrap();
-    let consensus_private_key = keygen.generate_bls12381_private_key();
-    let consensus_public_key = bls12381::PublicKey::from(&consensus_private_key);
-    let validator_cli_index = 0;
-    cli.init(validator_cli_index, &private_key).await.unwrap();
-    assert_eq!(
-        DEFAULT_FUNDED_COINS,
-        cli.account_balance(validator_cli_index).await.unwrap()
-    );
+async fn test_show_validator_set() {
+    let (swarm, cli, _faucet) = setup_cli_test(1, 1).await;
+    let validator_set = cli.show_validator_set(0).await.unwrap();
 
-    let validator_config = cli.show_validator_config(validator_cli_index).await;
-    assert!(validator_config.is_err()); // validator not registered
+    assert_eq!(1, validator_set.active_validators.len());
+    assert_eq!(0, validator_set.pending_inactive.len());
+    assert_eq!(0, validator_set.pending_active.len());
+    assert_eq!(
+        validator_set
+            .active_validators
+            .first()
+            .unwrap()
+            .account_address(),
+        &swarm.validators().next().unwrap().peer_id()
+    );
+}
+
+#[tokio::test]
+async fn test_register_and_update_validator() {
+    let (mut swarm, cli, _faucet) = setup_cli_test(1, 0).await;
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    let rest_client = swarm.validators().next().unwrap().rest_client();
+
+    let mut keygen = KeyGen::from_os_rng();
+    let validator_cli_index = 0;
+    let keys = init_validator_account(&cli, &mut keygen, validator_cli_index).await;
+    // faucet can make our root LocalAccount sequence number get out of sync.
+    swarm
+        .chain_info()
+        .resync_root_account_seq_num(&rest_client)
+        .await
+        .unwrap();
+
+    assert!(cli
+        .show_validator_config(validator_cli_index)
+        .await
+        .is_err()); // validator not registered yet
 
     let port = 1234;
     cli.register_validator_candidate(
         validator_cli_index,
-        bls12381::PublicKey::from(&consensus_private_key),
-        bls12381::ProofOfPossession::create(&consensus_private_key),
+        keys.consensus_public_key(),
+        keys.consensus_proof_of_possession(),
         HostAndPort {
-            host: DnsName::try_from("0.0.0.0".to_string()).unwrap(),
+            host: dns_name("0.0.0.0"),
             port,
         },
-        network_private_key.public_key(),
+        keys.network_public_key(),
     )
     .await
     .unwrap();
@@ -140,16 +162,98 @@ async fn test_register_and_update_validator() {
         .await
         .unwrap();
     assert_eq!(
-        bls12381::PublicKey::from_encoded_string(
-            validator_config
-                .as_object()
-                .unwrap()
-                .get("consensus_pubkey")
-                .unwrap()
-                .as_str()
-                .unwrap()
-        )
-        .unwrap(),
-        consensus_public_key
+        validator_config.consensus_public_key,
+        keys.consensus_public_key()
     );
+
+    let new_port = 5678;
+    let new_network_private_key = keygen.generate_x25519_private_key().unwrap();
+
+    cli.update_validator_network_addresses(
+        validator_cli_index,
+        HostAndPort {
+            host: dns_name("0.0.0.0"),
+            port: new_port,
+        },
+        new_network_private_key.public_key(),
+    )
+    .await
+    .unwrap();
+
+    let validator_config = cli
+        .show_validator_config(validator_cli_index)
+        .await
+        .unwrap();
+
+    let address_new = validator_config
+        .validator_network_addresses()
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap();
+    assert_eq!(
+        address_new.find_noise_proto().unwrap(),
+        new_network_private_key.public_key()
+    );
+    assert_eq!(address_new.find_port().unwrap(), new_port);
+
+    reconfig(
+        &rest_client,
+        &transaction_factory,
+        swarm.chain_info().root_account(),
+    )
+    .await;
+
+    // because we haven't joined the validator set yet, we shouldn't be there
+    let validator_set = cli.show_validator_set(validator_cli_index).await.unwrap();
+    assert_eq!(1, validator_set.active_validators.len());
+    assert_eq!(0, validator_set.pending_inactive.len());
+    assert_eq!(0, validator_set.pending_active.len());
+}
+
+fn dns_name(addr: &str) -> DnsName {
+    DnsName::try_from(addr.to_string()).unwrap()
+}
+
+struct ValidatorNodeKeys {
+    account_private_key: Ed25519PrivateKey,
+    network_private_key: x25519::PrivateKey,
+    consensus_private_key: bls12381::PrivateKey,
+}
+
+impl ValidatorNodeKeys {
+    pub fn network_public_key(&self) -> x25519::PublicKey {
+        self.network_private_key.public_key()
+    }
+
+    pub fn consensus_public_key(&self) -> bls12381::PublicKey {
+        bls12381::PublicKey::from(&self.consensus_private_key)
+    }
+
+    pub fn consensus_proof_of_possession(&self) -> bls12381::ProofOfPossession {
+        bls12381::ProofOfPossession::create(&self.consensus_private_key)
+    }
+}
+
+async fn init_validator_account(
+    cli: &CliTestFramework,
+    keygen: &mut KeyGen,
+    validator_cli_index: usize,
+) -> ValidatorNodeKeys {
+    let validator_node_keys = ValidatorNodeKeys {
+        account_private_key: keygen.generate_ed25519_private_key(),
+        network_private_key: keygen.generate_x25519_private_key().unwrap(),
+        consensus_private_key: keygen.generate_bls12381_private_key(),
+    };
+    cli.init(
+        validator_cli_index,
+        &validator_node_keys.account_private_key,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        DEFAULT_FUNDED_COINS,
+        cli.account_balance(validator_cli_index).await.unwrap()
+    );
+    validator_node_keys
 }
