@@ -133,11 +133,20 @@ impl Events {
     }
 
     pub fn list(self, page: Page, accept_type: AcceptType) -> Result<impl Reply, Error> {
+        let ledger_version = self.ledger_info.version();
+        let limit = page.limit()?;
+        let last_page_start = if ledger_version > (limit as u64) {
+            ledger_version - (limit as u64)
+        } else {
+            0
+        };
+        let start_version = page.start(last_page_start, ledger_version)?;
+        
         let contract_events = self.context.get_events(
             &self.key,
-            page.start(0, u64::MAX)?,
-            page.limit()?,
-            self.ledger_info.version(),
+            start_version,
+            limit,
+            ledger_version
         )?;
 
         match accept_type {
