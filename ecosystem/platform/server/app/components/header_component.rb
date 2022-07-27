@@ -9,16 +9,18 @@ class HeaderComponent < ViewComponent::Base
 
   NAV_GROUPS = [
     NavGroup.new(
-      NavItem.new('/community', 'Community', 'Aptos Community'),
+      NavItem.new('#', 'Community', 'Aptos Community'),
       [
+        NavItem.new('/community', 'Aptos Community', 'Aptos Community'),
         NavItem.new('/it1', 'AIT1', 'Incentivized Testnet 1 Results'),
         NavItem.new('/it2', 'AIT2', 'Incentivized Testnet 2'),
         NavItem.new('https://forum.aptoslabs.com/', 'Forum', 'Aptos Forum')
       ]
     ),
     NavGroup.new(
-      NavItem.new('/developers', 'Developers', 'Aptos Developers'),
+      NavItem.new('#', 'Developers', 'Aptos Developers'),
       [
+        NavItem.new('/developers', 'Developer Resources', 'Aptos Developers'),
         NavItem.new('https://aptos.dev/', 'Documentation', 'Aptos Documentation')
       ]
     ),
