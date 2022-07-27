@@ -14,8 +14,7 @@ use aptos_vm::AptosVM;
 use fail::fail_point;
 use std::sync::Arc;
 use storage_interface::{
-    state_view::{DbStateView, LatestDbStateCheckpointView},
-    DbReader,
+    cached_state_view::CachedDbStateView, state_view::LatestDbStateCheckpointView, DbReader,
 };
 
 #[cfg(test)]
@@ -37,7 +36,7 @@ pub trait TransactionValidation: Send + Sync + Clone {
 
 pub struct VMValidator {
     db_reader: Arc<dyn DbReader>,
-    db_state_view: DbStateView,
+    state_view: CachedDbStateView,
     vm: AptosVM,
 }
 
@@ -56,7 +55,7 @@ impl VMValidator {
         let vm = AptosVM::new_for_validation(&db_state_view);
         VMValidator {
             db_reader,
-            db_state_view,
+            state_view: db_state_view.into(),
             vm,
         }
     }
@@ -73,21 +72,22 @@ impl TransactionValidation for VMValidator {
         });
         use aptos_vm::VMValidator;
 
-        Ok(self.vm.validate_transaction(txn, &self.db_state_view))
+        Ok(self.vm.validate_transaction(txn, &self.state_view))
     }
 
     fn restart(&mut self, _config: OnChainConfigPayload) -> Result<()> {
         self.notify_commit();
 
-        self.vm = AptosVM::new_for_validation(&self.db_state_view);
+        self.vm = AptosVM::new_for_validation(&self.state_view);
         Ok(())
     }
 
     fn notify_commit(&mut self) {
-        self.db_state_view = self
+        self.state_view = self
             .db_reader
             .latest_state_checkpoint_view()
-            .expect("Get db view cannot fail");
+            .expect("Get db view cannot fail")
+            .into();
     }
 }
 
