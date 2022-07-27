@@ -68,28 +68,34 @@ pub fn deserialize(value_bytes: &[u8]) -> u128 {
     bcs::from_bytes(value_bytes).expect("unexpected deserialization error")
 }
 
-/// `DeltaSet` contains all access paths that one transaction wants to update with deltas.
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-pub struct DeltaSet {
-    delta_set: Vec<(StateKey, DeltaOp)>,
+/// `DeltaChangeSet` contains all access paths that one transaction wants to update with deltas.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct DeltaChangeSet {
+    delta_change_set: Vec<(StateKey, DeltaOp)>,
 }
 
-impl DeltaSet {
-    pub fn new(delta_set: Vec<(StateKey, DeltaOp)>) -> Self {
-        DeltaSet { delta_set }
+impl DeltaChangeSet {
+    pub fn empty() -> Self {
+        DeltaChangeSet {
+            delta_change_set: vec![],
+        }
+    }
+
+    pub fn new(delta_change_set: Vec<(StateKey, DeltaOp)>) -> Self {
+        DeltaChangeSet { delta_change_set }
     }
 
     pub fn push(&mut self, delta: (StateKey, DeltaOp)) {
-        self.delta_set.push(delta);
+        self.delta_change_set.push(delta);
     }
 
     pub fn pop(&mut self) {
-        self.delta_set.pop();
+        self.delta_change_set.pop();
     }
 
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.delta_set.is_empty()
+        self.delta_change_set.is_empty()
     }
 }
 

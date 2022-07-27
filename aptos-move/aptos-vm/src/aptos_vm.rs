@@ -1234,15 +1234,14 @@ impl AptosSimulationVM {
                 if txn_status.is_discarded() {
                     discard_error_vm_status(err)
                 } else {
-                    let (vm_status, empty_output) =
-                        self.0.failed_transaction_cleanup_and_keep_vm_status(
-                            err,
-                            &mut gas_status,
-                            &txn_data,
-                            storage,
-                            log_context,
-                        );
-                    (vm_status, empty_output.into_transaction_output())
+                    let (vm_status, output) = self.0.failed_transaction_cleanup_and_keep_vm_status(
+                        err,
+                        &mut gas_status,
+                        &txn_data,
+                        storage,
+                        log_context,
+                    );
+                    (vm_status, output.into_transaction_output())
                 }
             }
         }

@@ -573,13 +573,13 @@ pub(crate) fn get_transaction_output_ext<A: AccessPathCache, S: MoveResolverExt>
     let gas_used: u64 = txn_data.max_gas_amount().sub(gas_left).get();
 
     let session_out = session.finish().map_err(|e| e.into_vm_status())?;
-    let (delta_set, change_set) = session_out.into_change_set_ext(ap_cache)?.into_inner();
+    let (delta_change_set, change_set) = session_out.into_change_set_ext(ap_cache)?.into_inner();
     let (write_set, events) = change_set.into_inner();
 
     let txn_output =
         TransactionOutput::new(write_set, events, gas_used, TransactionStatus::Keep(status));
 
-    Ok(TransactionOutputExt::new(delta_set, txn_output))
+    Ok(TransactionOutputExt::new(delta_change_set, txn_output))
 }
 
 pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(

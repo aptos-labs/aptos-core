@@ -6,7 +6,7 @@ use crate::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
-    delta_set::DeltaSet,
+    delta_change_set::DeltaChangeSet,
     ledger_info::LedgerInfo,
     proof::{
         accumulator::InMemoryAccumulator, TransactionInfoListWithProof, TransactionInfoWithProof,
@@ -952,20 +952,23 @@ impl TransactionOutput {
     }
 }
 
-/// Extension of `TransactionOutput` that also holds `DeltaSet`
+/// Extension of `TransactionOutput` that also holds `DeltaChangeSet`
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransactionOutputExt {
-    delta_set: DeltaSet,
+    delta_change_set: DeltaChangeSet,
     output: TransactionOutput,
 }
 
 impl TransactionOutputExt {
-    pub fn new(delta_set: DeltaSet, output: TransactionOutput) -> Self {
-        TransactionOutputExt { delta_set, output }
+    pub fn new(delta_change_set: DeltaChangeSet, output: TransactionOutput) -> Self {
+        TransactionOutputExt {
+            delta_change_set,
+            output,
+        }
     }
 
-    pub fn delta_set(&self) -> &DeltaSet {
-        &self.delta_set
+    pub fn delta_change_set(&self) -> &DeltaChangeSet {
+        &self.delta_change_set
     }
 
     pub fn write_set(&self) -> &WriteSet {
@@ -984,8 +987,8 @@ impl TransactionOutputExt {
         &self.output.status
     }
 
-    pub fn into(self) -> (DeltaSet, TransactionOutput) {
-        (self.delta_set, self.output)
+    pub fn into(self) -> (DeltaChangeSet, TransactionOutput) {
+        (self.delta_change_set, self.output)
     }
 
     pub fn into_transaction_output(self) -> TransactionOutput {
@@ -996,7 +999,7 @@ impl TransactionOutputExt {
 impl From<TransactionOutput> for TransactionOutputExt {
     fn from(output: TransactionOutput) -> Self {
         TransactionOutputExt {
-            delta_set: DeltaSet::default(),
+            delta_change_set: DeltaChangeSet::empty(),
             output,
         }
     }
