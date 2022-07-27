@@ -83,15 +83,14 @@ impl CliCommand<CreateResourceAccountSummary> for CreateResourceAccount {
     }
 
     async fn execute(self) -> CliTypedResult<CreateResourceAccountSummary> {
-        let seed: Vec<u8> = bcs::to_bytes(&self.seed).unwrap();
         let authentication_key: Vec<u8> = if let Some(key) = self.authentication_key {
-            bcs::to_bytes(&key).unwrap()
+            bcs::to_bytes(&key)?
         } else {
             vec![]
         };
         self.txn_options
             .submit_transaction(resource_account_create_resource_account(
-                seed,
+                bcs::to_bytes(&self.seed)?,
                 authentication_key,
             ))
             .await
