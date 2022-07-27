@@ -86,21 +86,19 @@ jobs:
           * [Test runner output](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           EOF
 
+          # add github step summary as described here https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary
+          echo "$FORGE_COMMENT" >> $GITHUB_STEP_SUMMARY
+
           # export env vars for next step
-          echo "FORGE_EXIT_CODE=$FORGE_EXIT_CODE" >> $GITHUB_ENV
           echo "FORGE_COMMENT=$FORGE_COMMENT" >> $GITHUB_ENV
 
+          if [ "$FORGE_BLOCKING" = "true" ]; then
+            exit $FORGE_EXIT_CODE
+          fi
+
       - name: Post forge result comment
-        if: env.FORGE_ENABLED == 'true' && github.event.number != null
+        if: env.FORGE_ENABLED == 'true' && github.event.number != null && !cancelled()
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           recreate: true
           path: ${{ env.FORGE_COMMENT }}
-
-      - name: Check Forge status
-        if: env.FORGE_ENABLED == 'true'
-        shell: bash
-        run: |
-          if [ "$FORGE_BLOCKING" = "true" ]; then
-            exit $FORGE_EXIT_CODE
-          fi
