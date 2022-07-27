@@ -21,7 +21,7 @@ This tutorial describes, in the following step-by-step approach, how to generate
 
 2. Prepare a wrapper around the REST interfaces.
 
-  Aptos provides a [REST API][rest_spec] for interacting with the blockchain. This steps prepares wrappers around this API, for retrieving account information, and for constructing a transaction, signing it and submitting the transaction.
+  Aptos provides a [REST API][rest_spec] for interacting with the blockchain. This step prepares wrappers around this API, for retrieving account information, and for constructing a transaction, signing it and submitting the transaction.
 
 3. Prepare a wrapper around the Faucet interface.
 
