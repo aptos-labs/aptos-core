@@ -15,6 +15,7 @@ use aptos_sdk::{
         PeerId,
     },
 };
+use prometheus_http_query::response::PromqlResult;
 use std::{
     collections::HashMap,
     fs, mem,
@@ -530,6 +531,15 @@ impl Swarm for LocalSwarm {
     }
 
     fn remove_chaos(&mut self, _chaos: SwarmChaos) -> Result<()> {
+        todo!()
+    }
+
+    async fn query_metrics(
+        &self,
+        _query: &str,
+        _time: Option<i64>,
+        _timeout: Option<i64>,
+    ) -> Result<PromqlResult> {
         todo!()
     }
 }

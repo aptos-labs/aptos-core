@@ -188,7 +188,6 @@ fn print_modules(ws: &WriteSet) {
             AccessPath::try_from(k.clone()).expect("State key can't be converted to access path");
         match v {
             WriteOp::Deletion => panic!("found WriteOp::Deletion in WriteSet"),
-            WriteOp::Delta(..) => panic!("found WriteOp::Delta in WriteSet"),
             WriteOp::Value(blob) => {
                 let tag = ap.path.get(0).expect("empty blob in WriteSet");
                 if *tag == 0 {
@@ -214,7 +213,6 @@ fn print_resources(storage: &impl MoveResolverExt, ws: &WriteSet) {
             AccessPath::try_from(k.clone()).expect("State key can't be converted to access path");
         match v {
             WriteOp::Deletion => panic!("found WriteOp::Deletion in WriteSet"),
-            WriteOp::Delta(..) => panic!("found WriteOp::Delta in WriteSet"),
             WriteOp::Value(blob) => {
                 let tag = ap.path.get(0).expect("empty blob in WriteSet");
                 if *tag == 1 {
@@ -245,7 +243,6 @@ fn print_account_states(storage: &impl MoveResolverExt, ws: &WriteSet) {
             AccessPath::try_from(k.clone()).expect("State key can't be converted to access path");
         match v {
             WriteOp::Deletion => panic!("found WriteOp::Deletion in WriteSet"),
-            WriteOp::Delta(..) => panic!("found WriteOp::Delta in WriteSet"),
             WriteOp::Value(blob) => {
                 let tag = ap.path.get(0).expect("empty blob in WriteSet");
                 if *tag == 1 {
