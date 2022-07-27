@@ -743,8 +743,12 @@ mod tests {
         let original_timestamp = entry.timestamp;
         entry.timestamp = String::from("2022-07-24T23:42:29.540278Z");
         entry.hostname = Some("test-host");
-        let expected = r#"{"level":"INFO","source":{"package":"aptos_logger","file":"crates/aptos-logger/src/aptos_logger.rs:718"},"thread_name":"aptos_logger::tests::basic","hostname":"test-host","timestamp":"2022-07-24T23:42:29.540278Z","message":"This is a log","data":{"bar":"foo_bar","category":"name","display":"12345","foo":5,"test":true}}"#;
+        let thread_name = thread::current().name().map(|s| s.to_string()).unwrap();
+
+        let expected = format!("{{\"level\":\"INFO\",\"source\":{{\"package\":\"aptos_logger\",\"file\":\"crates/aptos-logger/src/aptos_logger.rs:718\"}},\"thread_name\":\"{thread_name}\",\"hostname\":\"test-host\",\"timestamp\":\"2022-07-24T23:42:29.540278Z\",\"message\":\"This is a log\",\"data\":{{\"bar\":\"foo_bar\",\"category\":\"name\",\"display\":\"12345\",\"foo\":5,\"test\":true}}}}");
+
         assert_eq!(json_format(&entry).unwrap(), expected);
+
         entry.timestamp = original_timestamp;
 
         // Log time should be the time the structured log entry was created
