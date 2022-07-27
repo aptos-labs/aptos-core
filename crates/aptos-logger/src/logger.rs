@@ -43,7 +43,7 @@ pub(crate) fn enabled(metadata: &Metadata) -> bool {
 /// Sets the global `Logger` exactly once
 pub fn set_global_logger(logger: Arc<dyn Logger>) {
     if LOGGER.set(logger).is_err() {
-        eprintln!("Global logger has already been set");
+        eprintln!("Global logger has already been set!!");
     }
     let _ = tracing::subscriber::set_global_default(
         crate::tracing_adapter::TracingToAptosDataLayer
