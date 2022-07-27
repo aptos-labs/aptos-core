@@ -41,11 +41,9 @@ The Aptos node generates the following default SF-Stream configuration:
 ```
 sf_stream:
   enabled: false
-  target_address: "0.0.0.0:8083"
 ```
 
-When `sf_stream.enabled` is set to `true`, the SF-Stream will be enabled, and transactions will be streamed to the
-`target_address` address.
+When `sf_stream.enabled` is set to `true`, the SF-Stream will be enabled, and transactions will be streamed to stdout.
 
 ## Installing Protobuf Compiler
 
