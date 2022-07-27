@@ -3,12 +3,14 @@
 
 use crate::common::{
     types::{
-        account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
-        EncodingOptions, PrivateKeyInputOptions, ProfileConfig, ProfileOptions, PromptOptions,
+        account_address_from_public_key, CliCommand, EncodingOptions, PrivateKeyInputOptions,
         RngArgs,
     },
-    utils::{fund_account, prompt_yes_with_override, read_line},
+    utils::fund_account,
 };
+use aptos_cli_base::config::{CliConfig, ProfileConfig, ProfileOptions};
+use aptos_cli_base::prompts::{prompt_yes_with_override, read_line, PromptOptions};
+use aptos_cli_base::types::{CliError, CliTypedResult};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
 use async_trait::async_trait;
 use clap::Parser;

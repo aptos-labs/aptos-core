@@ -35,6 +35,7 @@ members = [
     "consensus/safety-rules",
     "crates/aptos",
     "crates/aptos-bitvec",
+    "crates/aptos-cli-base",
     "crates/aptos-compression",
     "crates/aptos-crypto",
     "crates/aptos-crypto-derive",

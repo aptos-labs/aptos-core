@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::{
-    types::{CliCommand, CliTypedResult, FaucetOptions, TransactionOptions},
+    types::{CliCommand, FaucetOptions, TransactionOptions},
     utils::fund_account,
 };
+use aptos_cli_base::types::CliTypedResult;
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;

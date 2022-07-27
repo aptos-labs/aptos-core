@@ -12,7 +12,8 @@ pub mod node;
 pub mod op;
 pub mod test;
 
-use crate::common::types::{CliCommand, CliResult, CliTypedResult};
+use crate::common::types::CliCommand;
+use aptos_cli_base::types::{CliResult, CliTypedResult};
 use async_trait::async_trait;
 use clap::Parser;
 use std::collections::BTreeMap;
@@ -70,7 +71,7 @@ impl CliCommand<BTreeMap<String, String>> for InfoTool {
     }
 
     async fn execute(self) -> CliTypedResult<BTreeMap<String, String>> {
-        let mut build_information: std::collections::BTreeMap<String, String> = BTreeMap::new();
+        let mut build_information: BTreeMap<String, String> = BTreeMap::new();
         build_information.insert(
             aptos_telemetry::build_information::BUILD_BRANCH.into(),
             build::BRANCH.into(),

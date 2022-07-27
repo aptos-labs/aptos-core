@@ -6,8 +6,8 @@
 #![forbid(unsafe_code)]
 
 use aptos::Tool;
+use aptos_cli_base::utils::print_cli_result;
 use clap::Parser;
-use std::process::exit;
 
 #[tokio::main]
 async fn main() {
@@ -15,11 +15,5 @@ async fn main() {
     let result = Tool::parse().execute().await;
 
     // At this point, we'll want to print and determine whether to exit for an error code
-    match result {
-        Ok(inner) => println!("{}", inner),
-        Err(inner) => {
-            println!("{}", inner);
-            exit(1);
-        }
-    }
+    print_cli_result(result);
 }

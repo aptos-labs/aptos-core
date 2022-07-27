@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{
-    CliCommand, CliConfig, CliError, CliTypedResult, ProfileOptions, RestOptions,
-};
+use crate::common::types::{CliCommand, RestOptions};
+use aptos_cli_base::config::{CliConfig, ProfileOptions};
+use aptos_cli_base::types::{CliError, CliTypedResult};
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
@@ -85,7 +85,6 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
         };
 
         let client = self.rest_options.client(&self.profile_options.profile)?;
-        let map_err_func = |err: anyhow::Error| CliError::ApiError(err.to_string());
         let response = match self.query {
             ListQuery::Balance => vec![
                 client
@@ -94,7 +93,7 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
                         "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
                     )
                     .await
-                    .map_err(map_err_func)?
+                    .map_err(|err| CliError::ApiError(err.to_string()))?
                     .into_inner()
                     .unwrap()
                     .data,
@@ -102,7 +101,7 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
             ListQuery::Modules => client
                 .get_account_modules(account)
                 .await
-                .map_err(map_err_func)?
+                .map_err(|err| CliError::ApiError(err.to_string()))?
                 .into_inner()
                 .iter()
                 .cloned()
@@ -112,7 +111,7 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
             ListQuery::Resources => client
                 .get_account_resources(account)
                 .await
-                .map_err(map_err_func)?
+                .map_err(|err| CliError::ApiError(err.to_string()))?
                 .into_inner()
                 .iter()
                 .map(|json| json.data.clone())

@@ -1,14 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::utils::create_dir_if_not_exist;
-use crate::{
-    common::{
-        types::{CliError, CliTypedResult},
-        utils::write_to_file,
-    },
-    CliCommand,
-};
+use crate::CliCommand;
+use aptos_cli_base::file::{create_dir_if_not_exist, write_to_file};
+use aptos_cli_base::parse::{from_yaml, to_yaml};
+use aptos_cli_base::types::{CliError, CliTypedResult};
 use aptos_config::config::Token;
 use aptos_genesis::config::Layout;
 use aptos_github_client::Client as GithubClient;
@@ -128,7 +124,11 @@ impl Client {
         branch: String,
         token_path: PathBuf,
     ) -> CliTypedResult<Client> {
-        let token = Token::FromDisk(token_path).read_token()?;
+        let token = Token::FromDisk(token_path.clone())
+            .read_token()
+            .map_err(|err| {
+                CliError::UnableToReadFile(token_path.display().to_string(), err.to_string())
+            })?;
         Ok(Client::Github(GithubClient::new(
             repository.owner,
             repository.repository,
@@ -150,9 +150,11 @@ impl Client {
                     .map_err(|e| CliError::IO(path.display().to_string(), e))?;
                 from_yaml(&contents)
             }
-            Client::Github(client) => {
-                from_base64_encoded_yaml(&client.get_file(&format!("{}.yaml", name))?)
-            }
+            Client::Github(client) => from_base64_encoded_yaml(
+                &client
+                    .get_file(&format!("{}.yaml", name))
+                    .map_err(CliError::unexpected)?,
+            ),
         }
     }
 
@@ -170,7 +172,9 @@ impl Client {
                 )?;
             }
             Client::Github(client) => {
-                client.put(&format!("{}.yaml", name), &to_base64_encoded_yaml(input)?)?;
+                client
+                    .put(&format!("{}.yaml", name), &to_base64_encoded_yaml(input)?)
+                    .map_err(CliError::unexpected)?;
             }
         }
 
@@ -224,12 +228,15 @@ impl Client {
                 }
             }
             Client::Github(client) => {
-                let files = client.get_directory(name)?;
+                let files = client.get_directory(name).map_err(CliError::unexpected)?;
 
                 for file in files {
                     // Only collect .mv files
                     if file.ends_with(".mv") {
-                        modules.push(base64::decode(client.get_file(&file)?)?)
+                        modules.push(
+                            base64::decode(client.get_file(&file).map_err(CliError::unexpected)?)
+                                .map_err(CliError::unexpected)?,
+                        )
                     }
                 }
             }
@@ -238,18 +245,12 @@ impl Client {
     }
 }
 
-pub fn to_yaml<T: Serialize + ?Sized>(input: &T) -> CliTypedResult<String> {
-    Ok(serde_yaml::to_string(input)?)
-}
-
-pub fn from_yaml<T: DeserializeOwned>(input: &str) -> CliTypedResult<T> {
-    Ok(serde_yaml::from_str(input)?)
-}
-
 pub fn to_base64_encoded_yaml<T: Serialize + ?Sized>(input: &T) -> CliTypedResult<String> {
     Ok(base64::encode(to_yaml(input)?))
 }
 
 pub fn from_base64_encoded_yaml<T: DeserializeOwned>(input: &str) -> CliTypedResult<T> {
-    from_yaml(&String::from_utf8(base64::decode(input)?)?)
+    from_yaml(&String::from_utf8(
+        base64::decode(input).map_err(CliError::unexpected)?,
+    )?)
 }

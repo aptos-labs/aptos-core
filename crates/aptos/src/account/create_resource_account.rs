@@ -1,7 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions};
+use crate::common::types::{CliCommand, TransactionOptions};
+use aptos_cli_base::types::CliTypedResult;
 use aptos_rest_client::{
     aptos_api_types::{WriteResource, WriteSetChange},
     Transaction,

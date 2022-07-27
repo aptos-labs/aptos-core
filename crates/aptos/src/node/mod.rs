@@ -1,19 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::PromptOptions;
-use crate::common::utils::prompt_yes_with_override;
-use crate::config::GlobalConfig;
-use crate::{
-    common::{
-        types::{
-            CliCommand, CliError, CliResult, CliTypedResult, ProfileOptions, RestOptions,
-            TransactionOptions,
-        },
-        utils::read_from_file,
-    },
-    genesis::git::from_yaml,
-};
+use crate::common::types::{RestOptions, TransactionOptions};
+use crate::CliCommand;
+use aptos_cli_base::config::{GlobalConfig, ProfileOptions};
+use aptos_cli_base::file::read_from_file;
+use aptos_cli_base::parse::from_yaml;
+use aptos_cli_base::prompts::{prompt_yes_with_override, PromptOptions};
+use aptos_cli_base::types::{CliError, CliResult, CliTypedResult};
 use aptos_config::config::NodeConfig;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet::FaucetArgs;

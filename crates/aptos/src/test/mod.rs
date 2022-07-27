@@ -15,12 +15,14 @@ use crate::{
     common::{
         init::InitTool,
         types::{
-            CliConfig, CliTypedResult, EncodingOptions, PrivateKeyInputOptions, ProfileOptions,
-            PromptOptions, RestOptions, RngArgs, TransactionOptions,
+            EncodingOptions, PrivateKeyInputOptions, RestOptions, RngArgs, TransactionOptions,
         },
     },
     CliCommand,
 };
+use aptos_cli_base::config::{CliConfig, ProfileOptions};
+use aptos_cli_base::prompts::PromptOptions;
+use aptos_cli_base::types::CliTypedResult;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{bls12381, x25519};
 use aptos_genesis::config::HostAndPort;

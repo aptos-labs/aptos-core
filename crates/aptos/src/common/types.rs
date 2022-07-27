@@ -1,19 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current, start_logger};
-use crate::config::GlobalConfig;
-use crate::{
-    common::{
-        init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
-        utils::{
-            chain_id, check_if_file_exists, get_sequence_number, read_from_file, to_common_result,
-            to_common_success_result, write_to_file, write_to_file_with_opts,
-            write_to_user_only_file,
-        },
-    },
-    genesis::git::from_yaml,
+use crate::common::utils::start_logger;
+use crate::common::{
+    init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
+    utils::{chain_id, get_sequence_number, to_common_result, to_common_success_result},
 };
+use aptos_cli_base::config::{CliConfig, ProfileOptions};
+use aptos_cli_base::file::{dir_default_to_current, read_from_file};
+use aptos_cli_base::types::{CliError, CliResult, CliTypedResult};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
@@ -36,244 +31,15 @@ use aptos_types::transaction::{
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
-use hex::FromHexError;
 use move_deps::move_core_types::account_address::AccountAddress;
-use serde::{Deserialize, Serialize};
-#[cfg(unix)]
-use std::os::unix::fs::OpenOptionsExt;
+use serde::Serialize;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     fmt::{Debug, Display, Formatter},
-    fs::OpenOptions,
     path::{Path, PathBuf},
     str::FromStr,
     time::Instant,
 };
-use thiserror::Error;
-
-/// A common result to be returned to users
-pub type CliResult = Result<String, String>;
-
-/// A common result to remove need for typing `Result<T, CliError>`
-pub type CliTypedResult<T> = Result<T, CliError>;
-
-/// CLI Errors for reporting through telemetry and outputs
-#[derive(Debug, Error)]
-pub enum CliError {
-    #[error("Aborted command")]
-    AbortedError,
-    #[error("API error: {0}")]
-    ApiError(String),
-    #[error("Error (de)serializing '{0}': {1}")]
-    BCS(&'static str, #[source] bcs::Error),
-    #[error("Invalid arguments: {0}")]
-    CommandArgumentError(String),
-    #[error("Unable to load config: {0} {1}")]
-    ConfigLoadError(String, String),
-    #[error("Unable to find config {0}, have you run `aptos init`?")]
-    ConfigNotFoundError(String),
-    #[error("Error accessing '{0}': {1}")]
-    IO(String, #[source] std::io::Error),
-    #[error("Move compilation failed: {0}")]
-    MoveCompilationError(String),
-    #[error("Move unit tests failed")]
-    MoveTestError,
-    #[error("Move Prover failed")]
-    MoveProverError,
-    #[error("Unable to parse '{0}': error: {1}")]
-    UnableToParse(&'static str, String),
-    #[error("Unable to read file '{0}', error: {1}")]
-    UnableToReadFile(String, String),
-    #[error("Unexpected error: {0}")]
-    UnexpectedError(String),
-}
-
-impl CliError {
-    pub fn to_str(&self) -> &'static str {
-        match self {
-            CliError::AbortedError => "AbortedError",
-            CliError::ApiError(_) => "ApiError",
-            CliError::BCS(_, _) => "BCS",
-            CliError::CommandArgumentError(_) => "CommandArgumentError",
-            CliError::ConfigLoadError(_, _) => "ConfigLoadError",
-            CliError::ConfigNotFoundError(_) => "ConfigNotFoundError",
-            CliError::IO(_, _) => "IO",
-            CliError::MoveCompilationError(_) => "MoveCompilationError",
-            CliError::MoveTestError => "MoveTestError",
-            CliError::MoveProverError => "MoveProverError",
-            CliError::UnableToParse(_, _) => "UnableToParse",
-            CliError::UnableToReadFile(_, _) => "UnableToReadFile",
-            CliError::UnexpectedError(_) => "UnexpectedError",
-        }
-    }
-}
-
-impl From<aptos_config::config::Error> for CliError {
-    fn from(e: aptos_config::config::Error) -> Self {
-        CliError::UnexpectedError(e.to_string())
-    }
-}
-
-impl From<aptos_github_client::Error> for CliError {
-    fn from(e: aptos_github_client::Error) -> Self {
-        CliError::UnexpectedError(e.to_string())
-    }
-}
-
-impl From<serde_yaml::Error> for CliError {
-    fn from(e: serde_yaml::Error) -> Self {
-        CliError::UnexpectedError(e.to_string())
-    }
-}
-
-impl From<base64::DecodeError> for CliError {
-    fn from(e: base64::DecodeError) -> Self {
-        CliError::UnexpectedError(e.to_string())
-    }
-}
-
-impl From<std::string::FromUtf8Error> for CliError {
-    fn from(e: std::string::FromUtf8Error) -> Self {
-        CliError::UnexpectedError(e.to_string())
-    }
-}
-
-impl From<aptos_crypto::CryptoMaterialError> for CliError {
-    fn from(e: aptos_crypto::CryptoMaterialError) -> Self {
-        CliError::UnexpectedError(e.to_string())
-    }
-}
-
-impl From<hex::FromHexError> for CliError {
-    fn from(e: FromHexError) -> Self {
-        CliError::UnexpectedError(e.to_string())
-    }
-}
-
-impl From<anyhow::Error> for CliError {
-    fn from(e: anyhow::Error) -> Self {
-        CliError::UnexpectedError(e.to_string())
-    }
-}
-
-impl From<bcs::Error> for CliError {
-    fn from(e: bcs::Error) -> Self {
-        CliError::UnexpectedError(e.to_string())
-    }
-}
-
-/// Config saved to `.aptos/config.yaml`
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CliConfig {
-    /// Map of profile configs
-    pub profiles: Option<HashMap<String, ProfileConfig>>,
-}
-
-const CONFIG_FILE: &str = "config.yaml";
-const LEGACY_CONFIG_FILE: &str = "config.yml";
-pub const CONFIG_FOLDER: &str = ".aptos";
-
-/// An individual profile
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct ProfileConfig {
-    /// Private key for commands.
-    pub private_key: Option<Ed25519PrivateKey>,
-    /// Public key for commands
-    pub public_key: Option<Ed25519PublicKey>,
-    /// Account for commands
-    pub account: Option<AccountAddress>,
-    /// URL for the Aptos rest endpoint
-    pub rest_url: Option<String>,
-    /// URL for the Faucet endpoint (if applicable)
-    pub faucet_url: Option<String>,
-}
-
-impl Default for CliConfig {
-    fn default() -> Self {
-        CliConfig {
-            profiles: Some(HashMap::new()),
-        }
-    }
-}
-
-impl CliConfig {
-    /// Checks if the config exists in the current working directory
-    pub fn config_exists() -> bool {
-        if let Ok(folder) = Self::aptos_folder() {
-            let config_file = folder.join(CONFIG_FILE);
-            let old_config_file = folder.join(LEGACY_CONFIG_FILE);
-            config_file.exists() || old_config_file.exists()
-        } else {
-            false
-        }
-    }
-
-    /// Loads the config from the current working directory
-    pub fn load() -> CliTypedResult<Self> {
-        let folder = Self::aptos_folder()?;
-
-        let config_file = folder.join(CONFIG_FILE);
-        let old_config_file = folder.join(LEGACY_CONFIG_FILE);
-        if config_file.exists() {
-            from_yaml(
-                &String::from_utf8(read_from_file(config_file.as_path())?)
-                    .map_err(CliError::from)?,
-            )
-        } else if old_config_file.exists() {
-            from_yaml(
-                &String::from_utf8(read_from_file(old_config_file.as_path())?)
-                    .map_err(CliError::from)?,
-            )
-        } else {
-            Err(CliError::ConfigNotFoundError(format!(
-                "{}",
-                config_file.display()
-            )))
-        }
-    }
-
-    pub fn load_profile(profile: &str) -> CliTypedResult<Option<ProfileConfig>> {
-        let mut config = Self::load()?;
-        Ok(config.remove_profile(profile))
-    }
-
-    pub fn remove_profile(&mut self, profile: &str) -> Option<ProfileConfig> {
-        if let Some(ref mut profiles) = self.profiles {
-            profiles.remove(&profile.to_string())
-        } else {
-            None
-        }
-    }
-
-    /// Saves the config to ./.aptos/config.yaml
-    pub fn save(&self) -> CliTypedResult<()> {
-        let aptos_folder = Self::aptos_folder()?;
-
-        // Create if it doesn't exist
-        create_dir_if_not_exist(aptos_folder.as_path())?;
-
-        // Save over previous config file
-        let config_file = aptos_folder.join(CONFIG_FILE);
-        let config_bytes = serde_yaml::to_string(&self).map_err(|err| {
-            CliError::UnexpectedError(format!("Failed to serialize config {}", err))
-        })?;
-        write_to_user_only_file(&config_file, CONFIG_FILE, config_bytes.as_bytes())?;
-
-        // As a cleanup, delete the old if it exists
-        let legacy_config_file = aptos_folder.join(LEGACY_CONFIG_FILE);
-        if legacy_config_file.exists() {
-            eprintln!("Removing legacy config file {}", LEGACY_CONFIG_FILE);
-            let _ = std::fs::remove_file(legacy_config_file);
-        }
-        Ok(())
-    }
-
-    /// Finds the current directory's .aptos folder
-    fn aptos_folder() -> CliTypedResult<PathBuf> {
-        let global_config = GlobalConfig::load()?;
-        global_config.get_config_location()
-    }
-}
 
 /// Types of Keys used by the blockchain
 #[derive(ArgEnum, Clone, Copy, Debug)]
@@ -302,33 +68,6 @@ impl FromStr for KeyType {
             "ed25519" => Ok(KeyType::Ed25519),
             "x25519" => Ok(KeyType::X25519),
             _ => Err("Invalid key type"),
-        }
-    }
-}
-
-#[derive(Debug, Parser)]
-pub struct ProfileOptions {
-    /// Profile to use from config
-    #[clap(long, default_value = "default")]
-    pub profile: String,
-}
-
-impl ProfileOptions {
-    pub fn account_address(&self) -> CliTypedResult<AccountAddress> {
-        if let Some(profile) = CliConfig::load_profile(&self.profile)? {
-            if let Some(account) = profile.account {
-                return Ok(account);
-            }
-        }
-
-        Err(CliError::ConfigNotFoundError(self.profile.clone()))
-    }
-}
-
-impl Default for ProfileOptions {
-    fn default() -> Self {
-        Self {
-            profile: "default".to_string(),
         }
     }
 }
@@ -415,7 +154,11 @@ impl RngArgs {
             let seed = seed.strip_prefix("0x").unwrap_or(seed);
             let mut seed_slice = [0u8; 32];
 
-            hex::decode_to_slice(seed, &mut seed_slice)?;
+            hex::decode_to_slice(seed, &mut seed_slice).map_err(|_| {
+                CliError::CommandArgumentError(
+                    "Invalid --random-seed, must be 32 hex bytes".to_string(),
+                )
+            })?;
             Ok(KeyGen::from_seed(seed_slice))
         } else {
             Ok(KeyGen::from_os_rng())
@@ -449,26 +192,6 @@ impl FromStr for EncodingType {
             "bcs" => Ok(EncodingType::BCS),
             "base64" => Ok(EncodingType::Base64),
             _ => Err("Invalid encoding type"),
-        }
-    }
-}
-
-/// An insertable option for use with prompts.
-#[derive(Clone, Copy, Debug, Parser)]
-pub struct PromptOptions {
-    /// Assume yes for all yes/no prompts
-    #[clap(long, group = "prompt_options")]
-    pub assume_yes: bool,
-    /// Assume no for all yes/no prompts
-    #[clap(long, group = "prompt_options")]
-    pub assume_no: bool,
-}
-
-impl PromptOptions {
-    pub fn yes() -> Self {
-        Self {
-            assume_yes: true,
-            assume_no: false,
         }
     }
 }
@@ -604,36 +327,6 @@ pub fn account_address_from_public_key(public_key: &Ed25519PublicKey) -> Account
     AccountAddress::new(*auth_key.derived_address())
 }
 
-#[derive(Debug, Parser)]
-pub struct SaveFile {
-    /// Output file name
-    #[clap(long, parse(from_os_str))]
-    pub output_file: PathBuf,
-
-    #[clap(flatten)]
-    pub prompt_options: PromptOptions,
-}
-
-impl SaveFile {
-    /// Check if the key file exists already
-    pub fn check_file(&self) -> CliTypedResult<()> {
-        check_if_file_exists(self.output_file.as_path(), self.prompt_options)
-    }
-
-    /// Save to the `output_file`
-    pub fn save_to_file(&self, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
-        write_to_file(self.output_file.as_path(), name, bytes)
-    }
-
-    /// Save to the `output_file` with restricted permissions (mode 0600)
-    pub fn save_to_file_confidential(&self, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
-        let mut opts = OpenOptions::new();
-        #[cfg(unix)]
-        opts.mode(0o600);
-        write_to_file_with_opts(self.output_file.as_path(), name, bytes, &mut opts)
-    }
-}
-
 /// Options specific to using the Rest endpoint
 #[derive(Debug, Default, Parser)]
 pub struct RestOptions {
@@ -684,7 +377,7 @@ pub struct MovePackageDir {
     /// Example: alice=0x1234, bob=0x5678
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
-    #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
+    #[clap(long, parse(try_from_str = aptos_cli_base::parse::parse_map), default_value = "")]
     named_addresses: BTreeMap<String, AccountAddressWrapper>,
 }
 

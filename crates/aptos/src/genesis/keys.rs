@@ -1,15 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current};
-use crate::{
-    common::{
-        types::{CliError, CliTypedResult, PromptOptions, RngArgs},
-        utils::{check_if_file_exists, read_from_file, write_to_user_only_file},
-    },
-    genesis::git::{from_yaml, to_yaml, GitOptions},
-    CliCommand,
+use crate::{common::types::RngArgs, genesis::git::GitOptions, CliCommand};
+use aptos_cli_base::file::{
+    create_dir_if_not_exist, dir_default_to_current, read_from_file, write_to_user_only_file,
 };
+use aptos_cli_base::parse::{from_yaml, to_yaml};
+use aptos_cli_base::prompts::{check_if_file_exists, PromptOptions};
+use aptos_cli_base::types::{CliError, CliTypedResult};
 use aptos_crypto::{bls12381, PrivateKey};
 use aptos_genesis::{
     config::{HostAndPort, ValidatorConfiguration},

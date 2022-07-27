@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::{
-        types::{PromptOptions, RngArgs},
-        utils::write_to_file,
-    },
+    common::types::RngArgs,
     genesis::{
         git::{GitOptions, SetupGit},
         keys::{GenerateKeys, SetValidatorConfiguration},
@@ -13,6 +10,8 @@ use crate::{
     },
     CliCommand,
 };
+use aptos_cli_base::file::write_to_file;
+use aptos_cli_base::prompts::PromptOptions;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey,

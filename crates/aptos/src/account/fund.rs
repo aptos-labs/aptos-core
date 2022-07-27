@@ -4,10 +4,12 @@
 use crate::{
     account::create::DEFAULT_FUNDED_COINS,
     common::{
-        types::{CliCommand, CliTypedResult, FaucetOptions, ProfileOptions},
+        types::{CliCommand, FaucetOptions},
         utils::fund_account,
     },
 };
+use aptos_cli_base::config::ProfileOptions;
+use aptos_cli_base::types::CliTypedResult;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;

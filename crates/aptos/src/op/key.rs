@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::{
-        types::{
-            CliError, CliTypedResult, EncodingOptions, EncodingType, ExtractPublicKey, KeyType,
-            PrivateKeyInputOptions, ProfileOptions, RngArgs, SaveFile,
-        },
-        utils::{append_file_extension, check_if_file_exists, write_to_file},
+    common::types::{
+        EncodingOptions, EncodingType, ExtractPublicKey, KeyType, PrivateKeyInputOptions, RngArgs,
     },
-    CliCommand, CliResult,
+    CliCommand,
 };
+use aptos_cli_base::config::ProfileOptions;
+use aptos_cli_base::file::{append_file_extension, write_to_file, SaveFile};
+use aptos_cli_base::prompts::check_if_file_exists;
+use aptos_cli_base::types::{CliError, CliResult, CliTypedResult};
 use aptos_config::config::{Peer, PeerRole};
 use aptos_crypto::{ed25519, x25519, PrivateKey, ValidCryptoMaterial};
 use aptos_types::account_address::{from_identity_public_key, AccountAddress};
