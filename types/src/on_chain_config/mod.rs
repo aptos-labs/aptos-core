@@ -31,7 +31,7 @@ pub use self::{
         ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerElectionType,
     },
     registered_currencies::RegisteredCurrencies,
-    validator_set::ValidatorSet,
+    validator_set::{ConsensusScheme, ValidatorSet},
     vm_config::VMConfig,
     vm_publishing_option::VMPublishingOption,
 };
