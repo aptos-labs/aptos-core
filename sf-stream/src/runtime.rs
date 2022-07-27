@@ -13,6 +13,7 @@ use aptos_mempool::MempoolClientSender;
 use aptos_types::chain_id::ChainId;
 use aptos_vm::data_cache::RemoteStorageOwned;
 use futures::channel::mpsc::channel;
+use protobuf::Message;
 use std::time::Duration;
 use std::{net::SocketAddr, sync::Arc};
 use storage_interface::state_view::DbStateView;
@@ -115,7 +116,8 @@ impl SfStreamer {
         }
     }
 
-    pub async fn batch_convert_once(&mut self, batch_size: u16) {
+    pub async fn batch_convert_once(&mut self, batch_size: u16) -> Vec<extractor::Transaction> {
+        let mut result: Vec<extractor::Transaction> = vec![];
         match &self.context.db.get_first_txn_version() {
             Ok(version_result) => {
                 if let Some(oldest_version) = version_result {
@@ -125,14 +127,14 @@ impl SfStreamer {
                             oldest_version, &self.current_version
                         );
                         sleep(Duration::from_millis(300)).await;
-                        return;
+                        return result;
                     }
                 }
             }
             Err(err) => {
                 warn!("[sf-stream] failed to get first txn version: {}", err);
                 sleep(Duration::from_millis(300)).await;
-                return;
+                return result;
             }
         }
 
@@ -144,7 +146,7 @@ impl SfStreamer {
                 if transactions.is_empty() {
                     debug!("[sf-stream] no transactions to send");
                     sleep(Duration::from_millis(100)).await;
-                    return;
+                    return result;
                 }
                 // TODO: there might be an off by one (tx version fetched)
                 debug!(
@@ -170,16 +172,18 @@ impl SfStreamer {
                         .unwrap();
 
                     let txn_proto = self.convert_transaction(txn);
-                    self.push_transaction(txn_proto).await;
+                    self.print_transaction(&txn_proto).await;
+                    result.push(txn_proto);
                     self.current_version = txn_version;
                 }
             }
             Err(err) => {
                 error!("[sf-stream] failed to get transactions: {}", err);
                 sleep(Duration::from_millis(100)).await;
-                return;
+                return result;
             }
-        };
+        }
+        result
     }
 
     pub fn maybe_update_from_block_metadata(&mut self, transaction: &Transaction) {
@@ -195,10 +199,9 @@ impl SfStreamer {
         convert_transaction(&transaction, self.block_height, self.current_epoch)
     }
 
-    pub async fn push_transaction(&self, _transaction: extractor::Transaction) {
-        // TODO: Push `transaction` to some server we instantiate
-        metrics::TRANSACTIONS_QUEUED.inc();
-        // &self.send_transaction_proto(txn_proto).await;
+    pub async fn print_transaction(&self, transaction: &extractor::Transaction) {
+        let pb_b64 = &base64::encode(transaction.write_to_bytes().unwrap());
+        println!("DMLOG TRX <sf.aptos.types.v1.TransactionTrace> {}", pb_b64);
         metrics::TRANSACTIONS_SENT.inc();
     }
 }
