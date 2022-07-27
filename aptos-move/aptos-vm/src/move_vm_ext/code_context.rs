@@ -101,6 +101,8 @@ const EALREADY_REQUESTED: u64 = 0x03_0000;
 /// Abort code when from_bytes fails (0x03 == INVALID_ARGUMENT)
 const EFROM_BYTES: u64 = 0x01_0001;
 
+const ENOT_SUPPORTED: u64 = 0x03_0002;
+
 const CHECK_COMPAT_POLICY: u8 = 1;
 
 /// The native code context.
@@ -143,6 +145,11 @@ fn native_request_publish(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert_eq!(args.len(), 4);
+
+    if !cfg!(any(test, feature = "fuzzing")) {
+        // This feature is currently disabled outside of test builds
+        return Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(ENOT_SUPPORTED));
+    }
     let policy = pop_arg!(args, u8);
     let mut code = vec![];
     for module in pop_arg!(args, Vec<Value>) {
