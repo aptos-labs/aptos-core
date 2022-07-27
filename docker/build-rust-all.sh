@@ -4,7 +4,7 @@
 set -e
 
 # Build all the rust release binaries
-RUSTFLAGS="--cfg tokio_unstable" cargo build --release \
+cargo build --release \
         -p aptos \
         -p aptos-node \
         -p aptos-indexer \

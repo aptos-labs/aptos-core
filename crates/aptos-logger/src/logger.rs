@@ -3,11 +3,11 @@
 
 //! Global logger definition and functions
 
-use crate::{counters::STRUCT_LOG_COUNT, error, Event, Metadata};
+use crate::{counters::STRUCT_LOG_COUNT, Event, Metadata};
 
 use once_cell::sync::OnceCell;
 use std::sync::Arc;
-use tracing_subscriber::prelude::*;
+use tracing_subscriber::Layer;
 
 /// The global `Logger`
 static LOGGER: OnceCell<Arc<dyn Logger>> = OnceCell::new();
@@ -41,30 +41,14 @@ pub(crate) fn enabled(metadata: &Metadata) -> bool {
 }
 
 /// Sets the global `Logger` exactly once
-pub fn set_global_logger(logger: Arc<dyn Logger>, console_port: Option<u16>) {
+pub fn set_global_logger(logger: Arc<dyn Logger>) {
     if LOGGER.set(logger).is_err() {
         eprintln!("Global logger has already been set");
-        error!("Global logger has already been set");
-        return;
     }
-
-    /*
-     * if console_port is set all tracing::log are captured by the tokio-tracing infrastructure.
-     * else aptos-logger intercepts all tracing::log events
-     * In both scenarios *ALL* aptos-logger::log events are captured by aptos-logger as usual.
-     */
-    if let Some(port) = console_port {
-        let console_layer = console_subscriber::ConsoleLayer::builder()
-            .server_addr(([0, 0, 0, 0], port))
-            .spawn();
-
-        tracing_subscriber::registry().with(console_layer).init();
-    } else {
-        let _ = tracing::subscriber::set_global_default(
-            crate::tracing_adapter::TracingToAptosDataLayer
-                .with_subscriber(tracing_subscriber::Registry::default()),
-        );
-    }
+    let _ = tracing::subscriber::set_global_default(
+        crate::tracing_adapter::TracingToAptosDataLayer
+            .with_subscriber(tracing_subscriber::Registry::default()),
+    );
 }
 
 /// Flush the global `Logger`
