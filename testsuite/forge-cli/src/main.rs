@@ -53,7 +53,7 @@ pub struct SuccessCriteriaArgs {
     // general options
     #[structopt(long, default_value = "3500")]
     avg_tps: usize,
-    #[structopt(long, default_value = "8000")]
+    #[structopt(long, default_value = "10000")]
     max_latency_ms: usize,
 }
 
