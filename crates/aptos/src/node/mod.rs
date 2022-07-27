@@ -188,7 +188,7 @@ impl CliCommand<Transaction> for IncreaseLockup {
         self.txn_options
             .submit_script_function(
                 AccountAddress::ONE,
-                "Stake",
+                "stake",
                 "increase_lockup",
                 vec![],
                 vec![bcs::to_bytes(&lockup_timestamp_secs)?],
