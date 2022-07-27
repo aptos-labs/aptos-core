@@ -45,7 +45,6 @@ pub fn bootstrap(
             let context = Context::new(chain_id, db, mp_sender.clone(), node_config.clone());
             let context_arc = Arc::new(context);
             let mut streamer = SfStreamer::new(
-                node_config.sf_stream.target_address,
                 context_arc,
                 starting_version.unwrap_or_default(),
                 Some(mp_sender),
@@ -57,7 +56,6 @@ pub fn bootstrap(
 }
 
 pub struct SfStreamer {
-    pub target_address: SocketAddr,
     pub context: Arc<Context>,
     pub current_version: u64,
     pub resolver: Arc<RemoteStorageOwned<DbStateView>>,
@@ -69,7 +67,6 @@ pub struct SfStreamer {
 
 impl SfStreamer {
     pub fn new(
-        target_address: SocketAddr,
         context: Arc<Context>,
         starting_version: u64,
         mp_client_sender: Option<MempoolClientSender>,
@@ -100,7 +97,6 @@ impl SfStreamer {
         });
 
         Self {
-            target_address,
             context,
             current_version: version,
             resolver,
