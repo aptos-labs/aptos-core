@@ -132,7 +132,7 @@ AptosFramework = {{ git = \"https://github.com/aptos-labs/aptos-core.git\", subd
 {}
 ",
             self.name,
-            toml::to_string(&addresses).unwrap()
+            toml::to_string(&addresses).map_err(|err| CliError::UnexpectedError(err.to_string()))?
         )
         .map_err(|err| {
             CliError::UnexpectedError(format!(
