@@ -156,6 +156,7 @@ dependencies = [
  "aptos-telemetry",
  "aptos-temppath",
  "aptos-transaction-builder",
+ "aptos-transactional-test-harness",
  "aptos-types",
  "aptos-vm",
  "aptosdb",
@@ -173,6 +174,7 @@ dependencies = [
  "move-deps",
  "parse_duration",
  "rand 0.7.3",
+ "regex",
  "reqwest",
  "serde 1.0.137",
  "serde_json",
@@ -181,12 +183,14 @@ dependencies = [
  "short-hex-str",
  "storage-interface",
  "tempfile",
+ "termcolor",
  "thiserror",
  "tokio",
  "tokio-util 0.7.2",
  "toml",
  "uuid",
  "vm-genesis",
+ "walkdir",
 ]
 
 [[package]]

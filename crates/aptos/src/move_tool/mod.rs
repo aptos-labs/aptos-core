@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod aptos_debug_natives;
+mod transactional_tests_runner;
 
 use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current};
 use crate::{
@@ -16,6 +17,7 @@ use crate::{
 };
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
+use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
@@ -42,6 +44,7 @@ use std::{
     str::FromStr,
 };
 use tokio::task;
+use transactional_tests_runner::TransactionalTestOpts;
 
 /// CLI tool for performing Move tasks
 ///
@@ -53,6 +56,7 @@ pub enum MoveTool {
     Run(RunFunction),
     Test(TestPackage),
     Prove(ProvePackage),
+    RunTransactionalTest(TransactionalTestOpts),
 }
 
 impl MoveTool {
@@ -64,6 +68,7 @@ impl MoveTool {
             MoveTool::Run(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
             MoveTool::Prove(tool) => tool.execute_serialized().await,
+            MoveTool::RunTransactionalTest(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -219,6 +224,33 @@ impl CliCommand<&'static str> for TestPackage {
             UnitTestResult::Success => Ok("Success"),
             UnitTestResult::Failure => Err(CliError::MoveTestError),
         }
+    }
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for TransactionalTestOpts {
+    fn command_name(&self) -> &'static str {
+        "TransactionalTest"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let root_path = self
+            .root_path
+            .clone()
+            .into_os_string()
+            .into_string()
+            .map_err(|_| CliError::CommandArgumentError("--root_path".to_string()))?;
+
+        let requirements = vec![transactional_tests_runner::Requirements::new(
+            run_aptos_test,
+            "tests".to_string(),
+            root_path,
+            self.pattern.clone(),
+        )];
+
+        transactional_tests_runner::runner(&self, &requirements);
+
+        Ok("Success")
     }
 }
 
