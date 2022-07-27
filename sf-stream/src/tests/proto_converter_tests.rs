@@ -11,15 +11,14 @@ use crate::{
 use aptos_sdk::types::account_config::aptos_root_address;
 use move_deps::move_core_types::value::MoveValue;
 use serde_json::Value;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 #[tokio::test]
 async fn test_genesis_works() {
     let test_context = new_test_context(current_function_name!());
 
-    let addr: SocketAddr = format!("{}:{}", "127.0.0.1", 8083).parse().unwrap();
     let context = Arc::new(test_context.context);
-    let mut streamer = SfStreamer::new(addr, context, 0, None);
+    let mut streamer = SfStreamer::new(context, 0, None);
     let converted = streamer.batch_convert_once(10).await;
 
     // position 0 should be genesis
@@ -44,9 +43,8 @@ async fn test_block_transactions_work() {
     let txn = test_context.create_user_account(&account);
     test_context.commit_block(&vec![txn.clone()]).await;
 
-    let addr: SocketAddr = format!("{}:{}", "127.0.0.1", 8083).parse().unwrap();
     let context = Arc::new(test_context.clone().context);
-    let mut streamer = SfStreamer::new(addr, context, 0, None);
+    let mut streamer = SfStreamer::new(context, 0, None);
 
     // emulating real stream, getting first block
     let converted_0 = streamer.batch_convert_once(1).await;
@@ -113,9 +111,8 @@ async fn test_block_height_works() {
         (8, 3),
     ]);
 
-    let addr: SocketAddr = format!("{}:{}", "127.0.0.1", 8083).parse().unwrap();
     let context = Arc::new(test_context.clone().context);
-    let mut streamer = SfStreamer::new(addr, context, 0, None);
+    let mut streamer = SfStreamer::new(context, 0, None);
 
     let converted = streamer.batch_convert_once(100).await;
     // Making sure that version - block height mapping is correct and that version is in order
