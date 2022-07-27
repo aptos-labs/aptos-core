@@ -7592,6 +7592,7 @@ dependencies = [
  "aptos-transaction-builder",
  "aptos-types",
  "aptos-vault-client",
+ "aptos-vm",
  "aptos-writeset-generator",
  "aptosdb",
  "async-trait",
