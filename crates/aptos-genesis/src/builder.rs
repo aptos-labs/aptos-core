@@ -367,7 +367,6 @@ const ONE_DAY: u64 = 86400;
 
 #[derive(Clone)]
 pub struct GenesisConfigurations {
-    pub min_price_per_gas_unit: u64,
     pub epoch_duration_secs: u64,
     pub min_stake: u64,
     pub max_stake: u64,
@@ -547,7 +546,6 @@ impl Builder {
         }
 
         let mut genesis_config = GenesisConfigurations {
-            min_price_per_gas_unit: 1,
             allow_new_validators: false,
             min_stake: 0,
             max_stake: u64::MAX,
@@ -564,7 +562,6 @@ impl Builder {
             root_key,
             configs,
             self.move_modules.clone(),
-            genesis_config.min_price_per_gas_unit,
             genesis_config.allow_new_validators,
             genesis_config.min_stake,
             genesis_config.max_stake,

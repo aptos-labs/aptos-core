@@ -9,9 +9,7 @@ use aptos_types::{
         authenticator::AuthenticationKeyPreimage, SignedTransaction, TransactionPayload,
     },
 };
-use move_deps::move_core_types::gas_schedule::{
-    AbstractMemorySize, GasAlgebra, GasCarrier, GasPrice, GasUnits,
-};
+use move_deps::move_core_types::gas_schedule::{GasAlgebra, GasCarrier, GasPrice};
 use std::convert::TryFrom;
 
 pub struct TransactionMetadata {
@@ -20,9 +18,9 @@ pub struct TransactionMetadata {
     pub secondary_signers: Vec<AccountAddress>,
     pub secondary_authentication_key_preimages: Vec<Vec<u8>>,
     pub sequence_number: u64,
-    pub max_gas_amount: GasUnits<GasCarrier>,
+    pub max_gas_amount: u64,
     pub gas_unit_price: GasPrice<GasCarrier>,
-    pub transaction_size: AbstractMemorySize<GasCarrier>,
+    pub transaction_size: u64,
     pub expiration_timestamp_secs: u64,
     pub chain_id: ChainId,
     pub script_hash: Vec<u8>,
@@ -45,9 +43,9 @@ impl TransactionMetadata {
                 .map(|account_auth| account_auth.authentication_key_preimage().into_vec())
                 .collect(),
             sequence_number: txn.sequence_number(),
-            max_gas_amount: GasUnits::new(txn.max_gas_amount()),
+            max_gas_amount: txn.max_gas_amount(),
             gas_unit_price: GasPrice::new(txn.gas_unit_price()),
-            transaction_size: AbstractMemorySize::new(txn.raw_txn_bytes_len() as u64),
+            transaction_size: txn.raw_txn_bytes_len() as u64,
             expiration_timestamp_secs: txn.expiration_timestamp_secs(),
             chain_id: txn.chain_id(),
             script_hash: match txn.payload() {
@@ -59,7 +57,7 @@ impl TransactionMetadata {
         }
     }
 
-    pub fn max_gas_amount(&self) -> GasUnits<GasCarrier> {
+    pub fn max_gas_amount(&self) -> u64 {
         self.max_gas_amount
     }
 
@@ -83,7 +81,7 @@ impl TransactionMetadata {
         self.sequence_number
     }
 
-    pub fn transaction_size(&self) -> AbstractMemorySize<GasCarrier> {
+    pub fn transaction_size(&self) -> u64 {
         self.transaction_size
     }
 
@@ -111,9 +109,9 @@ impl Default for TransactionMetadata {
             secondary_signers: vec![],
             secondary_authentication_key_preimages: vec![],
             sequence_number: 0,
-            max_gas_amount: GasUnits::new(100_000_000),
+            max_gas_amount: 100_000_000,
             gas_unit_price: GasPrice::new(0),
-            transaction_size: AbstractMemorySize::new(0),
+            transaction_size: 0,
             expiration_timestamp_secs: 0,
             chain_id: ChainId::test(),
             script_hash: vec![],
