@@ -29,6 +29,21 @@ const config = {
           sidebarCollapsible: false,
           editUrl: "https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/",
           remarkPlugins: [codeInjector],
+          lastVersion: "current",
+          versions: {
+            current: {
+              label: "Devnet",
+              path: "/",
+            },
+            testnet: {
+              label: "Testnet",
+              banner: "none",
+            },
+            mainnet: {
+              label: "Mainnet",
+              banner: "none",
+            }
+          },
         },
         blog: false,
         theme: {
@@ -78,6 +93,15 @@ const config = {
           srcDark: "img/aptos_word_dark.svg",
         },
         items: [
+          {
+            type: 'docsVersionDropdown',
+            position: 'right',
+            //dropdownItemsAfter: [
+              //{ to: '/testnet', label: 'Testnet', target: '_blank' },
+            //],
+            //dropdownItemsAfter: [{to: '/versions', label: 'All versions'}],
+            //dropdownActiveClassDisabled: true,
+          },
           {
             href: "https://github.com/aptos-labs/aptos-core/",
             label: "GitHub",
