@@ -95,10 +95,7 @@ fn test_state_store_pruner() {
     // Prune till version=0. This should basically be a no-op
     {
         pruner
-            .wake_and_wait(
-                0, /* latest_version */
-                PrunerIndex::StateStorePrunerIndex as usize,
-            )
+            .wake_and_wait_state_pruner(0 /* latest_version */)
             .unwrap();
         for i in 0..num_versions {
             verify_state_in_store(
@@ -110,23 +107,11 @@ fn test_state_store_pruner() {
         }
     }
 
-    // Test for batched pruning, since we use a batch size of 10, updating the latest version to
-    // less than 10 should not perform any actual pruning.
-    assert!(pruner
-        .wake_and_wait(
-            5, /* latest_version */
-            PrunerIndex::StateStorePrunerIndex as usize,
-        )
-        .is_err());
-
     // Notify the pruner to update the version to be 10 - since we use a batch size of 10,
     // we expect versions 0 to 9 to be pruned.
     {
         pruner
-            .wake_and_wait(
-                prune_batch_size as u64, /* latest_version */
-                PrunerIndex::StateStorePrunerIndex as usize,
-            )
+            .wake_and_wait_state_pruner(prune_batch_size as u64 /* latest_version */)
             .unwrap();
         for i in 0..prune_batch_size {
             assert!(state_store
@@ -211,10 +196,7 @@ fn test_state_store_pruner_partial_version() {
     // Prune till version=0. This should basically be a no-op
     {
         pruner
-            .wake_and_wait(
-                0, /* latest_version */
-                PrunerIndex::StateStorePrunerIndex as usize,
-            )
+            .wake_and_wait_state_pruner(0 /* latest_version */)
             .unwrap();
         verify_state_in_store(state_store, key1.clone(), Some(&value1), 1);
         verify_state_in_store(state_store, key2.clone(), Some(&value2_update), 1);
@@ -225,10 +207,7 @@ fn test_state_store_pruner_partial_version() {
     // should prune 1 stale node with the version 0.
     {
         assert!(pruner
-            .wake_and_wait(
-                1, /* latest_version */
-                PrunerIndex::StateStorePrunerIndex as usize,
-            )
+            .wake_and_wait_state_pruner(1 /* latest_version */,)
             .is_ok());
         assert!(state_store
             .get_state_value_with_proof_by_version(&key1, 0_u64)
@@ -241,23 +220,14 @@ fn test_state_store_pruner_partial_version() {
     // Prune 3 more times. All version 0 and 1 stale nodes should be gone.
     {
         assert!(pruner
-            .wake_and_wait(
-                2, /* latest_version */
-                PrunerIndex::StateStorePrunerIndex as usize,
-            )
+            .wake_and_wait_state_pruner(2 /* latest_version */,)
             .is_ok());
         assert!(pruner
-            .wake_and_wait(
-                2, /* latest_version */
-                PrunerIndex::StateStorePrunerIndex as usize,
-            )
+            .wake_and_wait_state_pruner(2 /* latest_version */,)
             .is_ok());
 
         assert!(pruner
-            .wake_and_wait(
-                2, /* latest_version */
-                PrunerIndex::StateStorePrunerIndex as usize,
-            )
+            .wake_and_wait_state_pruner(2 /* latest_version */,)
             .is_ok());
         assert!(state_store
             .get_state_value_with_proof_by_version(&key1, 0_u64)
@@ -318,7 +288,7 @@ fn test_state_store_pruner_disabled() {
     // Prune till version=0. This should basically be a no-op
     {
         pruner
-            .ensure_disabled(PrunerIndex::StateStorePrunerIndex as usize)
+            .ensure_disabled(PrunerIndex::StateStorePrunerIndex)
             .unwrap();
         for i in 0..num_versions {
             verify_state_in_store(
@@ -334,7 +304,7 @@ fn test_state_store_pruner_disabled() {
     // we expect versions 0 to 9 to be pruned.
     {
         pruner
-            .ensure_disabled(PrunerIndex::StateStorePrunerIndex as usize)
+            .ensure_disabled(PrunerIndex::StateStorePrunerIndex)
             .unwrap();
         for i in 0..prune_batch_size {
             assert!(state_store
@@ -386,11 +356,10 @@ fn test_worker_quit_eagerly() {
 
     {
         let (command_sender, command_receiver) = channel();
-        let worker = Worker::new(
-            Arc::clone(&db),
+        let worker = StatePrunerWorker::new(
             Arc::clone(&aptos_db.state_merkle_db),
             command_receiver,
-            Arc::new(Mutex::new(vec![Some(0), Some(0)])), /* progress */
+            Arc::new(Mutex::new(Some(0))), /* progress */
             StoragePrunerConfig {
                 state_store_prune_window: Some(1),
                 ledger_prune_window: Some(1),
@@ -399,16 +368,16 @@ fn test_worker_quit_eagerly() {
             },
         );
         command_sender
-            .send(Command::Prune {
-                target_db_versions: vec![Some(1), Some(0)],
+            .send(db_pruner::Command::Prune {
+                target_db_version: Some(1),
             })
             .unwrap();
         command_sender
-            .send(Command::Prune {
-                target_db_versions: vec![Some(2), Some(0)],
+            .send(db_pruner::Command::Prune {
+                target_db_version: Some(2),
             })
             .unwrap();
-        command_sender.send(Command::Quit).unwrap();
+        command_sender.send(db_pruner::Command::Quit).unwrap();
         // Worker quits immediately although `Command::Quit` is not the first command sent.
         worker.work();
         verify_state_in_store(state_store, key.clone(), Some(&value0), 0);

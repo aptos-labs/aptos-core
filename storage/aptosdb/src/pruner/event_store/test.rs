@@ -77,10 +77,7 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
     // start pruning events batches of size 2 and verify transactions have been pruned from DB
     for i in (0..=num_versions).step_by(2) {
         pruner
-            .wake_and_wait(
-                i as u64, /* latest_version */
-                PrunerIndex::LedgerPrunerIndex as usize,
-            )
+            .wake_and_wait_ledger_pruner(i as u64 /* latest_version */)
             .unwrap();
         // ensure that all events up to i * 2 has been pruned
         for j in 0..i {
@@ -125,7 +122,7 @@ fn verify_event_store_pruner_disabled(events: Vec<Vec<ContractEvent>>) {
     // Verify no pruning has happened.
     for _i in (0..=num_versions).step_by(2) {
         pruner
-            .ensure_disabled(PrunerIndex::LedgerPrunerIndex as usize)
+            .ensure_disabled(PrunerIndex::LedgerPrunerIndex)
             .unwrap();
         // ensure that all events up to i * 2 are valid in DB
         for version in 0..num_versions {
