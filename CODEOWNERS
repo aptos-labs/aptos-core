@@ -1,2 +1,6 @@
-# Owners for the `/developer-docs-site` directory and all is subdirectories.
+# Owners for the `/developer-docs-site` directory and all its subdirectories.
 /developer-docs-site/ @davidiw @rajkaramchedu
+# Owners for the `/crates/aptos-crypto` directory and all its subdirectories.
+/crates/aptos-crypto/ @alinush
+# Owners for the `/crates/aptos-crypto-derive` directory and all its subdirectories.
+/crates/aptos-crypto-derive/ @alinush

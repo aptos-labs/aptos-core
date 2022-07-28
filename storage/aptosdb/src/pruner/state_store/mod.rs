@@ -10,8 +10,10 @@ use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_logger::error;
 use aptos_types::transaction::{AtomicVersion, Version};
 use schemadb::{ReadOptions, SchemaBatch, DB};
-use std::sync::atomic::AtomicBool;
-use std::sync::{atomic::Ordering, Arc};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 #[cfg(test)]
 mod test;
@@ -126,7 +128,7 @@ impl StateStorePruner {
                 .start_timer();
             let new_min_readable_version =
                 indices.last().expect("Should exist.").stale_since_version;
-            let mut batch = SchemaBatch::new();
+            let batch = SchemaBatch::new();
             // Delete stale nodes.
             indices.into_iter().try_for_each(|index| {
                 batch.delete::<JellyfishMerkleNodeSchema>(&index.node_key)?;

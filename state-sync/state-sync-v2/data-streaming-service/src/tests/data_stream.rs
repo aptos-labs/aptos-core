@@ -29,7 +29,7 @@ use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use claim::{assert_err, assert_ge, assert_none, assert_ok};
 use futures::{FutureExt, StreamExt};
 use std::{sync::Arc, time::Duration};
-use storage_service_types::CompleteDataRange;
+use storage_service_types::responses::CompleteDataRange;
 use tokio::time::timeout;
 
 #[tokio::test]

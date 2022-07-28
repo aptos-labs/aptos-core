@@ -19,9 +19,9 @@ use network::{
     ProtocolId,
 };
 use std::{sync::Arc, time::Duration};
-use storage_service_types::{
-    StorageServiceError, StorageServiceMessage, StorageServiceRequest, StorageServiceResponse,
-};
+use storage_service_types::requests::StorageServiceRequest;
+use storage_service_types::responses::StorageServiceResponse;
+use storage_service_types::{StorageServiceError, StorageServiceMessage};
 use thiserror::Error;
 
 #[derive(Debug, Error)]

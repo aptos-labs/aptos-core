@@ -10,7 +10,10 @@ license = "Apache-2.0"
 publish = false
 
 [dependencies]
+bcs = "0.1.3"
+itertools = "0.10.0"
 proptest = "1.0.0"
+serde = { version = "1.0.137", default-features = false }
 
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
 aptos-keygen = { path = "../../crates/aptos-keygen" }
@@ -19,7 +22,7 @@ aptos-parallel-executor = { path = "../parallel-executor" }
 aptos-state-view = { path = "../../storage/state-view" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types", features = ["fuzzing"] }
-aptos-vm = { path = "../aptos-vm" }
+aptos-vm = { path = "../aptos-vm", features = ["fuzzing"] }
 
 aptos-writeset-generator = { path = "../writeset-transaction-generator" }
 cached-framework-packages =  { path = "../framework/cached-packages" }

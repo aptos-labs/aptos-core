@@ -38,7 +38,7 @@ impl TestReport {
         self.text.push_str(&text);
     }
 
-    pub fn report_txn_stats(&mut self, test_name: String, stats: TxnStats, window: Duration) {
+    pub fn report_txn_stats(&mut self, test_name: String, stats: &TxnStats, window: Duration) {
         let submitted_txn = stats.submitted;
         let expired_txn = stats.expired;
         let avg_tps = stats.committed / window.as_secs();

@@ -131,7 +131,7 @@ paths:
           required: true
           schema:
             $ref: '#/components/schemas/MoveStructTagId'
-          example: "0x1::AptosAccount::AptosAccount"
+          example: "0x1::account::Account"
         - $ref: '#/components/parameters/LedgerVersion'
       responses:
         "200":
@@ -348,7 +348,7 @@ paths:
         When given a transaction version, server looks up the transaction on-chain by version.
 
         To create a transaction hash:
-          1. Create hash message bytes: "Aptos::Transaction" bytes + BCS bytes of [Transaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/enum.Transaction.html).
+          1. Create hash message bytes: "APTOS::RawTransaction" bytes + BCS bytes of [Transaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/enum.Transaction.html).
           2. Apply hash algorithm `SHA3-256` to the hash message bytes.
           3. Hex-encode the hash bytes with `0x` prefix.
       operationId: get_transaction
@@ -471,7 +471,7 @@ paths:
           required: true
           schema:
             $ref: '#/components/schemas/MoveStructTagId'
-          example: "0x1::AptosAccount::AptosAccount"
+          example: "0x1::account::Account"
         - name: field_name
           in: path
           required: true
@@ -783,7 +783,7 @@ components:
 
             Move struct field name and value are serialized as object property name and value.
       example:
-        type: "0x1::AptosAccount::Balance<0x1::XDX::XDX>"
+        type: "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
         data:
           coin:
             value: "8000000000"
@@ -807,17 +807,16 @@ components:
         Vector type value examples:
           * `vector<u8>`
           * `vector<vector<u64>>`
-          * `vector<0x1::AptosAccount::Balance<0x1::XDX::XDX>>`
+          * `vector<0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>>`
 
         Struct type value examples:
-          * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
-          * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
-          * `0x1::AptosAccount::AccountOperationsCapability`
+          * `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
+          * `0x1::account::Account`
 
         Note:
           1. Empty chars should be ignored when comparing 2 struct tag ids.
           2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-      example: "0x1::XUS::XUS"
+      example: "0x1::aptos_coin::AptosCoin"
     MoveTypeId:
       title: Move Type ID
       type: string
@@ -842,49 +841,18 @@ components:
         Vector type value examples:
           * `vector<u8>`
           * `vector<vector<u64>>`
-          * `vector<0x1::AptosAccount::Balance<0x1::XDX::XDX>>`
+          * `vector<0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>>`
 
         Struct type value examples:
-          * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
-          * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
-          * `0x1::AptosAccount::AccountOperationsCapability`
+          * `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`
+          * `0x1::account::Account`
 
         Reference type value examples:
           * `&signer`
           * `&mut address`
           * `&mut vector<u8>`
 
-        Generic type parameter value example, the following is `0x1::TransactionFee::TransactionFee` JSON representation:
-
-            {
-                "name": "TransactionFee",
-                "is_native": false,
-                "abilities": ["key"],
-                "generic_type_params": [
-                    {"constraints": [], "is_phantom": true}
-                ],
-                "fields": [
-                    { "name": "balance", "type": "0x1::Aptos::Aptos<T0>" },
-                    { "name": "preburn", "type": "0x1::Aptos::Preburn<T0>" }
-                ]
-            }
-
-        It's Move source code:
-
-            module AptosFramework::TransactionFee {
-                struct TransactionFee<phantom CoinType> has key {
-                    balance: Aptos<CoinType>,
-                    preburn: Preburn<CoinType>,
-                }
-            }
-
-        The `T0` in the above JSON representation is the generic type place holder for
-        the `CoinType` in the Move source code.
-
-        Note:
-          1. Empty chars should be ignored when comparing 2 struct tag ids.
-          2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-      example: "0x1::AptosAccount::Balance<0x1::XUS::XUS>"
+      example: "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
     MoveStructTagId:
       title: Move Struct Tag ID
       type: string
@@ -898,16 +866,15 @@ components:
           2. `struct generic type parameters` joined by `, `.
 
         Examples:
-          * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
-          * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
-          * `0x1::AptosAccount::AccountOperationsCapability`
+          * `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`
+          * `0x1::account::Account`
 
         Note:
           1. Empty chars should be ignored when comparing 2 struct tag ids.
           2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
 
         See [doc](https://diem.github.io/move/structs-and-resources.html) for more details.
-      example: "0x1::AptosAccount::Balance<0x1::XUS::XUS>"
+      example: "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
     MoveModule:
       title: Move Module
       type: object
@@ -993,7 +960,7 @@ components:
             is_phantom: true
         fields:
           - name: "coin"
-            type: "0x1::Aptos::Aptos<T0>"
+            type: "0x1::aptos_coin::AptosCoin"
     MoveStructField:
       title: Move Struct Field
       type: object
@@ -1085,7 +1052,7 @@ components:
         Module name is case-sensitive.
 
         See [doc](https://diem.github.io/move/modules-and-scripts.html#modules) for more details.
-      example: "0x1::Aptos"
+      example: "0x1::aptos"
     UserTransactionRequest:
       title: User Transaction Request
       type: object
@@ -1342,9 +1309,9 @@ components:
             $ref: '#/components/schemas/MoveValue'
       example:
         type: "script_function_payload"
-        function: "0x1::PaymentScripts::peer_to_peer_with_metadata"
+        function: "0x1::payment_scripts::peer_to_peer_with_metadata"
         type_arguments:
-          - "0x1::XDX::XDX"
+          - "0x1::xdx::XDX"
         arguments:
           - "0x1668f6be25668c1a17cd8caf6b8d2f25"
           - "2021000000"
@@ -1359,7 +1326,7 @@ components:
         Format: `{address}::{module name}::{function name}`
 
         Both `module name` and `function name` are case-sensitive.
-      example: "0x1::PaymentScripts::peer_to_peer_with_metadata"
+      example: "0x1::payment_scripts::peer_to_peer_with_metadata"
     ScriptPayload:
       title: Script Payload
       type: object
@@ -1687,7 +1654,7 @@ components:
       example:
         key: "0x00000000000000000000000000000000000000000a550c18"
         sequence_number: "23"
-        type: "0x1::AptosAccount::CreateAccountEvent"
+        type: "0x1::account::CreateAccountEvent"
         data:
           created: "0xa550c18"
           role_id: "0"

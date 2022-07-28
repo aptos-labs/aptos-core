@@ -40,7 +40,7 @@ use futures::{
 };
 use itertools::zip_eq;
 use std::{cmp::min, pin::Pin, sync::Arc, time::Instant};
-use storage_interface::{DbReader, DbReaderWriter};
+use storage_interface::DbReaderWriter;
 use structopt::StructOpt;
 use tokio::io::BufReader;
 
@@ -409,12 +409,7 @@ impl TransactionRestoreBatchController {
         restore_handler.maybe_reset_state_store(expected_latest_version);
         let replay_start = Instant::now();
         let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.aptosdb));
-        let persisted_view = restore_handler.aptosdb.get_latest_executed_trees()?;
-        assert_eq!(
-            persisted_view.state().current_version,
-            first_version.checked_sub(1)
-        );
-        let chunk_replayer = Arc::new(ChunkExecutor::<AptosVM>::new_with_view(db, persisted_view));
+        let chunk_replayer = Arc::new(ChunkExecutor::<AptosVM>::new(db));
 
         let db_commit_stream = txns_to_execute_stream
             .try_chunks(BATCH_SIZE)

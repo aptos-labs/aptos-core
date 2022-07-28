@@ -34,7 +34,8 @@ use std::{
     thread,
     time::Duration,
 };
-use storage_service_types::{CompleteDataRange, Epoch};
+use storage_service_types::responses::CompleteDataRange;
+use storage_service_types::Epoch;
 use tokio::time::timeout;
 
 /// The number of state values held at any version

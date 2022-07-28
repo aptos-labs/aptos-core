@@ -371,6 +371,8 @@ impl<
                     )));
                 }
             }
+            self.reset_active_stream();
+            self.storage_synchronizer.finish_chunk_executor(); // The bootstrapper is now complete
         }
 
         Ok(())

@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -38,6 +39,7 @@ use thiserror::Error;
 pub mod async_proof_fetcher;
 pub mod cached_state_view;
 mod executed_trees;
+#[cfg(any(feature = "fuzzing"))]
 pub mod mock;
 pub mod no_proof_fetcher;
 pub mod proof_fetcher;
@@ -522,6 +524,11 @@ pub trait DbReader: Send + Sync {
 
     /// Get the ledger prune window config value.
     fn get_ledger_prune_window(&self) -> Result<Option<usize>> {
+        unimplemented!()
+    }
+
+    /// Get table info from the internal indexer.
+    fn get_table_info(&self, handle: TableHandle) -> Result<TableInfo> {
         unimplemented!()
     }
 }

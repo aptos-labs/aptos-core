@@ -31,12 +31,15 @@ use std::{
     time::{Duration, Instant},
 };
 use storage_interface::DbReader;
-use storage_service_types::{
-    CompleteDataRange, DataSummary, EpochEndingLedgerInfoRequest, ProtocolMetadata, Result,
-    ServerProtocolVersion, StateValuesWithProofRequest, StorageServerSummary, StorageServiceError,
-    StorageServiceRequest, StorageServiceResponse, TransactionOutputsWithProofRequest,
-    TransactionsWithProofRequest,
+use storage_service_types::requests::{
+    EpochEndingLedgerInfoRequest, StateValuesWithProofRequest, StorageServiceRequest,
+    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
+use storage_service_types::responses::{
+    CompleteDataRange, DataSummary, ProtocolMetadata, ServerProtocolVersion, StorageServerSummary,
+    StorageServiceResponse,
+};
+use storage_service_types::{Result, StorageServiceError};
 use thiserror::Error;
 use tokio::runtime::Handle;
 

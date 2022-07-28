@@ -31,7 +31,7 @@ pub use self::{
         ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerElectionType,
     },
     registered_currencies::RegisteredCurrencies,
-    validator_set::ValidatorSet,
+    validator_set::{ConsensusScheme, ValidatorSet},
     vm_config::VMConfig,
     vm_publishing_option::VMPublishingOption,
 };
@@ -160,7 +160,7 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
 }
 
 pub fn new_epoch_event_key() -> EventKey {
-    EventKey::new(0, CORE_CODE_ADDRESS)
+    EventKey::new(1, CORE_CODE_ADDRESS)
 }
 
 pub fn struct_tag_for_config(config_name: Identifier) -> StructTag {

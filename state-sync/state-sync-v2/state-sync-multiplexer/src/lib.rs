@@ -201,6 +201,7 @@ mod tests {
             false,
             NO_OP_STORAGE_PRUNER_CONFIG,
             RocksdbConfigs::default(),
+            false,
         )
         .unwrap();
         let (_, db_rw) = DbReaderWriter::wrap(db);
@@ -245,7 +246,7 @@ mod tests {
             mempool_notifier,
             consensus_listener,
             db_rw.clone(),
-            Arc::new(ChunkExecutor::<AptosVM>::new(db_rw).unwrap()),
+            Arc::new(ChunkExecutor::<AptosVM>::new(db_rw)),
             &node_config,
             Waypoint::new_any(&LedgerInfo::new(BlockInfo::empty(), HashValue::random())),
             event_subscription_service,

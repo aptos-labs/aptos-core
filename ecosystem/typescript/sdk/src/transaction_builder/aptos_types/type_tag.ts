@@ -134,8 +134,8 @@ export class StructTag {
 
   /**
    * Converts a string literal to a StructTag
-   * @param structTag String literal in format "AcountAddress::ModuleName::ResourceName",
-   *   e.g. "0x01::aptos_coin::AptosCoin"
+   * @param structTag String literal in format "AcountAddress::module_name::ResourceName",
+   *   e.g. "0x1::aptos_coin::AptosCoin"
    * @returns
    */
   static fromString(structTag: string): StructTag {

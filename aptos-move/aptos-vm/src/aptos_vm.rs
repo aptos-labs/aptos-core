@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::move_vm_ext::{NativeCodeContext, PublishRequest};
 use crate::{
     adapter_common,
     adapter_common::{
@@ -56,6 +57,7 @@ use move_deps::{
 };
 use num_cpus;
 use once_cell::sync::OnceCell;
+use std::collections::BTreeSet;
 use std::{
     cmp::min,
     collections::HashSet,
@@ -296,6 +298,8 @@ impl AptosVM {
             }
             .map_err(|e| e.into_vm_status())?;
 
+            self.resolve_pending_code_publish(&mut session, gas_status)?;
+
             charge_global_write_gas_usage(gas_status, &session, &txn_data.sender())?;
 
             self.success_transaction_cleanup(session, gas_status, txn_data, log_context)
@@ -329,39 +333,48 @@ impl AptosVM {
         Ok(())
     }
 
+    /// Execute all module initializers.
     fn execute_module_initialization<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
         gas_status: &mut GasStatus,
-        modules: &ModuleBundle,
+        modules: &[CompiledModule],
         senders: &[AccountAddress],
     ) -> VMResult<()> {
         let init_func_name = ident_str!("init_module");
+        for module in modules {
+            let init_function = session.load_function(&module.self_id(), init_func_name, &[]);
+            // it is ok to not have init_module function
+            // init_module function should be (1) private and (2) has no return value
+            if init_function.is_ok() {
+                if verify_module_init_function(module).is_ok() {
+                    let args: Vec<Vec<u8>> = senders
+                        .iter()
+                        .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
+                        .collect();
+                    session.execute_function_bypass_visibility(
+                        &module.self_id(),
+                        init_func_name,
+                        vec![],
+                        args,
+                        gas_status,
+                    )?;
+                } else {
+                    return Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
+                        .finish(Location::Undefined));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Deserialize a module bundle.
+    fn deserialize_module_bundle(&self, modules: &ModuleBundle) -> VMResult<Vec<CompiledModule>> {
+        let mut result = vec![];
         for module_blob in modules.iter() {
-            let args: Vec<Vec<u8>> = senders
-                .iter()
-                .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
-                .collect();
             match CompiledModule::deserialize(module_blob.code()) {
                 Ok(module) => {
-                    let init_function =
-                        session.load_function(&module.self_id(), init_func_name, &[]);
-                    // it is ok to not have init_module function
-                    // init_module function should be (1) private and (2) has no return value
-                    if init_function.is_ok() {
-                        if verify_module_init_function(&module).is_ok() {
-                            session.execute_function_bypass_visibility(
-                                &module.self_id(),
-                                init_func_name,
-                                vec![],
-                                args,
-                                gas_status,
-                            )?;
-                        } else {
-                            return Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
-                                .finish(Location::Undefined));
-                        }
-                    }
+                    result.push(module);
                 }
                 Err(_err) => {
                     return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
@@ -369,9 +382,12 @@ impl AptosVM {
                 }
             }
         }
-        Ok(())
+        Ok(result)
     }
 
+    /// Execute a module bundle load request.
+    /// TODO: this is going to be deprecated and removed in favor of code publishing via
+    /// NativeCodeContext
     fn execute_modules<S: MoveResolverExt>(
         &self,
         mut session: SessionExt<S>,
@@ -408,11 +424,70 @@ impl AptosVM {
         self.execute_module_initialization(
             &mut session,
             gas_status,
-            modules,
+            &self.deserialize_module_bundle(modules)?,
             &[txn_data.sender()],
         )?;
 
         self.success_transaction_cleanup(session, gas_status, txn_data, log_context)
+    }
+
+    /// Resolve a pending code publish request registered via the NativeCodeContext.
+    fn resolve_pending_code_publish<S: MoveResolverExt>(
+        &self,
+        session: &mut SessionExt<S>,
+        gas_status: &mut GasStatus,
+    ) -> VMResult<()> {
+        if let Some(PublishRequest {
+            destination,
+            bundle,
+            expected_modules,
+            check_compat,
+        }) = NativeCodeContext::extract_publish_request(session)
+        {
+            // TODO: unfortunately we need to deserialize the entire bundle here to handle
+            // `init_module` and verify some deployment conditions, while the VM need to do
+            // the deserialization again. Consider adding an API to MoveVM which allows to
+            // directly pass CompiledModule.
+            let modules = self.deserialize_module_bundle(&bundle)?;
+
+            // Validate the module bundle
+            self.validate_publish_request(&modules, expected_modules)?;
+
+            // Publish the bundle
+            if check_compat {
+                session.publish_module_bundle(bundle.into_inner(), destination, gas_status)?
+            } else {
+                session.publish_module_bundle_relax_compatibility(
+                    bundle.into_inner(),
+                    destination,
+                    gas_status,
+                )?
+            }
+
+            // Execute initializers
+            self.execute_module_initialization(session, gas_status, &modules, &[destination])
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Validate a publish request.
+    fn validate_publish_request(
+        &self,
+        modules: &[CompiledModule],
+        expected_names: BTreeSet<String>,
+    ) -> VMResult<()> {
+        let given_names = modules
+            .iter()
+            .map(|m| m.self_id().name().as_str().to_string())
+            .collect::<BTreeSet<_>>();
+        if given_names != expected_names {
+            Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
+                .with_message("metadata and code bundle mismatch".to_owned())
+                .finish(Location::Undefined))
+        } else {
+            Ok(())
+        }
     }
 
     pub(crate) fn execute_user_transaction<S: MoveResolverExt>(

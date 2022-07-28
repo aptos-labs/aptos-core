@@ -4,7 +4,7 @@
 use crate::Error;
 use aptos_logger::Schema;
 use serde::Serialize;
-use storage_service_types::StorageServiceRequest;
+use storage_service_types::requests::StorageServiceRequest;
 
 #[derive(Schema)]
 pub struct LogSchema<'a> {
