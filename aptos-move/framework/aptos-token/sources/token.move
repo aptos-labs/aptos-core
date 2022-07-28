@@ -138,7 +138,7 @@ module aptos_token::token {
 
     /// Represent collection and token metadata for a creator
     struct Collections has key {
-        collections: Table<String, CollectionData>,
+        collection_data: Table<String, CollectionData>,
         token_data: Table<TokenDataId, TokenData>,
         create_collection_events: EventHandle<CreateCollectionEvent>,
         create_token_data_events: EventHandle<CreateTokenDataEvent>,
@@ -576,7 +576,7 @@ module aptos_token::token {
             move_to(
                 creator,
                 Collections{
-                    collections: table::new(),
+                    collection_data: table::new(),
                     token_data: table::new(),
                     create_collection_events: event::new_event_handle<CreateCollectionEvent>(creator),
                     create_token_data_events: event::new_event_handle<CreateTokenDataEvent>(creator),
@@ -585,10 +585,10 @@ module aptos_token::token {
             )
         };
 
-        let collections = &mut borrow_global_mut<Collections>(account_addr).collections;
+        let collection_data = &mut borrow_global_mut<Collections>(account_addr).collection_data;
 
         assert!(
-            !table::contains(collections, name),
+            !table::contains(collection_data, name),
             error::already_exists(ECOLLECTION_ALREADY_EXISTS),
         );
 
@@ -602,7 +602,7 @@ module aptos_token::token {
             mutability_config
         };
 
-        table::add(collections, name, collection);
+        table::add(collection_data, name, collection);
         let collection_handle = borrow_global_mut<Collections>(account_addr);
         event::emit_event<CreateCollectionEvent>(
             &mut collection_handle.create_collection_events,
@@ -641,7 +641,7 @@ module aptos_token::token {
         let token_data_id = create_token_data_id(account_addr, collection, name);
 
         assert!(
-            table::contains(&collections.collections, token_data_id.collection),
+            table::contains(&collections.collection_data, token_data_id.collection),
             error::already_exists(ECOLLECTION_NOT_PUBLISHED),
         );
         assert!(
@@ -649,7 +649,7 @@ module aptos_token::token {
             error::already_exists(ETOKEN_ALREADY_EXISTS),
         );
 
-        let collection = table::borrow_mut(&mut collections.collections, token_data_id.collection);
+        let collection = table::borrow_mut(&mut collections.collection_data, token_data_id.collection);
         collection.count = collection.count + 1;
         assert!(
             collection.maximum >= collection.count,

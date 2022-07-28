@@ -401,7 +401,7 @@ impl ScriptFunctionCall {
                 new_network_addresses,
                 new_fullnode_addresses,
             ),
-            StakeWithdraw {} => stake_withdraw(),
+            StakeWithdraw { withdraw_amount } => stake_withdraw(withdraw_amount),
             TransactionPublishingOptionSetModulePublishingAllowed { is_allowed } => {
                 transaction_publishing_option_set_module_publishing_allowed(is_allowed)
             }

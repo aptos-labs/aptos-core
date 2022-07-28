@@ -126,7 +126,7 @@ export class TokenClient {
    * @param collectionName Name of collection where token is stored
    * @param name Token name
    * @param amount Amount of tokens which will be transfered
-   * @param serial_number the serial_number of the token with a default value 0
+   * @param property_version the version of token PropertyMap with a default value 0.
    * @returns A hash of transaction
    */
   async offerToken(
@@ -136,7 +136,7 @@ export class TokenClient {
     collectionName: string,
     name: string,
     amount: number,
-    serial_number: number = 0,
+    property_version: number = 0,
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
       type: "script_function_payload",
@@ -148,7 +148,7 @@ export class TokenClient {
         Buffer.from(collectionName).toString("hex"),
         Buffer.from(name).toString("hex"),
         amount.toString(),
-        serial_number.toString(),
+        property_version.toString(),
       ],
     };
     const transactionHash = await this.submitTransactionHelper(account, payload);
@@ -162,7 +162,7 @@ export class TokenClient {
    * @param creator Hex-encoded 16 bytes Aptos account address which created a token
    * @param collectionName Name of collection where token is stored
    * @param name Token name
-   * @param serial_number the serial_number of the token with a default value 0
+   * @param property_version the version of token PropertyMap with a default value 0.
    * @returns A hash of transaction
    */
   async claimToken(
@@ -171,7 +171,7 @@ export class TokenClient {
     creator: MaybeHexString,
     collectionName: string,
     name: string,
-    serial_number: number = 0,
+    property_version: number = 0,
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
       type: "script_function_payload",
@@ -182,7 +182,7 @@ export class TokenClient {
         creator,
         Buffer.from(collectionName).toString("hex"),
         Buffer.from(name).toString("hex"),
-        serial_number.toString(),
+        property_version.toString(),
       ],
     };
     const transactionHash = await this.submitTransactionHelper(account, payload);
@@ -196,7 +196,7 @@ export class TokenClient {
    * @param creator Hex-encoded 16 bytes Aptos account address which created a token
    * @param collectionName Name of collection where token is strored
    * @param name Token name
-   * @param serial_number the serial_number of the token with a default value 0
+   * @param property_version the version of token PropertyMap with a default value 0.
    * @returns A hash of transaction
    */
   async cancelTokenOffer(
@@ -205,7 +205,7 @@ export class TokenClient {
     creator: MaybeHexString,
     collectionName: string,
     name: string,
-    serial_number: number = 0,
+    property_version: number = 0,
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
       type: "script_function_payload",
@@ -216,7 +216,7 @@ export class TokenClient {
         creator,
         Buffer.from(collectionName).toString("hex"),
         Buffer.from(name).toString("hex"),
-        serial_number.toString(),
+        property_version.toString(),
       ],
     };
     const transactionHash = await this.submitTransactionHelper(account, payload);
