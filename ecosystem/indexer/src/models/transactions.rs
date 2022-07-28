@@ -13,17 +13,16 @@ use aptos_rest_client::aptos_api_types::{
     Address, BlockMetadataTransaction as APIBlockMetadataTransaction,
     Transaction as APITransaction, TransactionInfo, UserTransaction as APIUserTransaction, U64,
 };
+use async_graphql::SimpleObject;
 use diesel::{
     BelongingToDsl, ExpressionMethods, GroupedBy, OptionalExtension, QueryDsl, RunQueryDsl,
 };
 use futures::future::Either;
 use serde::Serialize;
-use async_graphql::Object;
 
-#[derive(AsChangeset, Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(AsChangeset, Debug, Identifiable, Insertable, Queryable, Serialize, SimpleObject)]
 #[primary_key(hash)]
 #[diesel(table_name = "transactions")]
-#[Object]
 pub struct Transaction {
     #[diesel(column_name = type)]
     pub type_: String,
@@ -277,11 +276,12 @@ impl Transaction {
     }
 }
 
-#[derive(AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(
+    AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize, SimpleObject,
+)]
 #[belongs_to(Transaction, foreign_key = "hash")]
 #[primary_key(hash)]
 #[diesel(table_name = "user_transactions")]
-#[Object]
 pub struct UserTransaction {
     pub hash: String,
     pub signature: serde_json::Value,
@@ -319,11 +319,12 @@ impl UserTransaction {
     }
 }
 
-#[derive(AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(
+    AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize, SimpleObject,
+)]
 #[belongs_to(Transaction, foreign_key = "hash")]
 #[primary_key("hash")]
 #[diesel(table_name = "block_metadata_transactions")]
-#[Object]
 pub struct BlockMetadataTransaction {
     pub hash: String,
     pub id: String,
