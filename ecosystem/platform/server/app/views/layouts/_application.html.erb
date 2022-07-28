@@ -14,7 +14,7 @@
     <%= render 'layouts/google_analytics' %>
   </head>
 
-  <body class="flex flex-col h-screen justify-between bg-neutral-900 antialiased">
+  <body class="flex flex-col h-screen justify-between antialiased bg-neutral-900 <%= content_for(:body_class) %>">
     <div class="flex flex-col flex-1">
       <%= render HeaderComponent.new(user: current_user) %>
 
