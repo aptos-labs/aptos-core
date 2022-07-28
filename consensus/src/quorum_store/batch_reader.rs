@@ -155,19 +155,19 @@ impl BatchReader {
         let mut expired_keys = Vec::new();
         for (digest, value) in db_content {
             let expiration = value.expiration;
-
-            if epoch < expiration.epoch() {
-                debug!(
-                    "Outdated batch reader in epoch {}, observed expiration epoch {}",
-                    epoch,
-                    expiration.epoch()
-                );
-
-                // Outdated batch reader with the system, must ensure to not affect state.
-                // Can already shutdown the worker thread as an optimization.
-                self_ob.shutdown_flag.store(true, Ordering::Relaxed);
-                break;
-            }
+            assert!(epoch >= expiration.epoch());
+            // if epoch < expiration.epoch() {
+            //     debug!(
+            //         "Outdated batch reader in epoch {}, observed expiration epoch {}",
+            //         epoch,
+            //         expiration.epoch()
+            //     );
+            //
+            //     // Outdated batch reader with the system, must ensure to not affect state.
+            //     // Can already shutdown the worker thread as an optimization.
+            //     self_ob.shutdown_flag.store(true, Ordering::Relaxed);
+            //     break;
+            // }
             // Guaranteed that epoch >= expiration.epoch() below.
 
             if epoch > expiration.epoch()
@@ -235,9 +235,9 @@ impl BatchReader {
     }
 
     pub async fn shutdown(&self) {
-        if !self.shutdown_flag.swap(true, Ordering::Relaxed) {
-            self.shutdown_notify.notified().await;
-        }
+        // if !self.shutdown_flag.swap(true, Ordering::Relaxed) {
+        self.shutdown_flag.swap(true, Ordering::Relaxed);
+        self.shutdown_notify.notified().await;
     }
 
     fn clear_expired_payload(&self, certified_time: LogicalTime) -> Vec<HashValue> {
@@ -300,10 +300,11 @@ impl BatchReader {
             "Non-increasing executed rounds reported to BatchStore"
         );
         let expired_keys = self.clear_expired_payload(certified_time);
-        self.batch_store_tx
+        if let Err(e) = self.batch_store_tx
             .send(BatchStoreCommand::Clean(expired_keys))
-            .await
-            .expect("Failed to send to BatchStore");
+            .await {
+            debug!("QS: Failed to send to BatchStore: {:?}", e);
+        }
     }
 
     fn last_committed_round(&self) -> Round {
@@ -394,7 +395,7 @@ impl BatchReader {
                     self.batch_store_tx
                     .send(BatchStoreCommand::BatchRequest(digest, peer_id, None))
                     .await
-                    .expect("Failed to send to BatchStore");
+                    .expect("Failed to send to BatchStore"); // TODO: I think we have a race here. Batch store can stop before batch reader.
                 },
             StorageMode::MemoryAndPersisted => {
                     let batch = Batch::new(

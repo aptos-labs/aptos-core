@@ -164,14 +164,11 @@ impl StateComputer for ExecutionProxy {
 
         for block in blocks {
             block_ids.push(block.id());
-            if block.block().payload().is_some(){
+            if block.block().payload().is_some() {
                 payloads.push(block.block().payload().unwrap().clone());
             }
             debug!("QSE: getting data in commit, round {}", block.round());
-            let signed_txns = self
-                .data_manager
-                .get_data(block.block())
-                .await?;
+            let signed_txns = self.data_manager.get_data(block.block()).await?;
 
             txns.extend(block.transactions_to_commit(&self.validators.lock(), signed_txns));
             reconfig_events.extend(block.reconfig_event());

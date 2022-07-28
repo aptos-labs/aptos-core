@@ -248,21 +248,21 @@ impl QuorumStore {
                 Some(command) = self.command_rx.recv() => {
                     match command {
                         QuorumStoreCommand::Shutdown(ack_tx) => {
-                let (batch_store_shutdown_tx, batch_store_shutdown_rx) = oneshot::channel();
+                            let (batch_store_shutdown_tx, batch_store_shutdown_rx) = oneshot::channel();
+                            self.batch_store_tx
+                                .send(BatchStoreCommand::Shutdown(batch_store_shutdown_tx))
+                                .await
+                                .expect("Failed to send to BatchStore");
 
-                self.batch_store_tx
-                .send(BatchStoreCommand::Shutdown(batch_store_shutdown_tx))
-                .await
-                .expect("Failed to send to BatchStore");
+                            batch_store_shutdown_rx.await.expect("Failed to stop BatchStore");
 
-                batch_store_shutdown_rx.await.expect("Failed to stop BatchStore");
-
-                ack_tx
-                .send(())
-                .expect("Failed to send shutdown ack from QuorumStore");
-                break;
-            }
+                            ack_tx
+                                .send(())
+                                .expect("Failed to send shutdown ack from QuorumStore");
+                            break;
+                        }
                         QuorumStoreCommand::AppendToBatch(fragment_payload, batch_id) => {
+                            debug!("QS: end batch cmd received, batch id {}", batch_id);
                             let msg = self.handle_append_to_batch(fragment_payload, batch_id);
                             self.network_sender.broadcast_without_self(msg).await;
 

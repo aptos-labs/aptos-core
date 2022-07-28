@@ -130,10 +130,15 @@ impl BatchStore {
 
     fn store(&self, persist_request: PersistRequest) -> Option<SignedDigest> {
         let expiration = persist_request.value.expiration.clone();
-
+        // Network listener should filter messages with wrong expiration epoch.
+        assert_eq!(
+            expiration.epoch(),
+            self.epoch,
+            "Persist Request for a batch with an incorrect epoch"
+        );
         match self
             .batch_reader
-            .save(persist_request.digest, persist_request.value.clone())
+            .save(persist_request.digest, persist_request.value.clone()) // TODO: what is this comes from old epoch?
         {
             Ok(needs_db) => {
                 if needs_db {

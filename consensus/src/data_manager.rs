@@ -116,14 +116,13 @@ impl DataManager for QuorumStoreDataManager {
             .map(|proof| proof.digest().clone())
             .collect();
 
-        self.quorum_store_wrapper_tx
+        let _ = self.quorum_store_wrapper_tx
             .load()
             .as_ref()
             .unwrap()
             .as_ref()
             .clone()
-            .try_send(WrapperCommand::CleanRequest(logical_time, digests))
-            .expect("could not send to wrapper");
+            .try_send(WrapperCommand::CleanRequest(logical_time, digests));
         let expired_set = self.expiration_status.lock().expire(logical_time.round());
         for expired in expired_set {
             self.digest_status.remove(&expired);
@@ -182,7 +181,7 @@ impl DataManager for QuorumStoreDataManager {
                         proofs.clone(),
                         LogicalTime::new(block.epoch(), block.round()),
                     )
-                    .await
+                        .await
                 };
                 let mut vec_ret = Vec::new();
                 debug!("QSE: waiting for data on {} receivers", receivers.len());
