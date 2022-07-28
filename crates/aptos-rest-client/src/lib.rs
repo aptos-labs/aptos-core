@@ -154,7 +154,7 @@ impl Client {
         hash: HashValue,
         expiration_timestamp_secs: u64,
     ) -> Result<Response<Transaction>> {
-        const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
+        const DEFAULT_TIMEOUT: Duration = Duration::from_secs(600);
         const DEFAULT_DELAY: Duration = Duration::from_millis(500);
 
         let start = std::time::Instant::now();

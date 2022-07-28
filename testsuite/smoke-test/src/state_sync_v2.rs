@@ -17,7 +17,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const MAX_CATCH_UP_SECS: u64 = 60; // The max time we'll wait for nodes to catch up
+const MAX_CATCH_UP_SECS: u64 = 600; // The max time we'll wait for nodes to catch up
 
 #[tokio::test]
 async fn test_full_node_bootstrap_accounts() {

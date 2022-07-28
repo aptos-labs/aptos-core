@@ -107,6 +107,8 @@ impl QuorumStoreWrapper {
             .collect();
         exclude_txns.extend(self.batch_builder.summaries().clone());
 
+        debug!("QS: excluding txs len: {:?}", exclude_txns.len());
+        let mut end_batch = false;
         // TODO: size and unwrap or not?
         let pulled_txns = self
             .mempool_proxy
@@ -114,7 +116,7 @@ impl QuorumStoreWrapper {
             .await
             .unwrap();
 
-        let mut end_batch = false;
+        debug!("QS: pulled_txns len: {:?}", pulled_txns.len());
 
         for txn in pulled_txns {
             if !self.batch_builder.append_transaction(&txn) {
