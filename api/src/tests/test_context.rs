@@ -10,7 +10,7 @@ use aptos_api_types::{
     mime_types, HexEncodedBytes, TransactionOnChainData, X_APTOS_CHAIN_ID,
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
 };
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NodeConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_crypto::{hash::HashValue, SigningKey};
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_sdk::{
@@ -67,7 +67,16 @@ pub fn new_test_context(test_name: &'static str) -> TestContext {
     let (validator_identity, _, _) = validators[0].get_key_objects(None).unwrap();
     let validator_owner = validator_identity.account_address.unwrap();
 
-    let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(&tmp_dir));
+    let (db, db_rw) = DbReaderWriter::wrap(
+        AptosDB::open(
+            &tmp_dir,
+            false,                       /* readonly */
+            NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
+            RocksdbConfigs::default(),
+            true, /* indexer */
+        )
+        .unwrap(),
+    );
     let ret =
         db_bootstrapper::maybe_bootstrap::<AptosVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
     assert!(ret);

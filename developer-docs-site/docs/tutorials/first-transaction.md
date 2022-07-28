@@ -35,10 +35,10 @@ Make sure you follow the below steps first so you can run the tutorial.
 
 1. Clone the Aptos repo.
 
-      ```
-      git clone https://github.com/aptos-labs/aptos-core.git
+    ```
+    git clone https://github.com/aptos-labs/aptos-core.git
 
-      ```
+    ```
 
 2. `cd` into `aptos-core` directory.
 
