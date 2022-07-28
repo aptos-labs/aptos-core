@@ -1,0 +1,21 @@
+[package]
+name = "aptos-gas"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Gas metering for the Aptos blockchain"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+move-binary-format = { git = "https://github.com/move-language/move", rev = "7d28bfa484ef7d9ff225a748832de1cf1b67d77b" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "7d28bfa484ef7d9ff225a748832de1cf1b67d77b" }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "7d28bfa484ef7d9ff225a748832de1cf1b67d77b" }
+move-vm-types = { git = "https://github.com/move-language/move", rev = "7d28bfa484ef7d9ff225a748832de1cf1b67d77b" }
+
+framework = { path = "../framework" }
+
+[features]
+testing = ["move-stdlib/testing"]
