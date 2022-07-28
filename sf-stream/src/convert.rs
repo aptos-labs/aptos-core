@@ -255,21 +255,32 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             )),
             special_fields: Default::default(),
         },
-        WriteSetChange::WriteTableItem(write_table_item) => extractor::WriteSetChange {
-            type_: protobuf::EnumOrUnknown::new(
-                extractor::write_set_change::WriteSetChangeType::WRITE_TABLE_ITEM,
-            ),
-            change: Some(extractor::write_set_change::Change::WriteTableItem(
-                extractor::WriteTableItem {
-                    state_key_hash: convert_hex_string_to_bytes(&write_table_item.state_key_hash),
-                    handle: write_table_item.handle.to_string(),
-                    key: write_table_item.key.to_string(),
-                    value: write_table_item.value.to_string(),
-                    special_fields: Default::default(),
-                },
-            )),
-            special_fields: Default::default(),
-        },
+        WriteSetChange::WriteTableItem(write_table_item) => {
+            let data = write_table_item.data.as_ref().unwrap();
+            extractor::WriteSetChange {
+                type_: protobuf::EnumOrUnknown::new(
+                    extractor::write_set_change::WriteSetChangeType::WRITE_TABLE_ITEM,
+                ),
+                change: Some(extractor::write_set_change::Change::WriteTableItem(
+                    extractor::WriteTableItem {
+                        state_key_hash: convert_hex_string_to_bytes(
+                            &write_table_item.state_key_hash,
+                        ),
+                        handle: write_table_item.handle.to_string(),
+                        key: write_table_item.key.to_string(),
+                        data: protobuf::MessageField::some(extractor::WriteTableData {
+                            key: data.key.to_string(),
+                            key_type: data.key_type.clone(),
+                            value: data.value.to_string(),
+                            value_type: data.value_type.clone(),
+                            special_fields: Default::default(),
+                        }),
+                        special_fields: Default::default(),
+                    },
+                )),
+                special_fields: Default::default(),
+            }
+        }
     }
 }
 
