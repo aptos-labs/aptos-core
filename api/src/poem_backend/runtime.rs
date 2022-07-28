@@ -30,16 +30,20 @@ use tokio::runtime::Handle;
 // TODO: https://github.com/poem-web/poem/issues/332
 // TODO: https://github.com/poem-web/poem/issues/333
 
-/// Returns address it is running at.
-pub fn attach_poem_to_runtime(
-    runtime_handle: &Handle,
-    context: Context,
-    config: &NodeConfig,
-) -> anyhow::Result<SocketAddr> {
-    let context = Arc::new(context);
-
-    let size_limit = context.content_length_limit();
-
+pub fn get_api_service(
+    context: Arc<Context>,
+) -> OpenApiService<
+    (
+        AccountsApi,
+        BasicApi,
+        EventsApi,
+        IndexApi,
+        StateApi,
+        TransactionsApi,
+    ),
+    (),
+> {
+    // These APIs get merged.
     let apis = (
         AccountsApi {
             context: context.clone(),
@@ -66,12 +70,24 @@ pub fn attach_poem_to_runtime(
         .name("Aptos Labs")
         .url("https://github.com/aptos-labs/aptos-core");
 
-    // These APIs get merged.
-    let api_service = OpenApiService::new(apis, "Aptos Node API", version)
+    OpenApiService::new(apis, "Aptos Node API", version)
         .description("The Aptos Node API is a RESTful API for client applications to interact with the Aptos blockchain.")
         .license(license)
         .contact(contact)
-        .external_document("https://github.com/aptos-labs/aptos-core");
+        .external_document("https://github.com/aptos-labs/aptos-core")
+}
+
+/// Returns address it is running at.
+pub fn attach_poem_to_runtime(
+    runtime_handle: &Handle,
+    context: Context,
+    config: &NodeConfig,
+) -> anyhow::Result<SocketAddr> {
+    let context = Arc::new(context);
+
+    let size_limit = context.content_length_limit();
+
+    let api_service = get_api_service(context);
 
     let spec_json = api_service.spec_endpoint();
     let spec_yaml = api_service.spec_endpoint_yaml();

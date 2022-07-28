@@ -3,6 +3,7 @@ resolver = "2"
 
 members = [
     "api",
+    "api/spec-generator",
     "api/types",
     "aptos-move/af-cli",
     "aptos-move/aptos-module-verifier",

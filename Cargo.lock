@@ -246,6 +246,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-api-spec-generator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-api",
+ "aptos-config",
+ "aptos-mempool",
+ "aptos-types",
+ "clap 3.2.11",
+ "storage-interface",
+]
+
+[[package]]
 name = "aptos-api-types"
 version = "0.0.1"
 dependencies = [
