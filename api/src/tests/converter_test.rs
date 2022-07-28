@@ -19,7 +19,7 @@ async fn test_value_conversion() {
 
     let state_view = context.latest_state_view();
     let resolver = state_view.as_move_resolver();
-    let converter = resolver.as_converter();
+    let converter = resolver.as_converter(context.db.clone());
 
     assert_value_conversion(&converter, "u8", 1i32, VmMoveValue::U8(1));
     assert_value_conversion(&converter, "u64", "1", VmMoveValue::U64(1));

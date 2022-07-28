@@ -25,6 +25,7 @@ use aptos_types::{
 
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_types::state_store::state_key::StateKey;
+use cached_framework_packages::aptos_stdlib;
 use move_deps::move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
@@ -413,20 +414,30 @@ async fn test_multi_ed25519_signed_transaction() {
 #[tokio::test]
 async fn test_get_transaction_by_hash() {
     let mut context = new_test_context(current_function_name!());
-    let account = context.gen_account();
+    let mut account = context.gen_account();
     let txn = context.create_user_account(&account);
-    context.commit_block(&vec![txn.clone()]).await;
+    let factory = context.transaction_factory();
+    let txn2 = account.sign_with_transaction_builder(factory.payload(
+        aptos_stdlib::token_create_unlimited_collection_script(
+            "my name".into(),
+            "awesome collection".into(),
+            "http://aptoslabs.com/ifonly.json".into(),
+        ),
+    ));
 
-    let txns = context.get("/transactions?start=2&limit=1").await;
+    context.commit_block(&vec![txn.clone(), txn2.clone()]).await;
+
+    let txns = context.get("/transactions?start=3&limit=1").await;
     assert_eq!(1, txns.as_array().unwrap().len());
-
     let resp = context
         .get(&format!(
             "/transactions/{}",
             txns[0]["hash"].as_str().unwrap()
         ))
         .await;
-    assert_json(resp, txns[0].clone());
+    assert_json(resp.clone(), txns[0].clone());
+    // Ensure changes contains the table data in the writeset
+    context.check_golden_output(resp.get("changes".to_string()).unwrap().clone());
 }
 
 #[tokio::test]

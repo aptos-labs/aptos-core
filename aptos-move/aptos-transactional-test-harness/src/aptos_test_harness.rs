@@ -53,6 +53,7 @@ use move_deps::{
     move_vm_runtime::session::SerializedReturnValues,
 };
 use once_cell::sync::Lazy;
+use std::sync::Arc;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
@@ -245,6 +246,9 @@ impl SignerAndKeyPair {
         })
     }
 }
+
+pub struct FakeDbReader {}
+impl storage_interface::DbReader for FakeDbReader {}
 
 /**
  * Helpers
@@ -873,7 +877,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             }
             AptosSubCommand::ViewTableCommand(view_table_cmd) => {
                 let resolver = self.storage.as_move_resolver();
-                let converter = resolver.as_converter();
+                let converter = resolver.as_converter(Arc::new(FakeDbReader {}));
 
                 let vm_key = converter
                     .try_into_vm_value(&view_table_cmd.key_type, view_table_cmd.key_value)

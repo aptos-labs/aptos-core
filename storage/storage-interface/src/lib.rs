@@ -531,6 +531,11 @@ pub trait DbReader: Send + Sync {
     fn get_table_info(&self, handle: TableHandle) -> Result<TableInfo> {
         unimplemented!()
     }
+
+    /// Returns whether the internal indexer DB has been enabled or not
+    fn indexer_enabled(&self) -> bool {
+        unimplemented!()
+    }
 }
 
 impl MoveStorage for &dyn DbReader {

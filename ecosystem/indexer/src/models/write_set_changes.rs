@@ -111,6 +111,7 @@ impl WriteSetChange {
                 handle,
                 key,
                 value,
+                ..
             }) => WriteSetChange {
                 transaction_hash,
                 hash: state_key_hash.clone(),

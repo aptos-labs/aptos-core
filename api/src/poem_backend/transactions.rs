@@ -88,7 +88,7 @@ impl TransactionsApi {
         }
 
         let resolver = self.context.move_resolver_poem()?;
-        let converter = resolver.as_converter();
+        let converter = resolver.as_converter(self.context.db.clone());
         let txns: Vec<Transaction> = data
             .into_iter()
             .map(|t| {

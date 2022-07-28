@@ -37,7 +37,7 @@ use crate::poem_backend::{AptosErrorCode, InternalError};
 #[derive(Clone)]
 pub struct Context {
     chain_id: ChainId,
-    db: Arc<dyn DbReader>,
+    pub db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
     node_config: NodeConfig,
 }
@@ -232,7 +232,7 @@ impl Context {
         };
 
         let resolver = self.move_resolver()?;
-        let converter = resolver.as_converter();
+        let converter = resolver.as_converter(self.db.clone());
         let txn = self.get_transaction_by_version(start, ledger_version)?;
 
         // Parse the resources and find the block metadata resource update
