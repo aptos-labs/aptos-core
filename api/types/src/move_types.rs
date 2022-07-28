@@ -165,7 +165,7 @@ impl<'de> Deserialize<'de> for U128 {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct HexEncodedBytes(Vec<u8>);
+pub struct HexEncodedBytes(pub Vec<u8>);
 
 impl HexEncodedBytes {
     pub fn json(&self) -> anyhow::Result<serde_json::Value> {

@@ -28,6 +28,7 @@ aptos-state-view = { path = "../../storage/state-view" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
+storage-interface = { path = "../../storage/storage-interface" }
 
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 
