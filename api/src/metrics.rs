@@ -6,7 +6,7 @@ use aptos_metrics_core::{register_histogram_vec, HistogramVec};
 use once_cell::sync::Lazy;
 use warp::log::{custom, Info, Log};
 
-static HISTOGRAM: Lazy<HistogramVec> = Lazy::new(|| {
+pub static HISTOGRAM: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_api_requests",
         "API requests latency grouped by method, operation_id and status",
