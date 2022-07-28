@@ -48,7 +48,10 @@ mod state_store_test;
 type StateValueBatch = aptos_jellyfish_merkle::StateValueBatch<StateKey, StateValue>;
 
 pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
-const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = 200_000;
+// We assume TARGET_SNAPSHOT_INTERVAL_IN_VERSION > block size.
+const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT_INTERVAL_IN_VERSION
+    * (buffered_state::ASYNC_COMMIT_CHANNEL_BUFFER_SIZE + 2)
+    * 2;
 
 #[derive(Debug)]
 pub(crate) struct StateDb {
