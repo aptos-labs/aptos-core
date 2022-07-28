@@ -46,8 +46,6 @@ pub struct Layout {
     pub epoch_duration_secs: u64,
     /// Initial timestamp for genesis validators to be locked up
     pub initial_lockup_timestamp: u64,
-    /// Min price per gas unit
-    pub min_price_per_gas_unit: u64,
 }
 
 impl Layout {
