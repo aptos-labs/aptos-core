@@ -8,7 +8,8 @@ use super::{middleware_log, AccountsApi, BasicApi, EventsApi, IndexApi};
 use crate::{
     context::Context,
     poem_backend::{
-        check_size::PostSizeLimit, error_converter::convert_error, StateApi, TransactionsApi,
+        accept_type::middleware_accept_type, check_size::PostSizeLimit,
+        error_converter::convert_error, StateApi, TransactionsApi,
     },
 };
 use anyhow::Context as AnyhowContext;
@@ -122,6 +123,7 @@ pub fn attach_poem_to_runtime(
             .at("/spec.yaml", spec_yaml)
             .with(cors)
             .with(PostSizeLimit::new(size_limit))
+            .before(middleware_accept_type)
             // NOTE: Make sure to keep this after all the `with` middleware.
             .catch_all_error(convert_error)
             .around(middleware_log);

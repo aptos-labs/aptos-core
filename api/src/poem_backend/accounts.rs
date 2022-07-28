@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::accept_type::{parse_accept, AcceptType};
+use super::accept_type::AcceptType;
 use super::{
     build_not_found, ApiTags, AptosErrorResponse, BadRequestError, BasicResponse,
     BasicResponseStatus, InternalError,
@@ -24,7 +24,6 @@ use move_deps::move_core_types::{
     language_storage::{ResourceKey, StructTag},
     move_resource::MoveStructType,
 };
-use poem::web::Accept;
 use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};
 use std::convert::TryInto;
@@ -47,14 +46,13 @@ impl AccountsApi {
     )]
     async fn get_account(
         &self,
-        accept: Accept,
+        accept_type: &AcceptType,
         address: Path<Address>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<AccountData> {
         fail_point_poem("endpoint_get_account")?;
-        let accept_type = parse_accept(&accept)?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
-        account.account(&accept_type)
+        account.account(accept_type)
     }
 
     /// Get account resources
@@ -73,14 +71,13 @@ impl AccountsApi {
     )]
     async fn get_account_resources(
         &self,
-        accept: Accept,
+        accept_type: &AcceptType,
         address: Path<Address>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<Vec<MoveResource>> {
         fail_point_poem("endpoint_get_account_resources")?;
-        let accept_type = parse_accept(&accept)?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
-        account.resources(&accept_type)
+        account.resources(accept_type)
     }
 
     /// Get account modules
@@ -97,14 +94,13 @@ impl AccountsApi {
     )]
     async fn get_account_modules(
         &self,
-        accept: Accept,
+        accept_type: &AcceptType,
         address: Path<Address>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
         fail_point_poem("endpoint_get_account_modules")?;
-        let accept_type = parse_accept(&accept)?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
-        account.modules(&accept_type)
+        account.modules(accept_type)
     }
 }
 

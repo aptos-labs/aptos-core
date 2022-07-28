@@ -3,12 +3,10 @@
 
 use std::sync::Arc;
 
-use super::accept_type::parse_accept;
-use super::ApiTags;
+use super::{AcceptType, ApiTags};
 use super::{BasicResponse, BasicResponseStatus, BasicResult};
 use crate::context::Context;
 use aptos_api_types::IndexResponse;
-use poem::web::Accept;
 use poem_openapi::OpenApi;
 
 pub struct IndexApi {
@@ -26,8 +24,7 @@ impl IndexApi {
         operation_id = "get_ledger_info",
         tag = "ApiTags::General"
     )]
-    async fn get_ledger_info(&self, accept: Accept) -> BasicResult<IndexResponse> {
-        let accept_type = parse_accept(&accept)?;
+    async fn get_ledger_info(&self, accept_type: &AcceptType) -> BasicResult<IndexResponse> {
         let ledger_info = self.context.get_latest_ledger_info_poem()?;
 
         let node_role = self.context.node_role();
@@ -37,7 +34,7 @@ impl IndexApi {
             index_response,
             &ledger_info,
             BasicResponseStatus::Ok,
-            &accept_type,
+            accept_type,
         ))
     }
 }

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::accept_type::{parse_accept, AcceptType};
+use super::accept_type::AcceptType;
 use super::{
     build_not_found, ApiTags, BadRequestError, BasicResponse, BasicResponseStatus, InternalError,
     NotFoundError,
@@ -21,7 +21,6 @@ use aptos_types::state_store::state_key::StateKey;
 use aptos_types::state_store::table::TableHandle;
 use aptos_vm::data_cache::AsMoveResolver;
 use move_deps::move_core_types::language_storage::{ModuleId, ResourceKey, StructTag};
-use poem::web::Accept;
 use poem_openapi::param::Query;
 use poem_openapi::payload::Json;
 use poem_openapi::{param::Path, OpenApi};
@@ -52,14 +51,13 @@ impl StateApi {
     )]
     async fn get_account_resource(
         &self,
-        accept: Accept,
+        accept_type: &AcceptType,
         address: Path<Address>,
         resource_type: Path<MoveStructTagWrapper>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveResource> {
         fail_point_poem("endpoint_get_account_resource")?;
-        let accept_type = parse_accept(&accept)?;
-        self.resource(&accept_type, address.0, resource_type.0, ledger_version.0)
+        self.resource(accept_type, address.0, resource_type.0, ledger_version.0)
     }
 
     /// Get specific account module
@@ -79,14 +77,13 @@ impl StateApi {
     )]
     async fn get_account_module(
         &self,
-        accept: Accept,
+        accept_type: &AcceptType,
         address: Path<Address>,
         module_name: Path<IdentifierWrapper>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveModuleBytecode> {
         fail_point_poem("endpoint_get_account_module")?;
-        let accept_type = parse_accept(&accept)?;
-        self.module(&accept_type, address.0, module_name.0, ledger_version.0)
+        self.module(accept_type, address.0, module_name.0, ledger_version.0)
     }
 
     /// Get table item
@@ -100,15 +97,14 @@ impl StateApi {
     )]
     async fn get_table_item(
         &self,
-        accept: Accept,
+        accept_type: &AcceptType,
         table_handle: Path<U128>,
         table_item_request: Json<TableItemRequest>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveValue> {
         fail_point_poem("endpoint_get_table_item")?;
-        let accept_type = parse_accept(&accept)?;
         self.table_item(
-            &accept_type,
+            accept_type,
             table_handle.0,
             table_item_request.0,
             ledger_version.0,
