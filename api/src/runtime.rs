@@ -31,21 +31,28 @@ pub fn bootstrap(
     let context = Context::new(chain_id, db, mp_sender, config.clone());
 
     // Poem will run on a different port.
-    let poem_address = attach_poem_to_runtime(&runtime, context.clone(), config)
+    let poem_address = attach_poem_to_runtime(runtime.handle(), context.clone(), config)
         .context("Failed to attach poem to runtime")?;
 
     let api = WebServer::from(config.api.clone());
     runtime.spawn(async move {
-        // TODO: This proxy is temporary while we have both APIs running.
-        let proxy = warp::path!("v1" / ..).and(reverse_proxy_filter(
-            "v1".to_string(),
-            format!("http://{}", poem_address),
-        ));
-        let routes = proxy.or(index::routes(context));
+        let routes = get_routes_with_poem(poem_address, context);
         api.serve(routes).await;
     });
 
     Ok(runtime)
+}
+
+// TODO: This proxy is temporary while we have both APIs running.
+pub fn get_routes_with_poem(
+    poem_address: SocketAddr,
+    context: Context,
+) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
+    let proxy = warp::path!("v1" / ..).and(reverse_proxy_filter(
+        "v1".to_string(),
+        format!("http://{}", poem_address),
+    ));
+    proxy.or(index::routes(context))
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -115,7 +122,7 @@ mod tests {
     pub fn bootstrap_with_config(cfg: NodeConfig) {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let context = runtime.block_on(new_test_context_async(
-            "test_bootstrap_jsonprc_and_api_configured_at_different_port",
+            "test_bootstrap_jsonprc_and_api_configured_at_different_port".to_string(),
         ));
         let ret = bootstrap(
             &cfg,
@@ -158,7 +165,7 @@ mod tests {
         }
     }
 
-    pub async fn new_test_context_async(test_name: &'static str) -> TestContext {
-        new_test_context(test_name)
+    pub async fn new_test_context_async(test_name: String) -> TestContext {
+        new_test_context(test_name, "v0")
     }
 }

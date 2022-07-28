@@ -42,7 +42,7 @@ pub trait Bytecode {
     fn new_move_struct_field(&self, def: &FieldDefinition) -> MoveStructField {
         MoveStructField {
             name: self.identifier_at(def.name).to_owned().into(),
-            typ: self.new_move_type(&def.signature.0),
+            typ: self.new_move_type(&def.signature.0).into(),
         }
     }
 
@@ -57,7 +57,10 @@ pub trait Bytecode {
             address: (*self.address_identifier_at(m_handle.address)).into(),
             module: self.identifier_at(m_handle.name).to_owned().into(),
             name: self.identifier_at(s_handle.name).to_owned().into(),
-            generic_type_params: type_params.iter().map(|t| self.new_move_type(t)).collect(),
+            generic_type_params: type_params
+                .iter()
+                .map(|t| self.new_move_type(t).into())
+                .collect(),
         }
     }
 
@@ -135,13 +138,13 @@ pub trait Bytecode {
                 .signature_at(fhandle.parameters)
                 .0
                 .iter()
-                .map(|s| self.new_move_type(s))
+                .map(|s| self.new_move_type(s).into())
                 .collect(),
             return_: self
                 .signature_at(fhandle.return_)
                 .0
                 .iter()
-                .map(|s| self.new_move_type(s))
+                .map(|s| self.new_move_type(s).into())
                 .collect(),
         }
     }

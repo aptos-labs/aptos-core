@@ -34,12 +34,11 @@ impl EventsApi {
         operation_id = "get_events_by_event_key",
         tag = "ApiTags::Events"
     )]
+    // TODO: https://github.com/aptos-labs/aptos-core/issues/2284
     async fn get_events_by_event_key(
         &self,
         accept: Accept,
-        // TODO: Make this a little smarter, in the spec this just looks like a string.
-        // Consider unpacking the inner EventKey type and taking two params, the creation
-        // number and the address.
+        // TODO: https://github.com/aptos-labs/aptos-core/issues/2278
         event_key: Path<EventKey>,
         start: Query<Option<U64>>,
         limit: Query<Option<u16>>,

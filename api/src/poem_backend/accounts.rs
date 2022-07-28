@@ -262,9 +262,6 @@ impl Account {
         )
     }
 
-    // TODO: Break this up into 3 structs / traits. There is common stuff,
-    // account specific stuff, and event specific stuff.
-
     // Events specific stuff.
 
     pub fn find_event_key(
@@ -315,27 +312,3 @@ impl Account {
             .map_err(BasicErrorWith404::internal)
     }
 }
-
-// TODO: For the BCS response type, instead of constructing the Rust type from
-// BCS just to serialize it back again, return the bytes directly. This is an
-// example of doing that, but it requires extensive testing:
-/*
-        let state_values = self
-            .context
-            .get_state_values(self.address.into(), self.ledger_version)
-            .ok_or_else(|| self.account_not_found())?;
-        match accept_type {
-            AcceptType::Bcs => Ok(BasicResponse::from_bcs(
-                state_value,
-                &self.latest_ledger_info,
-            )),
-            AcceptType::Json => {
-                let account_resource = deserialize_from_bcs::<AccountResource>(&state_value)?;
-                let account_data: AccountData = account_resource.into();
-                Ok(BasicResponse::from_json(
-                    account_data,
-                    &self.latest_ledger_info,
-                ))
-            }
-        }
-*/

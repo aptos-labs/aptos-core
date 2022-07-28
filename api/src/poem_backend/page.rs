@@ -22,7 +22,7 @@ impl Page {
         let start = self.start.unwrap_or(default);
         if start > max {
             return Err(E::bad_request_str(&format!(
-                "Given start value ({}) is too large, it must be < {}",
+                "Given start value ({}) is higher than the highest ledger version, it must be < {}",
                 start, max
             ))
             .error_code(AptosErrorCode::InvalidStartParam));

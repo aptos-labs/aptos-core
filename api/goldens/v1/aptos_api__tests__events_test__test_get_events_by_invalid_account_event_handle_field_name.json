@@ -1,0 +1,5 @@
+{
+  "message": "resource not found by address(0x1), struct tag(0x1::reconfiguration::Configuration), field name(not_found) and ledger version(0)",
+  "error_code": null,
+  "aptos_ledger_version": "0"
+}

@@ -19,15 +19,17 @@ pub(crate) struct GoldenOutputs {
     file: Arc<Mutex<File>>,
 }
 
-fn golden_path() -> PathBuf {
+fn golden_path(version_dir: &str) -> PathBuf {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push(GOLDEN_DIR_PATH);
+    path.push(version_dir);
     path
 }
 
 impl GoldenOutputs {
-    pub fn new(name: String) -> Self {
-        let mut mint = Mint::new(golden_path());
+    // `version_dir` should be something like "v0"
+    pub fn new(name: String, version_dir: &str) -> Self {
+        let mut mint = Mint::new(golden_path(version_dir));
         let mut file_path = PathBuf::new();
         file_path.push(name);
         let file = Arc::new(Mutex::new(

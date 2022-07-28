@@ -49,23 +49,21 @@ type SubmitTransactionResult<T> =
 type SimulateTransactionResult<T> = poem::Result<BasicResponse<T>, SubmitTransactionError>;
 
 // TODO: Consider making both content types accept either
-// SubmitTransactionRequest or SignedTransaction (using AptosPost), the way
+// SubmitTransactionRequest or SignedTransaction, the way
 // it is now is quite confusing.
 
 // We need a custom type here because we use different types for each of the
 // content types possible for the POST data.
-#[derive(ApiRequest)]
+#[derive(ApiRequest, Debug)]
 pub enum SubmitTransactionPost {
     #[oai(content_type = "application/json")]
     Json(Json<SubmitTransactionRequest>),
 
-    // TODO: Consider just using the same BCS content type as usual, or that
-    // with `+signed` on the end or something.
-    // TODO: Switch from Vec<u8> to SignedTransaction. This has the benefit of
-    // making Poem deserialize the data for us as well as describing the
-    // expected input in the OpenAPI spec.
+    // TODO: Since I don't want to impl all the Poem derives on SignedTransaction,
+    // find a way to at least indicate in the spec that it expects a SignedTransaction.
+    // TODO: https://github.com/aptos-labs/aptos-core/issues/2275
     #[oai(content_type = "application/x.aptos.signed_transaction+bcs")]
-    Bcs(Bcs<Vec<u8>>),
+    Bcs(Bcs),
 }
 
 pub struct TransactionsApi {
@@ -129,7 +127,6 @@ impl TransactionsApi {
         &self,
         accept: Accept,
         txn_version: Path<U64>,
-        // TODO: Use a new request type that can't return 507.
     ) -> BasicResultWith404<Transaction> {
         fail_point_poem("endpoint_transaction_by_version")?;
         let accept_type = parse_accept(&accept)?;
@@ -140,14 +137,13 @@ impl TransactionsApi {
     /// Get account transactions
     ///
     /// todo
-    /// todo, note that this currently returns [] even if the account doesn't
-    /// exist, when it should really return a 404.
     #[oai(
         path = "/accounts/:address/transactions",
         method = "get",
         operation_id = "get_account_transactions",
         tag = "ApiTags::Transactions"
     )]
+    // TODO: https://github.com/aptos-labs/aptos-core/issues/2285
     async fn get_accounts_transactions(
         &self,
         accept: Accept,
@@ -161,20 +157,6 @@ impl TransactionsApi {
         self.list_by_account(&accept_type, page, address.0)
     }
 
-    // TODO: Add custom sizelimit middleware.
-    // See https://github.com/poem-web/poem/issues/331.
-    //
-    // TODO: The original endpoint is all kinds of weird. The spec says it
-    // takes a SubmitTransactionRequest, but in reality it actually takes
-    // just a UserTransactionRequest, there is no such thing as a SubmitTransactionRequest.
-    // Really the SubmitTransactionRequest in the spec is what UserTransactionRequest
-    // is, but UserTransactionRequest in the existing spec is missing fields that they
-    // then add to SubmitTransactionRequest. Overall bizarre. I think we need to
-    // make a new struct for UserTransactionRequest that doesn't have the
-    // signature and flatten it in to a real SubmitTransactionRequest.
-    // This is all for JSON. For BCS, it takes in bytes it expects to
-    // deserialize into a SignedTransaction.
-    // Make sense of all this.
     //
     /// Submit transaction
     ///
@@ -267,8 +249,7 @@ impl TransactionsApi {
         let latest_ledger_info = self.context.get_latest_ledger_info_poem()?;
         let ledger_version = latest_ledger_info.version();
         let limit = page.limit()?;
-        // TODO: I think there is a bug at startup where limit 1 still returns
-        // every transaction.
+        // TODO: https://github.com/aptos-labs/aptos-core/issues/2286
         let last_page_start = if ledger_version > (limit as u64) {
             ledger_version - (limit as u64)
         } else {
@@ -334,7 +315,6 @@ impl TransactionsApi {
             .get_by_hash(hash.into(), &ledger_info)
             .await
             .context(format!("Failed to get transaction by hash {}", hash))
-            // TODO: Should this be a 500?
             .map_err(BasicErrorWith404::not_found)?
             .context(format!("Failed to find transaction with hash: {}", hash))
             .map_err(BasicErrorWith404::not_found)?;
@@ -352,7 +332,6 @@ impl TransactionsApi {
         let txn_data = self
             .get_by_version(version.0, &ledger_info)
             .context(format!("Failed to get transaction by version {}", version))
-            // TODO: Should this be a 500?
             .map_err(BasicErrorWith404::not_found)?
             .context(format!(
                 "Failed to find transaction at version: {}",
@@ -464,7 +443,7 @@ impl TransactionsApi {
     ) -> Result<SignedTransaction, SubmitTransactionError> {
         match data {
             SubmitTransactionPost::Bcs(data) => {
-                let signed_transaction = bcs::from_bytes(&data)
+                let signed_transaction = bcs::from_bytes(&data.0)
                     .context("Failed to deserialize input into SignedTransaction")
                     .map_err(SubmitTransactionError::bad_request)?;
                 Ok(signed_transaction)
