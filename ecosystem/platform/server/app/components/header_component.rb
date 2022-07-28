@@ -56,6 +56,7 @@ class HeaderComponent < ViewComponent::Base
     ]
     @rest[:data] ||= {}
     @rest[:data][:controller] = 'header'
+    @rest[:data][:action] = 'resize@window->header#windowResize'
   end
 
   def nav_groups
