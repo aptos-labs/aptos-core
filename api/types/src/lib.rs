@@ -30,8 +30,7 @@ pub use index::IndexResponse;
 pub use ledger_info::LedgerInfo;
 pub use move_types::{
     HexEncodedBytes, MoveFunction, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
-    MoveScriptBytecode, MoveStructTag, MoveStructValue, MoveType, MoveValue, ScriptFunctionId,
-    U128, U64,
+    MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, ScriptFunctionId, U128, U64,
 };
 pub use response::{
     Response, X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,

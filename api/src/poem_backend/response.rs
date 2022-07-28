@@ -27,7 +27,7 @@
 //! returned by each function and its callers is enforced at compile time.
 //! See generate_error_traits and its invocations for more on this topic.
 
-// TODO: Pending further discussion with the team, migrate back to U64 over u64.
+// TODO: https://github.com/aptos-labs/aptos-core/issues/2279
 
 use std::fmt::Display;
 
@@ -98,16 +98,14 @@ pub enum AptosErrorCode {
 
 #[derive(ResponseContent)]
 pub enum AptosResponseContent<T: ToJSON + Send + Sync> {
-    // When returning data as JSON, we take in T and then serialize to JSON
-    // as part of the response.
+    // When returning data as JSON, we take in T and then serialize to JSON as
+    // part of the response.
     Json(Json<T>),
 
-    // When returning data as BCS, we never actually interact with the Rust
-    // type. Instead, we just return the bytes we read from the DB directly,
-    // for efficiency reasons. Only through the `schema` decalaration at the
-    // endpoints does the return type make its way into the OpenAPI spec.
-    #[oai(actual_type = "Bcs<T>")]
-    Bcs(Bcs<Vec<u8>>),
+    // Return the data as BCS, which is just Vec<u8>. This data could have come
+    // from either an internal Rust type being serialized into bytes, or just
+    // the bytes directly from storage.
+    Bcs(Bcs),
 }
 
 /// This trait defines common functions that all error responses should impl.
@@ -229,44 +227,22 @@ macro_rules! generate_success_response {
 
         // Generate an enum with name `enum_name`. Iterate through each of the
         // response codes, generating a variant for each with the given name
-        // and status code. This extra derive, bad_request_handler, tells the
-        // framework to invoke the given function when the framework tries to
-        // return some kind of bad request error, e.g. from parsing params.
-        // This allows us to convert the framework error into our custom
-        // response type. Without this the framework would return errors that
-        // don't conform to our OpenAPI spec.
+        // and status code.
         #[derive(poem_openapi::ApiResponse)]
-        #[oai(bad_request_handler = "Self::bad_request_handler")]
         pub enum $enum_name<T: poem_openapi::types::ToJSON + Send + Sync> {
             $(
             #[oai(status = $status)]
             $name(
                 $crate::poem_backend::AptosResponseContent<T>,
                 #[oai(header = "X-Aptos-Chain-Id")] u16,
-                #[oai(header = "X-Aptos-Ledger-Version")] U64,
-                #[oai(header = "X-Aptos-Ledger-Oldest-Version")] U64,
-                #[oai(header = "X-Aptos-Ledger-TimestampUsec")] U64,
-                #[oai(header = "X-Aptos-Epoch")] U64,
+                // We use just regular u64 here instead of U64 since all header
+                // values are implicitly strings anyway.
+                #[oai(header = "X-Aptos-Ledger-Version")] u64,
+                #[oai(header = "X-Aptos-Ledger-Oldest-Version")] u64,
+                #[oai(header = "X-Aptos-Ledger-TimestampUsec")] u64,
+                #[oai(header = "X-Aptos-Epoch")] u64,
             ),
             )*
-
-            // For any endpoint, it is possible for the framework to return a
-            // an error repesenting a bad request. As such, to enable us to use
-            // bad_request_handler, we include this status code here, since the
-            // framework expects this on the T response, not the E. All other
-            // errors should be included in the error response, not this one.
-            #[oai(status = 400)]
-            BadRequest(Json<crate::poem_backend::AptosError>),
-        }
-
-        impl<T: poem_openapi::types::ToJSON + Send + Sync> $enum_name<T> {
-            // Generate a function that converts the framework-generated error
-            // into our custom error response (JSON + AptosError).
-            pub fn bad_request_handler(error: poem::Error) -> $enum_name<T> {
-                $enum_name::BadRequest(poem_openapi::payload::Json(
-                    $crate::poem_backend::AptosError::new(error.to_string()),
-                ))
-            }
         }
 
         // Generate an enum that captures all the different status codes that
@@ -298,10 +274,10 @@ macro_rules! generate_success_response {
                         $enum_name::$name(
                             value,
                             ledger_info.chain_id as u16,
-                            ledger_info.ledger_version,
-                            ledger_info.oldest_ledger_version,
-                            ledger_info.ledger_timestamp,
-                            ledger_info.epoch,
+                            ledger_info.ledger_version.into(),
+                            ledger_info.oldest_ledger_version.into(),
+                            ledger_info.ledger_timestamp.into(),
+                            ledger_info.epoch.into(),
                         )
                     },
                     )*
@@ -322,12 +298,12 @@ macro_rules! generate_success_response {
         }
 
         // Generate a From impl that builds a response from a Bcs<Vec<u8>> and friends.
-        impl<T: poem_openapi::types::ToJSON + Send + Sync> From<($crate::poem_backend::bcs_payload::Bcs<Vec<u8>>, &aptos_api_types::LedgerInfo, [<$enum_name Status>])>
+        impl<T: poem_openapi::types::ToJSON + Send + Sync> From<($crate::poem_backend::bcs_payload::Bcs, &aptos_api_types::LedgerInfo, [<$enum_name Status>])>
             for $enum_name<T>
         {
             fn from(
                 (value, ledger_info, status): (
-                    $crate::poem_backend::bcs_payload::Bcs<Vec<u8>>,
+                    $crate::poem_backend::bcs_payload::Bcs,
                     &aptos_api_types::LedgerInfo,
                     [<$enum_name Status>]
                 ),
@@ -380,7 +356,6 @@ generate_error_traits!(
     BadRequest,
     NotFound,
     PayloadTooLarge,
-    UnsupportedMediaType,
     Internal,
     InsufficientStorage
 );

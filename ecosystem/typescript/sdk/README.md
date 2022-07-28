@@ -45,7 +45,7 @@ sudo apt-get install nodejs yarn
 Originally created with this:
 
 ```bash
-$  npx swagger-typescript-api@latest -p ../../../api/doc/openapi.yaml -o ./src/api --modular --axios --single-http-client
+$  npx swagger-typescript-api@latest -p ../../../api/doc/v0/openapi.yaml -o ./src/api --modular --axios --single-http-client
 ```
 
 #### Changes to make after generation:
@@ -75,7 +75,7 @@ This project follows [semver](https://semver.org/) as closely as possible
 
 ## Release process
 
-1. Regenerate generated types `npx swagger-typescript-api@latest -p ../../../api/doc/openapi.yaml -o ./src/api --modular --axios --single-http-client`
+1. Regenerate generated types `npx swagger-typescript-api@latest -p ../../../api/doc/v0/openapi.yaml -o ./src/api --modular --axios --single-http-client`
 2. Update your commit message to follow the Angular Conventional Commits
 3. Test lint and format `yarn test` `yarn lint` `yarn fmt`
 4. Update the version in the `package.json` file and run `yarn changelog` to generate the changelog

@@ -31,7 +31,8 @@ use std::{
 };
 
 // TODO: Add read_only / write_only (and their all variants) where appropriate.
-// TODO: Explore whether we should use discriminator_name, see https://github.com/poem-web/poem/issues/329.
+// TODO: Investigate the use of discriminator_name, see https://github.com/poem-web/poem/issues/329.
+// TODO: See https://github.com/poem-web/poem/issues/347 re mapping stuff. UPDATE: Wait for 2.0.7 to be released.
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum TransactionData {
@@ -131,8 +132,8 @@ impl
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
-#[oai(one_of)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum Transaction {
     PendingTransaction(PendingTransaction),
     UserTransaction(Box<UserTransaction>),
@@ -436,15 +437,15 @@ impl From<(&ContractEvent, serde_json::Value)> for Event {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
-#[oai(one_of)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum GenesisPayload {
     WriteSetPayload(WriteSetPayload),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
-#[oai(one_of)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum TransactionPayload {
     ScriptFunctionPayload(ScriptFunctionPayload),
     ScriptPayload(ScriptPayload),
@@ -495,8 +496,8 @@ pub struct WriteSetPayload {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
-#[oai(one_of)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum WriteSet {
     ScriptWriteSet(ScriptWriteSet),
     DirectWriteSet(DirectWriteSet),
@@ -515,8 +516,8 @@ pub struct DirectWriteSet {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
-#[oai(one_of)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum WriteSetChange {
     DeleteModule(DeleteModule),
     DeleteResource(DeleteResource),
@@ -583,8 +584,8 @@ impl WriteSetChange {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
-#[oai(one_of)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum TransactionSignature {
     Ed25519Signature(Ed25519Signature),
     MultiEd25519Signature(MultiEd25519Signature),
@@ -707,8 +708,8 @@ impl TryFrom<MultiEd25519Signature> for AccountAuthenticator {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
-#[oai(one_of)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum AccountSignature {
     Ed25519Signature(Ed25519Signature),
     MultiEd25519Signature(MultiEd25519Signature),
@@ -858,7 +859,7 @@ impl From<TransactionAuthenticator> for TransactionSignature {
 /// 1. Transaction hash: hex-encoded string, e.g. "0x374eda71dce727c6cd2dd4a4fd47bfb85c16be2e3e95ab0df4948f39e1af9981"
 /// 2. Transaction version: u64 number string (as we encode u64 into string in JSON), e.g. "122"
 #[derive(Clone, Debug, Union)]
-#[oai(one_of)]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum TransactionId {
     Hash(HashValue),
     Version(U64),

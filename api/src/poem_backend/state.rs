@@ -89,7 +89,6 @@ impl StateApi {
         self.module(&accept_type, address.0, module_name.0, ledger_version.0)
     }
 
-    // TODO: This was originally POST to handle the nasty input types.
     /// Get table item
     ///
     /// todo
@@ -106,7 +105,6 @@ impl StateApi {
         table_item_request: Json<TableItemRequest>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveValue> {
-        // TODO: fail_point could just be middleware.
         fail_point_poem("endpoint_get_table_item")?;
         let accept_type = parse_accept(&accept)?;
         self.table_item(

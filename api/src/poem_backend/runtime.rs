@@ -5,7 +5,12 @@ use std::{net::SocketAddr, sync::Arc};
 
 use super::{middleware_log, AccountsApi, BasicApi, EventsApi, IndexApi};
 
-use crate::{context::Context, poem_backend::TransactionsApi};
+use crate::{
+    context::Context,
+    poem_backend::{
+        check_size::PostSizeLimit, error_converter::convert_error, StateApi, TransactionsApi,
+    },
+};
 use anyhow::Context as AnyhowContext;
 use aptos_config::config::NodeConfig;
 use aptos_logger::info;
@@ -16,15 +21,23 @@ use poem::{
     EndpointExt, Route, Server,
 };
 use poem_openapi::{ContactObject, LicenseObject, OpenApiService};
-use tokio::runtime::Runtime;
+use tokio::runtime::Handle;
+
+// TODOs regarding spec generation:
+// TODO: https://github.com/aptos-labs/aptos-core/issues/2280
+// TODO: https://github.com/poem-web/poem/issues/321
+// TODO: https://github.com/poem-web/poem/issues/332
+// TODO: https://github.com/poem-web/poem/issues/333
 
 /// Returns address it is running at.
 pub fn attach_poem_to_runtime(
-    runtime: &Runtime,
+    runtime_handle: &Handle,
     context: Context,
     config: &NodeConfig,
 ) -> anyhow::Result<SocketAddr> {
     let context = Arc::new(context);
+
+    let size_limit = context.content_length_limit();
 
     let apis = (
         AccountsApi {
@@ -37,6 +50,9 @@ pub fn attach_poem_to_runtime(
             context: context.clone(),
         },
         IndexApi {
+            context: context.clone(),
+        },
+        StateApi {
             context: context.clone(),
         },
         TransactionsApi { context },
@@ -86,29 +102,28 @@ pub fn attach_poem_to_runtime(
         }
     };
 
-    let acceptor = runtime
-        .block_on(async move { listener.into_acceptor().await })
-        .context("Failed to bind Poem to address with OS assigned port")?;
+    let acceptor = tokio::task::block_in_place(move || {
+        runtime_handle
+            .block_on(async move { listener.into_acceptor().await })
+            .context("Failed to bind Poem to address with OS assigned port")
+    })?;
 
     let actual_address = &acceptor.local_addr()[0];
     let actual_address = *actual_address
         .as_socket_addr()
         .context("Failed to get socket addr from local addr for Poem webserver")?;
-
-    runtime.spawn(async move {
+    runtime_handle.spawn(async move {
         let cors = Cors::new()
             .allow_methods(vec![Method::GET, Method::POST])
             .allow_headers(vec![header::CONTENT_TYPE, header::ACCEPT]);
         let route = Route::new()
             .nest("/", api_service)
             .at("/spec.json", spec_json)
-            // TODO: Consider using something akin to openapi-format.
-            // TODO: Figure out why comments do not resolve like this: https://yaml-multiline.info/
-            // TODO: Consider using https://github.com/schemathesis/schemathesis
-            // See https://github.com/poem-web/poem/issues/333
-            // See https://github.com/poem-web/poem/issues/332
             .at("/spec.yaml", spec_yaml)
             .with(cors)
+            .with(PostSizeLimit::new(size_limit))
+            // NOTE: Make sure to keep this after all the `with` middleware.
+            .catch_all_error(convert_error)
             .around(middleware_log);
         Server::new_with_acceptor(acceptor)
             .run(route)

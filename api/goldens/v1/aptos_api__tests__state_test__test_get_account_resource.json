@@ -1,0 +1,11 @@
+{
+  "type": {
+    "address": "0x1",
+    "module": "guid",
+    "name": "Generator",
+    "generic_type_params": []
+  },
+  "data": {
+    "counter": "3"
+  }
+}
