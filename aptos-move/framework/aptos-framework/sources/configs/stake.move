@@ -107,6 +107,10 @@ module aptos_framework::stake {
         // pending deactivation for next epoch
         pending_inactive: Coin<AptosCoin>,
         locked_until_secs: u64,
+
+        // Stores an amount of rewards minted from the last time has been unlocked
+        rewards_minted: u64,
+
         // Track the current operator of the validator node.
         // This allows the operator to be different from the original account and allow for separation of
         // the validator operations and ownership.
@@ -272,6 +276,11 @@ module aptos_framework::stake {
         } else {
             lockup_time - timestamp::now_seconds()
         }
+    }
+
+    /// Return the amount of rewards minted from the last time validator has been unlocked
+    public fun get_rewards_minted(pool_address: address): u64 acquires StakePool {
+        borrow_global<StakePool>(pool_address).rewards_minted
     }
 
     /// Return the different stake amounts for `pool_address` (whether the validator is active or not).
@@ -454,6 +463,7 @@ module aptos_framework::stake {
             pending_inactive: coin::zero<AptosCoin>(),
             inactive: coin::zero<AptosCoin>(),
             locked_until_secs: 0,
+            rewards_minted: 0,
             operator_address: account_address,
             delegated_voter: account_address,
         });
@@ -673,6 +683,10 @@ module aptos_framework::stake {
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         let old_locked_until_secs = stake_pool.locked_until_secs;
         stake_pool.locked_until_secs = new_locked_until_secs;
+
+        if (old_locked_until_secs <= timestamp::now_seconds()) {
+            stake_pool.rewards_minted = 0;
+        };
 
         let stake_pool_events = borrow_global_mut<StakePoolEvents>(pool_address);
         event::emit_event<IncreaseLockupEvent>(
@@ -1037,6 +1051,7 @@ module aptos_framework::stake {
         );
         let rewards_amount = coin::value<AptosCoin>(&rewards);
         coin::merge(&mut stake_pool.active, rewards);
+        stake_pool.rewards_minted = stake_pool.rewards_minted + rewards_amount;
 
         // Process any pending active or inactive stakes.
         coin::merge<AptosCoin>(&mut stake_pool.active, coin::extract_all<AptosCoin>(&mut stake_pool.pending_active));
@@ -1822,6 +1837,7 @@ module aptos_framework::stake {
             pending_active: coin::zero<AptosCoin>(),
             pending_inactive: coin::zero<AptosCoin>(),
             locked_until_secs,
+            rewards_minted: 0,
             operator_address: address,
             delegated_voter: address,
         });
